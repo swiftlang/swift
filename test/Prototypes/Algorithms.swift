@@ -263,11 +263,11 @@ extension MutableCollection where Self: RandomAccessCollection {
     // If the difference moving forward and backward are relative primes,
     // the entire rotation will be completed in one cycle. Otherwise, repeat
     // cycle, moving the start point forward with each cycle.
-    let cycles = _gcd(numericCast(plus), -numericCast(minus))
+    let cycles = _gcd(plus, -minus)
 
     for cycle in 1...cycles {
       _rotateCycle(
-        start: index(startIndex, offsetBy: numericCast(cycle)),
+        start: index(startIndex, offsetBy: cycle),
         sourceOffsetForIndex: { $0 < pivot ? plus : minus })
     }
     return pivot
@@ -412,13 +412,13 @@ extension Concatenation : RandomAccessCollection
     case let .first(i):
       let d: Int = _base1.distance(from: i, to: _base1.endIndex)
       if n < d {
-        return Index(first: _base1.index(i, offsetBy: numericCast(n)))
+        return Index(first: _base1.index(i, offsetBy: n))
       } else {
         return Index(
-          second: _base2.index(_base2.startIndex, offsetBy: numericCast(n - d)))
+          second: _base2.index(_base2.startIndex, offsetBy: n - d))
       }
     case let .second(i):
-      return Index(second: _base2.index(i, offsetBy: numericCast(n)))
+      return Index(second: _base2.index(i, offsetBy: n))
     }
   }
 
@@ -427,14 +427,14 @@ extension Concatenation : RandomAccessCollection
   ) -> Index {
     switch i._position {
     case let .first(i):
-      return Index(first: _base1.index(i, offsetBy: -numericCast(n)))
+      return Index(first: _base1.index(i, offsetBy: -n))
     case let .second(i):
       let d: Int = _base2.distance(from: _base2.startIndex, to: i)
       if n <= d {
-        return Index(second: _base2.index(i, offsetBy: -numericCast(n)))
+        return Index(second: _base2.index(i, offsetBy: -n))
       } else {
         return Index(
-          first: _base1.index(_base1.endIndex, offsetBy: -numericCast(n - d)))
+          first: _base1.index(_base1.endIndex, offsetBy: -(n - d)))
       }
     }
   }

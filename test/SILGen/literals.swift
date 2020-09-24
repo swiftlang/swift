@@ -57,9 +57,11 @@ class TakesArrayLiteral<Element> : ExpressibleByArrayLiteral {
 // CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [[POINTER1:%.*]] = index_addr [[POINTER]] : $*Int, [[IDX1]] : $Builtin.Word
 // CHECK: store [[TMP:%.*]] to [trivial] [[POINTER1]]
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Int>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Int>.Type
-// CHECK: [[CTOR:%.*]] = class_method %15 : $@thick TakesArrayLiteral<Int>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int>([[ARR]], [[METATYPE]])
+// CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Int>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 func returnsCustomArray() -> TakesArrayLiteral<Int> {
   // Use temporary to simplify generated_sil
@@ -79,9 +81,11 @@ class Klass {}
 // CHECK: [[CTOR:%.*]] = function_ref @$s8literals5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK: [[TMP:%.*]] = apply [[CTOR]]([[KLASS_METATYPE]]) : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK: store [[TMP]] to [init] [[POINTER]]
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Klass>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Klass>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Klass>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Klass>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Klass>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 func returnsClassElementArray() -> TakesArrayLiteral<Klass> {
   return [Klass()]
@@ -98,9 +102,11 @@ struct Foo<T> {
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: copy_addr %0 to [initialization] [[POINTER]] : $*Foo<T>
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Foo<T>>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 func returnsAddressOnlyElementArray<T>(t: Foo<T>) -> TakesArrayLiteral<Foo<T>> {
   return [t]
@@ -113,9 +119,11 @@ func returnsAddressOnlyElementArray<T>(t: Foo<T>) -> TakesArrayLiteral<Foo<T>> {
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: copy_addr %0 to [initialization] [[POINTER]] : $*Foo<T>
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Foo<T>>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 extension Foo {
   func returnsArrayFromSelf() -> TakesArrayLiteral<Foo<T>> {
@@ -132,9 +140,11 @@ extension Foo {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Foo<T>
 // CHECK: copy_addr [[ACCESS]] to [initialization] [[POINTER]] : $*Foo<T>
 // CHECK: end_access [[ACCESS]] : $*Foo<T>
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Foo<T>>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo<T>>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 extension Foo {
   mutating func returnsArrayFromMutatingSelf() -> TakesArrayLiteral<Foo<T>> {
@@ -159,9 +169,11 @@ struct Foo2 {
 // CHECK: [[CTOR:%.*]] = function_ref @$s8literals4Foo2V1kAcA5KlassC_tcfC : $@convention(method) (@owned Klass, @thin Foo2.Type) -> @owned Foo2
 // CHECK: [[TMP:%.*]] = apply [[CTOR]]([[K]], [[METATYPE_FOO2]]) : $@convention(method) (@owned Klass, @thin Foo2.Type) -> @owned Foo2
 // store [[TMP]] to [init] [[POINTER]] : $*Foo2
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo2>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo2>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<Foo2>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo2>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Foo2>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 func returnsNonTrivialStruct() -> TakesArrayLiteral<Foo2> {
   return [Foo2(k: Klass())]
@@ -180,10 +192,12 @@ func returnsNonTrivialStruct() -> TakesArrayLiteral<Foo2> {
 // CHECK: [[TMP:%.*]] = apply [[OTHER_FN]]([[ACCESS]]) : $@convention(method) (@inout NestedLValuePath) -> @owned NestedLValuePath
 // CHECK: end_access [[ACCESS]] : $*NestedLValuePath
 // CHECK: store [[TMP]] to [init] [[POINTER]] : $*NestedLValuePath
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<NestedLValuePath>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<NestedLValuePath>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<NestedLValuePath>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[ARR_RESULT:%.*]] = apply [[CTOR]]<NestedLValuePath>([[ARR]], [[METATYPE]])
-// CHECK: [[CTOR:%.*]] = function_ref @$s8literals16NestedLValuePathV3arrAcA17TakesArrayLiteralCyACG_tcfC : $@convention(method) (@owned TakesArrayLiteral<NestedLValuePath>, @thin NestedLValuePath.Type) -> @owned NestedLValuePath // user: %18
+// CHECK: [[ARR_RESULT:%.*]] = apply [[CTOR]]<NestedLValuePath>([[FIN_ARR]], [[METATYPE]])
+// CHECK: [[CTOR:%.*]] = function_ref @$s8literals16NestedLValuePathV3arrAcA17TakesArrayLiteralCyACG_tcfC : $@convention(method) (@owned TakesArrayLiteral<NestedLValuePath>, @thin NestedLValuePath.Type) -> @owned NestedLValuePath
 // CHECK: [[RESULT:%.*]] = apply [[CTOR]]([[ARR_RESULT]], [[METATYPE_NESTED]]) : $@convention(method) (@owned TakesArrayLiteral<NestedLValuePath>, @thin NestedLValuePath.Type) -> @owned NestedLValuePath
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*NestedLValuePath
 // CHECK: assign [[RESULT]] to [[ACCESS]] : $*NestedLValuePath
@@ -214,9 +228,11 @@ protocol WrapsSelfInArray {}
 // CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*WrapsSelfInArray, $Self
 // CHECK: copy_addr [[ACCESS]] to [initialization] [[EXISTENTIAL]] : $*Self
 // CHECK: end_access [[ACCESS]] : $*Self
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<WrapsSelfInArray>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<WrapsSelfInArray>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<WrapsSelfInArray>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<WrapsSelfInArray>([[ARR]], [[METATYPE]])
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<WrapsSelfInArray>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 extension WrapsSelfInArray {
   mutating func wrapInArray() -> TakesArrayLiteral<WrapsSelfInArray> {
@@ -245,7 +261,9 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: try_apply [[FN]]<T>([[POINTER1]]) : {{.*}} normal bb1, error bb2
 
 // CHECK: bb1([[TMP:%.*]] : $()):
-// CHECK: return [[ARR]]
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<T>([[ARR]])
+// CHECK: return [[FIN_ARR]]
 
 // CHECK: bb2([[ERR:%.*]] : @owned $Error):
 // CHECK: destroy_addr [[POINTER]] : $*T
@@ -278,9 +296,11 @@ class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 // CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 1
 // CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
 // CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
+// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<(Int, Int)>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesDictionaryLiteral<Int, Int>.Type
 // CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesDictionaryLiteral<Int, Int>.Type, #TakesDictionaryLiteral.init!allocator : <Key, Value> (TakesDictionaryLiteral<Key, Value>.Type) -> ((Key, Value)...) -> TakesDictionaryLiteral<Key, Value>, $@convention(method) <τ_0_0, τ_0_1> (@owned Array<(τ_0_0, τ_0_1)>, @thick TakesDictionaryLiteral<τ_0_0, τ_0_1>.Type) -> @owned TakesDictionaryLiteral<τ_0_0, τ_0_1>
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int, Int>(%8, %21)
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int, Int>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 
 func returnsCustomDictionary() -> TakesDictionaryLiteral<Int, Int> {

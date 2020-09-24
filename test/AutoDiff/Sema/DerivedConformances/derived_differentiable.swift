@@ -80,3 +80,40 @@ struct UsableFromInlineStruct: Differentiable {}
 // CHECK-AST:   internal init()
 // CHECK-AST:   @usableFromInline
 // CHECK-AST:   struct TangentVector : Differentiable, AdditiveArithmetic {
+
+// Test property wrappers.
+
+@propertyWrapper
+struct Wrapper<Value> {
+  var wrappedValue: Value
+}
+
+struct WrappedPropertiesStruct: Differentiable {
+  @Wrapper @Wrapper var x: Float
+  @Wrapper var y: Float
+  var z: Float
+  @noDerivative @Wrapper var nondiff: Float
+}
+
+// CHECK-AST-LABEL: internal struct WrappedPropertiesStruct : Differentiable {
+// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic {
+// CHECK-AST:     internal var x: Float.TangentVector
+// CHECK-AST:     internal var y: Float.TangentVector
+// CHECK-AST:     internal var z: Float.TangentVector
+// CHECK-AST:   }
+// CHECK-AST: }
+
+class WrappedPropertiesClass: Differentiable {
+  @Wrapper @Wrapper var x: Float = 1
+  @Wrapper var y: Float = 2
+  var z: Float = 3
+  @noDerivative @Wrapper var noDeriv: Float = 4
+}
+
+// CHECK-AST-LABEL: internal class WrappedPropertiesClass : Differentiable {
+// CHECK-AST:   internal struct TangentVector : Differentiable, AdditiveArithmetic {
+// CHECK-AST:     internal var x: Float.TangentVector
+// CHECK-AST:     internal var y: Float.TangentVector
+// CHECK-AST:     internal var z: Float.TangentVector
+// CHECK-AST:   }
+// CHECK-AST: }

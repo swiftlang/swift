@@ -687,15 +687,26 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
 
   llvm::Value *caseIndexFromValue = zero;
   if (fixedSize > Size(0)) {
-    // Read up to one pointer-sized 'chunk' of the payload.
-    // The size of the chunk does not have to be a power of 2.
-    auto *caseIndexType = llvm::IntegerType::get(Ctx,
-        fixedSize.getValueInBits());
-    auto *caseIndexAddr = Builder.CreateBitCast(valueAddr,
-        caseIndexType->getPointerTo());
-    caseIndexFromValue = Builder.CreateZExtOrTrunc(
-        Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
-        IGM.Int32Ty);
+    // llvm only supports integer types upto a certain size (i.e selection dag
+    // will crash).
+    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+      // Read up to one pointer-sized 'chunk' of the payload.
+      // The size of the chunk does not have to be a power of 2.
+      auto *caseIndexType =
+          llvm::IntegerType::get(Ctx, fixedSize.getValueInBits());
+      auto *caseIndexAddr =
+          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      caseIndexFromValue = Builder.CreateZExtOrTrunc(
+          Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
+          IGM.Int32Ty);
+    } else {
+      auto *caseIndexType = llvm::IntegerType::get(Ctx, 32);
+      auto *caseIndexAddr =
+          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      caseIndexFromValue = Builder.CreateZExtOrTrunc(
+          Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
+          IGM.Int32Ty);
+    }
   }
 
   auto *result1 = Builder.CreateAdd(
@@ -867,11 +878,25 @@ void irgen::storeFixedTypeEnumTagSinglePayload(
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    // Write the value to the payload as a zero extended integer.
-    auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
-    Builder.CreateStore(
-        Builder.CreateZExtOrTrunc(payloadIndex, intType),
-        Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+      // Write the value to the payload as a zero extended integer.
+      auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
+      Builder.CreateStore(
+          Builder.CreateZExtOrTrunc(payloadIndex, intType),
+          Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+    } else {
+      // Write the value to the payload as a zero extended integer.
+      Size limit = IGM.getPointerSize();
+      auto *intType = Builder.getIntNTy(limit.getValueInBits());
+      Builder.CreateStore(
+          Builder.CreateZExtOrTrunc(payloadIndex, intType),
+          Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+      // Zero the remainder of the payload.
+      auto zeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, limit);
+      auto zeroSize = Builder.CreateSub(
+          size, llvm::ConstantInt::get(size->getType(), limit.getValue()));
+      Builder.CreateMemSet(zeroAddr, Builder.getInt8(0), zeroSize);
+    }
   }
   // Write to the extra tag bytes, if any.
   emitSetTag(IGF, extraTagBitsAddr, extraTagIndex, numExtraTagBytes);
@@ -1330,23 +1355,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     if (!doesPlatformUseLegacyLayouts(platformName, archName))
       return;
 
-    // Find the first runtime library path that exists.
-    bool found = false;
-    for (auto &RuntimeLibraryPath
-         : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
-      if (fs->exists(RuntimeLibraryPath)) {
-        defaultPath.append(RuntimeLibraryPath);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      auto joined = llvm::join(IGM.Context.SearchPathOpts.RuntimeLibraryPaths,
-                               "', '");
-      llvm::report_fatal_error("Unable to find a runtime library path at '"
-                               + joined + "'");
-    }
-
+    defaultPath = IGM.Context.SearchPathOpts.RuntimeLibraryPaths[0];
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
     defaultPath.append(".yaml");
@@ -1797,7 +1806,8 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   // Use an [N x i8] array for storage, but load and store as a single iNNN
   // scalar.
   auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
-  auto intType = llvm::IntegerType::get(IGM.LLVMContext, size.getValueInBits());
+  auto intType = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                        size.getValueInBits());
   // There are no spare bits in an opaque storage type.
   auto type = new OpaqueStorageTypeInfo(storageType, intType, size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),

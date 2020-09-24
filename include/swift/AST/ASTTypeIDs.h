@@ -19,9 +19,11 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
+
 namespace swift {
 
 class AbstractFunctionDecl;
+class ActorIsolation;
 class BraceStmt;
 class ClosureExpr;
 class CodeCompletionCallbacksFactory;
@@ -29,6 +31,7 @@ class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;
+class FuncDecl;
 enum class FunctionBuilderBodyPreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
@@ -36,6 +39,7 @@ class GenericTypeParamType;
 class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
+struct ImplicitImport;
 class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;
@@ -49,19 +53,23 @@ class PrefixOperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
+struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
+class ProtocolConformance;
 class ProtocolDecl;
 class Requirement;
 enum class ResilienceExpansion : unsigned;
+struct FragileFunctionKind;
 class SourceFile;
+class SymbolSourceMap;
+struct TangentPropertyInfo;
 class Type;
+class TypeAliasDecl;
+struct TypePair;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 class VarDecl;
 class Witness;
-class TypeAliasDecl;
-class Type;
-struct TypePair;
-struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
 enum class ImplicitMemberAction : uint8_t;
 struct FingerprintAndMembers;

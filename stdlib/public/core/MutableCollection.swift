@@ -98,7 +98,7 @@ where SubSequence: MutableCollection
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
@@ -222,7 +222,7 @@ extension MutableCollection {
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
@@ -290,7 +290,7 @@ extension MutableCollection {
   /// - Returns: The new bounds of the moved elements.
   ///
   /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   @discardableResult
   public mutating func moveSubranges(
     _ subranges: RangeSet<Index>, to insertionPoint: Index

@@ -64,15 +64,17 @@ func test5() -> Int? {
 }
 
 func test6<T>(_ x : T) {
-  // FIXME: this code should work; T could be Int? or Int??
-  // or something like that at runtime.  rdar://16374053
-  _ = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  _ = x as? Int? // Okay.  We know nothing about T, so cannot judge.
 }
 
 class B : A { }
 
 func test7(_ x : A) {
-  _ = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
+  _ = x as? B? // Okay: Injecting into an Optional
+}
+
+func test7a(_ x : B) {
+  _ = x as? A // expected-warning{{conditional cast from 'B' to 'A' always succeeds}}
 }
 
 func test8(_ x : AnyObject?) {
@@ -423,9 +425,8 @@ func test_force_unwrap_not_being_too_eager() {
 
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
-  a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{value of protocol type 'Any' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
-  // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}}
+  a == "="? // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (FloatingPointSign, FloatingPointSign), (String, String), (Unicode.CanonicalCombiningClass, Unicode.CanonicalCombiningClass)}}
 }
 
 // SR-12309 - Force unwrapping 'nil' compiles without warning
@@ -449,4 +450,12 @@ func sr_12309() {
   _ = (((nil))) // expected-error {{'nil' requires a contextual type}}
   _ = ((((((nil)))))) // expected-error {{'nil' requires a contextual type}}
   _ = (((((((((nil))))))))) // expected-error {{'nil' requires a contextual type}}
+
+  func test_with_contextual_type_one() -> Int? {
+    return (nil) // Ok
+  }
+
+  func test_with_contextual_type_many() -> Int? {
+    return (((nil))) // Ok
+  }
 }

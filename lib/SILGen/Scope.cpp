@@ -86,12 +86,14 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   // recreate the RValue in the outer scope.
   CanType type = rv.type;
   unsigned numEltsRemaining = rv.elementsToBeAdded;
-  CleanupCloner cloner(SGF, rv);
-  llvm::SmallVector<SILValue, 4> values;
+  SmallVector<CleanupCloner, 4> cloners;
+  CleanupCloner::getClonersForRValue(SGF, rv, cloners);
+
+  SmallVector<SILValue, 4> values;
   std::move(rv).forwardAll(SGF, values);
 
   // Lifetime any address only values that we may have.
-  llvm::SmallVector<SILValue, 4> lifetimeExtendingBoxes;
+  SmallVector<SILValue, 4> lifetimeExtendingBoxes;
   lifetimeExtendAddressOnlyRValueSubValues(SGF, loc, values,
                                            lifetimeExtendingBoxes);
 
@@ -111,9 +113,9 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   // Reconstruct the managed values from the underlying sil values in the outer
   // scope. Since the RValue wants a std::vector value, we use that instead.
   std::vector<ManagedValue> managedValues;
-  std::transform(
-      values.begin(), values.end(), std::back_inserter(managedValues),
-      [&cloner](SILValue v) -> ManagedValue { return cloner.clone(v); });
+  for (unsigned i : indices(values)) {
+    managedValues.push_back(cloners[i].clone(values[i]));
+  }
 
   // And then assemble the managed values into a rvalue.
   return RValue(SGF, std::move(managedValues), type, numEltsRemaining);

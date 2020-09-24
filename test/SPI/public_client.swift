@@ -20,12 +20,12 @@ import SPIHelper
 
 // Use the public API
 publicFunc()
-spiFunc() // expected-error {{use of unresolved identifier}}
-internalFunc() // expected-error {{use of unresolved identifier}}
+spiFunc() // expected-error {{cannot find 'spiFunc' in scope}}
+internalFunc() // expected-error {{cannot find 'internalFunc' in scope}}
 
-let c = SPIClass() // expected-error {{use of unresolved identifier}}
-let s = SPIStruct() // expected-error {{use of unresolved identifier}}
-SPIEnum().spiMethod() // expected-error {{use of unresolved identifier}}
+let c = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
+let s = SPIStruct() // expected-error {{cannot find 'SPIStruct' in scope}}
+SPIEnum().spiMethod() // expected-error {{cannot find 'SPIEnum' in scope}}
 
 var ps = PublicStruct()
 let _ = PublicStruct(alt_init: 1) // expected-error {{argument passed to call that takes no arguments}}
@@ -33,13 +33,13 @@ ps.spiMethod() // expected-error {{'spiMethod' is inaccessible due to '@_spi' pr
 ps.spiVar = "write" // expected-error {{'spiVar' is inaccessible due to '@_spi' protection level}}
 print(ps.spiVar) // expected-error {{'spiVar' is inaccessible due to '@_spi' protection level}}
 
-otherApiFunc() // expected-error {{use of unresolved identifier}}
+otherApiFunc() // expected-error {{cannot find 'otherApiFunc' in scope}}
 
-public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{use of undeclared type}}
-public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{use of undeclared type}}
+public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot find type 'SPIClass' in scope}}
+public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot find type 'SPIClass' in scope}}
 
 @inlinable
-func inlinable() -> SPIClass { // expected-error {{use of undeclared type}}
-  spiFunc() // expected-error {{use of unresolved identifier}}
-  _ = SPIClass() // expected-error {{use of unresolved identifier}}
+func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' in scope}}
+  spiFunc() // expected-error {{cannot find 'spiFunc' in scope}}
+  _ = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
 }

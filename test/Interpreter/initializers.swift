@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-swift-version 4) | %FileCheck %s
+// RUN: %target-run-simple-swift(-swift-version 5) | %FileCheck %s
+
 // REQUIRES: executable_test
 
 // Test initialization and initializer inheritance.

@@ -156,7 +156,7 @@ class Foo {
     return x
   }
  
-  // CHECK-LABEL: sil private [ossa] @globalinit_33_E52D764B1F2009F2390B2B8DF62DAEB8_func0
+  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ
   // CHECK:         string_literal utf8 "Foo" 
   static let x = Foo(int:0)
 

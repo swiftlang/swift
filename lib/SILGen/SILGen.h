@@ -60,19 +60,16 @@ public:
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<NormalProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
-  struct DelayedFunction {
-    /// Insert the entity after the given function when it's emitted.
-    SILDeclRef insertAfter;
-    /// Code that generates the function.
-    std::function<void (SILFunction *)> emitter;
-  };
-
-  /// Mapping from SILDeclRefs to delayed SILFunction generators for
-  /// non-externally-visible symbols.
-  llvm::DenseMap<SILDeclRef, DelayedFunction> delayedFunctions;
+  /// Mapping from SILDeclRefs to where the given function will be inserted
+  /// when it's emitted. Used for non-externally visible symbols.
+  llvm::DenseMap<SILDeclRef, SILDeclRef> delayedFunctions;
 
   /// Queue of delayed SILFunctions that need to be forced.
-  std::deque<std::pair<SILDeclRef, DelayedFunction>> forcedFunctions;
+  std::deque<SILDeclRef> forcedFunctions;
+
+  /// Mapping global VarDecls to their onceToken and onceFunc, respectively.
+  llvm::DenseMap<VarDecl *, std::pair<SILGlobalVariable *,
+                                      SILFunction *>> delayedGlobals;
 
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
@@ -131,8 +128,7 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
-  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
-    MagicFileStringsByFilePath;
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>> FileIDsByFilePath;
 
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
@@ -274,7 +270,10 @@ public:
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
-  
+
+  /// Emits the function definition for a given SILDeclRef.
+  void emitFunctionDefinition(SILDeclRef constant, SILFunction *f);
+
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
@@ -286,10 +285,6 @@ public:
   /// the SILFunction to the current SILModule under the name
   /// SILDeclRef(cd, Destructor).
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
-
-  /// Generates the enum constructor for the given
-  /// EnumElementDecl under the name SILDeclRef(decl).
-  void emitEnumConstructor(EnumElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);
@@ -310,11 +305,7 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  void preEmitFunction(SILDeclRef constant,
-                       llvm::PointerUnion<ValueDecl *,
-                                          Expr *> astNode,
-                       SILFunction *F,
-                       SILLocation L);
+  void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.

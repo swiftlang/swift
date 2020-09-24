@@ -392,16 +392,16 @@ SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
-    return { CasePattern->getStartLoc(), E->getEndLoc() };
-  return CasePattern->getSourceRange();
+    return { getPattern()->getStartLoc(), E->getEndLoc() };
+  return getPattern()->getSourceRange();
 }
 SourceLoc CaseLabelItem::getStartLoc() const {
-  return CasePattern->getStartLoc();
+  return getPattern()->getStartLoc();
 }
 SourceLoc CaseLabelItem::getEndLoc() const {
   if (auto *E = getGuardExpr())
     return E->getEndLoc();
-  return CasePattern->getEndLoc();
+  return getPattern()->getEndLoc();
 }
 
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
@@ -458,6 +458,40 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                body, caseVarDecls, implicit, fallthroughStmt);
 }
 
+namespace {
+
+template<typename CaseIterator>
+CaseStmt *findNextCaseStmt(
+    CaseIterator first, CaseIterator last, const CaseStmt *caseStmt) {
+  for(auto caseIter = first; caseIter != last; ++caseIter) {
+    if (*caseIter == caseStmt) {
+      ++caseIter;
+      return caseIter == last ? nullptr : *caseIter;
+    }
+  }
+
+  return nullptr;
+}
+
+}
+
+CaseStmt *CaseStmt::findNextCaseStmt() const {
+  auto parent = getParentStmt();
+  if (!parent)
+    return nullptr;
+
+  if (auto switchParent = dyn_cast<SwitchStmt>(parent)) {
+    return ::findNextCaseStmt(
+        switchParent->getCases().begin(), switchParent->getCases().end(),
+        this);
+  }
+
+  auto doCatchParent = cast<DoCatchStmt>(parent);
+  return ::findNextCaseStmt(
+      doCatchParent->getCatches().begin(), doCatchParent->getCatches().end(),
+      this);
+}
+
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                Expr *SubjectExpr,
                                SourceLoc LBraceLoc,
@@ -479,6 +513,9 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());
+  for (auto *caseStmt : theSwitch->getCases())
+    caseStmt->setParentStmt(theSwitch);
+
   return theSwitch;
 }
 
@@ -487,14 +524,14 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 // dependency.
 
 struct StmtTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Stmt *S = static_cast<const Stmt *>(Entity);
     OS << Stmt::getKindName(S->getKind());
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Stmt *S = static_cast<const Stmt *>(Entity);

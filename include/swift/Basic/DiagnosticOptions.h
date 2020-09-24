@@ -32,6 +32,8 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
+  enum FormattingStyle { LLVM, Swift };
+
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
@@ -61,9 +63,14 @@ public:
 
   // If set to true, use the more descriptive experimental formatting style for
   // diagnostics.
-  bool EnableExperimentalFormatting = false;
+  FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
 
   std::string DiagnosticDocumentationPath = "";
+
+  std::string LocalizationCode = "";
+
+  // Diagnostic messages directory path.
+  std::string LocalizationPath = "";
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

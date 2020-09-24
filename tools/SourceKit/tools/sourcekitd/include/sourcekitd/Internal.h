@@ -86,7 +86,7 @@ public:
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);
-    void setCustomBuffer(SourceKit::UIdent Key, CustomBufferKind Kind,
+    void setCustomBuffer(SourceKit::UIdent Key,
                          std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 
   private:
@@ -174,6 +174,7 @@ sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
+std::string getDiagnosticDocumentationPath();
 
 void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 

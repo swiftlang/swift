@@ -37,4 +37,4 @@ import BrokenClangModule
 
 
 _ = BrokenClangModule.x
-// CHECK: broken-modules.swift:[[@LINE-1]]:5: error: use of unresolved identifier 'BrokenClangModule'
+// CHECK: broken-modules.swift:[[@LINE-1]]:5: error: cannot find 'BrokenClangModule' in scope

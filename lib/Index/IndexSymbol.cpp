@@ -143,7 +143,7 @@ SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
   info.SubKind = SymbolSubKind::None;
   info.Properties = SymbolPropertySet();
   if (auto *D = Mod.getAsSwiftModule()) {
-    if (!D->isClangModule()) {
+    if (!D->isNonSwiftModule()) {
       info.Lang = SymbolLanguage::Swift;
     } else {
       info.Lang = SymbolLanguage::C;

@@ -5,7 +5,7 @@ else()
   set(SWIFTAST_LLVM_LINK_COMPONENTS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
+    bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
   )
 endif()
 
@@ -44,7 +44,9 @@ add_swift_host_library(swiftAST STATIC
   DocComment.cpp
   Evaluator.cpp
   Expr.cpp
+  ExtInfo.cpp
   FineGrainedDependencies.cpp
+  FineGrainedDependencyFormat.cpp
   FrontendSourceFileDepGraphFactory.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
@@ -56,17 +58,18 @@ add_swift_host_library(swiftAST STATIC
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp
+  ModuleDependencies.cpp
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
   NameLookupRequests.cpp
+  OperatorNameLookup.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
-  ReferencedNameTracker.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp

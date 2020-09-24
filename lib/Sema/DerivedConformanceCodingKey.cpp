@@ -78,7 +78,7 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *rawValueDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
-  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
+  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredInterfaceType());
   rawValueDecl->setSpecifier(ParamSpecifier::Default);
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -212,8 +212,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   } else {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
-      auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                             SourceLoc(), DeclNameLoc(),
+      auto *baseTE = TypeExpr::createImplicit(enumType, C);
+      auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
                                              DeclNameRef(), elt, nullptr);
       pat->setImplicit();
 
@@ -284,9 +284,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
     auto labelItem = CaseLabelItem(litPat);
 
-    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto *valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto *valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
     auto *assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                           /*Implicit=*/true);
@@ -298,8 +298,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                      /*case body var decls*/ None));
   }
 
-  auto *anyPat = new (C) AnyPattern(SourceLoc());
-  anyPat->setImplicit();
+  auto *anyPat = AnyPattern::createImplicit(C);
   auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
@@ -363,7 +362,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
   auto name = requirement->getBaseName();
   if (name == Context.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
-    auto stringType = Context.getStringDecl()->getDeclaredType();
+    auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
     auto synth = [rawType, stringType](AbstractFunctionDecl *getterDecl) {
       if (rawType && rawType->isEqual(stringType)) {
         // enum SomeStringEnum : String {
@@ -394,7 +393,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
   } else if (name == Context.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
-    auto intType = Context.getIntDecl()->getDeclaredType();
+    auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
     auto optionalIntType = OptionalType::get(intType);
 
     auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
@@ -419,11 +418,11 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
     return deriveProperty(*this, optionalIntType, Context.Id_intValue, synth);
   } else if (name == DeclBaseName::createConstructor()) {
-    auto argumentNames = requirement->getFullName().getArgumentNames();
+    auto argumentNames = requirement->getName().getArgumentNames();
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == Context.Id_stringValue) {
         // Derive `init?(stringValue:)`
-        auto stringType = Context.getStringDecl()->getDeclaredType();
+        auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
         auto synth = [rawType, stringType](AbstractFunctionDecl *initDecl) {
           if (rawType && rawType->isEqual(stringType)) {
             // enum SomeStringEnum : String {
@@ -456,7 +455,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
         return deriveInitDecl(*this, stringType, Context.Id_stringValue, synth);
       } else if (argumentNames[0] == Context.Id_intValue) {
         // Synthesize `init?(intValue:)`
-        auto intType = Context.getIntDecl()->getDeclaredType();
+        auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
         auto synthesizer = [rawType, intType](AbstractFunctionDecl *initDecl) {
           if (rawType && rawType->isEqual(intType)) {
             // enum SomeIntEnum : Int {

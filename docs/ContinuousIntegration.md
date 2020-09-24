@@ -12,6 +12,7 @@
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Sourcekit Stress Testing](#sourcekit-stress-testing)
     - [Specific Preset Testing](#specific-preset-testing)
+    - [Running Non-Executable Device Tests](#running-non-executable-device-tests)
     - [Build Swift Toolchain](#build-swift-toolchain)
     - [Testing Compiler Performance](#testing-compiler-performance)
     - [Swift Community Hosted CI Pull Request Testing](#swift-community-hosted-ci-pull-request-testing)
@@ -91,6 +92,11 @@ macOS platform               | @swift-ci Please smoke benchmark              | S
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
+Ubuntu 18.04                 | @swift-ci Please test Ubuntu 18.04 platform   | Swift Test Ubuntu 18.04 Platform
+Ubuntu 20.04                 | @swift-ci Please test Ubuntu 20.04 platform   | Swift Test Ubuntu 20.04 Platform
+CentOS 7                     | @swift-ci Please test CentOS 7 platform       | Swift Test CentOS 7 Platform
+CentOS 8                     | @swift-ci Please test CentOS 8 platform       | Swift Test CentOS 8 Platform
+Amazon Linux 2               | @swift-ci Please test Amazon Linux 2 platform | Swift Test Amazon Linux 2 Platform
 
 The core principles of validation testing is that:
 
@@ -161,8 +167,18 @@ For example:
 ```
 preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 @swift-ci Please test with preset macOS
+```
+
+### Running Non-Executable Device Tests
+
+Using the specific preset testing, one can run non-executable device tests by
+telling swift-ci:
 
 ```
+preset=buildbot,tools=RA,stdlib=RD,test=non_executable
+@swift-ci Please test with preset macOS
+```
+
 ### Build Swift Toolchain
 
 Platform       | Comment | Check Status
@@ -184,7 +200,7 @@ These commands will:
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
 
-For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/master/docs/CompilerPerformance.md).
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/main/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 

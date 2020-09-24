@@ -295,11 +295,12 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   Results.push_back(SILResultInfo(
                       switchInfo.Br->getArg(0)->getType().getASTType(),
                       ResultConvention::Owned));
-  auto ExtInfo =
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false, /*noescape*/ false,
-                               DifferentiabilityKind::NonDifferentiable,
-                               /*clangFunctionType*/ nullptr);
+  auto ExtInfo = SILFunctionType::ExtInfoBuilder(
+                     SILFunctionType::Representation::Thin,
+                     /*pseudogeneric*/ false, /*noescape*/ false,
+                     /*async*/ false, DifferentiabilityKind::NonDifferentiable,
+                     /*clangFunctionType*/ nullptr)
+                     .build();
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
@@ -742,6 +743,18 @@ void BridgedArgument::eraseFromParent() {
   BridgeFun->eraseFromParent();
 }
 
+static ReleaseValueInst *findReleaseOf(SILValue releasedValue,
+                                       SILBasicBlock::iterator from,
+                                       SILBasicBlock::iterator to) {
+  while (from != to) {
+    auto release = dyn_cast<ReleaseValueInst>(&*from);
+    if (release && release->getOperand() == releasedValue)
+      return release;
+    ++from;
+  }
+  return nullptr;
+}
+
 BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
                                        ApplyInst *AI) {
   // Match
@@ -782,8 +795,11 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   // Make sure that if we have a bridged value release that it is on the bridged
   // value.
-  auto *BridgedValueRelease =
-      dyn_cast<ReleaseValueInst>(std::next(SILBasicBlock::iterator(Enum)));
+  if (Enum->getParent() != AI->getParent())
+    return BridgedArgument();
+  auto *BridgedValueRelease = dyn_cast_or_null<ReleaseValueInst>(
+      findReleaseOf(BridgedValue, std::next(SILBasicBlock::iterator(Enum)),
+                    SILBasicBlock::iterator(AI)));
   if (BridgedValueRelease && BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
@@ -995,7 +1011,7 @@ ObjCMethodCall::outline(SILModule &M) {
         // Otherwise, use the original type convention.
         Args.push_back(Arg);
       }
-      OrigSigIdx++;
+      ++OrigSigIdx;
     }
     OutlinedCall = Builder.createApply(Loc, FunRef, SubstitutionMap(), Args);
     if (!BridgedCall->use_empty() && !BridgedReturn)
@@ -1044,7 +1060,7 @@ ObjCMethodCall::outline(SILModule &M) {
       BridgedCall->setArgument(OrigSigIdx, FunArg);
       LastArg = FunArg;
     }
-    OrigSigIdx++;
+    ++OrigSigIdx;
   }
 
   // Set the method lookup's target.
@@ -1158,15 +1174,17 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
       // Otherwise, use the original type convention.
       Parameters.push_back(ParamInfo);
     }
-    OrigSigIdx++;
+    ++OrigSigIdx;
   }
 
-  auto ExtInfo = SILFunctionType::ExtInfo(
-      SILFunctionType::Representation::Thin,
-      /*pseudogeneric*/ false,
-      /*noescape*/ false,
-      DifferentiabilityKind::NonDifferentiable,
-      /*clangFunctionType*/ nullptr);
+  auto ExtInfo =
+      SILFunctionType::ExtInfoBuilder(SILFunctionType::Representation::Thin,
+                                      /*pseudogeneric*/ false,
+                                      /*noescape*/ false,
+                                      /*async*/ false,
+                                      DifferentiabilityKind::NonDifferentiable,
+                                      /*clangFunctionType*/ nullptr)
+          .build();
 
   SmallVector<SILResultInfo, 4> Results;
   // If we don't have a bridged return we changed from @autoreleased to @owned
@@ -1232,6 +1250,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
   SmallPtrSet<SILBasicBlock *, 32> Visited;
   SmallVector<SILBasicBlock *, 128> Worklist;
   OutlinePatterns patterns(FuncBuilder);
+  bool changed = false;
 
   // Traverse the function.
   Worklist.push_back(&*Fun->begin());
@@ -1252,6 +1271,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
            FunctionsAdded.push_back(F);
          CurInst = LastInst;
          assert(LastInst->getParent() == CurBlock);
+         changed = true;
        } else if (isa<TermInst>(CurInst)) {
          std::copy(CurBlock->succ_begin(), CurBlock->succ_end(),
                    std::back_inserter(Worklist));
@@ -1261,7 +1281,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
        }
     }
   }
-  return false;
+  return changed;
 }
 
 namespace {

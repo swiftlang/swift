@@ -43,6 +43,8 @@ public class PublicClass {
   public init(label __name: String) {}
   /// Public Filter Subscript Documentation NotForNormal NotForTesting
   public subscript(label __name: String) -> Int { return 0 }
+  /// SPI Function Documentation NotForNormal NotForTesting
+  @_spi(SPI) public func f_spi() { }
 }
 
 public extension PublicClass {
@@ -64,6 +66,16 @@ private class PrivateClass {
   private func f_private() { }
 }
 
+/// SPI Documentation NotForNormal NotForTesting
+@_spi(SPI) public class SPIClass {
+  /// SPI Function Documentation NotForNormal NotForTesting
+  public func f_spi() { }
+}
+
+/// SPI Extension Documentation NotForNormal NotForTesting
+@_spi(SPI) public extension PublicClass {
+}
+
 // NORMAL-NEGATIVE-NOT: NotForNormal
 // NORMAL-NEGATIVE-NOT: NotForTesting
 // NORMAL: PublicClass Documentation
@@ -74,7 +86,7 @@ private class PrivateClass {
 // TESTING-NEGATIVE-NOT: NotForTesting
 // TESTING: PublicClass Documentation
 // TESTING: Public Function Documentation
-// TESTINH: Public Init Documentation
+// TESTING: Public Init Documentation
 // TESTING: Public Subscript Documentation
 // TESTING: Internal Function Documentation
 // TESTING: InternalClass Documentation
@@ -85,4 +97,4 @@ private class PrivateClass {
 // SOURCE-LOC: comments-hidden.swift:41:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
 // SOURCE-LOC: comments-hidden.swift:43:10: Constructor/PublicClass.init RawComment=none BriefComment=none DocCommentAsXML=none
 // SOURCE-LOC: comments-hidden.swift:45:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
-// SOURCE-LOC: comments-hidden.swift:50:15: Func/-= RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:52:15: Func/-= RawComment=none BriefComment=none DocCommentAsXML=none

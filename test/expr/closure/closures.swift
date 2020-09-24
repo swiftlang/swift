@@ -141,6 +141,7 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
     f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
 }
 
@@ -325,7 +326,7 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}} {{19-20=let}}
+  // expected-warning @+1 {{variable 'i' was never mutated}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 
@@ -442,13 +443,13 @@ class r22344208 {
   }
 }
 
-var f = { (s: Undeclared) -> Int in 0 } // expected-error {{use of undeclared type 'Undeclared'}}
+var f = { (s: Undeclared) -> Int in 0 } // expected-error {{cannot find type 'Undeclared' in scope}}
 
 // <rdar://problem/21375863> Swift compiler crashes when using closure, declared to return illegal type.
 func r21375863() {
-  var width = 0
-  var height = 0
-  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{use of undeclared type 'asdf'}}
+  var width = 0 // expected-warning {{variable 'width' was never mutated}}
+  var height = 0 // expected-warning {{variable 'height' was never mutated}}
+  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}} expected-warning {{variable 'bufs' was never used}}
     [UInt8](repeating: 0, count: width*height)
   }
 }
@@ -504,3 +505,22 @@ var qux1: (() -> Void)? = {}
 
 SR9839(qux1!)
 SR9839(forceUnwrap(qux1))
+
+// rdar://problem/65155671 - crash referencing parameter of outer closure
+func rdar65155671(x: Int) {
+    { a in
+      _ = { [a] in a }
+    }(x)
+}
+
+func sr3186<T, U>(_ f: (@escaping (@escaping (T) -> U) -> ((T) -> U))) -> ((T) -> U) {
+    return { x in return f(sr3186(f))(x) }
+}
+
+class SR3186 {
+  init() {
+    // expected-warning@+1{{capture 'self' was never used}}
+    let v = sr3186 { f in { [unowned self, f] x in x != 1000 ? f(x + 1) : "success" } }(0)
+    print("\(v)")
+  }
+}

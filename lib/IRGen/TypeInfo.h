@@ -148,7 +148,6 @@ protected:
            IsABIAccessible_t abiAccessible,
            SpecialTypeInfoKind stik) : StorageType(Type) {
     assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
-    assert(!A.isZero() && "Invalid alignment");
     Bits.OpaqueBits = 0;
     Bits.TypeInfo.Kind = unsigned(stik);
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());

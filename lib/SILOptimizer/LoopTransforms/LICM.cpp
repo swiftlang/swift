@@ -214,8 +214,8 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
                                 SILLoop *Loop, DominanceInfo *DT) {
   auto HeaderBB = Loop->getHeader();
   auto DTRoot = DT->getNode(HeaderBB);
-  SmallVector<SILBasicBlock *, 8> ExitingBBs;
-  Loop->getExitingBlocks(ExitingBBs);
+  SmallVector<SILBasicBlock *, 8> ExitingAndLatchBBs;
+  Loop->getExitingAndLatchBlocks(ExitingAndLatchBBs);
   for (llvm::df_iterator<DominanceInfoNode *> It = llvm::df_begin(DTRoot),
                                               E = llvm::df_end(DTRoot);
        It != E;) {
@@ -223,7 +223,7 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
 
     // Don't decent into control-dependent code. Only traverse into basic blocks
     // that dominate all exits.
-    if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
+    if (!std::all_of(ExitingAndLatchBBs.begin(), ExitingAndLatchBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {
@@ -700,19 +700,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                InstSet &SideEffectInsts,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  const AccessedStorage &storage =
-      findAccessedStorageNonNested(BI->getSource());
+  const AccessedStorage &storage = findAccessedStorage(BI->getSource());
   if (!storage) {
     return false;
   }
 
-  auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
+  auto BIAccessedStorageNonNested = findAccessedStorage(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
     if (BI == OtherBI) {
       return true;
     }
     return BIAccessedStorageNonNested.isDistinctFrom(
-        findAccessedStorageNonNested(OtherBI));
+        findAccessedStorage(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))
@@ -963,6 +962,41 @@ static bool storesCommonlyDominateLoopExits(SILValue addr, SILLoop *loop,
   if (stores.count(header) != 0)
     return true;
 
+  // Also a store in the pre-header dominates all exists. Although the situation
+  // is a bit different here: the store in the pre-header remains - it's not
+  // (re)moved by the LICM transformation.
+  // But even if the loop-stores are not dominating the loop exits, it
+  // makes sense to move them out of the loop if this case. When this is done,
+  // dead-store-elimination can then most likely eliminate the store in the
+  // pre-header.
+  //
+  //   pre_header:
+  //     store %v1 to %addr
+  //   header:
+  //     cond_br %cond, then, tail
+  //   then:
+  //     store %v2 to %addr    // a conditional store in the loop
+  //     br tail
+  //   tail:
+  //     cond_br %loop_cond, header, exit
+  //   exit:
+  //
+  //  will be transformed to
+  //
+  //   pre_header:
+  //     store %v1 to %addr    // <- can be removed by DSE afterwards
+  //   header:
+  //     cond_br %cond, then, tail
+  //   then:
+  //     br tail
+  //   tail(%phi):
+  //     cond_br %loop_cond, header, exit
+  //   exit:
+  //     store %phi to %addr
+  //
+  if (stores.count(loop->getLoopPreheader()) != 0)
+    return true;
+
   // Propagate the store-is-not-alive flag through the control flow in the loop,
   // starting at the header.
   SmallPtrSet<SILBasicBlock *, 16> storesNotAlive;
@@ -1028,8 +1062,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
 
   SILSSAUpdater ssaUpdater;
-  ssaUpdater.Initialize(initialLoad->getType());
-  ssaUpdater.AddAvailableValue(preheader, initialLoad);
+  ssaUpdater.initialize(initialLoad->getType());
+  ssaUpdater.addAvailableValue(preheader, initialLoad);
 
   // Set all stored values as available values in the ssaUpdater.
   // If there are multiple stores in a block, only the last one counts.
@@ -1044,7 +1078,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       if (isLoadFromAddr(dyn_cast<LoadInst>(SI->getSrc()), addr))
         return;
 
-      ssaUpdater.AddAvailableValue(SI->getParent(), SI->getSrc());
+      ssaUpdater.addAvailableValue(SI->getParent(), SI->getSrc());
     }
   }
 
@@ -1065,7 +1099,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       // If we didn't see a store in this block yet, get the current value from
       // the ssaUpdater.
       if (!currentVal)
-        currentVal = ssaUpdater.GetValueInMiddleOfBlock(block);
+        currentVal = ssaUpdater.getValueInMiddleOfBlock(block);
       SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
                                                  currentVal, LI);
       LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
@@ -1083,8 +1117,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
                "should have split critical edges");
         SILBuilder B(succ->begin());
         auto *SI = B.createStore(loc.getValue(),
-                                 ssaUpdater.GetValueInMiddleOfBlock(succ),
-                                 addr, StoreOwnershipQualifier::Unqualified);
+                                 ssaUpdater.getValueInMiddleOfBlock(succ), addr,
+                                 StoreOwnershipQualifier::Unqualified);
         (void)SI;
         LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
       }

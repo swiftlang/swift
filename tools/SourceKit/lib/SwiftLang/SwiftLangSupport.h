@@ -109,7 +109,7 @@ public:
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
              swift::SyntaxParsingCache *SyntaxCache = nullptr);
-  void readSyntaxInfo(EditorConsumer &consumer);
+  void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -220,6 +220,18 @@ public:
 };
 } // end namespace CodeCompletion
 
+namespace TypeContextInfo {
+struct Options {
+  // TypeContextInfo doesn't receive any options at this point.
+};
+} // namespace TypeContextInfo
+
+namespace ConformingMethodList {
+struct Options {
+  // ConformingMethodList doesn't receive any options at this point.
+};
+} // namespace ConformingMethodList
+
 class SwiftInterfaceGenMap {
   llvm::StringMap<SwiftInterfaceGenContextRef> IFaceGens;
   mutable llvm::sys::Mutex Mtx;
@@ -286,6 +298,7 @@ struct SwiftStatistics {
 class SwiftLangSupport : public LangSupport {
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
+  std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
@@ -306,6 +319,9 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
+  StringRef getDiagnosticDocumentationPath() const {
+    return DiagnosticDocumentationPath;
+  }
 
   std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
@@ -379,6 +395,8 @@ public:
 
   static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
+  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
   static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);
@@ -416,14 +434,18 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
+  static void printFullyAnnotatedDeclaration(const swift::ExtensionDecl *VD,
+                                             llvm::raw_ostream &OS);
+
   static void
   printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
   static void
-  printFullyAnnotatedGenericReq(const swift::GenericSignature Sig,
-                                llvm::raw_ostream &OS);
+  printFullyAnnotatedSynthesizedDeclaration(const swift::ExtensionDecl *ED,
+                                            swift::TypeOrExtensionDecl Target,
+                                            llvm::raw_ostream &OS);
 
   /// Print 'description' or 'sourcetext' the given \p VD to \p OS. If
   /// \p usePlaceholder is \c true, call argument positions are substituted with
@@ -443,12 +465,14 @@ public:
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      bool EnableASTCaching, std::string &Error,
+      std::string &Error,
       llvm::function_ref<void(swift::CompilerInstance &, bool)> Callback);
 
   //==========================================================================//
   // LangSupport Interface
   //==========================================================================//
+
+  void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
@@ -594,11 +618,13 @@ public:
                std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) override;
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                                OptionsDictionary *options,
                                 ArrayRef<const char *> Args,
                                 TypeContextInfoConsumer &Consumer,
                                 Optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                               OptionsDictionary *options,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
                                ConformingMethodListConsumer &Consumer,

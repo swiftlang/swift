@@ -28,3 +28,8 @@
 // PARSE_NO_INTERFACE: error: this mode does not support emitting module interface files{{$}}
 // RUN: not %target-swift-frontend -emit-silgen -emit-module-interface-path %t %s 2>&1 | %FileCheck -check-prefix=SILGEN_NO_INTERFACE %s
 // SILGEN_NO_INTERFACE: error: this mode does not support emitting module interface files{{$}}
+
+// RUN: not %target-swift-frontend -parse -emit-private-module-interface-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_PRIVATE_INTERFACE %s
+// PARSE_NO_PRIVATE_INTERFACE: error: this mode does not support emitting module interface files{{$}}
+// RUN: not %target-swift-frontend -emit-silgen -emit-private-module-interface-path %t %s 2>&1 | %FileCheck -check-prefix=SILGEN_NO_PRIVATE_INTERFACE %s
+// SILGEN_NO_PRIVATE_INTERFACE: error: this mode does not support emitting module interface files{{$}}

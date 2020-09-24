@@ -26,59 +26,13 @@
 using namespace swift;
 using namespace constraints;
 
-void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
+void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
                                 ArrayRef<PathElement> path) {
-  id.AddPointer(anchor);
+  id.AddPointer(anchor.getOpaqueValue());
   id.AddInteger(path.size());
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
-    switch (elt.getKind()) {
-    case GenericParameter:
-      id.AddPointer(elt.castTo<LocatorPathElt::GenericParameter>().getType());
-      break;
-
-    case ProtocolRequirement: {
-      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
-      id.AddPointer(reqElt.getDecl());
-      break;
-    }
-
-    case Witness:
-      id.AddPointer(elt.castTo<LocatorPathElt::Witness>().getDecl());
-      break;
-
-    case KeyPathDynamicMember: {
-      auto kpElt = elt.castTo<LocatorPathElt::KeyPathDynamicMember>();
-      id.AddPointer(kpElt.getKeyPathDecl());
-      break;
-    }
-
-    case PatternMatch:
-      id.AddPointer(elt.castTo<LocatorPathElt::PatternMatch>().getPattern());
-      break;
-
-    case GenericArgument:
-    case NamedTupleElement:
-    case TupleElement:
-    case ApplyArgToParam:
-    case OpenedGeneric:
-    case KeyPathComponent:
-    case ConditionalRequirement:
-    case TypeParameterRequirement:
-    case ContextualType:
-    case SynthesizedArgument:
-    case TernaryBranch:
-    case ClosureBody: {
-      auto numValues = numNumericValuesInPathElement(elt.getKind());
-      for (unsigned i = 0; i < numValues; ++i)
-        id.AddInteger(elt.getValue(i));
-      break;
-    }
-#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
-#include "ConstraintLocatorPathElts.def"
-    // Nothing to do for simple locator elements.
-    break;
-    }
+    id.AddInteger(elt.getRawStorage());
   }
 }
 
@@ -90,6 +44,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::FunctionBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalPayload:
@@ -125,6 +80,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ImplicitCallAsFunction:
   case ConstraintLocator::TernaryBranch:
   case ConstraintLocator::PatternMatch:
+  case ConstraintLocator::ArgumentAttribute:
+  case ConstraintLocator::UnresolvedMemberChainResult:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -149,7 +106,7 @@ bool LocatorPathElt::isResultOfSingleExprFunction() const {
 /// Determine whether given locator points to the subscript reference
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -159,16 +116,16 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
 }
 
 bool ConstraintLocator::isKeyPathType() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
   // The format of locator should be `<keypath expr> -> key path type`
-  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+  if (!anchor || !isExpr<KeyPathExpr>(anchor) || path.size() != 1)
     return false;
   return path.back().getKind() == ConstraintLocator::KeyPathType;
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -178,7 +135,7 @@ bool ConstraintLocator::isKeyPathRoot() const {
 }
 
 bool ConstraintLocator::isKeyPathValue() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -194,7 +151,7 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
 }
 
 bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAnchor();
+  auto *anchor = getAsExpr(getAnchor());
   auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
   if (!KPE)
     return false;
@@ -247,6 +204,10 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
+bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
+  return isFirstElement<LocatorPathElt::FunctionBuilderBodyResult>();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -270,11 +231,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   
   out << "locator@" << (void*) this << " [";
 
-  if (anchor) {
-    out << Expr::getKindName(anchor->getKind());
+  if (auto *expr = anchor.dyn_cast<Expr *>()) {
+    out << Expr::getKindName(expr->getKind());
     if (sm) {
       out << '@';
-      anchor->getLoc().print(out, *sm);
+      expr->getLoc().print(out, *sm);
     }
   }
 
@@ -343,6 +304,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case FunctionResult:
       out << "function result";
+      break;
+
+    case FunctionBuilderBodyResult:
+      out << "function builder body result";
       break;
 
     case SequenceElementType:
@@ -499,6 +464,29 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case PatternMatch:
       out << "pattern match";
+      break;
+
+    case ArgumentAttribute: {
+      using AttrLoc = LocatorPathElt::ArgumentAttribute;
+
+      auto attrElt = elt.castTo<AttrLoc>();
+      out << "argument attribute: ";
+
+      switch (attrElt.getAttr()) {
+      case AttrLoc::Attribute::InOut:
+        out << "inout";
+        break;
+
+      case AttrLoc::Attribute::Escaping:
+        out << "@escaping";
+        break;
+      }
+
+      break;
+    }
+
+    case UnresolvedMemberChainResult:
+      out << "unresolved chain result";
       break;
     }
   }

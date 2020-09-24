@@ -1,0 +1,6 @@
+module Outer {
+ module Inner {
+  export Outer.Inner
+ }
+ export Outer
+}

@@ -39,7 +39,7 @@ operator<<(raw_ostream &Out, const NodeAnnotation Value) {
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-StringRef swift::ide::api::getDeclKindStr(const DeclKind Value)  {
+static StringRef getDeclKindStrRaw(const DeclKind Value)  {
   switch (Value) {
 #define DECL(X, PARENT) case DeclKind::X: return #X;
 #include "swift/AST/DeclNodes.def"
@@ -47,9 +47,22 @@ StringRef swift::ide::api::getDeclKindStr(const DeclKind Value)  {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
-raw_ostream &swift::ide::api::operator<<(raw_ostream &Out,
-    const DeclKind Value) {
-  return Out << getDeclKindStr(Value);
+StringRef swift::ide::api::getDeclKindStr(const DeclKind Value, bool lower) {
+  if (lower) {
+    switch (Value) {
+#define DECL(X, PARENT) case DeclKind::X: {                                   \
+    static std::string lowered = StringRef(#X).lower();                       \
+    return lowered;                                                           \
+    }
+#include "swift/AST/DeclNodes.def"
+    }
+  } else {
+    return getDeclKindStrRaw(Value);
+  }
+}
+
+raw_ostream &swift::ide::api::operator<<(raw_ostream &Out, const DeclKind Value) {
+  return Out << getDeclKindStrRaw(Value);
 }
 
 Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {

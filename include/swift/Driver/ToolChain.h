@@ -136,6 +136,13 @@ protected:
           ExtraEnvironment(std::move(extraEnv)) {}
   };
 
+  /// Handle arguments common to all invocations of the frontend (compilation,
+  /// module-merging, LLDB's REPL, etc).
+  virtual void addCommonFrontendArgs(const OutputInfo &OI,
+                                     const CommandOutput &output,
+                                     const llvm::opt::ArgList &inputArgs,
+                                     llvm::opt::ArgStringList &arguments) const;
+
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -154,6 +161,9 @@ protected:
                                              const JobContext &context) const;
   virtual InvocationInfo
   constructInvocation(const VerifyDebugInfoJobAction &job,
+                      const JobContext &context) const;
+  virtual InvocationInfo
+  constructInvocation(const VerifyModuleInterfaceJobAction &job,
                       const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const GeneratePCHJobAction &job,
                                              const JobContext &context) const;
@@ -286,6 +296,9 @@ public:
   /// the current toolchain.
   void getClangLibraryPath(const llvm::opt::ArgList &Args,
                            SmallString<128> &LibPath) const;
+
+  // Returns the Clang driver executable to use for linking.
+  const char *getClangLinkerDriver(const llvm::opt::ArgList &Args) const;
 
   /// Returns the name the clang library for a given sanitizer would have on
   /// the current toolchain.

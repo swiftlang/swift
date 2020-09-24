@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,8 +25,8 @@ public struct SubscriptRangeTest {
 
   public func bounds<C : Collection>(in c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return c.index(i, offsetBy: numericCast(bounds.lowerBound)) ..<
-           c.index(i, offsetBy: numericCast(bounds.upperBound))
+    return c.index(i, offsetBy: bounds.lowerBound) ..<
+           c.index(i, offsetBy: bounds.upperBound)
   }
 
   public init(
@@ -390,7 +390,7 @@ let findLastTests = [
 
 extension Collection {
   public func nthIndex(_ offset: Int) -> Index {
-    return self.index(self.startIndex, offsetBy: numericCast(offset))
+    return self.index(self.startIndex, offsetBy: offset)
   }
 }
 
@@ -639,14 +639,14 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         let index = c.endIndex
         expectCrashLater()
-        _blackHole(c.index(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(index, offsetBy: outOfBoundsIndexOffset))
       }
 
       self.test("\(testNamePrefix).Index/OutOfBounds/Right/Empty") {
         let c = makeWrappedCollection([])
         let index = c.endIndex
         expectCrashLater()
-        _blackHole(c.index(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(index, offsetBy: outOfBoundsIndexOffset))
       }
     }
 
@@ -659,7 +659,7 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.endIndex
         expectCrashLater()
-        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: outOfBoundsSubscriptOffset)
         _blackHole(c[index])
       }
 
@@ -667,7 +667,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.endIndex
         expectCrashLater()
-        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: outOfBoundsSubscriptOffset)
         _blackHole(c[index])
       }
 
@@ -684,10 +684,10 @@ extension TestSuite {
         print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
         let base = makeWrappedCollection(elements)
         let sliceStartIndex =
-          base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+          base.index(base.startIndex, offsetBy: sliceFromLeft)
         let sliceEndIndex = base.index(
           base.startIndex,
-          offsetBy: numericCast(elements.count - sliceFromRight))
+          offsetBy: elements.count - sliceFromRight)
         var slice = base[sliceStartIndex..<sliceEndIndex]
         expectType(C.SubSequence.self, &slice)
 
@@ -711,12 +711,12 @@ extension TestSuite {
           if sliceFromLeft == 0 { return }
           index = base.index(
             base.startIndex,
-            offsetBy: numericCast(sliceFromLeft - 1))
+            offsetBy: sliceFromLeft - 1)
         case .outOfRangeToTheRight:
           if sliceFromRight == 0 { return }
           index = base.index(
             base.startIndex,
-            offsetBy: numericCast(elements.count - sliceFromRight))
+            offsetBy: elements.count - sliceFromRight)
         case .baseEndIndex:
           index = base.endIndex
         case .sliceEndIndex:
@@ -758,7 +758,7 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.endIndex
         expectCrashLater()
-        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: outOfBoundsSubscriptOffset)
         _blackHole(c[index..<index])
       }
 
@@ -766,7 +766,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.endIndex
         expectCrashLater()
-        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: outOfBoundsSubscriptOffset)
         _blackHole(c[index..<index])
       }
 
@@ -786,10 +786,10 @@ extension TestSuite {
           + "/sliceFromRight=\(sliceFromRight)")
         let base = makeWrappedCollection(elements)
         let sliceStartIndex =
-          base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+          base.index(base.startIndex, offsetBy: sliceFromLeft)
         let sliceEndIndex = base.index(
           base.startIndex,
-          offsetBy: numericCast(elements.count - sliceFromRight))
+          offsetBy: elements.count - sliceFromRight)
         var slice = base[sliceStartIndex..<sliceEndIndex]
         expectType(C.SubSequence.self, &slice)
 
@@ -823,28 +823,28 @@ extension TestSuite {
           if sliceFromLeft == 0 { return }
           let index = base.index(
             base.startIndex,
-            offsetBy: numericCast(sliceFromLeft - 1))
+            offsetBy: sliceFromLeft - 1)
           bounds = index..<index
           break
         case .outOfRangeToTheLeftNonEmpty:
           if sliceFromLeft == 0 { return }
           let index = base.index(
             base.startIndex,
-            offsetBy: numericCast(sliceFromLeft - 1))
+            offsetBy: sliceFromLeft - 1)
           bounds = index..<sliceStartIndex
           break
         case .outOfRangeToTheRightEmpty:
           if sliceFromRight == 0 { return }
           let index = base.index(
             base.startIndex,
-            offsetBy: numericCast(elements.count - sliceFromRight + 1))
+            offsetBy: elements.count - sliceFromRight + 1)
           bounds = index..<index
           break
         case .outOfRangeToTheRightNonEmpty:
           if sliceFromRight == 0 { return }
           let index = base.index(
             base.startIndex,
-            offsetBy: numericCast(elements.count - sliceFromRight + 1))
+            offsetBy: elements.count - sliceFromRight + 1)
           bounds = sliceEndIndex..<index
           break
         case .outOfRangeBothSides:
@@ -853,11 +853,11 @@ extension TestSuite {
           bounds =
             base.index(
               base.startIndex,
-              offsetBy: numericCast(sliceFromLeft - 1))
+              offsetBy: sliceFromLeft - 1)
             ..<
             base.index(
               base.startIndex,
-              offsetBy: numericCast(elements.count - sliceFromRight + 1))
+              offsetBy: elements.count - sliceFromRight + 1)
           break
         case .baseEndIndex:
           if sliceFromRight == 0 { return }
@@ -892,7 +892,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).count/semantics") {
       for test in subscriptRangeTests {
         let c = makeWrappedCollection(test.collection)
-        expectEqual(test.count, numericCast(c.count) as Int)
+        expectEqual(test.count, c.count)
       }
     }
 
@@ -908,7 +908,7 @@ extension TestSuite {
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -929,7 +929,7 @@ extension TestSuite {
             extractValueFromEquatable(candidate).value == test.element.value
         }
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -1058,7 +1058,7 @@ extension TestSuite {
       for test in prefixThroughTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let index = c.index(
-          c.startIndex, offsetBy: numericCast(test.position))
+          c.startIndex, offsetBy: test.position)
         let result = c.prefix(through: index)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
@@ -1073,7 +1073,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
       for test in prefixUpToTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        let index = c.index(c.startIndex, offsetBy: numericCast(test.end))
+        let index = c.index(c.startIndex, offsetBy: test.end)
         let result = c.prefix(upTo: index)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
@@ -1088,7 +1088,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).suffix(from:)/semantics") {
       for test in suffixFromTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        let index = c.index(c.startIndex, offsetBy: numericCast(test.start))
+        let index = c.index(c.startIndex, offsetBy: test.start)
         let result = c.suffix(from: index)
 
         expectEqualSequence(
@@ -1149,7 +1149,7 @@ extension TestSuite {
           into: slice,
           in: slice.index(
             slice.startIndex,
-            offsetBy: numericCast(test.numberToRemove)) ..< slice.endIndex
+            offsetBy: test.numberToRemove) ..< slice.endIndex
         )
         slice.removeFirst(test.numberToRemove)
         expectEqualSequence(
@@ -1387,7 +1387,7 @@ extension TestSuite {
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -1416,7 +1416,7 @@ extension TestSuite {
             extractValueFromEquatable(candidate).value == test.element.value
         })
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -1441,7 +1441,7 @@ extension TestSuite {
             into: slice,
           in: slice.startIndex
             ..< slice.index(
-              slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
+              slice.endIndex, offsetBy: -test.numberToRemove)
         )
         let removedElement = slice.removeLast()
         expectEqual(
@@ -1486,7 +1486,7 @@ extension TestSuite {
           into: slice,
           in: slice.startIndex
             ..< slice.index(
-                  slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
+                  slice.endIndex, offsetBy: -test.numberToRemove)
         )
         slice.removeLast(test.numberToRemove)
         expectEqualSequence(
@@ -1547,7 +1547,7 @@ extension TestSuite {
           into: slice,
           in: slice.startIndex
               ..< slice.index(
-                    slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
+                    slice.endIndex, offsetBy: -test.numberToRemove)
         )
         let removedElement = slice.popLast()!
         expectEqual(
@@ -1591,7 +1591,7 @@ extension TestSuite {
         let index = c.startIndex
         expectCrashLater()
         _blackHole(
-          c.index(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
+          c.index(index, offsetBy: -outOfBoundsIndexOffset))
       }
 
       self.test("\(testNamePrefix).Index/OutOfBounds/Left/Empty") {
@@ -1599,7 +1599,7 @@ extension TestSuite {
         let index = c.startIndex
         expectCrashLater()
         _blackHole(
-          c.index(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
+          c.index(index, offsetBy: -outOfBoundsIndexOffset))
       }
     }
 
@@ -1616,7 +1616,7 @@ extension TestSuite {
         var index = c.startIndex
         expectCrashLater()
         index = c.index(
-          index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+          index, offsetBy: -outOfBoundsSubscriptOffset)
         _blackHole(c[index])
       }
 
@@ -1627,7 +1627,7 @@ extension TestSuite {
         var index = c.startIndex
         expectCrashLater()
         index = c.index(
-          index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+          index, offsetBy: -outOfBoundsSubscriptOffset)
         _blackHole(c[index])
       }
     }
@@ -1645,7 +1645,7 @@ extension TestSuite {
         var index = c.startIndex
         expectCrashLater()
         index = c.index(
-          index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+          index, offsetBy: -outOfBoundsSubscriptOffset)
         _blackHole(c[index..<index])
       }
 
@@ -1656,7 +1656,7 @@ extension TestSuite {
         var index = c.startIndex
         expectCrashLater()
         index = c.index(
-          index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+          index, offsetBy: -outOfBoundsSubscriptOffset)
         _blackHole(c[index..<index])
       }
     }
@@ -1884,7 +1884,7 @@ extension TestSuite {
       let d = c.distance(
         from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
       expectEqual(
-        numericCast(test.expectedDistance),
+        test.expectedDistance,
         d, stackTrace: SourceLocStack().with(test.loc))
     }
 
@@ -1901,7 +1901,7 @@ extension TestSuite {
       }
       let new = c.index(
         c.nthIndex(test.startOffset),
-        offsetBy: numericCast(test.distance))
+        offsetBy: test.distance)
 
       // Since the `nthIndex(offset:)` method performs the same operation
       // (i.e. advances `c.startIndex` by `test.distance`, it would be
@@ -1924,7 +1924,7 @@ extension TestSuite {
       if test.expectedOffset! >= max {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -1940,7 +1940,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      let new = c.index(start, offsetBy: numericCast(test.distance))
+      let new = c.index(start, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -1955,7 +1955,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -1968,7 +1968,7 @@ extension TestSuite {
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -1986,7 +1986,7 @@ extension TestSuite {
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         var new = c.nthIndex(test.startOffset)
-        let exact = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        let exact = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
             stackTrace: SourceLocStack().with(test.loc))
@@ -2009,7 +2009,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -2021,7 +2021,7 @@ extension TestSuite {
         expectCrashLater()
         _ = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
       }
     }
@@ -2037,7 +2037,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let exact = c.formIndex(
           &new,
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
@@ -2049,7 +2049,7 @@ extension TestSuite {
         }
       } else {
         expectCrashLater()
-        _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        _ = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
       }
     }
 
@@ -2133,7 +2133,7 @@ extension TestSuite {
       let d = c.distance(
         from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
       expectEqual(
-        numericCast(test.expectedDistance),
+        test.expectedDistance,
         d, stackTrace: SourceLocStack().with(test.loc))
     }
 
@@ -2150,7 +2150,7 @@ extension TestSuite {
       }
       let new = c.index(
         c.nthIndex(test.startOffset),
-        offsetBy: numericCast(test.distance))
+        offsetBy: test.distance)
 
       // Since the `nthIndex(offset:)` method performs the same operation
       // (i.e. advances `c.startIndex` by `test.distance`, it would be
@@ -2173,7 +2173,7 @@ extension TestSuite {
       if test.expectedOffset! >= max {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2189,7 +2189,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      let new = c.index(start, offsetBy: numericCast(test.distance))
+      let new = c.index(start, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2204,7 +2204,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2217,7 +2217,7 @@ extension TestSuite {
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -2235,7 +2235,7 @@ extension TestSuite {
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         var new = c.nthIndex(test.startOffset)
-        let exact = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        let exact = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
             stackTrace: SourceLocStack().with(test.loc))
@@ -2258,7 +2258,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -2270,7 +2270,7 @@ extension TestSuite {
         expectCrashLater()
         _ = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
       }
     }
@@ -2286,7 +2286,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let exact = c.formIndex(
           &new,
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
@@ -2298,7 +2298,7 @@ extension TestSuite {
         }
       } else {
         expectCrashLater()
-        _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        _ = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
       }
     }
 
@@ -2382,7 +2382,7 @@ extension TestSuite {
       let d = c.distance(
         from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
       expectEqual(
-        numericCast(test.expectedDistance),
+        test.expectedDistance,
         d, stackTrace: SourceLocStack().with(test.loc))
     }
 
@@ -2399,7 +2399,7 @@ extension TestSuite {
       }
       let new = c.index(
         c.nthIndex(test.startOffset),
-        offsetBy: numericCast(test.distance))
+        offsetBy: test.distance)
 
       // Since the `nthIndex(offset:)` method performs the same operation
       // (i.e. advances `c.startIndex` by `test.distance`, it would be
@@ -2422,7 +2422,7 @@ extension TestSuite {
       if test.expectedOffset! >= max {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2438,7 +2438,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      let new = c.index(start, offsetBy: numericCast(test.distance))
+      let new = c.index(start, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2453,7 +2453,7 @@ extension TestSuite {
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      c.formIndex(&new, offsetBy: test.distance)
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -2466,7 +2466,7 @@ extension TestSuite {
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -2484,7 +2484,7 @@ extension TestSuite {
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         var new = c.nthIndex(test.startOffset)
-        let exact = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        let exact = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
             stackTrace: SourceLocStack().with(test.loc))
@@ -2507,7 +2507,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let new = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new!,
@@ -2519,7 +2519,7 @@ extension TestSuite {
         expectCrashLater()
         _ = c.index(
           c.nthIndex(test.startOffset),
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
       }
     }
@@ -2535,7 +2535,7 @@ extension TestSuite {
       if collectionIsBidirectional {
         let exact = c.formIndex(
           &new,
-          offsetBy: numericCast(test.distance),
+          offsetBy: test.distance,
           limitedBy: limit)
         if let expectedOffset = test.expectedOffset {
           expectEqual(c.nthIndex(expectedOffset), new,
@@ -2547,7 +2547,7 @@ extension TestSuite {
         }
       } else {
         expectCrashLater()
-        _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        _ = c.formIndex(&new, offsetBy: test.distance, limitedBy: limit)
       }
     }
 

@@ -600,9 +600,7 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
 
 func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
   for idx in 0..<arr.count {
-    // expected-error@-1 {{protocol 'Sequence' requires that 'Lens<Int>' conform to 'Strideable'}}
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'Lens<Int>'}}
-    // expected-error@-3 {{referencing operator function '..<' on 'Comparable' requires that 'Lens<Int>' conform to 'Comparable'}}
+    // expected-error@-1 {{cannot convert value of type 'Lens<Int>' to expected argument type 'Int'}}
     let _ = arr[idx]
   }
 }
@@ -787,5 +785,40 @@ func test_combination_of_keypath_and_string_lookups() {
 
   func test(outer: Outer) {
     _ = outer.hello.world // Ok
+  }
+}
+
+// SR-12626
+@dynamicMemberLookup
+struct SR12626 {
+  var i: Int
+
+  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+    get { self[keyPath: member] }
+    set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
+  }
+}
+
+// SR-12245
+public struct SR12425_S {}
+
+@dynamicMemberLookup
+public struct SR12425_R {}
+
+internal var rightStructInstance: SR12425_R = SR12425_R()
+
+public extension SR12425_R {
+  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
+      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}
+
+@dynamicMemberLookup
+public struct SR12425_R1 {}
+
+public extension SR12425_R1 {
+  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
+    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
   }
 }

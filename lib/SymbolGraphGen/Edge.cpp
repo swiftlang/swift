@@ -21,9 +21,6 @@ using namespace symbolgraphgen;
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     OS.attribute("kind", Kind.Name);
-    if (Kind == RelationshipKind::DefaultImplementationOf() && Source.getSynthesizedBaseTypeDecl()) {
-      abort();
-    }
     SmallString<256> SourceUSR, TargetUSR;
 
     Source.getUSR(SourceUSR);
@@ -44,13 +41,21 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       OS.attribute("targetFallback", Scratch.str());
     }
 
-    if (ConformanceExtension &&
-        !ConformanceExtension->getGenericRequirements().empty()) {
-      OS.attributeArray("swiftConstraints", [&](){
-        for (const auto &Req : ConformanceExtension->getGenericRequirements()) {
-          ::serialize(Req, OS);
-        }
-      });
+    if (ConformanceExtension) {
+      SmallVector<Requirement, 4> FilteredRequirements;
+      filterGenericRequirements(
+          ConformanceExtension->getGenericRequirements(),
+          ConformanceExtension->getExtendedNominal()
+              ->getDeclContext()->getSelfNominalTypeDecl(),
+                                FilteredRequirements);
+      if (!FilteredRequirements.empty()) {
+        OS.attributeArray("swiftConstraints", [&](){
+          for (const auto &Req :
+               ConformanceExtension->getGenericRequirements()) {
+            ::serialize(Req, OS);
+          }
+        });
+      }
     }
   });
 }

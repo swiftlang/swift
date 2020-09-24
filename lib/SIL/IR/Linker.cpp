@@ -154,7 +154,7 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   for (auto P : Vtbl->getEntries()) {
     // Deserialize and recursively walk any vtable entries that do not have
     // bodies yet.
-    maybeAddFunctionToWorklist(P.Implementation);
+    maybeAddFunctionToWorklist(P.getImplementation());
   }
 }
 

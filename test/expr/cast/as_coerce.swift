@@ -68,14 +68,16 @@ class C5 {}
 
 var c: AnyObject = C3()
 
-if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject' to a more optional type 'C4?'}}
+// XXX TODO: Constant-folding should generate an error about 'C3' not being convertible to 'C4'
+//if let castX = c as! C4? {}
 
-// Only suggest replacing 'as' with 'as!' if it would fix the error.
+// XXX TODO: Only suggest replacing 'as' with 'as!' if it would fix the error.
 C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{6-8=as!}}
 C3() as C5 // expected-error {{cannot convert value of type 'C3' to type 'C5' in coercion}}
 
 // Diagnostic shouldn't include @lvalue in type of c3.
 var c3 = C3()
+// XXX TODO: This should not suggest `as!`
 c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{4-6=as!}}
 
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
@@ -92,8 +94,8 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 (1, 1.0, "a", [1, 23]) as (Int, Double, String, [String])
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
 
-_ = [1] as! [String] // expected-warning{{cast from '[Int]' to unrelated type '[String]' always fails}}
-_ = [(1, (1, 1))] as! [(Int, (String, Int))] // expected-warning{{cast from '[(Int, (Int, Int))]' to unrelated type '[(Int, (String, Int))]' always fails}}
+_ = [1] as! [String] // OK
+_ = [(1, (1, 1))] as! [(Int, (String, Int))] // OK
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
 _ = "hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{13-24=}}

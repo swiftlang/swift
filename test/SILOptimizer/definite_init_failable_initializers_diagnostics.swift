@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
-// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
 
 // High-level tests that DI rejects certain invalid idioms for early
 // return from initializers.
@@ -11,6 +11,24 @@ class FailableInitThatFailsReallyHard {
   }
 }
 
+// Failable initializers must produce correct diagnostics
+struct A {
+  var x: Int  // expected-note {{'self.x' not initialized}}
+  init?(i: Int) {
+    if i > 0 {
+      self.x = i
+    }
+  } // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// Delegating, failable initializers that doesn't initialize along all paths must produce correct diagnostics.
+extension Int {
+  init?(i: Int) {
+    if i > 0 {
+      self.init(i)
+    }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
 
 class BaseClass {}
 final class DerivedClass : BaseClass {

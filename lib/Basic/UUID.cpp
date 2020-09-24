@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/UUID.h"
+#include "llvm/ADT/SmallString.h"
 
 // WIN32 doesn't natively support <uuid/uuid.h>. Instead, we use Win32 APIs.
 #if defined(_WIN32)

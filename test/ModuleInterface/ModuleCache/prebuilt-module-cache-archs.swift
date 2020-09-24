@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/include/Lib.swiftmodule)
-// RUN: cp %S/Inputs/prebuilt-module-cache/Lib.swiftinterface %t/include/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/prebuilt-module-cache/Lib.swiftinterface %t/include/Lib.swiftmodule/%target-swiftinterface-name
 
 // Baseline check: if the prebuilt cache path does not exist, everything should
 // still work.

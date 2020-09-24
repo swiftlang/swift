@@ -35,6 +35,7 @@ from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 import six
 
+from swift_build_support.swift_build_support import build_graph
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -218,10 +219,9 @@ def validate_arguments(toolchain, args):
     targets_needing_toolchain = [
         'build_indexstoredb',
         'build_playgroundsupport',
-        'build_pythonkit',
         'build_sourcekitlsp',
-        'build_tensorflow_swift_apis',
         'build_toolchainbenchmarks',
+        'build_swift_inspect',
         'tsan_libdispatch_test',
     ]
     has_target_needing_toolchain = \
@@ -271,9 +271,7 @@ def apply_default_arguments(toolchain, args):
     ninja_required = (
         args.build_foundation or
         args.build_indexstoredb or
-        args.build_pythonkit or
         args.build_sourcekitlsp or
-        args.build_tensorflow_swift_apis or
         args.cmake_generator == 'Ninja'
     )
     if ninja_required and toolchain.ninja is None:
@@ -350,6 +348,18 @@ def apply_default_arguments(toolchain, args):
                 target.arch in supported_archs)
         ]
 
+    # Filter out any macOS stdlib deployment targets that are not supported
+    # by the macOS SDK.
+    targets = StdlibDeploymentTarget.get_targets_by_name(
+        args.stdlib_deployment_targets)
+    args.stdlib_deployment_targets = [
+        target.name
+        for target in targets
+        if (not target.platform.is_darwin or
+            target.platform.sdk_supports_architecture(
+                target.arch, args.darwin_xcrun_toolchain))
+    ]
+
     # Include the Darwin module-only architectures in the CMake options.
     if args.swift_darwin_module_archs:
         args.extra_cmake_options.append(
@@ -373,6 +383,10 @@ class BuildScriptInvocation(object):
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
         self.build_libparser_only = args.build_libparser_only
+
+    @property
+    def install_all(self):
+        return self.args.install_all or self.args.infer_dependencies
 
     def build_ninja(self):
         if not os.path.exists(self.workspace.source_dir("ninja")):
@@ -450,7 +464,13 @@ class BuildScriptInvocation(object):
         ]
 
         # Compute any product specific cmake arguments.
-        for product_class in self.compute_product_classes():
+        #
+        # NOTE: The sum(list(...)) is b/c compute_product_classes returns a
+        # tuple of lists of which the first is the build-script-impl products
+        # and the second is the non-build-script-impl-products. It guarantees
+        # that when we concatenate these two lists together we get a valid
+        # dependency graph.
+        for product_class in sum(list(self.compute_product_classes()), []):
             if not product_class.is_build_script_impl_product():
                 continue
 
@@ -538,23 +558,28 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
-        # Currently we do not build external benchmarks by default.
-        if args.build_external_benchmarks:
-            impl_args += ["--skip-build-external-benchmarks=0"]
-        if not args.build_foundation:
-            impl_args += ["--skip-build-foundation"]
-        if not args.build_xctest:
-            impl_args += ["--skip-build-xctest"]
-        if not args.build_lldb:
-            impl_args += ["--skip-build-lldb"]
-        if not args.build_llbuild:
-            impl_args += ["--skip-build-llbuild"]
-        if not args.build_libcxx:
-            impl_args += ["--skip-build-libcxx"]
-        if not args.build_libdispatch:
-            impl_args += ["--skip-build-libdispatch"]
-        if not args.build_libicu:
-            impl_args += ["--skip-build-libicu"]
+
+        # Then add subproject install flags that either skip building them /or/
+        # if we are going to build them and install_all is set, we also install
+        # them.
+        conditional_subproject_configs = [
+            (args.build_cmark, "cmark"),
+            (args.build_llvm, "llvm"),
+            (args.build_swift, "swift"),
+            (args.build_foundation, "foundation"),
+            (args.build_xctest, "xctest"),
+            (args.build_lldb, "lldb"),
+            (args.build_llbuild, "llbuild"),
+            (args.build_libcxx, "libcxx"),
+            (args.build_libdispatch, "libdispatch"),
+            (args.build_libicu, "libicu")
+        ]
+        for (should_build, string_name) in conditional_subproject_configs:
+            if not should_build and not self.args.infer_dependencies:
+                impl_args += ["--skip-build-{}".format(string_name)]
+            elif self.install_all:
+                impl_args += ["--install-{}".format(string_name)]
+
         if args.build_swift_dynamic_stdlib:
             impl_args += ["--build-swift-dynamic-stdlib"]
         if args.build_swift_static_stdlib:
@@ -566,26 +591,6 @@ class BuildScriptInvocation(object):
         if args.build_swift_static_sdk_overlay:
             impl_args += ["--build-swift-static-sdk-overlay"]
 
-        if not args.build_linux:
-            impl_args += ["--skip-build-linux"]
-        if not args.build_freebsd:
-            impl_args += ["--skip-build-freebsd"]
-        if not args.build_cygwin:
-            impl_args += ["--skip-build-cygwin"]
-        if not args.build_osx:
-            impl_args += ["--skip-build-osx"]
-        if not args.build_ios_device:
-            impl_args += ["--skip-build-ios-device"]
-        if not args.build_ios_simulator:
-            impl_args += ["--skip-build-ios-simulator"]
-        if not args.build_tvos_device:
-            impl_args += ["--skip-build-tvos-device"]
-        if not args.build_tvos_simulator:
-            impl_args += ["--skip-build-tvos-simulator"]
-        if not args.build_watchos_device:
-            impl_args += ["--skip-build-watchos-device"]
-        if not args.build_watchos_simulator:
-            impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
         if not args.build_clang_tools_extra:
@@ -603,32 +608,6 @@ class BuildScriptInvocation(object):
                 "--skip-test-libdispatch",
                 "--skip-test-libicu",
             ]
-        if not args.test_linux:
-            impl_args += ["--skip-test-linux"]
-        if not args.test_freebsd:
-            impl_args += ["--skip-test-freebsd"]
-        if not args.test_cygwin:
-            impl_args += ["--skip-test-cygwin"]
-        if not args.test_osx:
-            impl_args += ["--skip-test-osx"]
-        if not args.test_ios_host:
-            impl_args += ["--skip-test-ios-host"]
-        if not args.test_ios_simulator:
-            impl_args += ["--skip-test-ios-simulator"]
-        if not args.test_ios_32bit_simulator:
-            impl_args += ["--skip-test-ios-32bit-simulator"]
-        if not args.test_tvos_host:
-            impl_args += ["--skip-test-tvos-host"]
-        if not args.test_tvos_simulator:
-            impl_args += ["--skip-test-tvos-simulator"]
-        if not args.test_watchos_host:
-            impl_args += ["--skip-test-watchos-host"]
-        if not args.test_watchos_simulator:
-            impl_args += ["--skip-test-watchos-simulator"]
-        if not args.test_android:
-            impl_args += ["--skip-test-android"]
-        if not args.test_android_host:
-            impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
         if args.validation_test:
@@ -643,12 +622,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
-        if not args.test_optimized:
-            impl_args += ["--skip-test-optimized"]
-        if not args.test_optimize_for_size:
-            impl_args += ["--skip-test-optimize-for-size"]
-        if not args.test_optimize_none_with_implicit_dynamic:
-            impl_args += ["--skip-test-optimize-none-with-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -679,6 +652,14 @@ class BuildScriptInvocation(object):
                 targets.darwin_toolchain_prefix(
                     args.install_prefix),
                 "--host-lipo", toolchain.lipo,
+            ]
+
+            # Isolate build from the system; Darwin toolchains build against SDKs.
+            # For additional isolation, disable pkg-config. Homebrew's pkg-config
+            # prioritizes CommandLineTools paths, resulting in compile errors.
+            args.extra_cmake_options += [
+                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib',
+                '-DPKG_CONFIG_EXECUTABLE=/usr/bin/false',
             ]
 
         if toolchain.libtool is not None:
@@ -745,6 +726,11 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.coverage_db)
             ]
 
+        if args.llvm_install_components:
+            impl_args += [
+                "--llvm-install-components=%s" % args.llvm_install_components
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -792,56 +778,112 @@ class BuildScriptInvocation(object):
         return options
 
     def compute_product_classes(self):
-        """compute_product_classes() -> list
+        """compute_product_classes() -> (list, list)
 
-        Compute the list of all Product classes used in this build. This list
-        is constructed in dependency order.
+        Compute the list first of all build-script-impl products and then all
+        non-build-script-impl products. It is assumed that concatenating the two
+        lists together will result in a valid dependency graph for the
+        compilation.
+
         """
 
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
+        impl_product_classes = []
+        if self.args.build_cmark:
+            impl_product_classes.append(products.CMark)
+
+        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
+        # Swift still needs a few LLVM targets like tblgen to be built for it to be
+        # configured. Instead, handle this in build-script-impl for now.
+        impl_product_classes.append(products.LLVM)
+        if self.args.build_libcxx:
+            impl_product_classes.append(products.LibCXX)
+        if self.args.build_libicu:
+            impl_product_classes.append(products.LibICU)
+        if self.args.build_swift:
+            impl_product_classes.append(products.Swift)
+        if self.args.build_lldb:
+            impl_product_classes.append(products.LLDB)
+        if self.args.build_libdispatch:
+            impl_product_classes.append(products.LibDispatch)
+        if self.args.build_foundation:
+            impl_product_classes.append(products.Foundation)
+        if self.args.build_xctest:
+            impl_product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            impl_product_classes.append(products.LLBuild)
+        # Sanity check that all of our impl classes are actually
+        # build_script_impl products.
+        for prod in impl_product_classes:
+            assert(prod.is_build_script_impl_product())
 
         product_classes = []
-        product_classes.append(products.CMark)
-        product_classes.append(products.LLVM)
-        if self.args.build_libcxx:
-            product_classes.append(products.LibCXX)
-        if self.args.build_libicu:
-            product_classes.append(products.LibICU)
-        product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            product_classes.append(products.LLDB)
-        if self.args.build_libdispatch:
-            product_classes.append(products.LibDispatch)
-        if self.args.build_foundation:
-            product_classes.append(products.Foundation)
-        if self.args.build_xctest:
-            product_classes.append(products.XCTest)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
+        if self.args.build_swift_driver:
+            product_classes.append(products.SwiftDriver)
         if self.args.build_swiftsyntax:
             product_classes.append(products.SwiftSyntax)
         if self.args.build_skstresstester:
             product_classes.append(products.SKStressTester)
+        if self.args.build_swiftformat:
+            product_classes.append(products.SwiftFormat)
         if self.args.build_swiftevolve:
             product_classes.append(products.SwiftEvolve)
         if self.args.build_indexstoredb:
             product_classes.append(products.IndexStoreDB)
         if self.args.build_playgroundsupport:
             product_classes.append(products.PlaygroundSupport)
-        if self.args.build_pythonkit:
-            product_classes.append(products.PythonKit)
-        if self.args.build_tensorflow_swift_apis:
-            product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
             product_classes.append(products.Benchmarks)
+        if self.args.build_swift_inspect:
+            product_classes.append(products.SwiftInspect)
         if self.args.tsan_libdispatch_test:
             product_classes.append(products.TSanLibDispatch)
-        return product_classes
+        # Sanity check that all of our non-impl classes are actually
+        # not build_script_impl products.
+        for prod in product_classes:
+            assert(not prod.is_build_script_impl_product())
+
+        # Now that we have our two lists of product_classes, if we are asked to
+        # infer dependencies, infer the dependencies now and then re-split the
+        # list.
+        if self.args.infer_dependencies:
+            combined = impl_product_classes + product_classes
+            if self.args.verbose_build:
+                print("-- Build Graph Inference --")
+                print("Initial Product List:")
+                for p in combined:
+                    print("    {}".format(p.product_name()))
+
+            # Now that we have produced the schedule, resplit. We require our
+            # dependencies to respect our build-script-impl property. This means
+            # that no build-script-impl products can have dependencies on
+            # non-build-script-impl products. Otherwise, it would be unsafe to
+            # re-order build-script-impl products in front of non
+            # build-script-impl products.
+            impl_product_classes = []
+            product_classes = []
+            is_darwin = platform.system() == 'Darwin'
+            final_schedule = build_graph.produce_scheduled_build(combined)[0]
+            for p in final_schedule:
+                if is_darwin and p.is_nondarwin_only_build_product():
+                    continue
+
+                if p.is_build_script_impl_product():
+                    impl_product_classes.append(p)
+                else:
+                    product_classes.append(p)
+            if self.args.verbose_build:
+                print("Final Build Order:")
+                for p in impl_product_classes:
+                    print("    {}".format(p.product_name()))
+                for p in product_classes:
+                    print("    {}".format(p.product_name()))
+        return (impl_product_classes, product_classes)
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -869,10 +911,7 @@ class BuildScriptInvocation(object):
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        product_classes = self.compute_product_classes()
-
-        impl_product_classes = [cls for cls in product_classes
-                                if cls.is_build_script_impl_product()]
+        (impl_product_classes, product_classes) = self.compute_product_classes()
 
         # Execute each "pass".
 
@@ -906,6 +945,9 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 self._execute_install_action(host_target, product_class)
 
+        # Core Lipo...
+        self._execute_merged_host_lipo_core_action()
+
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
@@ -925,6 +967,9 @@ class BuildScriptInvocation(object):
                     toolchain=self.toolchain,
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=build_dir)
+                if product.should_clean(host_target):
+                    print("--- Cleaning %s ---" % product_name)
+                    product.clean(host_target)
                 if product.should_build(host_target):
                     print("--- Building %s ---" % product_name)
                     product.build(host_target)
@@ -932,7 +977,8 @@ class BuildScriptInvocation(object):
                     print("--- Running tests for %s ---" % product_name)
                     product.test(host_target)
                     print("--- Finished tests for %s ---" % product_name)
-                if product.should_install(host_target):
+                if product.should_install(host_target) or \
+                   (self.install_all and product.should_build(host_target)):
                     print("--- Installing %s ---" % product_name)
                     product.install(host_target)
 
@@ -972,6 +1018,9 @@ class BuildScriptInvocation(object):
 
     def _execute_merged_host_lipo_action(self):
         self._execute_action("merged-hosts-lipo")
+
+    def _execute_merged_host_lipo_core_action(self):
+        self._execute_action("merged-hosts-lipo-core")
 
     def _execute_action(self, action_name):
         shell.call_without_sleeping(
@@ -1237,6 +1286,7 @@ def main_normal():
 
         if platform.system() == 'Darwin':
             prefix = targets.darwin_toolchain_prefix(args.install_prefix)
+            prefix = os.path.join(args.host_target, prefix.lstrip('/'))
         else:
             prefix = args.install_prefix
 

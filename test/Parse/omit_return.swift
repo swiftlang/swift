@@ -1005,7 +1005,7 @@ var fvs_stubMyOwnFatalError: () {
 var fvs_forceTryExplicit: String {
     get { "ok" }
     set {
-        return try! failableIdentity("shucks") // expected-error {{cannot convert value of type 'String' to expected argument type '()'}}
+        return try! failableIdentity("shucks") // expected-error {{unexpected non-void return value in void function}}
     }
 }
 
@@ -1710,7 +1710,7 @@ class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
 class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
 
 func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
-    value is type // expected-error {{use of undeclared type 'type'}}
+    value is type // expected-error {{cannot find type 'type' in scope}}
 }
 
 

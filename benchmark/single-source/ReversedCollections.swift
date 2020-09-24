@@ -16,7 +16,7 @@ public let ReversedCollections = [
   BenchmarkInfo(name: "ReversedArray2", runFunction: run_ReversedArray, tags: [.validation, .api, .Array],
       setUpFunction: { blackHole(arrayInput) },
       tearDownFunction: { arrayInput = nil }),
-  BenchmarkInfo(name: "ReversedBidirectional", runFunction: run_ReversedBidirectional, tags: [.validation, .api]),
+  BenchmarkInfo(name: "ReversedBidirectional", runFunction: run_ReversedBidirectional, tags: [.validation, .api, .cpubench]),
   BenchmarkInfo(name: "ReversedDictionary2", runFunction: run_ReversedDictionary, tags: [.validation, .api, .Dictionary],
       setUpFunction: { blackHole(dictionaryInput) },
       tearDownFunction: { dictionaryInput = nil })

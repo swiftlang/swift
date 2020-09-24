@@ -103,10 +103,9 @@ $ NDK_PATH="path/to/android-ndk21"
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \     # The Swift compiler built in the previous step.
                                                                 # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
-    -target armv7a-none-linux-androideabi \                     # Targeting android-armv7.
-    -sdk ${NDK_PATH}/platforms/android-21/arch-arm \            # Use the same architecture and API version as you used to build the stdlib in the previous step.
-    -Xclang-linker -nostdlib++ \                                # Don't link libc++, and supply the path to libgcc.
+    -target armv7a-none-linux-androideabi \                     # Targeting android-armv7, and supply the path to libgcc.
     -L ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x/armv7-a \
+    -sdk ${NDK_PATH}/platforms/android-21/arch-arm \            # Use the same architecture and API version as you used to build the stdlib in the previous step.
     hello.swift
 ```
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -51,7 +51,7 @@ public struct AnyIterator<Element> {
   ///     func digits() -> AnyIterator<String> {
   ///         let lazyStrings = (0..<10).lazy.map { String($0) }
   ///         let iterator:
-  ///             LazyMapIterator<IndexingIterator<Range<Int>>, String>
+  ///             LazyMapSequence<Range<Int>, String>.Iterator
   ///             = lazyStrings.makeIterator()
   ///
   ///         return AnyIterator(iterator)
@@ -743,7 +743,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func _index(
     _ i: _AnyIndexBox, offsetBy n: Int
   ) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
+    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: n))
   }
 
   @inlinable
@@ -752,10 +752,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     offsetBy n: Int,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
-    return _base.index(
-        _unbox(i),
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit))
+    return _base.index(_unbox(i), offsetBy: n, limitedBy: _unbox(limit))
       .map { _IndexBox(_base: $0) }
   }
 
@@ -764,7 +761,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     _ i: inout _AnyIndexBox, offsetBy n: Int
   ) {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(&box._base, offsetBy: numericCast(n))
+      return _base.formIndex(&box._base, offsetBy: n)
     }
     fatalError("Index type mismatch!")
   }
@@ -774,10 +771,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(
-        &box._base,
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit))
+      return _base.formIndex(&box._base, offsetBy: n, limitedBy: _unbox(limit))
     }
     fatalError("Index type mismatch!")
   }
@@ -787,12 +781,12 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     from start: _AnyIndexBox,
     to end: _AnyIndexBox
   ) -> Int {
-    return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
+    return _base.distance(from: _unbox(start), to: _unbox(end))
   }
 
   @inlinable
   internal override var _count: Int {
-    return numericCast(_base.count)
+    return _base.count
   }
 
   @usableFromInline
@@ -949,7 +943,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func _index(
     _ i: _AnyIndexBox, offsetBy n: Int
   ) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
+    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: n))
   }
 
   @inlinable
@@ -958,11 +952,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     offsetBy n: Int,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
-    return _base.index(
-        _unbox(i),
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit)
-      )
+    return _base.index(_unbox(i), offsetBy: n, limitedBy: _unbox(limit))
       .map { _IndexBox(_base: $0) }
   }
 
@@ -971,7 +961,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     _ i: inout _AnyIndexBox, offsetBy n: Int
   ) {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(&box._base, offsetBy: numericCast(n))
+      return _base.formIndex(&box._base, offsetBy: n)
     }
     fatalError("Index type mismatch!")
   }
@@ -981,10 +971,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(
-        &box._base,
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit))
+      return _base.formIndex(&box._base, offsetBy: n, limitedBy: _unbox(limit))
     }
     fatalError("Index type mismatch!")
   }
@@ -994,12 +981,12 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     from start: _AnyIndexBox,
     to end: _AnyIndexBox
   ) -> Int {
-    return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
+    return _base.distance(from: _unbox(start), to: _unbox(end))
   }
 
   @inlinable
   internal override var _count: Int {
-    return numericCast(_base.count)
+    return _base.count
   }
 
   @inlinable
@@ -1168,7 +1155,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func _index(
     _ i: _AnyIndexBox, offsetBy n: Int
   ) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
+    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: n))
   }
 
   @inlinable
@@ -1177,11 +1164,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     offsetBy n: Int,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
-    return _base.index(
-        _unbox(i),
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit)
-      )
+    return _base.index(_unbox(i), offsetBy: n, limitedBy: _unbox(limit))
       .map { _IndexBox(_base: $0) }
   }
 
@@ -1190,7 +1173,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     _ i: inout _AnyIndexBox, offsetBy n: Int
   ) {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(&box._base, offsetBy: numericCast(n))
+      return _base.formIndex(&box._base, offsetBy: n)
     }
     fatalError("Index type mismatch!")
   }
@@ -1200,10 +1183,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(
-        &box._base,
-        offsetBy: numericCast(n),
-        limitedBy: _unbox(limit))
+      return _base.formIndex(&box._base, offsetBy: n, limitedBy: _unbox(limit))
     }
     fatalError("Index type mismatch!")
   }
@@ -1213,12 +1193,12 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     from start: _AnyIndexBox,
     to end: _AnyIndexBox
   ) -> Int {
-    return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
+    return _base.distance(from: _unbox(start), to: _unbox(end))
   }
 
   @inlinable
   internal override var _count: Int {
-    return numericCast(_base.count)
+    return _base.count
   }
 
   @inlinable

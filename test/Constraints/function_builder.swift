@@ -32,7 +32,6 @@ struct TupleBuilder {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -41,10 +40,12 @@ struct TupleBuilder {
   static func buildEither<T,U>(second value: U) -> Either<T,U> {
     return .second(value)
   }
+
+  static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
-  print(body(cond))
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) throws -> T) rethrows {
+  print(try body(cond))
 }
 
 // CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
@@ -646,7 +647,6 @@ struct TupleBuilderWithOpt {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
   static func buildOptional<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -663,4 +663,107 @@ func tuplifyWithOpt<T>(_ cond: Bool, @TupleBuilderWithOpt body: (Bool) -> T) {
 tuplifyWithOpt(true) { c in
   "1"
   3.14159
+}
+
+// Test for-each loops with buildArray.
+// CHECK: testForEach
+// CHECK-SAME: (1, "separator")
+// CHECK-SAME: (2, "separator")
+// CHECK-SAME: (3, "separator")
+// CHECK-SAME: (4, "separator")
+// CHECK-SAME: (5, "separator")
+// CHECK-SAME: (6, "separator")
+// CHECK-SAME: (7, "separator")
+// CHECK-SAME: (8, "separator")
+// CHECK-SAME: (9, "separator")
+// CHECK-SAME: (10, "separator")
+tuplify(true) { c in
+  "testForEach"
+  for i in 0 ..< (c ? 10 : 5) {
+    i + 1
+    "separator"
+  }
+}
+
+// Test the use of function builders partly implemented through a protocol.
+indirect enum FunctionBuilder<Expression> {
+    case expression(Expression)
+    case block([FunctionBuilder])
+    case either(Either<FunctionBuilder, FunctionBuilder>)
+    case optional(FunctionBuilder?)
+}
+
+protocol FunctionBuilderProtocol {
+    associatedtype Expression
+    typealias Component = FunctionBuilder<Expression>
+    associatedtype Return
+
+    static func buildExpression(_ expression: Expression) -> Component
+    static func buildBlock(_ components: Component...) -> Component
+    static func buildOptional(_ optional: Component?) -> Component
+    static func buildArray(_ components: [Component]) -> Component
+    static func buildLimitedAvailability(_ component: Component) -> Component
+
+    static func buildFinalResult(_ components: Component) -> Return
+}
+
+extension FunctionBuilderProtocol {
+    static func buildExpression(_ expression: Expression) -> Component { .expression(expression) }
+    static func buildBlock(_ components: Component...) -> Component { .block(components) }
+    static func buildOptional(_ optional: Component?) -> Component { .optional(optional) }
+    static func buildArray(_ components: [Component]) -> Component { .block(components) }
+    static func buildLimitedAvailability(_ component: Component) -> Component { component }
+}
+
+@_functionBuilder
+enum ArrayBuilder<E>: FunctionBuilderProtocol {
+    typealias Expression = E
+    typealias Component = FunctionBuilder<E>
+    typealias Return = [E]
+
+    static func buildFinalResult(_ components: Component) -> Return {
+        switch components {
+        case .expression(let e): return [e]
+        case .block(let children): return children.flatMap(buildFinalResult)
+        case .either(.first(let child)): return buildFinalResult(child)
+        case .either(.second(let child)): return buildFinalResult(child)
+        case .optional(let child?): return buildFinalResult(child)
+        case .optional(nil): return []
+        }
+    }
+}
+
+
+func buildArray(@ArrayBuilder<String> build: () -> [String]) -> [String] {
+    return build()
+}
+
+
+let a = buildArray {
+    "1"
+    "2"
+    if Bool.random() {
+        "maybe 3"
+    }
+}
+// CHECK: ["1", "2"
+print(a)
+
+// Throwing in function builders.
+enum MyError: Error {
+  case boom
+}
+
+// CHECK: testThrow
+do {
+  print("testThrow")
+  try tuplify(true) { c in
+    "ready to throw"
+    throw MyError.boom
+  }
+} catch MyError.boom {
+  // CHECK: caught it!
+  print("caught it!")
+} catch {
+  fatalError("Threw something else?")
 }

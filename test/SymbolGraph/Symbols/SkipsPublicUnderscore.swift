@@ -7,9 +7,11 @@ public protocol PublicProtocol {}
 
 // CHECK-NOT: precise:{{.*}}_ProtocolShouldntAppear
 // CHECK-NOT: precise:{{.*}}PublicProtocol
+@_show_in_interface
 public protocol _ProtocolShouldntAppear {}
 
 // CHECK-NOT: _ShouldntAppear
+
 public struct _ShouldntAppear: PublicProtocol, _ProtocolShouldntAppear {
   // Although these are public and not underscored,
   // they are inside an underscored type,
@@ -51,3 +53,11 @@ extension _ShouldntAppear {
     public var shouldntAppear: Int
   }
 }
+
+extension _ShouldntAppear.InnerShouldntAppear {
+  public struct ShouldntAppear {}
+}
+
+extension _ShouldntAppear.InnerShouldntAppear: Equatable {}
+
+// CHECK: "relationships": []

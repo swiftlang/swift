@@ -6,7 +6,7 @@ enum Either<T,U> {
 }
 
 @_functionBuilder
-struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -45,7 +45,10 @@ struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
 }
 
 @_functionBuilder
-struct TupleBuilderWithoutIf { // expected-note {{struct 'TupleBuilderWithoutIf' declared here}}
+struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
+  // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}
+  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
+  // expected-note@-3{{add 'buildArray(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -87,8 +90,8 @@ func testDiags() {
   // For loop
   tuplify(true) { _ in
     17
-    for c in name { // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
-    // expected-error@-1 {{use of unresolved identifier 'name'}}
+    for c in name {
+    // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
 
@@ -104,6 +107,19 @@ func testDiags() {
   tuplifyWithoutIf(true) {
     if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
       "hello"
+    }
+  }
+
+  tuplifyWithoutIf(true) {
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+      "hello"
+    } else {
+    }
+  }
+
+  tuplifyWithoutIf(true) { a in
+    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+      x
     }
   }
 }
@@ -179,7 +195,7 @@ struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter
 }
 
 func test_51167632() -> some P {
-  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'; only concrete types such as structs, enums and classes can conform to protocols}}
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
@@ -418,28 +434,45 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
-    String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+    let a = nil // There is no diagnostic here because next line fails to pre-check, so body is invalid
+    String(nothing) // expected-error {{cannot find 'nothing' in scope}}
+  }
+
+  @TupleBuilder var nilWithoutContext: String {
+    let a = nil // expected-error {{'nil' requires a contextual type}}
   }
 
   func buildTupleClosure() {
     tuplify(true) { _ in
-      String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+      let a = nothing // expected-error {{cannot find 'nothing' in scope}}
+      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
 }
 
 // Check @unknown
 func testUnknownInSwitchSwitch(e: E) {
-    tuplify(true) { c in
+  tuplify(true) { c in
     "testSwitch"
     switch e {
-    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
-      "a"
     case .b(let i, let s?):
       i * 2
       s + "!"
     default:
       "nothing"
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      // expected-error@-1{{'case' blocks cannot appear after the 'default' block of a 'switch'}}
+      "a"
+    }
+  }
+
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+      @unknown case _: // expected-error{{'@unknown' can only be applied to the last case in a switch}}
+      "a"
+    default:
+      "default"
     }
   }
 }
@@ -463,6 +496,8 @@ func testCaseMutabilityMismatches(e: E3) {
             var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
       x
       y += "a"
+    default:
+      "default"
     }
   }
 }
@@ -557,4 +592,70 @@ func rdar61347993() {
 
   func test_closure(_: () -> Result) {}
   test_closure {} // expected-error {{cannot convert value of type '()' to closure result type 'Result'}}
+}
+
+// One-way constraints through parameters.
+func wrapperifyInfer<T, U>(_ cond: Bool, @WrapperBuilder body: (U) -> T) -> T {
+  fatalError("boom")
+}
+
+let intValue = 17
+wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closure parameter 'x' in the current context}}
+  intValue + x
+}
+
+struct DoesNotConform {}
+
+struct MyView {
+  @TupleBuilder var value: some P { // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform()
+  }
+
+  @TupleBuilder func test() -> some P { // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform()
+  }
+
+  @TupleBuilder var emptySwitch: some P {
+    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
+    }
+  }
+
+  @TupleBuilder var invalidSwitchOne: some P {
+    switch Optional.some(1) {
+    case . // expected-error {{expected ':' after 'case'}}
+    } // expected-error {{expected identifier after '.' expression}}
+  }
+
+  @TupleBuilder var invalidSwitchMultiple: some P {
+    switch Optional.some(1) {
+    case .none: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+    case . // expected-error {{expected ':' after 'case'}}
+    } // expected-error {{expected identifier after '.' expression}}
+  }
+
+  @TupleBuilder var invalidCaseWithoutDot: some P {
+    switch Optional.some(1) {
+    case none: 42 // expected-error {{cannot find 'none' in scope}}
+    case .some(let x):
+      0
+    }
+  }
+
+  @TupleBuilder var invalidConversion: Int { // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+    ""
+  }
+}
+
+// Make sure throwing function builder closures are implied.
+enum MyError: Error {
+  case boom
+}
+
+do {
+    tuplify(true) { c in // expected-error{{invalid conversion from throwing function of type '(Bool) throws -> String' to non-throwing function type '(Bool) -> String'}}
+    "testThrow"
+    throw MyError.boom
+  }
 }

@@ -13,7 +13,6 @@
 #ifndef SWIFT_RUNTIME_THREADLOCALSTORAGE_H
 #define SWIFT_RUNTIME_THREADLOCALSTORAGE_H
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 
 // Depending on the target, we may be able to use dedicated TSD keys or
@@ -24,16 +23,6 @@
 // On Apple platforms, we have dedicated TSD keys.
 #if defined(__APPLE__)
 # define SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC 1
-#endif
-
-// If we're using Clang, and Clang claims not to support thread_local,
-// it must be because we're on a platform that doesn't support it.
-#if __clang__ && !__has_feature(cxx_thread_local)
-// No thread_local.
-#else
-// Otherwise, we do have thread_local.
-# define SWIFT_TLS_HAS_THREADLOCAL 1
-static_assert(LLVM_ENABLE_THREADS, "LLVM_THREAD_LOCAL will use a global?");
 #endif
 
 #if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
@@ -92,6 +81,9 @@ typedef unsigned long __swift_thread_key_t;
 #  include <io.h>
 #  define WIN32_LEAN_AND_MEAN
 #  include <Windows.h>
+
+#include <type_traits>
+
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 

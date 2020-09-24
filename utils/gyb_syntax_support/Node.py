@@ -1,7 +1,7 @@
 from __future__ import print_function
 import sys  # noqa: I201
 
-from kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
+from .kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
 
 
 def error(msg):
@@ -19,7 +19,8 @@ class Node(object):
 
     def __init__(self, name, description=None, kind=None, traits=None,
                  children=None, element=None, element_name=None,
-                 element_choices=None, omit_when_empty=False):
+                 element_choices=None, omit_when_empty=False,
+                 must_uphold_invariant=False):
         self.syntax_kind = name
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
@@ -39,6 +40,8 @@ class Node(object):
 
         self.omit_when_empty = omit_when_empty
         self.collection_element = element or ""
+        self.must_uphold_invariant = must_uphold_invariant
+
         # For SyntaxCollections make sure that the element_name is set.
         assert(not self.is_syntax_collection() or element_name or
                (element and element != 'Syntax'))

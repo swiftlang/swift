@@ -62,6 +62,8 @@ public:
     KeyPathInitializer,
     KeyPathMetadataAccessor,
     DynamicReplacementKey,
+    ProtocolConformanceDescriptor,
+    ProtocolConformanceDescriptorAsArgument,
   };
 
 private:

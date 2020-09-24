@@ -212,7 +212,7 @@ postfix func☃⃠(a : Int) -> Int { return a }
 
 _ = n☃⃠ ☃⃠ n   // Ok.
 _ = n ☃⃠ ☃⃠n   // Ok.
-_ = n ☃⃠☃⃠ n   // expected-error {{use of unresolved operator '☃⃠☃⃠'}}
+_ = n ☃⃠☃⃠ n   // expected-error {{cannot find operator '☃⃠☃⃠' in scope}}
 _ = n☃⃠☃⃠n     // expected-error {{ambiguous missing whitespace between unary and binary operators}}
 // expected-note @-1 {{could be binary '☃⃠' and prefix '☃⃠'}} {{12-12= }} {{18-18= }}
 // expected-note @-2 {{could be postfix '☃⃠' and binary '☃⃠'}} {{6-6= }} {{12-12= }}

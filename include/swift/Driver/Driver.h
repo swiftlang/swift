@@ -25,7 +25,6 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <functional>
@@ -101,6 +100,14 @@ public:
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
+
+  enum class LTOKind {
+    None,
+    LLVMThin,
+    LLVMFull,
+  };
+
+  LTOKind LTOVariant = LTOKind::None;
 
   /// Describes if and how the output of compile actions should be
   /// linked together.
@@ -366,6 +373,11 @@ private:
                                  llvm::SmallString<128> &buffer,
                                  file_types::ID fileType,
                                  CommandOutput *output) const;
+
+  void chooseModuleSummaryPath(Compilation &C, const TypeToPathMap *OutputMap,
+                               StringRef workingDirectory,
+                               llvm::SmallString<128> &Buf,
+                               CommandOutput *Output) const;
 
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;

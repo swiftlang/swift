@@ -471,6 +471,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
   auto IntArg = SyntaxFactory::makeBlankTupleTypeElement()
     .withType(Int);
+  auto Async = SyntaxFactory::makeIdentifier(
+      "async", { }, { Trivia::spaces(1) });
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, { Trivia::spaces(1) });
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
@@ -498,13 +500,43 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     SyntaxFactory::makeFunctionType(LeftParen,
                                     TypeList,
                                     RightParen,
+                                    Async,
+                                    Throws,
+                                    Arrow,
+                                    Int)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) async throws -> Int");
+  }
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+
+    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
+    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
+    auto xArg = SyntaxFactory::makeBlankTupleTypeElement()
+      .withName(x)
+      .withColon(Colon)
+      .withType(Int)
+      .withTrailingComma(Comma);
+    auto yArg = SyntaxFactory::makeBlankTupleTypeElement()
+      .withName(y)
+      .withColon(Colon)
+      .withType(Int);
+
+    auto TypeList = SyntaxFactory::makeTupleTypeElementList({
+      xArg, yArg
+    });
+    SyntaxFactory::makeFunctionType(LeftParen,
+                                    TypeList,
+                                    RightParen,
+                                    None,
                                     Throws,
                                     Arrow,
                                     Int)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws -> Int");
   }
-
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -515,6 +547,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     SyntaxFactory::makeFunctionType(LeftParen,
                                     TypeList,
                                     RightParen,
+                                    None,
                                     Rethrows,
                                     Arrow,
                                     Int).print(OS);
@@ -529,6 +562,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     SyntaxFactory::makeFunctionType(LeftParen,
                                     TypeList,
                                     RightParen,
+                                    None,
                                     TokenSyntax::missingToken(tok::kw_throws,
                                                               "throws"),
                                     Arrow,

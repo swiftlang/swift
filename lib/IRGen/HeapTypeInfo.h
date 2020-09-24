@@ -228,6 +228,10 @@ public:
     return LoadedRef(ptr, true);
   }
 
+  ReferenceCounting getReferenceCountingType() const override {
+    return asDerived().getReferenceCounting();
+  }
+
   // Extra inhabitants of heap object pointers.
 
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {

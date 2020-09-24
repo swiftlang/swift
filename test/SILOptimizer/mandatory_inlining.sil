@@ -1428,3 +1428,38 @@ bb0(%0 : $@callee_guaranteed () -> ()):
   %9999 = tuple()
   return %9999 : $()
 }
+
+struct Mystruct {
+  var s: String
+}
+
+sil  @use_string : $@convention(thin) (@guaranteed String) -> ()
+
+sil private [transparent] [ossa] @callee_with_guaranteed : $@convention(thin) (Bool, @in_guaranteed Mystruct) -> () {
+bb0(%0 : $Bool, %1 : $*Mystruct):
+  %4 = struct_element_addr %1 : $*Mystruct, #Mystruct.s
+  %5 = load [copy] %4 : $*String
+  %6 = function_ref  @use_string : $@convention(thin) (@guaranteed String) -> ()
+  %7 = apply %6(%5)  : $@convention(thin) (@guaranteed String) -> ()
+  destroy_value %5 : $String
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// Make sure that this doesn't cause a memory lifetime failure.
+//
+// CHECK-LABEL: sil [ossa] @partial_apply_with_indirect_param
+// CHECK: } // end sil function 'partial_apply_with_indirect_param'
+sil [ossa] @partial_apply_with_indirect_param : $@convention(thin) (@in_guaranteed Mystruct, Bool) -> () {
+bb0(%0 : $*Mystruct, %1 : $Bool):
+  %216 = function_ref @callee_with_guaranteed : $@convention(thin) (Bool, @in_guaranteed Mystruct) -> ()
+  %217 = alloc_stack $Mystruct
+  copy_addr %0 to [initialization] %217 : $*Mystruct
+  %219 = partial_apply [callee_guaranteed] %216(%217) : $@convention(thin) (Bool, @in_guaranteed Mystruct) -> ()
+  %220 = apply %219(%1) : $@callee_guaranteed (Bool) -> ()
+  destroy_value %219 : $@callee_guaranteed (Bool) -> ()
+  dealloc_stack %217 : $*Mystruct
+  %19 = tuple ()
+  return %19 : $()
+}
+

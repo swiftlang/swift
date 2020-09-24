@@ -3,6 +3,10 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// RUN: %target-build-swift  -o %t/main %target-rpath(%t) %s -swift-version 5 -enable-library-evolution
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: CPU=arm64 || CPU=arm64e || CPU=x86_64

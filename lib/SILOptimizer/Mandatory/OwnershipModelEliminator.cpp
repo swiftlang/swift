@@ -93,6 +93,16 @@ struct OwnershipModelEliminatorVisitor
   bool visitSwitchEnumInst(SwitchEnumInst *SWI);
   bool visitDestructureStructInst(DestructureStructInst *DSI);
   bool visitDestructureTupleInst(DestructureTupleInst *DTI);
+
+  // We lower this to unchecked_bitwise_cast losing our assumption of layout
+  // compatibility.
+  bool visitUncheckedValueCastInst(UncheckedValueCastInst *UVCI) {
+    auto *NewVal = B.createUncheckedBitwiseCast(
+        UVCI->getLoc(), UVCI->getOperand(), UVCI->getType());
+    UVCI->replaceAllUsesWith(NewVal);
+    UVCI->eraseFromParent();
+    return true;
+  }
 };
 
 } // end anonymous namespace
@@ -362,9 +372,10 @@ namespace {
 
 struct OwnershipModelEliminator : SILModuleTransform {
   bool SkipTransparent;
+  bool SkipStdlibModule;
 
-  OwnershipModelEliminator(bool SkipTransparent)
-      : SkipTransparent(SkipTransparent) {}
+  OwnershipModelEliminator(bool SkipTransparent, bool SkipStdlibModule)
+      : SkipTransparent(SkipTransparent), SkipStdlibModule(SkipStdlibModule) {}
 
   void run() override {
     if (DumpBefore.size()) {
@@ -372,6 +383,13 @@ struct OwnershipModelEliminator : SILModuleTransform {
     }
 
     auto &Mod = *getModule();
+
+    // If we are supposed to skip the stdlib module and we are in the stdlib
+    // module bail.
+    if (SkipStdlibModule && Mod.isStdlibModule()) {
+      return;
+    }
+
     for (auto &F : Mod) {
       // If F does not have ownership, skip it. We have no further work to do.
       if (!F.hasOwnership())
@@ -429,9 +447,17 @@ struct OwnershipModelEliminator : SILModuleTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/);
+  return new OwnershipModelEliminator(false /*skip transparent*/,
+                                      false /*ignore stdlib*/);
 }
 
 SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/);
+  return new OwnershipModelEliminator(true /*skip transparent*/,
+                                      false /*ignore stdlib*/);
+}
+
+SILTransform *
+swift::createNonStdlibNonTransparentFunctionOwnershipModelEliminator() {
+  return new OwnershipModelEliminator(true /*skip transparent*/,
+                                      true /*ignore stdlib*/);
 }

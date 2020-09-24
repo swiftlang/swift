@@ -1082,7 +1082,7 @@ enum UnavailableCaseOSSpecific {
   case a
   case b
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   @available(macOS, unavailable)
   @available(iOS, unavailable)
   @available(tvOS, unavailable)
@@ -1438,3 +1438,15 @@ enum SR11212Tests {
   }
 
 } // end SR11212Tests
+
+func sr12412() {
+  enum E {
+    case x
+    case y
+  }
+  switch (E.x, true) as Optional<(e: E, b: Bool)> {
+      case nil, (e: .x, b: _)?: break
+      case (e: .y, b: false)?: break
+      case (e: .y, b: true)?: break
+  }
+}

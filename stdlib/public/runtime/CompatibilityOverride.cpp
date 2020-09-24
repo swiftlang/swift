@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 #include "CompatibilityOverride.h"
 
 #include "ImageInspection.h"
@@ -68,3 +70,5 @@ static OverrideSection *getOverrideSectionPtr() {
     return Section->name;                                           \
   }
 #include "CompatibilityOverride.def"
+
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES

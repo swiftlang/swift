@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_multiple_types
 // RUN: %target-codesign %t/reflect_multiple_types
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_multiple_types | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_multiple_types | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
@@ -118,7 +118,7 @@ reflect(object: obj)
 // CHECK-64-LABEL: Type info:
 // CHECK-64-NEXT: (class_instance size=185 alignment=8 stride=192 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field name=t00 offset=16
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t01 offset=24
 // CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
@@ -126,22 +126,22 @@ reflect(object: obj)
 // CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1))))
 
 // CHECK-64-NEXT:   (field name=t02 offset=32
-// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_str offset=0
-// CHECK-64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:           (field name=_guts offset=0
-// CHECK-64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:               (field name=_object offset=0
-// CHECK-64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:                   (field name=_countAndFlagsBits offset=0
 // CHECK-64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:                       (field name=_value offset=0
 // CHECK-64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:                   (field name=_object offset=8
-// CHECK-64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))))
+// CHECK-64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))))))))
 
 // CHECK-64-NEXT:   (field name=t03 offset=48
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t04 offset=56
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
@@ -180,12 +180,12 @@ reflect(object: obj)
 // CHECK-64-NEXT:   (field name=t14 offset=128
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:   (field name=t15 offset=136
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 
 // (unstable implementation details omitted)
 
 // CHECK-64:   (field name=t16 offset=144
-// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // (unstable implementation details omitted)
 
 // CHECK-64:   (field name=t17 offset=160

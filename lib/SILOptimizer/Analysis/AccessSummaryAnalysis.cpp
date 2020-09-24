@@ -65,6 +65,29 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     Operand *operand = worklist.pop_back_val();
     SILInstruction *user = operand->getUser();
 
+    // Handle all types of full applies without switching over them.
+    // Ultimately, this analysis only considers calls with @inout_aliasable
+    // arguments because other argument conventions require an access on the
+    // caller side.
+    if (auto apply = FullApplySite::isa(user)) {
+      SILFunction *callee = apply.getCalleeFunction();
+      // We can't apply a summary for function whose body we can't see.  Since
+      // user-provided closures are always in the same module as their callee
+      // This likely indicates a missing begin_access before an open-coded
+      // call.
+      if (!callee || callee->empty()) {
+        summary.mergeWith(SILAccessKind::Modify, apply.getLoc(),
+                          getSubPathTrieRoot());
+        continue;
+      }
+      unsigned operandNumber = operand->getOperandNumber();
+      assert(operandNumber > 0 && "Summarizing apply for non-argument?");
+
+      unsigned calleeArgumentIndex = operandNumber - 1;
+      processCall(info, argumentIndex, callee, calleeArgumentIndex, order);
+      continue;
+    }
+
     switch (user->getKind()) {
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
@@ -101,14 +124,6 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       processPartialApply(info, argumentIndex, cast<PartialApplyInst>(user),
                           operand, order);
       break;
-    case SILInstructionKind::ApplyInst:
-      processFullApply(info, argumentIndex, cast<ApplyInst>(user), operand,
-                       order);
-      break;
-    case SILInstructionKind::TryApplyInst:
-      processFullApply(info, argumentIndex, cast<TryApplyInst>(user), operand,
-                       order);
-      break;
     default:
       // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should
@@ -124,9 +139,9 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 }
 
 #ifndef NDEBUG
-/// Sanity check to make sure that a noescape partial apply is
-/// only ultimately used by an apply, a try_apply or as an argument (but not
-/// the called function) in a partial_apply.
+/// Sanity check to make sure that a noescape partial apply is only ultimately
+/// used by directly calling it or passing it as argument, but not using it as a
+/// partial_apply callee.
 ///
 /// FIXME: This needs to be checked in the SILVerifier.
 static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
@@ -136,6 +151,9 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   switch (user->getKind()) {
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+    // The partial_apply must be passed to a @noescape argument type, but that
+    // is already checked by the SIL verifier.
     return true;
   // partial_apply [stack] is terminated by a dealloc_stack.
   case SILInstructionKind::DeallocStackInst:
@@ -150,7 +168,10 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
                         hasExpectedUsesOfNoEscapePartialApply);
 
   case SILInstructionKind::PartialApplyInst:
-    return partialApplyUse->get() != cast<PartialApplyInst>(user)->getCallee();
+    if (partialApplyUse->get() == cast<PartialApplyInst>(user)->getCallee())
+      return false;
+    return llvm::all_of(cast<PartialApplyInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
 
   // Look through begin_borrow.
   case SILInstructionKind::BeginBorrowInst:
@@ -243,27 +264,6 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   processCall(callerInfo, callerArgumentIndex, calleeFunction,
               calleeArgumentIndex, order);
-}
-
-void AccessSummaryAnalysis::processFullApply(FunctionInfo *callerInfo,
-                                             unsigned callerArgumentIndex,
-                                             FullApplySite apply,
-                                             Operand *argumentOperand,
-                                             FunctionOrder &order) {
-  unsigned operandNumber = argumentOperand->getOperandNumber();
-  assert(operandNumber > 0 && "Summarizing apply for non-argument?");
-
-  unsigned calleeArgumentIndex = operandNumber - 1;
-  SILFunction *callee = apply.getCalleeFunction();
-  // We can't apply a summary for function whose body we can't see.
-  // Since user-provided closures are always in the same module as their callee
-  // This likely indicates a missing begin_access before an open-coded
-  // call.
-  if (!callee || callee->empty())
-    return;
-
-  processCall(callerInfo, callerArgumentIndex, callee, calleeArgumentIndex,
-              order);
 }
 
 void AccessSummaryAnalysis::processCall(FunctionInfo *callerInfo,

@@ -23,5 +23,5 @@ SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
               BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseSourceFileRequest,
-              ArrayRef<Decl *>(SourceFile *), SeparatelyCached,
+              SourceFileParsingResult(SourceFile *), SeparatelyCached,
               NoLocationInfo)

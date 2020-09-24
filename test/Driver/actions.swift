@@ -193,7 +193,7 @@
 // COMPILE-PLUS-OBJECT-MACHO: 3: link, {0, 2}, image
 
 
-// RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -force-single-frontend-invocation 2>&1 | %FileCheck %s -check-prefix=WHOLE-MODULE -check-prefix WHOLE-MODULE-%target-object-format
+// RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -whole-module-optimization 2>&1 | %FileCheck %s -check-prefix=WHOLE-MODULE -check-prefix WHOLE-MODULE-%target-object-format
 // WHOLE-MODULE: 0: input, "{{.*}}Inputs/main.swift", swift
 // WHOLE-MODULE: 1: input, "{{.*}}Inputs/empty.swift", swift
 // WHOLE-MODULE: 2: input, "{{.*}}actions.swift", swift

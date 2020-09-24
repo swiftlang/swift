@@ -470,10 +470,6 @@ public:
     assert(!isa<ParamDecl>(vd)
            && "should not bind function params on this path");
     if (vd->getParentPatternBinding() && !vd->getParentInitializer()) {
-      // This value is uninitialized (and unbound) if it has a pattern binding
-      // decl, with no initializer value.
-      assert(!vd->hasNonPatternBindingInit() && "Bound values aren't uninit!");
-      
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
@@ -555,14 +551,13 @@ public:
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's
-    // lifetime.
+    // lifetime, if permitted to do so.
+    if (!EmitDebugValueOnInit)
+      return;
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
-    if (address)
-      SGF.B.createDebugValueAddr(PrologueLoc, value, DbgVar);
-    else
-      SGF.B.createDebugValue(PrologueLoc, value, DbgVar);
+    SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
   }
   
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
@@ -966,7 +961,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
-  auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
+  auto destType = OptionalType::get(pattern->getCastType());
 
   value =
       emitConditionalCheckedCast(SGF, loc, value, pattern->getType(), destType,
@@ -1042,7 +1037,7 @@ struct InitializationForPattern
   InitializationPtr visitTypedPattern(TypedPattern *P) {
     return visit(P->getSubPattern());
   }
-  InitializationPtr visitVarPattern(VarPattern *P) {
+  InitializationPtr visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
 

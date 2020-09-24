@@ -243,7 +243,7 @@ func init_tests() {
   var cs2a = C(x: 0)
   var cs3a = C()
 
-  var y = x.init() // expected-error{{use of unresolved identifier 'x'}}
+  var y = x.init() // expected-error{{cannot find 'x' in scope}}
 }
 
 protocol P {
@@ -323,12 +323,12 @@ class TestOverloadSets {
     self.init(5, 5) // expected-error{{extra argument in call}}
   }
   
-  convenience init(a : Z0) { // expected-note{{candidate has partially matching parameter list (a: Z0)}}
+  convenience init(a : Z0) { // expected-note{{candidate expects value of type 'Z0' for parameter #1}}
     self.init(42 as Int8) // expected-error{{no exact matches in call to initializer}}
   }
   
-  init(value: Int) { /* ... */ } // expected-note{{candidate has partially matching parameter list (value: Int)}}
-  init(value: Double) { /* ... */ } // expected-note{{candidate has partially matching parameter list (value: Double)}}
+  init(value: Int) { /* ... */ } // expected-note{{candidate expects value of type 'Int' for parameter #1}}
+  init(value: Double) { /* ... */ } // expected-note{{candidate expects value of type 'Double' for parameter #1}}
 }
 
 class TestNestedExpr {

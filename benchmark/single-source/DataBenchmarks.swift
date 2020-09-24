@@ -13,7 +13,7 @@
 import TestsUtils
 import Foundation
 
-let d: [BenchmarkCategory] =  [.validation, .api, .Data]
+let d: [BenchmarkCategory] =  [.validation, .api, .Data, .cpubench]
 
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
@@ -416,7 +416,7 @@ func withUnsafeMutableBytes(_ N: Int, data: Data) {
 @inline(never)
 func copyBytes(_ N: Int, data: Data) {
   let amount = data.count
-  var buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: amount)
+  let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: amount)
   defer { buffer.deallocate() }
   for _ in 1...N {
     data.copyBytes(to: buffer, from: 0..<amount)

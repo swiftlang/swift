@@ -285,9 +285,9 @@ struct Tuples {
 completion(a: 1) { (x: Any, y: Int) -> Int in
   return x as! Int + y
 }
-// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Any</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
+// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure><brace>{ (<param>x: <type>Any</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
 // CHECK:    return x as! Int + y
-// CHECK: }</closure></arg></call>
+// CHECK: }</brace></closure></arg></call>
 
 myFunc(foo: 0,
        bar: baz == 0)
@@ -321,14 +321,14 @@ thirdCall("""
 """)
 // CHECK: <call><name>thirdCall</name>("""
 // CHECK-NEXT: \("""
-// CHECK-NEXT:   \(<call><name><closure>{
+// CHECK-NEXT:   \(<call><name><closure><brace>{
 // CHECK-NEXT:   return <call><name>a</name>()</call>
-// CHECK-NEXT:   }</closure></name>()</call>)
+// CHECK-NEXT:   }</brace></closure></name>()</call>)
 // CHECK-NEXT:   """)
 // CHECK-NEXT: """)</call>
 
 fourthCall(a: @escaping () -> Int)
 // CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
 
-// CHECK: <call><name>foo</name> <closure>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</closure></call>
+// CHECK: <call><name>foo</name> <closure><brace>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</brace></closure></call>
 foo { [unowned self, x] in _ }

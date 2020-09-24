@@ -22,7 +22,7 @@ enum Z {
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 
-enum Optional<T> {  // expected-note {{'T' declared as parameter to type 'Optional'}}
+enum Optional<T> {
   case none
   case value(T)
 
@@ -59,8 +59,7 @@ acceptString("\(hello), \(world) #\(i)!")
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
-Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<Any>}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
+Optional(.none) // expected-error {{cannot infer contextual base in reference to member 'none'}}
 
 // Interpolation
 _ = "\(hello), \(world) #\(i)!"
@@ -253,4 +252,15 @@ func sr_10837() {
       // expected-error@-1 {{partial application of 'super.init' initializer chain is not allowed}}
     }
   }
+}
+
+// To make sure that hack related to type variable bindings works as expected we need to test
+// that in the following case result of a call to `reduce` maintains optionality.
+func test_that_optionality_of_closure_result_is_preserved() {
+  struct S {}
+
+  let arr: [S?] = []
+  let _: [S]? = arr.reduce([], { (a: [S]?, s: S?) -> [S]? in
+    a.flatMap { (group: [S]) -> [S]? in s.map { group + [$0] } } // Ok
+  })
 }

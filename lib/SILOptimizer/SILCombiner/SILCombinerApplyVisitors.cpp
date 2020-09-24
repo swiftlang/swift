@@ -153,8 +153,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Bail if the result type of the converted callee is different from the callee's
   // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsSubstType(AI.getModule())
-        != ConvertCalleeTy->getAllResultsSubstType(AI.getModule())) {
+  if (SubstCalleeTy->getAllResultsSubstType(
+          AI.getModule(), AI.getFunction()->getTypeExpansionContext()) !=
+      ConvertCalleeTy->getAllResultsSubstType(
+          AI.getModule(), AI.getFunction()->getTypeExpansionContext())) {
     return nullptr;
   }
 
@@ -164,8 +166,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResults();
   SILFunctionConventions substConventions(SubstCalleeTy, FRI->getModule());
   SILFunctionConventions convertConventions(ConvertCalleeTy, FRI->getModule());
-  auto oldOpTypes = substConventions.getParameterSILTypes();
-  auto newOpTypes = convertConventions.getParameterSILTypes();
+  auto context = AI.getFunction()->getTypeExpansionContext();
+  auto oldOpTypes = substConventions.getParameterSILTypes(context);
+  auto newOpTypes = convertConventions.getParameterSILTypes(context);
 
   assert(Ops.size() == SubstCalleeTy->getNumParameters()
          && "Ops and op types must have same size.");
@@ -187,7 +190,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
-      auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
+      auto URC =
+          Builder.createUncheckedReinterpretCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -204,12 +208,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // we got this far it is legal to perform the transformation (since
   // otherwise, we would be creating malformed SIL).
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
-  SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
-                                            Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()
-                               ->getAllResultsSubstType(AI.getModule())
-           == AI.getSubstCalleeType()
-               ->getAllResultsSubstType(AI.getModule()) &&
+  ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+                                       Args, setNonThrowing);
+  assert(FullApplySite(NAI).getSubstCalleeType()->getAllResultsSubstType(
+             AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
+             AI.getSubstCalleeType()->getAllResultsSubstType(
+                 AI.getModule(), AI.getFunction()->getTypeExpansionContext()) &&
          "Function types should be the same");
   return NAI;
 }
@@ -223,11 +227,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   ...
 ///   load/store %addr
-bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunctionOrNull();
-  if (!callee)
-    return false;
-
+bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
+                                          SILFunction *callee) {
   if (AI->getNumArguments() != 3)
     return false;
 
@@ -269,6 +270,232 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
+}
+
+/// Replaces a call of the getter of AnyKeyPath._storedInlineOffset with a
+/// "constant" offset, in case of a keypath literal.
+///
+/// "Constant" offset means a series of struct_element_addr and
+/// tuple_element_addr instructions with a 0-pointer as base address.
+/// These instructions can then be lowered to "real" constants in IRGen for
+/// concrete types, or to metatype offset lookups for generic or resilient types.
+///
+/// Replaces:
+///   %kp = keypath ...
+///   %offset = apply %_storedInlineOffset_method(%kp)
+/// with:
+///   %zero = integer_literal $Builtin.Word, 0
+///   %null_ptr = unchecked_trivial_bit_cast %zero to $Builtin.RawPointer
+///   %null_addr = pointer_to_address %null_ptr
+///   %projected_addr = struct_element_addr %null_addr
+///    ... // other address projections
+///   %offset_ptr = address_to_pointer %projected_addr
+///   %offset_builtin_int = unchecked_trivial_bit_cast %offset_ptr
+///   %offset_int = struct $Int (%offset_builtin_int)
+///   %offset = enum $Optional<Int>, #Optional.some!enumelt, %offset_int
+bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
+                                             FuncDecl *calleeFn,
+                                             KeyPathInst *kp) {
+  auto *accessor = dyn_cast<AccessorDecl>(calleeFn);
+  if (!accessor || !accessor->isGetter())
+    return false;
+
+  AbstractStorageDecl *storage = accessor->getStorage();
+  DeclName name = storage->getName();
+  if (!name.isSimpleName() ||
+      (name.getBaseIdentifier().str() != "_storedInlineOffset"))
+    return false;
+
+  KeyPathPattern *pattern = kp->getPattern();
+  SubstitutionMap patternSubs = kp->getSubstitutions();
+  CanType rootTy = pattern->getRootType().subst(patternSubs)->getCanonicalType();
+  CanType parentTy = rootTy;
+  
+  // First check if _storedInlineOffset would return an offset or nil. Basically
+  // only stored struct and tuple elements produce an offset. Everything else
+  // (e.g. computed properties, class properties) result in nil.
+  bool hasOffset = true;
+  for (const KeyPathPatternComponent &component : pattern->getComponents()) {
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+
+      // Handle the special case of C tail-allocated arrays. IRGen would
+      // generate an undef offset for struct_element_addr of C tail-allocated
+      // arrays.
+      VarDecl *propDecl = component.getStoredPropertyDecl();
+      if (propDecl->hasClangNode() && propDecl->getType()->isVoid())
+        return false;
+
+      if (!parentTy.getStructOrBoundGenericStruct())
+        hasOffset = false;
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement:
+      break;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      // We cannot predict the offset of fields in resilient types, because it's
+      // unknown if a resilient field is a computed or stored property.
+      if (component.getExternalDecl())
+        return false;
+      hasOffset = false;
+      break;
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      hasOffset = false;
+      break;
+    }
+    parentTy = component.getComponentType();
+  }
+
+  SILLocation loc = AI->getLoc();
+  SILValue result;
+
+  if (hasOffset) {
+    SILType rootAddrTy = SILType::getPrimitiveAddressType(rootTy);
+    SILValue rootAddr = Builder.createBaseAddrForOffset(loc, rootAddrTy);
+
+    auto projector = KeyPathProjector::create(kp, rootAddr, loc, Builder);
+    if (!projector)
+      return false;
+
+    // Create the address projections of the keypath.
+    SILType ptrType = SILType::getRawPointerType(Builder.getASTContext());
+    SILValue offsetPtr;
+    projector->project(KeyPathProjector::AccessType::Get, [&](SILValue addr) {
+      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType);
+    });
+
+    // The result of the _storedInlineOffset call should be Optional<Int>. If
+    // not, something is wrong with the stdlib. Anyway, if it's not like we
+    // expect, bail.
+    SILType intType = AI->getType().getOptionalObjectType();
+    if (!intType)
+      return false;
+    StructDecl *intDecl = intType.getStructOrBoundGenericStruct();
+    if (!intDecl || intDecl->getStoredProperties().size() != 1)
+      return false;
+    VarDecl *member = intDecl->getStoredProperties()[0];
+    CanType builtinIntTy = member->getType()->getCanonicalType();
+    if (!isa<BuiltinIntegerType>(builtinIntTy))
+      return false;
+
+    // Convert the projected address back to an optional integer.
+    SILValue offset = Builder.createUncheckedReinterpretCast(
+        loc, offsetPtr, SILType::getPrimitiveObjectType(builtinIntTy));
+    SILValue offsetInt = Builder.createStruct(loc, intType, { offset });
+    result = Builder.createOptionalSome(loc, offsetInt, AI->getType());
+  } else {
+    // The keypath has no offset.
+    result = Builder.createOptionalNone(loc, AI->getType());
+  }
+  AI->replaceAllUsesWith(result);
+  eraseInstFromFunction(*AI);
+  ++NumOptimizedKeypaths;
+  return true;
+}
+
+/// Try to optimize a keypath KVC string access on a literal key path.
+///
+/// Replace:
+///   %kp = keypath (objc "blah", ...)
+///   %string = apply %keypath_kvcString_method(%kp)
+/// With:
+///   %string = string_literal "blah"
+bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
+                                              FuncDecl *calleeFn,
+                                              KeyPathInst *kp) {
+  if (!calleeFn->getAttrs()
+        .hasSemanticsAttr(semantics::KEYPATH_KVC_KEY_PATH_STRING))
+    return false;
+  
+  // Method should return `String?`
+  auto &C = calleeFn->getASTContext();
+  auto objTy = AI->getType().getOptionalObjectType();
+  if (!objTy || objTy.getStructOrBoundGenericStruct() != C.getStringDecl())
+    return false;
+  
+  auto objcString = kp->getPattern()->getObjCString();
+  
+  SILValue literalValue;
+  if (objcString.empty()) {
+    // Replace with a nil String value.
+    literalValue = Builder.createEnum(AI->getLoc(), SILValue(),
+                                      C.getOptionalNoneDecl(),
+                                      AI->getType());
+  } else {
+    // Construct a literal String from the ObjC string.
+    auto init = C.getStringBuiltinInitDecl(C.getStringDecl());
+    if (!init)
+      return false;
+    auto initRef = SILDeclRef(init.getDecl(), SILDeclRef::Kind::Allocator);
+    auto initFn = AI->getModule().findFunction(initRef.mangle(),
+                                               SILLinkage::PublicExternal);
+    if (!initFn)
+      return false;
+
+    auto stringValue = Builder.createStringLiteral(AI->getLoc(), objcString,
+                                             StringLiteralInst::Encoding::UTF8);
+    auto stringLen = Builder.createIntegerLiteral(AI->getLoc(),
+                                                SILType::getBuiltinWordType(C),
+                                                objcString.size());
+    auto isAscii = Builder.createIntegerLiteral(AI->getLoc(),
+                                          SILType::getBuiltinIntegerType(1, C),
+                                          C.isASCIIString(objcString));
+    auto metaTy =
+      CanMetatypeType::get(objTy.getASTType(), MetatypeRepresentation::Thin);
+    auto self = Builder.createMetatype(AI->getLoc(),
+                                     SILType::getPrimitiveObjectType(metaTy));
+    
+    auto initFnRef = Builder.createFunctionRef(AI->getLoc(), initFn);
+    auto string = Builder.createApply(AI->getLoc(),
+                                      initFnRef, {},
+                                      {stringValue, stringLen, isAscii, self});
+    
+    literalValue = Builder.createEnum(AI->getLoc(), string,
+                                      C.getOptionalSomeDecl(), AI->getType());
+  }
+
+  AI->replaceAllUsesWith(literalValue);
+  eraseInstFromFunction(*AI);
+  ++NumOptimizedKeypaths;
+  return true;
+}
+
+bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+  if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
+    return tryOptimizeKeypathApplication(AI, callee);
+  }
+  
+  // Try optimize keypath method calls.
+  auto *methodInst = dyn_cast<ClassMethodInst>(AI->getCallee());
+  if (!methodInst)
+    return false;
+  
+  if (AI->getNumArguments() != 1) {
+    return false;
+  }
+
+  SILDeclRef callee = methodInst->getMember();
+  if (!callee.hasDecl()) {
+    return false;
+  }
+  auto *calleeFn = dyn_cast<FuncDecl>(callee.getDecl());
+  if (!calleeFn)
+    return false;
+
+  KeyPathInst *kp = KeyPathProjector::getLiteralKeyPath(AI->getArgument(0));
+  if (!kp || !kp->hasPattern())
+    return false;
+  
+  if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp))
+    return true;
+
+  if (tryOptimizeKeypathKVCString(AI, calleeFn, kp))
+    return true;
+
+  return false;
 }
 
 /// Try to optimize a keypath application with an apply instruction.
@@ -427,12 +654,6 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
   return true;
 }
 
-SILInstruction *
-SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
-  // String literals concatenation optimizer.
-  return tryToConcatenateStrings(AI, Builder);
-}
-
 /// This routine replaces the old witness method inst with a new one.
 void SILCombiner::replaceWitnessMethodInst(
     WitnessMethodInst *WMI, SILBuilderContext &BuilderCtx, CanType ConcreteType,
@@ -565,7 +786,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
     llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
     SILBuilderContext &BuilderCtx,
     SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
-  for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
+  for (unsigned ArgIdx = 0, e = Apply.getNumArguments(); ArgIdx < e;
+       ++ArgIdx) {
     auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
     if (!ArgASTType->hasArchetype())
       continue;
@@ -584,6 +806,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
       // BuilderContext before rewriting any uses of the ConcreteType.
       OpenedArchetypesTracker.addOpenedArchetypeDef(
           cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
+    } else if (auto *I = CEI.ConcreteValue->getDefiningInstruction()) {
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(I);
     }
   }
 }
@@ -677,7 +901,7 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
 
   // This bailout check is also needed for non-Self arguments [including Self].
   unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; Idx++) {
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
     if (Idx == ArgIdx)
       continue;
     if (Apply.getArgument(Idx)->getType().getASTType().findIf(
@@ -865,12 +1089,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   // We need to make sure that we can a) update Apply to use the new args and b)
   // at least one argument has changed. If no arguments have changed, we need
   // to return nullptr. Otherwise, we will have an infinite loop.
-  auto substTy =
-      Apply.getCallee()
-          ->getType()
-          .substGenericArgs(Apply.getModule(), NewCallSubs,
-                            Apply.getFunction()->getTypeExpansionContext())
-          .getAs<SILFunctionType>();
+  auto context = Apply.getFunction()->getTypeExpansionContext();
+  auto substTy = Apply.getCallee()
+                     ->getType()
+                     .substGenericArgs(Apply.getModule(), NewCallSubs, context)
+                     .getAs<SILFunctionType>();
   SILFunctionConventions conv(substTy,
                               SILModuleConventions(Apply.getModule()));
   bool canUpdateArgs = true;
@@ -879,7 +1102,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     // Make sure that *all* the arguments in both the new substitution function
     // and our vector of new arguments have the same type.
     canUpdateArgs &=
-        conv.getSILArgumentType(index) == NewArgs[index]->getType();
+        conv.getSILArgumentType(index, context) == NewArgs[index]->getType();
     // Make sure that we have changed at least one argument.
     madeUpdate |=
         NewArgs[index]->getType() != Apply.getArgument(index)->getType();
@@ -1209,35 +1432,6 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   return true;
 }
 
-// Return a new apply with the specified callee. This creates a new apply rather
-// than simply rewriting the callee operand because the apply's SubstCalleeType,
-// derived from the callee and substitution list, may change.
-FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
-                                              SILValue callee) {
-  SmallVector<SILValue, 4> arguments;
-  for (SILValue arg : apply.getArguments())
-    arguments.push_back(arg);
-
-  Builder.addOpenedArchetypeOperands(apply.getInstruction());
-  if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
-    return Builder.createTryApply(TAI->getLoc(), callee,
-                                  TAI->getSubstitutionMap(), arguments,
-                                  TAI->getNormalBB(), TAI->getErrorBB());
-  } else {
-    auto *AI = cast<ApplyInst>(apply);
-    auto fTy = callee->getType().getAs<SILFunctionType>();
-    // The optimizer can generate a thin_to_thick_function from a throwing thin
-    // to a non-throwing thick function (in case it can prove that the function
-    // is not throwing).
-    // Therefore we have to check if the new callee (= the argument of the
-    // thin_to_thick_function) is a throwing function and set the not-throwing
-    // flag in this case.
-    return Builder.createApply(apply.getLoc(), callee,
-                               apply.getSubstitutionMap(), arguments,
-                               AI->isNonThrowing() || fTy->hasErrorResult());
-  }
-}
-
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (AI->getFunction()->hasOwnership())
     return nullptr;
@@ -1266,12 +1460,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->getEffectsKind() < EffectsKind::ReleaseNone) {
-      // Try to optimize string concatenation.
-      if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
-        return I;
-      }
-    }
     if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
@@ -1289,7 +1477,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // function when rewriting the callsite. This should be ok because the
     // ABI normally expects a guaranteed callee.
     if (!AI->getOrigCalleeType()->isCalleeConsumed())
-      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
+      return cloneFullApplySiteReplacingCallee(AI, TTTFI->getOperand(),
+                                               Builder.getBuilderContext())
+          .getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about
@@ -1351,7 +1541,7 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
          "mismatching number of arguments for the same destination block");
 
   // Check if both blocks pass the same arguments to the common destination.
-  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; Idx++) {
+  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; ++Idx) {
     if (NormalBr->getArg(Idx) != ErrorBr->getArg(Idx))
       return false;
   }
@@ -1424,7 +1614,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     // function when rewriting the callsite. This should be ok because the
     // ABI normally expects a guaranteed callee.
     if (!AI->getOrigCalleeType()->isCalleeConsumed())
-      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
+      return cloneFullApplySiteReplacingCallee(AI, TTTFI->getOperand(),
+                                               Builder.getBuilderContext())
+          .getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about

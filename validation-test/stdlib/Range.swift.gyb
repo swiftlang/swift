@@ -401,7 +401,7 @@ ${TestSuite}.test("Equatable") {
 
 ${TestSuite}.test("'${op}' traps when upperBound < lowerBound")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Can't form Range with upperBound < lowerBound" : "")
+    "Range requires lowerBound <= upperBound" : "")
   .code {
   let _1 = ${Bound}(1)
   let _2 = ${Bound}(2)

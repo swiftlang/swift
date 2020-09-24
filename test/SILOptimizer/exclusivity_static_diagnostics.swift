@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enforce-exclusivity=checked -swift-version 4 -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -enforce-exclusivity=checked -swift-version 4 -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -enforce-exclusivity=checked -swift-version 4 -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -647,5 +647,33 @@ struct DisjointLet {
       // Access to captured `self` for member .cache`.
       a + b.x
     }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// coroutineWithClosureArg: AccessedSummaryAnalysis must consider
+// begin_apply a valid user of partial_apply.
+//
+// Test that this does not assert in hasExpectedUsesOfNoEscapePartialApply.
+//
+// This test needs two closures, one to capture the variable, another
+// to recapture the variable, so AccessSummary is forced to process
+// the closure.
+func coroutineWithClosureArg(i: Int, x: inout Int, d: inout Dictionary<Int, Int>) {
+  { d[i, default: x] = 0 }()
+}
+
+// -----------------------------------------------------------------------------
+//
+struct TestConflictInCoroutineClosureArg {
+  static let defaultKey = 0
+
+  var dictionary = [defaultKey:0]
+
+  mutating func incrementValue(at key: Int) {
+    dictionary[key, default:
+      dictionary[TestConflictInCoroutineClosureArg.defaultKey]!] += 1
+    // expected-error@-2 {{overlapping accesses to 'self.dictionary', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-note@-2 {{conflicting access is here}}
   }
 }

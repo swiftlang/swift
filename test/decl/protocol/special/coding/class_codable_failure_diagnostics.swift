@@ -9,8 +9,8 @@ class C1 : Codable {
   var a: String = ""
   var b: Int = 0
   var c: Nested = Nested()
-  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'C1.Nested' does not conform to 'Decodable'}}
-  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'C1.Nested' does not conform to 'Encodable'}}
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'Nested' does not conform to 'Decodable'}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'Nested' does not conform to 'Encodable'}}
 }
 
 // Codable class with non-enum CodingKeys.
@@ -112,7 +112,7 @@ class C6 : Codable {
 // Non-final classes cannot synthesize Decodable in an extension.
 class C7 {}
 extension C7 : Decodable {}
-// expected-error@-1 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
+// expected-error@-1 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be satisfied by a 'required' initializer in the class definition}}
 
 // Check that the diagnostics from an extension end up on the extension
 class C8 {

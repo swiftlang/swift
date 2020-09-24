@@ -396,7 +396,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
   auto &fileMgr = clangCI.getFileManager();
 
   for (auto &import : imports) {
-    ModuleDecl *mod = import.second;
+    ModuleDecl *mod = import.importedModule;
     if (mod->isOnoneSupportModule())
       continue; // ignore the Onone support library.
     if (mod->isSwiftShimsModule())
@@ -416,14 +416,16 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
           StringRef moduleName = mod->getNameStr();
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
-            withoutUnitName = false;
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
-            if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
-              moduleName = clangMod->getTopLevelModuleName();
-              // FIXME: clang's -Rremarks do not seem to go through Swift's
-              // diagnostic emitter.
-              clang::index::emitIndexDataForModuleFile(clangMod,
-                                                       clangCI, unitWriter);
+            if (!clangModUnit->isSystemModule() || indexSystemModules) {
+              withoutUnitName = false;
+              if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
+                moduleName = clangMod->getTopLevelModuleName();
+                // FIXME: clang's -Rremarks do not seem to go through Swift's
+                // diagnostic emitter.
+                clang::index::emitIndexDataForModuleFile(clangMod,
+                                                         clangCI, unitWriter);
+              }
             }
           } else {
             // Serialized AST file.
@@ -578,11 +580,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     unitWriter.addRecordFile(recordFile, *FE, isSystemModule, mod);
   }
 
-  ModuleDecl::ImportFilter importFilter;
-  importFilter |= ModuleDecl::ImportFilterKind::Public;
-  importFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  module->getImportedModules(imports, importFilter);
+  module->getImportedModules(imports, {ModuleDecl::ImportFilterKind::Exported,
+                                       ModuleDecl::ImportFilterKind::Default});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
@@ -619,13 +619,11 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
       getModuleInfoFromOpaqueModule);
 
   // Module dependencies.
-  ModuleDecl::ImportFilter importFilter;
-  importFilter |= ModuleDecl::ImportFilterKind::Public;
-  importFilter |= ModuleDecl::ImportFilterKind::Private;
-  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(imports, importFilter);
+  primarySourceFile->getImportedModules(
+      imports, {ModuleDecl::ImportFilterKind::Exported,
+                ModuleDecl::ImportFilterKind::Default,
+                ModuleDecl::ImportFilterKind::ImplementationOnly});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,

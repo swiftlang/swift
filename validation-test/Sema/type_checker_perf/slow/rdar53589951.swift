@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
+// REQUIRES: rdar36854536
 
 class Color {
   init(hue: Double, saturation: Double, brightness: Double, alpha: Double) {}

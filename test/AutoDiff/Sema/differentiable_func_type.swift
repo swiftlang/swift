@@ -60,19 +60,19 @@ func fakeGradient<T, U: FloatingPoint>(of f: @differentiable (T) -> U) {}
 
 func takesOpaqueClosure(f: @escaping (Float) -> Float) {
   // expected-note @-1 {{did you mean to take a '@differentiable' closure?}} {{38-38=@differentiable }}
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: f)
 }
 
 let globalAddOne: (Float) -> Float = { $0 + 1 }
-// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
 fakeGradient(of: globalAddOne)
 
 func someScope() {
   let localAddOne: (Float) -> Float = { $0 + 1 }
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: globalAddOne)
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: localAddOne)
   // The following case is okay during type checking, but will fail in the AD transform.
   fakeGradient { localAddOne($0) }
@@ -95,9 +95,14 @@ func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Fl
 }
 
 func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
-  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = f as @differentiable(linear) (Float) -> Float
 }
+
+struct Struct: Differentiable {
+  var x: Float
+}
+let _: @differentiable (Float) -> Struct = Struct.init
 
 //===----------------------------------------------------------------------===//
 // Parameter selection (@noDerivative)
@@ -170,8 +175,10 @@ extension Vector: Differentiable where T: Differentiable {
   mutating func move(along direction: TangentVector) { fatalError() }
 }
 
+// expected-note@+1 2 {{found this candidate}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
+// expected-note  @+5 2 {{found this candidate}}
 // expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
 // expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
 // expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
@@ -179,9 +186,13 @@ func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Vector<T>) -> Vector<U>) {}
 
 func nondiff(x: Vector<Int>) -> Vector<Int> {}
-// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+
+// TODO(diagnostics): Ambiguity notes for two following calls should talk about `T` and `U` both not conforming to `Differentiable`
+// but we currently have to way to coalesce notes multiple fixes in to a single note.
+
+// expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGeneric'}}
 inferredConformancesGeneric(nondiff)
-// expected-error @+1 {{global function 'inferredConformancesGenericLinear' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGenericLinear'}}
 inferredConformancesGenericLinear(nondiff)
 
 func diff(x: Vector<Float>) -> Vector<Float> {}
@@ -203,16 +214,16 @@ extension Linear: Differentiable where T: Differentiable, T == T.TangentVector {
   typealias TangentVector = Self
 }
 
-// expected-note @+1 2 {{where 'T' = 'Int'}}
+// expected-note @+1 2 {{found this candidate}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Linear<T>) -> Linear<U>) {}
 
-// expected-note @+1 2 {{where 'T' = 'Int'}}
+// expected-note @+1 2 {{found this candidate}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Linear<T>) -> Linear<U>) {}
 
 func nondiff(x: Linear<Int>) -> Linear<Int> {}
-// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGeneric'}}
 inferredConformancesGeneric(nondiff)
-// expected-error @+1 {{global function 'inferredConformancesGenericLinear' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGenericLinear'}}
 inferredConformancesGenericLinear(nondiff)
 
 func diff(x: Linear<Float>) -> Linear<Float> {}

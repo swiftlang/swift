@@ -7,19 +7,25 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib
+// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -D DEBUG -Onone
 // RUN: %target-codesign %t/%target-library-name(mysimd)
 
-// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out
+// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -D DEBUG -Onone
+// RUN: %target-codesign %t/a.out
+
+// RUN: %target-run %t/a.out %t/%target-library-name(mysimd)
+
+// RUN: %empty-directory(%t)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(mysimd)) -enable-library-evolution %S/../Inputs/polymorphic_builtins.swift -emit-module -emit-module-path %t/mysimd.swiftmodule -module-name mysimd -parse-stdlib -O
+// RUN: %target-codesign %t/%target-library-name(mysimd)
+
+// RUN: %target-build-swift %s -L %t -I %t -lmysimd -parse-stdlib -Xfrontend -disable-access-control -Xfrontend -sil-verify-all %target-rpath(%t) -o %t/a.out -O
 // RUN: %target-codesign %t/a.out
 
 // RUN: %target-run %t/a.out %t/%target-library-name(mysimd)
 
 // REQUIRES: executable_test
-
-// TODO: Re-enable this when optimization is enabled.
-//
-// REQUIRES: swift_test_mode_optimize_none
 
 import Swift
 import StdlibUnittest
@@ -86,12 +92,16 @@ Tests.test("Indirect Dispatch + Transparent + _isConcrete Guard == OK") {
 }
 
 // In this case, we call mul which is unguarded with _isConcrete and thus
-// crashes. The stdlib maintainer should have guarded this usage to ensure that
-// we did not go down this code path.
+// crashes in Debug, but in Release we (after inlining/specialization) /do/
+// succeed. This is one reason why _isConcrete is needed.
+//
+// The stdlib maintainer should have guarded this usage to ensure that we did
+// not go down this code path.
 
-Tests.test("Indirect Dispatch + Transparent + No _isConcrete Guard == Crash") {
+Tests.test("Indirect Dispatch + Transparent + No _isConcrete Guard == Crash when Debug") {
+#if DEBUG
   expectCrashLater()
-
+#endif
   let inputs: [Int32] = [5,6,7,8]
   let expectedOutputs: [Int32] = inputs.map { $0 &* $0 }
 

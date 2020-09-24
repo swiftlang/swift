@@ -19,8 +19,10 @@
 
 #include "llvm/ADT/None.h"
 
+#include <cassert>
 #include <type_traits>
 #include <cstdint>
+#include <initializer_list>
 
 namespace swift {
 
@@ -58,6 +60,10 @@ public:
   /// Create an option set with only the given option set.
   constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}
 
+  /// Create an option set containing the given options.
+  constexpr OptionSet(std::initializer_list<Flags> flags)
+      : Storage(combineFlags(flags)) {}
+
   /// Create an option set from raw storage.
   explicit constexpr OptionSet(StorageType storage) : Storage(storage) {}
 
@@ -91,6 +97,14 @@ public:
   /// Check if this option set contains the exact same options as the given set.
   constexpr bool containsOnly(OptionSet set) const {
     return Storage == set.Storage;
+  }
+
+  /// Check if this option set contains any options from \p set.
+  ///
+  /// \pre \p set must be non-empty.
+  bool containsAny(OptionSet set) const {
+    assert((bool)set && "argument must be non-empty");
+    return (bool)((*this) & set);
   }
 
   // '==' and '!=' are deliberately not defined because they provide a pitfall
@@ -135,6 +149,14 @@ private:
   static auto _checkResultTypeOperatorOr(T t) -> decltype(t | t) { return T(); }
 
   static void _checkResultTypeOperatorOr(...) {}
+
+  static constexpr StorageType
+  combineFlags(const std::initializer_list<Flags> &flags) {
+    OptionSet result;
+    for (Flags flag : flags)
+      result |= flag;
+    return result.Storage;
+  }
 
   static_assert(!std::is_same<decltype(_checkResultTypeOperatorOr(Flags())),
                               Flags>::value,

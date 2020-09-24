@@ -35,9 +35,9 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // We won't actually emit the block until we finish with the destructor body.
   prepareEpilog(false, false, CleanupLocation::get(Loc));
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
-  emitStmt(dd->getBody());
+  emitStmt(dd->getTypecheckedBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(Loc);
@@ -151,7 +151,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
   B.createDeallocRef(loc, selfForDealloc, false);
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
 
   // Return.
   B.createReturn(loc, emitEmptyTuple(loc));
@@ -212,9 +212,9 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // We won't actually emit the block until we finish with the destructor body.
   prepareEpilog(false, false, CleanupLocation::get(loc));
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
-  emitStmt(dd->getBody());
+  emitStmt(dd->getTypecheckedBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(loc);

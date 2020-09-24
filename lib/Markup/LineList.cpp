@@ -46,7 +46,7 @@ size_t swift::markup::measureIndentation(StringRef Text) {
   size_t Col = 0;
   for (size_t i = 0, e = Text.size(); i != e; ++i) {
     if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {
-      Col++;
+      ++Col;
       continue;
     }
 
@@ -78,7 +78,7 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 
   if (S.startswith(" * "))
     return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\n\r"))
+  if (S.startswith(" *\n") || S.startswith(" *\r\n"))
     return NumLeadingSpaces + 2;
   return 0;
 }

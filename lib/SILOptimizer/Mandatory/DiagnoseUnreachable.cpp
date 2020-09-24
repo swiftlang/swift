@@ -181,7 +181,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);
-    NumBasicBlockArgsPropagated++;
+    ++NumBasicBlockArgsPropagated;
   }
 
   // Remove args from the block.
@@ -277,7 +277,7 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
 
   LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
   recursivelyDeleteTriviallyDeadInstructions(SUI, true);
-  NumTerminatorsFolded++;
+  ++NumTerminatorsFolded;
   return true;
 }
 
@@ -352,7 +352,7 @@ static bool constantFoldEnumAddrTerminator(
 
   LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
   recursivelyDeleteTriviallyDeadInstructions(SUI, true);
-  NumTerminatorsFolded++;
+  ++NumTerminatorsFolded;
   return true;
 }
 
@@ -528,7 +528,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         CondIsTrue = true;
       }
       recursivelyDeleteTriviallyDeadInstructions(TI, true);
-      NumInstructionsRemoved++;
+      ++NumInstructionsRemoved;
 
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
@@ -552,7 +552,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
             UnreachableInfo{UnreachableKind::FoldedBranch, Loc, CondIsTrue}));
       }
 
-      NumTerminatorsFolded++;
+      ++NumTerminatorsFolded;
       return true;
     }
   }
@@ -611,7 +611,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         SILBuilderWithScope B(&BB, TI);
         B.createBranch(TI->getLoc(), TheSuccessorBlock);
         recursivelyDeleteTriviallyDeadInstructions(TI, true);
-        NumTerminatorsFolded++;
+        ++NumTerminatorsFolded;
         return true;
       }
       
@@ -777,7 +777,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       // noreturn function and therefore dead.
       setOutsideBlockUsesToUndef(CurrentInst);
 
-      NumInstructionsRemoved++;
+      ++NumInstructionsRemoved;
       continue;
     }
 
@@ -975,7 +975,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
     // Drop references to other blocks.
     recursivelyDeleteTriviallyDeadInstructions(BB->getTerminator(), true);
-    NumInstructionsRemoved++;
+    ++NumInstructionsRemoved;
   }
 
   // Delete dead instructions and everything that could become dead after
@@ -992,7 +992,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   for (auto I = F.begin(), E = F.end(); I != E;)
     if (!Reachable.count(&*I)) {
       I = F.getBlocks().erase(I);
-      NumBlocksRemoved++;
+      ++NumBlocksRemoved;
     } else
       ++I;
 

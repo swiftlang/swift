@@ -10,6 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import libcxx
+from . import libicu
+from . import llvm
 from . import product
 from ..cmake import CMakeOptions
 
@@ -44,6 +48,17 @@ class Swift(product.Product):
         # Add experimental differentiable programming flag.
         self.cmake_options.extend(
             self._enable_experimental_differentiable_programming)
+
+        # Add experimental concurrency flag.
+        self.cmake_options.extend(self._enable_experimental_concurrency)
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
 
     @property
     def _runtime_sanitizer_flags(self):
@@ -121,3 +136,15 @@ updated without updating swift.py?")
     def _enable_experimental_differentiable_programming(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
                  self.args.enable_experimental_differentiable_programming)]
+
+    @property
+    def _enable_experimental_concurrency(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL',
+                 self.args.enable_experimental_concurrency)]
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU]

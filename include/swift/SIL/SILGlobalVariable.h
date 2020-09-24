@@ -37,6 +37,9 @@ class SILGlobalVariable
   : public llvm::ilist_node<SILGlobalVariable>,
     public SILAllocated<SILGlobalVariable>
 {
+public:
+  using const_iterator = SILBasicBlock::const_iterator;
+
 private:
   friend class SILModule;
   friend class SILBuilder;
@@ -53,7 +56,7 @@ private:
   
   /// The SIL location of the variable, which provides a link back to the AST.
   /// The variable only gets a location after it's been emitted.
-  Optional<SILLocation> Location;
+  const SILLocation Location;
 
   /// The linkage of the global variable.
   unsigned Linkage : NumSILLinkageBits;
@@ -67,12 +70,15 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
+  /// Whether or not this is a declaration.
+  unsigned IsDeclaration : 1;
+
+  /// Whether or not there is a valid SILLocation.
+  unsigned HasLocation : 1;
+
   /// The VarDecl associated with this SILGlobalVariable. Must by nonnull for
   /// language-level global variables.
   VarDecl *VDecl;
-
-  /// Whether or not this is a declaration.
-  bool IsDeclaration;
 
   /// If this block is not empty, the global variable has a static initializer.
   ///
@@ -132,20 +138,17 @@ public:
 
   VarDecl *getDecl() const { return VDecl; }
 
-  /// Initialize the source location of the function.
-  void setLocation(SILLocation L) { Location = L; }
-
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
   bool hasLocation() const {
-    return Location.hasValue();
+    return HasLocation;
   }
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
-    assert(Location.hasValue());
-    return Location.getValue();
+    assert(HasLocation);
+    return Location;
   }
 
   /// Returns the value of the static initializer or null if the global has no
@@ -156,6 +159,9 @@ public:
   bool isInitializedObject() {
     return dyn_cast_or_null<ObjectInst>(getStaticInitializerValue()) != nullptr;
   }
+
+  const_iterator begin() const { return StaticInitializerBlock.begin(); }
+  const_iterator end() const { return StaticInitializerBlock.end(); }
 
   /// Returns true if \p I is a valid instruction to be contained in the
   /// static initializer.
@@ -227,7 +233,7 @@ public ilist_node_traits<::swift::SILGlobalVariable> {
   using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:
-  static void deleteNode(SILGlobalVariable *V) {}
+  static void deleteNode(SILGlobalVariable *V) { V->~SILGlobalVariable(); }
   
 private:
   void createNode(const SILGlobalVariable &);
@@ -254,8 +260,7 @@ SILFunction *getCalleeOfOnceCall(BuiltinInst *BI);
 /// Given an addressor, AddrF, find the call to the global initializer if
 /// present, otherwise return null. If an initializer is returned, then
 /// `CallToOnce` is initialized to the corresponding builtin "once" call.
-SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
-                             BuiltinInst *&CallToOnce);
+SILFunction *findInitializer(SILFunction *AddrF, BuiltinInst *&CallToOnce);
 
 /// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
 /// rewrite the initialization pattern.

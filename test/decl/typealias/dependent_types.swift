@@ -23,11 +23,12 @@ struct X1<T> : P1 {
   }
 }
 
-struct GenericStruct<T> { // expected-note 2{{generic type 'GenericStruct' declared here}}
+struct GenericStruct<T> { // expected-note 3{{generic type 'GenericStruct' declared here}}
   typealias Alias = T
   typealias MetaAlias = T.Type
 
   typealias Concrete = Int
+  typealias ReferencesConcrete = Concrete
 
   func methodOne() -> Alias.Type {}
   func methodTwo() -> MetaAlias {}
@@ -58,6 +59,9 @@ let _: GenericStruct.MetaAlias = metaFoo()
 // ... but if the typealias has a fully concrete underlying type,
 // we are OK.
 let _: GenericStruct.Concrete = foo()
+
+let _: GenericStruct.ReferencesConcrete = foo()
+// expected-error@-1 {{reference to generic type 'GenericStruct' requires arguments in <...>}}
 
 class SuperG<T, U> {
   typealias Composed = (T, U)

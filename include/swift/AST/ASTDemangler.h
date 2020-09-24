@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/TypeDecoder.h"
 
 namespace swift {
@@ -33,6 +34,7 @@ namespace swift {
 class TypeDecl;
 
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 Type getTypeForMangling(ASTContext &ctx,
                         llvm::StringRef mangling);
@@ -90,8 +92,7 @@ public:
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
 
-  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
-                       bool isVariadic);
+  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
 
   Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags);
@@ -178,6 +179,7 @@ private:
                                               Demangle::Node::Kind kind);
 };
 
+SWIFT_END_INLINE_NAMESPACE
 }  // namespace Demangle
 
 }  // namespace swift

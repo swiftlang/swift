@@ -89,7 +89,7 @@ let _ = mine.getCollisionNonProperty(1)
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension IAMMutableStruct1 {
 // PRINT-NEXT:    init(with withIAMStruct1: IAMStruct1)
-// PRINT-NEXT:    init(url url: UnsafePointer<Int8>!)
+// PRINT-NEXT:    init(url url: UnsafePointer<CChar>!)
 // PRINT-NEXT:    func doSomething()
 // PRINT-NEXT:  }
 //

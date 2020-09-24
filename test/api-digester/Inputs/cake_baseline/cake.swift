@@ -40,6 +40,9 @@ public struct C6 {}
 @frozen
 public enum IceKind {}
 
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public enum FutureKind {}
+
 public protocol P1 {}
 
 public protocol P2 {}

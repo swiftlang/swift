@@ -126,7 +126,7 @@ extension Timer {
                 lock.cleanupLock()
             }
 
-            func addSubsriber<S: Subscriber>(_ sub: S)
+            func addSubscriber<S: Subscriber>(_ sub: S)
                 where
                     S.Failure == Failure,
                     S.Input == Output
@@ -195,7 +195,7 @@ extension Timer {
         }
 
         public func receive<S: Subscriber>(subscriber: S) where Failure == S.Failure, Output == S.Input {
-            routingSubscription.addSubsriber(subscriber)
+            routingSubscription.addSubscriber(subscriber)
         }
 
         public func connect() -> Cancellable {

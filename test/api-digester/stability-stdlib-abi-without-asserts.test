@@ -1,0 +1,37 @@
+// Welcome, Build Wrangler!
+//
+// A failure in this test indicates that there is a potential ABI breaking
+// change in the Standard Library. If you observe a failure, please reach out to
+// the Standard Library team directly to make sure we resolve this quickly!
+//
+// Instead of XFAILing this test, please consider extending the list of expected
+// changes at the bottom. (In addition to ignoring the current set of ABI breaks,
+// XFAILing this test also silences any future ABI breaks that may land on this
+// branch, which isn't ideal.)
+//
+// You can find a diff of what needs to be added in the output of the failed
+// test run. The order of lines doesn't matter, and you can also include
+// comments to refer to any bugs you filed.
+//
+// Thanks! -- Your friendly stdlib engineers
+
+// REQUIRES: OS=macosx
+// REQUIRES: swift_stdlib_no_asserts
+// RUN: %empty-directory(%t.tmp)
+// mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
+// RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location -v
+// RUN: %clang -E -P -x c %S/stability-stdlib-abi-without-asserts.test -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
+// RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
+
+// The digester can incorrectly register a generic signature change when
+// declarations are shuffled. rdar://problem/46618883
+// UNSUPPORTED: swift_evolve
+
+Func _prespecialize() is a new API without @available attribute
+Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
+
+// These reflection APIs are exposed to facilitate building SwiftReflectionTest.swift when testing Release builds.
+Func _getMetadataSection(_:) is a new API without @available attribute
+Func _getMetadataSectionCount() is a new API without @available attribute
+Func _getMetadataSectionName(_:) is a new API without @available attribute

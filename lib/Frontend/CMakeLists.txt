@@ -20,10 +20,10 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSIL
   swiftMigrator
   swiftOption
-  swiftParseSIL
   swiftSILGen
   swiftSILOptimizer
   swiftIRGen
+  swiftLocalization
   swiftSema
   swiftSerialization
   swiftTBDGen)

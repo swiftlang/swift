@@ -12,7 +12,18 @@
 
 import os
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import swiftsyntax
+from . import xctest
 from .. import shell
 from .. import targets
 
@@ -36,7 +47,8 @@ class IndexStoreDB(product.Product):
         return self.args.test_indexstoredb
 
     def test(self, host_target):
-        run_build_script_helper('test', host_target, self, self.args)
+        run_build_script_helper('test', host_target, self, self.args,
+                                self.args.test_indexstoredb_sanitize_all)
 
     def should_install(self, host_target):
         return False
@@ -44,14 +56,33 @@ class IndexStoreDB(product.Product):
     def install(self, host_target):
         pass
 
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM,
+                swiftsyntax.SwiftSyntax]
 
-def run_build_script_helper(action, host_target, product, args):
+
+def run_build_script_helper(action, host_target, product, args,
+                            sanitize_all=False):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
-    toolchain_path = targets.toolchain_path(args.install_destdir,
+    install_destdir = args.install_destdir
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
+                                                              host_target,
+                                                              product.build_dir)
+    toolchain_path = targets.toolchain_path(install_destdir,
                                             args.install_prefix)
-
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
     helper_cmd = [
@@ -65,5 +96,14 @@ def run_build_script_helper(action, host_target, product, args):
     ]
     if args.verbose_build:
         helper_cmd.append('--verbose')
+
+    if sanitize_all:
+        helper_cmd.append('--sanitize-all')
+    elif args.enable_asan:
+        helper_cmd.extend(['--sanitize', 'address'])
+    elif args.enable_ubsan:
+        helper_cmd.extend(['--sanitize', 'undefined'])
+    elif args.enable_tsan:
+        helper_cmd.extend(['--sanitize', 'thread'])
 
     shell.call(helper_cmd)

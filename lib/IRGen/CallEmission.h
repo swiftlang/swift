@@ -61,7 +61,7 @@ private:
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
   void emitYieldsToExplosion(Explosion &out);
-  llvm::CallSite emitCallSite();
+  llvm::CallInst *emitCallSite();
 
 public:
   CallEmission(IRGenFunction &IGF, Callee &&callee)

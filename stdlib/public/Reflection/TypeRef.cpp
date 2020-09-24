@@ -109,8 +109,14 @@ public:
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
-    for (auto element : T->getElements())
-      printRec(element);
+    T->getLabels();
+    auto Labels = T->getLabels();
+    for (auto NameElement : llvm::zip_first(Labels, T->getElements())) {
+      auto Label = std::get<0>(NameElement);
+      if (!Label.empty())
+        fprintf(file, "%s = ", Label.str().c_str());
+      printRec(std::get<1>(NameElement));
+    }
     fprintf(file, ")");
   }
 
@@ -256,6 +262,22 @@ public:
     fprintf(file, ")");
   }
 
+  void visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    printHeader("opaque_archetype");
+    printField("id", O->getID().str());
+    printField("description", O->getDescription().str());
+    fprintf(file, " ordinal %u ", O->getOrdinal());
+    for (auto argList : O->getArgumentLists()) {
+      fprintf(file, "\n");
+      fprintf(indent(Indent + 2), "args: <");
+      for (auto arg : argList) {
+        printRec(arg);
+      }
+      fprintf(file, ">");
+    }
+    fprintf(file, ")");
+  }
+
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     fprintf(file, ")");
@@ -348,6 +370,10 @@ struct TypeRefIsConcrete
   bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return true;
   }
+    
+  bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return false;
+  }
 
 #define REF_STORAGE(Name, name, ...) \
   bool visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
@@ -380,6 +406,14 @@ class DemanglingForTypeRef
     : public TypeRefVisitor<DemanglingForTypeRef, Demangle::NodePointer> {
   Demangle::Demangler &Dem;
 
+  /// Demangle a type and dive into the outermost Type node.
+  Demangle::NodePointer demangleAndUnwrapType(llvm::StringRef mangledName) {
+    auto node = Dem.demangleType(mangledName);
+    if (node && node->getKind() == Node::Kind::Type && node->getNumChildren())
+      node = node->getFirstChild();
+    return node;
+  }
+
 public:
   DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
 
@@ -394,13 +428,32 @@ public:
   }
 
   Demangle::NodePointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
-    return Dem.demangleType(B->getMangledName());
+    return demangleAndUnwrapType(B->getMangledName());
   }
 
   Demangle::NodePointer visitNominalTypeRef(const NominalTypeRef *N) {
-    if (auto parent = N->getParent())
-      assert(false && "not implemented");
-    return Dem.demangleType(N->getMangledName());
+    auto node = demangleAndUnwrapType(N->getMangledName());
+    if (!node || node->getNumChildren() != 2)
+      return node;
+
+    auto parent = N->getParent();
+    if (!parent)
+      return node;
+
+    // Swap in the richer parent that is stored in the NominalTypeRef
+    // instead of what is encoded in the mangled name. The mangled name's
+    // context has been "unspecialized" by NodeBuilder.
+    auto parentNode = visit(parent);
+    if (!parentNode)
+      return node;
+    if (parentNode->getKind() == Node::Kind::Type &&
+        parentNode->getNumChildren())
+      parentNode = parentNode->getFirstChild();
+
+    auto contextualizedNode = Dem.createNode(node->getKind());
+    contextualizedNode->addChild(parentNode, Dem);
+    contextualizedNode->addChild(node->getChild(1), Dem);
+    return contextualizedNode;
   }
 
   Demangle::NodePointer
@@ -438,16 +491,16 @@ public:
 
   Demangle::NodePointer visitTupleTypeRef(const TupleTypeRef *T) {
     auto tuple = Dem.createNode(Node::Kind::Tuple);
-    if (T->isVariadic()) {
-      auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
-      tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
-      tuple->addChild(tupleElt, Dem);
-      return tuple;
-    }
 
-    for (auto element : T->getElements()) {
+    auto Labels = T->getLabels();
+    for (auto LabelElement : llvm::zip(Labels, T->getElements())) {
       auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
-      tupleElt->addChild(visit(element), Dem);
+      auto Label = std::get<0>(LabelElement);
+      if (!Label.empty()) {
+        auto name = Dem.createNode(Node::Kind::TupleElementName, Label);
+        tupleElt->addChild(name, Dem);
+      }
+      tupleElt->addChild(visit(std::get<1>(LabelElement)), Dem);
       tuple->addChild(tupleElt, Dem);
     }
     return tuple;
@@ -471,7 +524,7 @@ public:
       break;
     }
 
-    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (const auto &param : F->getParameters()) {
       auto flags = param.getFlags();
       auto input = visit(param.getType());
@@ -517,7 +570,7 @@ public:
       }
 
       // Otherwise it requires a tuple wrapper.
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     // This covers both none and multiple parameters.
@@ -559,8 +612,10 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
-    if (F->getFlags().throws())
+    if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (F->getFlags().isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;
@@ -589,7 +644,10 @@ public:
 
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
-    assert(!M->wasAbstract() && "not implemented");
+    // FIXME: This is lossy. @objc_metatype is also abstract.
+    auto repr = Dem.createNode(Node::Kind::MetatypeRepresentation,
+                               M->wasAbstract() ? "@thick" : "@thin");
+    node->addChild(repr, Dem);
     node->addChild(visit(M->getInstanceType()), Dem);
     return node;
   }
@@ -622,7 +680,7 @@ public:
   }
 
   Demangle::NodePointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    return Dem.demangleType(F->getName());
+    return demangleAndUnwrapType(F->getName());
   }
 
   Demangle::NodePointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
@@ -660,6 +718,36 @@ public:
   Demangle::NodePointer visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return Dem.createNode(Node::Kind::OpaqueType);
   }
+      
+  Demangle::NodePointer visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    auto decl = Dem.demangleSymbol(O->getID());
+    if (!decl)
+      return nullptr;
+    
+    auto index = Dem.createNode(Node::Kind::Index, O->getOrdinal());
+    
+    auto argNodeLists = Dem.createNode(Node::Kind::TypeList);
+    for (auto argList : O->getArgumentLists()) {
+      auto argNodeList = Dem.createNode(Node::Kind::TypeList);
+      
+      for (auto arg : argList) {
+        auto argNode = visit(arg);
+        if (!argNode)
+          return nullptr;
+        
+        argNodeList->addChild(argNode, Dem);
+      }
+      
+      argNodeLists->addChild(argNodeList, Dem);
+    }
+    
+    auto node = Dem.createNode(Node::Kind::OpaqueType);
+    node->addChild(decl, Dem);
+    node->addChild(index, Dem);
+    node->addChild(argNodeLists, Dem);
+    
+    return node;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
@@ -678,11 +766,15 @@ bool TypeRef::isConcreteAfterSubstitutions(
 
 unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
-    if (auto *Nominal = dyn_cast<NominalTypeRef>(P))
-      return 1 + Nominal->getDepth();
-    return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
+    switch (P->getKind()) {
+    case TypeRefKind::Nominal:
+      return 1 + cast<NominalTypeRef>(P)->getDepth();
+    case TypeRefKind::BoundGeneric:
+      return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
+    default:
+      break;
+    }
   }
-
   return 0;
 }
 
@@ -766,7 +858,8 @@ public:
     std::vector<const TypeRef *> Elements;
     for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    return TupleTypeRef::create(Builder, Elements);
+    std::string Labels = T->getLabelString();
+    return TupleTypeRef::create(Builder, Elements, std::move(Labels));
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -831,6 +924,11 @@ public:
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return O;
   }
+
+  const TypeRef *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return O;
+  }
+
 };
 
 static const TypeRef *
@@ -846,7 +944,7 @@ public:
   using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
 
   TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
-    : Builder(Builder), Substitutions(Substitutions) {}
+      : Builder(Builder), Substitutions(Substitutions) {}
 
   const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
@@ -874,7 +972,8 @@ public:
     std::vector<const TypeRef *> Elements;
     for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    return TupleTypeRef::create(Builder, Elements);
+    std::string Labels = T->getLabelString();
+    return TupleTypeRef::create(Builder, Elements, std::move(Labels));
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -1009,10 +1108,25 @@ public:
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return O;
   }
+    
+  const TypeRef *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    std::vector<const TypeRef *> newArgsBuffer;
+    for (auto argList : O->getArgumentLists()) {
+      for (auto arg : argList) {
+        newArgsBuffer.push_back(visit(arg));
+      }
+    }
+
+    std::vector<llvm::ArrayRef<const TypeRef *>> newArgLists;
+
+    return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
+                                          O->getOrdinal(),
+                                          newArgLists);
+  }
 };
 
-const TypeRef *
-TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
+const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
+                              const GenericArgumentMap &Subs) const {
   return TypeRefSubstitution(Builder, Subs).visit(this);
 }
 
@@ -1051,7 +1165,7 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
                                S->getParent()))
         return false;
 
-      for (unsigned i = 0, e = O->getGenericParams().size(); i < e; i++) {
+      for (unsigned i = 0, e = O->getGenericParams().size(); i < e; ++i) {
         if (!deriveSubstitutions(Subs,
                                  O->getGenericParams()[i],
                                  S->getGenericParams()[i]))
@@ -1068,7 +1182,7 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
       if (O->getElements().size() != S->getElements().size())
         return false;
 
-      for (unsigned i = 0, e = O->getElements().size(); i < e; i++) {
+      for (unsigned i = 0, e = O->getElements().size(); i < e; ++i) {
         if (!deriveSubstitutions(Subs,
                                  O->getElements()[i],
                                  S->getElements()[i]))

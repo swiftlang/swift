@@ -33,7 +33,6 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftAST
   swiftMarkup
   swiftParse
-  swiftParseSIL
   swiftSIL
   swiftSILGen
   swiftSILOptimizer

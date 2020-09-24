@@ -84,19 +84,19 @@ bb5:
 //
 // CHECK-LABEL: sil @testJumpThreadIndex : $@convention(thin) (__ContiguousArrayStorageBase, Builtin.Int64) -> Builtin.Int32 {
 // CHECK: bb0(%0 : $__ContiguousArrayStorageBase, %1 : $Builtin.Int64):
-// CHECK:   cond_br undef, bb1, bb2
+// CHECK:   cond_br undef, bb2, bb1
 // CHECK: bb1:
-// CHECK:   apply
-// CHECK:   strong_retain
-// CHECK:   strong_release
-// CHECK:   [[IDX1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
-// CHECK:   br bb3([[IDX1]] : $Builtin.Word)
-// CHECK: bb2:
 // CHECK:   apply
 // CHECK:   strong_retain
 // CHECK:   strong_release
 // CHECK:   [[IDX2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
 // CHECK:   br bb3([[IDX2]] : $Builtin.Word)
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK:   strong_retain
+// CHECK:   strong_release
+// CHECK:   [[IDX1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
+// CHECK:   br bb3([[IDX1]] : $Builtin.Word)
 // CHECK: bb3([[PHI:%.*]] : $Builtin.Word):
 // CHECK:   [[TAIL:%.*]] = ref_tail_addr %0 : $__ContiguousArrayStorageBase, $Int32
 // CHECK:   [[ELT:%.*]] = index_addr [[TAIL]] : $*Int32, %14 : $Builtin.Word
@@ -190,14 +190,8 @@ sil @doNothing : $@convention(thin) (@inout Int) -> ()
 
 // CHECK-LABEL: sil @testMultiUse : $@convention(method) (Bool, @inout Int) -> () {
 // CHECK: bb0(%0 : $Bool, %1 : $*Int):
-// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK:   cond_br %{{.*}}, bb1, bb2
 // CHECK: bb1:
-// CHECK:   [[ALLOC1:%.*]] = alloc_box ${ var S }, var, name "s"
-// CHECK:   [[PROJ1:%.*]] = project_box [[ALLOC1]] : ${ var S }, 0
-// CHECK:   [[ADR1:%.*]] = struct_element_addr [[PROJ1]] : $*S, #S.x
-// CHECK:   store %{{.*}} to [[ADR1]] : $*Int
-// CHECK:   br bb3([[ALLOC1]] : ${ var S })
-// CHECK: bb2:
 // CHECK:   apply %{{.*}}(%1) : $@convention(thin) (@inout Int) -> ()
 // CHECK:   [[ALLOC2:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK:   [[PROJ2:%.*]] = project_box [[ALLOC2]] : ${ var S }, 0
@@ -205,6 +199,12 @@ sil @doNothing : $@convention(thin) (@inout Int) -> ()
 // CHECK:   store %{{.*}} to [[ADR2]] : $*Int
 // CHECK:   apply %{{.*}}([[ADR2]]) : $@convention(thin) (@inout Int) -> ()
 // CHECK:   br bb3([[ALLOC2]] : ${ var S })
+// CHECK: bb2:
+// CHECK:   [[ALLOC1:%.*]] = alloc_box ${ var S }, var, name "s"
+// CHECK:   [[PROJ1:%.*]] = project_box [[ALLOC1]] : ${ var S }, 0
+// CHECK:   [[ADR1:%.*]] = struct_element_addr [[PROJ1]] : $*S, #S.x
+// CHECK:   store %{{.*}} to [[ADR1]] : $*Int
+// CHECK:   br bb3([[ALLOC1]] : ${ var S })
 // CHECK: bb3([[BOXARG:%.*]] : ${ var S }):
 // CHECK:   [[PROJ3:%.*]] = project_box [[BOXARG]] : ${ var S }, 0
 // CHECK:   [[ADR3:%.*]] = struct_element_addr [[PROJ3]] : $*S, #S.x

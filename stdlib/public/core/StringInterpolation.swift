@@ -75,7 +75,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
     let capacityPerInterpolation = 2
     let initialCapacity = literalCapacity +
       interpolationCount * capacityPerInterpolation
-    _storage = String(_StringGuts(_initialCapacity: initialCapacity))
+    _storage = String._createEmpty(withInitialCapacity: initialCapacity)
   }
   
   /// Appends a literal segment of a string interpolation.
@@ -178,7 +178,12 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   public mutating func appendInterpolation<T>(_ value: T) {
     _print_unlocked(value, &self)
   }
-  
+
+  @_alwaysEmitIntoClient
+  public mutating func appendInterpolation(_ value: Any.Type) {
+	  _typeName(value, qualified: false).write(to: &self)
+  }
+
   /// Creates a string from this instance, consuming the instance in the
   /// process.
   @inlinable

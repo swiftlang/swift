@@ -48,12 +48,6 @@ class DiagnosticEngine;
 class Evaluator;
 class UnifiedStatsReporter;
 
-namespace detail {
-// Remove this when the compiler bumps to C++17.
-template <typename...>
-using void_t = void;
-}
-
 /// An "abstract" request function pointer, which is the storage type
 /// used for each of the
 using AbstractRequestFunction = void(void);
@@ -71,7 +65,7 @@ class PrettyStackTraceRequest : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceRequest(const Request &request) : request(request) { }
 
-  void print(llvm::raw_ostream &out) const {
+  void print(llvm::raw_ostream &out) const override {
     out << "While evaluating request ";
     simple_display(out, request);
     out << "\n";
@@ -91,9 +85,9 @@ public:
   CyclicalRequestError(const Request &request, const Evaluator &evaluator)
     : request(request), evaluator(evaluator) {}
 
-  virtual void log(llvm::raw_ostream &out) const;
+  virtual void log(llvm::raw_ostream &out) const override;
 
-  virtual std::error_code convertToErrorCode() const {
+  virtual std::error_code convertToErrorCode() const override {
     // This is essentially unused, but is a temporary requirement for
     // llvm::ErrorInfo subclasses.
     llvm_unreachable("shouldn't get std::error_code from CyclicalRequestError");
@@ -231,37 +225,7 @@ class Evaluator {
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
 
-  /// A stack of dependency sources in the order they were evaluated.
-  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
-
-  /// An RAII type that manages manipulating the evaluator's
-  /// dependency source stack. It is specialized to be zero-cost for
-  /// requests that are not dependency sources.
-  template <typename Request, typename = detail::void_t<>>
-  struct IncrementalDependencyStackRAII {
-    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {}
-  };
-
-  template <typename Request>
-  struct IncrementalDependencyStackRAII<
-      Request, typename std::enable_if<Request::isDependencySource>::type> {
-    NullablePtr<Evaluator> Eval;
-    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {
-      auto Source = Req.readDependencySource(E);
-      // If there is no source to introduce, bail. This can occur if
-      // a request originates in the context of a module.
-      if (!Source.getPointer()) {
-        return;
-      }
-      E.dependencySources.emplace_back(Source);
-      Eval = &E;
-    }
-
-    ~IncrementalDependencyStackRAII() {
-      if (Eval.isNonNull())
-        Eval.get()->dependencySources.pop_back();
-    }
-  };
+  evaluator::DependencyRecorder recorder;
 
   /// Retrieve the request function for the given zone and request IDs.
   AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
@@ -279,9 +243,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags,
-            bool debugDumpCycles,
-            bool buildDependencyGraph);
+  Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
@@ -297,13 +259,20 @@ public:
   void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
+  void enumerateReferencesInFile(
+      const SourceFile *SF,
+      evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    return recorder.enumerateReferencesInFile(SF, f);
+  }
+
   /// Retrieve the result produced by evaluating a request that can
   /// be cached.
   template<typename Request,
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
     // The request can be cached, but check a predicate to determine
     // whether this particular instance is cached. This allows more
     // fine-grained control over which instances get cache.
@@ -319,7 +288,8 @@ public:
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
     return getResultUncached(request);
   }
 
@@ -464,59 +434,22 @@ private:
   }
 
 private:
-  // Report the result of evaluating a request that is not a dependency sink -
-  // which is to say do nothing.
-  template <typename Request,
-            typename std::enable_if<!Request::isDependencySink>::type * = nullptr>
+  // Report the result of evaluating a request that is not a dependency sink.
+  template <typename Request, typename std::enable_if<
+                                  !Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
-                             const typename Request::OutputType &o) {}
+                             const typename Request::OutputType &o) {
+    recorder.replay(activeRequests, ActiveRequest(r));
+  }
 
   // Report the result of evaluating a request that is a dependency sink.
   template <typename Request,
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    if (auto *tracker = getActiveDependencyTracker())
-      r.writeDependencySink(*this, *tracker, o);
-  }
-
-  /// If there is an active dependency source, returns its
-  /// \c ReferencedNameTracker. Else, returns \c nullptr.
-  ReferencedNameTracker *getActiveDependencyTracker() const {
-    if (auto *source = getActiveDependencySourceOrNull())
-      return source->getRequestBasedReferencedNameTracker();
-    return nullptr;
-  }
-
-public:
-  /// Returns \c true if the scope of the current active source cascades.
-  ///
-  /// If there is no active scope, the result always cascades.
-  bool isActiveSourceCascading() const {
-    return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
-  }
-
-  /// Returns the scope of the current active scope.
-  ///
-  /// If there is no active scope, the result always cascades.
-  evaluator::DependencyScope getActiveSourceScope() const {
-    if (dependencySources.empty()) {
-      return evaluator::DependencyScope::Cascading;
-    }
-    return dependencySources.back().getInt();
-  }
-
-  /// Returns the active dependency's source file, or \c nullptr if no
-  /// dependency source is active.
-  ///
-  /// The use of this accessor is strongly discouraged, as it implies that a
-  /// dependency sink is seeking to filter out names based on the files they
-  /// come from. Existing callers are being migrated to more reasonable ways
-  /// of judging the relevancy of a dependency.
-  SourceFile *getActiveDependencySourceOrNull() const {
-    if (dependencySources.empty())
-      return nullptr;
-    return dependencySources.back().getPointer();
+    return recorder.record(activeRequests, [&r, &o](auto &c) {
+      return r.writeDependencySink(c, o);
+    });
   }
 
 public:

@@ -42,6 +42,7 @@ class ConformingMethodListConsumer {
 public:
   virtual ~ConformingMethodListConsumer() {}
   virtual void handleResult(const ConformingMethodListResult &result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
 };
 
 /// Printing consumer
@@ -53,6 +54,7 @@ public:
   PrintingConformingMethodListConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
   void handleResult(const ConformingMethodListResult &result) override;
+  void setReusingASTContext(bool flag) override {}
 };
 
 /// Create a factory for code completion callbacks.

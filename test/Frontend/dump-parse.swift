@@ -73,3 +73,53 @@ nonescaping({ $0 })
 // CHECK-AST:        (declref_expr type='((Int) -> Int) -> ()'
 // CHECK-AST-NEXT:        (paren_expr
 // CHECK-AST-NEXT:          (closure_expr type='(Int) -> Int' {{.*}} discriminator=1 single-expression
+
+// CHECK-LABEL: (struct_decl range=[{{.+}}] "MyStruct")
+struct MyStruct {}
+
+// CHECK-LABEL: (enum_decl range=[{{.+}}] "MyEnum"
+enum MyEnum {
+
+    // CHECK-LABEL: (enum_case_decl range=[{{.+}}]
+    // CHECK-NEXT:    (enum_element_decl range=[{{.+}}]  "foo(x:)"
+    // CHECK-NEXT:      (parameter_list range=[{{.+}}]
+    // CHECK-NEXT:         (parameter "x" apiName=x)))
+    // CHECK-NEXT:     (enum_element_decl range=[{{.+}}] "bar"))
+    // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "foo(x:)"
+    // CHECK-NEXT:    (parameter_list range=[{{.+}}]
+    // CHECK-NEXT:      (parameter "x" apiName=x)))
+    // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "bar"))
+    case foo(x: MyStruct), bar
+}
+
+// CHECK-LABEL: (top_level_code_decl range=[{{.+}}]
+// CHECK-NEXT:    (brace_stmt implicit range=[{{.+}}]
+// CHECK-NEXT:      (sequence_expr type='<null>'
+// CHECK-NEXT:        (discard_assignment_expr type='<null>')
+// CHECK-NEXT:        (assign_expr type='<null>'
+// CHECK-NEXT:          (**NULL EXPRESSION**)
+// CHECK-NEXT:          (**NULL EXPRESSION**))
+// CHECK-NEXT:        (closure_expr type='<null>' discriminator={{[0-9]+}}
+// CHECK-NEXT:          (parameter_list range=[{{.+}}]
+// CHECK-NEXT:            (parameter "v"))
+// CHECK-NEXT:          (brace_stmt range=[{{.+}}])))))
+_ = { (v: MyEnum) in }
+
+// CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
+struct SelfParam {
+
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-NEXT:    (parameter "self")
+  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
+  // CHECK-NEXT:    (result
+  // CHECK-NEXT:      (type_optional
+  // CHECK-NEXT:        (type_ident
+  // CHECK-NEXT:          (component id='SelfParam' bind=none))))
+  static func createOptional() -> SelfParam? {
+
+    // CHECK-LABEL: (call_expr type='<null>' arg_labels=
+    // CHECK-NEXT:    (unresolved_decl_ref_expr type='<null>' name=SelfParam function_ref=unapplied)
+    // CHECK-NEXT:    (tuple_expr type='()'{{.*}}))
+    SelfParam()
+  }
+}

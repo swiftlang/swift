@@ -4,4 +4,4 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-NOT: Unknown
+// CHECK-NOT: Unknown{{Code|Block}}

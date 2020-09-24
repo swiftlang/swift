@@ -62,7 +62,7 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(Located<Identifier> ID) {
+bool SourceLoader::canImportModule(ImportPath::Element ID) {
   // Search the memory buffers to see if we can find this file on disk.
   FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
                                             ID.Loc);
@@ -79,7 +79,7 @@ bool SourceLoader::canImportModule(Located<Identifier> ID) {
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ArrayRef<Located<Identifier>> path) {
+                                     ImportPath::Module path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -104,10 +104,6 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
                                      /*isSystem=*/false);
 
-  // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool>
-      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
-
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
@@ -115,22 +111,22 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx);
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
+                                                : ImplicitStdlibKind::None;
+
+  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.Item] = importMod;
+  Ctx.addLoadedModule(importMod);
 
-  auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
-  if (!Ctx.getStdlibModule())
-    implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
-
-  auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID, implicitImportKind,
-                                          Ctx.LangOpts.CollectParsedToken,
-                                          Ctx.LangOpts.BuildSyntaxTree);
+  auto *importFile =
+      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
   importMod->addFile(*importFile);
   performImportResolution(*importFile);
   importMod->setHasResolvedImports();
+  bindExtensions(*importMod);
   return importMod;
 }
 

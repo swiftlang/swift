@@ -82,10 +82,11 @@ type_initializer_map = [
   ]
 
 import re
-def derive_name((type, val)):
+def derive_name(type, val):
   return (re.sub(r'[<> ,\.\?\(\)\[\]-]', '_', type), type, val)
 
-for name, type, val in map(derive_name, type_initializer_map):
+for (type, val) in type_initializer_map:
+  (name, type, val) = derive_name(type, val)
   generic = (type in ['T', 'U'])
   function = "->" in type
 }%

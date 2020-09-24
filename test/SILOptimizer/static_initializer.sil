@@ -25,8 +25,8 @@ sil_global private @globalinit_token0 : $Builtin.Word
 // CHECK-NEXT: }
 sil_global @_Tv2ch1xSi : $Outer
 
-// CHECK-LABEL: sil private @globalinit_func0 : $@convention(c) () -> () {
-sil private @globalinit_func0 : $@convention(c) () -> () {
+// CHECK-LABEL: sil private [global_init_once_fn] @globalinit_func0 : $@convention(c) () -> () {
+sil private [global_init_once_fn] @globalinit_func0 : $@convention(c) () -> () {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Outer
   %1 = integer_literal $Builtin.Int32, 2

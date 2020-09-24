@@ -317,7 +317,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addGenericWitnessTable(GenericRequirement requirement,
                                 ClassDecl *forClass) {
       if (forClass == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
       }
       super::addGenericWitnessTable(requirement, forClass);
     }
@@ -325,17 +325,25 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addGenericArgument(GenericRequirement requirement,
                             ClassDecl *forClass) {
       if (forClass == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
       }
       super::addGenericArgument(requirement, forClass);
     }
 
-    void addMethod(SILDeclRef fn) {
+    void addReifiedVTableEntry(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
         Layout.MethodInfos.try_emplace(fn, getNextOffset());
       }
-      super::addMethod(fn);
+      super::addReifiedVTableEntry(fn);
+    }
+    
+    void noteNonoverriddenMethod(SILDeclRef fn) {
+      if (fn.getDecl()->getDeclContext() == Target) {
+        auto impl = VTable->getEntry(IGM.getSILModule(), fn);
+        Layout.MethodInfos.try_emplace(fn,
+         IGM.getAddrOfSILFunction(impl->getImplementation(), NotForDefinition));
+      }
     }
 
     void noteStartOfFieldOffsets(ClassDecl *forClass) {
@@ -346,7 +354,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 
     void addFieldOffset(VarDecl *field) {
       if (field->getDeclContext() == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
       }
       super::addFieldOffset(field);
@@ -398,8 +406,14 @@ Size ClassMetadataLayout::getInstanceAlignMaskOffset() const {
 ClassMetadataLayout::MethodInfo
 ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
   auto &stored = getStoredMethodInfo(method);
-  auto offset = emitOffset(IGF, stored.TheOffset);
-  return MethodInfo(offset);
+  switch (stored.TheKind) {
+  case MethodInfo::Kind::Offset: {
+    auto offset = emitOffset(IGF, stored.TheOffset);
+    return MethodInfo(offset);
+  }
+  case MethodInfo::Kind::DirectImpl:
+    return MethodInfo(stored.TheImpl);
+  }
 }
 
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,
@@ -543,6 +557,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
       super::noteStartOfGenericRequirements();
     }
 
+    void addTrailingFlags() {
+      Layout.TrailingFlagsOffset = getNextOffset();
+      super::addTrailingFlags();
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -556,6 +575,11 @@ Offset
 EnumMetadataLayout::getPayloadSizeOffset() const {
   assert(PayloadSizeOffset.isStatic());
   return Offset(PayloadSizeOffset.getStaticOffset());
+}
+
+Offset EnumMetadataLayout::getTrailingFlagsOffset() const {
+  assert(TrailingFlagsOffset.isStatic());
+  return Offset(TrailingFlagsOffset.getStaticOffset());
 }
 
 /********************************** STRUCTS ***********************************/
@@ -594,6 +618,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
       super::noteEndOfFieldOffsets();
     }
 
+    void addTrailingFlags() {
+      Layout.TrailingFlagsOffset = getNextOffset();
+      super::addTrailingFlags();
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -620,6 +649,11 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
   return Offset(FieldOffsetVector.getStaticOffset());
 }
 
+Offset 
+StructMetadataLayout::getTrailingFlagsOffset() const {
+  assert(TrailingFlagsOffset.isStatic());
+  return Offset(TrailingFlagsOffset.getStaticOffset());
+}
 /****************************** FOREIGN CLASSES *******************************/
 ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
                                                        ClassDecl *theClass)

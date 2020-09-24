@@ -74,7 +74,11 @@ extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 void *MainAddr);
 
-/// Determine if the given invocation should run as a subcommand.
+/// Determine if the given invocation should run as a "subcommand".
+///
+/// Examples of "subcommands" are 'swift build' or 'swift test', which are
+/// usually used to invoke the Swift package manager executables 'swift-build'
+/// and 'swift-test', respectively.
 ///
 /// \param ExecName The name of the argv[0] we were invoked as.
 /// \param SubcommandName On success, the full name of the subcommand to invoke.
@@ -136,6 +140,15 @@ static int run_driver(StringRef ExecName,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
     }
+
+    // Run the integrated Swift frontend when called as "swift-frontend" but
+    // without a leading "-frontend".
+    if (!FirstArg.startswith("--driver-mode=")
+        && ExecName == "swift-frontend") {
+      return performFrontend(llvm::makeArrayRef(argv.data()+1,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
+    }
   }
 
   std::string Path = getExecutablePath(argv[0]);
@@ -179,6 +192,8 @@ static int run_driver(StringRef ExecName,
 
   if (C) {
     std::unique_ptr<sys::TaskQueue> TQ = TheDriver.buildTaskQueue(*C);
+    if (!TQ)
+        return 1;
     return C->performJobs(std::move(TQ));
   }
 

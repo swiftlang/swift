@@ -74,12 +74,21 @@ public struct PublicStruct: LibProtocol {
 
   public init() { }
 
-  @IoiPropertyWrapper("some text")
-  public var wrappedVar: String
+  public var nonWrappedVar: String = "some text"
 }
 
 struct StructWithOverride: HiddenProtocolWithOverride {
   func hiddenOverride() {}
+}
+
+internal protocol RefinesHiddenProtocol: HiddenProtocol {
+
+}
+
+public struct PublicStructConformsToHiddenProtocol: RefinesHiddenProtocol {
+  public typealias Value = Int
+
+  public init() { }
 }
 
 #elseif CLIENT_APP
@@ -87,6 +96,9 @@ struct StructWithOverride: HiddenProtocolWithOverride {
 import public_lib
 
 var s = PublicStruct()
-print(s.wrappedVar)
+print(s.nonWrappedVar)
+
+var p = PublicStructConformsToHiddenProtocol()
+print(p)
 
 #endif

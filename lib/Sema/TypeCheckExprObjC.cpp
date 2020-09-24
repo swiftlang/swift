@@ -221,6 +221,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
     
@@ -241,6 +242,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // From here, we're resolving a property. Use the current type.
       updateState(/*isProperty=*/true, currentType);
 
+      auto resolved = KeyPathExpr::Component::
+        forDictionaryKey(componentName, currentType, componentNameLoc);
+      resolvedComponents.push_back(resolved);
       continue;
     }
 
@@ -263,7 +267,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         diags.diagnose(componentNameLoc, diag::could_not_find_type_member,
                        currentType, componentName);
       else
-        diags.diagnose(componentNameLoc, diag::use_unresolved_identifier,
+        diags.diagnose(componentNameLoc, diag::cannot_find_in_scope,
                        componentName, false);
 
       // Note all the correction candidates.
@@ -309,7 +313,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       for (auto result : lookup) {
         diags.diagnose(result.getValueDecl(), diag::decl_declared_here,
-                       result.getValueDecl()->getFullName());
+                       result.getValueDecl()->getName());
       }
       isInvalid = true;
       break;
@@ -321,15 +325,19 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     if (auto var = dyn_cast<VarDecl>(found)) {
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
-      auto resolved =
-        KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
+      Type varTy = var->getInterfaceType();
+
+      // Updates currentType
+      updateState(/*isProperty=*/true, varTy);
+
+      auto resolved = KeyPathExpr::Component::forProperty(varRef, currentType,
+                                                          componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       // Check that the property is @objc.
       if (!var->isObjC()) {
         diags.diagnose(componentNameLoc, diag::expr_keypath_non_objc_property,
-                       var->getFullName());
+                       var->getName());
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
           diags.diagnose(var, diag::make_decl_objc,
                          var->getDescriptiveKind())
@@ -345,7 +353,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
           auto *parent = var->getDeclContext()->getSelfNominalTypeDecl();
           diags.diagnose(componentNameLoc,
                          diag::expr_keypath_swift3_objc_inference,
-                         var->getFullName(),
+                         var->getName(),
                          parent->getName());
           diags.diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
             .fixItInsert(var->getAttributeInsertionLoc(false),
@@ -373,7 +381,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // We cannot refer to a generic type.
       if (type->getDeclaredInterfaceType()->hasTypeParameter()) {
         diags.diagnose(componentNameLoc, diag::expr_keypath_generic_type,
-                       type->getFullName());
+                       type->getName());
         isInvalid = true;
         break;
       }
@@ -390,13 +398,21 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         break;
       }
 
+      // Updates currentType based on newType.
       updateState(/*isProperty=*/false, newType);
+
+      // Resolve this component to the type we found.
+      auto typeRef = ConcreteDeclRef(type);
+      auto resolved = KeyPathExpr::Component::forProperty(typeRef, currentType,
+                                                          componentNameLoc);
+      resolvedComponents.push_back(resolved);
+
       continue;
     }
 
     // Declarations that cannot be part of a key-path.
     diags.diagnose(componentNameLoc, diag::expr_keypath_not_property,
-                   found->getDescriptiveKind(), found->getFullName(),
+                   found->getDescriptiveKind(), found->getName(),
                    /*isForDynamicKeyPathMemberLookup=*/false);
     isInvalid = true;
     break;

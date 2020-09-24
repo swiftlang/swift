@@ -1056,28 +1056,28 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
     // Reuse one of the integer witnesses if applicable.
     switch (sizeAndAlignment(fixedTI->getFixedSize(),
                              fixedTI->getFixedAlignment())) {
-    case sizeAndAlignment(Size(0), Alignment(1)):
+    case sizeAndAlignment(Size(0), Alignment::create<1>()):
       witnessSurrogate = TupleType::getEmpty(C);
       break;
-    case sizeAndAlignment(Size(1), Alignment(1)):
+    case sizeAndAlignment(Size(1), Alignment::create<1>()):
       witnessSurrogate = BuiltinIntegerType::get(8, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(2), Alignment(2)):
+    case sizeAndAlignment(Size(2), Alignment::create<2>()):
       witnessSurrogate = BuiltinIntegerType::get(16, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(4), Alignment(4)):
+    case sizeAndAlignment(Size(4), Alignment::create<4>()):
       witnessSurrogate = BuiltinIntegerType::get(32, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(8), Alignment(8)):
+    case sizeAndAlignment(Size(8), Alignment::create<8>()):
       witnessSurrogate = BuiltinIntegerType::get(64, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(16), Alignment(16)):
+    case sizeAndAlignment(Size(16), Alignment::create<16>()):
       witnessSurrogate = BuiltinIntegerType::get(128, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(32), Alignment(32)):
+    case sizeAndAlignment(Size(32), Alignment::create<32>()):
       witnessSurrogate = BuiltinIntegerType::get(256, C)->getCanonicalType();
       break;
-    case sizeAndAlignment(Size(64), Alignment(64)):
+    case sizeAndAlignment(Size(64), Alignment::create<64>()):
       witnessSurrogate = BuiltinIntegerType::get(512, C)->getCanonicalType();
       break;
     }

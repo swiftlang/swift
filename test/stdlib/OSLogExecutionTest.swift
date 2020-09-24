@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogExecutionTest
+// RUN: %target-codesign %t/OSLogExecutionTest
 // RUN: %target-run %t/OSLogExecutionTest
 //
 // RUN: %target-build-swift %s -O -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogExecutionTest
+// RUN: %target-codesign %t/OSLogExecutionTest
 // RUN: %target-run %t/OSLogExecutionTest
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Run-time tests for testing the correctness of the optimizations that optimize the
 // construction of the format string and the byte buffer from a string interpolation.

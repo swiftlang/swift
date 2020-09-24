@@ -25,7 +25,7 @@ static unsigned getAnyMetatypeDepth(CanType type) {
   unsigned depth = 0;
   while (auto metatype = dyn_cast<AnyMetatypeType>(type)) {
     type = metatype.getInstanceType();
-    depth++;
+    ++depth;
   }
   return depth;
 }
@@ -205,7 +205,7 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
   auto hashable =
     M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
   if (!hashable) return CanType();
-  return hashable->getDeclaredType()->getCanonicalType();
+  return hashable->getDeclaredInterfaceType()->getCanonicalType();
 }
 
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
@@ -492,9 +492,14 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // A function cast can succeed if the function types can be identical,
       // or if the target type is throwier than the original.
 
+      // An async function cannot be cast to a non-async function and
+      // vice-versa.
+      if (sourceFunction->isAsync() != targetFunction->isAsync())
+        return DynamicCastFeasibility::WillFail;
+
       // A non-throwing source function can be cast to a throwing target type,
       // but not vice versa.
-      if (sourceFunction->throws() && !targetFunction->throws())
+      if (sourceFunction->isThrowing() && !targetFunction->isThrowing())
         return DynamicCastFeasibility::WillFail;
       
       // The cast can't change the representation at runtime.
@@ -719,7 +724,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 static unsigned getOptionalDepth(CanType type) {
   unsigned depth = 0;
   while (CanType objectType = type.getOptionalObjectType()) {
-    depth++;
+    ++depth;
     type = objectType;
   }
   return depth;

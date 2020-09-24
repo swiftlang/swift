@@ -11,6 +11,35 @@ func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
 }
 
+struct EmptyWithConcreteNonmutatingMoveAlong: Differentiable {
+  typealias TangentVector = Empty.TangentVector
+  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
+  func move(along _: TangentVector) {}
+  static func proof_that_i_have_nonmutating_move_along() {
+    let empty = Self()
+    empty.move(along: .init())
+  }
+}
+
+protocol DifferentiableWithNonmutatingMoveAlong: Differentiable {}
+extension DifferentiableWithNonmutatingMoveAlong {
+  func move(along _: TangentVector) {}
+}
+
+struct EmptyWithInheritedNonmutatingMoveAlong: DifferentiableWithNonmutatingMoveAlong {
+  typealias TangentVector = Empty.TangentVector
+  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
+  static func proof_that_i_have_nonmutating_move_along() {
+    let empty = Self()
+    empty.move(along: .init())
+  }
+}
+
+class EmptyClass: Differentiable {}
+func testEmptyClass() {
+  assertConformsToAdditiveArithmetic(EmptyClass.TangentVector.self)
+}
+
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic: AdditiveArithmetic, Differentiable {}
@@ -21,14 +50,24 @@ struct EmptyAdditiveArithmetic: AdditiveArithmetic, Differentiable {}
 struct ImmutableStoredProperties: Differentiable {
   var okay: Float
 
-  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let nondiff: Int
 
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   let diff: Float
+
+  let nonmutatingMoveAlongStruct: EmptyWithConcreteNonmutatingMoveAlong
+
+  let inheritedNonmutatingMoveAlongStruct: EmptyWithInheritedNonmutatingMoveAlong
+  
+  let diffClass: EmptyClass // No error on class-bound `let` with a non-mutating `move(along:)`.
 }
 func testImmutableStoredProperties() {
-  _ = ImmutableStoredProperties.TangentVector(okay: 1)
+  _ = ImmutableStoredProperties.TangentVector(
+    okay: 1, 
+    nonmutatingMoveAlongStruct: Empty.TangentVector(), 
+    inheritedNonmutatingMoveAlongStruct: Empty.TangentVector(),
+    diffClass: EmptyClass.TangentVector())
 }
 struct MutableStoredPropertiesWithInitialValue: Differentiable {
   var x = Float(1)
@@ -36,7 +75,8 @@ struct MutableStoredPropertiesWithInitialValue: Differentiable {
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue: Differentiable {
-  let x = Float(1)  // expected-warning {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable or have a non-mutating 'move(along:)'; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
   static func testMemberwiseInitializer() {
@@ -308,7 +348,7 @@ where T: Differentiable {}
 
 // TF-265: Test invalid initializer (that uses a non-existent type).
 struct InvalidInitializer: Differentiable {
-  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {}  // expected-error {{use of undeclared type 'NonExistentType'}}
+  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {}  // expected-error {{cannot find type 'NonExistentType' in scope}}
 }
 
 // Test memberwise initializer synthesis.
@@ -323,28 +363,69 @@ where T: AdditiveArithmetic {}
 extension NoMemberwiseInitializerExtended: Differentiable
 where T: Differentiable & AdditiveArithmetic {}
 
-// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
+// SR-12793: Test interaction with `@differentiable` and `@derivative` type-checking.
+
+struct SR_12793: Differentiable {
+  var x: Float
+
+  @differentiable
+  func method() -> Float { x }
+
+  @derivative(of: method)
+  func vjpMethod() -> (value: Float, pullback: (Float) -> TangentVector) { fatalError() }
+
+  // Test usage of synthesized `TangentVector` type.
+  // This should not produce an error: "reference to invalid associated type 'TangentVector'".
+  mutating func move(along direction: TangentVector) {}
+}
+
+// Test property wrappers.
+
+@propertyWrapper
+struct ImmutableWrapper<Value> {
+  private var value: Value
+  var wrappedValue: Value { value }
+}
 
 @propertyWrapper
 struct Wrapper<Value> {
-  private var value: Value
-  var wrappedValue: Value {
-    value
-  }
+  var wrappedValue: Value
 }
-struct TF_1190<T> {}
-struct TF_1190_Outer: Differentiable {
-  // expected-warning @+1 {{stored property '_x' has no derivative because 'Wrapper<TF_1190<Float>>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
-  @Wrapper var x: TF_1190<Float>
-  @noDerivative @Wrapper var y: TF_1190<Float>
+
+@propertyWrapper
+class ClassWrapper<Value> {
+  var wrappedValue: Value
+  init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+}
+
+struct Generic<T> {}
+extension Generic: Differentiable where T: Differentiable {}
+
+struct WrappedProperties: Differentiable {
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable or have a non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute}}
+  @ImmutableWrapper var immutableInt: Generic<Int>
+
+  // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  @Wrapper var mutableInt: Generic<Int>
+
+  @Wrapper var float: Generic<Float>
+  @ClassWrapper var float2: Generic<Float>
+  // SR-13071: Test `@differentiable` wrapped property.
+  @differentiable @Wrapper var float3: Generic<Float>
+
+  @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
+
+  static func testTangentMemberwiseInitializer() {
+    _ = TangentVector(float: .init(), float2: .init(), float3: .init())
+  }
 }
 
 // Verify that cross-file derived conformances are disallowed.
 
-// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming: Differentiable {}
+// expected-error @-1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
+// expected-error @-2 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}
 
-// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming: Differentiable {}
+// expected-error @-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
+// expected-error @-2 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}

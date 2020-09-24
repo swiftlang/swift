@@ -76,6 +76,9 @@ public:
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
 
+  /// Remove all instructions of a SILGlobalVariable's static initializer block.
+  void clearStaticInitializerBlock(SILModule &module);
+
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
@@ -108,6 +111,10 @@ public:
   /// Transfer the instructions from Other to the end of this block.
   void spliceAtEnd(SILBasicBlock *Other) {
     InstList.splice(end(), Other->InstList);
+  }
+
+  void spliceAtBegin(SILBasicBlock *Other) {
+    InstList.splice(begin(), Other->InstList);
   }
 
   bool empty() const { return InstList.empty(); }
@@ -201,6 +208,8 @@ public:
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
   void cloneArgumentList(SILBasicBlock *Other);
+
+  void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
@@ -396,8 +405,8 @@ public:
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
-  /// Pretty-print the SILBasicBlock with the designated stream and context.
-  void print(llvm::raw_ostream &OS, SILPrintContext &Ctx) const;
+  /// Pretty-print the SILBasicBlock with the designated context.
+  void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 

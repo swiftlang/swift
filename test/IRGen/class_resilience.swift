@@ -3,7 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-runtime-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %t/class_resilience.swift
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
@@ -20,8 +21,8 @@
 // CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = hidden global [[INT]] 0,
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
-// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 4]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 4]] }
 
 // CHECK: @"$s16class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd" = hidden constant [[INT]] {{8|16}}
 // CHECK: @"$s16class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|20}}
@@ -101,20 +102,20 @@
 // CHECK-native-SAME: i32 0
 
 // CHECK: @"$s16class_resilience17MyResilientParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
-// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 2]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 2]] }
 
 // CHECK: @"$s16class_resilience16MyResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-SAME-32: { [[INT]] 60, i32 2, i32 15 }
-// CHECK-SAME-64: { [[INT]] 96, i32 2, i32 12 }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
-// CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
-// CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 6 + 5]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 3 + 5]] }
 
 // CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
 // CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = hidden constant [[INT]] 0,
@@ -400,7 +401,8 @@ public class ClassWithResilientThenEmpty {
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
-// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{10|13}}
+// CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{10|13}}
+// CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{7|10}}
 // CHECK-NEXT: [[FIELDS_ADDR:%.*]] = bitcast [3 x i8**]* [[FIELDS]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{12|24}}, i8* [[FIELDS_ADDR]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0
@@ -415,8 +417,9 @@ public class ClassWithResilientThenEmpty {
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
 // CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-DIRECT-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-DIRECT-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-INDIRECT-objc-STABLE-ABI-TRUE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
@@ -478,7 +481,8 @@ public class ClassWithResilientThenEmpty {
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [2 x i8**]
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
-// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{10|13}}
+// CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{10|13}}
+// CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{7|10}}
 // CHECK-NEXT: [[FIELDS_ADDR:%.*]] = bitcast [2 x i8**]* [[FIELDS]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{8|16}}, i8* [[FIELDS_ADDR]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* [[FIELDS]], i32 0, i32 0
@@ -493,8 +497,9 @@ public class ClassWithResilientThenEmpty {
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
 // CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-DIRECT-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-DIRECT-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-INDIRECT-objc-STABLE-ABI-TRUE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null

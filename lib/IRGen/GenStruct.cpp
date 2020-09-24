@@ -52,7 +52,8 @@ using namespace irgen;
 enum class StructTypeInfoKind {
   LoadableStructTypeInfo,
   FixedStructTypeInfo,
-  ClangRecordTypeInfo,
+  LoadableClangRecordTypeInfo,
+  AddressOnlyClangRecordTypeInfo,
   NonFixedStructTypeInfo,
   ResilientStructTypeInfo
 };
@@ -83,6 +84,12 @@ namespace {
   /// A field-info implementation for fields of Clang types.
   class ClangFieldInfo : public RecordField<ClangFieldInfo> {
   public:
+    ClangFieldInfo(VarDecl *swiftField, const ElementLayout &layout,
+                   const TypeInfo &typeInfo)
+        : RecordField(typeInfo), Field(swiftField) {
+      completeFrom(layout);
+    }
+
     ClangFieldInfo(VarDecl *swiftField, const ElementLayout &layout,
                    unsigned explosionBegin, unsigned explosionEnd)
       : RecordField(layout, explosionBegin, explosionEnd),
@@ -290,19 +297,19 @@ namespace {
       }
     }
   };
-  
+
   /// A type implementation for loadable record types imported from Clang.
-  class ClangRecordTypeInfo final :
-    public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
+  class LoadableClangRecordTypeInfo final :
+    public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                               ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
   public:
-    ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+    LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                         unsigned explosionSize,
                         llvm::Type *storageType, Size size,
                         SpareBitVector &&spareBits, Alignment align,
                         const clang::RecordDecl *clangDecl)
-      : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
+      : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
                            align, IsPOD, IsFixedSize),
@@ -318,7 +325,7 @@ namespace {
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T,
                               bool isOutlined) const override {
-      ClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
+      LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -329,6 +336,50 @@ namespace {
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
     }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  class AddressOnlyClangRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                                  ClangFieldInfo> {
+    const clang::RecordDecl *ClangDecl;
+
+  public:
+    AddressOnlyClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                   llvm::Type *storageType, Size size,
+                                   Alignment align,
+                                   const clang::RecordDecl *clangDecl)
+        : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
+                             fields, storageType, size,
+                             // We can't assume any spare bits in a C++ type
+                             // with user-defined special member functions.
+                             SpareBitVector(llvm::Optional<APInt>{
+                                 llvm::APInt(size.getValueInBits(), 0)}),
+                             align, IsPOD, IsNotBitwiseTakable, IsFixedSize),
+          ClangDecl(clangDecl) {
+      (void)ClangDecl;
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("Address-only C++ types must be created by C++ special "
+                       "member functions.");
+    }
+
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return None;
     }
@@ -680,7 +731,11 @@ public:
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
-    return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
+    if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
+      return AddressOnlyClangRecordTypeInfo::create(
+          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+    }
+    return LoadableClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
                                        llvmType, TotalStride,
                                        std::move(SpareBits), TotalAlignment,
                                        ClangDecl);
@@ -773,7 +828,7 @@ private:
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
-      auto &fieldTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(
+      auto &fieldTI = cast<FixedTypeInfo>(IGM.getTypeInfo(
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI);
@@ -812,7 +867,7 @@ private:
 
   /// Add storage for an (optional) Swift field at the given offset.
   void addField(VarDecl *swiftField, Size offset,
-                const LoadableTypeInfo &fieldType) {
+                const FixedTypeInfo &fieldType) {
     assert(offset >= NextOffset && "adding fields out of order");
 
     // Add a padding field if required.
@@ -823,8 +878,11 @@ private:
   }
 
   /// Add information to track a value field at the current offset.
-  void addFieldInfo(VarDecl *swiftField, const LoadableTypeInfo &fieldType) {
-    unsigned explosionSize = fieldType.getExplosionSize();
+  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType) {
+    bool isLoadableField = isa<LoadableTypeInfo>(fieldType);
+    unsigned explosionSize = 0;
+    if (isLoadableField)
+      explosionSize = cast<LoadableTypeInfo>(fieldType).getExplosionSize();
     unsigned explosionBegin = NextExplosionIndex;
     NextExplosionIndex += explosionSize;
     unsigned explosionEnd = NextExplosionIndex;
@@ -838,9 +896,12 @@ private:
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 
-    FieldInfos.push_back(
-           ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
-    
+    if (isLoadableField)
+      FieldInfos.push_back(
+          ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
+    else
+      FieldInfos.push_back(ClangFieldInfo(swiftField, layout, fieldType));
+
     if (!isEmpty) {
       LLVMFields.push_back(fieldType.getStorageType());
       NextOffset += fieldType.getFixedSize();
@@ -862,22 +923,26 @@ private:
 
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
-#define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
-  auto &structTI = IGF.getTypeInfo(type);                              \
-  switch (getStructTypeInfoKind(structTI)) {                           \
-  case StructTypeInfoKind::ClangRecordTypeInfo:                        \
-    return structTI.as<ClangRecordTypeInfo>().op(IGF, __VA_ARGS__);    \
-  case StructTypeInfoKind::LoadableStructTypeInfo:                     \
-    return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
-  case StructTypeInfoKind::FixedStructTypeInfo:                        \
-    return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);    \
-  case StructTypeInfoKind::NonFixedStructTypeInfo:                     \
-    return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__); \
-  case StructTypeInfoKind::ResilientStructTypeInfo:                    \
-    llvm_unreachable("resilient structs are opaque");                  \
-  }                                                                    \
-  llvm_unreachable("bad struct type info kind!");                      \
-} while (0)
+#define FOR_STRUCT_IMPL(IGF, type, op, ...)                                    \
+  do {                                                                         \
+    auto &structTI = IGF.getTypeInfo(type);                                    \
+    switch (getStructTypeInfoKind(structTI)) {                                 \
+    case StructTypeInfoKind::LoadableClangRecordTypeInfo:                      \
+      return structTI.as<LoadableClangRecordTypeInfo>().op(IGF, __VA_ARGS__);  \
+    case StructTypeInfoKind::AddressOnlyClangRecordTypeInfo:                   \
+      return structTI.as<AddressOnlyClangRecordTypeInfo>().op(IGF,             \
+                                                              __VA_ARGS__);    \
+    case StructTypeInfoKind::LoadableStructTypeInfo:                           \
+      return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__);       \
+    case StructTypeInfoKind::FixedStructTypeInfo:                              \
+      return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);          \
+    case StructTypeInfoKind::NonFixedStructTypeInfo:                           \
+      return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__);       \
+    case StructTypeInfoKind::ResilientStructTypeInfo:                          \
+      llvm_unreachable("resilient structs are opaque");                        \
+    }                                                                          \
+    llvm_unreachable("bad struct type info kind!");                            \
+  } while (0)
 
 Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   Address base,

@@ -407,7 +407,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
     unsigned i = unsigned(index);
     if (i > unsigned(ValueWitness::Flags)) {
       if (IGF.IGM.getPointerSize() == Size(8)) {
-        i--; // one pointer width skips both flags and xiCount
+        --i; // one pointer width skips both flags and xiCount
       } else if (IGF.IGM.getPointerSize() == Size(4)) {
         // no adjustment required
       } else {
@@ -575,7 +575,7 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
   // Emit the dynamic alloca.
   auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
-  alloca->setAlignment(llvm::MaybeAlign(align.getValue()));
+  alloca->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
 
   assert(!isInEntryBlock ||
          getActiveDominancePoint().isUniversal() &&
@@ -1354,6 +1354,7 @@ irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
   auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
                                    "__swift_get_extra_inhabitant_index",
                                    &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
   fn->setCallingConv(IGM.SwiftCC);
   IRGenFunction IGF(IGM, fn);
   auto parameters = IGF.collectParameters();
@@ -1427,8 +1428,9 @@ irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
 
   // TODO: use a meaningful mangled name and internal/shared linkage.
   auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
-                                   "__swift_get_extra_inhabitant_index",
+                                   "__swift_store_extra_inhabitant_index",
                                    &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
   fn->setCallingConv(IGM.SwiftCC);
   IRGenFunction IGF(IGM, fn);
   auto parameters = IGF.collectParameters();

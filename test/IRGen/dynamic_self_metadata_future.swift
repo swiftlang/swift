@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -prespecialize-generic-metadata %s -target %module-target-future -emit-ir -parse-as-library | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // REQUIRES: CPU=x86_64
 
 // FIXME: Not a SIL test because we can't parse dynamic Self in SIL.

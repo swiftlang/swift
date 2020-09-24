@@ -74,6 +74,30 @@ static llvm::cl::opt<bool>
 Classify("classify",
            llvm::cl::desc("Display symbol classification characters"));
 
+/// Options that are primarily used for testing.
+/// \{
+static llvm::cl::opt<bool> DisplayLocalNameContexts(
+    "display-local-name-contexts", llvm::cl::init(true),
+    llvm::cl::desc("Qualify local names"),
+    llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> DisplayStdlibModule(
+    "display-stdlib-module", llvm::cl::init(true),
+    llvm::cl::desc("Qualify types originating from the Swift standard library"),
+    llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> DisplayObjCModule(
+    "display-objc-module", llvm::cl::init(true),
+    llvm::cl::desc("Qualify types originating from the __ObjC module"),
+    llvm::cl::Hidden);
+
+static llvm::cl::opt<std::string> HidingModule(
+    "hiding-module",
+    llvm::cl::desc("Don't qualify types originating from this module"),
+    llvm::cl::Hidden);
+/// \}
+
+
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
                llvm::cl::ZeroOrMore);
@@ -233,6 +257,10 @@ int main(int argc, char **argv) {
   options.SynthesizeSugarOnTypes = !DisableSugar;
   if (Simplified)
     options = swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+  options.DisplayStdlibModule = DisplayStdlibModule;
+  options.DisplayObjCModule = DisplayObjCModule;
+  options.HidingCurrentModule = HidingModule;
+  options.DisplayLocalNameContexts = DisplayLocalNameContexts;
 
   if (InputNames.empty()) {
     CompactMode = true;

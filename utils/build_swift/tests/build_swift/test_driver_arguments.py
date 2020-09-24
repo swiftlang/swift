@@ -342,7 +342,7 @@ class TestDriverArgumentParser(unittest.TestCase):
         try:
             return migration.parse_args(self.parser, args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse arguments: {}'.format(
+            raise ParserError('failed to parse arguments: {} {}'.format(
                 six.text_type(args), e))
 
     def _check_impl_args(self, namespace):
@@ -353,7 +353,7 @@ class TestDriverArgumentParser(unittest.TestCase):
                 constants.BUILD_SCRIPT_IMPL_PATH,
                 namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse impl arguments: {}'.format(
+            raise ParserError('failed to parse impl arguments: {} {}'.format(
                 six.text_type(namespace.build_script_impl_args), e))
 
     def parse_args_and_unknown_args(self, args, namespace=None):
@@ -369,7 +369,7 @@ class TestDriverArgumentParser(unittest.TestCase):
                     migration._process_disambiguation_arguments(
                         namespace, unknown_args))
             except (SystemExit, argparse.ArgumentError) as e:
-                raise ParserError('failed to parse arguments: {}'.format(
+                raise ParserError('failed to parse arguments: {} {}'.format(
                     six.text_type(args), e))
 
         return namespace, unknown_args

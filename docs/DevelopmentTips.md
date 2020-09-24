@@ -41,3 +41,25 @@ Given the size of artifacts generated, you might also want to bump the cache siz
 You can run some compiles to see if it is actually doing something by running `sccache --show-stats`. Depending on the exact compilation task you're running, you might see very different cache hit rates. For example, `sccache` is particularly effective if you're rebuilding LLVM, which doesn't change so frequently from the Swift compiler's perspective. On the other hand, if you're changing the compiler's AST, the cache hit rate is likely to be much lower.
 
 One known issue with `sccache` is that you might occassionally get an "error: Connection to server timed out", even though you didn't stop the server. Simply re-running the build command usually works.
+
+## Memory usage
+
+When building Swift, peak memory usage happens during the linking phases that produce llvm and swift executables. In case your build fails because a process ran out of RAM, you can use one or more of the following techniques to reduce the peak memory usage.
+
+### Reduce the amount of debug symbols
+
+We can use debug symbols for only the part of the project we intend to work on. For example, when working on the compiler itself, we can build with debug symbols enabled only for the compiler:
+
+```
+build-script --release --debug-swift
+```
+
+### Reduce the number of parallel link jobs
+
+By default, `build-script` will spawn as many parallel compile / link jobs as there are CPUs in the machine. We can reduce the number of parallel link jobs by setting the `LLVM_PARALLEL_LINK_JOBS` and `SWIFT_PARALLEL_LINK_JOBS` CMake properties. We can set them through the `--llvm-cmake-options` and `--swift-cmake-options` arguments to `build-script`.
+
+For example, to have `build-script` spawn only one link job at a time, we can invoke it as:
+
+```
+build-script --llvm-cmake-options==-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
+```

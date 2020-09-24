@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/USRGeneration.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "DeclarationFragmentPrinter.h"
 #include "SymbolGraphASTWalker.h"
 
@@ -44,11 +45,16 @@ DeclarationFragmentPrinter::getKindSpelling(FragmentKind Kind) const {
       return "typeIdentifier";
     case FragmentKind::GenericParameter:
       return "genericParameter";
+    case FragmentKind::InternalParam:
+      return "internalParam";
+    case FragmentKind::ExternalParam:
+      return "externalParam";
     case FragmentKind::Text:
       return "text";
     case FragmentKind::None:
       llvm_unreachable("Fragment kind of 'None' has no spelling");
   }
+  llvm_unreachable("invalid fragment kind");
 }
 
 void DeclarationFragmentPrinter::closeFragment() {
@@ -100,10 +106,10 @@ DeclarationFragmentPrinter::printNamePre(PrintNameContext Context) {
     break;
   case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::FunctionParameterExternal:
-    openFragment(FragmentKind::Identifier);
+    openFragment(FragmentKind::ExternalParam);
     break;
   case PrintNameContext::FunctionParameterLocal:
-    openFragment(FragmentKind::Identifier);
+    openFragment(FragmentKind::InternalParam);
     break;
   case PrintNameContext::TupleElement:
   case PrintNameContext::TypeMember:
@@ -131,8 +137,19 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     PrintNameContext NameContext) {
   openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
-  llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(RefTo, OS);
+  USR.clear();
+
+  auto ShouldLink = Name.str() != "Self";
+  if (const auto *TD = T->getAnyNominal()) {
+    if (SG->isImplicitlyPrivate(TD)) {
+      ShouldLink = false;
+    }
+  }
+
+  if (ShouldLink) {
+    llvm::raw_svector_ostream OS(USR);
+    ide::printDeclUSR(RefTo, OS);
+  }
   closeFragment();
 }
 
@@ -141,4 +158,38 @@ void DeclarationFragmentPrinter::printText(StringRef Text) {
     openFragment(FragmentKind::Text);
   }
   Spelling.append(Text);
+}
+
+void DeclarationFragmentPrinter::printAbridgedType(const GenericTypeDecl *TD,
+                                                   bool PrintKeyword) {
+  if (PrintKeyword) {
+    openFragment(DeclarationFragmentPrinter::FragmentKind::Keyword);
+    switch (TD->getKind()) {
+      case DeclKind::Struct:
+        printText(getTokenText(tok::kw_struct));
+        break;
+      case DeclKind::Enum:
+        printText(getTokenText(tok::kw_enum));
+        break;
+      case DeclKind::Protocol:
+        printText(getTokenText(tok::kw_protocol));
+        break;
+      case DeclKind::Class:
+        printText(getTokenText(tok::kw_class));
+        break;
+      case DeclKind::TypeAlias:
+        printText(getTokenText(tok::kw_typealias));
+        break;
+      case DeclKind::OpaqueType:
+        llvm_unreachable("OpaqueType should not be in symbol graphs!");
+      default:
+        llvm_unreachable("GenericTypeDecl kind not handled in DeclarationFragmentPrinter!");
+    }
+
+    openFragment(DeclarationFragmentPrinter::FragmentKind::Text);
+    printText(" ");
+  }
+
+  openFragment(DeclarationFragmentPrinter::FragmentKind::Identifier);
+  printText(TD->getNameStr());
 }

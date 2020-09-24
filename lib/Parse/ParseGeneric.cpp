@@ -135,7 +135,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Return early if there was code completion token.
   if (Result.hasCodeCompletion())
     return Result;
-  auto Invalid = Result.isError();
+  auto Invalid = Result.isErrorOrHasCompletion();
 
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
@@ -143,7 +143,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
       parseGenericWhereClause(WhereLoc, Requirements,
-                              FirstTypeInComplete).isError()) {
+                              FirstTypeInComplete).isErrorOrHasCompletion()) {
     Invalid = true;
   }
   
@@ -283,7 +283,7 @@ ParserStatus Parser::parseGenericWhereClause(
       if (CodeCompletion)
         CodeCompletion->completeGenericRequirement();
       consumeToken(tok::code_complete);
-      Status.setHasCodeCompletion();
+      Status.setHasCodeCompletionAndIsError();
       break;
     }
 
@@ -293,7 +293,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
     if (FirstType.hasCodeCompletion()) {
       BodyContext->setTransparent();
-      Status.setHasCodeCompletion();
+      Status.setHasCodeCompletionAndIsError();
       FirstTypeInComplete = true;
     }
 
@@ -332,13 +332,9 @@ ParserStatus Parser::parseGenericWhereClause(
       } else {
         // Parse the protocol or composition.
         ParserResult<TypeRepr> Protocol = parseType();
-
-        if (Protocol.isNull()) {
-          Status.setIsParseError();
-          if (Protocol.hasCodeCompletion())
-            Status.setHasCodeCompletion();
-          break;
-        }
+        Status |= Protocol;
+        if (Protocol.isNull())
+          Protocol = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
@@ -356,17 +352,18 @@ ParserStatus Parser::parseGenericWhereClause(
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();
-      if (SecondType.isNull()) {
-        Status.setIsParseError();
-        if (SecondType.hasCodeCompletion())
-          Status.setHasCodeCompletion();
-        break;
-      }
+      Status |= SecondType;
+      if (SecondType.isNull())
+        SecondType = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
       // Add the requirement
       Requirements.push_back(RequirementRepr::getSameType(FirstType.get(),
                                                       EqualLoc,
                                                       SecondType.get()));
+    } else if (FirstType.hasCodeCompletion()) {
+      // Recover by adding dummy constraint.
+      Requirements.push_back(RequirementRepr::getTypeConstraint(
+          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc)));
     } else {
       BodyContext->setTransparent();
       diagnose(Tok, diag::expected_requirement_delim);
@@ -392,13 +389,9 @@ ParserStatus Parser::parseGenericWhereClause(
 }
 
 
-/// Parse a free-standing where clause attached to a declaration,
-/// adding it to a generic parameter list, if any, or to the given
-/// generic context representing the declaration.
+/// Parse a free-standing where clause attached to a declaration.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                    GenericParamList *&genericParams,
-                                    ParseDeclOptions flags) {
+parseFreestandingGenericWhereClause(GenericContext *genCtx) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
 
   SmallVector<RequirementRepr, 4> Requirements;
@@ -406,23 +399,11 @@ parseFreestandingGenericWhereClause(GenericContext *genCtx,
   bool FirstTypeInComplete;
   auto result = parseGenericWhereClause(WhereLoc, Requirements,
                                         FirstTypeInComplete);
-  if (result.shouldStopParsing() || Requirements.empty())
+  if (result.isErrorOrHasCompletion() || Requirements.empty())
     return result;
 
-  if (genericParams) {
-    // Push the generic arguments back into a local scope so that references will
-    // find them.
-    Scope S(this, ScopeKind::Generics);
-    for (auto pd : genericParams->getParams())
-      addToScope(pd);
-
-    genericParams->addTrailingWhereClause(Context, WhereLoc, Requirements);
-
-  } else {
-    // A where clause against outer generic parameters.
-    genCtx->setTrailingWhereClause(
-        TrailingWhereClause::create(Context, WhereLoc, Requirements));
-  }
+  genCtx->setTrailingWhereClause(
+      TrailingWhereClause::create(Context, WhereLoc, Requirements));
 
   return ParserStatus();
 }
@@ -436,7 +417,7 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
   bool firstTypeInComplete;
   auto whereStatus =
       parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
-  if (whereStatus.isSuccess()) {
+  if (whereStatus.isSuccess() && !whereStatus.hasCodeCompletion()) {
     trailingWhere =
         TrailingWhereClause::create(Context, whereLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {

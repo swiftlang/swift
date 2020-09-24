@@ -1,4 +1,4 @@
-//===--- Type.h - Swift Language Type ASTs ----------------------*- C++ -*-===//
+//===--- Type.h - Value objects for Swift and SIL types ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Type class.
+// This file defines the Type and CanType classes, which are value objects
+// used to cheaply pass around different kinds of types. The full hierarchy for
+// Swift and SIL types -- including tuple types, function types and more -- is
+// defined in Types.h.
 //
 //===----------------------------------------------------------------------===//
 
@@ -147,7 +150,7 @@ enum class SubstFlags {
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x04,
+  SubstituteOpaqueArchetypes = 0x04
 };
 
 /// Options for performing substitutions into a type.
@@ -213,7 +216,10 @@ public:
   
   bool isNull() const { return Ptr == 0; }
   
-  TypeBase *operator->() const { return Ptr; }
+  TypeBase *operator->() const {
+    assert(Ptr && "Cannot dereference a null Type!");
+    return Ptr;
+  }
   
   explicit operator bool() const { return Ptr != 0; }
 
@@ -325,11 +331,6 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
-  friend llvm::hash_code hash_value(Type type) {
-    using llvm::hash_value;
-    return hash_value(type.getPointer());
-  }
-
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
   /// to be appended to only a portion of the returned type. For
@@ -381,11 +382,12 @@ SourceLoc extractNearestSourceLoc(Type ty);
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
+  static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
+  static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
@@ -433,7 +435,7 @@ public:
   ///   - existentials with class or class protocol bounds
   /// But not:
   ///   - function types
-  bool allowsOwnership(GenericSignatureImpl *sig) const {
+  bool allowsOwnership(const GenericSignatureImpl *sig) const {
     return isReferenceTypeImpl(*this, sig,
                                /*functions count*/ false);
   }
@@ -472,6 +474,11 @@ public:
     return isObjCExistentialTypeImpl(*this);
   }
 
+  // Is this an ObjC generic class.
+  bool isTypeErasedGenericClassType() const {
+    return isTypeErasedGenericClassTypeImpl(*this);
+  }
+
   ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
   StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
@@ -495,6 +502,10 @@ public:
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
   bool operator!=(CanType T) const { return !operator==(T); }
+
+  friend llvm::hash_code hash_value(CanType T) {
+    return llvm::hash_value(T.getPointer());
+  }
 
   bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
 };
@@ -525,7 +536,10 @@ public:                                                             \
   TYPE *getPointer() const {                                        \
     return static_cast<TYPE*>(Type::getPointer());                  \
   }                                                                 \
-  TYPE *operator->() const { return getPointer(); }                 \
+  TYPE *operator->() const {                                        \
+    assert(getPointer() && "Cannot dereference a null " #TYPE);     \
+    return getPointer();                                            \
+  }                                                                 \
   operator TYPE *() const { return getPointer(); }                  \
   explicit operator bool() const { return getPointer() != nullptr; }
 

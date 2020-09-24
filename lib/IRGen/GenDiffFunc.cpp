@@ -46,15 +46,17 @@ class DifferentiableFuncFieldInfo final
 public:
   DifferentiableFuncFieldInfo(
       NormalDifferentiableFunctionTypeComponent component, const TypeInfo &type,
-      IndexSubset *parameterIndices)
+      IndexSubset *parameterIndices, IndexSubset *resultIndices)
       : RecordField(type), component(component),
-        parameterIndices(parameterIndices) {}
+        parameterIndices(parameterIndices), resultIndices(resultIndices) {}
 
   /// The field index.
   const NormalDifferentiableFunctionTypeComponent component;
 
   /// The parameter indices.
   IndexSubset *parameterIndices;
+  /// The result indices.
+  IndexSubset *resultIndices;
 
   std::string getFieldName() const {
     switch (component) {
@@ -65,6 +67,7 @@ public:
     case NormalDifferentiableFunctionTypeComponent::VJP:
       return "vjp";
     }
+    llvm_unreachable("invalid component type");
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
@@ -74,7 +77,7 @@ public:
       return SILType::getPrimitiveObjectType(origFnTy);
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        parameterIndices, resultIndices, kind, IGM.getSILTypes(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
@@ -131,12 +134,14 @@ class DifferentiableFuncTypeBuilder
 
   SILFunctionType *originalType;
   IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
 
 public:
   DifferentiableFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
       : RecordTypeBuilder(IGM),
         originalType(fnTy->getWithoutDifferentiability()),
-        parameterIndices(fnTy->getDifferentiabilityParameterIndices()) {
+        parameterIndices(fnTy->getDifferentiabilityParameterIndices()),
+        resultIndices(fnTy->getDifferentiabilityResultIndices()) {
     assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
   }
 
@@ -164,7 +169,8 @@ public:
   getFieldInfo(unsigned index,
                NormalDifferentiableFunctionTypeComponent component,
                const TypeInfo &fieldTI) {
-    return DifferentiableFuncFieldInfo(component, fieldTI, parameterIndices);
+    return DifferentiableFuncFieldInfo(component, fieldTI, parameterIndices,
+                                       resultIndices);
   }
 
   SILType getType(NormalDifferentiableFunctionTypeComponent component) {
@@ -172,7 +178,7 @@ public:
       return SILType::getPrimitiveObjectType(originalType->getCanonicalType());
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        parameterIndices, resultIndices, kind, IGM.getSILTypes(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
@@ -209,6 +215,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       return "transpose";
     }
+    llvm_unreachable("invalid component type");
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
@@ -223,6 +230,7 @@ public:
           LookUpConformanceInModule(IGM.getSwiftModule()));
       return SILType::getPrimitiveObjectType(transposeTy);
     }
+    llvm_unreachable("invalid component type");
   }
 };
 
@@ -321,6 +329,7 @@ public:
           LookUpConformanceInModule(IGM.getSwiftModule()));
       return SILType::getPrimitiveObjectType(transposeTy);
     }
+    llvm_unreachable("invalid component type");
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {

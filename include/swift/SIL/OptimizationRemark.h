@@ -19,8 +19,10 @@
 #ifndef SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 #define SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -32,17 +34,74 @@ class SILFunction;
 
 namespace OptRemark {
 
+struct ArgumentKeyKind {
+  enum InnerTy {
+    // Just assume this is a normal msg that we are emitting.
+    Default,
+
+    // Assume this is a note that should be emitted as a separate
+    // diagnostic when emitting diagnostics. Do nothing special
+    // along the backend path.
+    Note,
+
+    // Assume that this is a note that should be emitted as a separate
+    // diagnostic but that doesn't have its own source loc: we should reuse the
+    // one for the original remark.
+    //
+    // This is intended to be used in situations where one needs to emit a
+    // "note" warning due to us not being able to infer a part of our
+    // opt-remark.
+    ParentLocNote,
+  };
+
+  InnerTy innerValue;
+
+  ArgumentKeyKind(InnerTy value) : innerValue(value) {}
+
+  operator InnerTy() const { return innerValue; }
+
+  /// Return true if this argument is meant to be a separate diagnostic when we
+  /// emit diagnostics but when we emit to the remark streamer (due to not
+  /// having support for this), we just emit the remark inline.
+  ///
+  /// TODO: Unfortunate that this needs to be done.
+  bool isSeparateDiagnostic() const {
+    switch (innerValue) {
+    case InnerTy::Default:
+      return false;
+    case InnerTy::Note:
+    case InnerTy::ParentLocNote:
+      return true;
+    }
+
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+};
+
+struct ArgumentKey {
+  ArgumentKeyKind kind;
+  std::string data;
+
+  ArgumentKey(ArgumentKeyKind kind, StringRef data) : kind(kind), data(data) {}
+  ArgumentKey(ArgumentKeyKind::InnerTy kind, StringRef data)
+      : kind(kind), data(data) {}
+  ArgumentKey(ArgumentKey kind, StringRef data) : kind(kind.kind), data(data) {}
+};
+
 /// Used in the streaming interface as the general argument type.  It
 /// internally converts everything into a key-value pair.
 struct Argument {
-  std::string key;
+  ArgumentKey key;
   std::string val;
   /// If set, the debug location corresponding to the value.
   SourceLoc loc;
 
-  explicit Argument(StringRef Str = "") : key("String"), val(Str) {}
-  Argument(StringRef key, StringRef val) : key(key), val(val) {}
+  explicit Argument(StringRef str = "")
+      : Argument({ArgumentKeyKind::Default, "String"}, str) {}
 
+  Argument(StringRef key, StringRef val)
+      : Argument({ArgumentKeyKind::Default, key}, val) {}
+  Argument(ArgumentKey key, StringRef val) : key(key), val(val) {}
   Argument(StringRef key, int n);
   Argument(StringRef key, long n);
   Argument(StringRef key, long long n);
@@ -50,9 +109,22 @@ struct Argument {
   Argument(StringRef key, unsigned long n);
   Argument(StringRef key, unsigned long long n);
 
-  Argument(StringRef key, SILFunction *f);
+  Argument(StringRef key, SILFunction *f)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), f) {}
+  Argument(ArgumentKey key, SILFunction *f);
   Argument(StringRef key, SILType ty);
   Argument(StringRef key, CanType ty);
+
+  Argument(StringRef key, StringRef msg, const ValueDecl *decl)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
+  Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
+      : key(key), val(msg), loc(decl->getLoc()) {}
+
+  Argument(StringRef key, llvm::Twine &&msg, SILLocation loc)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), std::move(msg),
+                 loc) {}
+  Argument(ArgumentKey key, llvm::Twine &&msg, SILLocation loc)
+      : key(key), val(msg.str()), loc(loc.getSourceLoc()) {}
 };
 
 /// Shorthand to insert named-value pairs.
@@ -65,10 +137,41 @@ struct IndentDebug {
   unsigned width;
 };
 
+enum class SourceLocInferenceBehavior : unsigned {
+  None = 0,
+  ForwardScan = 0x1,
+  BackwardScan = 0x2,
+  ForwardScan2nd = 0x4,
+  AlwaysInfer = 0x8,
+
+  ForwardThenBackwards = ForwardScan | BackwardScan,
+  BackwardsThenForwards = BackwardScan | ForwardScan2nd,
+  ForwardScanAlwaysInfer = ForwardScan | AlwaysInfer,
+  BackwardScanAlwaysInfer = BackwardScan | AlwaysInfer,
+};
+
+inline SourceLocInferenceBehavior operator&(SourceLocInferenceBehavior lhs,
+                                            SourceLocInferenceBehavior rhs) {
+  auto lhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(lhs);
+  auto rhsVal = std::underlying_type<SourceLocInferenceBehavior>::type(rhs);
+  return SourceLocInferenceBehavior(lhsVal & rhsVal);
+}
+
+/// Infer the proper SourceLoc to use for the given SILInstruction.
+///
+/// This means that if we have a valid location for the instruction, we just
+/// return that. Otherwise, we have a runtime instruction that does not have a
+/// valid source location. In such a case, we infer the source location from the
+/// surrounding code. If we can not find any surrounding code, we return an
+/// invalid SourceLoc.
+SourceLoc inferOptRemarkSourceLoc(SILInstruction &i,
+                                  SourceLocInferenceBehavior inferBehavior);
+
 /// The base class for remarks.  This can be created by optimization passed to
 /// report successful and unsuccessful optimizations. CRTP is used to preserve
 /// the underlying type encoding the remark kind in the insertion operator.
-template <typename DerivedT> class Remark {
+template <typename DerivedT>
+class Remark {
   /// Arguments collected via the streaming interface.
   SmallVector<Argument, 4> args;
 
@@ -93,9 +196,10 @@ template <typename DerivedT> class Remark {
   unsigned indentDebugWidth = 0;
 
 protected:
-  Remark(StringRef identifier, SILInstruction &i)
+  Remark(StringRef identifier, SILInstruction &i,
+         SourceLocInferenceBehavior inferenceBehavior)
       : identifier((Twine("sil.") + identifier).str()),
-        location(i.getLoc().getSourceLoc()),
+        location(inferOptRemarkSourceLoc(i, inferenceBehavior)),
         function(i.getParent()->getParent()),
         demangledFunctionName(Demangle::demangleSymbolAsString(
             function->getName(),
@@ -133,17 +237,25 @@ public:
 
 /// Remark to report a successful optimization.
 struct RemarkPassed : public Remark<RemarkPassed> {
-  RemarkPassed(StringRef id, SILInstruction &i) : Remark(id, i) {}
+  RemarkPassed(StringRef id, SILInstruction &i)
+      : Remark(id, i, SourceLocInferenceBehavior::None) {}
+  RemarkPassed(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior)
+      : Remark(id, i, inferenceBehavior) {}
 };
 /// Remark to report a unsuccessful optimization.
 struct RemarkMissed : public Remark<RemarkMissed> {
-  RemarkMissed(StringRef id, SILInstruction &i) : Remark(id, i) {}
+  RemarkMissed(StringRef id, SILInstruction &i)
+      : Remark(id, i, SourceLocInferenceBehavior::None) {}
+  RemarkMissed(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior)
+      : Remark(id, i, inferenceBehavior) {}
 };
 
 /// Used to emit the remarks.  Passes reporting remarks should create an
 /// instance of this.
 class Emitter {
-  SILModule &module;
+  SILFunction &fn;
   std::string passName;
   bool passedEnabled;
   bool missedEnabled;
@@ -157,7 +269,7 @@ class Emitter {
   template <typename RemarkT> bool isEnabled();
 
 public:
-  Emitter(StringRef passName, SILModule &m);
+  Emitter(StringRef passName, SILFunction &fn);
 
   /// Take a lambda that returns a remark which will be emitted.  The
   /// lambda is not evaluated unless remarks are enabled.  Second argument is
@@ -166,7 +278,7 @@ public:
   void emit(T remarkBuilder, decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    if (isEnabled<RemarkT>() || module.getSILRemarkStreamer()) {
+    if (isEnabled<RemarkT>() || fn.getModule().getSILRemarkStreamer()) {
       auto rb = remarkBuilder();
       rb.setPassName(passName);
       emit(rb);
@@ -180,8 +292,9 @@ public:
                           decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    bool emitRemark = emitter && (emitter->isEnabled<RemarkT>() ||
-                                  emitter->module.getSILRemarkStreamer());
+    bool emitRemark =
+        emitter && (emitter->isEnabled<RemarkT>() ||
+                    emitter->fn.getModule().getSILRemarkStreamer());
     // Same for DEBUG.
     bool shouldEmitDebug = false;
 #ifndef NDEBUG

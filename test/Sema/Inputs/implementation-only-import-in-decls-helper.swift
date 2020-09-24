@@ -18,4 +18,12 @@ public struct IntLike: ExpressibleByIntegerLiteral, Equatable {
   public init(integerLiteral: Int) {}
 }
 
+@propertyWrapper
+public struct BadWrapper {
+    public var wrappedValue: Int
+    public init(wrappedValue: Int) {
+        self.wrappedValue = wrappedValue
+    }
+}
+
 precedencegroup BadPrecedence {}

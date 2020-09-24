@@ -24,162 +24,132 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
 
 class SwiftClass {}
 
-func checkArchiving(_ cls: AnyObject.Type) {
-  NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(cls, operation: 0)
+func _check(_ label: String, _ cls: AnyObject.Type, _ op: CInt) {
+  NSLog("--%@ start", label)
+  NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(cls, operation: op)
+  NSLog("--%@ end", label)
 }
-func checkUnarchiving(_ cls: AnyObject.Type) {
-  NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(cls, operation: 1)
+func checkArchiving(_ label: String, _ cls: AnyObject.Type) {
+  _check(label, cls, 0)
+}
+func checkUnarchiving(_ label: String, _ cls: AnyObject.Type) {
+  _check(label, cls, 1)
 }
 
-func mark(line: Int32 = #line) {
-  NSLog("--%d--", line)
-}
 
-mark() // CHECK: --[[@LINE]]--
-checkArchiving(SwiftClass.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --SwiftClass start
+checkArchiving("SwiftClass", SwiftClass.self)
+// CHECK-NEXT: --SwiftClass end
 
 
 private class ArchivedTwice {}
 
-checkArchiving(ArchivedTwice.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.+}}).ArchivedTwice' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedTwice'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedTwice)
-// CHECK-NEXT: @objc(ABCArchivedTwice)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(ArchivedTwice.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --ArchivedTwice1 start
+checkArchiving("ArchivedTwice1", ArchivedTwice.self)
+// CHECK: Attempting to archive Swift class '_Test.({{.+}}).ArchivedTwice' with {{.+}} runtime name '_TtC{{.+[0-9]+}}ArchivedTwice'
+// CHECK: @objc(_TtC{{.+[0-9]+}}ArchivedTwice)
+
+// CHECK-LABEL: --ArchivedTwice2 start
+checkArchiving("ArchivedTwice2", ArchivedTwice.self)
+// CHECK-NEXT: --ArchivedTwice2 end
 
 private class UnarchivedTwice {}
 
-checkUnarchiving(UnarchivedTwice.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedTwice' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedTwice'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedTwice)
-// CHECK-NEXT: @objc(ABCUnarchivedTwice)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(UnarchivedTwice.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --UnarchivedTwice1 start
+checkUnarchiving("UnarchivedTwice1", UnarchivedTwice.self)
+// CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedTwice' with {{.+}} runtime name '_TtC{{.+[0-9]+}}UnarchivedTwice'
+// CHECK: @objc(_TtC{{.+[0-9]+}}UnarchivedTwice)
+
+// CHECK-LABEL: --UnarchivedTwice2 start
+checkUnarchiving("UnarchivedTwice2", UnarchivedTwice.self)
+// CHECK-NEXT: --UnarchivedTwice2 end
 
 private class ArchivedThenUnarchived {}
 
-checkArchiving(ArchivedThenUnarchived.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.+}}).ArchivedThenUnarchived' with mangled runtime name '_TtC{{.+[0-9]+}}ArchivedThenUnarchived'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedThenUnarchived)
-// CHECK-NEXT: @objc(ABCArchivedThenUnarchived)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(ArchivedThenUnarchived.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --ArchivedThenUnarchived1 start
+checkArchiving("ArchivedThenUnarchived1", ArchivedThenUnarchived.self)
+// CHECK: Attempting to archive Swift class '_Test.({{.+}}).ArchivedThenUnarchived' with {{.+}} runtime name '_TtC{{.+[0-9]+}}ArchivedThenUnarchived'
+// CHECK: @objc(_TtC{{.+[0-9]+}}ArchivedThenUnarchived)
+
+// CHECK-LABEL: --ArchivedThenUnarchived2 start
+checkUnarchiving("ArchivedThenUnarchived2", ArchivedThenUnarchived.self)
+// CHECK-NEXT: --ArchivedThenUnarchived2 end
 
 private class UnarchivedThenArchived {}
 
-checkUnarchiving(UnarchivedThenArchived.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedThenArchived' with mangled runtime name '_TtC{{.+[0-9]+}}UnarchivedThenArchived'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedThenArchived)
-// CHECK-NEXT: @objc(ABCUnarchivedThenArchived)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(UnarchivedThenArchived.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --UnarchivedThenArchived1 start
+checkUnarchiving("UnarchivedThenArchived1", UnarchivedThenArchived.self)
+// CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).UnarchivedThenArchived' with {{.+}} runtime name '_TtC{{.+[0-9]+}}UnarchivedThenArchived'
+// CHECK: @objc(_TtC{{.+[0-9]+}}UnarchivedThenArchived)
 
-class Outer {
+// CHECK-LABEL: --UnarchivedThenArchived2 start
+checkArchiving("UnarchivedThenArchived2", UnarchivedThenArchived.self)
+// CHECK-NEXT: --UnarchivedThenArchived2 end
+
+private class Outer {
   class ArchivedTwice {}
   class UnarchivedTwice {}
   class ArchivedThenUnarchived {}
   class UnarchivedThenArchived {}
 }
 
-checkArchiving(Outer.ArchivedTwice.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.Outer.ArchivedTwice'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedTwice)
-// CHECK-NEXT: @objc(ABCArchivedTwice)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(Outer.ArchivedTwice.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --Outer.ArchivedTwice1 start
+checkArchiving("Outer.ArchivedTwice1", Outer.ArchivedTwice.self)
+// CHECK: Attempting to archive Swift class '_Test.({{.+}}).Outer.ArchivedTwice'
+// CHECK: @objc(_TtC{{.+[0-9]+}}ArchivedTwice)
 
-checkUnarchiving(Outer.UnarchivedTwice.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.Outer.UnarchivedTwice'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedTwice)
-// CHECK-NEXT: @objc(ABCUnarchivedTwice)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(Outer.UnarchivedTwice.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --Outer.ArchivedTwice2 start
+checkArchiving("Outer.ArchivedTwice2", Outer.ArchivedTwice.self)
+// CHECK-NEXT: --Outer.ArchivedTwice2 end
 
-checkArchiving(Outer.ArchivedThenUnarchived.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.Outer.ArchivedThenUnarchived'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}ArchivedThenUnarchived)
-// CHECK-NEXT: @objc(ABCArchivedThenUnarchived)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(Outer.ArchivedThenUnarchived.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --Outer.UnarchivedTwice1 start
+checkUnarchiving("Outer.UnarchivedTwice1", Outer.UnarchivedTwice.self)
+// CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).Outer.UnarchivedTwice'
+// CHECK: @objc(_TtC{{.+[0-9]+}}UnarchivedTwice)
 
-checkUnarchiving(Outer.UnarchivedThenArchived.self)
-// CHECK-NEXT: Attempting to unarchive Swift class '_Test.Outer.UnarchivedThenArchived'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}UnarchivedThenArchived)
-// CHECK-NEXT: @objc(ABCUnarchivedThenArchived)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(Outer.UnarchivedThenArchived.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --Outer.UnarchivedTwice2 start
+checkUnarchiving("Outer.UnarchivedTwice2", Outer.UnarchivedTwice.self)
+// CHECK-NEXT: --Outer.UnarchivedTwice2 end
+
+// CHECK-LABEL: --Outer.ArchivedThenUnarchived1 start
+checkArchiving("Outer.ArchivedThenUnarchived1", Outer.ArchivedThenUnarchived.self)
+// CHECK: Attempting to archive Swift class '_Test.({{.+}}).Outer.ArchivedThenUnarchived'
+// CHECK: @objc(_TtC{{.+[0-9]+}}ArchivedThenUnarchived)
+
+// CHECK-LABEL: --Outer.ArchivedThenUnarchived2 start
+checkUnarchiving("Outer.ArchivedThenUnarchived2", Outer.ArchivedThenUnarchived.self)
+// CHECK-NEXT: --Outer.ArchivedThenUnarchived2 end
+
+// CHECK-LABEL: --Outer.UnarchivedThenArchived1 start
+checkUnarchiving("Outer.UnarchivedThenArchived1", Outer.UnarchivedThenArchived.self)
+// CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).Outer.UnarchivedThenArchived'
+// CHECK: @objc(_TtC{{.+[0-9]+}}UnarchivedThenArchived)
+
+// CHECK-LABEL: --Outer.UnarchivedThenArchived2 start
+checkArchiving("Outer.UnarchivedThenArchived2", Outer.UnarchivedThenArchived.self)
+// CHECK-NEXT: --Outer.UnarchivedThenArchived2 end
 
 
 private class 日本語 {}
 
-checkArchiving(日本語.self)
-// CHECK-NEXT: Attempting to archive Swift class '_Test.({{.*}}).日本語'
-// CHECK-NEXT: @objc(_TtC{{.+[0-9]+}}9日本語)
-// CHECK-NEXT: @objc(ABCMyModel)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(日本語.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+// CHECK-LABEL: --Japanese1 start
+checkArchiving("Japanese1", 日本語.self)
+// CHECK: Attempting to archive Swift class '_Test.({{.*}}).日本語'
 
+// CHECK-LABEL: --Japanese2 start
+checkArchiving("Japanese2", 日本語.self)
+// CHECK-NEXT: --Japanese2 end
 
-class ArchivedTwiceGeneric<T> {}
+func someFunction() {
+  class LocalArchived: NSObject {}
+  class LocalUnarchived: NSObject {}
 
-checkArchiving(ArchivedTwiceGeneric<Int>.self)
-// CHECK-NEXT: Attempting to archive generic Swift class '_Test.ArchivedTwiceGeneric<Swift.Int>' with mangled runtime name '_TtGC5_Test20ArchivedTwiceGenericSi_'
-// CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
-// CHECK-SAME: _TtGC5_Test20ArchivedTwiceGenericSi_
-// CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(ArchivedTwiceGeneric<Int>.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+  // CHECK-LABEL: --LocalArchived start
+  checkArchiving("LocalArchived", LocalArchived.self)
+  // CHECK: Attempting to archive Swift class '_Test.({{.+}}).LocalArchived'
 
-checkArchiving(ArchivedTwiceGeneric<NSObject>.self)
-// CHECK-NEXT: Attempting to archive generic Swift class '_Test.ArchivedTwiceGeneric<__C.NSObject>' with mangled runtime name '_TtGC5_Test20ArchivedTwiceGenericCSo8NSObject_'
-// CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
-// CHECK-SAME: _TtGC5_Test20ArchivedTwiceGenericCSo8NSObject_
-// CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(ArchivedTwiceGeneric<NSObject>.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
-
-class UnarchivedTwiceGeneric<T> {}
-
-checkUnarchiving(UnarchivedTwiceGeneric<Int>.self)
-// CHECK-NEXT: Attempting to unarchive generic Swift class '_Test.UnarchivedTwiceGeneric<Swift.Int>' with mangled runtime name '_TtGC5_Test22UnarchivedTwiceGenericSi_'
-// CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
-// CHECK-SAME: _TtGC5_Test22UnarchivedTwiceGenericSi_
-// CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(UnarchivedTwiceGeneric<Int>.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
-
-class ArchivedThenUnarchivedGeneric<T> {}
-
-checkArchiving(ArchivedThenUnarchivedGeneric<Int>.self)
-// CHECK-NEXT: Attempting to archive generic Swift class '_Test.ArchivedThenUnarchivedGeneric<Swift.Int>' with mangled runtime name '_TtGC5_Test29ArchivedThenUnarchivedGenericSi_'
-// CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
-// CHECK-SAME: _TtGC5_Test29ArchivedThenUnarchivedGenericSi_
-// CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkUnarchiving(ArchivedThenUnarchivedGeneric<Int>.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
-
-class UnarchivedThenArchivedGeneric<T> {}
-
-checkUnarchiving(UnarchivedThenArchivedGeneric<Int>.self)
-// CHECK-NEXT: Attempting to unarchive generic Swift class '_Test.UnarchivedThenArchivedGeneric<Swift.Int>' with mangled runtime name '_TtGC5_Test29UnarchivedThenArchivedGenericSi_'
-// CHECK-NEXT: NSKeyedUnarchiver.setClass(_:forClassName:)
-// CHECK-SAME: _TtGC5_Test29UnarchivedThenArchivedGenericSi_
-// CHECK-NEXT: NSKeyedArchiver.setClassName(_:for:)
-mark() // CHECK-NEXT: --[[@LINE]]--
-checkArchiving(UnarchivedThenArchivedGeneric<Int>.self)
-mark() // CHECK-NEXT: --[[@LINE]]--
+  // CHECK-LABEL: --LocalUnarchived start
+  checkUnarchiving("LocalUnarchived", LocalUnarchived.self)
+  // CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).LocalUnarchived'
+}
+someFunction()

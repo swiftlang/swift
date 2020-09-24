@@ -68,9 +68,9 @@ test(arg1: 1,
 }
 
 let x = [1, 2, 3]
-        .filter {$0 < $1}
-        .filter {$0 < $1}
-        .filter {$0 < $1}
+    .filter {$0 < $1}
+    .filter {$0 < $1}
+    .filter {$0 < $1}
 
 bax(34949494949)
     .foo(a: Int,
@@ -81,6 +81,27 @@ bax(34949494949)
         fatalError()
     }
     .baz
+
+
+// Enum element parameters should be aligned, and raw values should be indented.
+
+enum TestEnum {
+    case first(x: Int,
+               y: Int,
+               z: Int),
+         second(
+            x: Int,
+            y: Int
+         )
+    case third
+}
+
+enum RawEnum: String {
+    case aCaseWithAParticularlyLongNameSoTheValueIsWrapped =
+            "a long message here",
+         aNotherCaseWithAParticularlyLongNameSoTheValueIsWrapped =
+            "a long message here"
+}
 
 
 // Condition elements should align with each other.
@@ -120,11 +141,11 @@ if #available(
 // do the same.
 //
 let _ = []
-        .map {
-            f {
-                print()
-            } ?? 0
-        }
+    .map {
+        f {
+            print()
+        } ?? 0
+    }
 
 basename
     .foo(a: Int,
@@ -213,10 +234,10 @@ let arrayC = [2]
 let arrayD = [3]
 
 let array1 =
-        arrayA +
-        arrayB +
-        arrayC +
-        arrayD
+    arrayA +
+    arrayB +
+    arrayC +
+    arrayD
 
 array1 =
     arrayA +
@@ -233,9 +254,9 @@ arrayC +
 arrayD
 
 let array2 = arrayA +
-        arrayB +
-        arrayC +
-        arrayD
+    arrayB +
+    arrayC +
+    arrayD
 
 
 // Comments should not break exact alignment, and leading comments should be aligned, rather than the label.
@@ -286,6 +307,20 @@ let s = """
         b
             c
     """
+
+func wantsToIndentContents() {
+    let dontLetItIndentMyValue = """
+a
+    b
+        c
+"""
+}
+
+print("""
+    foo {
+        bar()
+    }
+    """)
 
 
 // Interpolations shouldn't change how multiline strings are handled.
@@ -832,7 +867,7 @@ func foo(
 ) {}
 
 var (d, e):
-        (Int, Int) = (1, 3),
+    (Int, Int) = (1, 3),
     (f, g): (
         Int,
         Int
@@ -877,6 +912,14 @@ let x: Array<(
 let x = foo<Int,
             String,
             Int>()
+
+let x = foo<
+    Int,
+    String,
+    Int
+>()
+.filter { $0 > 10 }
+.count
 
 
 // Invalid elements should still be indented.
@@ -939,3 +982,84 @@ IncrementedFirst++
     }++
     .baz()
 
+
+// Multiple patterns in catch should align exactly.
+
+do {
+    print("hello")
+} catch MyErr.a(let code, let message),
+        MyErr.b(
+            let code,
+            let message
+        ),
+        MyErr.c(let code, let message) {
+    print("ahhh!")
+}
+
+do {
+    throw MyErr.a
+} catch where foo == 0,
+        where bar == 1 {
+}
+
+do
+{
+    print("hello")
+}
+catch MyErr.a(let code, let message),
+      MyErr.b(
+        let code,
+        let message
+      ),
+      MyErr.c(let code, let message)
+{
+    print("ahhh!")
+}
+
+// Pattern binding decls should only column-align if no element spans from the first line to beyond it.
+
+public let x = 10,
+           y = 20
+
+private var firstThing = 20,
+            secondThing = item
+                .filter {},
+            thirdThing = 42
+
+public let myVar = itemWithALongName
+    .filter { $0 >= $1 && $0 - $1 < 50}
+
+public let first = 45, second = itemWithALongName
+    .filter { $0 >= $1 && $0 - $1 < 50}
+
+private var secondThing = item
+    .filter {},
+    firstThing = 20,
+    thirdThing = 56
+
+
+// Function decls missing their parameter list and body shouldn't pick up the next token as a continuation.
+
+struct BarType {
+    func bar
+}
+
+struct <#name#> {
+    <#fields#>
+}
+
+struct <#name#> {
+    <#fields#>
+    func foo() {}
+}
+
+
+// Array literal elements should have their continuation lines indented relative to their first line.
+
+doStuffWithList([
+    baseThing()
+        .map { $0 }
+        .append(\.sdfsdf),
+    secondItem
+        .filter {$0 < 10}
+])

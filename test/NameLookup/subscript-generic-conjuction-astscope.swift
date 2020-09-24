@@ -1,7 +1,5 @@
 // Check that ASTScope lookup works for a construction found in GRDB's Row.swift
-// RUN: %target-swift-frontend -typecheck %s -enable-astscope-lookup -warn-if-astscope-lookup 2>%t.out
-// RUN: %FileCheck %s <%t.out
-// CHECK: WARNING: TRYING Scope exclusively
+// RUN: %target-swift-frontend -typecheck %s
 
 protocol P1 {}
 protocol P2 {}

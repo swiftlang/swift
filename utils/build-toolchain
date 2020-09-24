@@ -29,6 +29,15 @@ function usage() {
   echo "--distcc"
   echo "Build with distcc to speed up the toolchain build"
   echo ""
+  echo "--preset-file"
+  echo "load build-script presets from the specified file"
+  echo ""
+  echo "--preset-prefix"
+  echo "Customize the preset invoked by prepending a prefix"
+  echo ""
+  echo "--use-os-runtime"
+  echo "Require this toolchain to link against against the OS runtime rather than the toolchains packaged runtime"
+  echo ""
 }
 
 RESULT_DIR=$PWD
@@ -38,6 +47,10 @@ cd "$(dirname $0)/.." || exit
 DISTCC_FLAG=
 DRY_RUN=
 BUNDLE_PREFIX=
+PRESET_FILE_FLAGS=
+PRESET_PREFIX=
+PRESET_SUFFIX=
+
 case $(uname -s) in
   Darwin)
     SWIFT_PACKAGE=buildbot_osx_package,no_test
@@ -69,6 +82,17 @@ while [ $# -ne 0 ]; do
   ;;
     --distcc)
       DISTCC_FLAG="--distcc"
+  ;;
+    --preset-file)
+      shift
+      PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS} --preset-file=$1"
+  ;;
+    --preset-prefix)
+      shift
+      PRESET_PREFIX="$1"
+  ;;
+    --use-os-runtime)
+      PRESET_SUFFIX=",use_os_runtime"
   ;;
   -h|--help)
     usage
@@ -115,8 +139,10 @@ SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain
 SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
 DISTCC_FLAG="${DISTCC_FLAG}"
+PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS}"
 
-./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} \
+        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${PRESET_SUFFIX}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
@@ -127,4 +153,5 @@ DISTCC_FLAG="${DISTCC_FLAG}"
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
         darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
-        darwin_toolchain_alias="Local"
+        darwin_toolchain_alias="Local" \
+        darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}"

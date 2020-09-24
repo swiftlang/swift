@@ -50,7 +50,7 @@ fromAlwaysImportedOverlay() // no-error
 fromAlwaysImportedPlatformOverlay() // no-error
 
 // We should *not* have loaded _NeverImportedOverlay
-fromNeverImportedOverlay() // expected-error {{use of unresolved identifier 'fromNeverImportedOverlay'}}
+fromNeverImportedOverlay() // expected-error {{cannot find 'fromNeverImportedOverlay' in scope}}
 
 // Unlike real cross-import overlays, our test overlay doesn't @_exported import
 // the underlying module, so you can't call underlying declarations at all in
@@ -60,12 +60,12 @@ fromNeverImportedOverlay() // expected-error {{use of unresolved identifier 'fro
 // if we were using a well-formed overlay, the overlay could shadow them if it
 // chose.
 
-fromThinLibrary() // expected-error {{use of unresolved identifier 'fromThinLibrary'}}
-fromFatLibrary() // expected-error {{use of unresolved identifier 'fromFatLibrary'}}
-fromClangLibrary() // expected-error {{use of unresolved identifier 'fromClangLibrary'}}
-fromSwiftFramework() // expected-error {{use of unresolved identifier 'fromSwiftFramework'}}
-fromClangFramework() // expected-error {{use of unresolved identifier 'fromClangFramework'}}
-fromOverlaidClangFramework() // expected-error {{use of unresolved identifier 'fromOverlaidClangFramework'}}
+fromThinLibrary() // expected-error {{cannot find 'fromThinLibrary' in scope}}
+fromFatLibrary() // expected-error {{cannot find 'fromFatLibrary' in scope}}
+fromClangLibrary() // expected-error {{cannot find 'fromClangLibrary' in scope}}
+fromSwiftFramework() // expected-error {{cannot find 'fromSwiftFramework' in scope}}
+fromClangFramework() // expected-error {{cannot find 'fromClangFramework' in scope}}
+fromOverlaidClangFramework() // expected-error {{cannot find 'fromOverlaidClangFramework' in scope}}
 
 //
 // FileCheck output for -emit-dependencies:

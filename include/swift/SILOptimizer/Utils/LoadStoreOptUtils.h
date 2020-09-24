@@ -35,7 +35,6 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -169,14 +168,16 @@ public:
   }
 
   /// Print the LSBase.
-  virtual void print(llvm::raw_ostream &os, SILModule *Mod,
-                     TypeExpansionContext context) {
+  virtual void print(llvm::raw_ostream &os) {
     os << Base;
-    Path.getValue().print(os, *Mod, context);
+    SILFunction *F = Base->getFunction();
+    if (F) {
+      Path.getValue().print(os, F->getModule(), TypeExpansionContext(*F));
+    }
   }
 
-  virtual void dump(SILModule *Mod, TypeExpansionContext context) {
-    print(llvm::dbgs(), Mod, context);
+  virtual void dump() {
+    print(llvm::dbgs());
   }
 };
 
@@ -235,7 +236,7 @@ public:
   }
 
   /// Returns whether the LSValue has been initialized properly.
-  bool isValid() const {
+  bool isValid() const override {
     if (CoveringValue)
       return true;
     return LSBase::isValid();
@@ -260,13 +261,12 @@ public:
     return Path.getValue().createExtract(Base, Inst, true);
   }
 
-  void print(llvm::raw_ostream &os, SILModule *Mod,
-             TypeExpansionContext context) {
+  void print(llvm::raw_ostream &os) override {
     if (CoveringValue) {
       os << "Covering Value";
       return;
     }
-    LSBase::print(os, Mod, context);
+    LSBase::print(os);
   }
 
   /// Expand this SILValue to all individual fields it contains.

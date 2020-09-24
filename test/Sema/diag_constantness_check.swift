@@ -292,7 +292,7 @@ func testFunctionWithWrongSemantics(x: Int) {
 // Test that the check is resilient to other type errors.
 func testOtherTypeErrors() {
   constantArgumentFunction(x)
-    // expected-error@-1 {{use of unresolved identifier 'x'}}
+    // expected-error@-1 {{cannot find 'x' in scope}}
   constantArgumentFunction(10 as String)
     // expected-error@-1 {{cannot convert value of type 'Int' to type 'String' in coercion}}
 }

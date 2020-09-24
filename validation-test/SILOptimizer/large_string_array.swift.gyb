@@ -1,0 +1,28 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+
+// The compiler should finish in less than 1 minute. To give some slack,
+// specify a timeout of 5 minutes.
+// If the compiler needs more than 5 minutes, there is probably a real problem.
+// So please don't just increase the timeout in case this fails.
+
+// RUN: %{python} %S/../../test/Inputs/timeout.py 300 %target-swift-frontend -O -parse-as-library -sil-verify-none -emit-sil %t/main.swift | %FileCheck %s
+
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: long_test
+// REQUIRES: CPU=arm64 || CPU=x86_64
+
+// Check if the optimizer can optimize the whole array into a statically
+// initialized global
+
+// CHECK: sil_global private @{{.*9str_array.*}}WZTv_ : $_ContiguousArrayStorage<String> = {
+// CHECK:   %initval = object $_ContiguousArrayStorage<String>
+
+public let str_array: [String] = [
+
+% for i in range(63500):
+  "string in array with index ${i}",
+% end
+
+]
+

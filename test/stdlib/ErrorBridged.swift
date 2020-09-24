@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -o %t/ErrorBridged -DPTR_SIZE_%target-ptrsize -module-name main %s
+// RUN: %target-codesign %t/ErrorBridged
 // RUN: %target-run %t/ErrorBridged
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -849,7 +850,7 @@ ErrorBridgingTests.test("Swift Error bridged to NSError description") {
     expectEqual("Something", bridgedError.description)
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     checkDescription()
   }
 }
@@ -880,7 +881,7 @@ ErrorBridgingTests.test("Swift Error description memory management") {
     }
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     checkDescription()
   }
 }

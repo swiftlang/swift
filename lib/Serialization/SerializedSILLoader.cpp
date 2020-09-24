@@ -27,7 +27,7 @@ SerializedSILLoader::SerializedSILLoader(
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
-  for (auto &Entry : Ctx.LoadedModules) {
+  for (const auto &Entry : Ctx.getLoadedModules()) {
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
         auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callbacks);
@@ -154,11 +154,6 @@ bool SerializedSILLoader::invalidateFunction(SILFunction *F) {
     if (Des->invalidateFunction(F))
       return true;
   return false;
-}
-
-void SerializedSILLoader::getAll() {
-  for (auto &Des : LoadedSILSections)
-    Des->getAll();
 }
 
 // FIXME: Not the best interface. We know exactly which FileUnits may have SIL

@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: optimized_stdlib
 
 import Foundation
 

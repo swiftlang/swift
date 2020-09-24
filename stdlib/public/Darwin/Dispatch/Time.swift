@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 public struct DispatchTime : Comparable {
 	private static let timebaseInfo: mach_timebase_info_data_t = {

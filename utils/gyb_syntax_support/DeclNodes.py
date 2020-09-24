@@ -1,6 +1,6 @@
 # flake8: noqa I201
-from Child import Child
-from Node import Node
+from .Child import Child
+from .Node import Node
 
 
 DECL_NODES = [
@@ -72,10 +72,13 @@ DECL_NODES = [
          ]),
 
     # function-signature ->
-    #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
+    #   '(' parameter-list? ')' async? (throws | rethrows)? '->'? type?
     Node('FunctionSignature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
@@ -167,7 +170,8 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating', 'indirect', '__consuming'
+                       'mutating', 'nonmutating', 'indirect', '__consuming',
+                       'actor'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),
@@ -477,12 +481,14 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPathComponent"
     Node('AccessPathComponent', kind='Syntax',
          children=[
             Child('Name', kind='IdentifierToken'),
             Child('TrailingDot', kind='PeriodToken', is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPath"
     Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
 
     Node('ImportDecl', kind='Decl',

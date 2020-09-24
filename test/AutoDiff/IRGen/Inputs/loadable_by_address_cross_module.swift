@@ -15,14 +15,4 @@ public struct LargeLoadableType<T>: AdditiveArithmetic, Differentiable {
   public func externalLBAModifiedFunction(_ x: Float) -> Float {
     return x * a
   }
-
-  // TODO(TF-1226): Remove custom derivative when stdlib derivatives are upstreamed.
-  @usableFromInline
-  @derivative(of: externalLBAModifiedFunction)
-  func externalLBAModifiedFunctionVJP(_ x: Float) -> (
-    value: Float, pullback: (Float) -> (Self, Float)
-  ) {
-    let value = externalLBAModifiedFunction(x)
-    return (value, { v in (Self(a: v * x), v * a) })
-  }
 }

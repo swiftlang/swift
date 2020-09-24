@@ -95,8 +95,10 @@ static void resolveDeclFromMangledNameList(
   }
 }
 
-static void resolveTypeFromMangledNameList(
-    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+static void
+resolveTypeFromMangledNameList(swift::ASTContext &Ctx,
+                               llvm::ArrayRef<std::string> MangledNames,
+                               bool QualifyTypes) {
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
         swift::Demangle::getTypeForMangling(Ctx, Mangled);
@@ -104,6 +106,8 @@ static void resolveTypeFromMangledNameList(
       llvm::outs() << "Can't resolve type of " << Mangled << "\n";
     } else {
       swift::PrintOptions PO;
+      PO.FullyQualifiedTypesIfAmbiguous = QualifyTypes;
+      PO.QualifyImportedTypes = QualifyTypes;
       PO.PrintStorageRepresentationAttrs = true;
       ResolvedType->print(llvm::outs(), PO);
       llvm::outs() << "\n";
@@ -233,6 +237,9 @@ int main(int argc, char **argv) {
       "dummy-dwarfimporter",
       desc("Install a dummy DWARFImporterDelegate"), cat(Visible));
 
+  opt<bool> QualifyTypes("qualify-types", desc("Qualify dumped types"),
+                         cat(Visible));
+
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -328,20 +335,17 @@ int main(int argc, char **argv) {
     if (Verbose)
       llvm::outs() << "Importing " << path << "... ";
 
+    swift::ImportPath::Module::Builder modulePath;
 #ifdef SWIFT_SUPPORTS_SUBMODULES
-    std::vector<swift::Located<swift::Identifier>> AccessPath;
     for (auto i = llvm::sys::path::begin(path);
          i != llvm::sys::path::end(path); ++i)
       if (!llvm::sys::path::is_separator((*i)[0]))
-          AccessPath.push_back({ CI.getASTContext().getIdentifier(*i),
-                                 swift::SourceLoc() });
+          modulePath.push_back(CI.getASTContext().getIdentifier(*i));
 #else
-    std::vector<swift::Located<swift::Identifier>> AccessPath;
-    AccessPath.push_back({ CI.getASTContext().getIdentifier(path),
-                           swift::SourceLoc() });
+    modulePath.push_back(CI.getASTContext().getIdentifier(path));
 #endif
 
-    auto Module = CI.getASTContext().getModule(AccessPath);
+    auto Module = CI.getASTContext().getModule(modulePath.get());
     if (!Module) {
       if (Verbose)
         llvm::errs() << "FAIL!\n";
@@ -352,14 +356,14 @@ int main(int argc, char **argv) {
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);
-      for (auto Decl : Decls) {
+      for (auto Decl : Decls)
         Decl->dump(llvm::outs());
-      }
     }
     if (!DumpTypeFromMangled.empty()) {
       llvm::SmallVector<std::string, 8> MangledNames;
       collectMangledNames(DumpTypeFromMangled, MangledNames);
-      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames,
+                                     QualifyTypes);
     }
     if (!DumpDeclFromMangled.empty()) {
       llvm::SmallVector<std::string, 8> MangledNames;

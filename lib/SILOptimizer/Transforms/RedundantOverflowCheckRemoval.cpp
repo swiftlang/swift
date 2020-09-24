@@ -114,7 +114,7 @@ public:
 
       for (auto *CF : ToRemove) {
         CF->eraseFromParent();
-        NumCondFailRemoved++;
+        ++NumCondFailRemoved;
       }
       ToRemove.clear();
       return true;
@@ -136,7 +136,7 @@ public:
     // For each block in a Reverse Post Order scan:
     for (auto &BB : ReversePostOrder) {
       // For each instruction:
-      for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {
+      for (auto Inst = BB->begin(), End = BB->end(); Inst != End; ++Inst) {
         // Use branch information for eliminating condfails.
         if (auto *CBI = dyn_cast<CondBranchInst>(Inst))
           registerBranchFormula(CBI);

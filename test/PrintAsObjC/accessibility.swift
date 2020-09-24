@@ -40,13 +40,13 @@
 
 
 #if MAIN
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
 
 @NSApplicationMain
 @objc class AppDelegate : NSApplicationDelegate {}
 
-#elseif os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
 
 @UIApplicationMain
@@ -54,5 +54,6 @@ import UIKit
 
 #else
 // Uh oh, this test depends on having an app delegate.
+#error("Unsupported platform")
 #endif
 #endif

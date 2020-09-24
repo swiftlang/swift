@@ -121,6 +121,13 @@ public:
     return ManagedValue::forOwnedObjectRValue(value, cleanup);
   }
 
+  static ManagedValue
+  forExclusivelyBorrowedOwnedObjectRValue(SILValue value,
+                                          CleanupHandle cleanup) {
+    assert(value->getType().isObject());
+    return ManagedValue::forOwnedObjectRValue(value, cleanup);
+  }
+
   /// Create a managed value for a +0 borrowed non-trivial rvalue object.
   static ManagedValue
   forBorrowedObjectRValue(SILValue value) {

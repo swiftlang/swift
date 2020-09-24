@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_OBJC_H
 #define SWIFT_SEMA_TYPE_CHECK_OBJC_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
 
@@ -123,6 +124,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 /// and figure out its foreign error convention (if any).
 bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                            ObjCReason Reason,
+                           Optional<ForeignAsyncConvention> &asyncConvention,
                            Optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.

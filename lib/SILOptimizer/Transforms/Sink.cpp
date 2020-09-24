@@ -112,7 +112,7 @@ public:
     }
 
     II->moveBefore(&*Dest->begin());
-    NumInstrSunk++;
+    ++NumInstrSunk;
     return true;
   }
 
@@ -136,7 +136,7 @@ public:
       // Skip empty blocks.
       if (Inst == Begin) continue;
       // Point to the first real instruction.
-      Inst--;
+      --Inst;
 
       while (true) {
         if (Inst == Begin) {

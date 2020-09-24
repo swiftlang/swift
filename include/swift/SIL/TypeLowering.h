@@ -55,19 +55,17 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
                                       AnyFunctionType::ExtInfo extInfo);
 
 /// Change the given function type's representation.
-inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
-                                          SILFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withSILRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
+inline CanAnyFunctionType
+adjustFunctionType(CanAnyFunctionType t, AnyFunctionType::Representation rep,
+                   ClangTypeInfo clangTypeInfo) {
+  auto extInfo = t->getExtInfo()
+                     .intoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTypeInfo.getType())
+                     .build();
+  return adjustFunctionType(t, extInfo);
 }
 
-/// Change the given function type's representation.
-inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
-                                          AnyFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
-}
-  
 /// Given a SIL function type, return a type that is identical except
 /// for using the given ExtInfo.
 CanSILFunctionType
@@ -389,6 +387,28 @@ public:
                             ///> substypes and perform operations on these
                             ///> types.
   };
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and lets one specify an expansion kind that gets passed to any
+  /// copy_value that we create.
+  virtual SILValue emitLoweredLoad(
+      SILBuilder &B, SILLocation loc, SILValue addr,
+      LoadOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
+
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and allows for one to specify an expansion kind that is passed to
+  /// any destroy operations we create if we are asked to assign in non-ossa
+  /// code.
+  virtual void emitLoweredStore(
+      SILBuilder &B, SILLocation loc, SILValue value, SILValue addr,
+      StoreOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
 
   //===--------------------------------------------------------------------===//
   // DestroyValue
@@ -969,8 +989,8 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo,
-                                            Bridgeability bridging);
+                                            Bridgeability bridging,
+                                            SILFunctionTypeRepresentation rep);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -1095,6 +1115,15 @@ private:
 };
 
 } // namespace Lowering
+
+CanSILFunctionType getNativeSILFunctionType(
+    Lowering::TypeConverter &TC, TypeExpansionContext context,
+    Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
+    SILExtInfo silExtInfo, Optional<SILDeclRef> origConstant = None,
+    Optional<SILDeclRef> constant = None,
+    Optional<SubstitutionMap> reqtSubs = None,
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
+
 } // namespace swift
 
 namespace llvm {

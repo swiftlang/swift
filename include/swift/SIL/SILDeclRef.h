@@ -42,11 +42,11 @@ namespace swift {
   class ASTContext;
   class ClassDecl;
   class SILFunctionType;
-  enum class SILLinkage : unsigned char;
   enum IsSerialized_t : unsigned char;
   enum class SubclassScope : unsigned char;
   class SILModule;
   class SILLocation;
+  enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
 
 /// How a method is dispatched.
@@ -277,10 +277,10 @@ struct SILDeclRef {
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
   /// Return the hash code for the SIL declaration.
-  llvm::hash_code getHashCode() const {
-    return llvm::hash_combine(loc.getOpaqueValue(),
-                              static_cast<int>(kind),
-                              isForeign, defaultArgIndex);
+  friend llvm::hash_code hash_value(const SILDeclRef &ref) {
+    return llvm::hash_combine(ref.loc.getOpaqueValue(),
+                              static_cast<int>(ref.kind),
+                              ref.isForeign, ref.defaultArgIndex);
   }
 
   bool operator==(SILDeclRef rhs) const {
@@ -309,7 +309,7 @@ struct SILDeclRef {
   /// function.
   SILDeclRef asAutoDiffDerivativeFunction(
       AutoDiffDerivativeFunctionIdentifier *derivativeId) const {
-    assert(!derivativeFunctionIdentifier);
+    assert(derivativeId);
     SILDeclRef declRef = *this;
     declRef.derivativeFunctionIdentifier = derivativeId;
     return declRef;
@@ -396,6 +396,16 @@ struct SILDeclRef {
   bool isDynamicallyReplaceable() const;
 
   bool canBeDynamicReplacement() const;
+
+  bool isAutoDiffDerivativeFunction() const {
+    return derivativeFunctionIdentifier != nullptr;
+  }
+
+  AutoDiffDerivativeFunctionIdentifier *
+  getAutoDiffDerivativeFunctionIdentifier() const {
+    assert(isAutoDiffDerivativeFunction());
+    return derivativeFunctionIdentifier;
+  }
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

@@ -1,6 +1,7 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   AADumper.cpp
   AccessSummaryDumper.cpp
+  AccessedStorageAnalysisDumper.cpp
   AccessedStorageDumper.cpp
   BasicCalleePrinter.cpp
   BasicInstructionPropertyDumper.cpp
@@ -31,4 +32,4 @@ silopt_register_sources(
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
   OwnershipDumper.cpp
-)
+  OwnershipVerifierTextualErrorDumper.cpp)

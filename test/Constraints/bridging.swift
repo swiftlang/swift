@@ -180,7 +180,7 @@ func dictionaryToNSDictionary() {
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
-  return d == d // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
+  return d == d // expected-error{{referencing operator function '==' on 'Dictionary' requires that 'NotEquatable' conform to 'Equatable'}}
 }
 
 // NSString -> String
@@ -373,7 +373,7 @@ func bridgeTupleToAnyObject() {
 
 // Array defaulting and bridging type checking error per rdar://problem/54274245
 func rdar54274245(_ arr: [Any]?) {
-  _ = (arr ?? []) as [NSObject]
+  _ = (arr ?? []) as [NSObject] // expected-warning {{coercion from '[Any]' to '[NSObject]' may fail; use 'as?' or 'as!' instead}}
 }
 
 // rdar://problem/60501780 - failed to infer NSString as a value type of a dictionary

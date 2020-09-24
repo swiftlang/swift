@@ -19,6 +19,9 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -37,6 +40,24 @@ using namespace swift;
 using namespace constraints;
 
 namespace {
+
+/// Find the first #available condition within the statement condition,
+/// or return NULL if there isn't one.
+const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
+  for (const auto &cond : stmtCond) {
+    switch (cond.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+      continue;
+
+    case StmtConditionElement::CK_Availability:
+      return &cond;
+      break;
+    }
+  }
+
+  return nullptr;
+}
 
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
@@ -73,25 +94,37 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    // FIXME: Setting a TypeLoc on this expression is necessary in order
+    // FIXME: Setting a base on this expression is necessary in order
     // to get diagnostics if something about this builder call fails,
     // e.g. if there isn't a matching overload for `buildBlock`.
-    // But we can only do this if there isn't a type variable in the type.
-    TypeLoc typeLoc;
-    if (!builderType->hasTypeVariable()) {
-      typeLoc = TypeLoc(new (ctx) FixedTypeRepr(builderType, loc), builderType);
+    TypeExpr *typeExpr;
+    auto simplifiedTy = cs->simplifyType(builderType);
+    if (!simplifiedTy->hasTypeVariable()) {
+      typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
+      // HACK: If there's not enough information to completely resolve the
+      // builder type, but we have the base available to us, form an *explicit*
+      // TypeExpr pointing at it. We cannot form an implicit base without
+      // a fully-resolved concrete type. Really, whatever we put here has no
+      // bearing on the generated solution because we're going to use this node
+      // to stash the builder type and hand it back to the ambient
+      // constraint system.
+      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
+    } else {
+      // HACK: If there's not enough information in the constraint system,
+      // create a garbage base type to force it to diagnose
+      // this as an ambiguous expression.
+      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
+      // an UnresolvedDotExpr and get a slightly better diagnostic.
+      typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
-
-    auto typeExpr = new (ctx) TypeExpr(typeLoc);
     cs->setType(typeExpr, MetatypeType::get(builderType));
-    cs->setType(&typeExpr->getTypeLoc(), builderType);
 
     SmallVector<SourceLoc, 4> argLabelLocs;
     for (auto i : indices(argLabels)) {
       argLabelLocs.push_back(args[i]->getStartLoc());
     }
 
-    typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
@@ -100,7 +133,7 @@ class BuilderClosureVisitor
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
-                                    /*trailing closure*/ nullptr,
+                                    /*trailing closures*/{},
                                     /*implicit*/true);
 
     return result;
@@ -114,28 +147,8 @@ class BuilderClosureVisitor
       return known->second;
     }
 
-    bool found = false;
-    for (auto decl : builder->lookupDirect(fnName)) {
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        // Function must be static.
-        if (!func->isStatic())
-          continue;
-
-        // Function must have the right argument labels, if provided.
-        if (!argLabels.empty()) {
-          auto funcLabels = func->getFullName().getArgumentNames();
-          if (argLabels.size() > funcLabels.size() ||
-              funcLabels.slice(0, argLabels.size()) != argLabels)
-            continue;
-        }
-
-        // Okay, it's a good-enough match.
-        found = true;
-        break;
-      }
-    }
-
-    return supportedOps[fnName] = found;
+    return supportedOps[fnName] = TypeChecker::typeSupportsBuilderOp(
+               builderType, dc, fnName, argLabels);
   }
 
   /// Build an implicit variable in this context.
@@ -144,7 +157,7 @@ class BuilderClosureVisitor
     Identifier name = ctx.getIdentifier(
         ("$__builder" + Twine(varCounter++)).str());
     auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 /*isCaptureList=*/false, loc, name, dc);
+                                 loc, name, dc);
     var->setImplicit();
     return var;
   }
@@ -196,9 +209,6 @@ public:
                         DeclContext *dc, Type builderType,
                         Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    assert((cs || !builderType->hasTypeVariable()) &&
-           "cannot handle builder type with type variables without "
-           "constraint system");
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
     applied.bodyResultType = bodyResultType;
@@ -268,26 +278,12 @@ protected:
       return;
     }
 
-    // If we aren't generating constraints, there's nothing to do.
-    if (!cs)
-      return;
-
-    /// Generate constraints for each pattern binding entry
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Type check the pattern.
-      auto pattern = patternBinding->getPattern(index);
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+    // If there is a constraint system, generate constraints for the pattern
+    // binding.
+    if (cs) {
+      SolutionApplicationTarget target(patternBinding);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-        continue;
-
-      // Keep track of this binding entry.
-      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+        hadError = true;
     }
   }
 
@@ -373,23 +369,13 @@ protected:
   }
 
   VarDecl *visitDoStmt(DoStmt *doStmt) {
-    if (!builderSupports(ctx.Id_buildDo)) {
-      if (!unhandledNode)
-        unhandledNode = doStmt;
-      return nullptr;
-    }
-
-    auto childVar = visit(doStmt->getBody());
+    auto childVar = visitBraceStmt(doStmt->getBody());
     if (!childVar)
       return nullptr;
 
     auto childRef = buildVarRef(childVar, doStmt->getEndLoc());
-    auto call = buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo,
-                                  childRef, /*argLabels=*/{ });
-    if (!call)
-      return nullptr;
 
-    return captureExpr(call, /*oneWay=*/true, doStmt);
+    return captureExpr(childRef, /*oneWay=*/true, doStmt);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -399,7 +385,7 @@ protected:
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
-    numPayloads++;
+    ++numPayloads;
 
     // If there's an 'else' clause, it contributes payloads:
     if (auto elseStmt = ifStmt->getElseStmt()) {
@@ -409,7 +395,7 @@ protected:
                                            isOptional);
       // Otherwise it's just the one.
       } else {
-        numPayloads++;
+        ++numPayloads;
       }
 
     // If not, the chain result is at least optional.
@@ -500,10 +486,20 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
+    // If there is a #available in the condition, the 'then' will need to
+    // be wrapped in a call to buildLimitedAvailability(_:), if available.
+    Expr *thenVarRefExpr = buildVarRef(
+        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    if (findAvailabilityCondition(ifStmt->getCond()) &&
+        builderSupports(ctx.Id_buildLimitedAvailability)) {
+      thenVarRefExpr = buildCallIfWanted(
+          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+          { thenVarRefExpr }, { Identifier() });
+    }
+
     // Prepare the `then` operand by wrapping it to produce a chain result.
     Expr *thenExpr = buildWrappedChainPayload(
-        buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc()),
-        payloadIndex, numPayloads, isOptional);
+        thenVarRefExpr, payloadIndex, numPayloads, isOptional);
 
     // Prepare the `else operand:
     Expr *elseExpr;
@@ -550,8 +546,7 @@ protected:
       return nullptr;
     }
 
-    // FIXME: Need a locator for the "if" statement.
-    Type resultType = cs->addJoinConstraint(nullptr,
+    Type resultType = cs->addJoinConstraint(cs->getConstraintLocator(ifStmt),
         {
           { cs->getType(thenExpr), cs->getConstraintLocator(thenExpr) },
           { cs->getType(elseExpr), cs->getConstraintLocator(elseExpr) }
@@ -676,6 +671,18 @@ protected:
     if (!cs)
       return nullptr;
 
+    // If there are no 'case' statements in the body let's try
+    // to diagnose this situation via limited exhaustiveness check
+    // before failing a builder transform, otherwise type-checker
+    // might end up without any diagnostics which leads to crashes
+    // in SILGen.
+    if (capturedCaseVars.empty()) {
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, dc,
+                                             /*limitChecking=*/true);
+      hadError = true;
+      return nullptr;
+    }
+
     // Form the expressions that inject the result of each case into the
     // appropriate
     llvm::TinyPtrVector<Expr *> injectedCaseExprs;
@@ -708,8 +715,8 @@ protected:
     }
 
     // Form the type of the switch itself.
-    // FIXME: Need a locator for the "switch" statement.
-    Type resultType = cs->addJoinConstraint(nullptr, injectedCaseTerms);
+    Type resultType = cs->addJoinConstraint(
+        cs->getConstraintLocator(switchStmt), injectedCaseTerms);
     if (!resultType) {
       hadError = true;
       return nullptr;
@@ -724,6 +731,18 @@ protected:
   }
 
   VarDecl *visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
+    auto *body = caseStmt->getBody();
+
+    // Explicitly disallow `case` statements with empty bodies
+    // since that helps to diagnose other issues with switch
+    // statements by excluding invalid cases.
+    if (auto *BS = dyn_cast<BraceStmt>(body)) {
+      if (BS->getNumElements() == 0) {
+        hadError = true;
+        return nullptr;
+      }
+    }
+
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
@@ -740,17 +759,150 @@ protected:
     return visit(caseStmt->getBody());
   }
 
+  VarDecl *visitForEachStmt(ForEachStmt *forEachStmt) {
+    // for...in statements are handled via buildArray(_:); bail out if the
+    // builder does not support it.
+    if (!builderSupports(ctx.Id_buildArray)) {
+      if (!unhandledNode)
+        unhandledNode = forEachStmt;
+      return nullptr;
+    }
+
+    // For-each statements require the Sequence protocol. If we don't have
+    // it (which generally means the standard library isn't loaded), fall
+    // out of the function-builder path entirely to let normal type checking
+    // take care of this.
+    auto sequenceProto = TypeChecker::getProtocol(
+        dc->getASTContext(), forEachStmt->getForLoc(),
+        KnownProtocolKind::Sequence);
+    if (!sequenceProto) {
+      if (!unhandledNode)
+        unhandledNode = forEachStmt;
+      return nullptr;
+    }
+
+    // Generate constraints for the loop header. This also wires up the
+    // types for the patterns.
+    auto target = SolutionApplicationTarget::forForEachStmt(
+        forEachStmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/true);
+    if (cs) {
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
+        return nullptr;
+      }
+
+      cs->setSolutionApplicationTarget(forEachStmt, target);
+    }
+
+    // Visit the loop body itself.
+    VarDecl *bodyVar = visit(forEachStmt->getBody());
+    if (!bodyVar)
+      return nullptr;
+
+    // If there's no constraint system, there is nothing left to visit.
+    if (!cs)
+      return nullptr;
+
+    // Form a variable of array type that will capture the result of each
+    // iteration of the loop. We need a fresh type variable to remove the
+    // lvalue-ness of the array variable.
+    SourceLoc loc = forEachStmt->getForLoc();
+    VarDecl *arrayVar = buildVar(loc);
+    Type arrayElementType = cs->createTypeVariable(
+        cs->getConstraintLocator(forEachStmt), 0);
+    cs->addConstraint(
+        ConstraintKind::Equal, cs->getType(bodyVar), arrayElementType,
+        cs->getConstraintLocator(
+          forEachStmt, ConstraintLocator::RValueAdjustment));
+    Type arrayType = ArraySliceType::get(arrayElementType);
+    cs->setType(arrayVar, arrayType);
+
+    // Form an initialization of the array to an empty array literal.
+    Expr *arrayInitExpr = ArrayExpr::create(ctx, loc, { }, { }, loc);
+    cs->setContextualType(
+        arrayInitExpr, TypeLoc::withoutLoc(arrayType), CTP_CannotFail);
+    arrayInitExpr = cs->generateConstraints(arrayInitExpr, dc);
+    if (!arrayInitExpr) {
+      hadError = true;
+      return nullptr;
+    }
+    cs->addConstraint(
+        ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
+        cs->getConstraintLocator(
+          arrayInitExpr, LocatorPathElt::ContextualType()));
+
+    // Form a call to Array.append(_:) to add the result of executing each
+    // iteration of the loop body to the array formed above.
+    SourceLoc endLoc = forEachStmt->getEndLoc();
+    auto arrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
+        arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
+        DeclNameLoc(endLoc), /*implicit=*/true);
+    arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+    auto bodyVarRef = buildVarRef(bodyVar, endLoc);
+    Expr *arrayAppendCall = CallExpr::create(
+        ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
+        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
+    arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
+    if (!arrayAppendCall) {
+      hadError = true;
+      return nullptr;
+    }
+
+    // Form the final call to buildArray(arrayVar) to allow the function
+    // builder to reshape the array into whatever it wants as the result of
+    // the for-each loop.
+    auto finalArrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto buildArrayCall = buildCallIfWanted(
+        endLoc, ctx.Id_buildArray, { finalArrayVarRef }, { Identifier() });
+    assert(buildArrayCall);
+    buildArrayCall = cs->generateConstraints(buildArrayCall, dc);
+    if (!buildArrayCall) {
+      hadError = true;
+      return nullptr;
+    }
+
+    // Form a final variable for the for-each expression itself, which will
+    // be initialized with the call to the function builder's buildArray(_:).
+    auto finalForEachVar = buildVar(loc);
+    cs->setType(finalForEachVar, cs->getType(buildArrayCall));
+    applied.capturedStmts.insert(
+      {forEachStmt, {
+          finalForEachVar,
+          { arrayVarRef, arrayInitExpr, arrayAppendCall, buildArrayCall }}});
+
+    return finalForEachVar;
+  }
+
+  /// Visit a throw statement, which never produces a result.
+  VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
+    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
+    if (!exnType) {
+      hadError = true;
+    }
+
+    if (cs) {
+     SolutionApplicationTarget target(
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         /*isDiscarded=*/false);
+     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+       hadError = true;
+
+     cs->setSolutionApplicationTarget(throwStmt, target);
+   }
+
+    return nullptr;
+  }
+
   CONTROL_FLOW_STMT(Guard)
   CONTROL_FLOW_STMT(While)
   CONTROL_FLOW_STMT(DoCatch)
   CONTROL_FLOW_STMT(RepeatWhile)
-  CONTROL_FLOW_STMT(ForEach)
   CONTROL_FLOW_STMT(Case)
   CONTROL_FLOW_STMT(Break)
   CONTROL_FLOW_STMT(Continue)
   CONTROL_FLOW_STMT(Fallthrough)
   CONTROL_FLOW_STMT(Fail)
-  CONTROL_FLOW_STMT(Throw)
   CONTROL_FLOW_STMT(PoundAssert)
 
 #undef CONTROL_FLOW_STMT
@@ -764,6 +916,9 @@ struct FunctionBuilderTarget {
     ReturnValue,
     /// The temporary variable into which the result should be assigned.
     TemporaryVar,
+    /// An expression to evaluate at the end of the block, allowing the update
+    /// of some state from an outer scope.
+    Expression,
   } kind;
 
   /// Captured variable information.
@@ -776,6 +931,10 @@ struct FunctionBuilderTarget {
   static FunctionBuilderTarget forAssign(VarDecl *temporaryVar,
                                          llvm::TinyPtrVector<Expr *> exprs) {
     return FunctionBuilderTarget{TemporaryVar, {temporaryVar, exprs}};
+  }
+
+  static FunctionBuilderTarget forExpression(Expr *expr) {
+    return FunctionBuilderTarget{Expression, { nullptr, { expr }}};
   }
 };
 
@@ -881,7 +1040,12 @@ private:
       assign->setType(TupleType::getEmpty(ctx));
       return assign;
     }
+
+    case FunctionBuilderTarget::Expression:
+      // Execute the expression.
+      return rewriteExpr(capturedExpr);
     }
+    llvm_unreachable("invalid function builder target");
   }
 
   /// Declare the given temporary variable, adding the appropriate
@@ -894,12 +1058,14 @@ private:
 
     // Form a new pattern binding to bind the temporary variable to the
     // transformed expression.
-    auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
+    auto pattern = NamedPattern::createImplicit(ctx, temporaryVar);
     pattern->setType(temporaryVar->getType());
 
     auto pbd = PatternBindingDecl::create(
         ctx, SourceLoc(), StaticSpellingKind::None, temporaryVar->getLoc(),
         pattern, SourceLoc(), initExpr, dc);
+    if (temporaryVar->isImplicit())
+      pbd->setImplicit();
     elements.push_back(temporaryVar);
     elements.push_back(pbd);
   }
@@ -909,11 +1075,11 @@ private:
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       // Find the solution application target for this.
       auto knownTarget =
-          builderTransform.patternBindingEntries.find({patternBinding, index});
-      assert(knownTarget != builderTransform.patternBindingEntries.end());
+          *solution.getConstraintSystem().getSolutionApplicationTarget(
+            {patternBinding, index});
 
       // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget->second);
+      auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
         continue;
 
@@ -974,6 +1140,14 @@ public:
       }
 
       if (auto stmt = node.dyn_cast<Stmt *>()) {
+        // "throw" statements produce no value. Transform them directly.
+        if (auto throwStmt = dyn_cast<ThrowStmt>(stmt)) {
+          if (auto newStmt = visitThrowStmt(throwStmt)) {
+            newElements.push_back(stmt);
+          }
+          continue;
+        }
+
         // Each statement turns into a (potential) temporary variable
         // binding followed by the statement itself.
         auto captured = takeCapturedStmt(stmt);
@@ -1051,6 +1225,62 @@ public:
           FunctionBuilderTarget::forAssign(
             capturedThen.first, {capturedThen.second.front()}));
     ifStmt->setThenStmt(newThen);
+
+    // Look for a #available condition. If there is one, we need to check
+    // that the resulting type of the "then" doesn't refer to any types that
+    // are unavailable in the enclosing context.
+    //
+    // Note that this is for staging in support for buildLimitedAvailability();
+    // the diagnostic is currently a warning, so that existing code that
+    // compiles today will continue to compile. Once function builder types
+    // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
+    // this warning to an error.
+    if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
+      SourceLoc loc = availabilityCond->getStartLoc();
+      Type thenBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[0]));
+      thenBodyType.findIf([&](Type type) {
+        auto nominal = type->getAnyNominal();
+        if (!nominal)
+          return false;
+
+        if (auto reason = TypeChecker::checkDeclarationAvailability(
+                              nominal, loc, dc)) {
+          ctx.Diags.diagnose(
+              loc, diag::function_builder_missing_limited_availability,
+              builderTransform.builderType);
+
+          // Add a note to the function builder with a stub for
+          // buildLimitedAvailability().
+          if (auto builder = builderTransform.builderType->getAnyNominal()) {
+            SourceLoc buildInsertionLoc;
+            std::string stubIndent;
+            Type componentType;
+            std::tie(buildInsertionLoc, stubIndent, componentType) =
+                determineFunctionBuilderBuildFixItInfo(builder);
+            if (buildInsertionLoc.isValid()) {
+              std::string fixItString;
+              {
+                llvm::raw_string_ostream out(fixItString);
+                printFunctionBuilderBuildFunction(
+                    builder, componentType,
+                    FunctionBuilderBuildFunction::BuildLimitedAvailability,
+                    stubIndent, out);
+
+                builder->diagnose(
+                    diag::function_builder_missing_build_limited_availability,
+                    builderTransform.builderType)
+                  .fixItInsert(buildInsertionLoc, fixItString);
+              }
+            }
+          }
+
+          return true;
+        }
+
+        return false;
+      });
+    }
 
     if (auto elseBraceStmt =
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
@@ -1145,8 +1375,7 @@ public:
       // Check restrictions on '@unknown'.
       if (caseStmt->hasUnknownAttr()) {
         checkUnknownAttrRestrictions(
-            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
-            limitExhaustivityChecks);
+            cs.getASTContext(), caseStmt, limitExhaustivityChecks);
       }
 
       ++caseIndex;
@@ -1180,6 +1409,75 @@ public:
     return caseStmt;
   }
 
+  Stmt *visitForEachStmt(
+      ForEachStmt *forEachStmt, FunctionBuilderTarget target) {
+    // Translate the for-each loop header.
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto forEachTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+    if (!forEachTarget)
+      return nullptr;
+
+    const auto &captured = target.captured;
+    auto finalForEachVar = captured.first;
+    auto arrayVarRef = captured.second[0];
+    auto arrayVar = cast<VarDecl>(cast<DeclRefExpr>(arrayVarRef)->getDecl());
+    auto arrayInitExpr = captured.second[1];
+    auto arrayAppendCall = captured.second[2];
+    auto buildArrayCall = captured.second[3];
+
+    // Collect the three steps to initialize the array variable to an
+    // empty array, execute the loop to collect the results of each iteration,
+    // then form the buildArray() call to the write the result.
+    std::vector<ASTNode> outerBodySteps;
+
+    // Step 1: Declare and initialize the array variable.
+    arrayVar->setInterfaceType(solution.simplifyType(cs.getType(arrayVar)));
+    arrayInitExpr = rewriteExpr(arrayInitExpr);
+    declareTemporaryVariable(arrayVar, outerBodySteps, arrayInitExpr);
+
+    // Step 2. Transform the body of the for-each statement. Each iteration
+    // will append the result of executing the loop body to the array.
+    auto body = forEachStmt->getBody();
+    auto capturedBody = takeCapturedStmt(body);
+    auto newBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          FunctionBuilderTarget::forExpression(arrayAppendCall),
+          FunctionBuilderTarget::forAssign(
+            capturedBody.first, {capturedBody.second.front()})));
+    forEachStmt->setBody(newBody);
+    outerBodySteps.push_back(forEachStmt);
+
+    // Step 3. Perform the buildArray() call to turn the array of results
+    // collected from the iterations into a single value under the control of
+    // the function builder.
+    outerBodySteps.push_back(
+        initializeTarget(
+          FunctionBuilderTarget::forAssign(finalForEachVar, {buildArrayCall})));
+
+    // Form a brace statement to put together the three main steps for the
+    // for-each loop translation outlined above.
+    return BraceStmt::create(
+        ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
+  }
+
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt) {
+    // Rewrite the error.
+    auto target = *solution.getConstraintSystem()
+        .getSolutionApplicationTarget(throwStmt);
+    if (auto result = rewriteTarget(target))
+      throwStmt->setSubExpr(result->getAsExpr());
+    else
+      return nullptr;
+
+    return throwStmt;
+  }
+
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt, FunctionBuilderTarget target) {
+    llvm_unreachable("Throw statements produce no value");
+  }
+
 #define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
@@ -1193,12 +1491,10 @@ public:
   UNHANDLED_FUNCTION_BUILDER_STMT(Defer)
   UNHANDLED_FUNCTION_BUILDER_STMT(DoCatch)
   UNHANDLED_FUNCTION_BUILDER_STMT(RepeatWhile)
-  UNHANDLED_FUNCTION_BUILDER_STMT(ForEach)
   UNHANDLED_FUNCTION_BUILDER_STMT(Break)
   UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fail)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Throw)
   UNHANDLED_FUNCTION_BUILDER_STMT(PoundAssert)
 #undef UNHANDLED_FUNCTION_BUILDER_STMT
 };
@@ -1223,10 +1519,6 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
-/// Find the return statements in the given body, which block the application
-/// of a function builder.
-static std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
-
 Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
@@ -1235,9 +1527,11 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func};
-  switch (evaluateOrDefault(
-              ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
+  auto request =
+      PreCheckFunctionBuilderRequest{{AnyFunctionRef(func),
+                                      /*SuppressDiagnostics=*/false}};
+  switch (evaluateOrDefault(ctx.evaluator, request,
+                            FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
@@ -1300,32 +1594,9 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  // Find an expression... any expression... to use for a locator.
-  // FIXME: This is a hack because we don't have the notion of locators that
-  // refer to statements.
-  Expr *fakeAnchor = nullptr;
-  {
-    class FindExprWalker : public ASTWalker {
-      Expr *&fakeAnchor;
-
-    public:
-      explicit FindExprWalker(Expr *&fakeAnchor) : fakeAnchor(fakeAnchor) { }
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-        if (!fakeAnchor)
-          fakeAnchor = E;
-
-        return { false, nullptr };
-      }
-    } walker(fakeAnchor);
-
-    func->getBody()->walk(walker);
-  }
-
   if (auto result = cs.matchFunctionBuilder(
           func, builderType, resultContextType, resultConstraintKind,
-          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-          /*FIXME:*/cs.getConstraintLocator(fakeAnchor))) {
+          cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
   }
@@ -1360,6 +1631,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     // The system was salvaged; continue on as if nothing happened.
   }
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Applying Solution ---\n";
+    solutions.front().dump(log);
+    log << '\n';
+  }
+
   // FIXME: Shouldn't need to do this.
   cs.applySolution(solutions.front());
 
@@ -1367,6 +1645,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   if (auto result = cs.applySolution(
           solutions.front(),
           SolutionApplicationTarget(func))) {
+    performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
     return result->getFunctionBody();
   }
 
@@ -1377,23 +1656,38 @@ Optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
-    ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator) {
+    ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
+  if (InvalidFunctionBuilderBodies.count(fn)) {
+    (void)recordFix(
+        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+            *this, getConstraintLocator(fn.getBody())));
+    return getTypeMatchSuccess();
+  }
+
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn};
+  auto request =
+      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
-    // If the pre-check had an error, flag that.
-    return getTypeMatchFailure(locator);
+  case FunctionBuilderBodyPreCheck::Error: {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
+            *this, getConstraintLocator(fn.getBody()))))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
+  }
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
@@ -1427,28 +1721,28 @@ ConstraintSystem::matchFunctionBuilder(
     }
   }
 
-  // If the builder type has a type parameter, substitute in the type
-  // variables.
-  if (builderType->hasTypeParameter()) {
-    // Find the opened type for this callee and substitute in the type
-    // parametes.
-    for (const auto &opened : OpenedTypes) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(),
-                                   opened.second.end());
-        builderType = openType(builderType, replacements);
-        break;
-      }
-    }
-    assert(!builderType->hasTypeParameter());
-  }
-
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
                                 bodyResultType);
 
-  auto applied = visitor.apply(fn.getBody());
-  if (!applied)
-    return getTypeMatchFailure(locator);
+  Optional<AppliedBuilderTransform> applied = None;
+  {
+    DiagnosticTransaction transaction(dc->getASTContext().Diags);
+
+    applied = visitor.apply(fn.getBody());
+    if (!applied)
+      return getTypeMatchFailure(locator);
+
+    if (transaction.hasErrors()) {
+      InvalidFunctionBuilderBodies.insert(fn);
+
+      if (recordFix(
+              IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+                  *this, getConstraintLocator(fn.getBody()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+  }
 
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
@@ -1467,8 +1761,12 @@ ConstraintSystem::matchFunctionBuilder(
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
   // use special locator.
-  if (auto *closure = fn.getAbstractClosureExpr())
+  if (auto *closure = fn.getAbstractClosureExpr()) {
     locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+  } else {
+    locator = getConstraintLocator(fn.getAbstractFunctionDecl(),
+                                   ConstraintLocator::FunctionBuilderBodyResult);
+  }
 
   // Bind the body result type to the type of the transformed expression.
   addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
@@ -1482,14 +1780,17 @@ namespace {
 class PreCheckFunctionBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
+  bool SuppressDiagnostics = false;
   std::vector<ReturnStmt *> ReturnStmts;
   bool HasError = false;
 
   bool hasReturnStmt() const { return !ReturnStmts.empty(); }
 
 public:
-  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck)
-    : Fn(fn), SkipPrecheck(skipPrecheck) {}
+  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck,
+                                     bool suppressDiagnostics)
+      : Fn(fn), SkipPrecheck(skipPrecheck),
+        SuppressDiagnostics(suppressDiagnostics) {}
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
@@ -1504,25 +1805,37 @@ public:
     if (HasError)
       return FunctionBuilderBodyPreCheck::Error;
 
+    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
     if (hasReturnStmt())
       return FunctionBuilderBodyPreCheck::HasReturnStmt;
-
-    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
     return FunctionBuilderBodyPreCheck::Okay;
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (SkipPrecheck)
+      return std::make_pair(false, E);
+
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (!SkipPrecheck &&
-        ConstraintSystem::preCheckExpression(E, /*DC*/ Fn.getAsDeclContext())) {
-      HasError = true;
-      return std::make_pair(false, nullptr);
-    }
+    {
+      auto *DC = Fn.getAsDeclContext();
+      auto &diagEngine = DC->getASTContext().Diags;
 
-    return std::make_pair(false, E);
+      // Suppress any diangostics which could be produced by this expression.
+      DiagnosticTransaction transaction(diagEngine);
+
+      HasError |= ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/false);
+      HasError |= transaction.hasErrors();
+
+      if (SuppressDiagnostics)
+        transaction.abort();
+
+      return std::make_pair(false, HasError ? nullptr : E);
+    }
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -1546,14 +1859,185 @@ public:
 
 }
 
-FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
-                                         AnyFunctionRef fn) const {
-  return PreCheckFunctionBuilderApplication(fn, false).run();
+FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
+    Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const {
+  // We don't want to do the precheck if it will already have happened in
+  // the enclosing expression.
+  bool skipPrecheck = false;
+  if (auto closure = dyn_cast_or_null<ClosureExpr>(
+          owner.Fn.getAbstractClosureExpr()))
+    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
+
+  return PreCheckFunctionBuilderApplication(
+             owner.Fn, /*skipPrecheck=*/false,
+             /*suppressDiagnostics=*/owner.SuppressDiagnostics)
+      .run();
 }
 
-std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn) {
-  PreCheckFunctionBuilderApplication precheck(fn, true);
+std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
+  PreCheckFunctionBuilderApplication precheck(fn, /*skipPreCheck=*/true,
+                                              /*SuppressDiagnostics=*/true);
   (void)precheck.run();
   return precheck.getReturnStmts();
+}
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  bool foundMatch = false;
+  SmallVector<ValueDecl *, 4> foundDecls;
+  dc->lookupQualified(
+      builderType, DeclNameRef(fnName),
+      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+  for (auto decl : foundDecls) {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      // Function must be static.
+      if (!func->isStatic())
+        continue;
+
+      // Function must have the right argument labels, if provided.
+      if (!argLabels.empty()) {
+        auto funcLabels = func->getName().getArgumentNames();
+        if (argLabels.size() > funcLabels.size() ||
+            funcLabels.slice(0, argLabels.size()) != argLabels)
+          continue;
+      }
+
+      foundMatch = true;
+      break;
+    }
+  }
+
+  if (allResults)
+    allResults->append(foundDecls.begin(), foundDecls.end());
+
+  return foundMatch;
+}
+
+Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
+  Type componentType;
+
+  SmallVector<ValueDecl *, 4> potentialMatches;
+  ASTContext &ctx = builder->getASTContext();
+  bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+      builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
+      /*argLabels=*/{}, &potentialMatches);
+  if (supportsBuildBlock) {
+    for (auto decl : potentialMatches) {
+      auto func = dyn_cast<FuncDecl>(decl);
+      if (!func || !func->isStatic())
+        continue;
+
+      // If we haven't seen a component type before, gather it.
+      if (!componentType) {
+        componentType = func->getResultInterfaceType();
+        continue;
+      }
+
+      // If there are inconsistent component types, bail out.
+      if (!componentType->isEqual(func->getResultInterfaceType())) {
+        componentType = Type();
+        break;
+      }
+    }
+  }
+
+  return componentType;
+}
+
+std::tuple<SourceLoc, std::string, Type>
+swift::determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder) {
+  SourceLoc buildInsertionLoc = builder->getBraces().Start;
+  std::string stubIndent;
+  Type componentType;
+
+  if (buildInsertionLoc.isInvalid())
+    return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
+
+  ASTContext &ctx = builder->getASTContext();
+  buildInsertionLoc = Lexer::getLocForEndOfToken(
+      ctx.SourceMgr, buildInsertionLoc);
+
+  StringRef extraIndent;
+  StringRef currentIndent = Lexer::getIndentationForLine(
+      ctx.SourceMgr, buildInsertionLoc, &extraIndent);
+  stubIndent = (currentIndent + extraIndent).str();
+
+  componentType = inferFunctionBuilderComponentType(builder);
+  return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
+}
+
+void swift::printFunctionBuilderBuildFunction(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function,
+      Optional<std::string> stubIndent, llvm::raw_ostream &out) {
+  // Render the component type into a string.
+  std::string componentTypeString;
+  if (componentType)
+    componentTypeString = componentType.getString();
+  else
+    componentTypeString = "<#Component#>";
+
+  // Render the code.
+  ExtraIndentStreamPrinter printer(out, stubIndent.getValueOr(std::string()));
+
+  // If we're supposed to provide a full stub, add a newline and the introducer
+  // keywords.
+  if (stubIndent) {
+    printer.printNewline();
+
+    if (builder->getFormalAccess() >= AccessLevel::Public)
+      printer << "public ";
+
+    printer << "static func ";
+  }
+
+  bool printedResult = false;
+  switch (function) {
+  case FunctionBuilderBuildFunction::BuildBlock:
+    printer << "buildBlock(_ components: " << componentTypeString << "...)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildExpression:
+    printer << "buildExpression(_ expression: <#Expression#>)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildOptional:
+    printer << "buildOptional(_ component: " << componentTypeString << "?)";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherFirst:
+    printer << "buildEither(first component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildEitherSecond:
+    printer << "buildEither(second component: " << componentTypeString << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildArray:
+    printer << "buildArray(_ components: [" << componentTypeString << "])";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+    printer << "buildLimitedAvailability(_ component: " << componentTypeString
+            << ")";
+    break;
+
+  case FunctionBuilderBuildFunction::BuildFinalResult:
+    printer << "buildFinalResult(_ component: " << componentTypeString
+            << ") -> <#Result#>";
+    printedResult = true;
+    break;
+  }
+
+  if (!printedResult)
+    printer << " -> " << componentTypeString;
+
+  if (stubIndent) {
+    printer << " {";
+    printer.printNewline();
+    printer << "  <#code#>";
+    printer.printNewline();
+    printer << "}";
+  }
 }

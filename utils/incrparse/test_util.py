@@ -3,7 +3,9 @@
 from __future__ import print_function
 
 import argparse
+import io
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -21,8 +23,14 @@ def escapeCmdArg(arg):
 
 
 def run_command(cmd):
+    if sys.version_info[0] < 3:
+        cmd = list(map(lambda s: s.encode('utf-8'), cmd))
     print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    if sys.version_info[0] < 3 or platform.system() == 'Windows':
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    else:
+        return subprocess.check_output(list(map(lambda s: s.encode('utf-8'), cmd)),
+                                       stderr=subprocess.STDOUT)
 
 
 def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
@@ -56,7 +64,7 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
                 # Compute the -incremental-edit argument for swift-syntax-test
                 column = len(pre_edit_line) + len(prefix) + 1
                 edit_arg = '%d:%d-%d:%d=%s' % \
-                    (line_no, column, line_no, column + len(pre_edit),
+                    (line_no, column, line_no, column + len(pre_edit.encode('utf-8')),
                      post_edit)
                 incremental_edit_args.append('-incremental-edit')
                 incremental_edit_args.append(edit_arg)
@@ -102,14 +110,19 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
             # Nothing more to do
             line = ''
 
-    return (pre_edit_line, post_edit_line, current_reparse_start)
+    return (pre_edit_line.encode('utf-8'),
+            post_edit_line.encode('utf-8'),
+            current_reparse_start)
 
 
 def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
                         incremental_edit_args, reparse_args):
-    with open(test_file, mode='r') as test_file_handle, \
-            open(pre_edit_file, mode='w+b') as pre_edit_file_handle, \
-            open(post_edit_file, mode='w+b') as post_edit_file_handle:
+    with io.open(test_file, mode='r', encoding='utf-8',
+                 newline='\n') as test_file_handle, \
+            io.open(pre_edit_file, mode='w+', encoding='utf-8',
+                    newline='\n') as pre_edit_file_handle, \
+            io.open(post_edit_file, mode='w+', encoding='utf-8',
+                    newline='\n') as post_edit_file_handle:
 
         current_reparse_start = None
 
@@ -121,8 +134,8 @@ def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
             (pre_edit_line, post_edit_line, current_reparse_start) = \
                 parseLineRes
 
-            pre_edit_file_handle.write(pre_edit_line)
-            post_edit_file_handle.write(post_edit_line)
+            pre_edit_file_handle.write(pre_edit_line.decode('utf-8'))
+            post_edit_file_handle.write(post_edit_line.decode('utf-8'))
 
             line_no += 1
 
@@ -231,7 +244,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
         if print_visual_reuse_info:
             print(output)
     except subprocess.CalledProcessError as e:
-        raise TestFailedError(e.output)
+        raise TestFailedError(e.output.decode('utf-8'))
 
 
 def main():

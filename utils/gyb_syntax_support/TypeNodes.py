@@ -1,5 +1,5 @@
-from Child import Child
-from Node import Node  # noqa: I201
+from .Child import Child
+from .Node import Node  # noqa: I201
 
 TYPE_NODES = [
     # simple-type-identifier -> identifier generic-argument-clause?
@@ -159,7 +159,7 @@ TYPE_NODES = [
 
     # throwing-specifier -> 'throws' | 'rethrows'
     # function-type -> attribute-list '(' function-type-argument-list ')'
-    #   throwing-specifier? '->'? type?
+    #   async? throwing-specifier? '->'? type?
     Node('FunctionType', kind='Type',
          traits=['Parenthesized'],
          children=[
@@ -167,6 +167,9 @@ TYPE_NODES = [
              Child('Arguments', kind='TupleTypeElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[

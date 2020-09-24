@@ -14,10 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(IRGen, IRGenSourceFileRequest,
-              std::unique_ptr<llvm::Module>(IRGenDescriptor),
+SWIFT_REQUEST(IRGen, IRGenRequest,
+              GeneratedModule(IRGenDescriptor),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(IRGen, IRGenWholeModuleRequest,
-              std::unique_ptr<llvm::Module>(IRGenDescriptor),
+SWIFT_REQUEST(IRGen, OptimizedIRRequest,
+              GeneratedModule(IRGenDescriptor),
               Uncached, NoLocationInfo)
-
+SWIFT_REQUEST(IRGen, SymbolObjectCodeRequest,
+              StringRef(SymbolsToEmit, IRGenDescriptor),
+              Cached, NoLocationInfo)

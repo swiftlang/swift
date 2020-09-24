@@ -27,6 +27,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -232,47 +233,6 @@ std::string DependencyKey::computeNameForProvidedEntity<
 }
 
 //==============================================================================
-// MARK: createDependedUponKey
-//==============================================================================
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
-  return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
-  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       name.str());
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
-                       mangledName.str(), "");
-}
-
-DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
-                                                   StringRef memberBaseName) {
-  const bool isMemberBlank = memberBaseName.empty();
-  const auto kind =
-      isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, mangledHolderName.str(),
-                       isMemberBlank ? "" : memberBaseName.str());
-}
-
-//==============================================================================
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
@@ -291,13 +251,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
                              SF, outputPath, depTracker, alsoEmitDotFile)
                               .construct();
 
-  const bool hadError =
-      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        out << g.yamlProlog(SF->getASTContext().hadError());
-        llvm::yaml::Output yamlWriter(out);
-        yamlWriter << g;
-        return false;
-      });
+  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
 
   // If path is stdout, cannot read it back, so check for "-"
   assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
@@ -437,7 +391,7 @@ private:
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD || excludeIfPrivate(VD))
         continue;
-      if (VD->getFullName().isOperator())
+      if (VD->getName().isOperator())
         memberOperatorDecls.push_back(cast<FuncDecl>(D));
       else if (const auto *const NTD = dyn_cast<NominalTypeDecl>(D))
         findNominalsAndOperatorsIn(NTD);
@@ -539,7 +493,7 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 template <NodeKind kind, typename ContentsT>
 void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
     std::vector<ContentsT> &contentsVec) {
-  for (const auto declOrPair : contentsVec) {
+  for (const auto &declOrPair : contentsVec) {
     Optional<std::string> fp = getFingerprintIfAny(declOrPair);
     addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
@@ -551,24 +505,110 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of used Decls
 //==============================================================================
 
+namespace {
+/// Extracts uses out of a SourceFile
+class UsedDeclEnumerator {
+  SourceFile *SF;
+  const DependencyTracker &depTracker;
+  StringRef swiftDeps;
+
+  /// Cache these for efficiency
+  const DependencyKey sourceFileInterface;
+  const DependencyKey sourceFileImplementation;
+
+  const bool includeIntrafileDeps;
+
+  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
+
+public:
+  UsedDeclEnumerator(
+      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
+      bool includeIntrafileDeps,
+      function_ref<void(const DependencyKey &, const DependencyKey &)>
+          createDefUse)
+      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
+        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
+            DeclAspect::interface, swiftDeps)),
+        sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
+            DeclAspect::implementation, swiftDeps)),
+        includeIntrafileDeps(includeIntrafileDeps), createDefUse(createDefUse) {
+  }
+
+public:
+  void enumerateAllUses() {
+    auto &Ctx = SF->getASTContext();
+    Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
+      std::string name = ref.name.userFacingName().str();
+      const auto *nominal = ref.subject;
+      using Kind = evaluator::DependencyCollector::Reference::Kind;
+
+      switch (ref.kind) {
+      case Kind::Empty:
+      case Kind::Tombstone:
+        llvm_unreachable("Cannot enumerate dead reference!");
+      case Kind::TopLevel:
+        return enumerateUse<NodeKind::topLevel>("", name);
+      case Kind::Dynamic:
+        return enumerateUse<NodeKind::dynamicLookup>("", name);
+      case Kind::PotentialMember: {
+        std::string context = DependencyKey::computeContextForProvidedEntity<
+            NodeKind::potentialMember>(nominal);
+        return enumerateUse<NodeKind::potentialMember>(context, "");
+      }
+      case Kind::UsedMember: {
+        std::string context =
+            DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
+                nominal);
+        return enumerateUse<NodeKind::member>(context, name);
+      }
+      }
+    });
+    enumerateExternalUses();
+    enumerateNominalUses();
+  }
+
+private:
+  template <NodeKind kind>
+  void enumerateUse(StringRef context, StringRef name) {
+    // Assume that what is depended-upon is the interface
+    createDefUse(
+        DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
+        sourceFileImplementation);
+  }
+
+  void enumerateNominalUses() {
+    auto &Ctx = SF->getASTContext();
+    Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
+      const NominalTypeDecl *subject = ref.subject;
+      if (!subject) {
+        return;
+      }
+
+      bool isPrivate = subject->isPrivateToEnclosingFile();
+      if (isPrivate && !includeIntrafileDeps) {
+        return;
+      }
+
+      std::string context =
+          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
+              subject);
+      enumerateUse<NodeKind::nominal>(context, "");
+    });
+  }
+
+  void enumerateExternalUses() {
+    for (StringRef s : depTracker.getDependencies())
+      enumerateUse<NodeKind::externalDepend>("", s);
+  }
+};
+} // end namespace
+
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  const DependencyKey sourceFileInterface =
-      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
-                                                 swiftDeps);
-
-  const DependencyKey sourceFileImplementation =
-      DependencyKey::createKeyForWholeSourceFile(DeclAspect::implementation,
-                                                 swiftDeps);
-
-  SF->getConfiguredReferencedNameTracker()->enumerateAllUses(
-      includePrivateDeps, depTracker,
-      [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
-          StringRef name, const bool isCascadingUse) {
-        addAUsedDecl(DependencyKey(kind, DeclAspect::interface, context.str(),
-                                   name.str()),
-                     isCascadingUse ? sourceFileInterface
-                                    : sourceFileImplementation);
-      });
+  UsedDeclEnumerator(SF, depTracker, swiftDeps, includePrivateDeps,
+                     [&](const DependencyKey &def, const DependencyKey &use) {
+                       addAUsedDecl(def, use);
+                     })
+    .enumerateAllUses();
 }
 
 //==============================================================================

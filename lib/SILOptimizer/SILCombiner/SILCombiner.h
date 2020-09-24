@@ -147,6 +147,10 @@ public:
     return nullptr;
   }
 
+  // Erases \p inst and all of its users, recursively.
+  // The caller has to make sure that all users are removable (e.g. dead).
+  void eraseInstIncludingUsers(SILInstruction *inst);
+
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         bool AddOperandsToWorklist = true) {
     SILBasicBlock::iterator nullIter;
@@ -176,6 +180,7 @@ public:
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
+  bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
@@ -183,6 +188,7 @@ public:
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
+  SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *visitUnconditionalCheckedCastInst(
@@ -225,6 +231,8 @@ public:
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
 
+  SILInstruction *optimizeBuiltinCOWBufferForReading(BuiltinInst *BI);
+
   // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
   // the following holds true: N1 > M1 and M2>= M1
   SILInstruction *optimizeBuiltinTruncOrBitCast(BuiltinInst *I);
@@ -241,6 +249,11 @@ public:
 
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
+  bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
+  bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
+  bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
@@ -259,8 +272,6 @@ private:
           replaceValueUsesWith(oldValue, newValue);
         });
   }
-
-  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "GlobalARCSequenceDataflow.h"
 #include "ARCBBState.h"
+#include "ARCSequenceOptUtils.h"
 #include "RCStateTransitionVisitors.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -75,6 +76,12 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
     }
   }
 
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&DecToIncStateMap = DecToIncStateMap](SILInstruction *Inst) {
+        assert(isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst));
+        return DecToIncStateMap.find(Inst) != DecToIncStateMap.end();
+      };
+
   // For each instruction I in BB...
   for (auto &I : BB) {
 
@@ -93,7 +100,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 
     // This SILValue may be null if we were unable to find a specific RCIdentity
     // that the instruction "visits".
-    SILValue Op = Result.RCIdentity;
+    SILValue CurrentRC = Result.RCIdentity;
 
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
@@ -104,10 +111,12 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
       // If we visited an increment or decrement successfully (and thus Op is
       // set), if this is the state for this operand, skip it. We already
       // processed it.
-      if (Op && OtherState->first == Op)
+      if (CurrentRC && OtherState->first == CurrentRC)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          &I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
   }
 
@@ -117,7 +126,6 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
 void ARCSequenceDataflowEvaluator::mergePredecessors(
     ARCBBStateInfoHandle &DataHandle) {
   bool HasAtLeastOnePred = false;
-  llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
 
   SILBasicBlock *BB = DataHandle.getBB();
   ARCBBState &BBState = DataHandle.getState();
@@ -195,39 +203,6 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
 //                             Bottom Up Dataflow
 //===----------------------------------------------------------------------===//
 
-// This is temporary code duplication. This will be removed when Loop ARC is
-// finished and Block ARC is removed.
-static bool isARCSignificantTerminator(TermInst *TI) {
-  switch (TI->getTermKind()) {
-  case TermKind::UnreachableInst:
-  // br is a forwarding use for its arguments. It cannot in of itself extend
-  // the lifetime of an object (just like a phi-node) cannot.
-  case TermKind::BranchInst:
-  // A cond_br is a forwarding use for its non-operand arguments in a similar
-  // way to br. Its operand must be an i1 that has a different lifetime from any
-  // ref counted object.
-  case TermKind::CondBranchInst:
-    return false;
-  // Be conservative for now. These actually perform some sort of operation
-  // against the operand or can use the value in some way.
-  case TermKind::ThrowInst:
-  case TermKind::ReturnInst:
-  case TermKind::UnwindInst:
-  case TermKind::YieldInst:
-  case TermKind::TryApplyInst:
-  case TermKind::SwitchValueInst:
-  case TermKind::SwitchEnumInst:
-  case TermKind::SwitchEnumAddrInst:
-  case TermKind::DynamicMethodBranchInst:
-  case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
-  case TermKind::CheckedCastAddrBranchInst:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled TermKind in switch.");
-}
-
 /// Analyze a single BB for refcount inc/dec instructions.
 ///
 /// If anything was found it will be added to DecToIncStateMap.
@@ -254,8 +229,19 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       RCIA, EAFI, BBState, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
       SetFactory);
 
-  // For each terminator instruction I in BB visited in reverse...
-  for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
+  std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched =
+      [&IncToDecStateMap = IncToDecStateMap](SILInstruction *Inst) {
+        assert(isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst));
+        return IncToDecStateMap.find(Inst) != IncToDecStateMap.end();
+      };
+
+  auto II = BB.rbegin();
+  if (!isARCSignificantTerminator(&cast<TermInst>(*II))) {
+    II++;
+  }
+
+  // For each instruction I in BB visited in reverse...
+  for (auto IE = BB.rend(); II != IE;) {
     SILInstruction &I = *II;
     ++II;
 
@@ -274,7 +260,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
     // This SILValue may be null if we were unable to find a specific RCIdentity
     // that the instruction "visits".
-    SILValue Op = Result.RCIdentity;
+    SILValue CurrentRC = Result.RCIdentity;
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
@@ -285,36 +271,13 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
       // If this is the state associated with the instruction that we are
       // currently visiting, bail.
-      if (Op && OtherState->first == Op)
+      if (CurrentRC && OtherState->first == CurrentRC)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, AA);
+      OtherState->second.checkAndResetKnownSafety(
+          &I, OtherState->first, checkIfRefCountInstIsMatched, RCIA, AA);
     }
-  }
-
-  // This is ignoring the possibility that we may have a loop with an
-  // interesting terminator but for which, we are going to clear all state
-  // (since it is a loop boundary). We may in such a case, be too conservative
-  // with our other predecessors. Luckily this cannot happen since cond_br is
-  // the only terminator that allows for critical edges and all other
-  // "interesting terminators" always having multiple successors. This means
-  // that this block could not have multiple predecessors since otherwise, the
-  // edge would be broken.
-  llvm::TinyPtrVector<SILInstruction *> PredTerminators;
-  for (SILBasicBlock *PredBB : BB.getPredecessorBlocks()) {
-    auto *TermInst = PredBB->getTerminator();
-    if (!isARCSignificantTerminator(TermInst))
-      continue;
-    PredTerminators.push_back(TermInst);
-  }
-
-  for (auto &OtherState : BBState.getBottomupStates()) {
-    // If the other state's value is blotted, skip it.
-    if (!OtherState.hasValue())
-      continue;
-
-    OtherState->second.updateForPredTerminators(PredTerminators,
-                                                SetFactory, AA);
   }
 
   return NestingDetected;
@@ -416,7 +379,34 @@ ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
 bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);
   NestingDetected |= processTopDown();
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "*** Bottom-Up and Top-Down analysis results ***\n");
+  LLVM_DEBUG(dumpDataflowResults());
+
   return NestingDetected;
+}
+
+void ARCSequenceDataflowEvaluator::dumpDataflowResults() {
+  llvm::dbgs() << "IncToDecStateMap:\n";
+  for (auto it : IncToDecStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Increment: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
+
+  llvm::dbgs() << "DecToIncStateMap:\n";
+  for (auto it : DecToIncStateMap) {
+    if (!it.hasValue())
+      continue;
+    auto instAndState = it.getValue();
+    llvm::dbgs() << "Decrement: ";
+    instAndState.first->dump();
+    instAndState.second.dump();
+  }
 }
 
 // We put the destructor here so we don't need to expose the type of

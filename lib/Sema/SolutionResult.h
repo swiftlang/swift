@@ -135,6 +135,7 @@ public:
     case TooComplex:
       return true;
     }
+    llvm_unreachable("invalid diagnostic kind");
   }
 
   /// Note that the failure has been diagnosed.

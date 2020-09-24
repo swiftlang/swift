@@ -61,9 +61,17 @@ extension Extended {
   func callAsFunction() -> Extended {
     return self
   }
+
+  func callAsFunction(_: Int) -> Extended {
+    return self
+  }
 }
 var extended = Extended()
 extended()().callAsFunction()()
+
+// Test diagnostic location
+extended()().callAsFunction()(1) // expected-warning@:30 {{result of call to 'callAsFunction' is unused}}
+extended()().callAsFunction(1) // expected-warning@:14 {{result of call to 'callAsFunction' is unused}}
 
 struct TakesTrailingClosure {
   func callAsFunction(_ fn: () -> Void) {

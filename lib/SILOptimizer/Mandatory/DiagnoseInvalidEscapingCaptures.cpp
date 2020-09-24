@@ -17,6 +17,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -75,6 +76,12 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     if (oper->getOperandNumber() == 0)
       followUses(copy);
 
+    return false;
+  }
+
+  // Look through `differentiable_function`.
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(user)) {
+    followUses(DFI);
     return false;
   }
 
@@ -326,17 +333,22 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   // Should match SELECT_ESCAPING_CLOSURE_KIND in DiagnosticsSIL.def.
   enum {
     EscapingLocalFunction,
-    EscapingClosure
+    EscapingClosure,
+    EscapingAutoClosure,
   } functionKind = EscapingClosure;
 
   if (auto *F = PAI->getReferencedFunctionOrNull()) {
     if (auto loc = F->getLocation()) {
-      if (loc.isASTNode<FuncDecl>())
+      if (loc.isASTNode<FuncDecl>()) {
         functionKind = EscapingLocalFunction;
+      } else if (loc.isASTNode<AutoClosureExpr>()) {
+        functionKind = EscapingAutoClosure;
+      }
     }
   }
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
+    Optional<Identifier> paramName = None;
     if (isUseOfSelfInInitializer(inoutCapture)) {
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                functionKind);
@@ -346,14 +358,23 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
         diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                  functionKind);
       else {
+        paramName = param->getName();
         diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
                  functionKind, param->getName());
         diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
                  param->getName());
       }
     }
-
-    diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
+    if (functionKind != EscapingAutoClosure) {
+      diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
+      continue;
+    }
+    // For an autoclosure capture, present a way to fix the problem.
+    if (paramName)
+      diagnose(Context, PAI->getLoc(), diag::copy_inout_captured_by_autoclosure,
+               paramName.getValue());
+    else
+      diagnose(Context, PAI->getLoc(), diag::copy_self_captured_by_autoclosure);
   }
 
   // Finally, diagnose captures of values with noescape type.

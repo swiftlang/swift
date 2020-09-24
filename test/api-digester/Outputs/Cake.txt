@@ -40,7 +40,6 @@ cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.
 /* Decl Attribute changes */
 cake: Enum IceKind is now without @frozen
 cake: Func C1.foo1() is now not static
-cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static

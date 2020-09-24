@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import io
 import re
 import subprocess
 import sys
@@ -72,16 +73,16 @@ constants.""")
     else:
         slashes_re = r'/'
 
-    stdin = sys.stdin.read()
+    stdin = io.open(sys.stdin.fileno(), 'r', encoding='utf-8', errors='ignore').read()
 
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
         # Since we want to use pattern as a regex in some platforms, we need
         # to escape it first, and then replace the escaped slash
         # literal (r'\\/') for our platform-dependent slash regex.
-        stdin = re.sub(re.sub(r'\\/', slashes_re, re.escape(pattern)),
-                       replacement,
-                       stdin)
+        stdin = re.sub(re.sub(r'\\/' if sys.version_info[0] < 3 else r'/',
+                              slashes_re, re.escape(pattern)),
+                       replacement, stdin)
 
     if args.dry_run:
         print(stdin)
@@ -89,7 +90,7 @@ constants.""")
     else:
         p = subprocess.Popen(
             [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
-        stdout, stderr = p.communicate(stdin)
+        stdout, stderr = p.communicate(stdin.encode('utf-8'))
         if stdout is not None:
             print(stdout)
         if stderr is not None:

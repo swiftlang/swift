@@ -1,5 +1,3 @@
-// XFAIL: broken_std_regex
-
 func aaaBbb() {}
 func aaaaBbb() {}
 func aaaCcc() {}

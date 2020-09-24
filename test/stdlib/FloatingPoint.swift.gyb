@@ -260,6 +260,16 @@ FloatingPoint.test("Float/staticProperties") {
 }
 
 // Tests the float and int conversions work correctly. Each case is special.
+
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  FloatingPoint.test("Float16/Int") {
+    expectNil(Int(exactly: Float16.infinity))
+    expectNil(Int(exactly: -Float16.infinity))
+  }
+}
+#endif
+
 FloatingPoint.test("Float/UInt8") {
   expectEqual(UInt8.min, UInt8(Float(UInt8.min)))
   expectEqual(UInt8.max, UInt8(Float(UInt8.max)))

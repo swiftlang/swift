@@ -33,8 +33,19 @@ three different optimization levels:
 
 In the Xcode UI, one can modify the current optimization level as follows:
 
-...
+In the Project Navigator, select the project icon to enter the Project Editor.
+In the project editor, select the icon under the "Project" header to enter
+the project settings editor. From there, an optimization setting can be applied
+to every target in the project by changing the "Optimization Level" field under
+the "Build Settings" header.
 
+To apply a custom optimization level to a particular target, select that target
+under the "Targets" header in the Project Editor and override the
+"Optimization Level" field under its "Build Settings" header.
+
+If a given optimization level is not available in the UI, its corresponding flag
+can be manually specified by selecting the ``Other...`` level in
+the "Optimization Level" dropdown.
 
 Whole Module Optimizations (WMO)
 ================================
@@ -272,18 +283,19 @@ through the usage of ``inout`` parameters:
   var a = [1, 2, 3]
   append_one_in_place(&a)
 
-Unchecked operations
+Wrapping operations
 ====================
 
 Swift eliminates integer overflow bugs by checking for overflow when performing
-normal arithmetic. These checks are not appropriate in high performance code
-where one knows that no memory safety issues can result.
+normal arithmetic. These checks may not be appropriate in high performance code
+if one either knows that overflow cannot occur, or that the result of
+allowing the operation to wrap around is correct.
 
-Advice: Use unchecked integer arithmetic when you can prove that overflow cannot occur
+Advice: Use wrapping integer arithmetic when you can prove that overflow cannot occur
 ---------------------------------------------------------------------------------------
 
-In performance-critical code you can elide overflow checks if you know it is
-safe.
+In performance-critical code you can use wrapping arithmetic to avoid overflow
+checks if you know it is safe.
 
 ::
 
@@ -291,10 +303,16 @@ safe.
   b: [Int]
   c: [Int]
 
-  // Precondition: for all a[i], b[i]: a[i] + b[i] does not overflow!
+  // Precondition: for all a[i], b[i]: a[i] + b[i] either does not overflow,
+  // or the result of wrapping is desired.
   for i in 0 ... n {
     c[i] = a[i] &+ b[i]
   }
+
+It's important to note that the behavior of the ``&+``, ``&-``, and ``&*``
+operators is fully-defined; the result simply wraps around if it would overflow.
+Thus, ``Int.max &+ 1`` is guaranteed to be ``Int.min`` (unlike in C, where
+``INT_MAX + 1`` is undefined behavior).
 
 Generics
 ========

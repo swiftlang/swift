@@ -206,13 +206,13 @@ public:
   }
 
   friend llvm::hash_code hash_value(const TypeWitnessAndDecl &owner) {
-    return llvm::hash_combine(owner.witnessType,
+    return llvm::hash_combine(owner.witnessType.getPointer(),
                               owner.witnessDecl);
   }
 
   friend bool operator==(const TypeWitnessAndDecl &lhs,
                          const TypeWitnessAndDecl &rhs) {
-    return lhs.witnessType->isEqual(rhs.witnessType) &&
+    return lhs.witnessType.getPointer() == rhs.witnessType.getPointer() &&
            lhs.witnessDecl == rhs.witnessDecl;
   }
 

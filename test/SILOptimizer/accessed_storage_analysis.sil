@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -accessed-storage-analysis-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
 
 sil_stage canonical
 
@@ -627,7 +627,7 @@ bb3(%result : $Int):
   return %result : $Int
 }
 
-// Make sure findAccessedStorage returns a valid storage object for an address-phi
+// Make sure identifyFormalAccess returns a valid storage object for an address-phi
 // that feeds ref_element_addr instructions. The ref_element_addr's need to have the
 // same base object and same field id.
 // <rdar://problem/46114512> SIL verification failed: Unknown formal access pattern: storage

@@ -10,3 +10,4 @@ public protocol P {
 // CHECK: "kind": "requirementOf"
 // CHECK-NEXT: "source": "s:10ConformsTo1PP1xSivp"
 // CHECK-NEXT: "target": "s:10ConformsTo1PP"
+// CHECK-NOT: defaultImplementationOf

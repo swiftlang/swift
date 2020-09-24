@@ -159,3 +159,10 @@ struct StructOfNSStrings useStructOfNSStringsInObjC(struct StructOfNSStrings);
 __attribute__((swift_name("OuterType.InnerType")))
 @interface OuterTypeInnerType : NSObject<NSRuncing>
 @end
+
+@protocol P
+- (oneway void)stuff;
+@end
+
+@interface ObjcGenericClass<__covariant SectionType>
+@end

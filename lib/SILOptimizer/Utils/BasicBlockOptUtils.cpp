@@ -107,9 +107,9 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.Initialize(inst->getType());
-    ssaUpdater.AddAvailableValue(origBB, inst);
-    ssaUpdater.AddAvailableValue(getNewBB(), newResult);
+    ssaUpdater.initialize(inst->getType());
+    ssaUpdater.addAvailableValue(origBB, inst);
+    ssaUpdater.addAvailableValue(getNewBB(), newResult);
 
     if (useList.empty())
       continue;
@@ -124,7 +124,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
       if (user->getParent() == origBB)
         continue;
 
-      ssaUpdater.RewriteUse(*use);
+      ssaUpdater.rewriteUse(*use);
     }
   }
 }
@@ -215,7 +215,8 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return false;
 
     for (SILValue operandVal : projections[idx]->getOperandValues())
-      pushOperandVal(operandVal);
+      if (!pushOperandVal(operandVal))
+        return false;
   }
   return true;
 }

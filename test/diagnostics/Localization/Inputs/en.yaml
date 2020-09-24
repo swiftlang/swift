@@ -1,0 +1,45 @@
+#===--- en.yaml - Localized diagnostic messages for English ---*- YAML -*-===#
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===----------------------------------------------------------------------===#
+#
+# This file defines the diagnostic messages for the English language.
+# Each diagnostic is described in the following format:
+# - id: "<diagnostic-id>"
+#   msg: "<diagnostic-message>"
+# 
+#===----------------------------------------------------------------------===#
+
+- id: "not_available_in_def"
+  msg: "Shouldn't be produced"
+
+- id: "lex_unterminated_string"
+  msg: "unterminated string literal"
+
+- id: "not_available_in_def_2"
+  msg: "Shouldn't be produced"
+
+- id: "var_init_self_referential"
+  msg: "variable used within its own initial value"
+
+- id: "cannot_find_in_scope"
+  msg: "cannot %select{find|find operator}1 %0 in scope"
+
+- id: "not_available_in_def_3"
+  msg: "Shouldn't be produced"
+
+- id: "warning_invalid_locale_code"
+  msg: "unsupported locale code; supported locale codes are '%0'"
+
+- id: "not_available_in_def_4"
+  msg: "Shouldn't be produced"
+
+- id: "not_available_in_def_5"
+  msg: "Shouldn't be produced"

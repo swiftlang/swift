@@ -35,11 +35,7 @@ using namespace swift;
 /// Check whether a given \p decl has a @_semantics attribute with the given
 /// attribute name \c attrName.
 static bool hasSemanticsAttr(ValueDecl *decl, StringRef attrName) {
-  for (auto semantics : decl->getAttrs().getAttributes<SemanticsAttr>()) {
-    if (semantics->Value.equals(attrName))
-      return true;
-  }
-  return false;
+  return decl->getAttrs().hasSemanticsAttr(attrName);
 }
 
 /// Return true iff  the given \p structDecl has a name that matches one of the
@@ -52,6 +48,15 @@ static bool isAtomicOrderingDecl(StructDecl *structDecl) {
           structName == astContext.Id_AtomicUpdateOrdering);
 }
 
+/// Return true iff the given nominal type decl \p nominal has a name that
+/// matches one of the known OSLog types that need not be a constant in the new
+/// os_log APIs.
+static bool isOSLogDynamicObject(NominalTypeDecl *nominal) {
+  ASTContext &astContext = nominal->getASTContext();
+  Identifier name = nominal->getName();
+  return (name == astContext.Id_OSLog || name == astContext.Id_OSLogType);
+}
+
 /// Return true iff the parameter \p param of function \c funDecl is required to
 /// be a constant. This is true if either the function is an os_log function or
 /// it is an atomics operation and the parameter represents the ordering.
@@ -59,6 +64,14 @@ static bool isParamRequiredToBeConstant(FuncDecl *funcDecl, ParamDecl *param) {
   assert(funcDecl && param && "funcDecl and param must not be null");
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_REQUIRES_CONSTANT_ARGUMENTS))
     return true;
+  if (hasSemanticsAttr(funcDecl, semantics::OSLOG_LOG_WITH_LEVEL)) {
+    // We are looking at a top-level os_log function that accepts level and
+    // possibly custom log object. Those need not be constants, but every other
+    // parameter must be.
+    Type paramType = param->getType();
+    NominalTypeDecl *nominal = paramType->getNominalOrBoundGenericNominal();
+    return !nominal || !isOSLogDynamicObject(nominal);
+  }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
@@ -73,6 +86,13 @@ static bool isParamRequiredToBeConstant(FuncDecl *funcDecl, ParamDecl *param) {
 /// @_semantics("constant_evaluable").
 static bool hasConstantEvaluableAttr(ValueDecl *decl) {
   return hasSemanticsAttr(decl, semantics::CONSTANT_EVALUABLE);
+}
+
+/// Return true iff the \p decl is annotated with oslog.message.init semantics
+/// attribute.
+static bool isOSLogMessageInitializer(ValueDecl *decl) {
+  return hasSemanticsAttr(decl, semantics::OSLOG_MESSAGE_INIT_STRING_LITERAL) ||
+         hasSemanticsAttr(decl, semantics::OSLOG_MESSAGE_INIT_INTERPOLATION);
 }
 
 /// Check whether \p expr is a compile-time constant. It must either be a
@@ -156,10 +176,18 @@ static Expr *checkConstantness(Expr *expr) {
       continue;
     }
 
+    AbstractFunctionDecl *callee = dyn_cast<AbstractFunctionDecl>(calledValue);
+    if (!callee)
+      return expr;
+
+    // If this is an application of OSLogMessage initializer, fail the check
+    // as this type must be created from string interpolations.
+    if (isOSLogMessageInitializer(callee))
+      return expr;
+
     // If this is a constant_evaluable function, check whether the arguments are
     // constants.
-    AbstractFunctionDecl *callee = dyn_cast<AbstractFunctionDecl>(calledValue);
-    if (!callee || !hasConstantEvaluableAttr(callee))
+    if (!hasConstantEvaluableAttr(callee))
       return expr;
     expressionsToCheck.push_back(apply->getArg());
   }
@@ -297,7 +325,7 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
   // Collect argument indices that are required to be constants.
   SmallVector<unsigned, 4> constantArgumentIndices;
   auto paramList = callee->getParameters();
-  for (unsigned i = 0; i < paramList->size(); i++) {
+  for (unsigned i = 0; i < paramList->size(); ++i) {
     ParamDecl *param = paramList->get(i);
     if (isParamRequiredToBeConstant(callee, param))
       constantArgumentIndices.push_back(i);

@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN --check-prefix=CHECK-IRGEN-%target-cpu %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
 
@@ -577,10 +576,6 @@ bb0(%0 : $*T):
   %3 = tuple ()
   return %3 : $()
 } // end sil function '$s16eager_specialize21exportSpecializationsyyxlF'
-
-// Check that a public specialization for Int64 was produced.
-// specialized exportSpecializations<A> (A) -> ()
-// CHECK-DEADFUNCELIM-LABEL: sil @$s16eager_specialize21exportSpecializationsyyxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
 
 ////////////////////////////////////////////////////////////////////
 // Check the ability to produce explicit partial specializations.

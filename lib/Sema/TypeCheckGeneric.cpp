@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -126,18 +127,16 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
     }
   }
-  
+
   // Try to resolve the constraint repr. It should be some kind of existential
-  // type.
-  TypeResolutionOptions options(TypeResolverContext::GenericRequirement);
-  TypeLoc constraintTypeLoc(repr->getConstraint());
-  // Pass along the error type if resolving the repr failed.
-  auto resolution = TypeResolution::forInterface(
-    dc, dc->getGenericSignatureOfContext());
-  bool validationError
-    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution, options);
-  auto constraintType = constraintTypeLoc.getType();
-  if (validationError)
+  // type. Pass along the error type if resolving the repr failed.
+  auto constraintType = TypeResolution::forInterface(
+                            dc, TypeResolverContext::GenericRequirement,
+                            // Unbound generics are meaningless in opaque types.
+                            /*unboundTyOpener*/ nullptr)
+                            .resolveType(repr->getConstraint());
+
+  if (constraintType->hasError())
     return nullptr;
   
   // Error out if the constraint type isn't a class or existential type.
@@ -264,7 +263,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 
       ctx.Diags.diagnose(decl,
                          diag::requirement_restricts_self,
-                         decl->getDescriptiveKind(), decl->getFullName(),
+                         decl->getDescriptiveKind(), decl->getName(),
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),
                          req.getSecondType().getString());
@@ -469,12 +468,13 @@ GenericSignature TypeChecker::checkGenericSignature(
   // Debugging of the generic signature builder and generic signature
   // generation.
   if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
+    llvm::errs() << "\n";
     if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       VD->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
     } else {
       dc->printContext(llvm::errs());
     }
-    llvm::errs() << "\n";
     llvm::errs() << "Generic signature: ";
     sig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -585,14 +585,15 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   if (auto PD = dyn_cast<ProtocolDecl>(GC)) {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+        Requirement(RequirementKind::Conformance, self,
+                    PD->getDeclaredInterfaceType());
     auto sig = GenericSignature::get({self}, {req});
 
     // Debugging of the generic signature builder and generic signature
     // generation.
     if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      PD->printContext(llvm::errs());
       llvm::errs() << "\n";
+      PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
@@ -605,6 +606,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   bool allowConcreteGenericParams = false;
   const auto *genericParams = GC->getGenericParams();
+  const auto *where = GC->getTrailingWhereClause();
+
   if (genericParams) {
     // Setup the depth of the generic parameters.
     const_cast<GenericParamList *>(genericParams)
@@ -619,33 +622,35 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
       return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
     }
+  }
 
   // ...or we may only have a contextual where clause.
-  } else if (const auto *where = GC->getTrailingWhereClause()) {
+  if (where) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
-    if (GC->getParent()->isModuleScopeContext()) {
+    if (!GC->isGenericContext()) {
       GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         diag::where_nongeneric_toplevel);
-      return nullptr;
-    } else if (!GC->isGenericContext()) {
-      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         diag::where_nongeneric_ctx);
+                                         GC->getParent()->isModuleScopeContext()
+                                             ? diag::where_nongeneric_toplevel
+                                             : diag::where_nongeneric_ctx);
       return nullptr;
     }
+  }
 
+  if (!genericParams && where)
     allowConcreteGenericParams = true;
-  } else {
+
+  if (!genericParams && !where) {
     // We can fast-path computing the generic signature of non-generic
     // declarations by re-using the parent context's signature.
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl()))
       if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
          return subscript->getGenericSignature();
 
-    return GC->getParent()->getGenericSignatureOfContext();
+    return GC->getParentForLookup()->getGenericSignatureOfContext();
   }
 
-  auto parentSig = GC->getParent()->getGenericSignatureOfContext();
+  auto parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
   if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
@@ -655,26 +660,27 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // For functions and subscripts, resolve the parameter and result types and
     // note them as inference sources.
     if (subscr || func) {
-      // Gather requirements from the parameter list.
-      auto resolution = TypeResolution::forStructural(GC);
+      const auto baseOptions =
+          TypeResolutionOptions(func ? TypeResolverContext::AbstractFunctionDecl
+                                     : TypeResolverContext::SubscriptDecl);
 
-      TypeResolutionOptions options =
-          (func ? TypeResolverContext::AbstractFunctionDecl
-                : TypeResolverContext::SubscriptDecl);
-
+      const auto resolution =
+          TypeResolution::forStructural(GC, baseOptions,
+                                        /*unboundTyOpener*/ nullptr);
       auto params = func ? func->getParameters() : subscr->getIndices();
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
           continue;
 
-        auto paramOptions = options;
+        auto paramOptions = baseOptions;
         paramOptions.setContext(param->isVariadic()
                                     ? TypeResolverContext::VariadicFunctionInput
                                     : TypeResolverContext::FunctionInput);
         paramOptions |= TypeResolutionFlags::Direct;
 
-        auto type = resolution.resolveType(typeRepr, paramOptions);
+        const auto type =
+            resolution.withOptions(paramOptions).resolveType(typeRepr);
 
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
@@ -685,16 +691,17 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       // Gather requirements from the result type.
       auto *resultTypeRepr = [&subscr, &func]() -> TypeRepr * {
         if (subscr) {
-          return subscr->getElementTypeLoc().getTypeRepr();
+          return subscr->getElementTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
-          return FD->getBodyResultTypeLoc().getTypeRepr();
+          return FD->getResultTypeRepr();
         } else {
           return nullptr;
         }
       }();
       if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
-        auto resultType = resolution.resolveType(
-            resultTypeRepr, TypeResolverContext::FunctionResult);
+        const auto resultType =
+            resolution.withOptions(TypeResolverContext::FunctionResult)
+                .resolveType(resultTypeRepr);
 
         inferenceSources.emplace_back(resultTypeRepr, resultType);
       }
@@ -725,19 +732,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
-    // Extensions must occur at the top level, they have no
-    // (valid) parent signature.
-    parentSig = nullptr;
+
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
-  // EGREGIOUS HACK: The GSB cannot handle the addition of parent signatures
-  // from malformed decls in many cases.  Check the invalid bit and null out the
-  // parent signature.
-  if (auto *DD = GC->getParent()->getAsDecl()) {
-    parentSig = DD->isInvalid() ? nullptr : parentSig;
-  }
-  
   return TypeChecker::checkGenericSignature(
       GC, GC, parentSig,
       allowConcreteGenericParams,
@@ -753,14 +751,8 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
-    LookupConformanceFn conformances,
-    ConformanceCheckOptions conformanceOptions,
-    GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
-
-  // We handle any conditional requirements ourselves.
-  conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
 
   struct RequirementSet {
     ArrayRef<Requirement> Requirements;
@@ -770,14 +762,18 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  ASTContext &ctx = dc->getASTContext();
+  auto *module = dc->getParentModule();
+  ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
     for (const auto &rawReq : current.Requirements) {
       auto req = rawReq;
       if (current.Parents.empty()) {
-        auto substed = rawReq.subst(substitutions, conformances, options);
+        auto substed = rawReq.subst(
+            substitutions,
+            LookUpConformanceInModule(module),
+            options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;
@@ -809,8 +805,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       }
 
       bool requirementFailure = false;
-      if (listener && !listener->shouldCheck(kind, firstType, secondType))
-        continue;
 
       Diag<Type, Type, Type> diagnostic;
       Diag<Type, Type, StringRef> diagnosticNote;
@@ -819,22 +813,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       case RequirementKind::Conformance: {
         // Protocol conformance requirements.
         auto proto = secondType->castTo<ProtocolType>();
-        // FIXME: This should track whether this should result in a private
-        // or non-private dependency.
-        // FIXME: Do we really need "used" at this point?
-        // FIXME: Poor location information. How much better can we do here?
-        // FIXME: This call should support listener to be able to properly
-        //        diagnose problems with conformances.
-        auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
-                                              conformanceOptions, loc);
+        auto conformance = module->lookupConformance(firstType, proto->getDecl());
 
         if (conformance) {
-          // Report the conformance.
-          if (listener && valid && current.Parents.empty()) {
-            listener->satisfiedConformance(rawFirstType, firstType,
-                                           conformance);
-          }
-
           auto conditionalReqs = conformance.getConditionalRequirements();
           if (!conditionalReqs.empty()) {
             auto history = current.Parents;
@@ -844,7 +825,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           continue;
         }
 
-        // A failure at the top level is diagnosed elsewhere.
+        if (loc.isValid())
+          diagnoseConformanceFailure(firstType, proto->getDecl(), module, loc);
+
         if (current.Parents.empty())
           return RequirementCheckResult::Failure;
 
@@ -888,11 +871,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       if (!requirementFailure)
         continue;
 
-      if (listener &&
-          listener->diagnoseUnsatisfiedRequirement(rawReq, firstType,
-                                                   secondType, current.Parents))
-        return RequirementCheckResult::Failure;
-
       if (loc.isValid()) {
         // FIXME: Poor source-location information.
         ctx.Diags.diagnose(loc, diagnostic, owner, firstType, secondType);
@@ -925,36 +903,29 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              unsigned index,
                              TypeResolutionStage stage) const {
   // Figure out the type resolution.
-  TypeResolutionOptions options = TypeResolverContext::GenericRequirement;
+  const auto options =
+      TypeResolutionOptions(TypeResolverContext::GenericRequirement);
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(owner.dc);
+    resolution = TypeResolution::forStructural(owner.dc, options,
+                                               /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(owner.dc);
+    resolution = TypeResolution::forInterface(owner.dc, options,
+                                              /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual:
     llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
   }
 
-  auto resolveType = [&](TypeLoc &typeLoc) -> Type {
-    Type result;
-    if (auto typeRepr = typeLoc.getTypeRepr())
-      result = resolution->resolveType(typeRepr, options);
-    else
-      result = typeLoc.getType();
-
-    return result ? result : ErrorType::get(owner.dc->getASTContext());
-  };
-
   auto &reqRepr = getRequirement();
   switch (reqRepr.getKind()) {
   case RequirementReprKind::TypeConstraint: {
-    Type subject = resolveType(reqRepr.getSubjectLoc());
-    Type constraint = resolveType(reqRepr.getConstraintLoc());
+    Type subject = resolution->resolveType(reqRepr.getSubjectRepr());
+    Type constraint = resolution->resolveType(reqRepr.getConstraintRepr());
     return Requirement(constraint->getClassOrBoundGenericClass()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
@@ -963,12 +934,12 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 
   case RequirementReprKind::SameType:
     return Requirement(RequirementKind::SameType,
-                       resolveType(reqRepr.getFirstTypeLoc()),
-                       resolveType(reqRepr.getSecondTypeLoc()));
+                       resolution->resolveType(reqRepr.getFirstTypeRepr()),
+                       resolution->resolveType(reqRepr.getSecondTypeRepr()));
 
   case RequirementReprKind::LayoutConstraint:
     return Requirement(RequirementKind::Layout,
-                       resolveType(reqRepr.getSubjectLoc()),
+                       resolution->resolveType(reqRepr.getSubjectRepr()),
                        reqRepr.getLayoutConstraint());
   }
   llvm_unreachable("unhandled kind");
@@ -980,11 +951,6 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
-  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
-          /*functionsAreNonCascading*/ true)) {
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
-  }
-  
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto &ctx = typeAlias->getASTContext();
@@ -994,9 +960,10 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(ctx);
   }
 
-  auto resolution = TypeResolution::forStructural(typeAlias);
-  auto type = resolution.resolveType(underlyingTypeRepr, options);
-  
+  const auto type = TypeResolution::forStructural(typeAlias, options,
+                                                  /*unboundTyOpener*/ nullptr)
+                        .resolveType(underlyingTypeRepr);
+
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
   if (genericSig)

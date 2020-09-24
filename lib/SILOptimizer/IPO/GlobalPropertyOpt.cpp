@@ -466,7 +466,7 @@ void GlobalPropertyOpt::replacePropertyCalls() {
       AI->replaceAllUsesWith(TrueStruct);
       
       semCall.removeCall();
-      NumPropertiesReplaced++;
+      ++NumPropertiesReplaced;
     }
   }
 }

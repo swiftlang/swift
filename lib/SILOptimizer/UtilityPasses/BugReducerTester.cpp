@@ -84,10 +84,12 @@ class BugReducerTester : public SILFunctionTransform {
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(
         nullptr,
-        SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                                 false /*isPseudoGeneric*/, false /*noescape*/,
-                                 DifferentiabilityKind::NonDifferentiable,
-                                 nullptr /*clangFunctionType*/),
+        SILFunctionType::ExtInfoBuilder(
+            SILFunctionType::Representation::Thin, false /*isPseudoGeneric*/,
+            false /*noescape*/, false /*async*/,
+            DifferentiabilityKind::NonDifferentiable,
+            nullptr /*clangFunctionType*/)
+            .build(),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(), ResultInfoArray,
         None, SubstitutionMap(), SubstitutionMap(),

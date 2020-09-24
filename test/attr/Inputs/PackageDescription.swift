@@ -6,7 +6,7 @@ public enum SwiftVersion {
     case v4
 
     // CHECK: @available(_PackageDescription 5.0)
-    // CHECK-NEXT: @available(OSX 10.1, *)
+    // CHECK-NEXT: @available(macOS 10.1, *)
     // CHECK-NEXT: v5
     @available(_PackageDescription, introduced: 5.0)
     @available(macOS, introduced: 10.1)

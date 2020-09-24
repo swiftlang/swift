@@ -292,7 +292,23 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       // If this is an implicit statement or expression, just skip over it,
       // don't emit a diagnostic here.
       if (auto *S = ESD.dyn_cast<Stmt*>()) {
-        if (S->isImplicit()) continue;
+        // Return statement in a single-expression closure or function is
+        // implicit, but the result isn't. So, skip over return statements
+        // that are implicit and either have no results or the result is
+        // implicit. Otherwise, don't so we can emit unreachable code
+        // diagnostics.
+        if (S->isImplicit() && isa<ReturnStmt>(S)) {
+          auto returnStmt = cast<ReturnStmt>(S);
+          if (!returnStmt->hasResult()) {
+            continue;
+          }
+          if (returnStmt->getResult()->isImplicit()) {
+            continue;
+          }
+        }
+        if (S->isImplicit() && !isa<ReturnStmt>(S)) {
+          continue;
+        }
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         // Optional chaining expressions are wrapped in a structure like.
         //
@@ -346,7 +362,13 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      SGF.visit(ESD.get<Decl*>());
+      auto *D = ESD.get<Decl*>();
+
+      // Hoisted declarations are emitted at the top level by emitSourceFile().
+      if (D->isHoisted())
+        continue;
+
+      SGF.visit(D);
     }
   }
 }

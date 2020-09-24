@@ -27,22 +27,40 @@
 namespace swift {
 
 class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
+private:
+  uint16_t Tag;
+
 public:
+  constexpr MetadataAllocator(uint16_t tag) : Tag(tag) {}
+  MetadataAllocator() = delete;
+
   void Reset() {}
 
   LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Allocate;
 
-  void Deallocate(const void *Ptr, size_t size);
+  void Deallocate(const void *Ptr, size_t size, size_t Alignment);
   using AllocatorBase<MetadataAllocator>::Deallocate;
 
   void PrintStats() const {}
+  
+  MetadataAllocator withTag(uint16_t Tag) {
+    MetadataAllocator Allocator = *this;
+    Allocator.Tag = Tag;
+    return Allocator;
+  }
+};
+
+template<uint16_t StaticTag>
+class TaggedMetadataAllocator: public MetadataAllocator {
+public:
+  constexpr TaggedMetadataAllocator() : MetadataAllocator(StaticTag) {}
 };
 
 /// A typedef for simple global caches.
-template <class EntryTy>
+template <class EntryTy, uint16_t Tag>
 using SimpleGlobalCache =
-  ConcurrentMap<EntryTy, /*destructor*/ false, MetadataAllocator>;
+  ConcurrentMap<EntryTy, /*destructor*/ false, TaggedMetadataAllocator<Tag>>;
 
 template <class T, bool ProvideDestructor = true>
 class StaticOwningPointer {
@@ -87,9 +105,10 @@ struct ConcurrencyControl {
   ConcurrencyControl() = default;
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
 class LockingConcurrentMapStorage {
-  ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
+  ConcurrentMap<EntryType, ProvideDestructor,
+                TaggedMetadataAllocator<Tag>> Map;
   StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
 
 public:
@@ -230,7 +249,7 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
+  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
     EntryType *entry = Storage.find(key);
     if (!entry) return None;
     return entry->await(Storage.getConcurrency(),
@@ -324,8 +343,8 @@ public:
   }
 
   template <class... ArgTys>
-  Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
-                                   ArgTys &&...args) {
+  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+                                         ArgTys &&... args) {
     // Delegate to the implementation class.
     ValueType origValue = asImpl().allocate(std::forward<ArgTys>(args)...);
 
@@ -367,6 +386,14 @@ class MetadataCacheKey {
 
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+    return compareProtocolConformanceDescriptors(aDescription, bDescription);
+  }
+
+public:
+  /// Compare two conformance descriptors, checking their contents if necessary.
+  static int compareProtocolConformanceDescriptors(
+      const ProtocolConformanceDescriptor *aDescription,
+      const ProtocolConformanceDescriptor *bDescription) {
     if (aDescription == bDescription)
       return 0;
 
@@ -386,6 +413,7 @@ class MetadataCacheKey {
                            bDescription->getProtocol());
   }
 
+private:
   /// Compare the content from two keys.
   static int compareContent(const void * const *adata,
                             const void * const *bdata,
@@ -471,7 +499,7 @@ public:
 
 private:
   uint32_t computeHash() const {
-    size_t H = 0x56ba80d1 * NumKeyParameters;
+    size_t H = 0x56ba80d1u * NumKeyParameters;
     for (unsigned index = 0; index != NumKeyParameters; ++index) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
       H ^= (reinterpret_cast<size_t>(Data[index])
@@ -747,10 +775,22 @@ protected:
   using super::asImpl;
 
 private:
+  #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  using ThreadID = int;
+  static ThreadID CurrentThreadID() {
+    return 0;
+  }
+  #else
+  using ThreadID = std::thread::id;
+  static ThreadID CurrentThreadID() {
+    return std::this_thread::get_id();
+  }
+  #endif
+
   /// Additional storage that is only ever accessed under the lock.
   union LockedStorage_t {
     /// The thread that is allocating the entry.
-    std::thread::id AllocatingThread;
+    ThreadID AllocatingThread;
 
     /// The completion queue.
     MetadataCompletionQueueEntry *CompletionQueue;
@@ -809,7 +849,7 @@ public:
   MetadataCacheEntryBase()
       : LockedStorageKind(LSK::AllocatingThread),
         TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
-    LockedStorage.AllocatingThread = std::this_thread::get_id();
+    LockedStorage.AllocatingThread = CurrentThreadID();
   }
 
   // Note that having an explicit destructor here is important to make this
@@ -822,7 +862,7 @@ public:
 
   bool isBeingAllocatedByCurrentThread() const {
     return LockedStorageKind == LSK::AllocatingThread &&
-           LockedStorage.AllocatingThread == std::this_thread::get_id();
+           LockedStorage.AllocatingThread == CurrentThreadID();
   }
 
   /// Given that this thread doesn't own the right to initialize the
@@ -849,9 +889,9 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  Optional<Status>
-  beginAllocation(ConcurrencyControl &concurrency, MetadataRequest request,
-                  Args &&...args) {
+  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+                                         MetadataRequest request,
+                                         Args &&... args) {
     // Returning a non-None value here will preempt initialization, so we
     // should only do it if we're reached PrivateMetadataState::Complete.
 
@@ -1076,7 +1116,7 @@ private:
     case LSK::CompletionQueue:
       // Move the existing completion queue to the cache entry.
       queueEntry->CompletionQueue = LockedStorage.CompletionQueue;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case LSK::AllocatingThread:
       LockedStorageKind = LSK::QueueEntry;
@@ -1388,10 +1428,10 @@ public:
   }
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
 class MetadataCache :
     public LockingConcurrentMap<EntryType,
-             LockingConcurrentMapStorage<EntryType, ProvideDestructor>> {
+             LockingConcurrentMapStorage<EntryType, Tag, ProvideDestructor>> {
 };
 
 } // namespace swift

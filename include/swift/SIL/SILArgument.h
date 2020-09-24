@@ -99,8 +99,7 @@ public:
     Bits.SILArgument.VOKind = static_cast<unsigned>(newKind);
   }
 
-  SILBasicBlock *getParent() { return parentBlock; }
-  const SILBasicBlock *getParent() const { return parentBlock; }
+  SILBasicBlock *getParent() const { return parentBlock; }
 
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
@@ -148,6 +147,14 @@ public:
   /// each predecessor block associated with an incoming value.
   bool
   getIncomingPhiOperands(SmallVectorImpl<Operand *> &returnedPhiOperands) const;
+
+  /// If this argument is a true phi, for each operand in each predecessor block
+  /// associated with an incoming value, call visitor(op). Visitor must return
+  /// true for iteration to continue. False to stop it.
+  ///
+  /// Returns false if this is not a true phi or that a visitor signaled error
+  /// by returning false.
+  bool visitIncomingPhiOperands(function_ref<bool(Operand *)> visitor) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -248,6 +255,13 @@ public:
   /// each predecessor block associated with an incoming value.
   bool
   getIncomingPhiOperands(SmallVectorImpl<Operand *> &returnedPhiOperands) const;
+
+  /// If this argument is a phi, call visitor for each passing the operand for
+  /// each incoming phi values for each predecessor BB. If this argument is not
+  /// a phi, return false.
+  ///
+  /// If visitor returns false, iteration is stopped and we return false.
+  bool visitIncomingPhiOperands(function_ref<bool(Operand *)> visitor) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -437,6 +451,17 @@ inline bool SILArgument::getIncomingPhiOperands(
   case SILArgumentKind::SILPhiArgument:
     return cast<SILPhiArgument>(this)->getIncomingPhiOperands(
         returnedPhiOperands);
+  case SILArgumentKind::SILFunctionArgument:
+    return false;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline bool SILArgument::visitIncomingPhiOperands(
+    function_ref<bool(Operand *)> visitor) const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->visitIncomingPhiOperands(visitor);
   case SILArgumentKind::SILFunctionArgument:
     return false;
   }

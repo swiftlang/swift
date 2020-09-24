@@ -9,13 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
+//
 // Implementation Note: Because StaticString is used in the
 // implementation of _precondition(), _fatalErrorMessage(), etc., we
 // keep it extremely close to the bare metal.  In particular, because
 // we store only Builtin types, we are guaranteed that no assertions
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
+//
+//===----------------------------------------------------------------------===//
 
 /// A string type designed to represent text that is known at compile time.
 ///
@@ -67,16 +69,7 @@
 ///         utf8[4]     //-> Fatal error!
 ///     }
 @frozen
-public struct StaticString
-  : _ExpressibleByBuiltinUnicodeScalarLiteral,
-    _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
-    _ExpressibleByBuiltinStringLiteral,
-    ExpressibleByUnicodeScalarLiteral,
-    ExpressibleByExtendedGraphemeClusterLiteral,
-    ExpressibleByStringLiteral,
-    CustomStringConvertible,
-    CustomDebugStringConvertible,
-    CustomReflectable {
+public struct StaticString {
 
   /// Either a pointer to the start of UTF-8 data, represented as an integer,
   /// or an integer representation of a single Unicode scalar.
@@ -179,20 +172,7 @@ public struct StaticString
       return body(UnsafeBufferPointer(
         start: utf8Start, count: utf8CodeUnitCount))
     } else {
-      var buffer: UInt64 = 0
-      var i = 0
-      let sink: (UInt8) -> Void = {
-#if _endian(little)
-        buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
-#else
-        buffer = buffer | (UInt64($0) << (UInt64(7-i) * 8))
-#endif
-        i += 1
-      }
-      UTF8.encode(unicodeScalar, into: sink)
-      return body(UnsafeBufferPointer(
-        start: UnsafePointer(Builtin.addressof(&buffer)),
-        count: i))
+      return unicodeScalar.withUTF8CodeUnits { body($0) }
     }
   }
 
@@ -228,12 +208,18 @@ public struct StaticString
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
   }
+}
+
+extension StaticString: _ExpressibleByBuiltinUnicodeScalarLiteral {
 
   @_effects(readonly)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self = StaticString(unicodeScalar: value)
   }
+}
+
+extension StaticString: ExpressibleByUnicodeScalarLiteral {
 
   /// Creates an instance initialized to a single Unicode scalar.
   ///
@@ -244,6 +230,9 @@ public struct StaticString
   public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
+}
+
+extension StaticString: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
   @_effects(readonly)
   @_transparent
@@ -258,6 +247,9 @@ public struct StaticString
       isASCII: isASCII
     )
   }
+}
+
+extension StaticString: ExpressibleByExtendedGraphemeClusterLiteral {
 
   /// Creates an instance initialized to a single character that is made up of
   /// one or more Unicode scalar values.
@@ -269,6 +261,9 @@ public struct StaticString
   public init(extendedGraphemeClusterLiteral value: StaticString) {
     self = value
   }
+}
+
+extension StaticString: _ExpressibleByBuiltinStringLiteral {
 
   @_effects(readonly)
   @_transparent
@@ -282,6 +277,9 @@ public struct StaticString
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII)
   }
+}
+
+extension StaticString: ExpressibleByStringLiteral {
 
   /// Creates an instance initialized to the value of a string literal.
   ///
@@ -292,11 +290,17 @@ public struct StaticString
   public init(stringLiteral value: StaticString) {
     self = value
   }
+}
+
+extension StaticString: CustomStringConvertible {
 
   /// A textual representation of the static string.
   public var description: String {
     return withUTF8Buffer { String._uncheckedFromUTF8($0) }
   }
+}
+
+extension StaticString: CustomDebugStringConvertible {
 
   /// A textual representation of the static string, suitable for debugging.
   public var debugDescription: String {
@@ -304,7 +308,8 @@ public struct StaticString
   }
 }
 
-extension StaticString {
+extension StaticString: CustomReflectable {
+
   public var customMirror: Mirror {
     return Mirror(reflecting: description)
   }

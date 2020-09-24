@@ -81,6 +81,10 @@ public:
     }
 
     Info() = default;
+
+    Kind getKind() const {
+      return static_cast<Kind>(TheKind);
+    }
   };
 
 private:  
@@ -95,8 +99,8 @@ private:
   CanType ResultType;
 
   ForeignErrorConvention(Kind kind, unsigned parameterIndex, IsOwned_t isOwned,
-                         IsReplaced_t isReplaced, Type parameterType,
-                         Type resultType = Type())
+                         IsReplaced_t isReplaced, CanType parameterType,
+                         CanType resultType = CanType())
       : info(kind, parameterIndex, isOwned, isReplaced),
         ErrorParameterType(parameterType), ResultType(resultType) {}
 
@@ -178,11 +182,24 @@ public:
   /// Returns the physical result type of the function, for functions
   /// that completely erase this information.
   CanType getResultType() const {
-    assert(getKind() == ZeroResult ||
-           getKind() == NonZeroResult);
+    assert(resultTypeErasedToVoid(getKind()));
     return ResultType;
   }
-  
+
+  /// Whether this kind of error import erases the result type to 'Void'.
+  static bool resultTypeErasedToVoid(Kind kind) {
+    switch (kind) {
+    case ZeroResult:
+    case NonZeroResult:
+      return true;
+
+    case ZeroPreservedResult:
+    case NilResult:
+    case NonNilError:
+      return false;
+    }
+  }
+
   bool operator==(ForeignErrorConvention other) const {
     return info.TheKind == other.info.TheKind
       && info.ErrorIsOwned == other.info.ErrorIsOwned

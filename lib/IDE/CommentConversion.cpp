@@ -247,7 +247,7 @@ struct CommentToXMLConverter {
 
   void printTagFields(ArrayRef<StringRef> Tags) {
     OS << "<Tags>";
-    for (const auto Tag : Tags) {
+    for (const auto &Tag : Tags) {
       if (Tag.empty()) {
         continue;
       }
@@ -258,7 +258,7 @@ struct CommentToXMLConverter {
     OS << "</Tags>";
   }
 
-  void visitDocComment(const DocComment *DC);
+  void visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget);
   void visitCommentParts(const swift::markup::CommentParts &Parts);
 };
 } // unnamed namespace
@@ -297,7 +297,8 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
   }
 }
 
-void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
+void CommentToXMLConverter::
+visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
   const Decl *D = DC->getDecl();
 
   StringRef RootEndTag;
@@ -318,7 +319,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       StringRef FileName = SM.getDisplayNameForLoc(Loc);
-      auto LineAndColumn = SM.getLineAndColumn(Loc);
+      auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
       OS << " file=\"";
       appendWithXMLEscaping(OS, FileName);
       OS << "\"";
@@ -336,7 +337,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   if (VD && VD->hasName()) {
     llvm::SmallString<64> SS;
     llvm::raw_svector_ostream NameOS(SS);
-    NameOS << VD->getFullName();
+    NameOS << VD->getName();
     appendWithXMLEscaping(OS, NameOS.str());
   }
   OS << "</Name>";
@@ -347,6 +348,10 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     {
       llvm::raw_svector_ostream OS(SS);
       Failed = ide::printValueDeclUSR(VD, OS);
+      if (!Failed && SynthesizedTarget) {
+        OS << "::SYNTHESIZED::";
+        Failed = ide::printValueDeclUSR(SynthesizedTarget.getBaseNominal(), OS);
+      }
     }
     if (!Failed && !SS.empty()) {
       OS << "<USR>" << SS << "</USR>";
@@ -362,6 +367,9 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     PO.VarInitializers = false;
     PO.ShouldQualifyNestedDeclarations =
         PrintOptions::QualifyNestedDeclarations::TypesOnly;
+    PO.SkipUnderscoredStdlibProtocols = false;
+    if (SynthesizedTarget)
+      PO.initForSynthesizedExtension(SynthesizedTarget);
 
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
@@ -398,12 +406,15 @@ static bool getClangDocumentationCommentAsXML(const clang::Decl *D,
   return true;
 }
 
-static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
-                                                       StringRef Doc,
-                                                       raw_ostream &OS) {
+static void
+replaceObjcDeclarationsWithSwiftOnes(const Decl *D, StringRef Doc,
+                                     raw_ostream &OS,
+                                     TypeOrExtensionDecl SynthesizedTarget) {
   StringRef Open = "<Declaration>";
   StringRef Close = "</Declaration>";
   PrintOptions Options = PrintOptions::printQuickHelpDeclaration();
+  if (SynthesizedTarget)
+      Options.initForSynthesizedExtension(SynthesizedTarget);
   std::string S;
   llvm::raw_string_ostream SS(S);
   D->print(SS, Options);
@@ -444,14 +455,16 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
   return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
-bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
+bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
+                                       TypeOrExtensionDecl SynthesizedTarget) {
   auto MaybeClangNode = D->getClangNode();
   if (MaybeClangNode) {
     if (auto *CD = MaybeClangNode.getAsDecl()) {
       std::string S;
       llvm::raw_string_ostream SS(S);
       if (getClangDocumentationCommentAsXML(CD, SS)) {
-        replaceObjcDeclarationsWithSwiftOnes(D, SS.str(), OS);
+        replaceObjcDeclarationsWithSwiftOnes(D, SS.str(), OS,
+                                             SynthesizedTarget);
         return true;
       }
     }
@@ -464,7 +477,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     return false;
 
   CommentToXMLConverter Converter(OS);
-  Converter.visitDocComment(DC);
+  Converter.visitDocComment(DC, SynthesizedTarget);
 
   OS.flush();
   return true;
@@ -821,7 +834,7 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
     Converter.visit(N);
   }
 
-  for (const auto PF : DC->getParamFields()) {
+  for (const auto &PF : DC->getParamFields()) {
     Converter.visit(PF);
   }
 

@@ -685,6 +685,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::AllocGlobalInst:
   case SILInstructionKind::GlobalAddrInst:
+  case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
     return InlineCost::Free;
@@ -713,6 +714,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
 
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::RefToRawPointerInst:
@@ -778,6 +780,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::YieldInst:
+  case SILInstructionKind::EndCOWMutationInst:
     return InlineCost::Free;
 
   case SILInstructionKind::AbortApplyInst:
@@ -869,6 +872,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SelectEnumInst:

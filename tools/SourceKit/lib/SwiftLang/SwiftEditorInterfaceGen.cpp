@@ -91,21 +91,6 @@ typedef SwiftInterfaceGenContext::Implementation::TextReference TextReference;
 typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back({ Ctx.getIdentifier(SubModuleName), SourceLoc() });
-  }
-  return Ctx.getModule(AccessPath);
-}
-
-static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
-}
-
 namespace {
 class AnnotatingPrinter : public StreamPrinter {
   SourceTextInfo &Info;
@@ -233,16 +218,14 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+      InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
+                file_types::TY_Swift));
+  return CI.setup(Invocation);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,
@@ -296,30 +279,11 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   }
 
   // Get the (sub)module to generate.
-  Mod = getModuleByFullName(Ctx, ModuleName);
+  Mod = Ctx.getModuleByName(ModuleName);
   if (!Mod) {
     ErrMsg = "Could not load module: ";
     ErrMsg += ModuleName;
     return true;
-  }
-
-  std::vector<StringRef> SplitModuleName;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    SplitModuleName.push_back(SubModuleName);
-  }
-  assert(!SplitModuleName.empty());
-
-  // FIXME: If this is a submodule, get its top-level module, which will be the
-  // DeclContext for all of its Decls since we don't have first-class submodules.
-  if (SplitModuleName.size() > 1) {
-    Mod = getModuleByFullName(Ctx, SplitModuleName[0]);
-    if (!Mod) {
-      ErrMsg = "Could not load module: ";
-      ErrMsg += ModuleName;
-      return true;
-    }
   }
 
   PrintOptions Options = PrintOptions::printModuleInterface();
@@ -330,11 +294,11 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.getValue());
   }
-  printSubmoduleInterface(Mod, SplitModuleName,
-    Group.hasValue() ? llvm::makeArrayRef(Group.getValue()) : ArrayRef<StringRef>(),
-                          TraversalOptions,
-                          Printer, Options,
-                          Group.hasValue() && SynthesizedExtensions);
+  printModuleInterface(Mod, Group.hasValue()
+                         ? llvm::makeArrayRef(Group.getValue())
+                         : ArrayRef<StringRef>(),
+                       TraversalOptions, Printer, Options,
+                       Group.hasValue() && SynthesizedExtensions);
 
   Info.Text = std::string(OS.str());
   return false;
@@ -415,7 +379,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     ErrMsg = "Could not load the stdlib module";
     return nullptr;
@@ -475,7 +439,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
+  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   if (!Stdlib) {
     ErrorMsg = "Could not load the stdlib module";
     return nullptr;

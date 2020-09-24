@@ -45,6 +45,7 @@ namespace constraints {
 
 class ConstraintLocator;
 class ConstraintSystem;
+enum class TrailingClosureMatching;
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -161,6 +162,12 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
+  /// The second type is the type of a function parameter, and the first type
+  /// is the type of a reference to that function parameter within the body.
+  /// Once the second type has been fully determined (and mapped down to a
+  /// concrete type), this constraint will be treated like a 'BindParam'
+  /// constraint.
+  OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type (inferred closure type). This is effectively a
   /// `Defaultable` constraint which a couple of differences:
@@ -309,6 +316,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefKind : 2;
+
+  /// The trailing closure matching for an applicable function constraint,
+  /// if any. 0 = None, 1 = Forward, 2 = Backward.
+  unsigned trailingClosureMatching : 2;
 
   union {
     struct {
@@ -476,6 +487,12 @@ public:
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
 
+  /// Create a new Applicable Function constraint.
+  static Constraint *createApplicableFunction(
+      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      Optional<TrailingClosureMatching> trailingClosureMatching,
+      ConstraintLocator *locator);
+
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
 
@@ -549,6 +566,7 @@ public:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
       return ConstraintClassification::Relational;
 
@@ -669,7 +687,8 @@ public:
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual;
+    return Kind == ConstraintKind::OneWayEqual ||
+        Kind == ConstraintKind::OneWayBindParam;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
@@ -691,6 +710,10 @@ public:
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
   }
+
+  /// For an applicable function constraint, retrieve the trailing closure
+  /// matching rule.
+  Optional<TrailingClosureMatching> getTrailingClosureMatching() const;
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }

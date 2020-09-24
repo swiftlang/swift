@@ -1,0 +1,97 @@
+// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-after=differentiation %s -module-name null -o /dev/null 2>&1 | %FileCheck %s
+
+// Test differentiation of semantic member accessors:
+// - Stored property accessors.
+// - Property wrapper wrapped value accessors.
+
+// TODO(TF-1254): Support forward-mode differentiation and test generated differentials.
+
+import _Differentiation
+
+@propertyWrapper
+struct Wrapper<Value> {
+  var wrappedValue: Value
+}
+
+struct Struct: Differentiable {
+  @Wrapper @Wrapper var x: Float = 10
+  var y: Float = 10
+}
+
+struct Generic<T> {
+  @Wrapper @Wrapper var x: T
+  var y: T
+}
+extension Generic: Differentiable where T: Differentiable {}
+
+func trigger<T: Differentiable>(_ x: T.Type) {
+  let _: @differentiable (Struct) -> Float = { $0.x }
+  let _: @differentiable (inout Struct, Float) -> Void = { $0.x = $1 }
+
+  let _: @differentiable (Generic<T>) -> T = { $0.x }
+  let _: @differentiable (inout Generic<T>, T) -> Void = { $0.x = $1 }
+}
+
+// CHECK-LABEL: // differentiability witness for Generic.x.setter
+// CHECK-NEXT: sil_differentiability_witness private [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvs : $@convention(method) <T> (@in T, @inout Generic<T>) -> () {
+
+// CHECK-LABEL: // differentiability witness for Generic.x.getter
+// CHECK-NEXT: sil_differentiability_witness private [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvg : $@convention(method) <T> (@in_guaranteed Generic<T>) -> @out T {
+
+// CHECK-LABEL: // differentiability witness for Struct.x.setter
+// CHECK-NEXT: sil_differentiability_witness private [parameters 0 1] [results 0] @$s4null6StructV1xSfvs : $@convention(method) (Float, @inout Struct) -> () {
+
+// CHECK-LABEL: // differentiability witness for Struct.x.getter
+// CHECK-NEXT: sil_differentiability_witness private [parameters 0] [results 0] @$s4null6StructV1xSfvg : $@convention(method) (Struct) -> Float {
+
+// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvs__pullback_src_0_wrt_0_1_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@inout Generic<τ_0_0>.TangentVector, @owned {{.*}}) -> @out τ_0_0.TangentVector {
+// CHECK: bb0([[ADJ_X_RESULT:%.*]] : $*τ_0_0.TangentVector, [[ADJ_SELF:%.*]] : $*Generic<τ_0_0>.TangentVector, {{.*}} : {{.*}}):
+// CHECK:   [[ADJ_X_TMP:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_X_TMP]], {{.*}})
+// CHECK:   [[ADJ_X:%.*]] = struct_element_addr [[ADJ_SELF]] : $*Generic<τ_0_0>.TangentVector, #Generic.TangentVector.x
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
+// CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_X_TMP]], [[ADJ_X]], {{.*}})
+// CHECK:   destroy_addr [[ADJ_X]] : $*τ_0_0.TangentVector
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_X]], {{.*}})
+// CHECK:   copy_addr [take] [[ADJ_X_TMP]] to [initialization] [[ADJ_X_RESULT]] : $*τ_0_0.TangentVector
+// CHECK:   dealloc_stack [[ADJ_X_TMP]] : $*τ_0_0.TangentVector
+// CHECK:   return {{.*}} : $()
+// CHECK: }
+
+// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvg__pullback_src_0_wrt_0_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> @out Generic<τ_0_0>.TangentVector {
+// CHECK: bb0([[ADJ_SELF_RESULT:%.*]] : $*Generic<τ_0_0>.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{.*}} : ${{.*}}):
+// CHECK:   [[ADJ_SELF_TMP:%.*]] = alloc_stack $Generic<τ_0_0>.TangentVector
+// CHECK:   [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:   copy_addr [[SEED]] to [initialization] [[SEED_COPY]] : $*τ_0_0.TangentVector
+// CHECK:   [[ADJ_X:%.*]] = struct_element_addr [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector, #Generic.TangentVector.x
+// CHECK:   copy_addr [take] [[SEED_COPY]] to [initialization] [[ADJ_X]] : $*τ_0_0.TangentVector
+// CHECK:   [[ADJ_Y:%.*]] = struct_element_addr [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector, #Generic.TangentVector.y
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_Y]], {{.*}})
+// CHECK:   copy_addr [take] [[ADJ_SELF_TMP]] to [initialization] [[ADJ_SELF_RESULT]] : $*Generic<τ_0_0>.TangentVector
+// CHECK:   dealloc_stack [[SEED_COPY]] : $*τ_0_0.TangentVector
+// CHECK:   dealloc_stack [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector
+// CHECK:   return {{.*}} : $()
+// CHECK: }
+
+// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvs__pullback_src_0_wrt_0_1 : $@convention(method) (@inout Struct.TangentVector, @owned _AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1) -> Float {
+// CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector, {{.*}} : $_AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1):
+// CHECK:   [[ADJ_X_ADDR:%.*]] = struct_element_addr [[ADJ_SELF]] : $*Struct.TangentVector, #Struct.TangentVector.x
+// CHECK:   [[ADJ_X:%.*]] = load [trivial] [[ADJ_X_ADDR]] : $*Float
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
+// CHECK:   apply [[ZERO_FN]]<Float>([[ADJ_X_ADDR]], {{.*}})
+// CHECK:   return [[ADJ_X]] : $Float
+// CHECK: }
+
+// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvg__pullback_src_0_wrt_0 : $@convention(method) (Float, @owned _AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0) -> Struct.TangentVector {
+// CHECK: bb0([[ADJ_X:%.*]] : $Float, {{.*}} : $_AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0):
+// CHECK:   [[ADJ_Y_ADDR:%.*]] = alloc_stack $Float
+// CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
+// CHECK:   apply [[ZERO_FN]]<Float>([[ADJ_Y_ADDR]], {{.*}})
+// CHECK:   [[ADJ_Y:%.*]] = load [trivial] [[ADJ_Y_ADDR]] : $*Float
+// CHECK:   dealloc_stack [[ADJ_Y_ADDR]] : $*Float
+// CHECK:   [[ADJ_SELF:%.*]] = struct $Struct.TangentVector ([[ADJ_X]] : $Float, [[ADJ_Y]] : $Float)
+// CHECK:   return [[ADJ_SELF]] : $Struct.TangentVector
+// CHECK: }

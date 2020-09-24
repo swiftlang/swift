@@ -22,7 +22,6 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
-#include <vector>
 
 namespace swift {
 class CapturedValue;

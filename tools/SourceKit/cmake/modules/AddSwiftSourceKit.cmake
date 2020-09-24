@@ -1,74 +1,11 @@
-
-function(add_sourcekit_symbol_exports target_name export_file)
-  # Makefile.rules contains special cases for different platforms.
-  # We restrict ourselves to Darwin for the time being.
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    add_custom_command(OUTPUT symbol.exports
-      COMMAND sed -e "s/^/_/" < ${export_file} > symbol.exports
-      DEPENDS ${export_file}
-      VERBATIM
-      COMMENT "Creating export file for ${target_name}")
-    add_custom_target(${target_name}_exports DEPENDS symbol.exports)
-    set_property(DIRECTORY APPEND
-      PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
-    set_target_properties(${target_name}_exports PROPERTIES
-      FOLDER "SourceKit libraries")
-
-    get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
-    foreach(src ${srcs})
-      get_filename_component(extension ${src} EXT)
-      if(extension STREQUAL ".cpp")
-        set(first_source_file ${src})
-        break()
-      endif()
-    endforeach()
-
-    # Force re-linking when the exports file changes. Actually, it
-    # forces recompilation of the source file. The LINK_DEPENDS target
-    # property only works for makefile-based generators.
-    set_property(SOURCE ${first_source_file} APPEND PROPERTY
-      OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/symbol.exports)
-
-    set_property(TARGET ${target_name} APPEND_STRING PROPERTY
-                 LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
-
-    add_dependencies(${target_name} ${target_name}_exports)
-  endif()
-endfunction()
-
 # Add default compiler and linker flags to 'target'.
 #
 # FIXME: this is a HACK.  All SourceKit CMake code using this function should be
 # rewritten to use 'add_swift_host_library' or 'add_swift_target_library'.
 function(add_sourcekit_default_compiler_flags target)
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
-  set(c_compile_flags)
-  set(link_flags)
-
   # Add variant-specific flags.
-  set(build_type "${CMAKE_BUILD_TYPE}")
-  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  _add_variant_c_compile_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    RESULT_VAR_NAME c_compile_flags)
-  _add_variant_link_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
+  _add_host_variant_c_compile_flags(${target})
+  _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.
   if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
@@ -79,12 +16,6 @@ function(add_sourcekit_default_compiler_flags target)
   endif()
   target_compile_options(${target} PRIVATE
     -fblocks)
-  target_link_options(${target} PRIVATE
-    ${link_flags})
-  target_link_directories(${target} PRIVATE
-    ${library_search_directories})
-  target_link_libraries(${target} PRIVATE
-    ${link_libraries})
 endfunction()
 
 # Add a new SourceKit library.
@@ -155,7 +86,7 @@ macro(add_sourcekit_library name)
   swift_common_llvm_config(${name} ${SOURCEKITLIB_LLVM_LINK_COMPONENTS})
 
   if(SOURCEKITLIB_SHARED AND EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
+    add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -302,7 +233,7 @@ macro(add_sourcekit_framework name)
   swift_common_llvm_config(${name} ${SOURCEKITFW_LLVM_LINK_COMPONENTS})
 
   if (EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
+    add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
   if(SOURCEKITFW_MODULEMAP)

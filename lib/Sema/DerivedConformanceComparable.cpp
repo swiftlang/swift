@@ -74,39 +74,21 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
   FuncDecl *cmpFunc = C.getLessThanIntDecl();
   assert(cmpFunc && "should have a < for int as we already checked for it");
 
-  auto fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
+  Expr *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
+                                          /*implicit*/ true,
+                                          AccessSemantics::Ordinary);
 
-  Expr *cmpFuncExpr;
-  if (cmpFunc->getDeclContext()->isTypeContext()) {
-    auto contextTy = cmpFunc->getDeclContext()->getSelfInterfaceType();
-    Expr *base = TypeExpr::createImplicitHack(SourceLoc(), contextTy, C);
-    Expr *ref = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(), /*Implicit*/ true,
-                                    AccessSemantics::Ordinary, fnType);
-
-    fnType = fnType->getResult()->castTo<FunctionType>();
-    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
-    cmpFuncExpr->setImplicit();
-  } else {
-    cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
-                                      /*implicit*/ true,
-                                      AccessSemantics::Ordinary,
-                                      fnType);
-  }
-
-  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true,
-                                         TupleType::get(abTupleElts, C));
+                                         /*Implicit*/ true);
 
   auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+      cmpFuncExpr, abTuple, /*implicit*/ true);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/true };
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
@@ -131,26 +113,26 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 4> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
-    auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 lhsSubpattern);
+    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto lhsElemPat =
+        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, lhsSubpattern);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 4> rhsPayloadVars;
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
-    auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 rhsSubpattern);
+    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto rhsElemPat =
+        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, rhsSubpattern);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
@@ -162,9 +144,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -172,9 +153,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
-    auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
-      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) },
-                                                 SourceLoc());
+    auto caseTuplePattern = TuplePattern::createImplicit(C, {
+      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
     caseTuplePattern->setImplicit();
 
     auto labelItem = CaseLabelItem(caseTuplePattern);
@@ -183,7 +163,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // breaking out early if any pair is unequal. (same as Equatable synthesis.)
     // the else statement performs the lexicographic comparison.
     SmallVector<ASTNode, 8> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
@@ -215,8 +195,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // We only generate this if the enum has more than one case. If it has exactly
   // one case, then that single case statement is already exhaustive.
   if (elementCount > 1) {
-    auto defaultPattern = new (C) AnyPattern(SourceLoc());
-    defaultPattern->setImplicit();
+    auto defaultPattern = AnyPattern::createImplicit(C);
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto body = deriveBodyComparable_enum_noAssociatedValues_lt(ltDecl, nullptr).first;
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
@@ -264,7 +243,7 @@ deriveComparable_lt(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -275,29 +254,24 @@ deriveComparable_lt(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto comparableDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  comparableDecl->setImplicit();
+  auto *const comparableDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   comparableDecl->setUserAccessible(false);
 
   // Add the @_implements(Comparable, < (_:_:)) attribute
   if (generatedIdentifier != C.Id_LessThanOperator) {
     auto comparable = C.getProtocol(KnownProtocolKind::Comparable);
-    auto comparableType = comparable->getDeclaredType();
-    auto comparableTypeLoc = TypeLoc::withoutLoc(comparableType);
+    auto comparableType = comparable->getDeclaredInterfaceType();
+    auto comparableTypeExpr = TypeExpr::createImplicit(comparableType, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
                                    argumentLabels);
     comparableDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
                                                           SourceRange(),
-                                                          comparableTypeLoc,
+                                                          comparableTypeExpr,
                                                           comparableDeclName,
                                                           DeclNameLoc()));
   }
@@ -357,4 +331,23 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
     synthesizer = &deriveBodyComparable_enum_uninhabited_lt;
   }
   return deriveComparable_lt(*this, synthesizer);
+}
+
+void DerivedConformance::tryDiagnoseFailedComparableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  auto &ctx = DC->getASTContext();
+  auto *comparableProto = ctx.getProtocol(KnownProtocolKind::Comparable);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, comparableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, comparableProto);
+
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    if (enumDecl->hasRawType() && !enumDecl->getRawType()->is<ErrorType>()) {
+      auto rawType = enumDecl->getRawType();
+      auto rawTypeLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+      ctx.Diags.diagnose(rawTypeLoc,
+                         diag::comparable_synthesis_raw_value_not_allowed,
+                         rawType, nominal->getDeclaredInterfaceType(),
+                         comparableProto->getDeclaredInterfaceType());
+    }
+  }
 }

@@ -24,7 +24,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <memory>

@@ -627,6 +627,10 @@ void Remangler::mangleValueWitnessTable(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleAsyncAnnotation(Node *node) {
+  Buffer << "Z";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
 }
@@ -1201,7 +1205,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
   auto i = node->begin(), e = node->end();
   if (i != e && (*i)->getKind() == Node::Kind::ImplConvention) {
     StringRef text = (*i)->getText();
-    i++;
+    ++i;
     if (text == "@callee_unowned") {
       Buffer << 'd';
     } else if (text == "@callee_guaranteed") {
@@ -1224,7 +1228,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
     Buffer << ((*i)->getKind() == Node::Kind::DependentGenericSignature
               ? 'G' : 'g');
     mangleDependentGenericSignature((*i));
-    i++;
+    ++i;
   }
   Buffer << '_';
   for (; i != e && (*i)->getKind() == Node::Kind::ImplParameter; ++i) {
@@ -1324,6 +1328,19 @@ void Remangler::mangleImplConvention(Node *node) {
   } else {
     unreachable("invalid impl convention");
   }
+}
+
+void Remangler::mangleImplDifferentiability(Node *node) {
+  assert(node->getKind() == Node::Kind::ImplDifferentiability);
+  StringRef text = node->getText();
+  // Empty string represents default differentiability.
+  if (text.empty())
+    return;
+  if (text == "@noDerivative") {
+    Buffer << 'w';
+    return;
+  }
+  unreachable("Invalid impl differentiability");
 }
 
 void Remangler::mangleDynamicSelf(Node *node) {
@@ -2093,7 +2110,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 void Remangler::mangleOpaqueReturnType(Node *node) {
-  unreachable("unsupported");
+  Buffer << "Qu";
 }
 void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
   unreachable("unsupported");
@@ -2118,6 +2135,39 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 }
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
+}
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  Buffer << "MM";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MN";
+}
+
+void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MJ";
 }
 
 /// The top-level interface to the remangler.

@@ -1,5 +1,6 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
+// CHECK: [[@LINE+1]]:10 | protocol/Swift | P1 | [[P1_USR:.*]] | Def
 protocol P1 {}
 
 // CHECK: [[@LINE+1]]:8 | struct/Swift | S1 | [[S1_USR:.*]] | Def
@@ -59,6 +60,14 @@ func test2<X: AP>(x: X) {
   _ = type(of: x).A.self
 }
 
+@available(*, unavailable, renamed: "test")
+func test2(_ o: S1?) {
+  // CHECK: [[@LINE-1]]:6 | function/Swift | test2(_:) | [[test2_unavailable_USR:.*]] | Def
+  // CHECK: [[@LINE-2]]:17 | struct/Swift | S1 | [[S1_USR]] | Ref
+  test(o) // CHECK: [[@LINE]]:3 | function/Swift | test(_:) | {{.*}} | Ref,Call,RelCall,RelCont | rel: 1
+    // CHECK-NEXT: RelCall,RelCont | function/Swift | test2(_:) | [[test2_unavailable_USR]]
+}
+
 protocol Disposable {
   func dispose()
 }
@@ -67,4 +76,14 @@ func useDisposable(_ d: Disposable?) {
   // CHECK: [[@LINE+1]]:26 | instance-method/Swift | dispose() | s:14swift_ide_test10DisposableP7disposeyyF | Ref,RelCont | rel: 1
   guard let dispose = d?.dispose else { return }
   _ = dispose
+}
+
+func castExpr(x: Any) {
+    // CHECK: [[@LINE+2]]:9 | struct/Swift | S1 | [[S1_USR]] | Ref
+    // CHECK: [[@LINE+1]]:17 | protocol/Swift | P1 | [[P1_USR]] | Ref
+    _ = S1() as P1
+    // CHECK: [[@LINE+1]]:15 | struct/Swift | S1 | [[S1_USR]] | Ref
+    _ = x as! S1
+    // CHECK: [[@LINE+1]]:15 | struct/Swift | S1 | [[S1_USR]] | Ref
+    _ = x as? S1
 }

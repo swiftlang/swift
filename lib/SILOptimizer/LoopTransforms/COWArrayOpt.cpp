@@ -99,25 +99,6 @@ static bool isRelease(SILInstruction *Inst, SILValue RetainedValue,
         return true;
       }
 
-  if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-    if (auto *F = AI->getReferencedFunctionOrNull()) {
-      auto Params = F->getLoweredFunctionType()->getParameters();
-      auto Args = AI->getArguments();
-      for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
-           ++ArgIdx) {
-        if (MatchedReleases.count(&AI->getArgumentRef(ArgIdx)))
-          continue;
-        if (!areArraysEqual(RCIA, Args[ArgIdx], RetainedValue, ArrayAddress))
-          continue;
-        ParameterConvention P = Params[ArgIdx].getConvention();
-        if (P == ParameterConvention::Direct_Owned) {
-          LLVM_DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
-          MatchedReleases.insert(&AI->getArgumentRef(ArgIdx));
-          return true;
-        }
-      }
-    }
-  }
   LLVM_DEBUG(llvm::dbgs() << "      not a matching release " << *Inst);
   return false;
 }
@@ -307,6 +288,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetCapacity:
   case ArrayCallKind::kGetElement:
   case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kEndMutation:
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
@@ -315,6 +297,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
   case ArrayCallKind::kArrayUninitializedIntrinsic:
+  case ArrayCallKind::kArrayFinalizeIntrinsic:
   case ArrayCallKind::kAppendContentsOf:
   case ArrayCallKind::kAppendElement:
     return false;
@@ -451,6 +434,18 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
     return false;
   }
   return true;
+}
+
+template <typename UserRange>
+ArraySemanticsCall getEndMutationCall(const UserRange &AddressUsers) {
+  for (auto *UseInst : AddressUsers) {
+    if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
+      ArraySemanticsCall ASC(AI);
+      if (ASC.getKind() == ArrayCallKind::kEndMutation)
+        return ASC;
+    }
+  }
+  return ArraySemanticsCall();
 }
 
 /// Returns true if this instruction is a safe array use if all of its users are
@@ -659,7 +654,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 
       // Semantic calls are safe.
       ArraySemanticsCall Sem(Inst);
-      if (Sem) {
+      if (Sem && Sem.hasSelf()) {
         auto Kind = Sem.getKind();
         // Safe because they create new arrays.
         if (Kind == ArrayCallKind::kArrayInit ||
@@ -828,8 +823,14 @@ void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
   }
 }
 
-/// Check if this call to "make_mutable" is hoistable, and move it, or delete it
-/// if it's already hoisted.
+/// Check if this call to "make_mutable" is hoistable, and copy it, along with
+/// the corresponding end_mutation call, to the loop pre-header.
+///
+/// The origial make_mutable/end_mutation calls remain in the loop, because
+/// removing them would violate the COW representation rules.
+/// Having those calls in the pre-header will then enable COWOpts (after
+/// inlining) to constant fold the uniqueness check of the begin_cow_mutation
+/// in the loop.
 bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
                                    bool dominatesExits) {
   LLVM_DEBUG(llvm::dbgs() << "    Checking mutable array: " <<CurrentArrayAddr);
@@ -889,6 +890,18 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
       return false;
   }
 
+  auto ArrayUsers = llvm::map_range(MakeMutable.getSelf()->getUses(),
+                                    ValueBase::UseToUser());
+
+  // There should be a call to end_mutation. Find it so that we can copy it to
+  // the pre-header.
+  ArraySemanticsCall EndMutation = getEndMutationCall(ArrayUsers);
+  if (!EndMutation) {
+    EndMutation = getEndMutationCall(StructUses.StructAddressUsers);
+    if (!EndMutation)
+      return false;
+  }
+
   // Hoist the make_mutable.
   LLVM_DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
 
@@ -897,12 +910,18 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
   assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
          "Should be able to hoist make_mutable");
 
-  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+  // Copy the make_mutable and end_mutation calls to the pre-header.
+  TermInst *insertionPoint = Preheader->getTerminator();
+  ApplyInst *hoistedMM = MakeMutable.copyTo(insertionPoint, DomTree);
+  ApplyInst *EMInst = EndMutation;
+  ApplyInst *hoistedEM = cast<ApplyInst>(EMInst->clone(insertionPoint));
+  hoistedEM->setArgument(0, hoistedMM->getArgument(0));
+  placeFuncRef(hoistedEM, DomTree);
 
   // Register array loads. This is needed for hoisting make_mutable calls of
   // inner arrays in the two-dimensional case.
   if (arrayContainerIsUnique &&
-      StructUses.hasSingleAddressUse((ApplyInst *)MakeMutable)) {
+      StructUses.hasOnlyAddressUses((ApplyInst *)MakeMutable, EMInst)) {
     for (auto use : MakeMutable.getSelf()->getUses()) {
       if (auto *LI = dyn_cast<LoadInst>(use->getUser()))
         HoistableLoads.insert(LI);
@@ -934,39 +953,33 @@ bool COWArrayOpt::run() {
   // is only mapped to a call once the analysis has determined that no
   // make_mutable calls are required within the loop body for that array.
   llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
-
+  
+  llvm::SmallVector<ArraySemanticsCall, 8> makeMutableCalls;
+  
   for (auto *BB : Loop->getBlocks()) {
     if (ColdBlocks.isCold(BB))
       continue;
-    bool dominatesExits = dominatesExitingBlocks(BB);
-    for (auto II = BB->begin(), IE = BB->end(); II != IE;) {
-      // Inst may be moved by hoistMakeMutable.
-      SILInstruction *Inst = &*II;
-      ++II;
-      ArraySemanticsCall MakeMutableCall(Inst, "array.make_mutable");
-      if (!MakeMutableCall)
-        continue;
+      
+    // Instructions are getting moved around. To not mess with iterator
+    // invalidation, first collect all calls, and then do the transformation.
+    for (SILInstruction &I : *BB) {
+      ArraySemanticsCall MakeMutableCall(&I, "array.make_mutable");
+      if (MakeMutableCall)
+        makeMutableCalls.push_back(MakeMutableCall);
+    }
 
+    bool dominatesExits = dominatesExitingBlocks(BB);
+    for (ArraySemanticsCall MakeMutableCall : makeMutableCalls) {
       CurrentArrayAddr = MakeMutableCall.getSelf();
       auto HoistedCallEntry = ArrayMakeMutableMap.find(CurrentArrayAddr);
       if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
-        if (!hoistMakeMutable(MakeMutableCall, dominatesExits)) {
+        if (hoistMakeMutable(MakeMutableCall, dominatesExits)) {
+          ArrayMakeMutableMap[CurrentArrayAddr] = MakeMutableCall;
+          HasChanged = true;
+        } else {
           ArrayMakeMutableMap[CurrentArrayAddr] = nullptr;
-          continue;
         }
-
-        ArrayMakeMutableMap[CurrentArrayAddr] = MakeMutableCall;
-        HasChanged = true;
-        continue;
       }
-
-      if (!HoistedCallEntry->second)
-        continue;
-
-      LLVM_DEBUG(llvm::dbgs() << "    Removing make_mutable call: "
-                              << *MakeMutableCall);
-      MakeMutableCall.removeCall();
-      HasChanged = true;
     }
   }
   return HasChanged;

@@ -78,10 +78,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_2 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SECOND | %FileCheck %s -check-prefix=STATIC_METHOD_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SKIPPED | %FileCheck %s -check-prefix=STATIC_METHOD_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_OVERLOADED | %FileCheck %s -check-prefix=STATIC_METHOD_OVERLOADED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_3 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
@@ -90,6 +93,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
@@ -101,6 +105,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_IUO | %FileCheck %s -check-prefix=ARG_PARAMFLAG_IUO
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_VARIADIC | %FileCheck %s -check-prefix=ARG_PARAMFLAG_VARIADIC
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_1 | %FileCheck %s -check-prefix=TUPLEELEM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_2 | %FileCheck %s -check-prefix=TUPLEELEM_2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYPATH_THUNK_BASE | %FileCheck %s -check-prefix=KEYPATH_THUNK_BASE
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_1 | %FileCheck %s -check-prefix=VARIADIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_2 | %FileCheck %s -check-prefix=VARIADIC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_3 | %FileCheck %s -check-prefix=VARIADIC_2
 
 var i1 = 1
 var i2 = 2
@@ -192,8 +204,8 @@ class C1 {
 // ARG-NAME4: End completions
 
 // EXPECT_OINT: Begin completions
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
+// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: i2[#Int#]; name=i2
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: i1[#Int#]; name=i1
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: oi2[#Int?#]; name=oi2
@@ -202,13 +214,13 @@ class C1 {
 // EXPECT_OINT: End completions
 
 // EXPECT_INT: Begin completions
-// EXPECT_INT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_INT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
-// EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: voidGen()[#Void#]; name=voidGen()
+// EXPECT_INT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// EXPECT_INT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
+// EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: voidGen()[#Void#]; name=voidGen()
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: intGen()[#Int#]; name=intGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
-// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
+// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: Int[#Int#]
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule:      ointGen()[#Int?#]; name=ointGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
@@ -231,8 +243,8 @@ class C2 {
 }
 
 // EXPECT_OSTRING: Begin completions
-// EXPECT_OSTRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_OSTRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
+// EXPECT_OSTRING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// EXPECT_OSTRING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OSTRING-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: stringGen()[#String#]; name=stringGen()
 // EXPECT_OSTRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: s2[#String#]; name=s2
 // EXPECT_OSTRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: s1[#String#]; name=s1
@@ -244,10 +256,10 @@ class C2 {
 // EXPECT_OSTRING: End completions
 
 // EXPECT_STRING: Begin completions
-// EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
+// EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_STRING-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: stringGen()[#String#]; name=stringGen()
-// EXPECT_STRING-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: String[#String#]
+// EXPECT_STRING-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: String[#String#]
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os1[#String?#]; name=os1
@@ -297,7 +309,7 @@ class C3 {
 
 // OVERLOAD3: Begin completions
 // OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
-// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
 // OVERLOAD3-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C2[#C2#]
 // OVERLOAD3: End completions
@@ -308,7 +320,7 @@ class C3 {
 // OVERLOAD4: Begin completions
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
-// OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD4-DAG: Decl[Class]/CurrModule/TypeRelation[Identical]: C1[#C1#]
 // OVERLOAD4: End completions
 
@@ -417,54 +429,54 @@ class C4 {
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
 
 // MEMBER2: Begin completions
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]; name=IntGen()
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
 
 // MEMBER3: Begin completions
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: StringGen()[#String#]; name=StringGen()
 // MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
 
 // MEMBER4: Begin completions
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringGen()[#String#]; name=StringGen()
 // MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
-// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
-// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
 
 // MEMBER7: Begin completions
-// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: removeAll()[#Void#]; name=removeAll()
-// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: removeAll({#keepingCapacity: Bool#})[#Void#]; name=removeAll(keepingCapacity: Bool)
-// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: count[#Int#]; name=count
-// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: capacity[#Int#]; name=capacity
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: removeAll()[#Void#]; name=removeAll()
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: removeAll({#keepingCapacity: Bool#})[#Void#]; name=removeAll(keepingCapacity: Bool)
+// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: count[#Int#]; name=count
+// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: capacity[#Int#]; name=capacity
 
 // MEMBER8: Begin completions
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntGen()[#Int#]; name=InternalIntGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]; name=InternalIntOpGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]; name=InternalStringGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]; name=InternalStringOpGen()
-// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(i1: Int, i2: Int)
-// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(s1: String, s2: String)
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(i1: Int, i2: Int)
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(s1: String, s2: String)
 
 // FARG6: Begin completions
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntGen()[#Int#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalIntOpGen()[#Int?#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]
-// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]
-// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]
 
 func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
@@ -542,7 +554,7 @@ func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
   // NESTED_CLOSURE: Begin completions
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2[#_#]; name=t2
   // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
 }
 
@@ -570,10 +582,12 @@ func testTupleShuffle() {
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 
-// SHUFFLE_3: Begin completions, 3 items
+// SHUFFLE_3: Begin completions, 4 items
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// SHUFFLE_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+
 
 class HasSubscript {
   subscript(idx: Int) -> String {}
@@ -591,8 +605,8 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_1_DOT: Begin completions
 // SUBSCRIPT_1_DOT-NOT: i1
 // SUBSCRIPT_1_DOT-NOT: s1
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem/TypeRelation[Identical]: max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific/IsSystem/TypeRelation[Identical]: min[#Int#]; name=min
 
   let _ = obj[42, #^SUBSCRIPT_2^#
 // SUBSCRIPT_2: Begin completions, 1 items
@@ -612,8 +626,8 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_3_DOT: Begin completions
 // SUBSCRIPT_3_DOT-NOT: i1
 // SUBSCRIPT_3_DOT-NOT: s1
-// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#String#]; name=init()
-// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#String#]; name=init()
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
 
 }
 
@@ -656,6 +670,8 @@ class TestStaticMemberCall {
   static func create2(_ arg1: Int, arg2: Int = 0, arg3: Int = 1, arg4: Int = 2) -> TestStaticMemberCall {
     return TestStaticMemberCall()
   }
+  static func createOverloaded(arg1: Int) -> TestStaticMemberCall { TestStaticMemberCall() }
+  static func createOverloaded(arg1: String) -> String { arg1 }
 }
 func testStaticMemberCall() {
   let _ = TestStaticMemberCall.create1(#^STATIC_METHOD_AFTERPAREN_1^#)
@@ -667,7 +683,7 @@ func testStaticMemberCall() {
 // STATIC_METHOD_AFTERPAREN_2: Begin completions
 // STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
-// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: Int[#Int#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
 // STATIC_METHOD_AFTERPAREN_2: End completions
 
@@ -684,20 +700,31 @@ func testStaticMemberCall() {
 // STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: End completions
+
+  let _ = TestStaticMemberCall.createOverloaded(#^STATIC_METHOD_OVERLOADED^#)
+// STATIC_METHOD_OVERLOADED: Begin completions, 2 items
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// STATIC_METHOD_OVERLOADED-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// STATIC_METHOD_OVERLOADED: End completions
 }
 func testImplicitMember() {
   let _: TestStaticMemberCall = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_1^#)
 // IMPLICIT_MEMBER_AFTERPAREN_1: Begin completions, 1 items
-// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
 // IMPLICIT_MEMBER_AFTERPAREN_1: End completions
 
   let _: TestStaticMemberCall = .create2(#^IMPLICIT_MEMBER_AFTERPAREN_2^#)
 // IMPLICIT_MEMBER_AFTERPAREN_2: Begin completions
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
-// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: Int[#Int#];
 // IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
 // IMPLICIT_MEMBER_AFTERPAREN_2: End completions
+
+  let _: TestStaticMemberCall? = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_3^#)
+// IMPLICIT_MEMBER_AFTERPAREN_3: Begin completions, 1 items
+// IMPLICIT_MEMBER_AFTERPAREN_3: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_3: End completions
 
   let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
 // IMPLICIT_MEMBER_SECOND: Begin completions, 3 items
@@ -712,6 +739,12 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
+
+  let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
+// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 2 items
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: String#}[')'][#String#]; name=arg1: String
+// IMPLICIT_MEMBER_OVERLOADED: End completions
 }
 func testImplicitMemberInArrayLiteral() {
   struct Receiver {
@@ -725,8 +758,12 @@ func testImplicitMemberInArrayLiteral() {
     // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
   ])
   Receiver([
+    .create1(x: 1),
     .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
+  ])
+  Receiver([
+    .create1(x: 1),
     .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
     // Same as IMPLICIT_MEMBER_SECOND.
   ])
@@ -735,15 +772,22 @@ func testImplicitMemberInArrayLiteral() {
     // Same as IMPLICIT_MEMBER_SKIPPED.
     .create1(x: 12)
   ])
+  Receiver(arg1: 12, arg2: [
+    .create1(x: 12),
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_1_OVERLOADED^#)
+    // Same as IMPLICIT_MEMBER_OVERLOADED.
+  ])
   let _: [TestStaticMemberCall] = [
     .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1^#),
-    // Same as STATIC_METHOD_AFTERPAREN_1.
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
     .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2^#),
-    // Same as STATIC_METHOD_AFTERPAREN_2.
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
     .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND^#),
-    // Same as STATIC_METHOD_SECOND.
+    // Same as IMPLICIT_MEMBER_SECOND.
     .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED^#),
-    // Same as STATIC_METHOD_SKIPPED.
+    // Same as IMPLICIT_MEMBER_SKIPPED.
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_2_OVERLOADED^#),
+    // Same as IMPLICIT_MEMBER_OVERLOADED
   ]
 }
 
@@ -815,4 +859,50 @@ func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosu
 // ARG_PARAMFLAG_VARIADIC: Begin completions, 1 items
 // ARG_PARAMFLAG_VARIADIC-DAG: Pattern/ExprSpecific: {#variadicArg: Int...#}[#Int#];
 // ARG_PARAMFLAG_VARIADIC: End completions
+}
+
+func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
+  testTupleElement(arg: (.foo, .#^TUPLEELEM_1^#))
+// TUPLEELEM_1: Begin completions, 4 items
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// TUPLEELEM_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+// TUPLEELEM_1: End completions
+  testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
+// TUPLEELEM_2-NOT: Begin completions
+}
+
+func testKeyPathThunkInBase() {
+    struct TestKP {
+        var value: Int { 1 }
+    }
+    struct TestKPResult {
+        func testFunc(_ arg: SimpleEnum) {}
+    }
+    func foo(_ fn: (TestKP) -> Int) -> TestKPResult { TestKPResult() }
+
+    foo(\.value).testFunc(.#^KEYPATH_THUNK_BASE^#)
+// KEYPATH_THUNK_BASE: Begin completions, 4 items
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// KEYPATH_THUNK_BASE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): SimpleEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: SimpleEnum)
+// KEYPATH_THUNK_BASE: End completions
+}
+
+func testVariadic(_ arg: Any..., option1: Int = 0, option2: String = 1) {
+    testVariadic(#^VARIADIC_1^#)
+// VARIADIC_1: Begin completions
+// VARIADIC_1-DAG: Decl[FreeFunction]/CurrModule: ['(']{#(arg): Any...#}, {#option1: Int#}, {#option2: String#}[')'][#Void#];
+// VARIADIC_1-DAG: Decl[GlobalVar]/CurrModule:    i1[#Int#];
+// VARIADIC_1: End completions
+    testVariadic(1, #^VARIADIC_2^#)
+// VARIADIC_2: Begin completions
+// VARIADIC_2-DAG: Pattern/ExprSpecific:          {#option1: Int#}[#Int#];
+// VARIADIC_2-DAG: Pattern/ExprSpecific:          {#option2: String#}[#String#];
+// VARIADIC_2-DAG: Decl[GlobalVar]/CurrModule:    i1[#Int#];
+// VARIADIC_2: End completions
+    testVariadic(1, 2, #^VARIADIC_3^#)
+// Same as VARIADIC_2.
 }

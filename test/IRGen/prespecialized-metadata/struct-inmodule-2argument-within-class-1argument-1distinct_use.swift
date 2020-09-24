@@ -1,6 +1,6 @@
 // RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
@@ -50,18 +50,6 @@ doit()
 // CHECK:   [[ERASED_TYPE_1:%[0-9]+]] = bitcast %swift.type* %1 to i8*
 // CHECK:   [[ERASED_TYPE_2:%[0-9]+]] = bitcast %swift.type* %2 to i8*
 // CHECK:   [[ERASED_TYPE_3:%[0-9]+]] = bitcast %swift.type* %3 to i8*
-// CHECK:   br label %[[TYPE_COMPARISON_1:[0-9]+]]
-// CHECK: [[TYPE_COMPARISON_1]]:
-// CHECK:   [[EQUAL_TYPE_1_1:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSSN" to i8*), [[ERASED_TYPE_1]]
-// CHECK:   [[EQUAL_TYPES_1_1:%[0-9]+]] = and i1 true, [[EQUAL_TYPE_1_1]]
-// CHECK:   [[EQUAL_TYPE_1_2:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_2]]
-// CHECK:   [[EQUAL_TYPES_1_2:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_1]], [[EQUAL_TYPE_1_2]]
-// CHECK:   [[EQUAL_TYPE_1_3:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSdN" to i8*), [[ERASED_TYPE_3]]
-// CHECK:   [[EQUAL_TYPES_1_3:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_2]], [[EQUAL_TYPE_1_3]]
-// CHECK:   br i1 [[EQUAL_TYPES_1_3]], label %[[EXIT_PRESPECIALIZED_1:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
-// CHECK: [[EXIT_PRESPECIALIZED_1]]:
-// CHECK:   ret %swift.metadata_response { %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, %swift.type*, i32, i32, i64 }>* @"$s4main9NamespaceC5ValueVySS_SiSdGMf" to %swift.full_type*), i32 0, i32 1), [[INT]] 0 }
-// CHECK: [[EXIT_NORMAL]]:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE_1]], i8* [[ERASED_TYPE_2]], i8* [[ERASED_TYPE_3]], %swift.type_descriptor* bitcast ({{.+}}$s4main9NamespaceC5ValueVMn{{.+}} to %swift.type_descriptor*)) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

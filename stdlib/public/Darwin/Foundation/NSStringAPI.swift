@@ -19,8 +19,8 @@
 //
 // This file is shared between two projects:
 //
-// 1. https://github.com/apple/swift/tree/master/stdlib/public/Darwin/Foundation
-// 2. https://github.com/apple/swift-corelibs-foundation/tree/master/Foundation
+// 1. https://github.com/apple/swift/tree/main/stdlib/public/Darwin/Foundation
+// 2. https://github.com/apple/swift-corelibs-foundation/tree/main/Foundation
 //
 // If you change this file, you must update it in both places.
 
@@ -73,10 +73,10 @@ internal func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let cString = p else {
     return nil
   }
-  let len = UTF8._nullCodeUnitOffset(in: cString)
-  var result = [CChar](repeating: 0, count: len + 1)
-  for i in 0..<len {
-    result[i] = cString[i]
+  let bytesToCopy = UTF8._nullCodeUnitOffset(in: cString) + 1 // +1 for the terminating NUL
+  let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buffer, initializedCount in
+      buffer.baseAddress!.initialize(from: cString, count: bytesToCopy)
+      initializedCount = bytesToCopy
   }
   return result
 }
@@ -1257,7 +1257,7 @@ extension StringProtocol where Index == String.Index {
       in: _toRelativeNSRange(range),
       scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
       options: opts,
-      orthography: orthography != nil ? orthography! : nil
+      orthography: orthography
     ) {
       var stop_ = false
       body($0!.rawValue, self._toRange($1), self._toRange($2), &stop_)

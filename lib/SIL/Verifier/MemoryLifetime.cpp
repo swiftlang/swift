@@ -238,7 +238,7 @@ void MemoryLocations::dump() const {
                  << ", #f=" << loc.numFieldsNotCoveredBySubfields
                  << ", #ntf=" << loc.numNonTrivialFieldsNotCovered
                  << ": " << loc.representativeValue;
-    idx++;
+    ++idx;
   }
 }
 

@@ -497,7 +497,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
     bool hasLimitedInterestingConformances(CanType type) const override {
       return false;
     }
-    GenericSignature::ConformsToArray
+    GenericSignature::RequiredProtocols
     getInterestingConformances(CanType type) const override {
       llvm_unreachable("no limits");
     }

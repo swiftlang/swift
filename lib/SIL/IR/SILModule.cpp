@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
@@ -91,13 +92,18 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     const SILOptions &Options, const DeclContext *associatedDC,
-                     bool wholeModule)
-    : TheSwiftModule(SwiftModule),
-      AssociatedDeclContext(associatedDC),
-      Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
-      serialized(false), SerializeSILAction(), Types(TC) {
+SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                     Lowering::TypeConverter &TC, const SILOptions &Options)
+    : Stage(SILStage::Raw), Options(Options), serialized(false),
+      SerializeSILAction(), Types(TC) {
+  assert(!context.isNull());
+  if (auto *file = context.dyn_cast<FileUnit *>()) {
+    AssociatedDeclContext = file;
+  } else {
+    AssociatedDeclContext = context.get<ModuleDecl *>();
+  }
+  TheSwiftModule = AssociatedDeclContext->getParentModule();
+
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());
@@ -105,9 +111,16 @@ SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
 }
 
 SILModule::~SILModule() {
+#ifndef NDEBUG
+  checkForLeaks();
+#endif
+
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
+
+  for (auto vt : vtables)
+    vt->~SILVTable();
 
   // Drop everything functions in this module reference.
   //
@@ -121,11 +134,48 @@ SILModule::~SILModule() {
   }
 }
 
-std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
-                             bool WholeModule) {
-  return std::unique_ptr<SILModule>(
-      new SILModule(M, TC, Options, M, WholeModule));
+void SILModule::checkForLeaks() const {
+  int instsInModule = 0;
+  for (const SILFunction &F : *this) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILFunction &F : zombieFunctions) {
+    for (const SILBasicBlock &block : F) {
+      instsInModule += std::distance(block.begin(), block.end());
+    }
+  }
+  for (const SILGlobalVariable &global : getSILGlobals()) {
+      instsInModule += std::distance(global.StaticInitializerBlock.begin(),
+                                     global.StaticInitializerBlock.end());
+  }
+  
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                       SILInstruction::getNumDeletedInstructions();
+                       
+  if (numAllocated != instsInModule) {
+    llvm::errs() << "Leaking instructions!\n";
+    llvm::errs() << "Alloated instructions: " << numAllocated << '\n';
+    llvm::errs() << "Instructions in module: " << instsInModule << '\n';
+    llvm_unreachable("leaking instructions");
+  }
+}
+
+void SILModule::checkForLeaksAfterDestruction() {
+  int numAllocated = SILInstruction::getNumCreatedInstructions() -
+                     SILInstruction::getNumDeletedInstructions();
+
+  if (numAllocated != 0) {
+    llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
+    llvm_unreachable("leaking instructions");
+  }
+}
+
+std::unique_ptr<SILModule> SILModule::createEmptyModule(
+    llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+    Lowering::TypeConverter &TC, const SILOptions &Options) {
+  return std::unique_ptr<SILModule>(new SILModule(context, TC, Options));
 }
 
 ASTContext &SILModule::getASTContext() const {
@@ -350,6 +400,7 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
+          Linkage == SILLinkage::SharedExternal ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
 
@@ -400,6 +451,9 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
+      // Don't eliminate bodies of _alwaysEmitIntoClient functions
+      // (PublicNonABI linkage is de-serialized as SharedExternal)
+      F->getLinkage() != SILLinkage::SharedExternal &&
       !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
@@ -415,43 +469,51 @@ bool SILModule::hasFunction(StringRef Name) {
   return getSILLoader()->hasSILFunction(Name);
 }
 
-void SILModule::linkAllFromCurrentModule() {
-  getSILLoader()->getAllForModule(getSwiftModule()->getName(),
-                                  /*PrimaryFile=*/nullptr);
-}
-
 void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }
 
-void SILModule::removeFromZombieList(StringRef Name) {
+SILFunction *SILModule::removeFromZombieList(StringRef Name) {
   if (auto *Zombie = ZombieFunctionTable.lookup(Name)) {
     ZombieFunctionTable.erase(Name);
     zombieFunctions.remove(Zombie);
+
+    // The owner of the function's Name is the ZombieFunctionTable key, which is
+    // freed by erase().
+    // Make sure nobody accesses the name string after it is freed.
+    Zombie->Name = StringRef();
+    return Zombie;
   }
+  return nullptr;
 }
 
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
   assert(!F->isZombie() && "zombie function is in list of alive functions");
+
+  llvm::StringMapEntry<SILFunction*> *entry =
+      &*ZombieFunctionTable.insert(std::make_pair(F->getName(), nullptr)).first;
+  assert(!entry->getValue() && "Zombie function already exists");
+  StringRef zombieName = entry->getKey();
+
   // The owner of the function's Name is the FunctionTable key. As we remove
-  // the function from the table we have to store the name string elsewhere:
-  // in zombieFunctionNames.
-  StringRef copiedName = F->getName().copy(zombieFunctionNames);
+  // the function from the table we need to use the allocated name string from
+  // the ZombieFunctionTable.
   FunctionTable.erase(F->getName());
-  F->Name = copiedName;
+  F->Name = zombieName;
 
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
   getFunctionList().remove(F);
   zombieFunctions.push_back(F);
-  ZombieFunctionTable[copiedName] = F;
+  entry->setValue(F);
   F->setZombie();
 
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
   F->dropAllReferences();
   F->dropDynamicallyReplacedFunction();
+  F->getBlocks().clear();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
@@ -464,7 +526,8 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
   getSILGlobalList().erase(G);
 }
 
-SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
+                                   bool deserializeLazily) {
   if (!C)
     return nullptr;
 
@@ -472,6 +535,9 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   auto R = VTableMap.find(C);
   if (R != VTableMap.end())
     return R->second;
+
+  if (!deserializeLazily)
+    return nullptr;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl = getSILLoader()->lookupVTable(C);
@@ -581,7 +647,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   // Ok, we have a VTable. Try to lookup the SILFunction implementation from
   // the VTable.
   if (auto E = Vtbl->getEntry(*this, Member))
-    return E->Implementation;
+    return E->getImplementation();
 
   return nullptr;
 }
@@ -645,7 +711,9 @@ void SILModule::notifyDeleteHandlers(SILNode *node) {
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.hasAttribute(llvm::Attribute::NoReturn);
+    return IntrinsicInfo
+              .getOrCreateAttributes(getASTContext())
+              .hasFnAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {
@@ -698,11 +766,9 @@ void SILModule::serialize() {
   setSerialized();
 }
 
-void SILModule::setSILRemarkStreamer(
-    std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
-    std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer) {
-  silRemarkStream = std::move(remarkStream);
-  silRemarkStreamer = std::move(remarkStreamer);
+void SILModule::installSILRemarkStreamer() {
+  assert(!silRemarkStreamer && "SIL Remark Streamer is already installed!");
+  silRemarkStreamer = SILRemarkStreamer::create(*this);
 }
 
 bool SILModule::isStdlibModule() const {

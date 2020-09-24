@@ -1,5 +1,11 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-build-swift-dylib(%t/%target-library-name(TestModuleLinking)) -module-name TestModuleLinking -emit-module -emit-module-path %t/TestModuleLinking.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_protocol_self_orig.swift -Xfrontend -enable-private-imports -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift -I%t -L%t -lTestModuleLinking -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(TestModuleLinking)
+// RUN: %target-run %t/main %t/%target-library-name(TestModuleLinking) %t/%target-library-name(TestModuleLinking)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(TestModuleLinking)) -module-name TestModuleLinking -emit-module -emit-module-path %t/TestModuleLinking.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_protocol_self_orig.swift -Xfrontend -enable-private-imports -Xfrontend -enable-implicit-dynamic -enable-library-evolution
 // RUN: %target-build-swift -I%t -L%t -lTestModuleLinking -o %t/main %target-rpath(%t) %s -swift-version 5
 // RUN: %target-codesign %t/main %t/%target-library-name(TestModuleLinking)
 // RUN: %target-run %t/main %t/%target-library-name(TestModuleLinking) %t/%target-library-name(TestModuleLinking)

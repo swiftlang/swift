@@ -73,8 +73,11 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
 
   Success |= serializeSymbolGraph(Walker.MainGraph, Options);
 
-  for (auto Pair : Walker.ExtendedModuleGraphs) {
-    Success |= serializeSymbolGraph(*Pair.getSecond(), Options);
+  for (const auto &Entry : Walker.ExtendedModuleGraphs) {
+    if (Entry.getValue()->empty()) {
+      continue;
+    }
+    Success |= serializeSymbolGraph(*Entry.getValue(), Options);
   }
 
   return Success;

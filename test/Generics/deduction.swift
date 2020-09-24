@@ -25,7 +25,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
   xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
-  xx = identity2(yy) // expected-error{{no exact matches in call to global function 'identity2'}}
+  xx = identity2(yy) // expected-error{{no 'identity2' candidates produce the expected contextual result type 'X'}}
 }
 
 func twoIdentical<T>(_ x: T, _ y: T) -> T {}
@@ -89,7 +89,7 @@ func testReturnTuple(_ x: Int, y: Float) {
   var _ : (Float, Float) = returnTuple(y)
 
   // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{conflicting arguments to generic parameter 'T' ('Float' vs. 'Int')}}
 }
 
 
@@ -247,8 +247,7 @@ protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  // FIXME(diagnostics): This should report the "no exact matches" diagnostic.
-  u + u // expected-error{{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'U' conform to 'RangeReplaceableCollection'}}
+  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
   return x+y
 }
 

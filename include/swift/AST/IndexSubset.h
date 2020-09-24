@@ -207,7 +207,7 @@ public:
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
-  SWIFT_DEBUG_DUMPER(dump(llvm::raw_ostream &s = llvm::errs()));
+  SWIFT_DEBUG_DUMPER(dump());
 
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }

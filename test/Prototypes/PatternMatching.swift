@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -299,7 +299,7 @@ extension StaticString {
 extension Collection where Iterator.Element == UTF8.CodeUnit {
   var u8str : String {
     var a = Array<UTF8.CodeUnit>()
-    a.reserveCapacity(numericCast(count) + 1)
+    a.reserveCapacity(count + 1)
     a.append(contentsOf: self)
     a.append(0)
     return String(reflecting: String(cString: a))

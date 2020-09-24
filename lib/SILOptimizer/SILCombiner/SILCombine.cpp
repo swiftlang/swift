@@ -131,7 +131,9 @@ public:
   }
 
   void notifyHasNewUsers(SILValue value) override {
-    Worklist.addUsersToWorklist(value);
+    if (Worklist.size() < 10000) {
+      Worklist.addUsersToWorklist(value);
+    }
     changed = true;
   }
 
@@ -227,7 +229,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // Perform iterations until we do not make any changes.
   while (doOneIteration(F, Iteration)) {
     Changed = true;
-    Iteration++;
+    ++Iteration;
   }
 
   if (invalidatedStackNesting) {
@@ -237,6 +239,16 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // Cleanup the builder and return whether or not we made any changes.
   return Changed;
 }
+
+void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    while (!result->use_empty()) {
+      eraseInstIncludingUsers(result->use_begin()->getUser());
+    }
+  }
+  eraseInstFromFunction(*inst);
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points

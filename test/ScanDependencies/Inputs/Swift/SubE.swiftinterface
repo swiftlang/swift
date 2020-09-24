@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name SubE
+import Swift
+public func funcSubE() {}

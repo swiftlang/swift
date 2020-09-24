@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Tests the constantness Sema diagnostics for the OSLogTestHelper module,
 // which acts as a stub for the os overlay.
@@ -73,6 +73,10 @@ func testValidLogCalls(x: Int) {
 func testTypeIncorrectLogCalls() {
   let message = "test message"
 
+  class TestClass {
+  }
+  let x = TestClass()
+
   _osLogTestHelper(message)
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'OSLogMessage'}}
   _osLogTestHelper("prefix" + "\(x)")
@@ -81,9 +85,6 @@ func testTypeIncorrectLogCalls() {
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type '(String, UnsafeBufferPointer<UInt8>) -> Void'}}
   // expected-error@-2 {{missing argument label 'assertion:' in call}}
 
-  class TestClass {
-  }
-  let x = TestClass()
   _osLogTestHelper("\(x, format: .hex)")
   //expected-error@-1 {{no exact matches in call to instance method 'appendInterpolation'}}
 
@@ -117,4 +118,70 @@ func testOSLogInterpolationExtension(a: MyStruct) {
   // The following is not a Sema error but would result in SIL diagnostics as
   // the appendInterpolation overload is not marked as constant_evaluable.
   _osLogTestHelper("Error at line: \(a: a)")
+}
+
+func testExplicitOSLogMessageConstruction() {
+  _osLogTestHelper(OSLogMessage(stringLiteral: "world"))
+    // expected-error@-1 {{argument must be a string interpolation}}
+  _osLogTestHelper(
+    OSLogMessage( // expected-error {{argument must be a string interpolation}}
+      stringInterpolation:
+        OSLogInterpolation(
+          literalCapacity: 0,
+          interpolationCount: 0)))
+}
+
+// Test that @_semantics("oslog.log_with_level") permits values of type OSLog and
+// OSLogType to not be constants.
+
+class OSLog { }
+class OSLogType { }
+
+@_semantics("oslog.log_with_level")
+func osLogWithLevel(_ level: OSLogType, log: OSLog, _ message: OSLogMessage) {
+}
+
+func testNonConstantLogObjectLevel(
+  level: OSLogType,
+  log: OSLog,
+  message: OSLogMessage
+) {
+  osLogWithLevel(level, log: log, "message with no payload")
+  var levelOpt: OSLogType? = nil
+  levelOpt = level
+
+  let logClosure = { log }
+  osLogWithLevel(levelOpt!, log: logClosure(), "A string \("hello")")
+
+  osLogWithLevel(level, log: log, message)
+    // expected-error@-1 {{argument must be a string interpolation}}
+}
+
+// Test that log messages can be wrapped in constant_evaluable functions.
+
+// A function similar to the one used by SwiftUI preview to wrap string
+// literals.
+@_semantics("constant_evaluable")
+public func __designTimeStringStub(
+  _ key: String,
+  fallback: OSLogMessage
+) -> OSLogMessage {
+  fallback
+}
+
+func testSwiftUIPreviewWrapping() {
+  // This should not produce any diagnostics.
+  _osLogTestHelper(__designTimeStringStub("key", fallback: "A literal message"))
+}
+
+public func nonConstantFunction(
+  _ key: String,
+  fallback: OSLogMessage
+) -> OSLogMessage {
+  fallback
+}
+
+func testLogMessageWrappingDiagnostics() {
+  _osLogTestHelper(nonConstantFunction("key", fallback: "A literal message"))
+    // expected-error@-1{{argument must be a string interpolation}}
 }

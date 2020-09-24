@@ -227,9 +227,10 @@ Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
 
 static std::string rangeStrings(std::string prefix, const Ranges &ranges) {
   std::string s = prefix;
-  interleave(ranges.begin(), ranges.end(),
-             [&](const SerializableSourceRange &r) { s += r.printString(); },
-             [&] { s += ", "; });
+  llvm::interleave(
+      ranges.begin(), ranges.end(),
+      [&](const SerializableSourceRange &r) { s += r.printString(); },
+      [&] { s += ", "; });
   return s;
 }
 

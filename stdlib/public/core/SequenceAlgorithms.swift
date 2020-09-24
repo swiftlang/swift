@@ -96,7 +96,7 @@ extension Sequence {
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
   ///     let leastHue = hues.min { a, b in a.value < b.value }
   ///     print(leastHue)
-  ///     // Prints "Optional(("Coral", 16))"
+  ///     // Prints "Optional((key: "Coral", value: 16))"
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true`
   ///   if its first argument should be ordered before its second
@@ -141,7 +141,7 @@ extension Sequence {
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
   ///     let greatestHue = hues.max { a, b in a.value < b.value }
   ///     print(greatestHue)
-  ///     // Prints "Optional(("Heliotrope", 296))"
+  ///     // Prints "Optional((key: "Heliotrope", value: 296))"
   ///
   /// - Parameter areInIncreasingOrder:  A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
@@ -794,8 +794,8 @@ extension Sequence {
     return try _compactMap(transform)
   }
 
-  // The implementation of flatMap accepting a closure with an optional result.
-  // Factored out into a separate functions in order to be used in multiple
+  // The implementation of compactMap accepting a closure with an optional result.
+  // Factored out into a separate function in order to be used in multiple
   // overloads.
   @inlinable // protocol-only
   @inline(__always)

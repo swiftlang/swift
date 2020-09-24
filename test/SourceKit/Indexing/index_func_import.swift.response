@@ -63,7 +63,8 @@
           key.line: 10,
           key.column: 3
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

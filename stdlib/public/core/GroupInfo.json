@@ -64,6 +64,7 @@
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
     "CollectionAlgorithms.swift",
+    "EitherSequence.swift",
     "EmptyCollection.swift",
     "Stride.swift",
     "Repeat.swift",
@@ -168,7 +169,8 @@
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"],
+      "FloatingPointTypes.swift",
+      "FloatingPointRandom.swift"],
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
@@ -209,6 +211,7 @@
     "OptionSet.swift",
     "OutputStream.swift",
     "Policy.swift",
+    "Prespecialize.swift",
     "Print.swift",
     "REPL.swift",
     "Random.swift",

@@ -28,6 +28,7 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
@@ -47,9 +48,9 @@ version::Version swift::InterfaceFormatVersion({1, 0});
 static void diagnoseScopedImports(DiagnosticEngine &diags,
                                   ArrayRef<ModuleDecl::ImportedModule> imports){
   for (const ModuleDecl::ImportedModule &importPair : imports) {
-    if (importPair.first.empty())
+    if (importPair.accessPath.empty())
       continue;
-    diags.diagnose(importPair.first.front().Loc,
+    diags.diagnose(importPair.accessPath.front().Loc,
                    diag::module_interface_scoped_import_unsupported);
   }
 }
@@ -99,10 +100,26 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
-  ModuleDecl::ImportFilter allImportFilter;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  ModuleDecl::ImportFilter allImportFilter = {
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
+
+  // With -experimental-spi-imports:
+  // When printing the private swiftinterface file, print implementation-only
+  // imports only if they are also SPI. First, list all implementation-only
+  // imports and filter them later.
+  llvm::SmallSet<ModuleDecl::ImportedModule, 4,
+                 ModuleDecl::OrderImportedModules> ioiImportSet;
+  if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
+    SmallVector<ModuleDecl::ImportedModule, 4> ioiImport;
+    M->getImportedModules(ioiImport,
+                          {ModuleDecl::ImportFilterKind::ImplementationOnly,
+                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+  }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
@@ -112,16 +129,27 @@ static void printImports(raw_ostream &out,
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
   SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Public);
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
   llvm::SmallSet<ModuleDecl::ImportedModule, 8,
                  ModuleDecl::OrderImportedModules> publicImportSet;
+
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
-    auto importedModule = import.second;
+    auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
         importedModule->isBuiltinModule()) {
       continue;
+    }
+
+    llvm::SmallSetVector<Identifier, 4> spis;
+    M->lookupImportedSPIGroups(importedModule, spis);
+
+    // Only print implementation-only imports which have an SPI import.
+    if (ioiImportSet.count(import)) {
+      if (spis.empty())
+        continue;
+      out << "@_implementationOnly ";
     }
 
     if (publicImportSet.count(import))
@@ -129,8 +157,6 @@ static void printImports(raw_ostream &out,
 
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
-      SmallVector<Identifier, 4> spis;
-      M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }
@@ -140,9 +166,9 @@ static void printImports(raw_ostream &out,
 
     // Write the access path we should be honoring but aren't.
     // (See diagnoseScopedImports above.)
-    if (!import.first.empty()) {
+    if (!import.accessPath.empty()) {
       out << "/*";
-      for (const auto &accessPathElem : import.first)
+      for (const auto &accessPathElem : import.accessPath)
         out << "." << accessPathElem.Item;
       out << "*/";
     }
@@ -344,10 +370,16 @@ public:
   /// in \p map.
   ///
   /// \sa recordConditionalConformances
-  static void collectSkippedConditionalConformances(PerTypeMap &map,
-                                                    const Decl *D) {
+  static void collectSkippedConditionalConformances(
+                                            PerTypeMap &map,
+                                            const Decl *D,
+                                            const PrintOptions &printOptions) {
     auto *extension = dyn_cast<ExtensionDecl>(D);
     if (!extension || !extension->isConstrainedExtension())
+      return;
+
+    // Skip SPI extensions in the public interface.
+    if (!printOptions.PrintSPIs && extension->isSPI())
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
@@ -434,7 +466,7 @@ public:
       printer << " : ";
 
       ProtocolDecl *proto = protoAndAvailability.first;
-      proto->getDeclaredType()->print(printer, printOptions);
+      proto->getDeclaredInterfaceType()->print(printer, printOptions);
 
       printer << " {}\n";
     }
@@ -450,13 +482,17 @@ public:
       return false;
     assert(nominal->isGenericContext());
 
+    if (printOptions.PrintSPIs)
+      out << "@_spi(" << DummyProtocolName << ")\n";
     out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
     out << " : ";
-    swift::interleave(ConditionalConformanceProtocols,
-                      [&out, &printOptions](const ProtocolType *protoTy) {
-                        protoTy->print(out, printOptions);
-                      }, [&out] { out << ", "; });
+    llvm::interleave(
+        ConditionalConformanceProtocols,
+        [&out, &printOptions](const ProtocolType *protoTy) {
+          protoTy->print(out, printOptions);
+        },
+        [&out] { out << ", "; });
     out << " where "
         << nominal->getGenericSignature()->getGenericParams().front()->getName()
         << " : " << DummyProtocolName << " {}\n";
@@ -494,8 +530,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
     if (!D->shouldPrintInContext(printOptions) ||
         !printOptions.shouldPrint(D)) {
+
       InheritedProtocolCollector::collectSkippedConditionalConformances(
-          inheritedProtocolMap, D);
+          inheritedProtocolMap, D, printOptions);
       continue;
     }
 
@@ -516,6 +553,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   }
   if (needDummyProtocolDeclaration)
     InheritedProtocolCollector::printDummyProtocolDeclaration(out);
+
+  if (Opts.DebugPrintInvalidSyntax)
+    out << "#__debug_emit_invalid_swiftinterface_syntax__\n";
 
   return false;
 }

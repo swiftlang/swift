@@ -412,7 +412,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User)) {
+        isa<DebugValueInst>(User) ||
+        isa<FixLifetimeInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -445,13 +446,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       continue;
     }
     // Recursively follow projections.
-    if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
-      ProjectionIndex PI(ProjInst);
+    if (auto *svi = dyn_cast<SingleValueInstruction>(User)) {
+      ProjectionIndex PI(svi);
       if (PI.isValid()) {
         IndexTrieNode *ProjAddrNode = AddressNode;
         bool ProjInteriorAddr = IsInteriorAddress;
-        if (Projection::isAddressProjection(ProjInst)) {
-          if (isa<IndexAddrInst>(ProjInst)) {
+        if (Projection::isAddressProjection(svi)) {
+          if (isa<IndexAddrInst>(svi)) {
             // Don't support indexing within an interior address.
             if (IsInteriorAddress)
               return false;
@@ -466,11 +467,17 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
           // Don't expect to extract values once we've taken an address.
           return false;
         }
-        if (!recursivelyCollectInteriorUses(ProjInst,
+        if (!recursivelyCollectInteriorUses(svi,
                                             ProjAddrNode->getChild(PI.Index),
                                             ProjInteriorAddr)) {
           return false;
         }
+        continue;
+      }
+      ArraySemanticsCall AS(svi);
+      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+        if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
+          return false;
         continue;
       }
     }
@@ -528,10 +535,10 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.Initialize(StVal->getType());
+  SSAUp.initialize(StVal->getType());
 
   for (auto *Store : Stores)
-    SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
+    SSAUp.addAvailableValue(Store->getParent(), Store->getSrc());
 
   SILLocation Loc = Stores[0]->getLoc();
   for (auto *RelPoint : ReleasePoints) {
@@ -540,7 +547,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // the right thing for local uses. We have already ensured a single store
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
-    SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
+    SILValue RelVal = SSAUp.getValueAtEndOfBlock(RelPoint->getParent());
     if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
       B.createStrongRelease(Loc, RelVal, B.getDefaultAtomicity());
     else
@@ -835,9 +842,7 @@ static bool getDeadInstsAfterInitializerRemoved(
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized &&
-      ArraySemanticsCall(AI).getKind() !=
-          ArrayCallKind::kArrayUninitializedIntrinsic)
+  if (!isAllocatingApply(AI))
     return false;
 
   llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;

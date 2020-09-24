@@ -1,0 +1,146 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// FIXME: Casting.cpp has dozens of places to fail a cast. This test does not
+// attempt to enumerate them all.
+
+import StdlibUnittest
+
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
+
+% types = []
+% objectTypes = []
+% protocolTypes = []
+% ObjCTypes = []
+
+% types.append(['main.Class1', 'main.Class2'])
+% objectTypes.append(['main.Class1', 'main.Class2'])
+class Class1 { }
+class Class2 { }
+
+% types.append(['main.Struct1', 'main.Struct2'])
+struct Struct1 { }
+struct Struct2 { }
+
+% types.append(['main.ObjCClass1', 'main.ObjCClass2'])
+% objectTypes.append(['main.ObjCClass1', 'main.ObjCClass2'])
+% ObjCTypes.extend(['main.ObjCClass1', 'main.ObjCClass2'])
+#if _runtime(_ObjC)
+class ObjCClass1 : NSObject { }
+class ObjCClass2 : NSObject { }
+#endif
+
+% types.append(['DateFormatter', 'NumberFormatter'])
+% objectTypes.append(['DateFormatter', 'NumberFormatter'])
+% ObjCTypes.extend(['DateFormatter', 'NumberFormatter'])
+// non-Swift Objective-C class
+
+% protocolTypes.append('main.Proto1')
+% protocolTypes.append('main.Proto2')
+protocol Proto1 { }
+protocol Proto2 { }
+% protocolTypes.append('URLSessionDelegate')
+% ObjCTypes.append('URLSessionDelegate')
+// non-Swift Objective-C protocol
+
+
+var CastTrapsTestSuite = TestSuite("CastTraps")
+
+// Test `(T1() as Any) as T2` cast failure
+// for all type pairs.
+
+% for (t1, _) in types:
+%   for (_, t2) in types:
+
+%     if t1 not in ObjCTypes and t2 not in ObjCTypes:
+CastTrapsTestSuite.test("${t1}__${t2}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
+  .code
+{
+  let o = ${t1}() as Any
+  expectCrashLater()
+  let r = o as! ${t2}
+  _blackHole(r)
+}
+
+%     end
+%   end
+% end
+
+// Test `(T1() as AnyObject) as T2` cast failure
+// for object type to protocol type pairs
+
+% for (t1, _) in objectTypes:
+%   for (t2) in protocolTypes:
+
+%     if t1 not in ObjCTypes and t2 not in ObjCTypes:
+CastTrapsTestSuite.test("${t1}__${t2}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
+  .code
+{
+  let o = ${t1}() as AnyObject
+  expectCrashLater()
+  let r = o as! ${t2}
+  _blackHole(r)
+}
+
+%     end
+%   end
+% end
+
+protocol P2 {}
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+CastTrapsTestSuite.test("Unexpected null")
+  .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
+  .crashOutputMatches("Foo'")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("P2'")
+  .code
+{
+  class Foo {}
+  let n = UnsafeRawPointer(bitPattern: 0)
+  var o: Foo = unsafeBitCast(n, to: Foo.self)
+  let r = o as Any
+  expectCrashLater()
+  let s = r as? P2
+  _blackHole(s)
+}
+}
+
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+CastTrapsTestSuite.test("Unexpected Obj-C null")
+  .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
+  .crashOutputMatches("NSObject'")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("P2'")
+  .code
+{
+  let n = UnsafeRawPointer(bitPattern: 0)
+  var o: NSObject = unsafeBitCast(n, to: NSObject.self)
+  let r = o as Any
+  expectCrashLater()
+  let s = r as? P2
+  _blackHole(s)
+}
+}
+#endif
+
+runAllTests()

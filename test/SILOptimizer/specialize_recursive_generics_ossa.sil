@@ -1,0 +1,150 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -generic-specializer -cse -sil-generic-specializer-enable-ownership | %FileCheck %s
+
+// Check that SIL cloner can correctly handle specialization of recursive
+// functions with generic arguments.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Check that this recursive function is specialized only for Int32.
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
+// CHECK: function_ref @$s62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
+// CHECK: return
+sil [noinline] [ossa] @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T, let, name "t" // id: %1
+  // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
+  %2 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
+  %3 = alloc_stack $T                             // users: %4, %5, %6
+  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3 : $*T         // id: %6
+  destroy_addr %0 : $*T                           // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}
+
+// Check that this recursive function is specialized twice: for (Int, Double) and for (Double, Int).
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
+// CHECK: function_ref @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
+// CHECK: return
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
+// CHECK: function_ref @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
+// CHECK: return
+
+
+sil [noinline] [ossa] @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <T, U> (@in T, @in U) -> () {
+bb0(%0 : $*T, %1 : $*U):
+  debug_value_addr %0 : $*T, let, name "t" // id: %2
+  debug_value_addr %1 : $*U, let, name "u" // id: %3
+  // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
+  %4 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %9
+  %5 = alloc_stack $U                             // users: %6, %9, %11
+  copy_addr %1 to [initialization] %5 : $*U     // id: %6
+  %7 = alloc_stack $T                             // users: %8, %9, %10
+  copy_addr %0 to [initialization] %7 : $*T     // id: %8
+  %9 = apply %4<U, T>(%5, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %7 : $*T         // id: %10
+  dealloc_stack %5 : $*U         // id: %11
+  destroy_addr %1 : $*U                           // id: %12
+  destroy_addr %0 : $*T                           // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()                                // id: %15
+}
+
+sil [ossa] @$s29specialize_recursive_generics05test_b1_C0yyF : $@convention(thin) () -> () {
+bb0:
+  // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
+  %0 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
+  %1 = integer_literal $Builtin.Int32, 3          // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
+  %3 = alloc_stack $Int32                         // users: %4, %5, %6
+  store %2 to [trivial] %3 : $*Int32                      // id: %4
+  %5 = apply %0<Int32>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %3 : $*Int32     // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+sil [ossa] @$s29specialize_recursive_generics05test_b1_C29_with_different_substitutionsyyF : $@convention(thin) () -> () {
+bb0:
+  // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
+  %0 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %10
+  %1 = float_literal $Builtin.FPIEEE80, 0x3FFF999999999999999A // 1.20000000000000000004 // user: %2
+  %2 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%1 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %3
+  %3 = struct $Double (%2 : $Builtin.FPIEEE64)    // user: %5
+  %4 = alloc_stack $Double                        // users: %5, %10, %12
+  store %3 to [trivial] %4 : $*Double                     // id: %5
+  %6 = integer_literal $Builtin.Int32, 1          // user: %7
+  %7 = struct $Int32 (%6 : $Builtin.Int32)        // user: %9
+  %8 = alloc_stack $Int32                         // users: %9, %10, %11
+  store %7 to [trivial] %8 : $*Int32                      // id: %9
+  %10 = apply %0<Double, Int32>(%4, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %8 : $*Int32     // id: %11
+  dealloc_stack %4 : $*Double    // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
+}
+
+
+public class C : P {}
+
+public protocol P {}
+
+sil hidden [ossa] [noinline] @helper : $@convention(thin) <T> (@in T, @in P) -> @owned Optional<C> {
+bb0(%0 : $*T, %1 : $*P):
+  %4 = alloc_stack $P
+  copy_addr %1 to [initialization] %4 : $*P
+  %6 = alloc_stack $C
+  checked_cast_addr_br take_always P in %4 : $*P to C in %6 : $*C, bb1, bb2
+bb1:
+  %8 = load [take] %6 : $*C
+  %9 = enum $Optional<C>, #Optional.some!enumelt, %8 : $C
+  dealloc_stack %6 : $*C
+  br bb3(%9 : $Optional<C>)
+
+bb2:
+  %12 = enum $Optional<C>, #Optional.none!enumelt
+  dealloc_stack %6 : $*C
+  br bb3(%12 : $Optional<C>)
+
+bb3(%15 : @owned $Optional<C>):
+  dealloc_stack %4 : $*P
+  destroy_addr %1 : $*P
+  destroy_addr %0 : $*T
+  return %15 : $Optional<C>
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s6lookup4main1CC_Tg5
+sil [ossa] @lookup : $@convention(method) <Self where Self : P> (@owned C, @in_guaranteed Self) -> @owned Optional<C> {
+bb0(%0 : @owned $C, %1 : $*Self):
+  // CHECK: [[HELPER:%.*]] = function_ref @$s6helpers5Int32V_Tg5
+  %4 = function_ref @helper : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
+  %5 = integer_literal $Builtin.Int32, 1
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = alloc_stack $Int32
+  store %6 to [trivial] %7 : $*Int32
+  %9 = alloc_stack $P
+  %10 = init_existential_addr %9 : $*P, $Self
+  copy_addr %1 to [initialization] %10 : $*Self
+  // CHECK: apply [[HELPER]]
+  // CHECK-NOT: apply [[HELPER]]
+  %12 = apply %4<Int32>(%7, %9) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
+  destroy_value %12 : $Optional<C>
+  dealloc_stack %9 : $*P
+  dealloc_stack %7 : $*Int32
+  // CHECK: [[LOOKUP:%.*]] = function_ref @$s6lookup4main1CC_Tg5
+  %16 = function_ref @lookup : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
+  %17 = alloc_stack $C
+  %0c = copy_value %0 : $C
+  store %0c to [init] %17 : $*C
+  // CHECK: apply [[LOOKUP]]
+  %20 = apply %16<C>(%0, %17) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
+  destroy_addr %17 : $*C
+  dealloc_stack %17 : $*C
+  return %20 : $Optional<C>
+}

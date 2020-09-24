@@ -18,11 +18,15 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/TypeLoc.h"
+#include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -629,7 +633,7 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
   };
-    
+
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -662,6 +666,10 @@ namespace swift {
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
     llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
+
+    /// Diagnostic producer to handle the logic behind retrieving a localized
+    /// diagnostic message.
+    std::unique_ptr<diag::LocalizationProducer> localization;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
@@ -732,6 +740,31 @@ namespace swift {
     }
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
+    }
+
+    void setLocalization(std::string locale, std::string path) {
+      assert(!locale.empty());
+      assert(!path.empty());
+      llvm::SmallString<128> filePath(path);
+      llvm::sys::path::append(filePath, locale);
+      llvm::sys::path::replace_extension(filePath, ".db");
+
+      // If the serialized diagnostics file not available,
+      // fallback to the `YAML` file.
+      if (llvm::sys::fs::exists(filePath)) {
+        if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
+          localization = std::make_unique<diag::SerializedLocalizationProducer>(
+              std::move(file.get()));
+        }
+      } else {
+        llvm::sys::path::replace_extension(filePath, ".yaml");
+        // In case of missing localization files, we should fallback to messages
+        // from `.def` files.
+        if (llvm::sys::fs::exists(filePath)) {
+          localization =
+              std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+        }
+      }
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -955,8 +988,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id,
-                                           bool printDiagnosticName);
+    llvm::StringRef diagnosticStringFor(const DiagID id,
+                                        bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -1023,6 +1056,21 @@ namespace swift {
         Engine.TransactionStrings.clear();
         Engine.TransactionAllocator.Reset();
       }
+    }
+
+    bool hasErrors() const {
+      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
+                                           PrevDiagnostics,
+                                       Engine.TentativeDiagnostics.end());
+
+      for (auto &diagnostic : diagnostics) {
+        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
+        if (behavior == DiagnosticState::Behavior::Fatal ||
+            behavior == DiagnosticState::Behavior::Error)
+          return true;
+      }
+
+      return false;
     }
 
     /// Abort and close this transaction and erase all diagnostics

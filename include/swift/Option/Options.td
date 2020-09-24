@@ -51,6 +51,10 @@ def ArgumentIsPath : OptionFlag;
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
 
+// The option causes the output of a supplementary output, or is the path option
+// for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
+def SupplementaryOutput : OptionFlag;
+
 /////////
 // Options
 
@@ -135,14 +139,6 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_fine_grained_dependencies :
-Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Be more selective about incremental recompilation">;
-
-def disable_fine_grained_dependencies :
-Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Don't be more selective about incremental recompilation">;
-
 def enable_type_fingerprints :
 Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Enable per-nominal and extension body fingerprints">;
@@ -158,7 +154,7 @@ Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalB
 def disable_only_one_dependency_file :
 Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Disables incremental build optimization that only produces one dependencies file">;
- 
+
 
 def enable_source_range_dependencies :
 Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
@@ -171,7 +167,7 @@ HelpText<"Print a simple message comparing dependencies with source ranges (w/ f
 
 def driver_compare_incremental_schemes_path :
 Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
-HelpText<"Path to use for machine-readable comparision">,
+HelpText<"Path to use for machine-readable comparison">,
 MetaVarName<"<path>">;
 
 def driver_compare_incremental_schemes_path_EQ :
@@ -201,7 +197,7 @@ HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
 Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
@@ -217,7 +213,7 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
 
 def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Show commands to run and use verbose output">;
-def version : Flag<["-", "--"], "version">,
+def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
 
 def parseable_output : Flag<["-"], "parseable-output">,
@@ -322,21 +318,24 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit a JSON file containing information about what modules were loaded">;
 def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   HelpText<"Emit the loaded module trace JSON to <path>">,
   MetaVarName<"<path>">;
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   Alias<emit_loaded_module_trace_path>;
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -344,27 +343,32 @@ def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
-  Flags<[FrontendOption, NoInteractiveOption]>;
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
 def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   HelpText<"Emit the TBD file to <path>">,
   MetaVarName<"<path>">;
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   Alias<emit_tbd_path>;
 def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
   Flags<[FrontendOption]>,
   HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
-  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput]>,
   HelpText<"Emit a serialized diagnostics file to <path>">,
   MetaVarName<"<path>">;
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
-  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput]>,
   Alias<serialize_diagnostics_path>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -378,6 +382,21 @@ def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
 def print_educational_notes : Flag<["-"], "print-educational-notes">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Include educational notes in printed diagnostic output, if available">;
+def diagnostic_style : Separate<["-"], "diagnostic-style">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">,
+  HelpText<"The formatting style used when printing diagnostics ('swift' or 'llvm')">;
+def diagnostic_style_EQ : Joined<["-"], "diagnostic-style=">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">, Alias<diagnostic_style>;
+def locale : Separate<["-"], "locale">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Choose a language for diagnostic messages">,
+  MetaVarName<"<locale-code>">;
+def localization_path : Separate<["-"], "localization-path">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to localized diagnostic messages directory">,
+  MetaVarName<"<path>">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -411,33 +430,55 @@ def autolink_force_load : Flag<["-"], "autolink-force-load">,
   HelpText<"Force ld to link against this module even if no symbols are used">;
 
 def emit_module : Flag<["-"], "emit-module">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   Alias<emit_module_path>;
+
+def emit_module_summary :
+  Flag<["-"], "emit-module-summary">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
+  HelpText<"Output module summary file">;
+def emit_module_summary_path :
+  Separate<["-"], "emit-module-summary-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput]>,
+  MetaVarName<"<path>">, HelpText<"Output module summary file to <path>">;
 
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
   HelpText<"Output module interface file">;
 def emit_module_interface_path :
   Separate<["-"], "emit-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
 def emit_private_module_interface_path :
   Separate<["-"], "emit-private-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
-         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+
+def verify_emitted_module_interface :
+  Flag<["-"], "verify-emitted-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Check that module interfaces emitted during compilation typecheck">;
+def no_verify_emitted_module_interface :
+  Flag<["-"], "no-verify-emitted-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't check that module interfaces emitted during compilation typecheck">;
 
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
@@ -447,25 +488,27 @@ def avoid_emit_module_source_info :
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
 
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
-  Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>;
+  Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>;
 def emit_parseable_module_interface_path :
   Separate<["-"], "emit-parseable-module-interface-path">,
   Alias<emit_module_interface_path>,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         HelpHidden, ArgumentIsPath]>;
+         HelpHidden, ArgumentIsPath, SupplementaryOutput]>;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
 def static : Flag<["-"], "static">,
@@ -500,6 +543,10 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+def lto : Joined<["-"], "lto=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
+
 // Experimental feature options
 
 // Note: this flag will be removed when JVP/differential generation in the
@@ -516,8 +563,27 @@ def enable_experimental_additive_arithmetic_derivation :
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
+
+def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
+    "disable-fuzzy-forward-scan-trailing-closure-matching">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable fuzzy forward-scan trailing closure matching">;
+
+def enable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
+    "enable-fuzzy-forward-scan-trailing-closure-matching">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable fuzzy forward-scan trailing closure matching">;
+
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
+
+def experimental_cxx_stdlib :
+  Separate<["-"], "experimental-cxx-stdlib">,
+  HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
+
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -527,6 +593,10 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
+
+def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Don't treat warnings as errors">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -694,6 +764,9 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
     HelpText<"Remap source paths in debug info">;
+def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in coverage info">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
@@ -1027,13 +1100,13 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
-def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable ASTScope-based unqualified name lookup">;
+def scan_dependencies : Flag<["-"], "scan-dependencies">,
+  HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable ASTScope-based unqualified name lookup">;
+def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
+  HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,

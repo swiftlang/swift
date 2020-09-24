@@ -1,0 +1,402 @@
+import FooHelper
+
+func fooSubFunc1(_ a: Int32) -> Int32
+struct FooSubEnum1 : Equatable, RawRepresentable {
+
+    init(_ rawValue: UInt32)
+
+    init(rawValue rawValue: UInt32)
+
+    var rawValue: UInt32
+
+    static func != (_ lhs: FooSubEnum1, _ rhs: FooSubEnum1) -> Bool
+}
+var FooSubEnum1X: FooSubEnum1 { get }
+var FooSubEnum1Y: FooSubEnum1 { get }
+var FooSubUnnamedEnumeratorA1: Int { get }
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 0,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 18,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 23,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 35,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 37,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int32",
+    key.usr: "s:s5Int32V",
+    key.offset: 40,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int32",
+    key.usr: "s:s5Int32V",
+    key.offset: 50,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 56,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 63,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Equatable",
+    key.usr: "s:SQ",
+    key.offset: 77,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "RawRepresentable",
+    key.usr: "s:SY",
+    key.offset: 88,
+    key.length: 16
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 112,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 117,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 119,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt32",
+    key.usr: "s:s6UInt32V",
+    key.offset: 129,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 142,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 147,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 156,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt32",
+    key.usr: "s:s6UInt32V",
+    key.offset: 166,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 179,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 183,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt32",
+    key.usr: "s:s6UInt32V",
+    key.offset: 193,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 205,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 212,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 221,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 223,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 228,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 241,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 243,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 248,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 264,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 271,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 275,
+    key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 289,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 303,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 309,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 313,
+    key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 327,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 341,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 347,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 351,
+    key.length: 25
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 378,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 384,
+    key.length: 3
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "fooSubFunc1(_:)",
+    key.usr: "c:@F@fooSubFunc1",
+    key.offset: 18,
+    key.length: 37,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.var.local,
+        key.keyword: "_",
+        key.name: "a",
+        key.offset: 40,
+        key.length: 5
+      }
+    ],
+    key.modulename: "Foo.FooSub"
+  },
+  {
+    key.kind: source.lang.swift.decl.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 56,
+    key.length: 214,
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:SQ"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "RawRepresentable",
+        key.usr: "s:SY"
+      }
+    ],
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.constructor,
+        key.name: "init(_:)",
+        key.usr: "s:So11FooSubEnum1VyABs6UInt32Vcfc",
+        key.offset: 112,
+        key.length: 24,
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "rawValue",
+            key.offset: 129,
+            key.length: 6
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.constructor,
+        key.name: "init(rawValue:)",
+        key.usr: "s:So11FooSubEnum1V8rawValueABs6UInt32V_tcfc",
+        key.offset: 142,
+        key.length: 31,
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "rawValue",
+            key.name: "rawValue",
+            key.offset: 166,
+            key.length: 6
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.name: "rawValue",
+        key.usr: "s:So11FooSubEnum1V8rawValues6UInt32Vvp",
+        key.offset: 179,
+        key.length: 20,
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.operator.infix,
+        key.name: "!=(_:_:)",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooSubEnum1",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.offset: 205,
+        key.length: 63,
+        key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "lhs",
+            key.offset: 228,
+            key.length: 11
+          },
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "rhs",
+            key.offset: 248,
+            key.length: 11
+          }
+        ]
+      }
+    ],
+    key.modulename: "Foo.FooSub"
+  },
+  {
+    key.kind: source.lang.swift.decl.var.global,
+    key.name: "FooSubEnum1X",
+    key.usr: "c:@E@FooSubEnum1@FooSubEnum1X",
+    key.offset: 271,
+    key.length: 37,
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
+  },
+  {
+    key.kind: source.lang.swift.decl.var.global,
+    key.name: "FooSubEnum1Y",
+    key.usr: "c:@E@FooSubEnum1@FooSubEnum1Y",
+    key.offset: 309,
+    key.length: 37,
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
+  },
+  {
+    key.kind: source.lang.swift.decl.var.global,
+    key.name: "FooSubUnnamedEnumeratorA1",
+    key.usr: "c:@Ea@FooSubUnnamedEnumeratorA1@FooSubUnnamedEnumeratorA1",
+    key.offset: 347,
+    key.length: 42,
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
+  }
+]

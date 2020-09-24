@@ -516,19 +516,19 @@ class d0170_TestAvailability {
   @available(OSX, unavailable)
   func f3() {}
 // PASS_COMMON-NEXT: {{^}}  @available(iOS, unavailable){{$}}
-// PASS_COMMON-NEXT: {{^}}  @available(OSX, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(macOS, unavailable){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f3(){{$}}
 
   @available(iOS 8.0, OSX 10.10, *)
   func f4() {}
-// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, macOS 10.10, *){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f4(){{$}}
 
 // Convert long-form @available() to short form when possible.
   @available(iOS, introduced: 8.0)
   @available(OSX, introduced: 10.10)
   func f5() {}
-// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, macOS 10.10, *){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f5(){{$}}
 }
 

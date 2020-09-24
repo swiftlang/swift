@@ -72,7 +72,7 @@ struct AutoclosureEscapeTest {
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
 
-func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{use of undeclared type 'escaping'}}
+func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{cannot find type 'escaping' in scope}}
 // expected-error @-1 {{attribute can only be applied to types, not declarations}}
 // expected-error @-2 {{expected ',' separator}}
 // expected-error @-3 {{expected parameter name followed by ':'}}
@@ -115,7 +115,7 @@ let _ : AutoclosureFailableOf<Int> = .Success(42)
 let _ : (@autoclosure () -> ()) -> ()
 
 // escaping is the name of param type
-let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
+let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{cannot find type 'escaping' in scope}}
 
 // Migration
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
@@ -295,3 +295,36 @@ struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure
 
 // SR-9178
 func bar<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}
+
+func test_autoclosure_type_in_parens() {
+  let _: (@autoclosure (() -> Void)) -> Void = { _ in } // Ok
+
+  struct Test {
+    func bugSingle<T: RawRepresentable>(defaultValue: @autoclosure (() -> T)) -> T { // Ok
+      defaultValue()
+    }
+
+    func bugMultiple<T: RawRepresentable>(defaultValue: @autoclosure ((() -> T))) -> T { // Ok
+      defaultValue()
+    }
+  }
+
+  enum E : String {
+    case foo = "foo"
+    case bar = "bar"
+  }
+
+  _ = Test().bugSingle(defaultValue: E.foo)   // Ok
+  _ = Test().bugMultiple(defaultValue: E.bar) // Ok
+}
+
+func test_autoclosure_with_typealias() {
+  typealias ConcreteFunc = () -> Int
+  typealias GenericFunc<T> = () -> T
+
+  func test(cr: @autoclosure ConcreteFunc) -> Int { cr() } // Ok
+  func test<Q>(gn: @autoclosure GenericFunc<Q>) -> Q { gn() } // Ok
+
+  _ = test(cr: 0) // Ok
+  _ = test(gn: 1) // Ok
+}

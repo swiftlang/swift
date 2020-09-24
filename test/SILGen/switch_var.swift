@@ -537,14 +537,13 @@ func test_multiple_patterns1() {
   case (0, let x), (let x, 0):
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
-    // CHECK:     debug_value [[FIRST_X:%.*]] :
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X:%.*]] : $Int)
     // CHECK:   [[FIRST_FAIL]]:
     // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
     // CHECK:   [[SECOND_MATCH_CASE]]:
-    // CHECK:     debug_value [[SECOND_X:%.*]] :
-    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X:%.*]] : $Int)
     // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:     debug_value [[BODY_VAR]] : $Int, let, name "x"
     // CHECK:     [[A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)

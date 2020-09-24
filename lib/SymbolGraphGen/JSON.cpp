@@ -66,10 +66,15 @@ void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
         OS.attribute("extendedModule", ExtendedModule->getNameStr());
       }
     }
-    auto Generics = Extension->getGenericSignature();
-    if (Generics && !Generics->getRequirements().empty()) {
+
+    SmallVector<Requirement, 4> FilteredRequirements;
+
+    filterGenericRequirements(Extension,
+                              FilteredRequirements);
+
+    if (!FilteredRequirements.empty()) {
       OS.attributeArray("constraints", [&](){
-        for (const auto &Requirement : Generics->getRequirements()) {
+        for (const auto &Requirement : FilteredRequirements) {
           serialize(Requirement, OS);
         }
       }); // end constraints:
@@ -81,16 +86,16 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
                                       llvm::json::OStream &OS) {
   StringRef Kind;
   switch (Req.getKind()) {
-    case swift::RequirementKind::Conformance:
+    case RequirementKind::Conformance:
       Kind = "conformance";
       break;
-    case swift::RequirementKind::Superclass:
+    case RequirementKind::Superclass:
       Kind = "superclass";
       break;
-    case swift::RequirementKind::SameType:
+    case RequirementKind::SameType:
       Kind = "sameType";
       break;
-    case swift::RequirementKind::Layout:
+    case RequirementKind::Layout:
       return;
   }
 
@@ -99,5 +104,54 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
     OS.attribute("lhs", Req.getFirstType()->getString());
     OS.attribute("rhs", Req.getSecondType()->getString());
   });
+}
 
+void swift::symbolgraphgen::serialize(const swift::GenericTypeParamType *Param,
+                                      llvm::json::OStream &OS) {
+  OS.object([&](){
+    OS.attribute("name", Param->getName().str());
+    OS.attribute("index", Param->getIndex());
+    OS.attribute("depth", Param->getDepth());
+  });
+}
+
+void swift::symbolgraphgen::filterGenericRequirements(
+    ArrayRef<Requirement> Requirements,
+    const NominalTypeDecl *Self,
+    SmallVectorImpl<Requirement> &FilteredRequirements) {
+  for (const auto &Req : Requirements) {
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
+    // extension /* protocol */ Q {
+    // func foo() {}
+    // }
+    // ignore Self : Q, obvious
+    if (Req.getSecondType()->getAnyNominal() == Self) {
+      continue;
+    }
+    FilteredRequirements.push_back(Req);
+  }
+}
+
+void
+swift::symbolgraphgen::filterGenericRequirements(const ExtensionDecl *Extension,
+    SmallVectorImpl<Requirement> &FilteredRequirements) {
+  for (const auto &Req : Extension->getGenericRequirements()) {
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
+
+    if (!isa<ProtocolDecl>(Extension->getExtendedNominal()) &&
+        Req.getFirstType()->isEqual(Extension->getExtendedType())) {
+      continue;
+    }
+
+    // extension /* protocol */ Q
+    // ignore Self : Q, obvious
+    if (Req.getSecondType()->isEqual(Extension->getExtendedType())) {
+      continue;
+    }
+    FilteredRequirements.push_back(Req);
+  }
 }

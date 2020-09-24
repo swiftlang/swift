@@ -403,6 +403,7 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   UsePoints.clear();
   UsePointTable.clear();
   NodeAllocator.DestroyAll();
+  valid = true;
   assert(ToMerge.empty());
 }
 
@@ -416,6 +417,9 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 // it's interior property.
 EscapeAnalysis::CGNode *
 EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
+  if (!isValid())
+    return nullptr;
+
   // Early filter obvious non-pointer opcodes.
   if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
       isa<PreviousDynamicFunctionRefInst>(V))
@@ -1018,8 +1022,8 @@ EscapeAnalysis::ConnectionGraph::getValueContent(SILValue ptrVal) {
 
 CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
   if (!ReturnNode) {
-    SILType resultTy =
-        F->mapTypeIntoContext(F->getConventions().getSILResultType());
+    SILType resultTy = F->mapTypeIntoContext(
+        F->getConventions().getSILResultType(F->getTypeExpansionContext()));
     bool hasReferenceOnly = EA->hasReferenceOnly(resultTy, *F);
     ReturnNode = allocNode(nullptr, NodeType::Return, false, hasReferenceOnly);
   }
@@ -1028,6 +1032,9 @@ CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
+  assert(isValid());
+  assert(SourceGraph->isValid());
+
   // The main point of the merging algorithm is to map each content node in the
   // source graph to a content node in this (destination) graph. This may
   // require creating new nodes or merging existing nodes in this graph.
@@ -1492,6 +1499,11 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
 #ifndef NDEBUG
   OS << "CG of " << F->getName() << '\n';
 
+  if (!isValid()) {
+    OS << "  invalid\n";
+    return;
+  }
+
   // Assign the same IDs to SILValues as the SILPrinter does.
   llvm::DenseMap<const SILNode *, unsigned> InstToIDMap;
   InstToIDMap[nullptr] = (unsigned)-1;
@@ -1595,6 +1607,7 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   // Invalidating EscapeAnalysis clears the connection graph.
   if (isEmpty())
     return;
+  assert(isValid());
 
   verifyStructure();
 
@@ -1608,8 +1621,15 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
         continue;
 
       if (auto ai = dyn_cast<ApplyInst>(&i)) {
-        if (EA->canOptimizeArrayUninitializedCall(ai, this).isValid())
+        if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
           continue;
+        // Ignore checking CGNode mapping for result of apply to a no return
+        // function that will have a null ReturnNode
+        if (auto *callee = ai->getReferencedFunctionOrNull()) {
+          if (EA->getFunctionInfo(callee)->isValid())
+            if (!EA->getConnectionGraph(callee)->getReturnNodeOrNull())
+              continue;
+        }
       }
       for (auto result : i.getResults()) {
         if (EA->getPointerBase(result))
@@ -1728,9 +1748,20 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
     // Create edges for the instructions.
     for (auto &i : *bb) {
       analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
+      
+      // Bail if the graph gets too big. The node merging algorithm has
+      // quadratic complexity and we want to avoid this.
+      // TODO: fix the quadratic complexity (if possible) and remove this limit.
+      if (ConGraph->Nodes.size() > 10000) {
+        ConGraph->invalidate();
+        return false;
+      }
     }
     return true;
   });
+
+  if (!ConGraph->isValid())
+    return;
 
   // Second step: create defer-edges for block arguments.
   for (SILBasicBlock &BB : *ConGraph->F) {
@@ -1826,8 +1857,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
 }
 
 EscapeAnalysis::ArrayUninitCall
-EscapeAnalysis::canOptimizeArrayUninitializedCall(
-    ApplyInst *ai, const ConnectionGraph *conGraph) {
+EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   ArrayUninitCall call;
   // This must be an exact match so we don't accidentally optimize
   // "array.uninitialized_intrinsic".
@@ -1873,8 +1903,7 @@ bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
   if (!ai)
     return false;
 
-  auto *conGraph = getConnectionGraph(ai->getFunction());
-  return canOptimizeArrayUninitializedCall(ai, conGraph).isValid();
+  return canOptimizeArrayUninitializedCall(ai).isValid();
 }
 
 // Handle @_semantics("array.uninitialized")
@@ -1924,7 +1953,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
       case ArrayCallKind::kArrayUninitialized: {
         ArrayUninitCall call = canOptimizeArrayUninitializedCall(
-            cast<ApplyInst>(FAS.getInstruction()), ConGraph);
+            cast<ApplyInst>(FAS.getInstruction()));
         if (call.isValid()) {
           createArrayUninitializedSubgraph(call, ConGraph);
           return;
@@ -2056,6 +2085,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     if (getPointerBase(SVI))
       return;
   }
+
+  // Incidental uses produce no values and have no effect on their operands.
+  if (isIncidentalUse(I))
+    return;
 
   // Instructions which return the address of non-writable memory cannot have
   // an effect on escaping.
@@ -2263,6 +2296,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SelectValueInst:
       analyzeSelectInst(cast<SelectValueInst>(I), ConGraph);
       return;
+    case SILInstructionKind::EndCOWMutationInst:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::EnumInst: {
@@ -2465,7 +2499,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         }
       }
     }
-    Iteration++;
+    ++Iteration;
   } while (NeedAnotherIteration);
 
   for (FunctionInfo *FInfo : BottomUpOrder) {
@@ -2480,6 +2514,16 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
                                       ConnectionGraph *CallerGraph,
                                       ConnectionGraph *CalleeGraph) {
+  if (!CallerGraph->isValid())
+    return false;
+    
+  if (!CalleeGraph->isValid()) {
+    setAllEscaping(AS, CallerGraph);
+    // Conservatively assume that setting that setAllEscaping(AS) did change the
+    // graph.
+    return true;
+  }
+                                      
   // This CGNodeMap uses an intrusive worklist to keep track of Mapped nodes
   // from the CalleeGraph. Meanwhile, mergeFrom uses separate intrusive
   // worklists to update nodes in the CallerGraph.
@@ -2538,6 +2582,11 @@ bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
 
 bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                                         ConnectionGraph *Graph) {
+  if (!Graph->isValid()) {
+    bool changed = SummaryGraph->isValid();
+    SummaryGraph->invalidate();
+    return changed;
+  }
 
   // Make a 1-to-1 mapping of all arguments and the return value. This CGNodeMap
   // node map uses an intrusive worklist to keep track of Mapped nodes from the

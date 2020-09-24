@@ -522,13 +522,18 @@ void RCIdentityFunctionInfo::getRCUsers(
 /// We only use the instruction analysis here.
 void RCIdentityFunctionInfo::getRCUses(SILValue InputValue,
                                        llvm::SmallVectorImpl<Operand *> &Uses) {
+  return visitRCUses(InputValue,
+                     [&](Operand *op) { return Uses.push_back(op); });
+}
 
+void RCIdentityFunctionInfo::visitRCUses(
+    SILValue InputValue, function_ref<void(Operand *)> Visitor) {
   // Add V to the worklist.
-  llvm::SmallVector<SILValue, 8> Worklist;
+  SmallVector<SILValue, 8> Worklist;
   Worklist.push_back(InputValue);
 
   // A set used to ensure we only visit uses once.
-  llvm::SmallPtrSet<Operand *, 8> VisitedOps;
+  SmallPtrSet<Operand *, 8> VisitedOps;
 
   // Then until we finish the worklist...
   while (!Worklist.empty()) {
@@ -564,7 +569,7 @@ void RCIdentityFunctionInfo::getRCUses(SILValue InputValue,
       }
 
       // Otherwise, stop searching and report this RC operand.
-      Uses.push_back(Op);
+      Visitor(Op);
     }
   }
 }

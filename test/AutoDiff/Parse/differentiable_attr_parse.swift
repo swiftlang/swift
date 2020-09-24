@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
-// TODO(TF-1021): Remove "deprecated 'jvp:' and 'vjp:' argument" warnings.
-
 /// Good
 
 struct Foo {

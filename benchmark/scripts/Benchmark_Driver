@@ -73,7 +73,25 @@ class BenchmarkDriver(object):
     def test_harness(self):
         """Full path to test harness binary."""
         suffix = self.args.optimization if hasattr(self.args, "optimization") else "O"
-        return os.path.join(self.args.tests, "Benchmark_" + suffix)
+        if hasattr(self.args, "architecture") and self.args.architecture:
+            suffix += "-" + self.args.architecture + "*"
+        pattern = os.path.join(self.args.tests, "Benchmark_" + suffix)
+        executables = []
+        if hasattr(self._subprocess, "test_mode") and self._subprocess.test_mode:
+            executables = [pattern]
+        else:
+            executables = glob.glob(pattern)
+        if len(executables) == 0:
+            raise ValueError(
+                "No benchmark executable for file name pattern " +
+                pattern + " found")
+        if len(executables) > 1:
+            raise ValueError(
+                "Multiple benchmark executables for file name pattern " +
+                pattern + " found\n" +
+                str(executables) +
+                "\nSpecify the architecture to select the right benchmark executable")
+        return executables[0]
 
     def _git(self, cmd):
         """Execute the Git command in the `swift-repo`."""
@@ -901,6 +919,12 @@ def parse_args(args):
         help="optimization level to use: {O,Onone,Osize}, (default: O)",
         default="O",
     )
+    shared_benchmarks_parser.add_argument(
+        "--architecture",
+        metavar="architecture",
+        help="current architecture (e.g., x86_64, arm64, etc)",
+        default=None,
+    )
 
     run_parser = subparsers.add_parser(
         "run",
@@ -951,9 +975,9 @@ def parse_args(args):
     )
     compare_parser.add_argument(
         "--baseline-branch",
-        default="master",
+        default="main",
         help="attempt to compare results to baseline results for specified "
-        "branch (default: master)",
+        "branch (default: main)",
     )
     compare_parser.set_defaults(func=compare)
 

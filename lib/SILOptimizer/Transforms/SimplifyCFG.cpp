@@ -1053,7 +1053,7 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   while (&*Iter != Terminator) {
     if (!(&*Iter)->isDebugInstruction())
       return false;
-    Iter++;
+    ++Iter;
   }
   return true;
 }
@@ -1153,6 +1153,22 @@ static bool isReachable(SILBasicBlock *Block) {
 static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
     "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
 
+/// Returns true if \p block has less instructions than \p other.
+static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
+  auto blockIter = block->begin();
+  auto blockEnd = block->end();
+  auto otherIter = other->begin();
+  auto otherEnd = other->end();
+  while (true) {
+    if (otherIter == otherEnd)
+      return false;
+    if (blockIter == blockEnd)
+      return true;
+    ++blockIter;
+    ++otherIter;
+  }
+}
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
@@ -1201,29 +1217,48 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       }
     }
 
-    // Zap BI and move all of the instructions from DestBB into this one.
     BI->eraseFromParent();
-    BB->spliceAtEnd(DestBB);
 
-    // Revisit this block now that we've changed it and remove the DestBB.
-    addToWorklist(BB);
+    // Move instruction from the smaller block to the larger block.
+    // The order is essential because if many blocks are merged and this is done
+    // in the wrong order, we end up with quadratic complexity.
+    //
+    SILBasicBlock *remainingBlock = nullptr, *deletedBlock = nullptr;
+    if (BB != Fn.getEntryBlock() && hasLessInstructions(BB, DestBB)) {
+      while (!BB->pred_empty()) {
+        SILBasicBlock *pred = *BB->pred_begin();
+        replaceBranchTarget(pred->getTerminator(), BB, DestBB, true);
+      }
+      DestBB->spliceAtBegin(BB);
+      DestBB->dropAllArguments();
+      DestBB->moveArgumentList(BB);
+      remainingBlock = DestBB;
+      deletedBlock = BB;
+    } else {
+      BB->spliceAtEnd(DestBB);
+      remainingBlock = BB;
+      deletedBlock = DestBB;
+    }
+
+    // Revisit this block now that we've changed it.
+    addToWorklist(remainingBlock);
 
     // This can also expose opportunities in the successors of
     // the merged block.
-    for (auto &Succ : BB->getSuccessors())
+    for (auto &Succ : remainingBlock->getSuccessors())
       addToWorklist(Succ);
 
-    if (LoopHeaders.count(DestBB))
-      LoopHeaders.insert(BB);
+    if (LoopHeaders.count(deletedBlock))
+      LoopHeaders.insert(remainingBlock);
 
-    auto Iter = JumpThreadingCost.find(DestBB);
+    auto Iter = JumpThreadingCost.find(deletedBlock);
     if (Iter != JumpThreadingCost.end()) {
       int costs = Iter->second;
-      JumpThreadingCost[BB] += costs;
+      JumpThreadingCost[remainingBlock] += costs;
     }
 
-    removeFromWorklist(DestBB);
-    DestBB->eraseFromParent();
+    removeFromWorklist(deletedBlock);
+    deletedBlock->eraseFromParent();
     ++NumBlocksMerged;
     return true;
   }
@@ -2357,7 +2392,8 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
     SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
-    auto ResultTy = calleeConv.getSILResultType();
+    auto ResultTy = calleeConv.getSILResultType(
+        TAI->getFunction()->getTypeExpansionContext());
     auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
 
     SILBuilderWithScope Builder(TAI);
@@ -2377,15 +2413,15 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
                                             Builder.getTypeExpansionContext());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
-
+    auto context = TAI->getFunction()->getTypeExpansionContext();
     SmallVector<SILValue, 8> Args;
     unsigned numArgs = TAI->getNumArguments();
     for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
-      Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         origConv.getSILArgumentType(i),
-                                         targetConv.getSILArgumentType(i));
+      std::tie(Arg, std::ignore) = castValueToABICompatibleType(
+          &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
+          targetConv.getSILArgumentType(i, context));
       Args.push_back(Arg);
     }
 
@@ -2400,8 +2436,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
-    auto CastedResult = castValueToABICompatibleType(&Builder, Loc, NewAI,
-                                                     ResultTy, OrigResultTy);
+    SILValue CastedResult;
+    std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
+        &Builder, Loc, NewAI, ResultTy, OrigResultTy);
 
     Builder.createBranch(Loc, NormalBB, { CastedResult });
     TAI->eraseFromParent();
@@ -2544,7 +2581,10 @@ bool SimplifyCFG::simplifyBlocks() {
 
     switch (TI->getTermKind()) {
     case TermKind::BranchInst:
-      Changed |= simplifyBranchBlock(cast<BranchInst>(TI));
+      if (simplifyBranchBlock(cast<BranchInst>(TI))) {
+        Changed = true;
+        continue;
+      }
       break;
     case TermKind::CondBranchInst:
       Changed |= simplifyCondBrBlock(cast<CondBranchInst>(TI));
@@ -2624,7 +2664,7 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     
     // Construct a new instruction by copying all the case entries.
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
-    for (int idx = 0, numIdcs = SWI->getNumCases(); idx < numIdcs; idx++) {
+    for (int idx = 0, numIdcs = SWI->getNumCases(); idx < numIdcs; ++idx) {
       CaseBBs.push_back(SWI->getCase(idx));
     }
     // Add the default-entry of the original instruction as case-entry.
@@ -3306,7 +3346,7 @@ static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
     unsigned ElemCount = 0;
     for (auto E : Enum->getAllElements()) {
       if (E)
-        ElemCount++;
+        ++ElemCount;
     }
 
     // Check if all possible cases are covered.

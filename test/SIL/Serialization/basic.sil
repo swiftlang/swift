@@ -15,6 +15,13 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return undef : $()
 }
 
+// CHECK-LABEL: sil @async_test : $@convention(thin) @async
+sil @async_test : $@async () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 // CHECK-LABEL: sil [serialized] [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
 sil [serialized] [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {

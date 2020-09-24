@@ -7,7 +7,7 @@ if platform.system() == 'Windows':
     import ctypes
     AdvAPI32 = ctypes.windll.Advapi32
 
-    from ctypes.wintypes import POINTER
+    from ctypes import POINTER
 
     UNLEN = 256
 

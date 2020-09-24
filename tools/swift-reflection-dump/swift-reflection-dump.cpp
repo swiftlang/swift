@@ -458,7 +458,7 @@ public:
 #else
     auto applePlatform = false;
 #endif
-#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
@@ -583,25 +583,28 @@ public:
 using ReflectionContextOwner
   = std::unique_ptr<void, void (*)(void*)>;
 
-template<typename Runtime>
-static std::pair<ReflectionContextOwner, TypeRefBuilder &>
-makeReflectionContextForMetadataReader(
-                                   std::shared_ptr<ObjectMemoryReader> reader) {
+struct ReflectionContextHolder {
+  ReflectionContextOwner Owner;
+  TypeRefBuilder &Builder;
+  ObjectMemoryReader &Reader;
+};
+
+template <typename Runtime>
+static ReflectionContextHolder makeReflectionContextForMetadataReader(
+    std::shared_ptr<ObjectMemoryReader> reader) {
   using ReflectionContext = ReflectionContext<Runtime>;
   auto context = new ReflectionContext(reader);
   auto &builder = context->getBuilder();
   for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
     context->addImage(reader->getImageStartAddress(i));
   }
-  return {ReflectionContextOwner(context,
-                                 [](void *x){ delete (ReflectionContext*)x; }),
-          builder};
+  return {ReflectionContextOwner(
+              context, [](void *x) { delete (ReflectionContext *)x; }),
+          builder, *reader};
 }
-                                          
 
-static std::pair<ReflectionContextOwner, TypeRefBuilder &>
-makeReflectionContextForObjectFiles(
-                          const std::vector<const ObjectFile *> &objectFiles) {
+static ReflectionContextHolder makeReflectionContextForObjectFiles(
+    const std::vector<const ObjectFile *> &objectFiles) {
   auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
 
   uint8_t pointerSize;
@@ -651,7 +654,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   }
   
   auto context = makeReflectionContextForObjectFiles(ObjectFiles);
-  auto &builder = context.second;
+  auto &builder = context.Builder;
 
   switch (Action) {
   case ActionType::DumpReflectionSections:
@@ -668,15 +671,18 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
 
       Demangle::Demangler Dem;
       auto Demangled = Dem.demangleType(Line);
-      auto *TypeRef =
-          swift::Demangle::decodeMangledType(builder, Demangled);
-      if (TypeRef == nullptr) {
-        fprintf(file, "Invalid typeref:%s\n", Line.c_str());
+      auto Result = swift::Demangle::decodeMangledType(builder, Demangled);
+      if (Result.isError()) {
+        auto *error = Result.getError();
+        char *str = error->copyErrorString();
+        fprintf(file, "Invalid typeref:%s - %s\n", Line.c_str(), str);
+        error->freeErrorString(str);
         continue;
       }
+      auto TypeRef = Result.getType();
 
       TypeRef->dump(file);
-      auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);
+      auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef, nullptr);
       if (TypeInfo == nullptr) {
         fprintf(file, "Invalid lowering\n");
         continue;

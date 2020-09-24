@@ -31,6 +31,8 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
   override init()
 }
 
+sil @getThrowingValue : $@convention(thin) () -> (Int, @error Error)
+
 // CHECK-LABEL: @self_init_assert_instruction
 // CHECK:  apply
 // CHECK-NEXT: store
@@ -291,4 +293,82 @@ bb0(%1 : $@thick MyClass4.Type):
   destroy_addr %3 : $*MyClass4
   dealloc_stack %2 : $*MyClass4
   return %7 : $MyClass4
+}
+
+// A failable initializer: Int.init?(i:) that doesn't initialize along all paths.
+sil hidden [ossa] @intInitExtension : $@convention(method) (Int, Bool) -> Optional<Int> {
+bb0(%0 : $Int, %1 : $Bool):
+  %2 = alloc_stack $Int, var, name "self"
+  %3 = mark_uninitialized [delegatingself] %2 : $*Int
+  %5 = metatype $@thin Int.Type
+  %6 = struct_extract %1 : $Bool, #Bool._value
+  cond_br %6, bb1, bb2
+
+bb1:
+  %14 = begin_access [modify] [static] %3 : $*Int
+  assign %0 to %14 : $*Int
+  end_access %14 : $*Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %19 = load [trivial] %3 : $*Int // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  %20 = enum $Optional<Int>, #Optional.some!enumelt, %19 : $Int
+  dealloc_stack %2 : $*Int
+  br bb5(%20 : $Optional<Int>)
+
+bb4:
+  dealloc_stack %2 : $*Int
+  %24 = enum $Optional<Int>, #Optional.none!enumelt
+  br bb5(%24 : $Optional<Int>)
+
+bb5(%26 : $Optional<Int>):
+  return %26 : $Optional<Int>
+}
+
+sil @selfinit_derivedclass_peerconvenience_init : $@convention (thin) (@owned DerivedClassWithNontrivialStoredProperties) -> @owned DerivedClassWithNontrivialStoredProperties
+
+// Make sure that we do not error when we store back in the fail block here.
+sil hidden [ossa] @convenience_init_with_throwing_argument : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> @owned Optional<DerivedClassWithNontrivialStoredProperties> {
+bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties, let, name "self"
+  %2 = mark_uninitialized [delegatingselfallocated] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
+  %6 = load [take] %2 : $*DerivedClassWithNontrivialStoredProperties
+  %7 = function_ref @getThrowingValue : $@convention(thin) () -> (Int, @error Error)
+  try_apply %7() : $@convention(thin) () -> (Int, @error Error), normal bb1, error bb5
+
+bb1(%9 : $Int):
+  %10 = function_ref @selfinit_derivedclass_peerconvenience_init : $@convention (thin) (@owned DerivedClassWithNontrivialStoredProperties) -> @owned DerivedClassWithNontrivialStoredProperties
+  %11 = apply %10(%6)  : $@convention (thin) (@owned DerivedClassWithNontrivialStoredProperties) -> @owned DerivedClassWithNontrivialStoredProperties
+  store %11 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
+  %13 = load [copy] %2 : $*DerivedClassWithNontrivialStoredProperties
+  %14 = enum $Optional<DerivedClassWithNontrivialStoredProperties>, #Optional.some!enumelt, %13 : $DerivedClassWithNontrivialStoredProperties
+  destroy_addr %2 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+  br bb3(%14 : $Optional<DerivedClassWithNontrivialStoredProperties>)
+
+bb2:
+  destroy_addr %2 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+  %20 = enum $Optional<DerivedClassWithNontrivialStoredProperties>, #Optional.none!enumelt
+  br bb3(%20 : $Optional<DerivedClassWithNontrivialStoredProperties>)
+
+bb3(%22 : @owned $Optional<DerivedClassWithNontrivialStoredProperties>):
+  return %22 : $Optional<DerivedClassWithNontrivialStoredProperties>
+
+bb4(%24 : @owned $Error):
+  %25 = begin_borrow %24 : $Error
+  %26 = copy_value %25 : $Error
+  debug_value %26 : $Error, let, name "error"
+  destroy_value %26 : $Error
+  end_borrow %25 : $Error
+  destroy_value %24 : $Error
+  br bb2
+
+bb5(%32 : @owned $Error):
+  store %6 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
+  br bb4(%32 : $Error)
 }

@@ -156,7 +156,7 @@ static bool canDuplicateBlock(SILBasicBlock *BB) {
 void CheckedCastBrJumpThreading::classifyPredecessor(
     SILBasicBlock *Pred, bool SuccessDominates, bool FailureDominates) {
   if (SuccessDominates == FailureDominates) {
-    numUnknownPreds++;
+    ++numUnknownPreds;
     return;
   }
   if (SuccessDominates) {
@@ -414,8 +414,8 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
           IncomingValue, DomBB, DomCondition, DT);
 
       if (ReachingValue == SILValue()) {
-        numUnknownPreds++;
-        idx++;
+        ++numUnknownPreds;
+        ++idx;
         continue;
       }
 
@@ -435,7 +435,7 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
 
       classifyPredecessor(
           PredBB, SuccessDominates, FailureDominates);
-      idx++;
+      ++idx;
     }
   } else {
     // ArgBB is the entry block. Check that conditions are the equivalent in this

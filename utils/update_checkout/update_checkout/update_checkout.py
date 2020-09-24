@@ -29,6 +29,11 @@ SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
 
+def child_init(lck):
+    global lock
+    lock = lck
+
+
 def run_parallel(fn, pool_args, n_processes=0):
     """Function used to run a given closure in parallel.
 
@@ -37,17 +42,13 @@ def run_parallel(fn, pool_args, n_processes=0):
     parallel implementation.
     """
 
-    def init(l):
-        global lock
-        lock = l
-
     if n_processes == 0:
         n_processes = cpu_count() * 2
 
     lk = Lock()
     print("Running ``%s`` with up to %d processes." %
           (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
+    pool = Pool(processes=n_processes, initializer=child_init, initargs=(lk,))
     results = pool.map_async(func=fn, iterable=pool_args).get(999999)
     pool.close()
     pool.join()
@@ -158,7 +159,15 @@ def update_single_repository(pool_args):
             if checkout_target:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                           echo=False)
-                shell.run(['git', 'checkout', checkout_target], echo=True)
+                try:
+                    shell.run(['git', 'checkout', checkout_target], echo=True)
+                except Exception as originalException:
+                    try:
+                        result = shell.run(['git', 'rev-parse', checkout_target])
+                        revision = result[0].strip()
+                        shell.run(['git', 'checkout', revision], echo=True)
+                    except Exception:
+                        raise originalException
 
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
@@ -348,7 +357,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
     """
     Dumps the current state of the repo into a new config file that contains a
-    master branch scheme with the relevant branches set to the appropriate
+    main branch scheme with the relevant branches set to the appropriate
     hashes.
     """
     new_config = {}

@@ -74,6 +74,25 @@ public protocol RangeExpression {
 }
 
 extension RangeExpression {
+
+  /// Returns a Boolean value indicating whether a value is included in a
+  /// range.
+  ///
+  /// You can use the pattern-matching operator (`~=`) to test whether a value
+  /// is included in a range. The pattern-matching operator is used
+  /// internally in `case` statements for pattern matching. The following
+  /// example uses the `~=` operator to test whether an integer is included in
+  /// a range of single-digit numbers:
+  ///
+  ///     let chosenNumber = 3
+  ///     if 0..<10 ~= chosenNumber {
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// - Parameters:
+  ///   - pattern: A range.
+  ///   - bound: A value to match against `pattern`.
   @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
@@ -704,10 +723,12 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `minimum <= maximum`.
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
-      "Can't form Range with upperBound < lowerBound")
+      "Range requires lowerBound <= upperBound")
     return Range(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 
@@ -733,8 +754,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeUpTo(maximum)
   }
 
@@ -760,8 +785,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeThrough(maximum)
   }
 
@@ -787,8 +816,12 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
+  ///
+  /// - Precondition: `minimum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
+    _precondition(minimum == minimum,
+      "Range cannot have an unordered lower bound.")
     return PartialRangeFrom(minimum)
   }
 }

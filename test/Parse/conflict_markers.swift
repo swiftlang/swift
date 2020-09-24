@@ -23,13 +23,13 @@ var b : String = "b"
 var a : String = "a"
 var b : String = "B"
 >>>>>>> 18844bc65229786b96b89a9fc7739c0fc897905e:conflict_markers.swift
-print(a + b) // expected-error {{use of unresolved identifier 'a'}} expected-error {{use of unresolved identifier 'b'}}
+print(a + b) // expected-error {{cannot find 'a' in scope}} expected-error {{cannot find 'b' in scope}}
 
 <<<<<<< HEAD:conflict_markers.swift // expected-error {{source control conflict marker in source file}}
 ======= 
 var d : String = "D"
 >>>>>>> 18844bc65229786b96b89a9fc7739c0fc897905e:conflict_markers.swift
-print(d) // expected-error {{use of unresolved identifier 'd'}}
+print(d) // expected-error {{cannot find 'd' in scope}}
 
 <<<<<<<"HEAD:fake_conflict_markers.swift" // No error
 >>>>>>>"18844bc65229786b96b89a9fc7739c0fc897905e:fake_conflict_markers.swift" // No error
@@ -43,7 +43,7 @@ var fake_b : String = "a"
 var fake_c : String = "a"
 >>>>>>>"18844bc65229786b96b89a9fc7739c0fc897905e:fake_conflict_markers.swift"
 >>>>>>> 18844bc65229786b96b89a9fc7739c0fc897905e:conflict_markers.swift
-print(fake_b + fake_c) // expected-error {{use of unresolved identifier 'fake_b'}} expected-error {{use of unresolved identifier 'fake_c'}}
+print(fake_b + fake_c) // expected-error {{cannot find 'fake_b' in scope}} expected-error {{cannot find 'fake_c' in scope}}
 
 // Disambiguating conflict markers from operator applications.
 
@@ -77,12 +77,12 @@ var b : String = "b"
 var a : String = "a"
 var b : String = "B"
 <<<<
-print(a + b) // expected-error {{use of unresolved identifier 'a'}} expected-error {{use of unresolved identifier 'b'}}
+print(a + b) // expected-error {{cannot find 'a' in scope}} expected-error {{cannot find 'b' in scope}}
 
 >>>> ORIGINAL // expected-error {{source control conflict marker in source file}}
 ==== THEIRS
 ==== YOURS
 var d : String = "D"
 <<<<
-print(d) // expected-error {{use of unresolved identifier 'd'}}
+print(d) // expected-error {{cannot find 'd' in scope}}
 

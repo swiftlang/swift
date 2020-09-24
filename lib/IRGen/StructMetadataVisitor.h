@@ -43,6 +43,9 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                  "Adjustment index must be synchronized with this layout");
+
     // Metadata header.
     super::layout();
 
@@ -104,13 +107,14 @@ public:
     NextOffset = NextOffset.roundUpToAlignment(super::IGM.getPointerAlignment());
   }
 
-  void addTrailingFlags() { addPointer(); }
+  void addTrailingFlags() { addInt64(); }
 
 private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
   void addInt32() { NextOffset += Size(4); }
+  void addInt64() { NextOffset += Size(8); }
 };
 
 } // end namespace irgen

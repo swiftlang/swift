@@ -25,7 +25,7 @@ import Foundation
 @objc protocol P {}
 
 
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   do {
     let d: [NSObject: NSObject] = [:]
     let c: AnyClass? = object_getClass(d)
