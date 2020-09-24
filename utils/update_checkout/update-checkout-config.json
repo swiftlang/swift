@@ -85,7 +85,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -116,7 +116,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
-                "swift-format": "main"
+                "swift-format": "main",
                 "tensorflow-swift-apis": "master"
             }
         },
@@ -313,7 +313,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "main"
+                "swift-format": "main",
                 "tensorflow-swift-apis": "master"
             }
        },
