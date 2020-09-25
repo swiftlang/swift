@@ -202,6 +202,10 @@ def disable_objc_attr_requires_foundation_module :
   HelpText<"Disable requiring uses of @objc to require importing the "
            "Foundation module">;
 
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
+
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Deprecated, use -enable-library-evolution instead">;
 
@@ -388,10 +392,6 @@ def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
-
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
 
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
