@@ -346,6 +346,10 @@ private:
 // MARK: Start of fine-grained-dependency-specific code
 //==============================================================================
 
+/// Uses the provided module or source file to construct a dependency graph,
+/// which is provided back to the caller in the continuation callback.
+///
+/// \Note The returned graph should not be escaped from the callback.
 bool withReferenceDependencies(
     llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
     const DependencyTracker &depTracker, StringRef outputPath,
