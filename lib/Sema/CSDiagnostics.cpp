@@ -6980,13 +6980,6 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
       emitDiagnostic(diag::unresolved_nil_literal);
       return true;
     }
-    // `_ = nil`
-    if (auto *assignment = dyn_cast<AssignExpr>(parentExpr)) {
-      if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-        emitDiagnostic(diag::unresolved_nil_literal);
-        return true;
-      }
-    }
   }
 
   emitDiagnostic(diag::unresolved_nil_literal);
