@@ -6,27 +6,71 @@
 protocol P {
   func f() -> Self
   func g() -> Self
+  subscript() -> Self { get }
+  var p: Self { get }
 }
 
 protocol CP : class {
   func f() -> Self
   func g() -> Self
+  subscript() -> Self { get }
+  var p: Self { get }
+}
+
+extension P {
+  func f() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] P extension.f()")
+    return self
+  }
+  func g() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] P extension.g()")
+    return self
+  }
+  subscript() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] P extension.subscript()")
+    return self
+  }
+  var p: Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] P extension.p")
+    return self
+  }
+}
+
+extension CP {
+  func f() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] CP extension.f()")
+    return self
+  }
+  func g() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] CP extension.g()")
+    return self
+  }
+  subscript() -> Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] CP extension.subscript()")
+    return self
+  }
+  var p: Self {
+    print("[Self := \(Self.self), self is \(type(of: self))] CP extension.p")
+    return self
+  }
 }
 
 func callDynamicSelfExistential(_ p: P) {
-  print("Before first call")
-  var p2 = p.f()
-  print("Between calls")
-  p2.g()
-  print("After second call")
+  print("callDynamicSelfExistential {")
+  let p2 = p.f()
+  let p3 = p2.g()
+  let p4 = p3[]
+  let p5 = p4.p
+  print(" } callDynamicSelfExistential")
 }
 
 func callDynamicSelfClassExistential(_ cp: CP) {
-  print("Before first call")
-  var cp2 = cp.f()
-  print("Between calls")
-  cp2.g()
-  print("After second call")
+  print("callDynamicSelfClassExistential {")
+  let cp2 = cp.f()
+  let cp3 = cp2.g()
+  let cp4 = cp3[]
+  let cp5 = cp4.p
+  print(" } callDynamicSelfClassExistential")
 }
 
 struct S : P {
@@ -39,54 +83,101 @@ struct S : P {
     print("S.g()")
     return self
   }
-}
 
-class C : P, CP {
-  init() {
-    print("Allocating C")
+  subscript() -> S {
+    print("S.subscript()")
+    return self
   }
 
+  var p: S {
+    print("S.p")
+    return self
+  }
+}
+
+class C1a : P, CP {
   func f() -> Self {
-    print("C.f()")
+    print("C1a.f()")
     return self
   }
 
   func g() -> Self {
-    print("C.g()")
+    print("C1a.g()")
+    return self
+  }
+
+  subscript() -> Self {
+    print("C1a.subscript()")
+    return self
+  }
+
+  var p: Self {
+    print("C1a.p")
+    return self
+  }
+}
+final class C1b : C1a {
+  override subscript() -> Self {
+    print("C1b.subscript()")
     return self
   }
 }
 
+class C2a : P {}
+final class C2b : C2a {}
+
+class C3a : CP {}
+final class C3b : C3a {}
+
 print("-------------------------------")
 
-// CHECK: S() as non-class existential
-print("S() as non-class existential")
-// CHECK-NEXT: Before first call
+// CHECK: callDynamicSelfExistential {
 // CHECK-NEXT: S.f()
-// CHECK-NEXT: Between calls
 // CHECK-NEXT: S.g()
-// CHECK-NEXT: After second call
+// CHECK-NEXT: S.subscript()
+// CHECK-NEXT: S.p
+// CHECK-NEXT: } callDynamicSelfExistential
 callDynamicSelfExistential(S())
 
-// CHECK-NEXT: C() as non-class existential
-print("C() as non-class existential")
-// CHECK-NEXT: Allocating C
-// CHECK-NEXT: Before first call
-// CHECK-NEXT: C.f()
-// CHECK-NEXT: Between calls
-// CHECK-NEXT: C.g()
-// CHECK-NEXT: After second call
-callDynamicSelfExistential(C())
+// CHECK-NEXT: callDynamicSelfExistential {
+// CHECK-NEXT: C1a.f()
+// CHECK-NEXT: C1a.g()
+// CHECK-NEXT: C1a.subscript()
+// CHECK-NEXT: C1a.p
+// CHECK-NEXT: } callDynamicSelfExistential
+callDynamicSelfExistential(C1a())
 
-// CHECK-NEXT: C() as class existential
-print("C() as class existential")
-// CHECK-NEXT: Allocating C
-// CHECK-NEXT: Before first call
-// CHECK-NEXT: C.f()
-// CHECK-NEXT: Between calls
-// CHECK-NEXT: C.g()
-// CHECK-NEXT: After second call
-callDynamicSelfClassExistential(C())
+// CHECK-NEXT: callDynamicSelfExistential {
+// CHECK-NEXT: C1a.f()
+// CHECK-NEXT: C1a.g()
+// CHECK-NEXT: C1b.subscript()
+// CHECK-NEXT: C1a.p
+// CHECK-NEXT: } callDynamicSelfExistential
+callDynamicSelfExistential(C1b())
+
+// CHECK-NEXT: callDynamicSelfExistential {
+// CHECK-NEXT: [Self := C2a, self is C2b] P extension.f()
+// CHECK-NEXT: [Self := C2a, self is C2b] P extension.g()
+// CHECK-NEXT: [Self := C2a, self is C2b] P extension.subscript()
+// CHECK-NEXT: [Self := C2a, self is C2b] P extension.p
+// CHECK-NEXT: } callDynamicSelfExistential
+callDynamicSelfExistential(C2b() as C2a)
+
+// CHECK-NEXT: callDynamicSelfClassExistential {
+// CHECK-NEXT: C1a.f()
+// CHECK-NEXT: C1a.g()
+// CHECK-NEXT: C1a.subscript()
+// CHECK-NEXT: C1a.p
+// CHECK-NEXT: } callDynamicSelfClassExistential
+callDynamicSelfClassExistential(C1a())
+
+// CHECK-NEXT: callDynamicSelfClassExistential {
+// CHECK-NEXT: [Self := C3b, self is C3b] CP extension.f()
+// CHECK-NEXT: [Self := C3b, self is C3b] CP extension.g()
+// CHECK-NEXT: [Self := C3b, self is C3b] CP extension.subscript()
+// CHECK-NEXT: [Self := C3b, self is C3b] CP extension.p
+// CHECK-NEXT: } callDynamicSelfClassExistential
+callDynamicSelfClassExistential(C3b() as C3a)
 
 print("-------------------------------")
 
