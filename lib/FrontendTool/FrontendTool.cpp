@@ -2292,7 +2292,23 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
-    serialize(MSF, serializationOpts, SM.get());
+    if (serializationOpts.ExperimentalCrossModuleIncrementalInfo) {
+      const auto alsoEmitDotFile =
+          Instance.getInvocation()
+              .getLangOptions()
+              .EmitFineGrainedDependencySourcefileDotFiles;
+
+      using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+      auto *Mod = MSF.get<ModuleDecl *>();
+      fine_grained_dependencies::withReferenceDependencies(
+          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          alsoEmitDotFile, [](SourceFileDepGraph &&g) {
+            serialize(MSF, serializationOpts, SM.get(), &g);
+            return false;
+          });
+    } else {
+      serialize(MSF, serializationOpts, SM.get());
+    }
   };
 
   // Set the serialization action, so that the SIL module
