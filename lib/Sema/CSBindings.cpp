@@ -1239,6 +1239,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       cs.increaseScore(SK_Hole);
 
       ConstraintFix *fix = nullptr;
+      unsigned fixImpact = 1;
+
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         // If it is represetative for a key path root, let's emit a more
         // specific diagnostic.
@@ -1279,9 +1281,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       } else if (dstLocator->directlyAt<NilLiteralExpr>()) {
         fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
+        // This is a dramatic event, it means that there is absolutely
+        // no contextual information to resolve type of `nil`.
+        fixImpact = 10;
       }
 
-      if (fix && cs.recordFix(fix))
+      if (fix && cs.recordFix(fix, fixImpact))
         return true;
     }
   }
