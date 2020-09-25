@@ -1946,7 +1946,7 @@ SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleExtract(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -1956,7 +1956,7 @@ SILCloner<ImplClass>::visitTupleElementAddrInst(TupleElementAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleElementAddr(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

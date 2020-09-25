@@ -1258,7 +1258,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   // parent tuple has only one non-trivial field.
   bool FoundNonTrivialField = false;
   SILType OpTy = getOperand()->getType();
-  unsigned FieldNo = getFieldNo();
+  unsigned FieldNo = getFieldIndex();
 
   // For each element index of the tuple...
   for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
@@ -1300,7 +1300,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
   // we have no other non-trivial elts.
   SILType OpTy = getOperand()->getType();
-  unsigned FieldNo = getFieldNo();
+  unsigned FieldNo = getFieldIndex();
 
   // For each element index of the tuple...
   for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
@@ -1348,7 +1348,7 @@ VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
          superDecl = superDecl->getSuperclassDecl()) {
-      assert(index > superDecl->getStoredProperties().size()
+      assert(index >= superDecl->getStoredProperties().size()
              && "field index cannot refer to a superclass field");
       index -= superDecl->getStoredProperties().size();
     }
@@ -1357,7 +1357,7 @@ VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
 }
 
 unsigned FieldIndexCacheBase::cacheFieldIndex() {
-  unsigned index = getFieldIndex(getParentDecl(), getField());
+  unsigned index = ::getFieldIndex(getParentDecl(), getField());
   SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = index;
   return index;
 }

@@ -3144,7 +3144,7 @@ static SILValue getInsertedValue(SILInstruction *Aggregate,
   }
   auto *Tuple = cast<TupleInst>(Aggregate);
   auto *TEI = cast<TupleExtractInst>(Extract);
-  return Tuple->getElement(TEI->getFieldNo());
+  return Tuple->getElement(TEI->getFieldIndex());
 }
 
 /// Find a parent SwitchEnumInst of the block \p BB. The block \p BB is a

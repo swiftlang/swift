@@ -2747,11 +2747,11 @@ public:
     require(EI->getType().isObject(),
             "result of tuple_extract must be object");
 
-    require(EI->getFieldNo() < operandTy->getNumElements(),
+    require(EI->getFieldIndex() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(EI->getType().getASTType(),
-                      operandTy.getElementType(EI->getFieldNo()),
+                      operandTy.getElementType(EI->getFieldIndex()),
                       "type of tuple_extract does not match type of element");
     }
   }
@@ -2793,12 +2793,12 @@ public:
             "must derive tuple_element_addr from tuple");
 
     ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getElements();
-    require(EI->getFieldNo() < fields.size(),
+    require(EI->getFieldIndex() < fields.size(),
             "invalid field index for element_addr instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           EI->getType().getASTType(),
-          CanType(fields[EI->getFieldNo()].getType()),
+          CanType(fields[EI->getFieldIndex()].getType()),
           "type of tuple_element_addr does not match type of element");
     }
   }
@@ -2856,7 +2856,7 @@ public:
           loweredFieldTy, EI->getType(),
           "result of ref_element_addr does not match type of field");
     }
-    EI->getFieldNo();  // Make sure we can access the field without crashing.
+    EI->getFieldIndex();  // Make sure we can access the field without crashing.
   }
 
   void checkRefTailAddrInst(RefTailAddrInst *RTAI) {

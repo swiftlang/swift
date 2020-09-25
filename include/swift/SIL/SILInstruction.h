@@ -5715,7 +5715,7 @@ class TupleExtractInst
   }
 
 public:
-  unsigned getFieldNo() const {
+  unsigned getFieldIndex() const {
     return SILInstruction::Bits.TupleExtractInst.FieldNo;
   }
 
@@ -5747,7 +5747,7 @@ class TupleElementAddrInst
   }
 
 public:
-  unsigned getFieldNo() const {
+  unsigned getFieldIndex() const {
     return SILInstruction::Bits.TupleElementAddrInst.FieldNo;
   }
 
@@ -5811,8 +5811,7 @@ public:
 
   VarDecl *getField() const { return field; }
 
-  // FIXME: this should be called getFieldIndex().
-  unsigned getFieldNo() const {
+  unsigned getFieldIndex() const {
     unsigned idx = SILInstruction::Bits.FieldIndexCacheBase.FieldIndex;
     if (idx != InvalidFieldIndex)
       return idx;

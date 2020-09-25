@@ -803,7 +803,7 @@ static SingleValueInstruction *getValueFromStaticLet(SILValue v) {
     if (!tupleVal)
       return nullptr;
     return cast<SingleValueInstruction>(
-      cast<TupleInst>(tupleVal)->getElement(teai->getFieldNo()));
+      cast<TupleInst>(tupleVal)->getElement(teai->getFieldIndex()));
   }
   return nullptr;
 }
@@ -1111,9 +1111,9 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
         kind = tuple;
       }
       if (kind == tuple) {
-        if (elems[telem->getFieldNo()])
+        if (elems[telem->getFieldIndex()])
           return SILValue();
-        elems[telem->getFieldNo()] = createValueFromAddr(telem, builder, loc);
+        elems[telem->getFieldIndex()] = createValueFromAddr(telem, builder, loc);
         continue;
       }
     }
@@ -1802,7 +1802,7 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
 
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
-  if (TEI->getFieldNo() != 1)
+  if (TEI->getFieldIndex() != 1)
     return nullptr;
 
   Builder.setCurrentDebugScope(TEI->getDebugScope());

@@ -118,7 +118,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // conservative given that classes are not "uniquely identified".
     auto *REA = cast<RefElementAddrInst>(base);
     value = stripBorrow(REA->getOperand());
-    setElementIndex(REA->getFieldNo());
+    setElementIndex(REA->getFieldIndex());
     break;
   }
   case Tail: {

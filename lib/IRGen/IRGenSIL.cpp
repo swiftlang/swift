@@ -3787,7 +3787,7 @@ void IRGenSILFunction::visitTupleExtractInst(swift::TupleExtractInst *i) {
   projectTupleElementFromExplosion(*this,
                                    baseType,
                                    fullTuple,
-                                   i->getFieldNo(),
+                                   i->getFieldIndex(),
                                    output);
   (void)fullTuple.claimAll();
   setLoweredExplosion(i, output);
@@ -3799,7 +3799,7 @@ void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
   SILType baseType = i->getOperand()->getType();
 
   Address field = projectTupleElementAddress(*this, base, baseType,
-                                             i->getFieldNo());
+                                             i->getFieldIndex());
   setLoweredAddress(i, field);
 }
 

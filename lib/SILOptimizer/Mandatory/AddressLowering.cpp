@@ -891,7 +891,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   if (origCallInst->getType().is<TupleType>()) {
     for (Operand *operand : origCallInst->getUses()) {
       if (auto *extract = dyn_cast<TupleExtractInst>(operand->getUser()))
-        origDirectResultValues[extract->getFieldNo()] = extract;
+        origDirectResultValues[extract->getFieldIndex()] = extract;
       else
         nonCanonicalUses.push_back(operand);
     }
@@ -1002,7 +1002,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
       assert(pass.valueStorageMap.contains(origCallInst));
       continue;
     }
-    unsigned origResultIdx = extractInst->getFieldNo();
+    unsigned origResultIdx = extractInst->getFieldIndex();
     auto resultInfo = origFnConv.getResults()[origResultIdx];
 
     if (extractInst->getType().isAddressOnly(*pass.F)) {
