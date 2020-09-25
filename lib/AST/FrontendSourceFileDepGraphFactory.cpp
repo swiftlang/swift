@@ -251,7 +251,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
                              SF, outputPath, depTracker, alsoEmitDotFile)
                               .construct();
 
-  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
+  bool hadError = writeFineGrainedDependencyGraphToPath(diags, outputPath, g);
 
   // If path is stdout, cannot read it back, so check for "-"
   assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));

@@ -75,6 +75,10 @@ namespace swift {
     class TypeConverter;
   }
 
+  namespace fine_grained_dependencies {
+    class SourceFileDepGraph;
+  }
+
   /// @{
 
   /// \returns true if the declaration should be verified.  This can return
@@ -174,8 +178,10 @@ namespace swift {
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
-                 const SILModule *M = nullptr);
+  void
+  serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+            const SILModule *M = nullptr,
+            const fine_grained_dependencies::SourceFileDepGraph *DG = nullptr);
 
   /// Serializes a module or single source file to the given output file and
   /// returns back the file's contents as a memory buffer.

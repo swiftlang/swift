@@ -124,7 +124,11 @@ bool readFineGrainedDependencyGraph(llvm::StringRef path,
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
-bool writeFineGrainedDependencyGraph(DiagnosticEngine &diags, llvm::StringRef path,
+bool writeFineGrainedDependencyGraphToPath(DiagnosticEngine &diags,
+                                           llvm::StringRef path,
+                                           const SourceFileDepGraph &g);
+
+void writeFineGrainedDependencyGraph(llvm::BitstreamWriter &Out,
                                      const SourceFileDepGraph &g);
 
 } // namespace fine_grained_dependencies

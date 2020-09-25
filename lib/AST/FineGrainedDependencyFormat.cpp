@@ -289,15 +289,12 @@ class Serializer {
   unsigned LastIdentifierID = 0;
   std::vector<StringRef> IdentifiersToWrite;
 
-  SmallVector<char, 0> Buffer;
-  llvm::BitstreamWriter Out{Buffer};
+  llvm::BitstreamWriter &Out;
 
   /// A reusable buffer for emitting records.
   SmallVector<uint64_t, 64> ScratchRecord;
 
   std::array<unsigned, 256> AbbrCodes;
-
-  void writeFineGrainedDependencyGraph(const SourceFileDepGraph &g);
 
   void addIdentifier(StringRef str);
   unsigned getIdentifier(StringRef str);
@@ -321,8 +318,10 @@ class Serializer {
   void writeMetadata();
 
 public:
-  void writeFineGrainedDependencyGraph(llvm::raw_ostream &os,
-                                       const SourceFileDepGraph &g);
+  Serializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
+
+public:
+  void writeFineGrainedDependencyGraph(const SourceFileDepGraph &g);
 };
 
 } // end namespace
@@ -467,20 +466,22 @@ unsigned Serializer::getIdentifier(StringRef str) {
   return iter->second;
 }
 
-void Serializer::writeFineGrainedDependencyGraph(llvm::raw_ostream &os,
-                                                 const SourceFileDepGraph &g) {
-  writeFineGrainedDependencyGraph(g);
-  os.write(Buffer.data(), Buffer.size());
-  os.flush();
+void swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
+    llvm::BitstreamWriter &Out, const SourceFileDepGraph &g) {
+  Serializer serializer{Out};
+  serializer.writeFineGrainedDependencyGraph(g);
 }
 
-bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
+bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
     DiagnosticEngine &diags, StringRef path,
     const SourceFileDepGraph &g) {
   PrettyStackTraceStringAction stackTrace("saving fine-grained dependency graph", path);
   return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
-    Serializer serializer;
-    serializer.writeFineGrainedDependencyGraph(out, g);
+    SmallVector<char, 0> Buffer;
+    llvm::BitstreamWriter Writer{Buffer};
+    writeFineGrainedDependencyGraph(Writer, g);
+    out.write(Buffer.data(), Buffer.size());
+    out.flush();
     return false;
   });
 }
