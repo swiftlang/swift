@@ -3,13 +3,27 @@
 set -ex
 
 sudo apt update
-sudo apt install -y \
-  git ninja-build clang python python-six \
-  uuid-dev libicu-dev icu-devtools libbsd-dev \
-  libedit-dev libxml2-dev libsqlite3-dev swig \
-  libpython-dev libncurses5-dev pkg-config \
-  libblocksruntime-dev libcurl4-openssl-dev \
-  systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+
+if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
+  sudo apt install -y \
+    git ninja-build clang python python-six \
+    uuid-dev libicu-dev icu-devtools libbsd-dev \
+    libedit-dev libxml2-dev libsqlite3-dev swig \
+    libpython-dev libncurses5-dev pkg-config \
+    libblocksruntime-dev libcurl4-openssl-dev \
+    systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
+  sudo apt install -y \
+    git ninja-build clang python python-six \
+    uuid-dev libicu-dev icu-devtools libbsd-dev \
+    libedit-dev libxml2-dev libsqlite3-dev swig \
+    libpython2-dev libncurses5-dev pkg-config \
+    libblocksruntime-dev libcurl4-openssl-dev \
+    systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+else
+  echo "Unknown Ubuntu version"
+  exit 1
+fi
 sudo apt clean
 
 SOURCE_PATH="$( cd "$(dirname $0)/../../../.." && pwd )" 
