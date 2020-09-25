@@ -935,6 +935,10 @@ namespace driver {
       for (const auto cmd :
            collectExternallyDependentJobsFromDependencyGraph(forRanges))
         jobsToSchedule.insert(cmd);
+      for (const auto cmd :
+           collectIncrementalExternallyDependentJobsFromDependencyGraph(
+               forRanges))
+        jobsToSchedule.insert(cmd);
       return jobsToSchedule;
     }
 
@@ -1109,6 +1113,21 @@ namespace driver {
       }
     }
 
+    void forEachOutOfDateIncrementalExternalDependency(
+        const bool forRanges,
+        function_ref<void(StringRef)> consumeExternalSwiftDeps) {
+      for (StringRef dependency :
+           getIncrementalExternalDependencies(forRanges)) {
+        // If the dependency has been modified since the oldest built file,
+        // or if we can't stat it for some reason (perhaps it's been
+        // deleted?), trigger rebuilds through the dependency graph.
+        llvm::sys::fs::file_status depStatus;
+        if (llvm::sys::fs::status(dependency, depStatus) ||
+            Comp.getLastBuildTime() < depStatus.getLastModificationTime())
+          consumeExternalSwiftDeps(dependency);
+      }
+    }
+
     CommandSet collectCascadedJobsFromDependencyGraph(
         const CommandSet &InitialCascadingCommands, const bool forRanges) {
       CommandSet CascadedJobs;
@@ -1136,6 +1155,25 @@ namespace driver {
         for (const Job * marked: markExternalInDepGraph(dependency, forRanges))
           ExternallyDependentJobs.push_back(marked);
       });
+      noteBuildingJobs(ExternallyDependentJobs, forRanges,
+                       "because of external dependencies");
+      return ExternallyDependentJobs;
+    }
+
+    SmallVector<const Job *, 16>
+    collectIncrementalExternallyDependentJobsFromDependencyGraph(
+        const bool forRanges) {
+      SmallVector<const Job *, 16> ExternallyDependentJobs;
+      // Check all cross-module dependencies as well.
+      forEachOutOfDateIncrementalExternalDependency(
+          forRanges, [&](StringRef dependency) {
+            // If the dependency has been modified since the oldest built file,
+            // or if we can't stat it for some reason (perhaps it's been
+            // deleted?), trigger rebuilds through the dependency graph.
+            for (const Job *marked :
+                 markExternalInDepGraph(dependency, forRanges))
+              ExternallyDependentJobs.push_back(marked);
+          });
       noteBuildingJobs(ExternallyDependentJobs, forRanges,
                        "because of external dependencies");
       return ExternallyDependentJobs;
@@ -1592,6 +1630,12 @@ namespace driver {
 
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
       return getFineGrainedDepGraph(forRanges).getExternalDependencies();
+    }
+
+    std::vector<StringRef>
+    getIncrementalExternalDependencies(const bool forRanges) const {
+      return getFineGrainedDepGraph(forRanges)
+          .getIncrementalExternalDependencies();
     }
 
     std::vector<const Job*>

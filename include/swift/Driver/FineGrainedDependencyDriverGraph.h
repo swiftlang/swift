@@ -168,6 +168,7 @@ class ModuleDepGraph {
 
   // Supports requests from the driver to getExternalDependencies.
   std::unordered_set<std::string> externalDependencies;
+  std::unordered_set<std::string> incrementalExternalDependencies;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -512,15 +513,28 @@ public:
   std::vector<const driver::Job *>
   findExternallyDependentUntracedJobs(StringRef externalDependency);
 
+  /// Find jobs that were previously not known to need compilation but that
+  /// depend on \c incrementalExternalDependency.
+  ///
+  /// This code path should only act as a fallback to the status-quo behavior.
+  /// Otherwise it acts to pessimize the behavior of cross-module incremental
+  /// builds.
+  std::vector<const driver::Job *>
+  findIncrementalExternallyDependentUntracedJobs(StringRef externalDependency);
+
   //============================================================================
   // MARK: ModuleDepGraph - External dependencies
   //============================================================================
 
 public:
   std::vector<StringRef> getExternalDependencies() const;
+  std::vector<StringRef> getIncrementalExternalDependencies() const;
 
   void forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
       StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
+  void forEachUntracedJobDirectlyDependentOnExternalIncrementalSwiftDeps(
+      StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
+
   //============================================================================
   // MARK: ModuleDepGraph - verification
   //============================================================================

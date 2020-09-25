@@ -195,6 +195,12 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
                                 externalDependencies.end());
 }
 
+std::vector<StringRef>
+ModuleDepGraph::getIncrementalExternalDependencies() const {
+  return std::vector<StringRef>(incrementalExternalDependencies.begin(),
+                                incrementalExternalDependencies.end());
+}
+
 // Add every (swiftdeps) use of the external dependency to foundJobs.
 // Can return duplicates, but it doesn't break anything, and they will be
 // canonicalized later.
@@ -216,12 +222,45 @@ std::vector<const Job *> ModuleDepGraph::findExternallyDependentUntracedJobs(
   return foundJobs;
 }
 
+std::vector<const Job *>
+ModuleDepGraph::findIncrementalExternallyDependentUntracedJobs(
+    StringRef externalDependency) {
+  FrontendStatsTracer tracer(stats,
+                             "fine-grained-dependencies-"
+                             "findIncrementalExternallyDependentUntracedJobs");
+  std::vector<const Job *> foundJobs;
+  forEachUntracedJobDirectlyDependentOnExternalIncrementalSwiftDeps(
+      externalDependency, [&](const Job *job) {
+        foundJobs.push_back(job);
+        for (const Job *marked : findJobsToRecompileWhenWholeJobChanges(job)) {
+          // findJobsToRecompileWhenWholeJobChanges is reflexive
+          // Don't return job twice.
+          if (marked != job)
+            foundJobs.push_back(marked);
+        }
+      });
+  return foundJobs;
+}
+
 void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
     StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
   DependencyKey key(NodeKind::externalDepend, DeclAspect::interface, "",
                     externalSwiftDeps.str());
+  for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
+    if (!useNode->getHasBeenTraced())
+      fn(getJob(useNode->getSwiftDepsOfProvides()));
+  }
+}
+
+void ModuleDepGraph::
+    forEachUntracedJobDirectlyDependentOnExternalIncrementalSwiftDeps(
+        StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
+  // TODO move nameForDep into key
+  // These nodes will depend on the *interface* of the external Decl.
+  DependencyKey key(NodeKind::incrementalExternalDepend, DeclAspect::interface,
+                    "", externalSwiftDeps.str());
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     if (!useNode->getHasBeenTraced())
       fn(getJob(useNode->getSwiftDepsOfProvides()));
@@ -387,9 +426,14 @@ bool ModuleDepGraph::recordWhatUseDependsUpon(
       sourceFileUseNode, [&](const SourceFileDepGraphNode *def) {
         const bool isNewUse =
             usesByDef[def->getKey()].insert(moduleUseNode).second;
-        if (isNewUse && def->getKey().getKind() == NodeKind::externalDepend) {
+        if (isNewUse) {
           StringRef externalSwiftDeps = def->getKey().getName();
-          externalDependencies.insert(externalSwiftDeps.str());
+          if (def->getKey().getKind() == NodeKind::externalDepend) {
+            externalDependencies.insert(externalSwiftDeps.str());
+          } else if (def->getKey().getKind() ==
+                     NodeKind::incrementalExternalDepend) {
+            incrementalExternalDependencies.insert(externalSwiftDeps.str());
+          }
           useHasNewExternalDependency = true;
         }
       });
@@ -641,6 +685,9 @@ void ModuleDepGraph::verifyExternalDependencyUniqueness(
   assert((key.getKind() != NodeKind::externalDepend ||
           externalDependencies.count(key.getName().str()) == 1) &&
          "Ensure each external dependency is tracked exactly once");
+  assert((key.getKind() != NodeKind::incrementalExternalDepend ||
+          incrementalExternalDependencies.count(key.getName().str()) == 1) &&
+         "Ensure each incremental external dependency is tracked exactly once");
 }
 
 void ModuleDepGraph::verifyCanFindEachJob() const {
@@ -724,6 +771,10 @@ void ModuleDepGraph::printOneNodeOfPath(raw_ostream &out,
   case NodeKind::externalDepend:
     out << filename << " depends on " << key.aspectName() << " of module '"
         << key.humanReadableName() << "'";
+    break;
+  case NodeKind::incrementalExternalDepend:
+    out << filename << " depends on " << key.aspectName()
+        << " of incremental module '" << key.humanReadableName() << "'";
     break;
   case NodeKind::sourceFileProvide:
     out << key.aspectName() << " of source file " << key.humanReadableName();
