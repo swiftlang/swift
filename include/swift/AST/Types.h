@@ -600,9 +600,6 @@ public:
   bool hasOpaqueArchetype() const {
     return getRecursiveProperties().hasOpaqueArchetype();
   }
-  /// Determine whether the type has any stored properties or enum cases that
-  /// involve an opaque type.
-  bool hasOpaqueArchetypePropertiesOrCases();
 
   /// Determine whether the type is an opened existential type.
   ///
