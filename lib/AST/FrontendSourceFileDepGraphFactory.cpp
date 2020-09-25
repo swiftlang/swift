@@ -241,8 +241,10 @@ bool fine_grained_dependencies::withReferenceDependencies(
     const DependencyTracker &depTracker, StringRef outputPath,
     bool alsoEmitDotFile,
     llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
-  if (MSF.dyn_cast<ModuleDecl *>()) {
-    llvm_unreachable("Cannot construct dependency graph for modules!");
+  if (auto *MD = MSF.dyn_cast<ModuleDecl *>()) {
+    SourceFileDepGraph g =
+        ModuleDepGraphFactory(MD, alsoEmitDotFile).construct();
+    return cont(std::move(g));
   } else {
     auto *SF = MSF.get<SourceFile *>();
     SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
@@ -592,6 +594,9 @@ private:
   }
 
   void enumerateExternalUses() {
+    for (StringRef s : depTracker.getIncrementalDependencies())
+      enumerateUse<NodeKind::incrementalExternalDepend>("", s);
+
     for (StringRef s : depTracker.getDependencies())
       enumerateUse<NodeKind::externalDepend>("", s);
   }
@@ -624,6 +629,78 @@ Optional<std::string> FrontendSourceFileDepGraphFactory::getFingerprintIfAny(
 }
 Optional<std::string>
 FrontendSourceFileDepGraphFactory::getFingerprintIfAny(const Decl *d) {
+  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+    auto result = idc->getBodyFingerprint();
+    assert((!result || !result->empty()) &&
+           "Fingerprint should never be empty");
+    return result;
+  }
+  return None;
+}
+
+//==============================================================================
+// MARK: ModuleDepGraphFactory
+//==============================================================================
+
+ModuleDepGraphFactory::ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot)
+    : AbstractSourceFileDepGraphFactory(
+          /*include private*/ true, Mod->getASTContext().hadError(),
+          Mod->getNameStr(), "0xBADBEEF", emitDot, Mod->getASTContext().Diags),
+      Mod(Mod) {}
+
+void ModuleDepGraphFactory::addAllDefinedDecls() {
+  // TODO: express the multiple provides and depends streams with variadic
+  // templates
+
+  // Many kinds of Decls become top-level depends.
+
+  SmallVector<Decl *, 32> TopLevelDecls;
+  Mod->getTopLevelDecls(TopLevelDecls);
+  DeclFinder declFinder(TopLevelDecls, includePrivateDeps,
+                        [this](VisibleDeclConsumer &consumer) {
+                          return Mod->lookupClassMembers({}, consumer);
+                        });
+
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.precedenceGroups);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.memberOperatorDecls);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.operators);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topValues);
+  addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.allNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::potentialMember>(
+      declFinder.potentialMemberHolders);
+  addAllDefinedDeclsOfAGivenType<NodeKind::member>(
+      declFinder.valuesInExtensions);
+  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
+      declFinder.classMembers);
+}
+
+/// Given an array of Decls or pairs of them in \p declsOrPairs
+/// create node pairs for context and name
+template <NodeKind kind, typename ContentsT>
+void ModuleDepGraphFactory::addAllDefinedDeclsOfAGivenType(
+    std::vector<ContentsT> &contentsVec) {
+  for (const auto &declOrPair : contentsVec) {
+    Optional<std::string> fp = getFingerprintIfAny(declOrPair);
+    addADefinedDecl(
+        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
+        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
+  }
+}
+
+//==============================================================================
+// MARK: ModuleDepGraphFactory - adding individual defined Decls
+//==============================================================================
+
+/// At present, only \c NominalTypeDecls have (body) fingerprints
+Optional<std::string> ModuleDepGraphFactory::getFingerprintIfAny(
+    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+  return None;
+}
+Optional<std::string>
+ModuleDepGraphFactory::getFingerprintIfAny(const Decl *d) {
   if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
     auto result = idc->getBodyFingerprint();
     assert((!result || !result->empty()) &&

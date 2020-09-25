@@ -53,6 +53,7 @@ enum class NodeKind {
   dynamicLookup,
   externalDepend,
   sourceFileProvide,
+  incrementalExternalDepend,
   /// For iterating through the NodeKinds.
   kindCount
 };
@@ -60,8 +61,10 @@ enum class NodeKind {
 /// Used for printing out NodeKinds to dot files, and dumping nodes for
 /// debugging.
 const std::string NodeKindNames[]{
-    "topLevel",      "nominal",        "potentialMember",  "member",
-    "dynamicLookup", "externalDepend", "sourceFileProvide"};
+    "topLevel",          "nominal",
+    "potentialMember",   "member",
+    "dynamicLookup",     "externalDepend",
+    "sourceFileProvide", "incrementalExternalDepend"};
 } // end namespace fine_grained_dependencies
 } // end namespace swift
 

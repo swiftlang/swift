@@ -54,6 +54,30 @@ private:
   static Optional<std::string> getFingerprintIfAny(const Decl *d);
 };
 
+class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
+  ModuleDecl *const Mod;
+
+public:
+  ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot);
+
+  ~ModuleDepGraphFactory() override = default;
+
+private:
+  void addAllDefinedDecls() override;
+  void addAllUsedDecls() override {}
+
+  /// Given an array of Decls or pairs of them in \p declsOrPairs
+  /// create node pairs for context and name
+  template <NodeKind kind, typename ContentsT>
+  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
+
+  /// At present, only nominals, protocols, and extensions have (body)
+  /// fingerprints
+  static Optional<std::string> getFingerprintIfAny(
+      std::pair<const NominalTypeDecl *, const ValueDecl *>);
+  static Optional<std::string> getFingerprintIfAny(const Decl *d);
+};
+
 } // namespace fine_grained_dependencies
 } // namespace swift
 

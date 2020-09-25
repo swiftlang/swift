@@ -75,6 +75,9 @@ enum class IntermoduleDepTrackingMode {
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
+  SmallVector<std::string, 8> incrementalDeps;
+  llvm::StringSet<> incrementalDepsUniquer;
+
 public:
   explicit DependencyTracker(
       IntermoduleDepTrackingMode Mode,
@@ -87,8 +90,18 @@ public:
   /// No path canonicalization is done.
   void addDependency(StringRef File, bool IsSystem);
 
+  /// Adds a file as an incremental dependency.
+  ///
+  /// No additional canonicalization or adulteration of the file path in
+  /// \p File is performed.
+  void addIncrementalDependency(StringRef File);
+
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
+
+  /// Fetches the list of dependencies that are known to have incremental swift
+  /// dependency information embedded inside of them.
+  ArrayRef<std::string> getIncrementalDependencies() const;
 
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
