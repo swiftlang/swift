@@ -24,6 +24,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -49,6 +50,10 @@ enum class ImportKind : uint8_t {
   Var,
   Func
 };
+
+inline bool isScopedImportKind(ImportKind importKind) {
+  return importKind != ImportKind::Module;
+}
 
 /// Possible attributes for imports in source files.
 enum class ImportFlags {
@@ -156,9 +161,17 @@ namespace detail {
 
   template<typename Subclass>
   class ImportPathBuilder {
-    llvm::SmallVector<ImportPathElement, 4> scratch;
+    using Scratch = llvm::SmallVector<ImportPathElement, 4>;
+    Scratch scratch;
 
   public:
+    using value_type = Scratch::value_type;
+    using reference = Scratch::reference;
+    using iterator = Scratch::iterator;
+    using const_iterator = Scratch::const_iterator;
+    using difference_type = Scratch::difference_type;
+    using size_type = Scratch::size_type;
+
     Subclass get() const {
       return Subclass(scratch);
     }
@@ -390,17 +403,66 @@ public:
   /// including submodules, assuming the \c ImportDecl has the indicated
   /// \c importKind.
   Module getModulePath(ImportKind importKind) const {
-    return getModulePath(importKind != ImportKind::Module);
+    return getModulePath(isScopedImportKind(importKind));
   }
 
   /// Extracts the portion of the \c ImportPath which represents a scope for the
   /// import, assuming the \c ImportDecl has the indicated \c importKind.
   Access getAccessPath(ImportKind importKind) const {
-    return getAccessPath(importKind != ImportKind::Module);
+    return getAccessPath(isScopedImportKind(importKind));
   }
 };
 
 // MARK: - Abstractions of imports
+
+/// Convenience struct to keep track of an import path and whether or not it
+/// is scoped.
+class UnloadedImportedModule {
+  // This is basically an ArrayRef with a bit stolen from the pointer.
+  // FIXME: Extract an ArrayRefIntPair type from this.
+  llvm::PointerIntPair<ImportPath::Raw::iterator, 1, bool> dataAndIsScoped;
+  ImportPath::Raw::size_type length;
+
+  ImportPath::Raw::iterator data() const {
+    return dataAndIsScoped.getPointer();
+  }
+
+  bool isScoped() const {
+    return dataAndIsScoped.getInt();
+  }
+
+  ImportPath::Raw getRaw() const {
+    return ImportPath::Raw(data(), length);
+  }
+
+  UnloadedImportedModule(ImportPath::Raw raw, bool isScoped)
+    : dataAndIsScoped(raw.data(), isScoped), length(raw.size()) { }
+
+public:
+  UnloadedImportedModule(ImportPath importPath, bool isScoped)
+    : UnloadedImportedModule(importPath.getRaw(), isScoped) { }
+
+  UnloadedImportedModule(ImportPath importPath, ImportKind importKind)
+    : UnloadedImportedModule(importPath, isScopedImportKind(importKind)) { }
+
+  ImportPath getImportPath() const {
+    return ImportPath(getRaw());
+  }
+
+  ImportPath::Module getModulePath() const {
+    return getImportPath().getModulePath(isScoped());
+  }
+
+  ImportPath::Access getAccessPath() const {
+    return getImportPath().getAccessPath(isScoped());
+  }
+
+  friend bool operator==(const UnloadedImportedModule &lhs,
+                         const UnloadedImportedModule &rhs) {
+    return (lhs.getRaw() == rhs.getRaw()) &&
+           (lhs.isScoped() == rhs.isScoped());
+  }
+};
 
 /// Convenience struct to keep track of a module along with its access path.
 struct alignas(uint64_t) ImportedModule {
@@ -471,8 +533,6 @@ struct AttributedImport {
            options.contains(ImportFlags::Reserved));
   }
 };
-
-using ImportedModuleDesc = AttributedImport<ImportedModule>;
 
 // MARK: - Implicit imports
 

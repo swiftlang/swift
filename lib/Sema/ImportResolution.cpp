@@ -51,36 +51,17 @@ namespace {
 /// source, or it may represent a cross-import overlay that has been found and
 /// needs to be loaded.
 struct UnboundImport {
+  /// Information about the import. Use this field, not \c getImportDecl(), to
+  /// determine the behavior expected for this import.
+  AttributedImport<UnloadedImportedModule> import;
+
   /// The source location to use when diagnosing errors for this import.
   SourceLoc importLoc;
-
-  /// The options for this import, such as "exported" or
-  /// "implementation-only". Use this field, not \c attrs, to determine the
-  /// behavior expected for this import.
-  ImportOptions options;
-
-  /// If \c options includes \c PrivateImport, the filename we should import
-  /// private declarations from.
-  StringRef sourceFileArg;
-
-  /// The module names being imported. There will usually be just one for the
-  /// top-level module, but a submodule import will have more.
-  ImportPath::Module modulePath;
-
-  /// If this is a scoped import, the names of the declaration being imported;
-  /// otherwise empty. (Currently the compiler doesn't support nested scoped
-  /// imports, so there should always be zero or one elements, but
-  /// \c ImportPath::Access is the common currency type for this.)
-  ImportPath::Access accessPath;
-
-  // Names of explicitly imported SPI groups via @_spi.
-  ArrayRef<Identifier> spiGroups;
 
   /// If this UnboundImport directly represents an ImportDecl, contains the
   /// ImportDecl it represents. This should only be used for diagnostics and
   /// for updating the AST; if you want to read information about the import,
-  /// get it from the other fields in \c UnboundImport rather than from the
-  /// \c ImportDecl.
+  /// get it from the \c import field rather than from the \c ImportDecl.
   ///
   /// If this UnboundImport represents a cross-import, contains the declaring
   /// module's \c ModuleDecl.
@@ -137,8 +118,8 @@ struct UnboundImport {
   /// UnboundImport.
   AttributedImport<ImportedModule>
   makeAttributedImport(ModuleDecl *module) const {
-    return { ImportedModule{ accessPath, module },
-             options, sourceFileArg, spiGroups };
+    return { ImportedModule{ import.module.getAccessPath(), module },
+             import.options, import.sourceFileArg, import.spiGroups };
   }
 
 private:
@@ -326,7 +307,7 @@ void ImportResolver::bindImport(UnboundImport &&I) {
     return;
   }
 
-  ModuleDecl *M = getModule(I.modulePath);
+  ModuleDecl *M = getModule(I.import.module.getModulePath());
   if (!I.checkModuleLoaded(M, SF)) {
     // Can't process further. checkModuleLoaded() will have diagnosed this.
     if (ID)
@@ -392,11 +373,11 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
 
 NullablePtr<ModuleDecl>
 UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
-  if (modulePath.size() == 1)
+  if (import.module.getModulePath().size() == 1)
     return M;
 
   // If we imported a submodule, import the top-level module as well.
-  Identifier topLevelName = modulePath.front().Item;
+  Identifier topLevelName = import.module.getModulePath().front().Item;
   ModuleDecl *topLevelModule = SF.getASTContext().getLoadedModule(topLevelName);
 
   if (!topLevelModule) {
@@ -496,39 +477,40 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
-  : importLoc(ID->getLoc()), options(), sourceFileArg(),
-    modulePath(ID->getModulePath()), accessPath(ID->getAccessPath()),
-    importOrUnderlyingModuleDecl(ID)
+  : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
+           {}),
+    importLoc(ID->getLoc()), importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
-    options |= ImportFlags::Exported;
+    import.options |= ImportFlags::Exported;
 
   if (ID->getAttrs().hasAttribute<TestableAttr>())
-    options |= ImportFlags::Testable;
+    import.options |= ImportFlags::Testable;
 
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    options |= ImportFlags::ImplementationOnly;
+    import.options |= ImportFlags::ImplementationOnly;
 
   if (auto *privateImportAttr =
           ID->getAttrs().getAttribute<PrivateImportAttr>()) {
-    options |= ImportFlags::PrivateImport;
-    sourceFileArg = privateImportAttr->getSourceFile();
+    import.options |= ImportFlags::PrivateImport;
+    import.sourceFileArg = privateImportAttr->getSourceFile();
   }
 
   SmallVector<Identifier, 4> spiGroups;
   for (auto attr : ID->getAttrs().getAttributes<SPIAccessControlAttr>()) {
-    options |= ImportFlags::SPIAccessControl;
+    import.options |= ImportFlags::SPIAccessControl;
     auto attrSPIs = attr->getSPIGroups();
     spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }
-  this->spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
+  import.spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
   // Exit early if this is not a self-import.
+  auto modulePath = import.module.getModulePath();
   if (modulePath.front().Item != SF.getParentModule()->getName() ||
       // Overlays use an @_exported self-import to load their clang module.
-      options.contains(ImportFlags::Exported) ||
+      import.options.contains(ImportFlags::Exported) ||
       // Imports of your own submodules are allowed in cross-language libraries.
       modulePath.size() != 1 ||
       // SIL files self-import to get decls from the rest of the module.
@@ -555,7 +537,8 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
   ASTContext &ctx = SF.getASTContext();
 
   SmallString<64> modulePathStr;
-  llvm::interleave(modulePath, [&](ImportPath::Element elem) {
+  llvm::interleave(import.module.getModulePath(),
+                   [&](ImportPath::Element elem) {
                      modulePathStr += elem.Item.str();
                    },
                    [&] { modulePathStr += "."; });
@@ -599,7 +582,7 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
   assert(topLevelModule);
   ASTContext &ctx = topLevelModule->getASTContext();
 
-  if (!options.contains(ImportFlags::PrivateImport))
+  if (!import.options.contains(ImportFlags::PrivateImport))
     return;
 
   if (topLevelModule->arePrivateImportsEnabled())
@@ -607,16 +590,16 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
 
   diagnoseInvalidAttr(DAK_PrivateImport, ctx.Diags,
                       diag::module_not_compiled_for_private_import);
-  sourceFileArg = StringRef();
+  import.sourceFileArg = StringRef();
 }
 
 void UnboundImport::validateImplementationOnly(ASTContext &ctx) {
-  if (!options.contains(ImportFlags::ImplementationOnly) ||
-      !options.contains(ImportFlags::Exported))
+  if (!import.options.contains(ImportFlags::ImplementationOnly) ||
+      !import.options.contains(ImportFlags::Exported))
     return;
 
   // Remove one flag to maintain the invariant.
-  options -= ImportFlags::ImplementationOnly;
+  import.options -= ImportFlags::ImplementationOnly;
 
   diagnoseInvalidAttr(DAK_ImplementationOnly, ctx.Diags,
                       diag::import_implementation_cannot_be_exported);
@@ -626,7 +609,7 @@ void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
   assert(topLevelModule);
   ASTContext &ctx = topLevelModule->getASTContext();
 
-  if (!options.contains(ImportFlags::Testable) ||
+  if (!import.options.contains(ImportFlags::Testable) ||
       topLevelModule->isTestingEnabled() ||
       topLevelModule->isNonSwiftModule() ||
       !ctx.LangOpts.EnableTestableAttrRequiresTestableModule)
@@ -637,7 +620,7 @@ void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
 
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
-  if (options.contains(ImportFlags::ImplementationOnly))
+  if (import.options.contains(ImportFlags::ImplementationOnly))
     return;
 
   // Per getTopLevelModule(), we'll only get nullptr here for non-Swift modules,
@@ -650,7 +633,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
     return;
 
   ASTContext &ctx = SF.getASTContext();
-  ctx.Diags.diagnose(modulePath.front().Loc,
+  ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                      diag::module_not_compiled_with_library_evolution,
                      topLevelModule.get()->getName(),
                      SF.getParentModule()->getName());
@@ -661,8 +644,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
 void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
                                         DiagnosticEngine &diags,
                                         Diag<Identifier> diagID) {
-  auto diag = diags.diagnose(modulePath.front().Loc, diagID,
-                             modulePath.front().Item);
+  auto diag = diags.diagnose(import.module.getModulePath().front().Loc, diagID,
+                             import.module.getModulePath().front().Item);
 
   auto *ID = getImportDecl().getPtrOrNull();
   if (!ID) return;
@@ -923,20 +906,32 @@ static bool canCrossImport(const AttributedImport<ImportedModule> &import) {
   return true;
 }
 
+static UnloadedImportedModule makeUnimportedCrossImportOverlay(
+    ASTContext &ctx,
+    Identifier overlayName,
+    const UnboundImport &base,
+    const AttributedImport<ImportedModule> &declaringImport) {
+  ImportPath::Builder
+      builder(overlayName, base.import.module.getModulePath()[0].Loc);
+
+  // If the declaring import was scoped, inherit that scope in the overlay's
+  // import.
+  llvm::copy(declaringImport.module.accessPath, std::back_inserter(builder));
+
+  // Cross-imports are not backed by an ImportDecl, so we need to provide
+  // our own storage for their module paths.
+  return UnloadedImportedModule(builder.copyTo(ctx),
+      /*isScoped=*/!declaringImport.module.accessPath.empty());
+}
+
 /// Create an UnboundImport for a cross-import overlay.
 UnboundImport::UnboundImport(
     ASTContext &ctx, const UnboundImport &base, Identifier overlayName,
     const AttributedImport<ImportedModule> &declaringImport,
     const AttributedImport<ImportedModule> &bystandingImport)
-    : importLoc(base.importLoc), options(), sourceFileArg(),
-      // Cross-imports are not backed by an ImportDecl, so we need to provide
-      // our own storage for their module paths.
-      modulePath(
-         ImportPath::Module::Builder(overlayName, base.modulePath[0].Loc)
-                    .copyTo(ctx)),
-      // If the declaring import was scoped, inherit that scope in the
-      // overlay's import.
-      accessPath(declaringImport.module.accessPath),
+    : import(makeUnimportedCrossImportOverlay(ctx, overlayName, base,
+                                              declaringImport), {}),
+      importLoc(base.importLoc),
       importOrUnderlyingModuleDecl(declaringImport.module.importedModule)
 {
   // A cross-import is never private or testable, and never comes from a private
@@ -950,13 +945,13 @@ UnboundImport::UnboundImport(
   // If both are exported, the cross-import is exported.
   if (declaringOptions.contains(ImportFlags::Exported) &&
       bystandingOptions.contains(ImportFlags::Exported))
-    options |= ImportFlags::Exported;
+    import.options |= ImportFlags::Exported;
 
   // If either are implementation-only, the cross-import is
   // implementation-only.
   if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
       bystandingOptions.contains(ImportFlags::ImplementationOnly))
-    options |= ImportFlags::ImplementationOnly;
+    import.options |= ImportFlags::ImplementationOnly;
 }
 
 void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
@@ -1107,7 +1102,7 @@ void ImportResolver::findCrossImports(
                          name);
 
     LLVM_DEBUG({
-      auto &crossImportOptions = unboundImports.back().options;
+      auto &crossImportOptions = unboundImports.back().import.options;
       llvm::dbgs() << "  ";
       if (crossImportOptions.contains(ImportFlags::Exported))
         llvm::dbgs() << "@_exported ";
