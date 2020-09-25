@@ -1207,8 +1207,35 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
-      while (parentExpr && isa<ParenExpr>(parentExpr))
-        parentExpr = CS.getParentExpr(parentExpr);
+      bool hasContextualType = bool(CS.getContextualType(expr));
+
+      while (parentExpr) {
+        if (!isa<IdentityExpr>(parentExpr))
+          break;
+
+        // If there is a parent, use it, otherwise we need
+        // to check whether the last parent node in the chain
+        // had a contextual type associated with it because
+        // in situations like:
+        //
+        // \code
+        // func foo() -> Int? {
+        //   return (nil)
+        // }
+        // \endcode
+        //
+        // parentheses around `nil` are significant.
+        if (auto *nextParent = CS.getParentExpr(parentExpr)) {
+          parentExpr = nextParent;
+        } else {
+          hasContextualType |= bool(CS.getContextualType(parentExpr));
+          // Since current expression is an identity expr
+          // and there are no more parents, let's pretend
+          // that `nil`  don't have a parent since parens
+          // are not semantically significant for further checks.
+          parentExpr = nullptr;
+        }
+      }
 
       // In cases like `_ = nil?` AST would have `nil`
       // wrapped in `BindOptionalExpr`.
@@ -1243,7 +1270,7 @@ namespace {
         }
       }
 
-      if (!parentExpr && !CS.getContextualType(expr)) {
+      if (!parentExpr && !hasContextualType) {
         DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
         return Type();
       }

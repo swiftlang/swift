@@ -449,4 +449,12 @@ func sr_12309() {
   _ = (((nil))) // expected-error {{'nil' requires a contextual type}}
   _ = ((((((nil)))))) // expected-error {{'nil' requires a contextual type}}
   _ = (((((((((nil))))))))) // expected-error {{'nil' requires a contextual type}}
+
+  func test_with_contextual_type_one() -> Int? {
+    return (nil) // Ok
+  }
+
+  func test_with_contextual_type_many() -> Int? {
+    return (((nil))) // Ok
+  }
 }
