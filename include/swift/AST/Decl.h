@@ -4121,12 +4121,14 @@ struct SelfReferenceKind {
     return SelfReferenceKind(false, false, false, false);
   }
 
-  /// The type refers to 'Self', but only as the result type of a method.
+  /// The type refers to 'Self', but only as the type of a property or
+  /// the result type of a method/subscript.
   static SelfReferenceKind Result() {
     return SelfReferenceKind(true, false, false, false);
   }
 
-  /// The type refers to 'Self', but only as the parameter type of a method.
+  /// The type refers to 'Self', but only as the parameter type
+  /// of a method/subscript.
   static SelfReferenceKind Parameter() {
     return SelfReferenceKind(false, true, false, false);
   }

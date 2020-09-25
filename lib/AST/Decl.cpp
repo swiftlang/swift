@@ -4960,12 +4960,13 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
   } else {
-    if (::findProtocolSelfReferences(this, type,
-                                     skipAssocTypes)) {
-      return SelfReferenceKind::Other();
-    }
-    return SelfReferenceKind::None();
+    assert(isa<VarDecl>(value));
+
+    return ::findProtocolSelfReferences(this, type,
+                                        skipAssocTypes);
   }
+
+  return SelfReferenceKind::None();
 }
 
 bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
