@@ -236,30 +236,20 @@ std::string DependencyKey::computeNameForProvidedEntity<
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
-bool fine_grained_dependencies::emitReferenceDependencies(
-    DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker,
-    StringRef outputPath,
-    const bool alsoEmitDotFile) {
-
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
-                             SF, outputPath, depTracker, alsoEmitDotFile)
-                              .construct();
-
-  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
-
-  // If path is stdout, cannot read it back, so check for "-"
-  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
-
-  if (alsoEmitDotFile)
-    g.emitDotFile(outputPath, diags);
-
-  return hadError;
+bool fine_grained_dependencies::withReferenceDependencies(
+    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    bool alsoEmitDotFile,
+    llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
+  if (MSF.dyn_cast<ModuleDecl *>()) {
+    llvm_unreachable("Cannot construct dependency graph for modules!");
+  } else {
+    auto *SF = MSF.get<SourceFile *>();
+    SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
+                               SF, outputPath, depTracker, alsoEmitDotFile)
+                               .construct();
+    return cont(std::move(g));
+  }
 }
 
 //==============================================================================

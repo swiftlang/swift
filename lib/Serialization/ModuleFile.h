@@ -465,6 +465,9 @@ public:
     return Core->Bits.IsImplicitDynamicEnabled;
   }
 
+  /// \c true if this module has incremental dependency information.
+  bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded

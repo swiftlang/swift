@@ -5212,9 +5212,11 @@ SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
   this->SF = DC.dyn_cast<SourceFile *>();
 }
 
-void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *SILMod,
-                               const SerializationOptions &options) {
+void Serializer::writeToStream(
+    raw_ostream &os, ModuleOrSourceFile DC,
+    const SILModule *SILMod,
+    const SerializationOptions &options,
+    const fine_grained_dependencies::SourceFileDepGraph *DepGraph) {
   Serializer S{SWIFTMODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -5226,6 +5228,9 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
+    if (options.ExperimentalCrossModuleIncrementalInfo) {
+      S.writeIncrementalInfo(DepGraph);
+    }
   }
 
   S.writeToStream(os);
@@ -5244,7 +5249,8 @@ void swift::serializeToBuffers(
                                "Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
-    Serializer::writeToStream(stream, DC, M, options);
+    Serializer::writeToStream(stream, DC, M, options,
+                              /*dependency info*/ nullptr);
     bool hadError = withOutputFile(getContext(DC).Diags,
                                    options.OutputPath,
                                    [&](raw_ostream &out) {
@@ -5295,12 +5301,13 @@ void swift::serializeToBuffers(
 
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
-                      const SILModule *M) {
+                      const SILModule *M,
+                      const fine_grained_dependencies::SourceFileDepGraph *DG) {
   assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
 
   if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
-    Serializer::writeToStream(llvm::outs(), DC, M, options);
+    Serializer::writeToStream(llvm::outs(), DC, M, options, DG);
     assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
     return;
   }
@@ -5310,7 +5317,7 @@ void swift::serialize(ModuleOrSourceFile DC,
                                  [&](raw_ostream &out) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftmodule");
-    Serializer::writeToStream(out, DC, M, options);
+    Serializer::writeToStream(out, DC, M, options, DG);
     return false;
   });
   if (hadError)

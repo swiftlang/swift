@@ -517,6 +517,12 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// Returns true if this module was or is being compiled for testing.
+  bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
+  void setHasIncrementalInfo(bool enabled = true) {
+    Bits.ModuleDecl.HasIncrementalInfo = enabled;
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {

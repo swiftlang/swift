@@ -238,7 +238,8 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    if (writeFineGrainedDependencyGraph(diags, options::OutputFilename, fg)) {
+    if (writeFineGrainedDependencyGraphToPath(
+            diags, options::OutputFilename, fg)) {
       llvm::errs() << "Failed to write binary swiftdeps\n";
       return 1;
     }
