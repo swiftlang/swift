@@ -127,6 +127,10 @@ if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
 
 if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
     config.available_features.add('differentiable_programming')
+
+if "@SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL@" == "TRUE":
+    config.available_features.add('structural')
+
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 
