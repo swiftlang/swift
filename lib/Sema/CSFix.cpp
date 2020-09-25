@@ -1606,7 +1606,8 @@ IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
 
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
-  return false;
+  MissingContextualTypeForNil failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 SpecifyContextualTypeForNil *
