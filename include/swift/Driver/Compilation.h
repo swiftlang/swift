@@ -281,6 +281,9 @@ private:
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
 
+  /// (experimental) Enable cross-module incremental build scheduling.
+  const bool EnableCrossModuleIncrementalBuild;
+
 public:
   /// Will contain a comparator if an argument demands it.
   Optional<IncrementalSchemeComparator> IncrementalComparator;
@@ -323,7 +326,8 @@ public:
               bool FineGrainedDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
               bool CompareIncrementalSchemes = false,
-              StringRef CompareIncrementalSchemesPath = "");
+              StringRef CompareIncrementalSchemesPath = "",
+              bool EnableCrossModuleIncrementalBuild = false);
   // clang-format on
   ~Compilation();
 
@@ -427,6 +431,10 @@ public:
 
   bool getShowDriverTimeCompilation() const {
     return ShowDriverTimeCompilation;
+  }
+
+  bool getEnableCrossModuleIncrementalBuild() const {
+    return EnableCrossModuleIncrementalBuild;
   }
 
   size_t getFilelistThreshold() const {

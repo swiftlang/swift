@@ -276,6 +276,14 @@ public:
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
 
+  /// When performing an incremental build, ensure that cross-module incremental
+  /// build metadata is available in any swift modules emitted by this frontend
+  /// job.
+  ///
+  /// This flag is currently only propagated from the driver to
+  /// any merge-modules jobs.
+  bool EnableExperimentalCrossModuleIncrementalBuild = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

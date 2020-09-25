@@ -584,6 +584,11 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def enable_experimental_cross_module_incremental_build :
+  Flag<["-"], "enable-experimental-cross-module-incremental-build">,
+  HelpText<"(experimental) Enable cross-module incremental build metadata and "
+           "driver scheduling">;
+
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
