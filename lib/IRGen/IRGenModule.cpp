@@ -587,6 +587,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  SwiftContextTy = createStructType(*this, "swift.context", {});
+  SwiftTaskTy = createStructType(*this, "swift.task", {});
+  SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
+  SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
@@ -676,6 +681,14 @@ namespace RuntimeConstants {
   GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
+    auto featureAvailability = context.getConcurrencyAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
