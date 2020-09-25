@@ -7,6 +7,12 @@
 
 // CHECK-LABEL: sil [noinline] @$s13prespecialize4test_4sizeySaySiGz_SitF
 //
+// function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
+// CHECK: function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyFSnySiG_Tg5
+//
+// function_ref specialized IndexingIterator.next() -> A.Element?
+// CHECK: function_ref @$ss16IndexingIteratorV4next7ElementQzSgyFSnySiG_Tg5
+//
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref @$sSayxSicigSi_Tg5
 // CHECK: return
