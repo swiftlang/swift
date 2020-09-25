@@ -209,6 +209,12 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     dependencyString.push_back(' ');
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
+  auto incrementalDependencyPaths =
+      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
+  for (auto const &path : incrementalDependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+  }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
@@ -1176,6 +1182,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
+    C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
