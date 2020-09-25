@@ -1108,6 +1108,11 @@ def create_argument_parser():
            help='Enable experimental Swift differentiable programming language'
                 ' features.')
 
+    option('--enable-experimental-structural', toggle_true,
+           default=True,
+           help='Enable experimental Swift automatic requirement satisfaction'
+                ' features.')
+
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
            help='Enable experimental Swift concurrency model.')

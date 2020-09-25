@@ -49,6 +49,9 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._enable_experimental_differentiable_programming)
 
+        # Add experimental structural flag.
+        self.cmake_options.extend(self._enable_experimental_structural)
+
         # Add experimental concurrency flag.
         self.cmake_options.extend(self._enable_experimental_concurrency)
 
@@ -136,6 +139,11 @@ updated without updating swift.py?")
     def _enable_experimental_differentiable_programming(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
                  self.args.enable_experimental_differentiable_programming)]
+
+    @property
+    def _enable_experimental_structural(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL:BOOL',
+                 self.args.enable_experimental_structural)]
 
     @property
     def _enable_experimental_concurrency(self):
