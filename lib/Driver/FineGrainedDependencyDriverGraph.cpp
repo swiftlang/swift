@@ -108,6 +108,27 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
   return changes;
 }
 
+ModuleDepGraph::Changes ModuleDepGraph::loadFromSwiftModuleBuffer(
+    const Job *Cmd, llvm::MemoryBuffer &buffer, DiagnosticEngine &diags) {
+  FrontendStatsTracer tracer(
+      stats, "fine-grained-dependencies-loadFromSwiftModuleBuffer");
+  PrettyStackTraceStringAction stackTrace(
+      "loading fine-grained dependency graph from swiftmodule",
+      buffer.getBufferIdentifier());
+
+   Optional<SourceFileDepGraph> sourceFileDepGraph =
+      SourceFileDepGraph::loadFromSwiftModuleBuffer(buffer);
+  if (!sourceFileDepGraph)
+    return None;
+  registerJob(Cmd);
+  auto changes = integrate(*sourceFileDepGraph, buffer.getBufferIdentifier());
+  if (verifyFineGrainedDependencyGraphAfterEveryImport)
+    verify();
+  if (emitFineGrainedDependencyDotFileAfterEveryImport)
+    emitDotFileForJob(diags, Cmd);
+  return changes;
+}
+
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   std::string swiftDeps = getSwiftDeps(cmd).str();
 

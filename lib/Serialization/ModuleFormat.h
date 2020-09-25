@@ -20,10 +20,11 @@
 #define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Bitstream/BitCodes.h"
-#include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
 namespace serialization {
@@ -724,8 +725,10 @@ enum BlockID {
   /// This is part of a stable format and should not be renumbered.
   ///
   /// Though we strive to keep the format stable, breaking the format of
-  /// .swiftsourceinfo doesn't have consequences as serious as breaking the format
-  /// of .swiftdoc because .swiftsourceinfo file is for local development use only.
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the
+  /// format
+  /// of .swiftdoc because .swiftsourceinfo file is for local development use
+  /// only.
   ///
   /// \sa decl_locs_block
   DECL_LOCS_BLOCK_ID,
@@ -733,7 +736,8 @@ enum BlockID {
   /// The incremental dependency information block.
   ///
   /// This is part of a stable format and should not be renumbered.
-  INCREMENTAL_INFORMATION_BLOCK_ID = 196,
+  INCREMENTAL_INFORMATION_BLOCK_ID =
+      fine_grained_dependencies::INCREMENTAL_INFORMATION_BLOCK_ID,
 };
 
 /// The record types within the control block.
