@@ -565,6 +565,7 @@ enum class ImplicitStdlibKind {
   Stdlib
 };
 
+/// Represents unprocessed options for implicit imports.
 struct ImplicitImportInfo {
   /// The implicit stdlib to import.
   ImplicitStdlibKind StdlibKind;
@@ -588,6 +589,20 @@ struct ImplicitImportInfo {
       : StdlibKind(ImplicitStdlibKind::None),
         ShouldImportUnderlyingModule(false) {}
 };
+
+/// Contains names of and pointers to modules that must be implicitly imported.
+struct ImplicitImportList {
+  ArrayRef<ImplicitImport> imports;
+
+  friend bool operator==(const ImplicitImportList &lhs,
+                         const ImplicitImportList &rhs) {
+    return lhs.imports == rhs.imports;
+  }
+};
+
+/// A list of modules to implicitly import.
+void simple_display(llvm::raw_ostream &out,
+                    const ImplicitImportList &importList);
 
 }
 

@@ -56,7 +56,6 @@ namespace swift {
   class FuncDecl;
   class InfixOperatorDecl;
   class LinkLibrary;
-  struct ImplicitImport;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -278,7 +277,7 @@ public:
 
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
-  ArrayRef<ImplicitImport> getImplicitImports() const;
+  ImplicitImportList getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());

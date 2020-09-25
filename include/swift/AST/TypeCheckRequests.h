@@ -2498,7 +2498,7 @@ public:
 /// of a given module.
 class ModuleImplicitImportsRequest
     : public SimpleRequest<ModuleImplicitImportsRequest,
-                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           ImplicitImportList(ModuleDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2506,8 +2506,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<ImplicitImport>
-  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+  ImplicitImportList evaluate(Evaluator &evaluator, ModuleDecl *module) const;
 
 public:
   // Cached.

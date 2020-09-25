@@ -174,15 +174,7 @@ public:
     addImplicitImports();
   }
 
-  void addImplicitImports() {
-    // TODO: Support cross-module imports.
-    for (auto &import : SF.getParentModule()->getImplicitImports()) {
-      assert(!(SF.Kind == SourceFileKind::SIL &&
-               import.Module->isStdlibModule()));
-      ImportedModule importedMod{ImportPath::Access(), import.Module};
-      boundImports.emplace_back(importedMod, import.Options);
-    }
-  }
+  void addImplicitImports();
 
   /// Retrieve the finalized imports.
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
@@ -400,7 +392,7 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
-ArrayRef<ImplicitImport>
+ImplicitImportList
 ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
                                        ModuleDecl *module) const {
   SmallVector<ImplicitImport, 4> imports;
@@ -468,7 +460,19 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return ctx.AllocateCopy(imports);
+  return { ctx.AllocateCopy(imports) };
+}
+
+void ImportResolver::addImplicitImports() {
+  auto implicitImports = SF.getParentModule()->getImplicitImports();
+
+  // TODO: Support cross-module imports.
+  for (auto &import : implicitImports.imports) {
+    assert(!(SF.Kind == SourceFileKind::SIL &&
+             import.Module->isStdlibModule()));
+    ImportedModule importedMod{ImportPath::Access(), import.Module};
+    boundImports.emplace_back(importedMod, import.Options);
+  }
 }
 
 //===----------------------------------------------------------------------===//

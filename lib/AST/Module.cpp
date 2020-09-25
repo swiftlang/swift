@@ -487,13 +487,12 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasIncrementalInfo = 0;
 }
 
-ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
+ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto &evaluator = getASTContext().evaluator;
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
 }
-
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // If this is a LoadedFile, make sure it loaded without error.

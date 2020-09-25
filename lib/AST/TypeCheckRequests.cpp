@@ -1397,6 +1397,14 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, import.Module);
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ImplicitImportList &importList) {
+  llvm::interleaveComma(importList.imports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
+}
+
 //----------------------------------------------------------------------------//
 // ResolveTypeRequest computation.
 //----------------------------------------------------------------------------//
