@@ -5,7 +5,7 @@
 
 import MemberInline
 
-public func sub(_ lhs: inout IntBox, _ rhs: IntBox) -> IntBox { lhs - rhs }
+public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs - rhs }
 
-// CHECK: call [[RES:i32|i64]] [[NAME:@(_ZN6IntBoxmiES_|"\?\?GIntBox@@QEAA\?AU0@U0@@Z")]](%struct.IntBox* {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.IntBox\* byval align 4}} {{%[0-9]+}})
-// CHECK: define linkonce_odr [[RES]] [[NAME]](%struct.IntBox* %this, {{i32 %rhs.coerce|\[1 x i32\] %rhs.coerce|i64 %rhs.coerce|%struct.IntBox\* byval\(%struct.IntBox\) align 4 %rhs}})
+// CHECK: call [[RES:i32|i64]] [[NAME:@(_ZN18LoadableIntWrappermiES_|"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z")]](%struct.LoadableIntWrapper* {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval align 4}} {{%[0-9]+}})
+// CHECK: define linkonce_odr [[RES]] [[NAME]](%struct.LoadableIntWrapper* %this, {{i32 %rhs.coerce|\[1 x i32\] %rhs.coerce|i64 %rhs.coerce|%struct.LoadableIntWrapper\* byval\(%struct.LoadableIntWrapper\) align 4 %rhs}})
