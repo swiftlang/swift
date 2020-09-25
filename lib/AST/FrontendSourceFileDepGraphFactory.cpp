@@ -594,6 +594,9 @@ private:
   }
 
   void enumerateExternalUses() {
+    for (StringRef s : depTracker.getIncrementalDependencies())
+      enumerateUse<NodeKind::incrementalExternalDepend>("", s);
+
     for (StringRef s : depTracker.getDependencies())
       enumerateUse<NodeKind::externalDepend>("", s);
   }

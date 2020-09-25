@@ -2302,7 +2302,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       auto *Mod = MSF.get<ModuleDecl *>();
       fine_grained_dependencies::withReferenceDependencies(
           Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
-          alsoEmitDotFile, [](SourceFileDepGraph &&g) {
+          alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
             serialize(MSF, serializationOpts, SM.get(), &g);
             return false;
           });
