@@ -27,6 +27,24 @@ CHANGELOG
 Swift Next
 ----------
 
+* [#34005][]:
+
+  Non-final classes are now allowed to satisfy read-only subscript and property requirements with a `Self` result type by following existing rules for implementing analogous *method* requirements.
+  
+  ```swift
+  protocol P {
+    func method() -> Self
+    subscript() -> Self { get }
+    var property: Self { get }
+  }
+  
+  class C: P {
+    func method() -> Self { self }
+    subscript() -> Self { self } // Now OK
+    var property: Self { self } // Now OK
+  }
+  ```
+  
 * [SE-0284][]:
 
   Functions, subscripts, and initializers may now have more than one variadic parameter, as long as all parameters which follow variadic parameters are labeled. This makes declarations like the following valid:
@@ -8200,3 +8218,5 @@ Swift 1.0
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
 [SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
+
+[#34005]: <https://github.com/apple/swift/pull/34005>
