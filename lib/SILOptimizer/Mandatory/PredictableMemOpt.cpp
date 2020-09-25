@@ -134,7 +134,7 @@ static unsigned computeSubelement(SILValue Pointer,
       SILType TT = TEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
-      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
+      for (unsigned i = 0, e = TEAI->getFieldIndex(); i != e; ++i) {
         SubElementNumber +=
             getNumSubElements(TT.getTupleElementType(i), M,
                               TypeExpansionContext(*RootInst->getFunction()));

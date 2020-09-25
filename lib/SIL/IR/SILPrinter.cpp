@@ -1773,11 +1773,11 @@ public:
   }
   
   void visitTupleExtractInst(TupleExtractInst *EI) {
-    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
+    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldIndex();
   }
 
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
-    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
+    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldIndex();
   }
   void visitStructExtractInst(StructExtractInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";

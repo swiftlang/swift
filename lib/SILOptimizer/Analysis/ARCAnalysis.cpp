@@ -1084,11 +1084,11 @@ swift::getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
     if (!TE || TE->getOperand() != BI)
       return Failed;
 
-    if (TE->getFieldNo() == 0 && !GuaranteedValue) {
+    if (TE->getFieldIndex() == 0 && !GuaranteedValue) {
       GuaranteedValue = TE;
       continue;
     }
-    if (TE->getFieldNo() == 1 && !Token) {
+    if (TE->getFieldIndex() == 1 && !Token) {
       Token = TE;
       continue;
     }

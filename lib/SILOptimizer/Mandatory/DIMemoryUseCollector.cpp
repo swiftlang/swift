@@ -613,7 +613,7 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
 
   // tuple_element_addr P, 42 indexes into the current tuple element.
   // Recursively process its uses with the adjusted element number.
-  unsigned FieldNo = TEAI->getFieldNo();
+  unsigned FieldNo = TEAI->getFieldIndex();
   auto T = TEAI->getOperand()->getType();
   if (T.is<TupleType>()) {
     for (unsigned i = 0; i != FieldNo; ++i) {

@@ -210,7 +210,7 @@ bool ObjectOutliner::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
                                     EndCOWMutationInst *toIgnore) {
   if (NumTailTupleElements > 0) {
     if (auto *TEA = dyn_cast<TupleElementAddrInst>(TailAddr)) {
-      unsigned TupleIdx = TEA->getFieldNo();
+      unsigned TupleIdx = TEA->getFieldIndex();
       assert(TupleIdx < NumTailTupleElements);
       for (Operand *Use : TEA->getUses()) {
         if (!handleTailAddr(TailIdx * NumTailTupleElements + TupleIdx, Use->getUser(), 0,

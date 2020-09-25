@@ -1113,7 +1113,7 @@ public:
     auto loc = tei->getLoc();
     auto origTupleTy = tei->getOperand()->getType().castTo<TupleType>();
     unsigned tanIndex = 0;
-    for (unsigned i : range(tei->getFieldNo())) {
+    for (unsigned i : range(tei->getFieldIndex())) {
       if (getTangentSpace(
               origTupleTy->getElement(i).getType()->getCanonicalType()))
         ++tanIndex;
@@ -1142,7 +1142,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
     unsigned tanIndex = 0;
-    for (unsigned i : range(teai->getFieldNo())) {
+    for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
               origTupleTy->getElement(i).getType()->getCanonicalType()))
         ++tanIndex;
