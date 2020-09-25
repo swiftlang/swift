@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cstddef>
 #include <type_traits>
+#include "llvm/Support/PointerLikeTypeTraits.h"
 
 namespace swift {
 /// NullablePtr pointer wrapper - NullablePtr is used for APIs where a
@@ -80,5 +81,20 @@ public:
 };
   
 } // end namespace swift
+
+namespace llvm {
+template <typename T> struct PointerLikeTypeTraits;
+template <typename T> struct PointerLikeTypeTraits<swift::NullablePtr<T>> {
+public:
+  static inline void *getAsVoidPointer(swift::NullablePtr<T> ptr) {
+    return static_cast<void *>(ptr.getPtrOrNull());
+  }
+  static inline swift::NullablePtr<T> getFromVoidPointer(void *ptr) {
+    return swift::NullablePtr<T>(static_cast<T*>(ptr));
+  }
+  enum { NumLowBitsAvailable = PointerLikeTypeTraits<T *>::NumLowBitsAvailable };
+};
+
+}
 
 #endif // SWIFT_BASIC_NULLABLEPTR_H
