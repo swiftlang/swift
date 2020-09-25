@@ -38,11 +38,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-/// If true, nest scopes so a variable is out of scope before its declaration
-/// Does not handle capture rules for local functions properly.
-/// If false don't push uses down into subscopes after decls.
-static const bool handleUseBeforeDef = false;
-
 #pragma mark source range utilities
 static bool rangeableIsIgnored(const Decl *d) { return d->isImplicit(); }
 static bool rangeableIsIgnored(const Expr *d) {
@@ -746,11 +741,11 @@ public:
     if (auto *var = patternBinding->getSingleVar())
       scopeCreator.addChildrenForKnownAttributes(var, parentScope);
 
-    const bool isInTypeDecl = parentScope->isATypeDeclScope();
+    const bool isLocalBinding = patternBinding->getDeclContext()->isLocalContext();
 
     const DeclVisibilityKind vis =
-        isInTypeDecl ? DeclVisibilityKind::MemberOfCurrentNominal
-                     : DeclVisibilityKind::LocalVariable;
+        isLocalBinding ? DeclVisibilityKind::LocalVariable
+                       : DeclVisibilityKind::MemberOfCurrentNominal;
     auto *insertionPoint = parentScope;
     for (auto i : range(patternBinding->getNumPatternEntries())) {
       insertionPoint =
@@ -759,9 +754,12 @@ public:
                   insertionPoint, patternBinding, i, vis)
               .getPtrOr(insertionPoint);
     }
-    // If in a type decl, the type search will find these,
-    // but if in a brace stmt, must continue under the last binding.
-    return isInTypeDecl ? parentScope : insertionPoint;
+
+    ASTScopeAssert(isLocalBinding || insertionPoint == parentScope,
+                   "Bindings at the top-level or members of types should "
+                   "not change the insertion point");
+
+    return insertionPoint;
   }
 
   NullablePtr<ASTScopeImpl> visitEnumElementDecl(EnumElementDecl *eed,
@@ -1041,11 +1039,13 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
     scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(var, this);
   });
 
-  ASTScopeAssert(!handleUseBeforeDef,
-                 "next line is wrong otherwise; would need a use scope");
+  // In local context, the PatternEntryDeclScope becomes the insertion point, so
+  // that all any bindings introduecd by the pattern are in scope for subsequent
+  // lookups.
+  if (vis == DeclVisibilityKind::LocalVariable)
+    return {this, "All code that follows is inside this scope"};
 
-  return {getParent().get(), "When not handling use-before-def, succeeding "
-                             "code just goes in the same scope as this one"};
+  return {getParent().get(), "Global and type members do not introduce scopes"};
 }
 
 void
@@ -1422,11 +1422,6 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
     : decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
-}
-
-bool ASTScopeImpl::isATypeDeclScope() const {
-  Decl *const pd = getDeclIfAny().getPtrOrNull();
-  return pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
 }
 
 #pragma mark new operators
