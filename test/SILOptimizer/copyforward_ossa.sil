@@ -265,7 +265,7 @@ sil [ossa] @_TFSq4someU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ
 
 sil [ossa] @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
 
-// CHECK-LABEL: sil hidden [ossa] @option_init :
+// CHECK-LABEL: sil hidden [ossa] @option_init
 // CHECK: alloc_stack
 // CHECK: alloc_stack
 // CHECK: alloc_stack
