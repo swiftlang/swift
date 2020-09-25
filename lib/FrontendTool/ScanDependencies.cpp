@@ -817,13 +817,13 @@ bool swift::scanDependencies(CompilerInstance &instance) {
     }
 
     // Add any implicit module names.
-    for (const auto &moduleName : importInfo.ModuleNames) {
-      mainDependencies.addModuleDependency(moduleName.str(), &alreadyAddedModules);
+    for (const auto &import : importInfo.AdditionalUnloadedImports) {
+      mainDependencies.addModuleDependency(import.module.getModulePath().front().Item.str(), &alreadyAddedModules);
     }
 
     // Already-loaded, implicitly imported module names.
-    for (const auto &module : importInfo.AdditionalModules) {
-      mainDependencies.addModuleDependency(module.first->getNameStr(), &alreadyAddedModules);
+    for (const auto &import : importInfo.AdditionalImports) {
+      mainDependencies.addModuleDependency(import.module.importedModule->getNameStr(), &alreadyAddedModules);
     }
 
     // Add the bridging header.

@@ -392,6 +392,27 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
+static void diagnoseNoSuchModule(ASTContext &ctx, SourceLoc importLoc,
+                                 ImportPath::Module modulePath,
+                                 bool nonfatalInREPL) {
+  SmallString<64> modulePathStr;
+  llvm::interleave(modulePath, [&](ImportPath::Element elem) {
+                     modulePathStr += elem.Item.str();
+                   },
+                   [&] { modulePathStr += "."; });
+
+  auto diagKind = diag::sema_no_import;
+  if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
+    diagKind = diag::sema_no_import_repl;
+  ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+
+  if (ctx.SearchPathOpts.SDKPath.empty() &&
+      llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+    ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+  }
+}
+
 ImplicitImportList
 ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
                                        ModuleDecl *module) const {
@@ -422,27 +443,22 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
   }
 
   // Add any modules we were asked to implicitly import.
-  for (auto moduleName : importInfo.ModuleNames) {
-    auto *importModule = ctx.getModuleByIdentifier(moduleName);
+  for (auto unloadedImport : importInfo.AdditionalUnloadedImports) {
+    auto *importModule = ctx.getModule(unloadedImport.module.getModulePath());
     if (!importModule) {
-      ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import, moduleName.str());
-      if (ctx.SearchPathOpts.SDKPath.empty() &&
-          llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
-        ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-        ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
-      }
+      diagnoseNoSuchModule(ctx, SourceLoc(),
+                           unloadedImport.module.getModulePath(),
+                           /*nonfatalInREPL=*/false);
       continue;
     }
-    ImportedModule import(ImportPath::Access(), importModule);
-    imports.emplace_back(import, ImportOptions());
+    ImportedModule import(unloadedImport.module.getAccessPath(), importModule);
+    imports.emplace_back(import, unloadedImport.options,
+                         unloadedImport.sourceFileArg,
+                         unloadedImport.spiGroups);
   }
 
   // Add any pre-loaded modules.
-  for (auto &module : importInfo.AdditionalModules) {
-    ImportedModule import(ImportPath::Access(), module.first);
-    imports.emplace_back(import, module.second ? ImportFlags::Exported
-                                               : ImportOptions());
-  }
+  llvm::copy(importInfo.AdditionalImports, std::back_inserter(imports));
 
   auto *clangImporter =
       static_cast<ClangImporter *>(ctx.getClangModuleLoader());
@@ -547,25 +563,8 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
   if (M)
     return true;
 
-  ASTContext &ctx = SF.getASTContext();
-
-  SmallString<64> modulePathStr;
-  llvm::interleave(import.module.getModulePath(),
-                   [&](ImportPath::Element elem) {
-                     modulePathStr += elem.Item.str();
-                   },
-                   [&] { modulePathStr += "."; });
-
-  auto diagKind = diag::sema_no_import;
-  if (ctx.LangOpts.DebuggerSupport)
-    diagKind = diag::sema_no_import_repl;
-  ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
-
-  if (ctx.SearchPathOpts.SDKPath.empty() &&
-      llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
-    ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-    ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
-  }
+  diagnoseNoSuchModule(SF.getASTContext(), importLoc,
+                       import.module.getModulePath(), /*nonfatalInREPL=*/true);
   return false;
 }
 

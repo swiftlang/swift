@@ -221,16 +221,17 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   auto *lastModule = SF.getParentModule();
 
   ImplicitImportInfo implicitImports;
-  implicitImports.AdditionalModules.emplace_back(lastModule,
-                                                 /*exported*/ false);
+  {
+    ImportedModule import(ImportPath::Access(), lastModule);
+    implicitImports.AdditionalImports.emplace_back(import, ImportOptions());
+  }
 
   // Carry over the private imports from the last module.
   SmallVector<ImportedModule, 8> imports;
   lastModule->getImportedModules(imports,
                                  ModuleDecl::ImportFilterKind::Default);
   for (auto &import : imports) {
-    implicitImports.AdditionalModules.emplace_back(import.importedModule,
-                                                   /*exported*/ false);
+    implicitImports.AdditionalImports.emplace_back(import, ImportOptions());
   }
 
   // Create a new module and file for the code completion buffer, similar to how

@@ -572,13 +572,14 @@ struct ImplicitImportInfo {
   /// The bridging header path for this module, empty if there is none.
   StringRef BridgingHeaderPath;
 
-  /// The names of additional modules to be implicitly imported.
-  SmallVector<Identifier, 4> ModuleNames;
+  /// The names of additional modules to be loaded and implicitly imported.
+  SmallVector<AttributedImport<UnloadedImportedModule>, 4>
+      AdditionalUnloadedImports;
 
   /// An additional list of already-loaded modules which should be implicitly
   /// imported.
-  SmallVector<std::pair<ModuleDecl *, /*exported*/ bool>, 4>
-      AdditionalModules;
+  SmallVector<AttributedImport<ImportedModule>, 4>
+      AdditionalImports;
 
   ImplicitImportInfo()
       : StdlibKind(ImplicitStdlibKind::None),
