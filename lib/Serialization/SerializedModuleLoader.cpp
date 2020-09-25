@@ -714,6 +714,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setPrivateImportsEnabled();
     if (loadedModuleFile->isImplicitDynamicEnabled())
       M.setImplicitDynamicEnabled();
+    if (loadedModuleFile->hasIncrementalInfo())
+      M.setHasIncrementalInfo();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
