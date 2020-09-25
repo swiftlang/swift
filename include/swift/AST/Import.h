@@ -444,25 +444,31 @@ struct alignas(uint64_t) ImportedModule {
   };
 };
 
+/// Augments a type representing an import to also include information about the
+/// import's attributes. This is usually used with either \c ImportedModule or
+/// \c UnloadedImportedModule.
 template<class ModuleInfo>
 struct AttributedImport {
+  /// Information about the module and access path being imported.
   ModuleInfo module;
 
-  ImportOptions importOptions;
+  /// Flags indicating which attributes of this import are present.
+  ImportOptions options;
 
-  // Filename for a @_private import.
-  StringRef filename;
+  /// If this is a @_private import, the value of its 'sourceFile:' argument;
+  /// otherwise, empty string.
+  StringRef sourceFileArg;
 
-  // Names of explicitly imported SPIs.
+  /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
 
   AttributedImport(ModuleInfo module, ImportOptions options,
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
-      : module(module), importOptions(options), filename(filename),
+      : module(module), options(options), sourceFileArg(filename),
         spiGroups(spiGroups) {
-    assert(!(importOptions.contains(ImportFlags::Exported) &&
-             importOptions.contains(ImportFlags::ImplementationOnly)) ||
-           importOptions.contains(ImportFlags::Reserved));
+    assert(!(options.contains(ImportFlags::Exported) &&
+             options.contains(ImportFlags::ImplementationOnly)) ||
+           options.contains(ImportFlags::Reserved));
   }
 };
 
@@ -596,14 +602,14 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.importOptions),
-            StringRefDMI::getHashValue(import.filename)));
+            ImportOptionsDMI::getHashValue(import.options),
+            StringRefDMI::getHashValue(import.sourceFileArg)));
   }
   static bool isEqual(const AttributedImport &a,
                       const AttributedImport &b) {
     return ModuleInfoDMI::isEqual(a.module, b.module) &&
-           ImportOptionsDMI::isEqual(a.importOptions, b.importOptions) &&
-           StringRefDMI::isEqual(a.filename, b.filename);
+           ImportOptionsDMI::isEqual(a.options, b.options) &&
+           StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg);
   }
 };
 }

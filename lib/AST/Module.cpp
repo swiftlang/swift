@@ -1191,14 +1191,14 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
-    if (desc.importOptions.contains(ImportFlags::Exported))
+    if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
-    else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Default;
 
-    if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+    if (desc.options.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
     if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
@@ -1892,7 +1892,7 @@ bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
   return llvm::any_of(SF->getImports(),
                       [](AttributedImport<ImportedModule> desc) {
-    return desc.importOptions.contains(ImportFlags::ImplementationOnly);
+    return desc.options.contains(ImportFlags::ImplementationOnly);
   });
 }
 
@@ -1917,15 +1917,15 @@ bool SourceFile::hasTestableOrPrivateImport(
         [module, queryKind](AttributedImport<ImportedModule> desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
             return desc.module.importedModule == module &&
-                   (desc.importOptions.contains(ImportFlags::PrivateImport) ||
-                    desc.importOptions.contains(ImportFlags::Testable));
+                   (desc.options.contains(ImportFlags::PrivateImport) ||
+                    desc.options.contains(ImportFlags::Testable));
           else if (queryKind == ImportQueryKind::TestableOnly)
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::Testable);
+                   desc.options.contains(ImportFlags::Testable);
           else {
             assert(queryKind == ImportQueryKind::PrivateOnly);
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::PrivateImport);
+                   desc.options.contains(ImportFlags::PrivateImport);
           }
         });
   case AccessLevel::Open:
@@ -1958,8 +1958,8 @@ bool SourceFile::hasTestableOrPrivateImport(
   return llvm::any_of(*Imports,
       [module, filename](AttributedImport<ImportedModule> desc) {
         return desc.module.importedModule == module &&
-              desc.importOptions.contains(ImportFlags::PrivateImport) &&
-              desc.filename == filename;
+              desc.options.contains(ImportFlags::PrivateImport) &&
+              desc.sourceFileArg == filename;
       });
 }
 
@@ -1974,7 +1974,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
-    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    if (desc.options.contains(ImportFlags::ImplementationOnly))
       continue;
 
     // If the module is imported this way, it's not imported
@@ -2012,7 +2012,7 @@ void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
-    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+    if (import.options.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
       spiGroups.insert(importedSpis.begin(), importedSpis.end());

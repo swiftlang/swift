@@ -61,7 +61,7 @@ struct UnboundImport {
 
   /// If \c options includes \c PrivateImport, the filename we should import
   /// private declarations from.
-  StringRef privateImportFileName;
+  StringRef sourceFileArg;
 
   /// The module names being imported. There will usually be just one for the
   /// top-level module, but a submodule import will have more.
@@ -137,8 +137,8 @@ struct UnboundImport {
   /// UnboundImport.
   AttributedImport<ImportedModule>
   makeAttributedImport(ModuleDecl *module) const {
-    return AttributedImport<ImportedModule>({ accessPath, module }, options,
-                                            privateImportFileName, spiGroups);
+    return { ImportedModule{ accessPath, module },
+             options, sourceFileArg, spiGroups };
   }
 
 private:
@@ -496,7 +496,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
-  : importLoc(ID->getLoc()), options(), privateImportFileName(),
+  : importLoc(ID->getLoc()), options(), sourceFileArg(),
     modulePath(ID->getModulePath()), accessPath(ID->getAccessPath()),
     importOrUnderlyingModuleDecl(ID)
 {
@@ -512,7 +512,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (auto *privateImportAttr =
           ID->getAttrs().getAttribute<PrivateImportAttr>()) {
     options |= ImportFlags::PrivateImport;
-    privateImportFileName = privateImportAttr->getSourceFile();
+    sourceFileArg = privateImportAttr->getSourceFile();
   }
 
   SmallVector<Identifier, 4> spiGroups;
@@ -607,7 +607,7 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
 
   diagnoseInvalidAttr(DAK_PrivateImport, ctx.Diags,
                       diag::module_not_compiled_for_private_import);
-  privateImportFileName = StringRef();
+  sourceFileArg = StringRef();
 }
 
 void UnboundImport::validateImplementationOnly(ASTContext &ctx) {
@@ -915,9 +915,9 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 //===----------------------------------------------------------------------===//
 
 static bool canCrossImport(const AttributedImport<ImportedModule> &import) {
-  if (import.importOptions.contains(ImportFlags::Testable))
+  if (import.options.contains(ImportFlags::Testable))
     return false;
-  if (import.importOptions.contains(ImportFlags::PrivateImport))
+  if (import.options.contains(ImportFlags::PrivateImport))
     return false;
 
   return true;
@@ -928,7 +928,7 @@ UnboundImport::UnboundImport(
     ASTContext &ctx, const UnboundImport &base, Identifier overlayName,
     const AttributedImport<ImportedModule> &declaringImport,
     const AttributedImport<ImportedModule> &bystandingImport)
-    : importLoc(base.importLoc), options(), privateImportFileName(),
+    : importLoc(base.importLoc), options(), sourceFileArg(),
       // Cross-imports are not backed by an ImportDecl, so we need to provide
       // our own storage for their module paths.
       modulePath(
@@ -944,8 +944,8 @@ UnboundImport::UnboundImport(
   assert(canCrossImport(declaringImport));
   assert(canCrossImport(bystandingImport));
 
-  auto &declaringOptions = declaringImport.importOptions;
-  auto &bystandingOptions = bystandingImport.importOptions;
+  auto &declaringOptions = declaringImport.options;
+  auto &bystandingOptions = bystandingImport.options;
 
   // If both are exported, the cross-import is exported.
   if (declaringOptions.contains(ImportFlags::Exported) &&
