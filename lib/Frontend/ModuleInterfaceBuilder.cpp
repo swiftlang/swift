@@ -153,6 +153,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
   auto outerPrettyStackState = llvm::SavePrettyStackState();
 
   bool SubError = false;
+  static const size_t ThreadStackSize = 8 << 20; // 8 MB.
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
     // Pretend we're on the original thread for pretty-stack-trace purposes.
     auto savedInnerPrettyStackState = llvm::SavePrettyStackState();
@@ -265,7 +266,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     return std::error_code();
     });
-  });
+  }, ThreadStackSize);
   return !RunSuccess || SubError;
 }
 
