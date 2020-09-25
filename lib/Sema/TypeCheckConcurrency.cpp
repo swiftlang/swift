@@ -22,7 +22,14 @@
 
 using namespace swift;
 
-bool swift::checkAsyncHandler(FuncDecl *func, bool diagnose) {
+/// Check whether the @asyncHandler attribute can be applied to the given
+/// function declaration.
+///
+/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
+///
+/// \returns \c true if there was a problem with adding the attribute, \c false
+/// otherwise.
+static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
   if (!func->getResultInterfaceType()->isVoid()) {
     if (diagnose) {
       func->diagnose(diag::asynchandler_returns_value)
@@ -78,7 +85,7 @@ bool swift::checkAsyncHandler(FuncDecl *func, bool diagnose) {
 void swift::addAsyncNotes(FuncDecl *func) {
   func->diagnose(diag::note_add_async_to_function, func->getName());
 
-  if (!checkAsyncHandler(func, /*diagnose=*/false)) {
+  if (func->canBeAsyncHandler()) {
     func->diagnose(
             diag::note_add_asynchandler_to_function, func->getName())
         .fixItInsert(func->getAttributeInsertionLoc(false), "@asyncHandler ");
@@ -108,7 +115,7 @@ bool IsAsyncHandlerRequest::evaluate(
     return false;
 
   // Is it possible to infer @asyncHandler for this function at all?
-  if (checkAsyncHandler(func, /*diagnose=*/false))
+  if (!func->canBeAsyncHandler())
     return false;
 
   // Add an implicit @asyncHandler attribute and return true. We're done.
@@ -155,6 +162,11 @@ bool IsAsyncHandlerRequest::evaluate(
   }
 
   return false;
+}
+
+bool CanBeAsyncHandlerRequest::evaluate(
+    Evaluator &evaluator, FuncDecl *func) const {
+  return !checkAsyncHandler(func, /*diagnose=*/false);
 }
 
 bool IsActorRequest::evaluate(

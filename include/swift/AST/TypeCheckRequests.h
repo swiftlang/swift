@@ -797,6 +797,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given function can be an @asyncHandler, without
+/// producing any diagnostics.
+class CanBeAsyncHandlerRequest :
+    public SimpleRequest<CanBeAsyncHandlerRequest,
+                         bool(FuncDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given class is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,

@@ -2458,7 +2458,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     bool canBeAsyncHandler = false;
     if (auto witnessFunc = dyn_cast<FuncDecl>(match.Witness)) {
       canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
-          !checkAsyncHandler(witnessFunc, /*diagnose=*/false);
+          witnessFunc->canBeAsyncHandler();
     }
     auto diag = match.Witness->diagnose(
         canBeAsyncHandler ? diag::actor_isolated_witness_could_be_async_handler
