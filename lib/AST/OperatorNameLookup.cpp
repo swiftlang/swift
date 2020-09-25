@@ -83,8 +83,7 @@ static TinyPtrVector<T *> lookupOperatorImpl(
       if (!visitedModules.insert(mod).second)
         continue;
 
-      bool isExported =
-          import.importOptions.contains(SourceFile::ImportFlags::Exported);
+      bool isExported = import.importOptions.contains(ImportFlags::Exported);
       if (!includePrivate && !isExported)
         continue;
 

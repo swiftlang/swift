@@ -290,8 +290,7 @@ static void recordShadowedDeclsAfterTypeMatch(
       auto file = dc->getParentSourceFile();
       if (!file) return false;
       for (const auto &import : file->getImports()) {
-        if (import.importOptions.contains(
-                SourceFile::ImportFlags::PrivateImport)
+        if (import.importOptions.contains(ImportFlags::PrivateImport)
             && import.module.importedModule == module
             && import.module.accessPath.matches(name))
           return true;

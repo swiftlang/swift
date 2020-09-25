@@ -354,7 +354,7 @@ ImportDepth::ImportDepth(ASTContext &context,
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
   // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
-  SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
+  SmallVector<ImportedModule, 16> mainImports;
   main->getImportedModules(mainImports,
                            {ModuleDecl::ImportFilterKind::Default,
                             ModuleDecl::ImportFilterKind::ImplementationOnly});
@@ -384,7 +384,7 @@ ImportDepth::ImportDepth(ASTContext &context,
     }
 
     // Add imports to the worklist.
-    SmallVector<ModuleDecl::ImportedModule, 16> imports;
+    SmallVector<ImportedModule, 16> imports;
     module->getImportedModules(imports);
     for (auto &import : imports) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap

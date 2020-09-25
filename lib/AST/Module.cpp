@@ -1175,7 +1175,7 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 }
 
 void
-SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
+SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   // FIXME: Ideally we should assert that the file has had its imports resolved
   // before calling this function. However unfortunately that can cause issues
@@ -1281,7 +1281,7 @@ ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
 }
 
 void
-ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
+ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
@@ -1451,7 +1451,7 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
-  SmallVector<ModuleDecl::ImportedModule, 32> stack;
+  SmallVector<ImportedModule, 32> stack;
 
   ModuleDecl::ImportFilter filter = {
       ModuleDecl::ImportFilterKind::Exported,
@@ -1465,9 +1465,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  auto topLevelModule =
-      ModuleDecl::ImportedModule{ImportPath::Access(), topLevel};
-  stack.emplace_back(topLevelModule);
+  stack.emplace_back(ImportPath::Access(), topLevel);
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val().importedModule;
@@ -1685,8 +1683,8 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
   SmallPtrSet<ModuleDecl *, 16> seen;
-  SmallVector<ModuleDecl::ImportedModule, 16> imported;
-  SmallVector<ModuleDecl::ImportedModule, 16> furtherImported;
+  SmallVector<ImportedModule, 16> imported;
+  SmallVector<ImportedModule, 16> furtherImported;
   ModuleDecl *overlayModule = this;
 
   getImportedModules(imported, ModuleDecl::ImportFilterKind::Exported);
@@ -1891,10 +1889,8 @@ void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
-  using ModuleDesc = SourceFile::ImportedModuleDesc;
-  return llvm::any_of(SF->getImports(), [](ModuleDesc desc) {
-    return desc.importOptions.contains(
-        SourceFile::ImportFlags::ImplementationOnly);
+  return llvm::any_of(SF->getImports(), [](ImportedModuleDesc desc) {
+    return desc.importOptions.contains(ImportFlags::ImplementationOnly);
   });
 }
 
@@ -2001,7 +1997,7 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
     ModuleDecl::ImportFilterKind::Default,
     ModuleDecl::ImportFilterKind::SPIAccessControl,
     ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
-  SmallVector<ModuleDecl::ImportedModule, 4> results;
+  SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
 
   for (auto &desc : results) {

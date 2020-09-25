@@ -43,11 +43,6 @@ using namespace swift;
 // MARK: ImportResolver and supporting types
 //===----------------------------------------------------------------------===//
 
-using ImportedModule = ModuleDecl::ImportedModule;
-using ImportedModuleDesc = SourceFile::ImportedModuleDesc;
-using ImportOptions = SourceFile::ImportOptions;
-using ImportFlags = SourceFile::ImportFlags;
-
 namespace {
 /// Represents an import which the ImportResolver knows exists, but which has
 /// not yet had its options checked, module loaded, or cross-imports found.
@@ -520,7 +515,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 
   SmallVector<Identifier, 4> spiGroups;
   for (auto attr : ID->getAttrs().getAttributes<SPIAccessControlAttr>()) {
-    options |= SourceFile::ImportFlags::SPIAccessControl;
+    options |= ImportFlags::SPIAccessControl;
     auto attrSPIs = attr->getSPIGroups();
     spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }

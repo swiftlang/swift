@@ -182,7 +182,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   if (!canReturnEarly) {
     auto &imports = ctx.getImportCache().getImportSet(moduleOrFile);
 
-    auto visitImport = [&](ModuleDecl::ImportedModule import,
+    auto visitImport = [&](ImportedModule import,
                            const DeclContext *moduleScopeContext) {
       if (import.accessPath.empty())
         import.accessPath = accessPath;
@@ -202,8 +202,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       if (auto *loader = ctx.getClangModuleLoader()) {
         headerImportModule = loader->getImportedHeaderModule();
         if (headerImportModule) {
-          ModuleDecl::ImportedModule import{ImportPath::Access(),
-                                            headerImportModule};
+          ImportedModule import{ImportPath::Access(), headerImportModule};
           visitImport(import, nullptr);
         }
       }

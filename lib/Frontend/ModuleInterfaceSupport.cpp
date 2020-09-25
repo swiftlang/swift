@@ -46,8 +46,8 @@ version::Version swift::InterfaceFormatVersion({1, 0});
 ///
 /// These come from declarations like `import class FooKit.MainFooController`.
 static void diagnoseScopedImports(DiagnosticEngine &diags,
-                                  ArrayRef<ModuleDecl::ImportedModule> imports){
-  for (const ModuleDecl::ImportedModule &importPair : imports) {
+                                  ArrayRef<ImportedModule> imports){
+  for (const ImportedModule &importPair : imports) {
     if (importPair.accessPath.empty())
       continue;
     diags.diagnose(importPair.accessPath.front().Loc,
@@ -109,29 +109,27 @@ static void printImports(raw_ostream &out,
   // When printing the private swiftinterface file, print implementation-only
   // imports only if they are also SPI. First, list all implementation-only
   // imports and filter them later.
-  llvm::SmallSet<ModuleDecl::ImportedModule, 4,
-                 ModuleDecl::OrderImportedModules> ioiImportSet;
+  llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
   if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
     allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
-    SmallVector<ModuleDecl::ImportedModule, 4> ioiImport;
+    SmallVector<ImportedModule, 4> ioiImport;
     M->getImportedModules(ioiImport,
                           {ModuleDecl::ImportFilterKind::ImplementationOnly,
                            ModuleDecl::ImportFilterKind::SPIAccessControl});
     ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
   }
 
-  SmallVector<ModuleDecl::ImportedModule, 8> allImports;
+  SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
-  ModuleDecl::removeDuplicateImports(allImports);
+  ImportedModule::removeDuplicates(allImports);
   diagnoseScopedImports(M->getASTContext().Diags, allImports);
 
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
-  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
+  SmallVector<ImportedModule, 8> publicImports;
   M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
-  llvm::SmallSet<ModuleDecl::ImportedModule, 8,
-                 ModuleDecl::OrderImportedModules> publicImportSet;
+  llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
 
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
