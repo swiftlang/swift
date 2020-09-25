@@ -532,26 +532,21 @@ struct AttributedImport {
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
   }
-};
 
-// MARK: - Implicit imports
-
-/// A module which has been implicitly imported.
-struct ImplicitImport {
-  ModuleDecl *Module;
-  ImportOptions Options;
-
-  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
-      : Module(module), Options(opts) {}
-
-  friend bool operator==(const ImplicitImport &lhs,
-                         const ImplicitImport &rhs) {
-    return lhs.Module == rhs.Module &&
-           lhs.Options.toRaw() == rhs.Options.toRaw();
+  friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
+                         const AttributedImport<ModuleInfo> &rhs) {
+    return lhs.module == rhs.module &&
+           lhs.options.toRaw() == rhs.options.toRaw() &&
+           lhs.sourceFileArg == rhs.sourceFileArg &&
+           lhs.spiGroups == rhs.spiGroups;
   }
 };
 
-void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
+/// A module which has been implicitly imported.
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<ImportedModule> &import);
+
+// MARK: - Implicit imports
 
 /// The kind of stdlib that should be imported.
 enum class ImplicitStdlibKind {
@@ -592,7 +587,7 @@ struct ImplicitImportInfo {
 
 /// Contains names of and pointers to modules that must be implicitly imported.
 struct ImplicitImportList {
-  ArrayRef<ImplicitImport> imports;
+  ArrayRef<AttributedImport<ImportedModule>> imports;
 
   friend bool operator==(const ImplicitImportList &lhs,
                          const ImplicitImportList &rhs) {

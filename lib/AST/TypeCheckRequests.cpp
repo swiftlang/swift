@@ -1392,9 +1392,37 @@ TypeCheckFunctionBodyRequest::readDependencySource(
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ImplicitImport &import) {
-  out << "implicit import of ";
-  simple_display(out, import.Module);
+                           const AttributedImport<ImportedModule> &import) {
+  out << "import of ";
+
+  if (!import.module.accessPath.empty()) {
+    simple_display(out, import.module.accessPath.front().Item);
+    out << " in ";
+  }
+
+  simple_display(out, import.module.importedModule);
+
+  out << " [";
+  if (import.options.contains(ImportFlags::Exported))
+    out << " exported";
+  if (import.options.contains(ImportFlags::Testable))
+    out << " testable";
+  if (import.options.contains(ImportFlags::ImplementationOnly))
+    out << " implementation-only";
+  if (import.options.contains(ImportFlags::PrivateImport))
+    out << " private(" << import.sourceFileArg << ")";
+
+  if (import.options.contains(ImportFlags::SPIAccessControl)) {
+    out << " spi(";
+    llvm::interleave(import.spiGroups,
+                     [&out](Identifier name) {
+                       simple_display(out, name);
+                     },
+                     [&out]() { out << " "; });
+    out << ")";
+  }
+
+  out << " ]";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

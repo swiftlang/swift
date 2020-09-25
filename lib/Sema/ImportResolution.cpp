@@ -395,24 +395,30 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 ImplicitImportList
 ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
                                        ModuleDecl *module) const {
-  SmallVector<ImplicitImport, 4> imports;
+  SmallVector<AttributedImport<ImportedModule>, 4> imports;
 
   auto &ctx = module->getASTContext();
   auto &importInfo = module->getImplicitImportInfo();
 
   // Add an implicit stdlib if needed.
+  ModuleDecl *stdlib;
   switch (importInfo.StdlibKind) {
   case ImplicitStdlibKind::None:
+    stdlib = nullptr;
     break;
   case ImplicitStdlibKind::Builtin:
-    imports.emplace_back(ctx.TheBuiltinModule);
+    stdlib = ctx.TheBuiltinModule;
     break;
   case ImplicitStdlibKind::Stdlib: {
-    auto *stdlib = ctx.getStdlibModule(/*loadIfAbsent*/ true);
+    stdlib = ctx.getStdlibModule(/*loadIfAbsent*/ true);
     assert(stdlib && "Missing stdlib?");
-    imports.emplace_back(stdlib);
     break;
   }
+  }
+
+  if (stdlib) {
+    ImportedModule import(ImportPath::Access(), stdlib);
+    imports.emplace_back(import, ImportOptions());
   }
 
   // Add any modules we were asked to implicitly import.
@@ -427,13 +433,15 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       }
       continue;
     }
-    imports.emplace_back(importModule);
+    ImportedModule import(ImportPath::Access(), importModule);
+    imports.emplace_back(import, ImportOptions());
   }
 
   // Add any pre-loaded modules.
   for (auto &module : importInfo.AdditionalModules) {
-    imports.emplace_back(module.first, module.second ? ImportFlags::Exported
-                                                     : ImportOptions());
+    ImportedModule import(ImportPath::Access(), module.first);
+    imports.emplace_back(import, module.second ? ImportFlags::Exported
+                                               : ImportOptions());
   }
 
   auto *clangImporter =
@@ -445,7 +453,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(headerModule, ImportFlags::Exported);
+    ImportedModule import(ImportPath::Access(), headerModule);
+    imports.emplace_back(import, ImportFlags::Exported);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -453,7 +462,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     auto *underlyingMod = clangImporter->loadModule(
         SourceLoc(), ImportPath::Module::Builder(module->getName()).get());
     if (underlyingMod) {
-      imports.emplace_back(underlyingMod, ImportFlags::Exported);
+      ImportedModule import(ImportPath::Access(), underlyingMod);
+      imports.emplace_back(import, ImportFlags::Exported);
     } else {
       ctx.Diags.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
                          module->getName());
@@ -469,9 +479,8 @@ void ImportResolver::addImplicitImports() {
   // TODO: Support cross-module imports.
   for (auto &import : implicitImports.imports) {
     assert(!(SF.Kind == SourceFileKind::SIL &&
-             import.Module->isStdlibModule()));
-    ImportedModule importedMod{ImportPath::Access(), import.Module};
-    boundImports.emplace_back(importedMod, import.Options);
+             import.module.importedModule->isStdlibModule()));
+    boundImports.push_back(import);
   }
 }
 
