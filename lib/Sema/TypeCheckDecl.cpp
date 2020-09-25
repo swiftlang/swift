@@ -520,16 +520,33 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       }
 
       // Look for a base of 'self' or 'super'.
-      BodyInitKind myKind;
+      arg = arg->getSemanticsProvidingExpr();
+
+      auto myKind = BodyInitKind::None;
       if (arg->isSuperExpr())
         myKind = BodyInitKind::Chained;
       else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
         myKind = BodyInitKind::Delegating;
-      else {
-        // We're constructing something else.
-        return { true, E };
+      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(arg)) {
+        // FIXME: We can see UnresolvedDeclRefExprs here because we have
+        // not yet run preCheckExpression() on the entire function body
+        // yet.
+        //
+        // We could consider pre-checking more eagerly.
+        auto name = declRef->getName();
+        auto loc = declRef->getLoc();
+        if (name.isSimpleName(ctx.Id_self)) {
+          auto *otherSelfDecl =
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
+                                            name.getFullName(), loc);
+          if (otherSelfDecl == Decl->getImplicitSelfDecl())
+            myKind = BodyInitKind::Delegating;
+        }
       }
       
+      if (myKind == BodyInitKind::None)
+        return { true, E };
+
       if (Kind == BodyInitKind::None) {
         Kind = myKind;
 
