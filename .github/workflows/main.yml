@@ -246,5 +246,5 @@ jobs:
       - name: Upload hello.wasm compiled with Ubuntu 20.04 package
         uses: actions/upload-artifact@v1
         with:
-          name: ubuntu2004-hello.wasm
+          name: ubuntu20.04-hello.wasm
           path: hello.wasm
