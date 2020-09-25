@@ -26,15 +26,6 @@ class Expr;
 class FuncDecl;
 class ValueDecl;
 
-/// Check whether the @asyncHandler attribute can be applied to the given
-/// function declaration.
-///
-/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
-///
-/// \returns \c true if there was a problem with adding the attribute, \c false
-/// otherwise.
-bool checkAsyncHandler(FuncDecl *func, bool diagnose);
-
 /// Add notes suggesting the addition of 'async' or '@asyncHandler', as
 /// appropriate, to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(FuncDecl *func);

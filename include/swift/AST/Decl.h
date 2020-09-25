@@ -578,7 +578,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -607,7 +607,10 @@ protected:
     IsNonSwiftModule : 1,
 
     /// Whether this module is the main module.
-    IsMainModule : 1
+    IsMainModule : 1,
+
+    /// Whether this module has incremental dependency information available.
+    HasIncrementalInfo : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -4121,12 +4124,14 @@ struct SelfReferenceKind {
     return SelfReferenceKind(false, false, false, false);
   }
 
-  /// The type refers to 'Self', but only as the result type of a method.
+  /// The type refers to 'Self', but only as the type of a property or
+  /// the result type of a method/subscript.
   static SelfReferenceKind Result() {
     return SelfReferenceKind(true, false, false, false);
   }
 
-  /// The type refers to 'Self', but only as the parameter type of a method.
+  /// The type refers to 'Self', but only as the parameter type
+  /// of a method/subscript.
   static SelfReferenceKind Parameter() {
     return SelfReferenceKind(false, true, false, false);
   }
@@ -5947,6 +5952,10 @@ public:
 
   /// Returns true if the function is an @asyncHandler.
   bool isAsyncHandler() const;
+
+  /// Returns true if the function if the signature matches the form of an
+  /// @asyncHandler.
+  bool canBeAsyncHandler() const;
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }

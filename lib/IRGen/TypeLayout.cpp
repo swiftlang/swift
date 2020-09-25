@@ -596,12 +596,14 @@ void ScalarTypeLayoutEntry::computeProperties() {
 }
 
 void ScalarTypeLayoutEntry::Profile(llvm::FoldingSetNodeID &id) const {
-  ScalarTypeLayoutEntry::Profile(id, typeInfo);
+  ScalarTypeLayoutEntry::Profile(id, typeInfo, representative);
 }
 
 void ScalarTypeLayoutEntry::Profile(llvm::FoldingSetNodeID &id,
-                                    const TypeInfo &ti) {
+                                    const TypeInfo &ti,
+                                    SILType ty) {
   id.AddPointer(&ti);
+  id.AddPointer(ty.getASTType().getPointer());
 }
 
 ScalarTypeLayoutEntry::~ScalarTypeLayoutEntry() {}
@@ -2083,7 +2085,7 @@ TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
                                         SILType representative) {
   assert(ti.isFixedSize());
   llvm::FoldingSetNodeID id;
-  ScalarTypeLayoutEntry::Profile(id, ti);
+  ScalarTypeLayoutEntry::Profile(id, ti, representative);
   // Do we already have an entry.
   void *insertPos;
   if (auto *entry = scalarEntries.FindNodeOrInsertPos(id, insertPos)) {

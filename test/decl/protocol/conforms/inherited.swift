@@ -5,7 +5,7 @@ protocol P1 {
   func f1(_ x: Self?) -> Bool
 }
 
-// Never inheritable: property with 'Self' in its signature.
+// Inheritable: property with 'Self' in its signature.
 protocol P2 {
   var prop2: Self { get set }
 }
@@ -13,7 +13,7 @@ protocol P2a {
   var prop2a: Self { get set }
 }
 
-// Never inheritable: subscript with 'Self' in its result type.
+// Inheritable: subscript with 'Self' in its result type.
 protocol P3 {
   subscript (i: Int) -> Self { get }
 }
@@ -94,7 +94,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f1(_ x: A?) -> Bool { return true }
 
   // P2
-  var prop2: A { // expected-error{{protocol 'P2' requirement 'prop2' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
+  var prop2: A { // expected-error{{property 'prop2' in non-final class 'A' must specify type 'Self' to conform to protocol 'P2'}}
     get { return self }
     set {}
   }
@@ -106,7 +106,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   }
 
   // P3
-  subscript (i: Int) -> A { // expected-error{{protocol 'P3' requirement 'subscript(_:)' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
+  subscript (i: Int) -> A { // expected-error{{subscript 'subscript(_:)' in non-final class 'A' must return 'Self' to conform to protocol 'P3'}}
     get {
      return self
     }
@@ -145,7 +145,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
 }
 
 extension A: P2a, P5a, P10a {}
-// expected-error@-1 {{protocol 'P2a' requirement 'prop2a' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
+// expected-error@-1 {{property 'prop2a' in non-final class 'A' must specify type 'Self' to conform to protocol 'P2a'}}
 // expected-error@-2 {{method 'f5a()' in non-final class 'A' must return 'Self' to conform to protocol 'P5a'}}
 // expected-error@-3 {{protocol 'P10a' requirement 'f10a' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
 

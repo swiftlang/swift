@@ -2092,7 +2092,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
     return FunctionType::get(params, result, fnTy->getExtInfo());
   }
 
-  return substType(type, /*result*/false);
+  return substType(type, /*result*/ true);
 }
 
 diag::RequirementKind
@@ -2458,7 +2458,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     bool canBeAsyncHandler = false;
     if (auto witnessFunc = dyn_cast<FuncDecl>(match.Witness)) {
       canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
-          !checkAsyncHandler(witnessFunc, /*diagnose=*/false);
+          witnessFunc->canBeAsyncHandler();
     }
     auto diag = match.Witness->diagnose(
         canBeAsyncHandler ? diag::actor_isolated_witness_could_be_async_handler
@@ -3361,41 +3361,36 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
         emitDeclaredHereIfNeeded(diags, diagLoc, witness);
       });
   } else if (selfKind.result) {
-    // The reference to Self occurs in the result type. A non-final class
-    // can satisfy this requirement with a method that returns Self.
+    // The reference to Self occurs in the result type of a method/subscript
+    // or the type of a property. A non-final class can satisfy this requirement
+    // by holding onto Self accordingly.
+    if (witness->getDeclContext()->getSelfClassDecl()) {
+      const bool hasDynamicSelfResult = [&] {
+        if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
+          return func->hasDynamicSelfResult();
+        } else if (auto var = dyn_cast<VarDecl>(witness)) {
+          return var->getInterfaceType()->hasDynamicSelfType();
+        }
 
-    // If the function has a dynamic Self, it's okay.
-    if (auto func = dyn_cast<FuncDecl>(witness)) {
-      if (func->getDeclContext()->getSelfClassDecl() &&
-          !func->hasDynamicSelfResult()) {
+        return cast<SubscriptDecl>(witness)
+            ->getElementInterfaceType()
+            ->hasDynamicSelfType();
+      }();
+
+      if (!hasDynamicSelfResult) {
         diagnoseOrDefer(requirement, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
             auto &diags = proto->getASTContext().Diags;
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
-            diags.diagnose(diagLoc,
-                           diag::witness_requires_dynamic_self,
+            diags.diagnose(diagLoc, diag::witness_requires_dynamic_self,
+                           getProtocolRequirementKind(requirement),
                            requirement->getName(),
                            conformance->getType(),
                            proto->getDeclaredInterfaceType());
             emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           });
       }
-
-    // Constructors conceptually also have a dynamic Self
-    // return type, so they're okay.
-    } else if (!isa<ConstructorDecl>(witness)) {
-      diagnoseOrDefer(requirement, false,
-        [witness, requirement](NormalProtocolConformance *conformance) {
-          auto proto = conformance->getProtocol();
-          auto &diags = proto->getASTContext().Diags;
-          SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          diags.diagnose(diagLoc, diag::witness_self_non_subtype,
-                         proto->getDeclaredInterfaceType(),
-                         requirement->getName(),
-                         conformance->getType());
-          emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-        });
     }
   } else if (selfKind.requirement) {
     if (auto targetPair = getAdopteeSelfSameTypeConstraint(classDecl,
@@ -3431,8 +3426,8 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // constraint that either the requirement not produce 'Self' in a
   // covariant position, or the type of the requirement does not involve
   // associated types.
-  if (auto func = dyn_cast<FuncDecl>(witness)) {
-    if (func->getDeclContext()->getExtendedProtocolDecl()) {
+  if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
+    if (witness->getDeclContext()->getExtendedProtocolDecl()) {
       auto selfKindWithAssocTypes = Proto->findProtocolSelfReferences(
           requirement,
           /*allowCovariantParameters=*/false,
@@ -3445,6 +3440,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             auto &diags = proto->getASTContext().Diags;
             diags.diagnose(conformance->getLoc(),
                            diag::witness_requires_class_implementation,
+                           getProtocolRequirementKind(requirement),
                            requirement->getName(),
                            conformance->getType());
             diags.diagnose(witness, diag::decl_declared_here,

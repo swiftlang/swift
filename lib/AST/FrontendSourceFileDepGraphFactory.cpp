@@ -15,7 +15,7 @@
 // it is written to a file which is read by the driver in order to decide which
 // source files require recompilation.
 
-#include "swift/AST/FrontendSourceFileDepGraphFactory.h"
+#include "FrontendSourceFileDepGraphFactory.h"
 
 // may not all be needed
 #include "swift/AST/ASTContext.h"
@@ -236,30 +236,20 @@ std::string DependencyKey::computeNameForProvidedEntity<
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
-bool fine_grained_dependencies::emitReferenceDependencies(
-    DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker,
-    StringRef outputPath,
-    const bool alsoEmitDotFile) {
-
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
-                             SF, outputPath, depTracker, alsoEmitDotFile)
-                              .construct();
-
-  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
-
-  // If path is stdout, cannot read it back, so check for "-"
-  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
-
-  if (alsoEmitDotFile)
-    g.emitDotFile(outputPath, diags);
-
-  return hadError;
+bool fine_grained_dependencies::withReferenceDependencies(
+    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    bool alsoEmitDotFile,
+    llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
+  if (MSF.dyn_cast<ModuleDecl *>()) {
+    llvm_unreachable("Cannot construct dependency graph for modules!");
+  } else {
+    auto *SF = MSF.get<SourceFile *>();
+    SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
+                               SF, outputPath, depTracker, alsoEmitDotFile)
+                               .construct();
+    return cont(std::move(g));
+  }
 }
 
 //==============================================================================
@@ -298,16 +288,13 @@ std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
 //==============================================================================
 //==============================================================================
-// MARK: SourceFileDeclFinder
+// MARK: DeclFinder
 //==============================================================================
 
 namespace {
 /// Takes all the Decls in a SourceFile, and collects them into buckets by
 /// groups of DeclKinds. Also casts them to more specific types
-/// TODO: Factor with SourceFileDeclFinder
-struct SourceFileDeclFinder {
-
-public:
+struct DeclFinder {
   /// Existing system excludes private decls in some cases.
   /// In the future, we might not want to do this, so use bool to decide.
   const bool includePrivateDecls;
@@ -324,11 +311,16 @@ public:
   ConstPtrPairVec<NominalTypeDecl, ValueDecl> valuesInExtensions;
   ConstPtrVec<ValueDecl> classMembers;
 
+  using LookupClassMember = llvm::function_ref<void(VisibleDeclConsumer &)>;
+
+public:
   /// Construct me and separates the Decls.
   // clang-format off
-    SourceFileDeclFinder(const SourceFile *const SF, const bool includePrivateDecls)
+    DeclFinder(ArrayRef<Decl *> topLevelDecls,
+               const bool includePrivateDecls,
+               LookupClassMember lookupClassMember)
     : includePrivateDecls(includePrivateDecls) {
-      for (const Decl *const D : SF->getTopLevelDecls()) {
+      for (const Decl *const D : topLevelDecls) {
         select<ExtensionDecl, DeclKind::Extension>(D, extensions, false) ||
         select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
         DeclKind::PostfixOperator>(D, operators, false) ||
@@ -345,7 +337,7 @@ public:
     findNominalsFromExtensions();
     findNominalsInTopNominals();
     findValuesInExtensions();
-    findClassMembers(SF);
+    findClassMembers(lookupClassMember);
   }
 
 private:
@@ -419,7 +411,7 @@ private:
   }
 
   /// Class members are needed for dynamic lookup dependency nodes.
-  void findClassMembers(const SourceFile *const SF) {
+  void findClassMembers(LookupClassMember lookup) {
     struct Collector : public VisibleDeclConsumer {
       ConstPtrVec<ValueDecl> &classMembers;
       Collector(ConstPtrVec<ValueDecl> &classMembers)
@@ -429,7 +421,7 @@ private:
         classMembers.push_back(VD);
       }
     } collector{classMembers};
-    SF->lookupClassMembers({}, collector);
+    lookup(collector);
   }
 
   /// Check \p D to see if it is one of the DeclKinds in the template
@@ -470,7 +462,10 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  SourceFileDeclFinder declFinder(SF, includePrivateDeps);
+  DeclFinder declFinder(SF->getTopLevelDecls(), includePrivateDeps,
+                        [this](VisibleDeclConsumer &consumer) {
+    SF->lookupClassMembers({}, consumer);
+  });
 
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
       declFinder.precedenceGroups);

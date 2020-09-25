@@ -59,10 +59,13 @@ namespace swift {
 class DependencyTracker;
 class DiagnosticEngine;
 class FrontendOptions;
+class ModuleDecl;
 class SourceFile;
 
 /// Use a new namespace to help keep the experimental code from clashing.
 namespace fine_grained_dependencies {
+
+class SourceFileDepGraph;
 
 using StringVec = std::vector<std::string>;
 
@@ -343,11 +346,11 @@ private:
 // MARK: Start of fine-grained-dependency-specific code
 //==============================================================================
 
-/// The entry point into this system from the frontend:
-/// Write out the .swiftdeps file for a frontend compilation of a primary file.
-bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
-                               const DependencyTracker &depTracker,
-                               StringRef outputPath, bool alsoEmitDotFile);
+bool withReferenceDependencies(
+    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
+
 //==============================================================================
 // MARK: Enums
 //==============================================================================

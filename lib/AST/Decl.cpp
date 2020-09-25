@@ -4960,12 +4960,13 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
   } else {
-    if (::findProtocolSelfReferences(this, type,
-                                     skipAssocTypes)) {
-      return SelfReferenceKind::Other();
-    }
-    return SelfReferenceKind::None();
+    assert(isa<VarDecl>(value));
+
+    return ::findProtocolSelfReferences(this, type,
+                                        skipAssocTypes);
   }
+
+  return SelfReferenceKind::None();
 }
 
 bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
@@ -6788,6 +6789,17 @@ bool AbstractFunctionDecl::isAsyncHandler() const {
   auto mutableFunc = const_cast<FuncDecl *>(func);
   return evaluateOrDefault(getASTContext().evaluator,
                            IsAsyncHandlerRequest{mutableFunc},
+                           false);
+}
+
+bool AbstractFunctionDecl::canBeAsyncHandler() const {
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func)
+    return false;
+
+  auto mutableFunc = const_cast<FuncDecl *>(func);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           CanBeAsyncHandlerRequest{mutableFunc},
                            false);
 }
 
