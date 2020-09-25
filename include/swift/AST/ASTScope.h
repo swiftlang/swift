@@ -280,7 +280,6 @@ private:
 public:
   virtual NullablePtr<ClosureExpr> getClosureIfClosureScope() const;
   virtual ASTContext &getASTContext() const;
-  virtual NullablePtr<DeclContext> getDeclContext() const;
   virtual NullablePtr<Decl> getDeclIfAny() const { return nullptr; };
   virtual NullablePtr<Stmt> getStmtIfAny() const { return nullptr; };
   virtual NullablePtr<Expr> getExprIfAny() const { return nullptr; };
@@ -354,7 +353,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static void
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc, DeclConsumer);
+  unqualifiedLookup(SourceFile *, SourceLoc, DeclConsumer);
 
   /// Entry point into ASTScopeImpl-land for labeled statement lookups.
   static llvm::SmallVector<LabeledStmt *, 4>
@@ -366,7 +365,6 @@ public:
 #pragma mark - - lookup- starting point
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
-                                                        const DeclNameRef name,
                                                         const SourceLoc where);
 
 protected:
@@ -487,8 +485,6 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  NullablePtr<DeclContext> getDeclContext() const override;
-
   void buildFullyExpandedTree();
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
@@ -497,7 +493,8 @@ public:
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
-  bool crossCheckWithAST();
+
+  ASTContext &getASTContext() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -684,7 +681,6 @@ public:
   // Returns the where clause scope, or the parent if none
   virtual ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
                                                        ScopeCreator &);
-  NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const {
     return nullptr;
   }
@@ -829,7 +825,6 @@ public:
 
   /// Actually holder is always a GenericContext, need to test if
   /// ProtocolDecl or SubscriptDecl but will refactor later.
-  NullablePtr<DeclContext> getDeclContext() const override;
   NullablePtr<const void> getReferrent() const override;
   std::string getClassName() const override;
   SourceRange
@@ -870,8 +865,6 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
-
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
@@ -906,7 +899,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   NullablePtr<const void> addressForPrinting() const override { return params; }
 };
@@ -929,9 +921,6 @@ private:
 public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override {
-    return decl;
-  }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
@@ -959,7 +948,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 };
@@ -1002,7 +990,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<const void> addressForPrinting() const override { return decl; }
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return attr;
@@ -1101,7 +1088,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
@@ -1189,7 +1175,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  NullablePtr<DeclContext> getDeclContext() const override;
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
   NullablePtr<const void> getReferrent() const override;
@@ -1210,9 +1195,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   NullablePtr<ClosureExpr> getClosureIfClosureScope() const override {
-    return closureExpr;
-  }
-  NullablePtr<DeclContext> getDeclContext() const override {
     return closureExpr;
   }
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
@@ -1247,9 +1229,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override {
-    return decl;
-  }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
   NullablePtr<const void> getReferrent() const override;
@@ -1336,9 +1315,6 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  virtual NullablePtr<DeclContext> getDeclContext() const override {
-    return decl;
-  }
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
   NullablePtr<const void> getReferrent() const override;
@@ -1358,7 +1334,6 @@ public:
 
   std::string getClassName() const override;
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
-  NullablePtr<DeclContext> getDeclContext() const override { return decl; }
   NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
@@ -1700,7 +1675,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   NullablePtr<ClosureExpr> parentClosureIfAny() const; // public??
   Stmt *getStmt() const override { return stmt; }

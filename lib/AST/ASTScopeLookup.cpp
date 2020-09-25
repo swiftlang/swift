@@ -36,21 +36,16 @@ using namespace namelookup;
 using namespace ast_scope;
 
 void ASTScopeImpl::unqualifiedLookup(
-    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
-    DeclConsumer consumer) {
+    SourceFile *sourceFile, const SourceLoc loc, DeclConsumer consumer) {
   const auto *start =
-      findStartingScopeForLookup(sourceFile, name, loc);
+      findStartingScopeForLookup(sourceFile, loc);
   if (start)
     start->lookup(nullptr, nullptr, consumer);
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc) {
+    SourceFile *sourceFile, const SourceLoc loc) {
   auto *const fileScope = sourceFile->getScope().impl;
-  // Parser may have added decls to source file, since previous lookup
-  if (name.isOperator())
-    return fileScope; // operators always at file scope
-
   const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
@@ -253,7 +248,7 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
     return false;
-  return consumer.lookInMembers(scope->getDeclContext().get(), nt);
+  return consumer.lookInMembers(scope->getGenericContext(), nt);
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
