@@ -344,9 +344,6 @@ public:
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
-public:
-  bool isATypeDeclScope() const;
-
 private:
   virtual ScopeCreator &getScopeCreator();
 
@@ -435,6 +432,7 @@ protected:
     return p->getParent().isNonNull() ? p : nullptr;
   }
 
+public:
   /// The tree is organized by source location and for most nodes this is also
   /// what obtaines for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
@@ -1079,6 +1077,7 @@ public:
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
+  bool isLabeledStmtLookupTerminator() const override;
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
@@ -1093,6 +1092,7 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
