@@ -5344,7 +5344,10 @@ public:
   /// indices.
   ///
   /// \param paramIdx The index of the parameter that is missing an argument.
-  virtual Optional<unsigned> missingArgument(unsigned paramIdx);
+  /// \param argInsertIdx The index in the argument list where this argument was
+  /// expected.
+  virtual Optional<unsigned> missingArgument(unsigned paramIdx,
+                                             unsigned argInsertIdx);
 
   /// Indicate that there was no label given when one was expected by parameter.
   ///

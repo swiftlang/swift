@@ -787,6 +787,57 @@ static bool isForPatternMatch(SolutionApplicationTarget &target) {
   return false;
 }
 
+static Optional<unsigned>
+getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
+  auto getArgs = [](Expr *E, Optional<unsigned> Index) -> ArrayRef<Expr *> {
+    if (auto *TE = dyn_cast<TupleExpr>(E))
+      return TE->getElements().slice(Index ? *Index : 0);
+    if (auto *PE = dyn_cast<ParenExpr>(E))
+      return {llvm::makeArrayRef(PE->getSubExpr()).slice(Index? *Index : 0)};
+    return None;
+  };
+
+  ArrayRef<Expr *> args;
+  if (auto *CE = getAsExpr<CallExpr>(anchor)) {
+    args = getArgs(CE->getArg(), CE->getUnlabeledTrailingClosureIndex());
+  } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
+    args = getArgs(SE->getIndex(), SE->getUnlabeledTrailingClosureIndex());
+  } else if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
+    args = getArgs(OLE->getArg(), OLE->getUnlabeledTrailingClosureIndex());
+  } else {
+    return None;
+  }
+
+  auto idx = std::find_if(args.begin(), args.end(), [&](Expr *Arg) {
+    SourceRange Range = Arg->getSourceRange();
+    return Range.isValid() && SM.rangeContainsCodeCompletionLoc(Range);
+  });
+
+  if (idx == args.end())
+    return None;
+  return {std::distance(args.begin(), idx)};
+}
+
+bool shouldIgnoreFixForCompletion(const Solution &S, const ConstraintFix *CF) {
+  if (auto *AMA = CF->getAs<AddMissingArguments>()) {
+    // Don't count missing argument fixes against the solution if they're after
+    // the completion position. They may just have not been written yet.
+    SourceManager &SM = S.getConstraintSystem().getASTContext().SourceMgr;
+    auto completionIdx = getCompletionArgIndex(AMA->getAnchor(), SM);
+    if (completionIdx) {
+      for (const SynthesizedArg &arg: AMA->getSynthesizedArguments()) {
+        if (arg.argInsertIdx) {
+          if (*arg.argInsertIdx <= *completionIdx)
+            return false;
+        }
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool TypeChecker::typeCheckForCodeCompletion(
     SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
@@ -871,7 +922,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
     // FIXME: this is only needed because in pattern matching position, the
     // code completion expression always becomes an expression pattern, which
-    // require the ~= operator to be defined on the type being matched against.
+    // requires the ~= operator to be defined on the type being matched against.
     // Pattern matching against an enum doesn't require that however, so valid
     // solutions always end up having fixes. Because Optional defines ~= between
     // Optional and _OptionalNilComparisonType (which defines a nilLiteral
@@ -903,17 +954,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     auto fixStart = std::partition(solutions.begin(), solutions.end(),
                                    [&](const Solution &S) {
       return std::all_of(S.Fixes.begin(), S.Fixes.end(), [&](ConstraintFix *CF) {
-        // Don't count missing argument fixes against the solution - the user
-        // may have just not written them yet.
-        switch (CF->getKind()) {
-        case FixKind::AddMissingArguments: {
-          SourceRange Range = CF->getAnchor().getSourceRange();
-          return Range.isInvalid() ||
-            Context.SourceMgr.rangeContainsCodeCompletionLoc(Range);
-        }
-        default:
-          return false;
-        }
+        return shouldIgnoreFixForCompletion(S, CF);
       });
     });
 

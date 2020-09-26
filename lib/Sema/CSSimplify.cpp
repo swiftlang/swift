@@ -40,7 +40,8 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
 Optional<unsigned>
-MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
+MatchCallArgumentListener::missingArgument(unsigned paramIdx,
+                                           unsigned argInsertIdx) {
   return None;
 }
 
@@ -702,10 +703,13 @@ static bool matchCallArgumentsImpl(
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
+    Optional<unsigned> prevArgIdx;
     for (auto paramIdx : indices(params)) {
       // If we have a binding for this parameter, we're done.
-      if (!parameterBindings[paramIdx].empty())
+      if (!parameterBindings[paramIdx].empty()) {
+        prevArgIdx = parameterBindings[paramIdx].back();
         continue;
+      }
 
       const auto &param = params[paramIdx];
 
@@ -717,7 +721,8 @@ static bool matchCallArgumentsImpl(
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
+      unsigned argInsertIdx = prevArgIdx ? *prevArgIdx + 1 : 0;
+      if (auto newArgIdx = listener.missingArgument(paramIdx, argInsertIdx)) {
         parameterBindings[paramIdx].push_back(*newArgIdx);
         continue;
       }
@@ -986,7 +991,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
   ArrayRef<AnyFunctionType::Param> Parameters;
   ConstraintLocatorBuilder Locator;
 
-  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> MissingArguments;
+  SmallVector<SynthesizedArg, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
 
 public:
@@ -1006,7 +1011,8 @@ public:
     }
   }
 
-  Optional<unsigned> missingArgument(unsigned paramIdx) override {
+  Optional<unsigned> missingArgument(unsigned paramIdx,
+                                     unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
       return None;
 
@@ -1024,7 +1030,8 @@ public:
 
     auto synthesizedArg = param.withType(argType);
 
-    MissingArguments.push_back(std::make_pair(paramIdx, synthesizedArg));
+    MissingArguments.push_back(SynthesizedArg{paramIdx, argInsertIdx,
+                                              synthesizedArg});
     Arguments.push_back(synthesizedArg);
 
     return newArgIdx;
@@ -1190,12 +1197,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       argsWithLabels.pop_back();
       // Let's make sure that labels associated with tuple elements
       // line up with what is expected by argument list.
-      SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4>
+      SmallVector<SynthesizedArg, 4>
           synthesizedArgs;
       for (unsigned i = 0, n = argTuple->getNumElements(); i != n; ++i) {
         const auto &elt = argTuple->getElement(i);
         AnyFunctionType::Param argument(elt.getType(), elt.getName());
-        synthesizedArgs.push_back(std::make_pair(i, argument));
+        synthesizedArgs.push_back(SynthesizedArg{i, None, argument});
         argsWithLabels.push_back(argument);
       }
 
@@ -1771,10 +1778,10 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
         cs.createTypeVariable(argLoc, TVO_CanBindToNoEscape)));
   }
 
-  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> synthesizedArgs;
+  SmallVector<SynthesizedArg, 4> synthesizedArgs;
   synthesizedArgs.reserve(numMissing);
   for (unsigned i = args.size() - numMissing, n = args.size(); i != n; ++i) {
-    synthesizedArgs.push_back(std::make_pair(i, args[i]));
+    synthesizedArgs.push_back(SynthesizedArg{i, None, args[i]});
   }
 
   auto *fix = AddMissingArguments::create(cs, synthesizedArgs,
@@ -3966,7 +3973,7 @@ bool ConstraintSystem::repairFailures(
     // to diagnose this as a missing argument which can't be ignored.
     if (arg != getTypeVariables().end()) {
       conversionsOrFixes.push_back(AddMissingArguments::create(
-          *this, {std::make_pair(0, AnyFunctionType::Param(*arg))},
+          *this, {SynthesizedArg{0, None, AnyFunctionType::Param(*arg)}},
           getConstraintLocator(anchor, path)));
       break;
     }
