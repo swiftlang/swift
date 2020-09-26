@@ -17,6 +17,8 @@
 
 SWIFT_TYPEID(ActorIsolation)
 SWIFT_TYPEID(AncestryFlags)
+SWIFT_TYPEID(BodyInitKind)
+SWIFT_TYPEID(BodyInitKindAndExpr)
 SWIFT_TYPEID(CtorInitializerKind)
 SWIFT_TYPEID(FunctionBuilderBodyPreCheck)
 SWIFT_TYPEID(GenericSignature)
@@ -35,6 +37,7 @@ SWIFT_TYPEID(TypePair)
 SWIFT_TYPEID(TypeWitnessAndDecl)
 SWIFT_TYPEID(Witness)
 SWIFT_TYPEID_NAMED(AbstractFunctionDecl *, AbstractFunctionDecl)
+SWIFT_TYPEID_NAMED(ApplyExpr *, ApplyExpr)
 SWIFT_TYPEID_NAMED(ClosureExpr *, ClosureExpr)
 SWIFT_TYPEID_NAMED(CodeCompletionCallbacksFactory *,
                    CodeCompletionCallbacksFactory)

@@ -684,6 +684,14 @@ public:
   static void unqualifiedLookup(SourceFile *, SourceLoc,
                                 namelookup::AbstractASTScopeDeclConsumer &);
 
+  /// Lookup that only finds local declarations and does not trigger
+  /// interface type computation.
+  static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
+                               SmallVectorImpl<ValueDecl *> &);
+
+  /// Returns the result if there is exactly one, nullptr otherwise.
+  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
+
   /// Entry point to record the visible statement labels from the given
   /// point.
   ///
