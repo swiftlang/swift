@@ -632,6 +632,13 @@ public:
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
+
+#if SWIFT_OBJC_INTEROP
+  /// Returns a retained Quick Look representation object an Obj-C object.
+  SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+  id _quickLookObjectForPointer(void *value);
+#endif
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

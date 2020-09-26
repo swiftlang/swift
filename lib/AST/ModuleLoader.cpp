@@ -50,9 +50,20 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
                                      /*IsMissing=*/false);
 }
 
+void DependencyTracker::addIncrementalDependency(StringRef File) {
+  if (incrementalDepsUniquer.insert(File).second) {
+    incrementalDeps.emplace_back(File.str());
+  }
+}
+
 ArrayRef<std::string>
 DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
+}
+
+ArrayRef<std::string>
+DependencyTracker::getIncrementalDependencies() const {
+  return incrementalDeps;
 }
 
 std::shared_ptr<clang::DependencyCollector>

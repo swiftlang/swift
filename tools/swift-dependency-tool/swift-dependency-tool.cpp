@@ -93,6 +93,8 @@ void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
   io.enumCase(value, "member", NodeKind::member);
   io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
   io.enumCase(value, "externalDepend", NodeKind::externalDepend);
+  io.enumCase(value, "incrementalExternalDepend",
+              NodeKind::incrementalExternalDepend);
   io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
 }
 

@@ -209,6 +209,12 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     dependencyString.push_back(' ');
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
+  auto incrementalDependencyPaths =
+      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
+  for (auto const &path : incrementalDependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+  }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
@@ -1176,6 +1182,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
+    C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -2285,7 +2292,23 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
-    serialize(MSF, serializationOpts, SM.get());
+    if (serializationOpts.ExperimentalCrossModuleIncrementalInfo) {
+      const auto alsoEmitDotFile =
+          Instance.getInvocation()
+              .getLangOptions()
+              .EmitFineGrainedDependencySourcefileDotFiles;
+
+      using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+      auto *Mod = MSF.get<ModuleDecl *>();
+      fine_grained_dependencies::withReferenceDependencies(
+          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
+            serialize(MSF, serializationOpts, SM.get(), &g);
+            return false;
+          });
+    } else {
+      serialize(MSF, serializationOpts, SM.get());
+    }
   };
 
   // Set the serialization action, so that the SIL module

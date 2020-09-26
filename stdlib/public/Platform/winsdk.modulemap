@@ -251,6 +251,25 @@ module WinSDK [system] {
     link "OleAut32.Lib"
   }
 
+  module Performance {
+    module PerfLib {
+      header "perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    header "winperf.h"
+    export *
+  }
+
   module Printing {
     header "winspool.h"
     export *
