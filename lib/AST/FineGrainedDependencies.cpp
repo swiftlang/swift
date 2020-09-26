@@ -58,6 +58,15 @@ SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
   return Optional<SourceFileDepGraph>(std::move(fg));
 }
 
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromSwiftModuleBuffer(llvm::MemoryBuffer &buffer) {
+  SourceFileDepGraph fg;
+  if (swift::fine_grained_dependencies::
+          readFineGrainedDependencyGraphFromSwiftModule(buffer, fg))
+    return None;
+  return Optional<SourceFileDepGraph>(std::move(fg));
+}
+
 //==============================================================================
 // MARK: SourceFileDepGraph access
 //==============================================================================

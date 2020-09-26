@@ -1113,21 +1113,6 @@ namespace driver {
       }
     }
 
-    void forEachOutOfDateIncrementalExternalDependency(
-        const bool forRanges,
-        function_ref<void(StringRef)> consumeExternalSwiftDeps) {
-      for (StringRef dependency :
-           getIncrementalExternalDependencies(forRanges)) {
-        // If the dependency has been modified since the oldest built file,
-        // or if we can't stat it for some reason (perhaps it's been
-        // deleted?), trigger rebuilds through the dependency graph.
-        llvm::sys::fs::file_status depStatus;
-        if (llvm::sys::fs::status(dependency, depStatus) ||
-            Comp.getLastBuildTime() < depStatus.getLastModificationTime())
-          consumeExternalSwiftDeps(dependency);
-      }
-    }
-
     CommandSet collectCascadedJobsFromDependencyGraph(
         const CommandSet &InitialCascadingCommands, const bool forRanges) {
       CommandSet CascadedJobs;
@@ -1164,18 +1149,68 @@ namespace driver {
     collectIncrementalExternallyDependentJobsFromDependencyGraph(
         const bool forRanges) {
       SmallVector<const Job *, 16> ExternallyDependentJobs;
-      // Check all cross-module dependencies as well.
-      forEachOutOfDateIncrementalExternalDependency(
-          forRanges, [&](StringRef dependency) {
-            // If the dependency has been modified since the oldest built file,
-            // or if we can't stat it for some reason (perhaps it's been
-            // deleted?), trigger rebuilds through the dependency graph.
-            for (const Job *marked :
-                 markExternalInDepGraph(dependency, forRanges))
-              ExternallyDependentJobs.push_back(marked);
-          });
+      auto fallbackToExternalBehavior = [&](StringRef external) {
+        for (const auto cmd :
+             markIncrementalExternalInDepGraph(external, forRanges)) {
+          ExternallyDependentJobs.push_back(cmd);
+        }
+      };
+
+      for (auto external : getFineGrainedDepGraph(forRanges)
+                               .getIncrementalExternalDependencies()) {
+        llvm::sys::fs::file_status depStatus;
+        // Can't `stat` this dependency? Treat it as a plain external
+        // dependency and drop schedule all of its consuming jobs to run.
+        if (llvm::sys::fs::status(external, depStatus)) {
+          fallbackToExternalBehavior(external);
+          continue;
+        }
+
+        // Is this module out of date? If not, just keep searching.
+        if (Comp.getLastBuildTime() >= depStatus.getLastModificationTime())
+          continue;
+
+        // Can we run a cross-module incremental build at all? If not, fallback.
+        if (!Comp.getEnableCrossModuleIncrementalBuild()) {
+          fallbackToExternalBehavior(external);
+          continue;
+        }
+
+        // If loading the buffer fails, the user may have deleted this external
+        // dependency or it could have become corrupted. We need to
+        // pessimistically schedule a rebuild to get dependent jobs to drop
+        // this dependency from their swiftdeps files if possible.
+        auto buffer = llvm::MemoryBuffer::getFile(external);
+        if (!buffer) {
+          fallbackToExternalBehavior(external);
+          continue;
+        }
+
+        // Cons up a fake `Job` to satisfy the incremental job tracing
+        // code's internal invariants.
+        Job fakeJob(Comp.getDerivedOutputFileMap(), external);
+        auto subChanges =
+            getFineGrainedDepGraph(forRanges).loadFromSwiftModuleBuffer(
+                &fakeJob, *buffer.get(), Comp.getDiags());
+
+        // If the incremental dependency graph failed to load, fall back to
+        // treating this as plain external job.
+        if (!subChanges.hasValue()) {
+          fallbackToExternalBehavior(external);
+          continue;
+        }
+
+        for (auto *CMD :
+             getFineGrainedDepGraph(forRanges)
+                 .findJobsToRecompileWhenNodesChange(subChanges.getValue())) {
+          if (CMD == &fakeJob) {
+            continue;
+          }
+          ExternallyDependentJobs.push_back(CMD);
+        }
+      }
       noteBuildingJobs(ExternallyDependentJobs, forRanges,
-                       "because of external dependencies");
+                       "because of incremental external dependencies");
       return ExternallyDependentJobs;
     }
 
@@ -1643,6 +1678,13 @@ namespace driver {
                                 const bool forRanges) {
       return getFineGrainedDepGraph(forRanges)
           .findExternallyDependentUntracedJobs(externalDependency);
+    }
+
+    std::vector<const Job *>
+    markIncrementalExternalInDepGraph(StringRef externalDependency,
+                                      const bool forRanges) {
+      return getFineGrainedDepGraph(forRanges)
+          .findIncrementalExternallyDependentUntracedJobs(externalDependency);
     }
 
     std::vector<const Job *> findJobsToRecompileWhenWholeJobChanges(
