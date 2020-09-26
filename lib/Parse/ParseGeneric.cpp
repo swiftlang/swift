@@ -117,9 +117,6 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Attach attributes.
     Param->getAttrs() = attributes;
 
-    // Add this parameter to the scope.
-    addToScope(Param);
-
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
   } while (HasNextParam);

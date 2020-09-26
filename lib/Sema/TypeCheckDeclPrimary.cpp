@@ -401,9 +401,6 @@ template<typename T>
 static void diagnoseDuplicateDecls(const T &decls) {
   llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
   for (auto *current : decls) {
-    if (!current->getASTContext().LangOpts.DisableParserLookup)
-      return;
-
     if (!current->hasName() || current->isImplicit())
       continue;
 
@@ -528,13 +525,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       otherDefinitions.append(found.begin(), found.end());
     }
   } else if (currentDC->isLocalContext()) {
-    if (ctx.LangOpts.DisableParserLookup) {
-      if (!current->isImplicit()) {
-        ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
-                                   current->getLoc(),
-                                   /*stopAfterInnermostBraceStmt=*/true,
-                                   otherDefinitions);
-      }
+    if (!current->isImplicit()) {
+      ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+                                 current->getLoc(),
+                                 /*stopAfterInnermostBraceStmt=*/true,
+                                 otherDefinitions);
     }
   } else {
     assert(currentDC->isModuleScopeContext());

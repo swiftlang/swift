@@ -388,11 +388,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // reference, because otherwise if it was in scope, it would have
       // been returned by the call to ASTScope::lookupLocalDecls() above.
       if (D->getDeclContext()->isLocalContext() &&
-          D->getDeclContext() == DC &&
-          (Context.LangOpts.DisableParserLookup ||
-           (Loc.isValid() && D->getLoc().isValid() &&
-            Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
-            !isa<TypeDecl>(D)))) {
+          D->getDeclContext() == DC) {
         localDeclAfterUse = D;
         return false;
       }

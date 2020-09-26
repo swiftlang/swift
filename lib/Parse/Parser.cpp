@@ -159,9 +159,6 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Set the parser position to the start of the delayed decl or the body.
   restoreParserPosition(getParserPosition(startLoc, prevLoc));
 
-  // Re-enter the lexical scope.
-  Scope S(this, info.takeScope());
-
   DeclContext *DC = info.ParentContext;
 
   switch (info.Kind) {
