@@ -117,7 +117,7 @@ merge_toolchains() {
   rsync -v -a $TARGET_TOOLCHAIN_SDK/usr/bin/ $DIST_TOOLCHAIN_SDK/usr/bin/
 
   # Replace absolute sysroot path with relative path
-  sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/glibc.modulemap
+  sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap
 }
 
 build_host_toolchain
