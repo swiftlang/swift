@@ -303,11 +303,11 @@ public:
 protected:
   // Checking the storage kind is far more common than other fields. Make sure
   // it can be byte load with no shift.
-  static const int ReservedKindBits = 8;
+  static const int ReservedKindBits = 7;
   static_assert(ReservedKindBits >= NumKindBits, "Too many storage kinds.");
 
   static const unsigned InvalidElementIndex =
-      (1 << (32 - ReservedKindBits)) - 1;
+      (1 << (32 - (ReservedKindBits + 1))) - 1;
 
   // Form a bitfield that is effectively a union over any pass-specific data
   // with the fields used within this class as a common prefix.
@@ -327,9 +327,10 @@ protected:
     // elementIndex can overflow while gracefully degrading analysis. For now,
     // reserve an absurd number of bits at a nice alignment boundary, but this
     // can be reduced.
-    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, 32, kind
-                               : ReservedKindBits,
-                                 elementIndex : 32 - ReservedKindBits);
+    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, 32,
+                               kind : ReservedKindBits,
+                               isLet : 1,
+                               elementIndex : 32 - (ReservedKindBits + 1));
 
     // Define bits for use in AccessedStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
@@ -512,7 +513,7 @@ public:
   }
 
   /// Return true if the given access is on a 'let' lvalue.
-  bool isLetAccess(SILFunction *F) const;
+  bool isLetAccess() const { return Bits.AccessedStorage.isLet; }
 
   /// If this is a uniquely identified formal access, then it cannot
   /// alias with any other uniquely identified access to different storage.
@@ -555,9 +556,12 @@ public:
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null.
   ///
-  /// WARNING: This is not a constant-time operation. It is for diagnostics and
-  /// checking via the ValueDecl if we are processing a `let` variable.
-  const ValueDecl *getDecl() const;
+  /// If \p base is provided, then it must be the accessed base for this
+  /// storage, as passed to the AccessedStorage constructor. What \p base is
+  /// provided, this is guaranteed to return a valid decl for class properties;
+  /// otherwise it is only a best effort based on the type of the object root
+  /// *before* the object is cast to the final accessed reference type.
+  const ValueDecl *getDecl(SILValue base = SILValue()) const;
 
   /// Get all leaf uses of all address, pointer, or box values that have a this
   /// AccessedStorage in common. Return true if all uses were found before
@@ -629,6 +633,8 @@ private:
     // nested/argument access.
     return false;
   }
+
+  void setLetAccess(SILValue base);
 };
 
 } // end namespace swift

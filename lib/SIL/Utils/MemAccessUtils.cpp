@@ -452,9 +452,9 @@ SILGlobalVariable *getReferencedGlobal(SILInstruction *inst) {
 constexpr unsigned AccessedStorage::TailIndex;
 
 AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
+  // For kind==Unidentified, base may be an invalid empty or tombstone value.
   assert(base && "invalid storage base");
   initKind(kind);
-
   switch (kind) {
   case Box:
     assert(isa<AllocBoxInst>(base));
@@ -505,6 +505,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     break;
   }
   }
+  setLetAccess(base);
 }
 
 void AccessedStorage::visitRoots(
@@ -528,21 +529,24 @@ void AccessedStorage::visitRoots(
   }
 }
 
-// Return true if the given access is on a 'let' lvalue.
-bool AccessedStorage::isLetAccess(SILFunction *F) const {
-  if (auto *decl = dyn_cast_or_null<VarDecl>(getDecl()))
-    return decl->isLet();
-
+// Set 'isLet' to true if this storage can be determined to be a 'let' variable.
+//
+// \p base must be the access base for this storage, as passed to the
+// AccessedStorage constructor.
+void AccessedStorage::setLetAccess(SILValue base) {
   // It's unclear whether a global will ever be missing it's varDecl, but
   // technically we only preserve it for debug info. So if we don't have a decl,
   // check the flag on SILGlobalVariable, which is guaranteed valid,
-  if (getKind() == AccessedStorage::Global)
-    return getGlobal()->isLet();
-
-  return false;
+  if (getKind() == AccessedStorage::Global) {
+    Bits.AccessedStorage.isLet = getGlobal()->isLet();
+    return;
+  }
+  if (auto *decl = dyn_cast_or_null<VarDecl>(getDecl(base))) {
+    Bits.AccessedStorage.isLet = decl->isLet();
+  }
 }
 
-const ValueDecl *AccessedStorage::getDecl() const {
+const ValueDecl *AccessedStorage::getDecl(SILValue base) const {
   switch (getKind()) {
   case Box:
     return cast<AllocBoxInst>(value)->getLoc().getAsASTNode<VarDecl>();
@@ -555,7 +559,7 @@ const ValueDecl *AccessedStorage::getDecl() const {
 
   case Class: {
     auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
-    return getIndexedField(decl, getPropertyIndex());
+    return decl ? getIndexedField(decl, getPropertyIndex()) : nullptr;
   }
   case Tail:
     return nullptr;
@@ -621,8 +625,10 @@ void AccessedStorage::print(raw_ostream &os) const {
     break;
   case Class:
     os << getObject();
-    os << "  Field: ";
-    getDecl()->print(os);
+    if (auto *decl = getDecl()) {
+      os << "  Field: ";
+      decl->print(os);
+    }
     os << " Index: " << getPropertyIndex() << "\n";
     break;
   case Tail:
@@ -1655,7 +1661,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
   // Additional checks that apply to anything that may fall through.
 
   // Immutable values are only accessed for initialization.
-  if (storage.isLetAccess(F))
+  if (storage.isLetAccess())
     return false;
 
   return true;

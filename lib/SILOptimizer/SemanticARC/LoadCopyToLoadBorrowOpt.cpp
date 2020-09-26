@@ -193,7 +193,7 @@ public:
 
   void visitGlobalAccess(SILValue global) {
     return answer(
-        !AccessedStorage(global, AccessedStorage::Global).isLetAccess(&ctx.fn));
+        !AccessedStorage(global, AccessedStorage::Global).isLetAccess());
   }
 
   void visitClassAccess(RefElementAddrInst *field) {

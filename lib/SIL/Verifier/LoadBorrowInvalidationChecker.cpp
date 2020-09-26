@@ -466,9 +466,9 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   }
 
   // If we have a let address, then we are already done.
-  if (storage.isLetAccess(lbi->getFunction()))
+  if (storage.isLetAccess()) {
     return true;
-
+  }
   // At this point, we know that we /may/ have writes. Now we go through various
   // cases to try and exhaustively identify if those writes overlap with our
   // load_borrow.
