@@ -1537,6 +1537,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Case("@convention(witness_method)", 'W')
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
+                        .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
         Buffer << FuncAttr;
