@@ -5946,7 +5946,7 @@ public:
   /// Returns true if the function is an @asyncHandler.
   bool isAsyncHandler() const;
 
-  /// Returns true if the function if the signature matches the form of an
+  /// Returns true if the function signature matches the form of an
   /// @asyncHandler.
   bool canBeAsyncHandler() const;
 

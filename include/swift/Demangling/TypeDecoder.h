@@ -706,6 +706,8 @@ public:
           } else if (text == "@convention(block)") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Block);
+          } else if (text == "@async") {
+            flags = flags.withAsync();
           }
         } else if (child->getKind() == NodeKind::ImplDifferentiable) {
           flags = flags.withDifferentiabilityKind(
