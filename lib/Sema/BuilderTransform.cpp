@@ -1979,7 +1979,8 @@ void swift::printFunctionBuilderBuildFunction(
     componentTypeString = "<#Component#>";
 
   // Render the code.
-  ExtraIndentStreamPrinter printer(out, stubIndent.getValueOr(std::string()));
+  std::string stubIndentStr = stubIndent.getValueOr(std::string());
+  ExtraIndentStreamPrinter printer(out, stubIndentStr);
 
   // If we're supposed to provide a full stub, add a newline and the introducer
   // keywords.
