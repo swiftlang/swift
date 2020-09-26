@@ -336,6 +336,8 @@ public:
                                      const SourceFileDepGraph &,
                                      DiagnosticEngine &);
 
+  Changes loadFromSwiftModuleBuffer(const driver::Job *, llvm::MemoryBuffer &,
+                                    DiagnosticEngine &);
 
 private:
   /// Read a SourceFileDepGraph belonging to \p job from \p buffer

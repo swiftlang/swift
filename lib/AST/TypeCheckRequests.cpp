@@ -1485,3 +1485,21 @@ void swift::simple_display(
       break;
   }
 }
+
+void swift::simple_display(
+    llvm::raw_ostream &out, BodyInitKind initKind) {
+  switch (initKind) {
+  case BodyInitKind::None: out << "none"; return;
+  case BodyInitKind::Delegating: out << "delegating"; return;
+  case BodyInitKind::Chained: out << "chained"; return;
+  case BodyInitKind::ImplicitChained: out << "implicit_chained"; return;
+  }
+  llvm_unreachable("Bad body init kind");
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr) {
+  simple_display(out, initKindAndExpr.initKind);
+  out << " ";
+  simple_display(out, initKindAndExpr.initExpr);
+}

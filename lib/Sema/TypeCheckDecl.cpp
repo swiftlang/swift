@@ -472,6 +472,160 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   return CtorInitializerKind::Designated;
 }
 
+BodyInitKindAndExpr
+BodyInitKindRequest::evaluate(Evaluator &evaluator,
+                              ConstructorDecl *decl) const {
+
+  struct FindReferenceToInitializer : ASTWalker {
+    const ConstructorDecl *Decl;
+    BodyInitKind Kind = BodyInitKind::None;
+    ApplyExpr *InitExpr = nullptr;
+    ASTContext &ctx;
+
+    FindReferenceToInitializer(const ConstructorDecl *decl,
+                               ASTContext &ctx)
+        : Decl(decl), ctx(ctx) { }
+
+    bool walkToDeclPre(class Decl *D) override {
+      // Don't walk into further nominal decls.
+      return !isa<NominalTypeDecl>(D);
+    }
+    
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+      // Don't walk into closures.
+      if (isa<ClosureExpr>(E))
+        return { false, E };
+      
+      // Look for calls of a constructor on self or super.
+      auto apply = dyn_cast<ApplyExpr>(E);
+      if (!apply)
+        return { true, E };
+
+      auto Callee = apply->getSemanticFn();
+      
+      Expr *arg;
+
+      if (isa<OtherConstructorDeclRefExpr>(Callee)) {
+        arg = apply->getArg();
+      } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
+        arg = CRE->getArg();
+      } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
+        if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
+          return { true, E };
+
+        arg = dotExpr->getBase();
+      } else {
+        // Not a constructor call.
+        return { true, E };
+      }
+
+      // Look for a base of 'self' or 'super'.
+      arg = arg->getSemanticsProvidingExpr();
+
+      auto myKind = BodyInitKind::None;
+      if (arg->isSuperExpr())
+        myKind = BodyInitKind::Chained;
+      else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
+        myKind = BodyInitKind::Delegating;
+      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(arg)) {
+        // FIXME: We can see UnresolvedDeclRefExprs here because we have
+        // not yet run preCheckExpression() on the entire function body
+        // yet.
+        //
+        // We could consider pre-checking more eagerly.
+        auto name = declRef->getName();
+        auto loc = declRef->getLoc();
+        if (name.isSimpleName(ctx.Id_self)) {
+          auto *otherSelfDecl =
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
+                                            name.getFullName(), loc);
+          if (otherSelfDecl == Decl->getImplicitSelfDecl())
+            myKind = BodyInitKind::Delegating;
+        }
+      }
+      
+      if (myKind == BodyInitKind::None)
+        return { true, E };
+
+      if (Kind == BodyInitKind::None) {
+        Kind = myKind;
+
+        InitExpr = apply;
+        return { true, E };
+      }
+
+      // If the kind changed, complain.
+      if (Kind != myKind) {
+        // The kind changed. Complain.
+        ctx.Diags.diagnose(E->getLoc(), diag::init_delegates_and_chains);
+        ctx.Diags.diagnose(InitExpr->getLoc(), diag::init_delegation_or_chain,
+                           Kind == BodyInitKind::Chained);
+      }
+
+      return { true, E };
+    }
+  };
+
+  auto &ctx = decl->getASTContext();
+  FindReferenceToInitializer finder(decl, ctx);
+  decl->getBody()->walk(finder);
+
+  // get the kind out of the finder.
+  auto Kind = finder.Kind;
+
+  auto *NTD = decl->getDeclContext()->getSelfNominalTypeDecl();
+
+  // Protocol extension and enum initializers are always delegating.
+  if (Kind == BodyInitKind::None) {
+    if (isa<ProtocolDecl>(NTD) || isa<EnumDecl>(NTD)) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
+
+  // Struct initializers that cannot see the layout of the struct type are
+  // always delegating. This occurs if the struct type is not fixed layout,
+  // and the constructor is either inlinable or defined in another module.
+  if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for structs in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (NTD->isResilient() &&
+        decl->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      Kind = BodyInitKind::Delegating;
+
+    } else if (isa<ExtensionDecl>(decl->getDeclContext())) {
+      // Prior to Swift 5, cross-module initializers were permitted to be
+      // non-delegating. However, if the struct isn't fixed-layout, we have to
+      // be delegating because, well, we don't know the layout.
+      // A dynamic replacement is permitted to be non-delegating.
+      if (NTD->isResilient() ||
+          (ctx.isSwiftVersionAtLeast(5) &&
+           !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
+        if (decl->getParentModule() != NTD->getParentModule())
+          Kind = BodyInitKind::Delegating;
+      }
+    }
+  }
+
+  // If we didn't find any delegating or chained initializers, check whether
+  // the initializer was explicitly marked 'convenience'.
+  if (Kind == BodyInitKind::None &&
+      decl->getAttrs().hasAttribute<ConvenienceAttr>())
+    Kind = BodyInitKind::Delegating;
+
+  // If we still don't know, check whether we have a class with a superclass: it
+  // gets an implicit chained initializer.
+  if (Kind == BodyInitKind::None) {
+    if (auto classDecl = decl->getDeclContext()->getSelfClassDecl()) {
+      if (classDecl->hasSuperclass())
+        Kind = BodyInitKind::ImplicitChained;
+    }
+  }
+
+  return BodyInitKindAndExpr(Kind, finder.InitExpr);
+}
+
 bool
 ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *decl) const {

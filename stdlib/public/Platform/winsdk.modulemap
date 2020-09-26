@@ -127,6 +127,14 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
+
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "winver.h"
+      export *
+
+      link "Version.Lib"
+    }
   }
 
   module AuthZ {

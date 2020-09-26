@@ -48,6 +48,7 @@ using NodeKindField = BCFixed<3>;
 using DeclAspectField = BCFixed<1>;
 
 const unsigned RECORD_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID;
+const unsigned INCREMENTAL_INFORMATION_BLOCK_ID = 196;
 
 /// The swiftdeps file format consists of a METADATA record, followed by zero or more
 /// IDENTIFIER_NODE records.
@@ -113,9 +114,15 @@ namespace record_block {
 }
 
 /// Tries to read the dependency graph from the given buffer.
-/// Returns true if there was an error.
+/// Returns \c true if there was an error.
 bool readFineGrainedDependencyGraph(llvm::MemoryBuffer &buffer,
                                     SourceFileDepGraph &g);
+
+/// Tries to read the dependency graph from the given buffer, assuming that it
+/// is in the format of a swiftmodule file.
+/// Returns \c true if there was an error.
+bool readFineGrainedDependencyGraphFromSwiftModule(llvm::MemoryBuffer &buffer,
+                                                   SourceFileDepGraph &g);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.

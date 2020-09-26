@@ -1195,7 +1195,12 @@ void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(
   }
 }
 
+// FIXME: This walks a partially-type checked function body, which
+// is not guaranteed to yield consistent results. We should come up
+// with another way of performing this analysis, for example by moving
+// it to a post-type checking pass in MiscDiagnostics.
 class VarDeclMultipleReferencesChecker : public ASTWalker {
+  DeclContext *DC;
   VarDecl *varDecl;
   int count;
 
@@ -1204,11 +1209,30 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
       if (DRE->getDecl() == varDecl)
         ++count;
     }
+
+    // FIXME: We can see UnresolvedDeclRefExprs here because we have
+    // not yet run preCheckExpression() on the entire function body
+    // yet.
+    //
+    // We could consider pre-checking more eagerly.
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+      auto name = UDRE->getName();
+      auto loc = UDRE->getLoc();
+      if (name.isSimpleName(varDecl->getName()) && loc.isValid()) {
+        auto *otherDecl =
+            ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                            name.getFullName(), loc);
+        if (otherDecl == varDecl)
+          ++count;
+      }
+    }
+
     return { true, E };
   }
 
 public:
-  VarDeclMultipleReferencesChecker(VarDecl *varDecl) : varDecl(varDecl),count(0) {}
+  VarDeclMultipleReferencesChecker(DeclContext *DC, VarDecl *varDecl)
+      : DC(DC), varDecl(varDecl),count(0) {}
   int referencesCount() { return count; }
 };
 
@@ -1267,12 +1291,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
       bool singleUse = false;
       AbstractFunctionDecl *AFD = nullptr;
-      if (auto contextDecl = varDecl->getDeclContext()->getAsDecl()) {
-        if ((AFD = dyn_cast<AbstractFunctionDecl>(contextDecl))) {
-          auto checker = VarDeclMultipleReferencesChecker(varDecl);
-          AFD->getBody()->walk(checker);
-          singleUse = checker.referencesCount() == 1;
-        }
+      if ((AFD = dyn_cast<AbstractFunctionDecl>(varDecl->getDeclContext()))) {
+        auto checker = VarDeclMultipleReferencesChecker(getDC(), varDecl);
+        AFD->getBody()->walk(checker);
+        singleUse = checker.referencesCount() == 1;
       }
 
       PatternBindingDecl *binding = varDecl->getParentPatternBinding();
@@ -1428,8 +1450,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     if (auto *ctor = dyn_cast<ConstructorDecl>(getDC())) {
       if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
         if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-            ConstructorDecl::BodyInitKind::Delegating) {
+            ctor->getDelegatingOrChainedInitKind().initKind ==
+            BodyInitKind::Delegating) {
           emitDiagnosticAt(loc, diag::assignment_let_property_delegating_init,
                            member->getName());
           if (auto overload = getOverloadChoiceIfAvailable(

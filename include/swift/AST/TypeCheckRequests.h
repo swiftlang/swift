@@ -212,6 +212,29 @@ private:
   evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
 
 public:
+// Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyInitKind initKind);
+void simple_display(llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr);
+
+/// Computes the kind of initializer call (self.init or super.init) performed
+/// in the body of a \c ConstructorDecl
+class BodyInitKindRequest :
+    public SimpleRequest<BodyInitKindRequest,
+                         BodyInitKindAndExpr(ConstructorDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BodyInitKindAndExpr evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
   // Caching.
   bool isCached() const { return true; }
 };
