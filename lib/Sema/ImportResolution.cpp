@@ -65,11 +65,12 @@ struct UnboundImport {
   ///
   /// If this UnboundImport represents a cross-import, contains the declaring
   /// module's \c ModuleDecl.
-  PointerUnion<ImportDecl *, ModuleDecl *> importOrUnderlyingModuleDecl;
+  PointerUnion<NullablePtr<ImportDecl>, ModuleDecl *>
+      importOrUnderlyingModuleDecl;
 
   NullablePtr<ImportDecl> getImportDecl() const {
-    return importOrUnderlyingModuleDecl.is<ImportDecl *>() ?
-           importOrUnderlyingModuleDecl.get<ImportDecl *>() : nullptr;
+    return importOrUnderlyingModuleDecl.is<NullablePtr<ImportDecl>>() ?
+           importOrUnderlyingModuleDecl.get<NullablePtr<ImportDecl>>() : nullptr;
   }
 
   NullablePtr<ModuleDecl> getUnderlyingModule() const {
@@ -79,6 +80,9 @@ struct UnboundImport {
 
   /// Create an UnboundImport for a user-written import declaration.
   explicit UnboundImport(ImportDecl *ID);
+
+  /// Create an UnboundImport for an unloaded implicit import.
+  explicit UnboundImport(AttributedImport<UnloadedImportedModule> implicit);
 
   /// Create an UnboundImport for a cross-import overlay.
   explicit UnboundImport(ASTContext &ctx,
@@ -192,6 +196,9 @@ private:
     return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
   }
 
+  /// Calls \c bindImport() on unbound imports until \c boundImports is drained.
+  void bindPendingImports();
+
   /// Check a single unbound import, bind it, add it to \c boundImports,
   /// and add its cross-import overlays to \c unboundImports.
   void bindImport(UnboundImport &&I);
@@ -284,6 +291,10 @@ void ImportResolver::visitImportDecl(ImportDecl *ID) {
   assert(unboundImports.empty());
 
   unboundImports.emplace_back(ID);
+  bindPendingImports();
+}
+
+void ImportResolver::bindPendingImports() {
   while(!unboundImports.empty())
     bindImport(unboundImports.pop_back_val());
 }
@@ -336,14 +347,16 @@ void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
 // MARK: Import module loading
 //===----------------------------------------------------------------------===//
 
-ModuleDecl *
-ImportResolver::getModule(ImportPath::Module modulePath) {
+static ModuleDecl *
+getModuleImpl(ImportPath::Module modulePath, ModuleDecl *loadingModule,
+              bool canImportBuiltin) {
+  ASTContext &ctx = loadingModule->getASTContext();
+
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
   // The Builtin module cannot be explicitly imported unless we're a .sil file.
-  if (SF.Kind == SourceFileKind::SIL &&
-      moduleID.Item == ctx.TheBuiltinModule->getName())
+  if (canImportBuiltin && moduleID.Item == ctx.TheBuiltinModule->getName())
     return ctx.TheBuiltinModule;
 
   // If the imported module name is the same as the current module,
@@ -352,14 +365,19 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
   //
   // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
   // for clang overlays as well.
-  if (moduleID.Item == SF.getParentModule()->getName() &&
-      modulePath.size() == 1) {
+  if (moduleID.Item == loadingModule->getName() && modulePath.size() == 1) {
     if (auto importer = ctx.getClangModuleLoader())
       return importer->loadModule(moduleID.Loc, modulePath);
     return nullptr;
   }
 
   return ctx.getModule(modulePath);
+}
+
+ModuleDecl *
+ImportResolver::getModule(ImportPath::Module modulePath) {
+  return getModuleImpl(modulePath, SF.getParentModule(),
+                       /*canImportBuiltin=*/SF.Kind == SourceFileKind::SIL);
 }
 
 NullablePtr<ModuleDecl>
@@ -391,16 +409,25 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
-static void diagnoseNoSuchModule(ASTContext &ctx, SourceLoc importLoc,
+static void diagnoseNoSuchModule(ModuleDecl *importingModule,
+                                 SourceLoc importLoc,
                                  ImportPath::Module modulePath,
                                  bool nonfatalInREPL) {
-  SmallString<64> modulePathStr;
-  modulePath.getString(modulePathStr);
+  ASTContext &ctx = importingModule->getASTContext();
 
-  auto diagKind = diag::sema_no_import;
-  if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
-    diagKind = diag::sema_no_import_repl;
-  ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+  if (modulePath.size() == 1 &&
+      importingModule->getName() == modulePath.front().Item) {
+    ctx.Diags.diagnose(importLoc, diag::error_underlying_module_not_found,
+                       importingModule->getName());
+  } else {
+    SmallString<64> modulePathStr;
+    modulePath.getString(modulePathStr);
+
+    auto diagKind = diag::sema_no_import;
+    if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
+      diagKind = diag::sema_no_import_repl;
+    ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+  }
 
   if (ctx.SearchPathOpts.SDKPath.empty() &&
       llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
@@ -413,6 +440,7 @@ ImplicitImportList
 ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
                                        ModuleDecl *module) const {
   SmallVector<AttributedImport<ImportedModule>, 4> imports;
+  SmallVector<AttributedImport<UnloadedImportedModule>, 4> unloadedImports;
 
   auto &ctx = module->getASTContext();
   auto &importInfo = module->getImplicitImportInfo();
@@ -436,16 +464,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     imports.emplace_back(ImportedModule(stdlib));
 
   // Add any modules we were asked to implicitly import.
-  for (auto unloadedImport : importInfo.AdditionalUnloadedImports) {
-    auto *importModule = ctx.getModule(unloadedImport.module.getModulePath());
-    if (!importModule) {
-      diagnoseNoSuchModule(ctx, SourceLoc(),
-                           unloadedImport.module.getModulePath(),
-                           /*nonfatalInREPL=*/false);
-      continue;
-    }
-    imports.push_back(unloadedImport.getLoaded(importModule));
-  }
+  llvm::copy(importInfo.AdditionalUnloadedImports,
+             std::back_inserter(unloadedImports));
 
   // Add any pre-loaded modules.
   llvm::copy(importInfo.AdditionalImports, std::back_inserter(imports));
@@ -464,18 +484,15 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 
   // Implicitly import the underlying Clang half of this module if needed.
   if (importInfo.ShouldImportUnderlyingModule) {
-    auto *underlyingMod = clangImporter->loadModule(
-        SourceLoc(), ImportPath::Module::Builder(module->getName()).get());
-    if (underlyingMod) {
-      imports.emplace_back(ImportedModule(underlyingMod),
-                           ImportFlags::Exported);
-    } else {
-      ctx.Diags.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
-                         module->getName());
-    }
+    // An @_exported self-import is loaded from ClangImporter instead of being
+    // rejected; see the special case in getModuleImpl() for details.
+    ImportPath::Builder importPath(module->getName());
+    unloadedImports.emplace_back(UnloadedImportedModule(importPath.copyTo(ctx),
+                                                        /*isScoped=*/false),
+                                 ImportFlags::Exported);
   }
 
-  return { ctx.AllocateCopy(imports) };
+  return { ctx.AllocateCopy(imports), ctx.AllocateCopy(unloadedImports) };
 }
 
 void ImportResolver::addImplicitImports() {
@@ -487,7 +504,16 @@ void ImportResolver::addImplicitImports() {
              import.module.importedModule->isStdlibModule()));
     boundImports.push_back(import);
   }
+
+  for (auto &unloadedImport : implicitImports.unloadedImports)
+    unboundImports.emplace_back(unloadedImport);
+
+  bindPendingImports();
 }
+
+UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
+  : import(implicit), importLoc(),
+    importOrUnderlyingModuleDecl(static_cast<ImportDecl *>(nullptr)) {}
 
 //===----------------------------------------------------------------------===//
 // MARK: Import validation (except for scoped imports)
@@ -552,7 +578,7 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
   if (M)
     return true;
 
-  diagnoseNoSuchModule(SF.getASTContext(), importLoc,
+  diagnoseNoSuchModule(SF.getParentModule(), importLoc,
                        import.module.getModulePath(), /*nonfatalInREPL=*/true);
   return false;
 }

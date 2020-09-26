@@ -1424,8 +1424,46 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
+                       const AttributedImport<UnloadedImportedModule> &import) {
+  out << "import of unloaded ";
+
+  import.module.getModulePath().print(out);
+
+  out << " [";
+  if (!import.module.getAccessPath().empty()) {
+    out << " scoped(";
+    import.module.getAccessPath().print(out);
+    out << ")";
+  }
+  if (import.options.contains(ImportFlags::Exported))
+    out << " exported";
+  if (import.options.contains(ImportFlags::Testable))
+    out << " testable";
+  if (import.options.contains(ImportFlags::ImplementationOnly))
+    out << " implementation-only";
+  if (import.options.contains(ImportFlags::PrivateImport))
+    out << " private(" << import.sourceFileArg << ")";
+
+  if (import.options.contains(ImportFlags::SPIAccessControl)) {
+    out << " spi(";
+    llvm::interleaveComma(import.spiGroups, out, [&out](Identifier name) {
+                                                   simple_display(out, name);
+                                                 });
+    out << ")";
+  }
+
+  out << " ]";
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
                            const ImplicitImportList &importList) {
   llvm::interleaveComma(importList.imports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
+  if (!importList.imports.empty() && !importList.unloadedImports.empty())
+    out << ", ";
+  llvm::interleaveComma(importList.unloadedImports, out,
                         [&](const auto &import) {
                           simple_display(out, import);
                         });

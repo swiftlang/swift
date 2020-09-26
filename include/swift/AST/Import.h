@@ -574,6 +574,10 @@ struct AttributedImport {
 void simple_display(llvm::raw_ostream &out,
                     const AttributedImport<ImportedModule> &import);
 
+/// A module which will be implicitly imported.
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<UnloadedImportedModule> &import);
+
 // MARK: - Implicit imports
 
 /// The kind of stdlib that should be imported.
@@ -617,10 +621,12 @@ struct ImplicitImportInfo {
 /// Contains names of and pointers to modules that must be implicitly imported.
 struct ImplicitImportList {
   ArrayRef<AttributedImport<ImportedModule>> imports;
+  ArrayRef<AttributedImport<UnloadedImportedModule>> unloadedImports;
 
   friend bool operator==(const ImplicitImportList &lhs,
                          const ImplicitImportList &rhs) {
-    return lhs.imports == rhs.imports;
+    return lhs.imports == rhs.imports
+        && lhs.unloadedImports == rhs.unloadedImports;
   }
 };
 
