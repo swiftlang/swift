@@ -6871,7 +6871,13 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
                                     Type baseTy, ValueDecl *member,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
-  auto baseObjectTy = baseTy->getWithoutSpecifierType();
+  assert(!baseTy->is<LValueType>());
+
+  auto inOutTy = baseTy->getAs<InOutType>();
+  if (!inOutTy)
+    return baseTy;
+
+  auto baseObjectTy = inOutTy->getObjectType();
 
   if (isa<ConstructorDecl>(member))
     return baseObjectTy;
@@ -6880,7 +6886,7 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     if (func->isMutating())
-      return InOutType::get(baseObjectTy);
+      return baseTy;
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;
@@ -6903,26 +6909,10 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
       !isNonMutatingSetterPWAssignInsideInit(baseExpr, member, UseDC))
     return baseObjectTy;
 
-  // If we're calling an accessor, keep the base as an inout type, because the
-  // getter may be mutating.
-  auto strategy = SD->getAccessStrategy(semantics,
-                                        isSettableFromHere
-                                          ? AccessKind::ReadWrite
-                                          : AccessKind::Read,
-                                        UseDC->getParentModule(),
-                                        UseDC->getResilienceExpansion());
-  if (baseTy->is<InOutType>() && strategy.getKind() != AccessStrategy::Storage)
-    return InOutType::get(baseObjectTy);
+  if (isa<SubscriptDecl>(member))
+    return baseTy;
 
-  // Accesses to non-function members in value types are done through an @lvalue
-  // type.
-  if (baseTy->is<InOutType>())
-    return LValueType::get(baseObjectTy);
-  
-  // Accesses to members in values of reference type (classes, metatypes) are
-  // always done through a the reference to self.  Accesses to value types with
-  // a non-mutable self are also done through the base type.
-  return baseTy;
+  return LValueType::get(baseObjectTy);
 }
 
 Expr *
