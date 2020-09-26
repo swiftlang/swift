@@ -1501,31 +1501,31 @@ bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
   return true;
 }
 
-static Decl *findSimpleReferencedDecl(const Expr *E) {
+static VarDecl *findSimpleReferencedVarDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
+    return dyn_cast<VarDecl>(DRE->getDecl());
 
   return nullptr;
 }
 
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
+static std::pair<VarDecl *, VarDecl *> findReferencedVarDecl(const Expr *E) {
   E = E->getValueProvidingExpr();
 
   if (auto *LE = dyn_cast<LoadExpr>(E))
-    return findReferencedDecl(LE->getSubExpr());
+    return findReferencedVarDecl(LE->getSubExpr());
 
   if (auto *AE = dyn_cast<AssignExpr>(E))
-    return findReferencedDecl(AE->getDest());
+    return findReferencedVarDecl(AE->getDest());
 
-  if (auto *D = findSimpleReferencedDecl(E))
+  if (auto *D = findSimpleReferencedVarDecl(E))
     return std::make_pair(nullptr, D);
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
+    if (auto *BaseDecl = findSimpleReferencedVarDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, cast<VarDecl>(MRE->getMember().getDecl()));
   }
 
   return std::make_pair(nullptr, nullptr);
@@ -1539,10 +1539,12 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
   auto *dstExpr = assignExpr->getDest();
   auto *srcExpr = assignExpr->getSrc();
 
-  auto dstDecl = findReferencedDecl(dstExpr);
-  auto srcDecl = findReferencedDecl(srcExpr);
+  auto dstDecl = findReferencedVarDecl(dstExpr);
+  auto srcDecl = findReferencedVarDecl(srcExpr);
 
-  if (dstDecl.second && dstDecl == srcDecl) {
+  if (dstDecl.second &&
+      dstDecl.second->hasStorage() &&
+      dstDecl == srcDecl) {
     auto &DE = dstDecl.second->getASTContext().Diags;
     DE.diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
                                               : diag::self_assignment_var)
