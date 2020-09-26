@@ -29,7 +29,7 @@ Swift Next
 
 * [#34005][]:
 
-  Non-final classes are now allowed to satisfy read-only subscript and property requirements with a `Self` result type by following existing rules for implementing analogous *method* requirements.
+  Non-final classes can now satisfy read-only subscript and property requirements with a possibly optional `Self` result type by following existing rules for implementing analogous *method* requirements:
   
   ```swift
   protocol P {
