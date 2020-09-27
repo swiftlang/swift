@@ -2,14 +2,14 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithDefinition
+import PartiallyPreDefinedClassTemplate
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("has-partial-definition") {
   let myInt = IntWrapper(value: 32)
-  var magicInt = PartiallyDefinedMagicallyWrappedInt(t: myInt)
+  var magicInt = PartiallyPreDefinedMagicallyWrappedInt(t: myInt)
   expectEqual(magicInt.getValuePlusArg(5), 37)
 }
 

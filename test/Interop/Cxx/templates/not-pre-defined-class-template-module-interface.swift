@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=DeclWithoutDefinition -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NotPreDefinedClassTemplate -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
 
 // CHECK: struct __CxxTemplateInst12MagicWrapperI10IntWrapperE {
 // CHECK:   var t: IntWrapper

@@ -21,6 +21,6 @@ inline int forceInstantiation() {
 // because function above forced the instantiation. Its members are fully
 // instantiated, so nothing needs to be explicitly instantiated by the Swift
 // compiler.
-typedef MagicWrapper<IntWrapper> FullyDefinedMagicallyWrappedInt;
+typedef MagicWrapper<IntWrapper> FullyPreDefinedMagicallyWrappedInt;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_INCLUDING_MEMBERS_H
