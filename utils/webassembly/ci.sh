@@ -5,11 +5,21 @@ set -ex
 SOURCE_PATH="$( cd "$(dirname $0)/../../.." && pwd  )" 
 SWIFT_PATH=$SOURCE_PATH/swift
 UTILS_PATH=$SWIFT_PATH/utils/webassembly
-if [[ "$(uname)" == "Linux" ]]; then
-  DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
-else
-  DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
-fi
+
+case $(uname -s) in
+  Darwin)
+    DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
+    HOST_SUFFIX=macosx-x86_64
+  ;;
+  Linux)
+    DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
+    HOST_SUFFIX=linux-x86_64
+  ;;
+  *)
+    echo "Unrecognised platform $(uname -s)"
+    exit 1
+  ;;
+esac
 
 BUILD_SCRIPT=$UTILS_PATH/build-toolchain.sh
 RUN_TEST_BIN=$SWIFT_PATH/utils/run-test
@@ -37,5 +47,5 @@ else
   $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 test/stdlib/
 
   # Run test but ignore failure temporarily
-  $BUILD_SCRIPT -t || true
+  ninja check-swift-wasi-wasm32 -C $TARGET_BUILD_DIR/swift-$HOST_SUFFIX || true
 fi
