@@ -767,3 +767,24 @@ do {
 } catch {
   fatalError("Threw something else?")
 }
+
+// CHECK: testStoredProperties
+struct MyTupleStruct<T, U> {
+  @TupleBuilder let first: () -> T
+  @TupleBuilder let second: U
+}
+
+print("testStoredProperties")
+let ts1 = MyTupleStruct {
+  1
+  "hello"
+  if true {
+    "conditional"
+  }
+} second: {
+  3.14159
+  "blah"
+}
+
+// CHECK: MyTupleStruct<(Int, String, Optional<String>), (Double, String)>(first: (Function), second: (3.14159, "blah"))
+print(ts1)
