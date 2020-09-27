@@ -19,6 +19,6 @@ inline MagicWrapper<IntWrapper> forceInstantiation() {
 // The ClassTemplateSpecializationDecl node for MagicWrapper<IntWrapper> already has a definition
 // because function above forced the instantiation. Its members are not
 // instantiated though, the Swift compiler needs to instantiate them.
-typedef MagicWrapper<IntWrapper> PartiallyDefinedMagicallyWrappedInt;
+typedef MagicWrapper<IntWrapper> PartiallyPreDefinedMagicallyWrappedInt;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H

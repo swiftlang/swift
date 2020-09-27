@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithPrimitiveArgument
+import ClassTemplateWithPrimitiveArgument
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")

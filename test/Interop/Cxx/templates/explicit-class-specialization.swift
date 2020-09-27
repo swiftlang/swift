@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-import ExplicitSpecialization
+import ExplicitClassSpecialization
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
