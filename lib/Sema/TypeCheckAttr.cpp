@@ -2987,8 +2987,19 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
 
-      // Check whether this is a property without an explicit getter.
+      // Check whether this is a storage declaration that is not permitted
+      // to have a function builder attached.
       auto shouldDiagnose = [&]() -> bool {
+        // An uninitialized stored property in a struct can have a function
+        // builder attached.
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          if (var->isInstanceMember() &&
+              isa<StructDecl>(var->getDeclContext()) &&
+              !var->getParentInitializer()) {
+            return false;
+          }
+        }
+
         auto getter = storage->getParsedAccessor(AccessorKind::Get);
         if (!getter)
           return true;
