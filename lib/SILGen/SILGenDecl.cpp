@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1171,6 +1172,22 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
   if (auto *Init = PBD->getExecutableInit(idx)) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
+
+    auto *var = PBD->getSingleVar();
+    if (var && var->getDeclContext()->isLocalContext()) {
+      if (auto *orig = var->getOriginalWrappedProperty()) {
+        auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
+        Init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
+
+        auto value = emitRValue(Init);
+        emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
+                                                     getForwardingSubstitutionMap(),
+                                                     std::move(value))
+          .forwardInto(*this, SILLocation(PBD), initialization.get());
+        return;
+      }
+    }
+
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
     initialization->finishUninitialized(*this);
@@ -1178,6 +1195,13 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+  // Visit (local) property wrapper backing var first
+  auto *singleVar = PBD->getSingleVar();
+  if (singleVar && singleVar->hasAttachedPropertyWrapper() &&
+      singleVar->getDeclContext()->isLocalContext()) {
+    auto *backingVar = singleVar->getPropertyWrapperBackingProperty();
+    visitPatternBindingDecl(backingVar->getParentPatternBinding());
+  }
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
@@ -1188,6 +1212,18 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
+
+  // Visit property wrapper synthesized accessors first.
+  if (D->hasAttachedPropertyWrapper() && D->getDeclContext()->isLocalContext()) {
+    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
+    if (!wrapperInfo)
+      return;
+
+    SGM.emitPropertyWrapperBackingInitializer(D);
+    visit(wrapperInfo.backingVar);
+    if (wrapperInfo.projectionVar)
+      visit(wrapperInfo.projectionVar);
+  }
 
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {
