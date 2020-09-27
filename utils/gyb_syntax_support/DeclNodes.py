@@ -263,8 +263,8 @@ DECL_NODES = [
          ]),
 
     # extension-declaration -> attributes? access-level-modifier?
-    #                            'extension' extended-type
-    #                              type-inheritance-clause?
+    #                            'extension' generic-parameter-clause?
+    #                             extended-type type-inheritance-clause?
     #                            generic-where-clause?
     #                            '{' extension-members '}'
     # extension-name -> identifier
@@ -275,6 +275,8 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
              Child('ExtensionKeyword', kind='ExtensionToken'),
+             Child('GenericParameterClause', kind='GenericParameterClause',
+                   is_optional=True),
              Child('ExtendedType', kind='Type'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
                    is_optional=True),

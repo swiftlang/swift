@@ -1103,9 +1103,10 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              MutableArrayRef<TypeLoc> inherited,
+                             GenericParamList *genericParams,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
-  : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
+  : GenericContext(DeclContextKind::ExtensionDecl, parent, genericParams),
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
@@ -1120,6 +1121,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
+                                     GenericParamList *genericParams,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -1130,8 +1132,8 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
   // Construct the extension.
   auto result = ::new (declPtr) ExtensionDecl(extensionLoc, extendedType,
-                                              inherited, parent,
-                                              trailingWhereClause);
+                                              inherited, genericParams,
+                                              parent, trailingWhereClause);
   if (clangNode)
     result->setClangNode(clangNode);
 

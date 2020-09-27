@@ -4648,6 +4648,19 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   DebuggerContextChange DCC (*this);
 
+  // Parse the generic params, if present.
+  Optional<Scope> genericScope;
+  genericScope.emplace(this, ScopeKind::Generics);
+  GenericParamList *genericParams;
+  bool gpHasCodeCompletion = false;
+
+  auto genericResult = maybeParseGenericParams();
+  genericParams = genericResult.getPtrOrNull();
+  gpHasCodeCompletion |= genericResult.hasCodeCompletion();
+
+  if (gpHasCodeCompletion && !CodeCompletion)
+    return makeParserCodeCompletionStatus();
+
   // Parse the type being extended.
   ParserStatus status;
   ParserResult<TypeRepr> extendedType = parseType(diag::extension_type_expected);
@@ -4681,9 +4694,12 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     status |= whereStatus;
   }
 
+  diagnoseWhereClauseInGenericParamList(genericParams);
+
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
                                              extendedType.getPtrOrNull(),
                                              Context.AllocateCopy(Inherited),
+                                             genericParams,
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
