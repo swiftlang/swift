@@ -1242,6 +1242,21 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
   auto *srcLocator = Binding.getLocator();
 
+  // FIXME: This check could be turned into an assert once
+  // all code completion kinds are ported to use
+  // `TypeChecker::typeCheckForCodeCompletion` API.
+  if (cs.isForCodeCompletion()) {
+    // If the hole is originated from code completion expression
+    // let's not try to fix this, anything connected to a
+    // code completion is allowed to be a hole because presence
+    // of a code completion token makes constraint system
+    // under-constrained due to e.g. lack of expressions on the
+    // right-hand side of the token, which are required for a
+    // regular type-check.
+    if (dstLocator->directlyAt<CodeCompletionExpr>())
+      return None;
+  }
+
   unsigned defaultImpact = 1;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
