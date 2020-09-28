@@ -57,8 +57,8 @@ if(WASI IN_LIST SWIFT_SDKS)
   handle_gyb_source_single(wasi_libc_modulemap_target
     SOURCE "wasi.modulemap.gyb"
     OUTPUT "${wasi_libc_modulemap_out}"
-    FLAGS "-DGLIBC_INCLUDE_PATH=${SWIFT_SDK_WASI_ARCH_wasm32_LIBC_INCLUDE_DIRECTORY}"
-          "-DGLIBC_ARCH_INCLUDE_PATH=${SWIFT_SDK_WASI_ARCH_wasm32_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
+    FLAGS "-DLIBC_INCLUDE_PATH=${SWIFT_SDK_WASI_ARCH_wasm32_LIBC_INCLUDE_DIRECTORY}"
+          "-DLIBC_ARCH_INCLUDE_PATH=${SWIFT_SDK_WASI_ARCH_wasm32_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
   add_custom_command_target(
     copy_wasi_libc_modulemap_static
     COMMAND
