@@ -1201,6 +1201,10 @@ def main_normal():
 
     args = migration.parse_args(parser, sys.argv[1:])
 
+    # Always infer dependencies when not using presets.
+    # FIXME(drexin): Remove once infer is always used
+    args.infer_dependencies = True
+
     if args.build_script_impl_args:
         # If we received any impl args, check if `build-script-impl` would
         # accept them or not before any further processing.
