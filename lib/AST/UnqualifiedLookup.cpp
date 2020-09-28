@@ -778,6 +778,8 @@ unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 // set to ~0 when not debugging
 const unsigned UnqualifiedLookupFactory::targetLookup = ~0;
 
+#endif // NDEBUG
+
 namespace {
 
 class ASTScopeDeclConsumerForLocalLookup
@@ -832,5 +834,3 @@ ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
     return nullptr;
   return result[0];
 }
-
-#endif // NDEBUG
