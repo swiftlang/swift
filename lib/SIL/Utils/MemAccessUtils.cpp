@@ -714,16 +714,26 @@ public:
 
 } // end anonymous namespace
 
-AccessedStorage AccessedStorage::compute(SILValue sourceAddress) {
+AccessedStorageWithBase
+AccessedStorageWithBase::compute(SILValue sourceAddress) {
   FindAccessedStorageVisitor visitor(NestedAccessType::IgnoreAccessBegin);
   visitor.findStorage(sourceAddress);
-  return visitor.getStorage();
+  return {visitor.getStorage(), visitor.getBase()};
+}
+
+AccessedStorageWithBase
+AccessedStorageWithBase::computeInScope(SILValue sourceAddress) {
+  FindAccessedStorageVisitor visitor(NestedAccessType::StopAtAccessBegin);
+  visitor.findStorage(sourceAddress);
+  return {visitor.getStorage(), visitor.getBase()};
+}
+
+AccessedStorage AccessedStorage::compute(SILValue sourceAddress) {
+  return AccessedStorageWithBase::compute(sourceAddress).storage;
 }
 
 AccessedStorage AccessedStorage::computeInScope(SILValue sourceAddress) {
-  FindAccessedStorageVisitor visitor(NestedAccessType::StopAtAccessBegin);
-  visitor.findStorage(sourceAddress);
-  return visitor.getStorage();
+  return AccessedStorageWithBase::computeInScope(sourceAddress).storage;
 }
 
 //===----------------------------------------------------------------------===//
