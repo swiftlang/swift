@@ -20,8 +20,10 @@
 namespace swift {
 
 class ActorIsolation;
+class ASTContext;
 class ClassDecl;
 class DeclContext;
+class DeclName;
 class Expr;
 class FuncDecl;
 class ValueDecl;
@@ -35,6 +37,9 @@ void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Whether the given declaration name is enqueue(partialTask:).
+bool isEnqueuePartialTask(ASTContext &ctx, DeclName name);
 
 } // end namespace swift
 

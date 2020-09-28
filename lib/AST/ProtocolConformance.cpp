@@ -1256,6 +1256,12 @@ void NominalTypeDecl::prepareConformanceTable() const {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
+
+  // Actor classes conform to the actor protocol.
+  if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
+    if (classDecl->isActor())
+      addSynthesized(KnownProtocolKind::Actor);
+  }
 }
 
 bool NominalTypeDecl::lookupConformance(

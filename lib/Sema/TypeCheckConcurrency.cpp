@@ -749,3 +749,12 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
       ctx.evaluator, ActorIsolationRequest{value},
       ActorIsolation::forUnspecified());
 }
+
+bool swift::isEnqueuePartialTask(ASTContext &ctx, DeclName name) {
+  if (name.isCompoundName() && name.getBaseName() == ctx.Id_enqueue) {
+    auto argumentNames = name.getArgumentNames();
+    return argumentNames.size() == 1 && argumentNames[0] == ctx.Id_partialTask;
+  }
+
+  return false;
+}
