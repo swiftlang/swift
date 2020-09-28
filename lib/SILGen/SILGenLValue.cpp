@@ -1314,6 +1314,11 @@ namespace {
             IsOnSelfParameter &&
             isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
 
+        // Assignment to a wrapped property can only be re-written to initialization for
+        // members of `self` in an initializer, and for local variables.
+        if (!(isAssignmentToSelfParamInInit || VD->getDeclContext()->isLocalContext()))
+          return false;
+
         // If we have a nonmutating setter on a value type, the call
         // captures all of 'self' and we cannot rewrite an assignment
         // into an initialization.
