@@ -528,6 +528,9 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
   if (SILPrintPassName)
     llvm::dbgs() << "Start function passes at stage: " << StageName << "\n";
 
+    // Compute the bottom up order of the new functions and the callees in it
+    BottomUpFunctionOrder SubBottomUpOrder(BCA);
+
   // Run all transforms for all functions, starting at the tail of the worklist.
   while (!FunctionWorklist.empty() && continueTransforming()) {
     unsigned TailIdx = FunctionWorklist.size() - 1;
@@ -561,8 +564,6 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
       continue;
     }
 
-    // Compute the bottom up order of the new functions and the callees in it
-    BottomUpFunctionOrder SubBottomUpOrder(BCA);
     // Initialize BottomUpFunctionOrder with new functions
     for (auto It = FunctionWorklist.begin() + TailIdx + 1;
          It != FunctionWorklist.end(); It++) {

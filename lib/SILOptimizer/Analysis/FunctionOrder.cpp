@@ -45,6 +45,9 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
 
       auto Callees = FAS ? BCA->getCalleeList(FAS) : BCA->getCalleeList(&I);
       for (auto *CalleeFn : Callees) {
+        if (!CalleeFn->isDefinition()) {
+          continue;
+        }
         // If not yet visited, visit the callee.
         if (DFSNum.find(CalleeFn) == DFSNum.end()) {
           DFS(CalleeFn);

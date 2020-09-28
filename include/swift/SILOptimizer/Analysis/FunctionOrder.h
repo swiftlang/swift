@@ -64,8 +64,7 @@ public:
 
   /// Get a flattened view of all functions in all the SCCs in bottom-up order
   ArrayRef<SILFunction *> getBottomUpOrder() {
-    if (!TheFunctions.empty())
-      return TheFunctions;
+    TheFunctions.clear();
     for (auto SCC : getSCCs())
       for (auto *F : SCC)
         TheFunctions.push_back(F);
