@@ -127,6 +127,14 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
+
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "winver.h"
+      export *
+
+      link "Version.Lib"
+    }
   }
 
   module AuthZ {
@@ -249,6 +257,25 @@ module WinSDK [system] {
     export *
 
     link "OleAut32.Lib"
+  }
+
+  module Performance {
+    module PerfLib {
+      header "perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    header "winperf.h"
+    export *
   }
 
   module Printing {

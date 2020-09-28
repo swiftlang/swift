@@ -1704,30 +1704,30 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   ASTContext &ctx = classDecl->getASTContext();
   bool wantSuperInitCall = false;
   bool isDelegating = false;
-  ApplyExpr *initExpr = nullptr;
-  switch (ctor->getDelegatingOrChainedInitKind(&ctx.Diags, &initExpr)) {
-  case ConstructorDecl::BodyInitKind::Delegating:
+  auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
+  switch (initKindAndExpr.initKind) {
+  case BodyInitKind::Delegating:
     isDelegating = true;
     wantSuperInitCall = false;
     break;
 
-  case ConstructorDecl::BodyInitKind::Chained:
-    checkSuperInit(ctor, initExpr, false);
+  case BodyInitKind::Chained:
+    checkSuperInit(ctor, initKindAndExpr.initExpr, false);
 
     /// A convenience initializer cannot chain to a superclass constructor.
     if (ctor->isConvenienceInit()) {
-      ctx.Diags.diagnose(initExpr->getLoc(),
+      ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(),
                          diag::delegating_convenience_super_init,
                          ctor->getDeclContext()->getDeclaredInterfaceType());
     }
 
     LLVM_FALLTHROUGH;
 
-  case ConstructorDecl::BodyInitKind::None:
+  case BodyInitKind::None:
     wantSuperInitCall = false;
     break;
 
-  case ConstructorDecl::BodyInitKind::ImplicitChained:
+  case BodyInitKind::ImplicitChained:
     wantSuperInitCall = true;
     break;
   }
@@ -1743,7 +1743,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
           .fixItInsert(ctor->getLoc(), "convenience ");
     }
 
-    ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
+    ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(), diag::delegation_here);
   }
 
   // An inlinable constructor in a class must always be delegating,

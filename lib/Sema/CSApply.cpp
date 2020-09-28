@@ -482,8 +482,7 @@ namespace {
   public:
     /// Build a reference to the given declaration.
     Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
-                       ConstraintLocatorBuilder locator, bool implicit,
-                       AccessSemantics semantics) {
+                       ConstraintLocatorBuilder locator, bool implicit) {
       auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *decl = choice.getDecl();
@@ -492,6 +491,9 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
       
+      auto semantics = decl->getAccessSemanticsFromContext(cs.DC,
+                                                           /*isAccessOnSelf*/false);
+
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
@@ -1173,8 +1175,8 @@ namespace {
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
 
-        base = coerceObjectArgumentToType(
-                 base, selfParamTy, member, semantics,
+        base = coerceSelfArgumentToType(
+                 base, selfParamTy, member,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         if (!isExistentialMetatype || openedExistential) {
@@ -1587,7 +1589,7 @@ namespace {
                         ArrayRef<Identifier> argLabels,
                         ConstraintLocatorBuilder locator);
 
-    /// Coerce the given object argument (e.g., for the base of a
+    /// Coerce the given 'self' argument (e.g., for the base of a
     /// member expression) to the given type.
     ///
     /// \param expr The expression to coerce.
@@ -1596,13 +1598,10 @@ namespace {
     ///
     /// \param member The member being accessed.
     ///
-    /// \param semantics The kind of access we've been asked to perform.
-    ///
     /// \param locator Locator used to describe where in this expression we are.
-    Expr *coerceObjectArgumentToType(Expr *expr,
-                                     Type baseTy, ValueDecl *member,
-                                     AccessSemantics semantics,
-                                     ConstraintLocatorBuilder locator);
+    Expr *coerceSelfArgumentToType(Expr *expr,
+                                   Type baseTy, ValueDecl *member,
+                                   ConstraintLocatorBuilder locator);
 
   private:
     /// Build a new subscript.
@@ -1806,8 +1805,7 @@ namespace {
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
-        base = coerceObjectArgumentToType(base, baseTy, subscript,
-                                          AccessSemantics::Ordinary, locator);
+        base = coerceSelfArgumentToType(base, baseTy, subscript, locator);
         if (!base)
           return nullptr;
 
@@ -1831,8 +1829,8 @@ namespace {
       auto containerTy = solution.simplifyType(openedBaseType);
       
       if (baseIsInstance) {
-        base = coerceObjectArgumentToType(
-          base, containerTy, subscript, AccessSemantics::Ordinary,
+        base = coerceSelfArgumentToType(
+          base, containerTy, subscript,
           locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         base = coerceToType(base,
@@ -2686,7 +2684,7 @@ namespace {
       // Find the overload choice used for this declaration reference.
       auto selected = solution.getOverloadChoice(locator);
       return buildDeclRef(selected, expr->getNameLoc(), locator,
-                          expr->isImplicit(), expr->getAccessSemantics());
+                          expr->isImplicit());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2716,7 +2714,7 @@ namespace {
       auto selected = solution.getOverloadChoice(locator);
 
       return buildDeclRef(selected, expr->getNameLoc(), locator,
-                          expr->isImplicit(), AccessSemantics::Ordinary);
+                          expr->isImplicit());
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -3036,8 +3034,7 @@ namespace {
         diagnoseDeprecatedConditionalConformanceOuterAccess(
             UDE, selected.choice.getDecl());
 
-        return buildDeclRef(selected, nameLoc, memberLocator, implicit,
-                            AccessSemantics::Ordinary);
+        return buildDeclRef(selected, nameLoc, memberLocator, implicit);
       }
 
       switch (selected.choice.getKind()) {
@@ -6879,9 +6876,14 @@ static bool isNonMutatingSetterPWAssignInsideInit(Expr *baseExpr,
 /// the given member.
 static Type adjustSelfTypeForMember(Expr *baseExpr,
                                     Type baseTy, ValueDecl *member,
-                                    AccessSemantics semantics,
                                     DeclContext *UseDC) {
-  auto baseObjectTy = baseTy->getWithoutSpecifierType();
+  assert(!baseTy->is<LValueType>());
+
+  auto inOutTy = baseTy->getAs<InOutType>();
+  if (!inOutTy)
+    return baseTy;
+
+  auto baseObjectTy = inOutTy->getObjectType();
 
   if (isa<ConstructorDecl>(member))
     return baseObjectTy;
@@ -6890,7 +6892,7 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     if (func->isMutating())
-      return InOutType::get(baseObjectTy);
+      return baseTy;
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;
@@ -6913,34 +6915,17 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
       !isNonMutatingSetterPWAssignInsideInit(baseExpr, member, UseDC))
     return baseObjectTy;
 
-  // If we're calling an accessor, keep the base as an inout type, because the
-  // getter may be mutating.
-  auto strategy = SD->getAccessStrategy(semantics,
-                                        isSettableFromHere
-                                          ? AccessKind::ReadWrite
-                                          : AccessKind::Read,
-                                        UseDC->getParentModule(),
-                                        UseDC->getResilienceExpansion());
-  if (baseTy->is<InOutType>() && strategy.getKind() != AccessStrategy::Storage)
-    return InOutType::get(baseObjectTy);
+  if (isa<SubscriptDecl>(member))
+    return baseTy;
 
-  // Accesses to non-function members in value types are done through an @lvalue
-  // type.
-  if (baseTy->is<InOutType>())
-    return LValueType::get(baseObjectTy);
-  
-  // Accesses to members in values of reference type (classes, metatypes) are
-  // always done through a the reference to self.  Accesses to value types with
-  // a non-mutable self are also done through the base type.
-  return baseTy;
+  return LValueType::get(baseObjectTy);
 }
 
 Expr *
-ExprRewriter::coerceObjectArgumentToType(Expr *expr,
-                                         Type baseTy, ValueDecl *member,
-                                         AccessSemantics semantics,
-                                         ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(expr, baseTy, member, semantics, dc);
+ExprRewriter::coerceSelfArgumentToType(Expr *expr,
+                                       Type baseTy, ValueDecl *member,
+                                       ConstraintLocatorBuilder locator) {
+  Type toType = adjustSelfTypeForMember(expr, baseTy, member, dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = cs.getType(expr);

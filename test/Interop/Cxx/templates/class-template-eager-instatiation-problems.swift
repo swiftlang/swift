@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-import EagerInstantiationProblems
+import ClassTemplateEagerInstantiationProblems
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")

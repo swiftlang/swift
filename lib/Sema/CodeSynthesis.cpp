@@ -261,6 +261,20 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         }
       }
 
+      Type functionBuilderType= var->getFunctionBuilderType();
+      if (functionBuilderType) {
+        // If the variable's type is structurally a function type, use that
+        // type. Otherwise, form a non-escaping function type for the function
+        // parameter.
+        bool isStructuralFunctionType =
+            varInterfaceType->lookThroughAllOptionalTypes()
+              ->is<AnyFunctionType>();
+        if (!isStructuralFunctionType) {
+          auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+          varInterfaceType = FunctionType::get({ }, varInterfaceType, extInfo);
+        }
+      }
+
       // Create the parameter.
       auto *arg = new (ctx)
           ParamDecl(SourceLoc(), Loc,
@@ -272,6 +286,14 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
+
+      // Attach a function builder attribute if needed.
+      if (functionBuilderType) {
+        auto typeExpr = TypeExpr::createImplicit(functionBuilderType, ctx);
+        auto attr = CustomAttr::create(
+            ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+        arg->getAttrs().add(attr);
+      }
 
       maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
       

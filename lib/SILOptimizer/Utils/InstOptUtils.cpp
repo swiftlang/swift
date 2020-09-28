@@ -1644,7 +1644,7 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
   if (auto *teai = dyn_cast<TupleElementAddrInst>(inst)) {
     SILBuilder builder(teai);
     auto *tei =
-        builder.createTupleExtract(teai->getLoc(), value, teai->getFieldNo());
+        builder.createTupleExtract(teai->getLoc(), value, teai->getFieldIndex());
     for (auto teaiUse : teai->getUses()) {
       replaceLoadSequence(teaiUse->getUser(), tei);
     }

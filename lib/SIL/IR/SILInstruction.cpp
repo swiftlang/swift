@@ -579,7 +579,7 @@ namespace {
       auto *X = cast<TupleExtractInst>(LHS);
       if (X->getTupleType() != RHS->getTupleType())
         return false;
-      if (X->getFieldNo() != RHS->getFieldNo())
+      if (X->getFieldIndex() != RHS->getFieldIndex())
         return false;
       return true;
     }
@@ -590,7 +590,7 @@ namespace {
       auto *X = cast<TupleElementAddrInst>(LHS);
       if (X->getTupleType() != RHS->getTupleType())
         return false;
-      if (X->getFieldNo() != RHS->getFieldNo())
+      if (X->getFieldIndex() != RHS->getFieldIndex())
         return false;
       return true;
     }

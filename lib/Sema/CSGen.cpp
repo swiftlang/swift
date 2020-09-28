@@ -2552,6 +2552,24 @@ namespace {
             }
           }
 
+          // FIXME: We can see UnresolvedDeclRefExprs here because we have
+          // not yet run preCheckExpression() on the entire closure body
+          // yet.
+          //
+          // We could consider pre-checking more eagerly.
+          if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+            auto name = declRef->getName();
+            auto loc = declRef->getLoc();
+            if (name.isSimpleName() && loc.isValid()) {
+              auto *varDecl = dyn_cast_or_null<VarDecl>(
+                ASTScope::lookupSingleLocalDecl(cs.DC->getParentSourceFile(),
+                                                name.getFullName(), loc));
+              if (varDecl)
+                if (auto varType = cs.getTypeIfAvailable(varDecl))
+                  varType->getTypeVariables(varRefs);
+            }
+          }
+
           return { true, expr };
         }
       } collectVarRefs(CS);

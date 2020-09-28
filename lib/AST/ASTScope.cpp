@@ -39,11 +39,11 @@ using namespace ast_scope;
 #pragma mark ASTScope
 
 void ASTScope::unqualifiedLookup(
-    SourceFile *SF, DeclNameRef name, SourceLoc loc,
+    SourceFile *SF, SourceLoc loc,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
-  ASTScopeImpl::unqualifiedLookup(SF, name, loc, consumer);
+  ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
 }
 
 llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
@@ -116,60 +116,7 @@ LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
 ASTContext &ASTScopeImpl::getASTContext() const {
   if (auto d = getDeclIfAny())
     return d.get()->getASTContext();
-  if (auto dc = getDeclContext())
-    return dc.get()->getASTContext();
   return getParent().get()->getASTContext();
-}
-
-#pragma mark getDeclContext
-
-NullablePtr<DeclContext> ASTScopeImpl::getDeclContext() const {
-  return nullptr;
-}
-
-NullablePtr<DeclContext> ASTSourceFileScope::getDeclContext() const {
-  return NullablePtr<DeclContext>(SF);
-}
-
-NullablePtr<DeclContext> GenericTypeOrExtensionScope::getDeclContext() const {
-  return getGenericContext();
-}
-
-NullablePtr<DeclContext> GenericParamScope::getDeclContext() const {
-  return dyn_cast<DeclContext>(holder);
-}
-
-NullablePtr<DeclContext> PatternEntryInitializerScope::getDeclContext() const {
-  return getPatternEntry().getInitContext();
-}
-
-NullablePtr<DeclContext> BraceStmtScope::getDeclContext() const {
-  return getParent().get()->getDeclContext();
-}
-
-NullablePtr<DeclContext>
-DefaultArgumentInitializerScope::getDeclContext() const {
-  auto *dc = decl->getDefaultArgumentInitContext();
-  ASTScopeAssert(dc, "If scope exists, this must exist");
-  return dc;
-}
-
-// When asked for a loc in an intializer in a capture list, the asked-for
-// context is the closure.
-NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
-  return expr->getClosureBody();
-}
-
-NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
-  return decl->getParentPatternBinding()->getInitContext(0);
-}
-
-NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {
-  return decl;
-}
-
-NullablePtr<DeclContext> ParameterListScope::getDeclContext() const {
-  return matchingContext;
 }
 
 #pragma mark getClassName
@@ -223,6 +170,10 @@ const SourceFile *ASTScopeImpl::getSourceFile() const {
 }
 
 const SourceFile *ASTSourceFileScope::getSourceFile() const { return SF; }
+
+ASTContext &ASTSourceFileScope::getASTContext() const {
+  return SF->getASTContext();
+}
 
 SourceRange ExtensionScope::getBraces() const { return decl->getBraces(); }
 

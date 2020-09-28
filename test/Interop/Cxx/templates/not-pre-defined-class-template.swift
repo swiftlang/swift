@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithoutDefinition
+import NotPreDefinedClassTemplate
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")

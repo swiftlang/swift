@@ -1197,7 +1197,12 @@ void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(
   }
 }
 
+// FIXME: This walks a partially-type checked function body, which
+// is not guaranteed to yield consistent results. We should come up
+// with another way of performing this analysis, for example by moving
+// it to a post-type checking pass in MiscDiagnostics.
 class VarDeclMultipleReferencesChecker : public ASTWalker {
+  DeclContext *DC;
   VarDecl *varDecl;
   int count;
 
@@ -1206,11 +1211,30 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
       if (DRE->getDecl() == varDecl)
         ++count;
     }
+
+    // FIXME: We can see UnresolvedDeclRefExprs here because we have
+    // not yet run preCheckExpression() on the entire function body
+    // yet.
+    //
+    // We could consider pre-checking more eagerly.
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+      auto name = UDRE->getName();
+      auto loc = UDRE->getLoc();
+      if (name.isSimpleName(varDecl->getName()) && loc.isValid()) {
+        auto *otherDecl =
+            ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                            name.getFullName(), loc);
+        if (otherDecl == varDecl)
+          ++count;
+      }
+    }
+
     return { true, E };
   }
 
 public:
-  VarDeclMultipleReferencesChecker(VarDecl *varDecl) : varDecl(varDecl),count(0) {}
+  VarDeclMultipleReferencesChecker(DeclContext *DC, VarDecl *varDecl)
+      : DC(DC), varDecl(varDecl),count(0) {}
   int referencesCount() { return count; }
 };
 
@@ -1269,12 +1293,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
       bool singleUse = false;
       AbstractFunctionDecl *AFD = nullptr;
-      if (auto contextDecl = varDecl->getDeclContext()->getAsDecl()) {
-        if ((AFD = dyn_cast<AbstractFunctionDecl>(contextDecl))) {
-          auto checker = VarDeclMultipleReferencesChecker(varDecl);
-          AFD->getBody()->walk(checker);
-          singleUse = checker.referencesCount() == 1;
-        }
+      if ((AFD = dyn_cast<AbstractFunctionDecl>(varDecl->getDeclContext()))) {
+        auto checker = VarDeclMultipleReferencesChecker(getDC(), varDecl);
+        AFD->getBody()->walk(checker);
+        singleUse = checker.referencesCount() == 1;
       }
 
       PatternBindingDecl *binding = varDecl->getParentPatternBinding();
@@ -1430,8 +1452,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     if (auto *ctor = dyn_cast<ConstructorDecl>(getDC())) {
       if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
         if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-            ConstructorDecl::BodyInitKind::Delegating) {
+            ctor->getDelegatingOrChainedInitKind().initKind ==
+            BodyInitKind::Delegating) {
           emitDiagnosticAt(loc, diag::assignment_let_property_delegating_init,
                            member->getName());
           if (auto overload = getOverloadChoiceIfAvailable(
@@ -1481,31 +1503,31 @@ bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
   return true;
 }
 
-static Decl *findSimpleReferencedDecl(const Expr *E) {
+static VarDecl *findSimpleReferencedVarDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
+    return dyn_cast<VarDecl>(DRE->getDecl());
 
   return nullptr;
 }
 
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
+static std::pair<VarDecl *, VarDecl *> findReferencedVarDecl(const Expr *E) {
   E = E->getValueProvidingExpr();
 
   if (auto *LE = dyn_cast<LoadExpr>(E))
-    return findReferencedDecl(LE->getSubExpr());
+    return findReferencedVarDecl(LE->getSubExpr());
 
   if (auto *AE = dyn_cast<AssignExpr>(E))
-    return findReferencedDecl(AE->getDest());
+    return findReferencedVarDecl(AE->getDest());
 
-  if (auto *D = findSimpleReferencedDecl(E))
+  if (auto *D = findSimpleReferencedVarDecl(E))
     return std::make_pair(nullptr, D);
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
+    if (auto *BaseDecl = findSimpleReferencedVarDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, cast<VarDecl>(MRE->getMember().getDecl()));
   }
 
   return std::make_pair(nullptr, nullptr);
@@ -1519,10 +1541,12 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
   auto *dstExpr = assignExpr->getDest();
   auto *srcExpr = assignExpr->getSrc();
 
-  auto dstDecl = findReferencedDecl(dstExpr);
-  auto srcDecl = findReferencedDecl(srcExpr);
+  auto dstDecl = findReferencedVarDecl(dstExpr);
+  auto srcDecl = findReferencedVarDecl(srcExpr);
 
-  if (dstDecl.second && dstDecl == srcDecl) {
+  if (dstDecl.second &&
+      dstDecl.second->hasStorage() &&
+      dstDecl == srcDecl) {
     auto &DE = dstDecl.second->getASTContext().Diags;
     DE.diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
                                               : diag::self_assignment_var)

@@ -506,13 +506,13 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
     switch (User->getKind()) {
     case SILInstructionKind::StructElementAddrInst: {
       auto inst = cast<StructElementAddrInst>(User);
-      ProjectionIndex = inst->getFieldNo();
+      ProjectionIndex = inst->getFieldIndex();
       SingleUser = inst;
       break;
     }
     case SILInstructionKind::TupleElementAddrInst: {
       auto inst = cast<TupleElementAddrInst>(User);
-      ProjectionIndex = inst->getFieldNo();
+      ProjectionIndex = inst->getFieldIndex();
       SingleUser = inst;
       break;
     }

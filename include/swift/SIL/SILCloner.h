@@ -1542,13 +1542,6 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitUncheckedValueCastInst(
     UncheckedValueCastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  if (!getBuilder().hasOwnership()) {
-    recordClonedInstruction(Inst, getBuilder().createUncheckedBitwiseCast(
-                                      getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType())));
-    return;
-  }
   recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
@@ -1953,7 +1946,7 @@ SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleExtract(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -1963,7 +1956,7 @@ SILCloner<ImplClass>::visitTupleElementAddrInst(TupleElementAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleElementAddr(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

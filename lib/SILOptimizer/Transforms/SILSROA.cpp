@@ -87,7 +87,7 @@ SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
 
 unsigned SROAMemoryUseAnalyzer::getEltNoForProjection(SILInstruction *Inst) {
   if (TT)
-    return cast<TupleElementAddrInst>(Inst)->getFieldNo();
+    return cast<TupleElementAddrInst>(Inst)->getFieldIndex();
 
   assert(SD && "SD should not be null since either it or TT must be set at "
          "this point.");

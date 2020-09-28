@@ -45,6 +45,7 @@ class Deserializer {
 public:
   Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
   bool readFineGrainedDependencyGraph(SourceFileDepGraph &g);
+  bool readFineGrainedDependencyGraphFromSwiftModule(SourceFileDepGraph &g);
 };
 
 } // end namespace
@@ -484,4 +485,107 @@ bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
     out.flush();
     return false;
   });
+}
+
+static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
+                                 ArrayRef<unsigned char> signature) {
+  for (unsigned char byte : signature) {
+    if (cursor.AtEndOfStream())
+      return false;
+    if (llvm::Expected<llvm::SimpleBitstreamCursor::word_t> maybeRead =
+            cursor.Read(8)) {
+      if (maybeRead.get() != byte)
+        return false;
+    } else {
+      consumeError(maybeRead.takeError());
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor, unsigned ID,
+                                     bool shouldReadBlockInfo = true) {
+  llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+  if (!maybeNext) {
+    consumeError(maybeNext.takeError());
+    return false;
+  }
+  llvm::BitstreamEntry next = maybeNext.get();
+
+  if (next.Kind != llvm::BitstreamEntry::SubBlock)
+    return false;
+
+  if (next.ID == RECORD_BLOCK_ID) {
+    if (shouldReadBlockInfo) {
+      if (!cursor.ReadBlockInfoBlock())
+        return false;
+    } else {
+      if (cursor.SkipBlock())
+        return false;
+    }
+    return enterTopLevelModuleBlock(cursor, ID, false);
+  }
+
+  if (next.ID != ID)
+    return false;
+
+  if (llvm::Error Err = cursor.EnterSubBlock(ID)) {
+    // FIXME this drops the error on the floor.
+    consumeError(std::move(Err));
+    return false;
+  }
+
+  return true;
+}
+
+bool swift::fine_grained_dependencies::
+    readFineGrainedDependencyGraphFromSwiftModule(llvm::MemoryBuffer &buffer,
+                                                  SourceFileDepGraph &g) {
+  Deserializer deserializer(buffer.getMemBufferRef());
+  return deserializer.readFineGrainedDependencyGraphFromSwiftModule(g);
+}
+
+bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
+    SourceFileDepGraph &g) {
+  if (!checkModuleSignature(Cursor, {0xE2, 0x9C, 0xA8, 0x0E}) ||
+      !enterTopLevelModuleBlock(Cursor, RECORD_BLOCK_ID, false)) {
+    return false;
+  }
+
+  llvm::BitstreamEntry topLevelEntry;
+
+  while (!Cursor.AtEndOfStream()) {
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        Cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+    if (!maybeEntry) {
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    topLevelEntry = maybeEntry.get();
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case INCREMENTAL_INFORMATION_BLOCK_ID: {
+      if (llvm::Error Err =
+              Cursor.EnterSubBlock(INCREMENTAL_INFORMATION_BLOCK_ID)) {
+        consumeError(std::move(Err));
+        return false;
+      }
+      readFineGrainedDependencyGraph(g);
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (Cursor.SkipBlock()) {
+        return false;
+      }
+      break;
+    }
+  }
+
+  return false;
 }

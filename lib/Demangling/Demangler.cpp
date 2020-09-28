@@ -1829,6 +1829,11 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (CoroAttr)
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
 
+  if (nextIf('H')) {
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@async"),
+                   *this);
+  }
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;

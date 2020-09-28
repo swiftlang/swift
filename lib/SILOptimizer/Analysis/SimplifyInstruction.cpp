@@ -97,7 +97,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
         return SILValue();
 
       // And the order of the field must be identical to the construction order.
-      if (Ex->getFieldNo() != i)
+      if (Ex->getFieldIndex() != i)
         return SILValue();
     }
 
@@ -132,7 +132,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
         return SILValue();
 
       // And the order of the field must be identical to the construction order.
-      if (Ex->getFieldNo() != i)
+      if (Ex->getFieldIndex() != i)
         return SILValue();
     }
 
@@ -145,11 +145,11 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
   if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-    return TheTuple->getElement(TEI->getFieldNo());
+    return TheTuple->getElement(TEI->getFieldIndex());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
-  if (TEI->getFieldNo() == 0)
+  if (TEI->getFieldIndex() == 0)
     if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
       return simplifyOverflowBuiltin(BI);
 
