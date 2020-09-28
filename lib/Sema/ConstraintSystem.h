@@ -5632,6 +5632,11 @@ public:
 
   bool attempt(ConstraintSystem &cs) const;
 
+  /// Determine what fix (if any) needs to be introduced into a
+  /// constraint system as part of resolving type variable as a hole.
+  Optional<std::pair<ConstraintFix *, unsigned>>
+  fixForHole(ConstraintSystem &cs) const;
+
   void print(llvm::raw_ostream &Out, SourceManager *) const {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
