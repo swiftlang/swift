@@ -442,6 +442,22 @@ private:
     trampBuilder.createBranch(loc, getOpBasicBlock(origSuccBB), args);
   }
 
+  void initDiffStructAndTrampolineBlocks() {
+    // Create the main bb0 struct and add a payload data mapping.
+    auto loc = original->getLocation();
+    auto *entryStruct =
+        differentialInfo.getLinearMapStruct(original->getEntryBlock());
+    auto structLoweredTy = getNominalDeclLoweredType(entryStruct);
+    bb0Struct = getBuilder().createAllocStack(loc, structLoweredTy);
+    // Create the trampoline blocks.
+    for (auto &origBB : *original) {
+      for (auto &succ : origBB.getSuccessors()) {
+        auto *trampBB = createTrampolineBlock(succ.getBB());
+        jvpTrampolineBBMap.insert({{&origBB, succ.getBB()}, trampBB});
+      }
+    }
+  }
+
   /// Set up the differential function. This includes:
   /// - Creating all differential blocks.
   /// - Creating differential entry block arguments based on the function type.
@@ -480,24 +496,9 @@ public:
     if (errorOccurred)
       return;
     // Create the main bb0 struct and add a payload data mapping.
-    // TODO: can't put this in `JVP::run()` or else it can't print the
-    // emitted differential.
-    if (!bb0Struct) {
-      auto loc = original->getLocation();
-      auto *entryStruct =
-          differentialInfo.getLinearMapStruct(original->getEntryBlock());
-      auto structLoweredTy = getNominalDeclLoweredType(entryStruct);
-      bb0Struct = getBuilder().createAllocStack(loc, structLoweredTy);
-      // Create the trampoline blocks.
-      for (auto &origBB : *original) {
-        for (auto &succ : origBB.getSuccessors()) {
-          auto *trampBB = createTrampolineBlock(succ.getBB());
-          jvpTrampolineBBMap.insert({{&origBB, succ.getBB()}, trampBB});
-          // Body of trampoline block is filled at the end of the visitor.
-          // TODO: See if we can find a better place to do it.
-        }
-      }
-    }
+    if (!bb0Struct)
+      initDiffStructAndTrampolineBlocks();
+
     if (differentialInfo.shouldDifferentiateInstruction(inst)) {
       LLVM_DEBUG(getADDebugStream() << "JVPCloner visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
@@ -515,8 +516,6 @@ public:
       TypeSubstCloner::visit(inst);
     }
   }
-
-  void visitBasicBlockArguments(SILBasicBlock *BB) { assert(false); }
 
   void visitInstructionsInBlock(SILBasicBlock *bb) {
     auto *jvpBB = BBMap[bb];
@@ -795,8 +794,6 @@ public:
     }
     differentialValues[ai->getParent()].push_back(differential);
 
-    // TODO: uncommenting this results in store / struct overconsume error in
-    // SIL verification
     if (ai->getParent() == this->original->getEntryBlock()) {
       auto *linearMapFieldLookup = differentialInfo.lookUpLinearMapDecl(ai);
       auto *field =
@@ -805,7 +802,6 @@ public:
                                       StoreOwnershipQualifier::Init);
     } else {
       auto *jvpBlock = builder.getInsertionBB();
-      // auto *jvpBlock = jvpBBMap.lookup(ai->getParent());
       assert(jvpBlock && "the mapping between original and jvp bb should have "
                          "been already added.");
       auto payloadPointer = jvpBlock->getArguments().back();
@@ -832,12 +828,8 @@ public:
     auto loc = ri->getOperand().getLoc();
     auto *origExit = ri->getParent();
     auto &builder = getBuilder();
-    // auto *diffStructVal = buildDifferentialValueStructValue(ri);
     auto diffStructVal = builder.emitLoadValueOperation(
         loc, bb0Struct, LoadOwnershipQualifier::Take);
-    // auto diffStructVal = builder.createLoad(loc, bb0Struct,
-    // LoadOwnershipQualifier::Copy); diffStructVal = builder.createLoad(loc,
-    // diffStructVal, LoadOwnershipQualifier::Copy);
     // Get the JVP value corresponding to the original functions's return value.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
@@ -1781,9 +1773,6 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       }
     });
   }
-
-  /*assert(diffBBMap.size() == 1 &&
-         "Can only currently handle single basic block functions");*/
 
   // The differential function has type:
   // (arg0', ..., argn', entry_df_struct) -> result'.

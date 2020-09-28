@@ -934,14 +934,6 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     if (context.getASTContext()
             .LangOpts.EnableExperimentalForwardModeDifferentiation &&
         !witness->getVJP()) {
-      // JVP and differential generation do not currently support functions with
-      // multiple basic blocks.
-      /*if (original->getBlocks().size() > 1) {
-        context.emitNondifferentiabilityError(
-            original->getLocation().getSourceLoc(), invoker,
-            diag::autodiff_jvp_control_flow_not_supported);
-        return true;
-      }*/
       // Emit JVP function.
       JVPCloner cloner(context, original, witness, jvp, invoker);
       if (cloner.run())
