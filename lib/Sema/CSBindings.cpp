@@ -368,6 +368,15 @@ void ConstraintSystem::PotentialBindings::finalize(
       PotentiallyIncomplete = true;
     }
 
+    // Delay resolution of the `nil` literal to a hole until
+    // the very end to give it a change to be bound to some
+    // other type, just like code completion expression which
+    // relies solely on contextual information.
+    if (locator->directlyAt<NilLiteralExpr>()) {
+      FullyBound = true;
+      PotentiallyIncomplete = true;
+    }
+
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 
@@ -1230,6 +1239,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       cs.increaseScore(SK_Hole);
 
       ConstraintFix *fix = nullptr;
+      unsigned fixImpact = 1;
+
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         // If it is represetative for a key path root, let's emit a more
         // specific diagnostic.
@@ -1268,9 +1279,14 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
           return true;
         
         fix = SpecifyKeyPathRootType::create(cs, dstLocator);
+      } else if (dstLocator->directlyAt<NilLiteralExpr>()) {
+        fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
+        // This is a dramatic event, it means that there is absolutely
+        // no contextual information to resolve type of `nil`.
+        fixImpact = 10;
       }
 
-      if (fix && cs.recordFix(fix))
+      if (fix && cs.recordFix(fix, fixImpact))
         return true;
     }
   }

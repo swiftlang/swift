@@ -440,6 +440,7 @@ struct TestConstraintGenerationErrors {
 
   @TupleBuilder var nilWithoutContext: String {
     let a = nil // expected-error {{'nil' requires a contextual type}}
+    ""
   }
 
   func buildTupleClosure() {

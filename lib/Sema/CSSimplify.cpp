@@ -5893,6 +5893,12 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   }
   
 
+  if (optTy->isHole()) {
+    if (auto *typeVar = second->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+    return SolutionKind::Solved;
+  }
+
   Type objectTy = optTy->getOptionalObjectType();
   // If the base type is not optional, let's attempt a fix (if possible)
   // and assume that `!` is just not there.
@@ -10072,7 +10078,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
-  case FixKind::IgnoreInvalidFunctionBuilderBody: {
+  case FixKind::IgnoreInvalidFunctionBuilderBody:
+  case FixKind::SpecifyContextualTypeForNil: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
