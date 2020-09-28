@@ -45,6 +45,7 @@ cd "$(dirname $0)/.." || exit
 
 # Set defaults
 DISTCC_FLAG=
+SCCACHE_FLAG=
 DRY_RUN=
 BUNDLE_PREFIX=
 PRESET_FILE_FLAGS=
@@ -82,6 +83,15 @@ while [ $# -ne 0 ]; do
   ;;
     --distcc)
       DISTCC_FLAG="--distcc"
+  ;;
+    --sccache)
+      SCCACHE=$(which sccache)
+      if [[ -z "${SCCACHE}" ]]; then
+          echo "Error! Asked to use sccache, but could not find sccache in PATH?!"
+          usage
+          exit 1
+      fi
+      SCCACHE_FLAG="--cmake-c-launcher=${SCCACHE} --cmake-cxx-launcher=${SCCACHE}"
   ;;
     --preset-file)
       shift
@@ -140,8 +150,10 @@ SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
 DISTCC_FLAG="${DISTCC_FLAG}"
 PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS}"
+SCCACHE_FLAG="${SCCACHE_FLAG}"
 
 ./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} \
+        ${SCCACHE_FLAG} \
         --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${PRESET_SUFFIX}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
