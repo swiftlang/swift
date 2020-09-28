@@ -454,11 +454,11 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
     LoadBorrowInst *lbi) {
 
-  SILValue address = getAccessBegin(lbi->getOperand());
+  SILValue address = getAccessScope(lbi->getOperand());
   if (!address)
     return false;
 
-  auto storage = findAccessedStorage(address);
+  auto storage = AccessedStorage::compute(address);
   // If we couldn't find an access storage, return that we are assumed to write.
   if (!storage) {
     llvm::errs() << "Couldn't compute access storage?!\n";

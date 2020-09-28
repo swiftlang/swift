@@ -507,7 +507,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  /// Return trye if the given access is guaranteed to be within a heap object.
+  /// Return true if the given access is guaranteed to be within a heap object.
   bool isObjectAccess() const {
     return getKind() == Class || getKind() == Tail;
   }
@@ -695,6 +695,28 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
 } // namespace llvm
 
 namespace swift {
+
+/// For convenience, encapsulate and AccessedStorage value along with its
+/// accessed base address.
+struct AccessedStorageWithBase {
+  AccessedStorage storage;
+  // The base of the formal access. For class storage, it is the
+  // ref_element_addr. For global storage it is the global_addr or initializer
+  // apply. For other storage, it is the same as accessPath.getRoot().
+  //
+  // Base may be invalid for global_addr -> address_to_pointer -> phi patterns.
+  // FIXME: add a structural requirement to SIL so base is always valid in OSSA.
+  SILValue base;
+
+  AccessedStorageWithBase(AccessedStorage storage, SILValue base)
+      : storage(storage), base(base) {}
+
+  /// Identical to AccessedStorage::compute but preserves the access base.
+  static AccessedStorageWithBase compute(SILValue sourceAddress);
+
+  /// Identical to AccessedStorage::computeInScope but preserves the base.
+  static AccessedStorageWithBase computeInScope(SILValue sourceAddress);
+};
 
 /// Return an AccessedStorage value that identifies formally accessed storage
 /// for \p beginAccess, considering any outer access scope as having distinct
