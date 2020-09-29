@@ -255,6 +255,9 @@ struct ASTContext::Implementation {
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
+  /// The module interface checker owned by the ASTContext.
+  std::unique_ptr<ModuleInterfaceChecker> InterfaceChecker;
+
   /// The various module loaders that import external modules into this
   /// ASTContext.
   SmallVector<std::unique_ptr<swift::ModuleLoader>, 4> ModuleLoaders;
@@ -267,9 +270,6 @@ struct ASTContext::Implementation {
 
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
-
-  /// The module loader used to load Swift textual interface.
-  ModuleLoader *TheModuleInterfaceLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
@@ -1519,9 +1519,13 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
-  if (IsInterface && !getImpl().TheModuleInterfaceLoader)
-    getImpl().TheModuleInterfaceLoader = loader.get();
   getImpl().ModuleLoaders.push_back(std::move(loader));
+}
+
+void ASTContext::addModuleInterfaceChecker(
+    std::unique_ptr<ModuleInterfaceChecker> checker) {
+  assert(!getImpl().InterfaceChecker && "Checker has been set already");
+  getImpl().InterfaceChecker = std::move(checker);
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
@@ -1610,8 +1614,10 @@ ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
   return getImpl().TheDWARFModuleLoader;
 }
 
-ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
-  return getImpl().TheModuleInterfaceLoader;
+ModuleInterfaceChecker *ASTContext::getModuleInterfaceChecker() const {
+  auto *result = getImpl().InterfaceChecker.get();
+  assert(result);
+  return result;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(

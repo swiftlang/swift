@@ -170,10 +170,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
     // Try building forwarding module first. If succeed, return.
-    if (static_cast<ModuleInterfaceLoader*>(SubInstance.getASTContext()
-        .getModuleInterfaceLoader())->tryEmitForwardingModule(moduleName,
-                                                              interfacePath,
-                                                  CompiledCandidates, OutPath)) {
+    if (SubInstance.getASTContext().getModuleInterfaceChecker()
+          ->tryEmitForwardingModule(moduleName, interfacePath,
+                                    CompiledCandidates, OutPath)) {
       return std::error_code();
     }
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
