@@ -3125,6 +3125,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
         return ABIDifference::CompatibleRepresentation_ThinToThick;
       }
     }
+
     return ABIDifference::NeedsThunk;
   }
 

@@ -81,3 +81,11 @@
 // CHECK-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
+
+// CHECK-IOS-SIM:   "target": {
+// CHECK-IOS-SIM:     "triple": "x86_64-apple-ios12.0-simulator",
+// CHECK-IOS-SIM:     "unversionedTriple": "x86_64-apple-ios-simulator",
+// CHECK-IOS-SIM:     "moduleTriple": "x86_64-apple-ios-simulator",
+// CHECK-IOS-SIM:     "swiftRuntimeCompatibilityVersion": "5.0",
+// CHECK-IOS-SIM:     "librariesRequireRPath": true
+// CHECK-IOS-SIM:   }
