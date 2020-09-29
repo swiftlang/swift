@@ -4775,7 +4775,7 @@ private:
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        const ConstraintSystem &cs,
+        ConstraintSystem &cs,
         llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
@@ -4783,17 +4783,17 @@ private:
 
     /// Infer bindings based on any protocol conformances that have default
     /// types.
-    void inferDefaultTypes(const ConstraintSystem &cs,
+    void inferDefaultTypes(ConstraintSystem &cs,
                            llvm::SmallPtrSetImpl<CanType> &existingTypes);
 
 public:
-    bool infer(const ConstraintSystem &cs,
+    bool infer(ConstraintSystem &cs,
                llvm::SmallPtrSetImpl<CanType> &exactTypes,
                Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(const ConstraintSystem &cs,
+    void finalize(ConstraintSystem &cs,
                   const llvm::SmallDenseMap<TypeVariableType *,
                                             ConstraintSystem::PotentialBindings>
                       &inferredBindings);
@@ -4862,7 +4862,7 @@ public:
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
   PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
-                                     bool finalize = true) const;
+                                     bool finalize = true);
 
 private:
   Optional<ConstraintSystem::PotentialBinding>

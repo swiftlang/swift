@@ -22,7 +22,7 @@ using namespace swift;
 using namespace constraints;
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -144,7 +144,7 @@ isUnviableDefaultType(Type defaultType,
 }
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
   auto isDirectRequirement = [&](Constraint *constraint) -> bool {
     if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
       auto *repr = cs.getRepresentative(typeVar);
@@ -300,7 +300,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
-    const ConstraintSystem &cs,
+    ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -620,8 +620,7 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
 }
 
 ConstraintSystem::PotentialBindings
-ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
-                                   bool finalize) const {
+ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
@@ -829,7 +828,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 bool ConstraintSystem::PotentialBindings::infer(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
     Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
