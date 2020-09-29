@@ -406,6 +406,9 @@ public:
   llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
 
   SILFunction *CurSILFn;
+  // If valid, the address by means of which a return--which is direct in
+  // SIL--is passed indirectly in IR.  Such indirection is necessary when the
+  // value which would be returned directly cannot fit into registers.
   Address IndirectReturn;
 
   /// The unique block that calls @llvm.coro.end.
