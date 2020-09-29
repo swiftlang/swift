@@ -1219,7 +1219,7 @@ extension ArraySlice {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///    If `body` has a return value, that value is also
+  ///    If no such storage exists, it is created. If `body` has a return value, that value is also
   ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
   ///   method. The pointer argument is valid only for the duration of the
   ///   method's execution.
