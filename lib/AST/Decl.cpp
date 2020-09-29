@@ -7508,6 +7508,56 @@ bool FuncDecl::isMainTypeMainMethod() const {
          getParameters()->size() == 0;
 }
 
+bool FuncDecl::isEnqueuePartialTaskName(ASTContext &ctx, DeclName name) {
+  if (name.isCompoundName() && name.getBaseName() == ctx.Id_enqueue) {
+    auto argumentNames = name.getArgumentNames();
+    return argumentNames.size() == 1 && argumentNames[0] == ctx.Id_partialTask;
+  }
+
+  return false;
+}
+
+bool FuncDecl::isActorEnqueuePartialTaskWitness() const {
+  if (!isEnqueuePartialTaskName(getASTContext(), getName()))
+    return false;
+
+  auto classDecl = getDeclContext()->getSelfClassDecl();
+  if (!classDecl)
+    return false;
+
+  if (!classDecl->isActor())
+    return false;
+
+  ASTContext &ctx = getASTContext();
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  if (!actorProto)
+    return false;
+
+  FuncDecl *requirement = nullptr;
+  for (auto protoMember : actorProto->getParsedMembers()) {
+    if (auto protoFunc = dyn_cast<FuncDecl>(protoMember)) {
+      if (isEnqueuePartialTaskName(ctx, protoFunc->getName())) {
+        requirement = protoFunc;
+        break;
+      }
+    }
+  }
+
+  if (!requirement)
+    return false;
+
+  SmallVector<ProtocolConformance *, 1> conformances;
+  classDecl->lookupConformance(
+      classDecl->getModuleContext(), actorProto, conformances);
+  for (auto conformance : conformances) {
+    auto witness = conformance->getWitnessDecl(requirement);
+    if (witness == this)
+      return true;
+  }
+
+  return false;
+}
+
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Throws,

@@ -287,7 +287,7 @@ ValueDecl *DerivedConformance::deriveActor(ValueDecl *requirement) {
   if (!func)
     return nullptr;
 
-  if (isEnqueuePartialTask(Context, func->getName()))
+  if (FuncDecl::isEnqueuePartialTaskName(Context, func->getName()))
     return deriveActor_enqueuePartialTask(*this);
 
   return nullptr;

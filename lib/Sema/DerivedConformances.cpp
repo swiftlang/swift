@@ -365,7 +365,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Actor.enqueue(partialTask: PartialTask)
-    if (isEnqueuePartialTask(ctx, name)) {
+    if (FuncDecl::isEnqueuePartialTaskName(ctx, name)) {
       return getRequirement(KnownProtocolKind::Actor);
     }
 

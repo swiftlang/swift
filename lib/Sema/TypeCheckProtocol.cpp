@@ -4219,10 +4219,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       auto &C = witness->getASTContext();
 
       // Ensure that Actor.enqueue(partialTask:) is implemented within the
-      // class itself.
-      if (isEnqueuePartialTask(C, requirement->getName()) &&
+      // actor class itself.
+      if (FuncDecl::isEnqueuePartialTaskName(C, requirement->getName()) &&
           Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
-          DC != witness->getDeclContext()) {
+          DC != witness->getDeclContext() &&
+          Adoptee->getClassOrBoundGenericClass() &&
+          Adoptee->getClassOrBoundGenericClass()->isActor()) {
         witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
         return;
       }
