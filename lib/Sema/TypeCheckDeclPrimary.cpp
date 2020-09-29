@@ -1418,16 +1418,10 @@ public:
     (void) VD->getPropertyWrapperBackingProperty();
     (void) VD->getImplInfo();
 
-    if (VD->hasAttachedPropertyWrapper() && VD->getDeclContext()->isLocalContext()) {
-      // If this is a local wrapped variable, visit the synthesized
-      // storage and projection first
-      auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo();
-      assert(wrapperInfo);
-
-      visitBoundVariable(wrapperInfo.backingVar);
-      if (wrapperInfo.projectionVar)
-        visitBoundVariable(wrapperInfo.projectionVar);
-    }
+    // Visit auxiliary decls first
+    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+      this->visitBoundVariable(var);
+    });
 
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())

@@ -1195,13 +1195,6 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  // Visit (local) property wrapper backing var first
-  auto *singleVar = PBD->getSingleVar();
-  if (singleVar && singleVar->hasAttachedPropertyWrapper() &&
-      singleVar->getDeclContext()->isLocalContext()) {
-    auto *backingVar = singleVar->getPropertyWrapperBackingProperty();
-    visitPatternBindingDecl(backingVar->getParentPatternBinding());
-  }
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
@@ -1213,17 +1206,17 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
 
-  // Visit property wrapper synthesized accessors first.
-  if (D->hasAttachedPropertyWrapper() && D->getDeclContext()->isLocalContext()) {
-    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
-    if (!wrapperInfo)
-      return;
-
+  // Emit the property wrapper backing initializer if necessary.
+  auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
+  if (wrapperInfo && wrapperInfo.initializeFromOriginal)
     SGM.emitPropertyWrapperBackingInitializer(D);
-    visit(wrapperInfo.backingVar);
-    if (wrapperInfo.projectionVar)
-      visit(wrapperInfo.projectionVar);
-  }
+
+  D->visitAuxiliaryDecls([&](VarDecl *var) {
+    if (auto *patternBinding = var->getParentPatternBinding())
+      visitPatternBindingDecl(patternBinding);
+
+    visit(var);
+  });
 
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {
