@@ -144,9 +144,6 @@ namespace {
     static const unsigned targetLookup;
 #endif
 
-  public: // for exp debugging
-    unsigned resultsSizeBeforeLocalsPass = ~0;
-
   public:
     // clang-format off
     UnqualifiedLookupFactory(DeclNameRef Name,
@@ -708,16 +705,10 @@ void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
 
 void UnqualifiedLookupFactory::printResults(raw_ostream &out) const {
   for (auto i : indices(Results)) {
-    if (i == resultsSizeBeforeLocalsPass)
-      out << "============== next pass ============\n";
     out << i << ": ";
     Results[i].print(out);
     out << "\n";
   }
-  if (resultsSizeBeforeLocalsPass == Results.size())
-    out << "============== next pass ============\n";
-  if (resultsSizeBeforeLocalsPass == ~0u)
-    out << "never tried locals\n\n";
 }
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
