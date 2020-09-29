@@ -1,4 +1,4 @@
-//===--- DerivedConformanceEquatableHashable.cpp - Derived Equatable & co -===//
+//===--- DerivedConformanceActor.cpp - Derived Actor Conformance ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
