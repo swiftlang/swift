@@ -1217,6 +1217,77 @@ bool TypeVarBindingProducer::computeNext() {
   return true;
 }
 
+Optional<std::pair<ConstraintFix *, unsigned>>
+TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
+  auto *dstLocator = TypeVar->getImpl().getLocator();
+  auto *srcLocator = Binding.getLocator();
+
+  unsigned defaultImpact = 1;
+
+  if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+    // If it is represetative for a key path root, let's emit a more
+    // specific diagnostic.
+    auto *keyPathRoot =
+        cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
+    if (keyPathRoot) {
+      ConstraintFix *fix = SpecifyKeyPathRootType::create(
+          cs, keyPathRoot->getImpl().getLocator());
+      return std::make_pair(fix, defaultImpact);
+    } else {
+      auto path = dstLocator->getPath();
+      // Drop `generic parameter` locator element so that all missing
+      // generic parameters related to the same path can be coalesced later.
+      ConstraintFix *fix = DefaultGenericArgument::create(
+          cs, GP,
+          cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
+      return std::make_pair(fix, defaultImpact);
+    }
+  }
+
+  if (TypeVar->getImpl().isClosureParameterType()) {
+    ConstraintFix *fix = SpecifyClosureParameterType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (TypeVar->getImpl().isClosureResultType()) {
+    auto *closure = castToExpr<ClosureExpr>(dstLocator->getAnchor());
+    // If the whole body is being ignored due to a pre-check failure,
+    // let's not record a fix about result type since there is
+    // just not enough context to infer it without a body.
+    if (cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
+                     FixKind::IgnoreInvalidFunctionBuilderBody))
+      return None;
+
+    ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
+    ConstraintFix *fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (srcLocator->isKeyPathRoot()) {
+    // If we recorded an invalid key path fix, let's skip this specify root
+    // type fix because it wouldn't produce a useful diagnostic.
+    auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
+    if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+      return None;
+
+    ConstraintFix *fix = SpecifyKeyPathRootType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (dstLocator->directlyAt<NilLiteralExpr>()) {
+    // This is a dramatic event, it means that there is absolutely
+    // no contextual information to resolve type of `nil`.
+    ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
+    return std::make_pair(fix, /*impact=*/(unsigned)10);
+  }
+
+  return None;
+}
+
 bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
   auto *srcLocator = Binding.getLocator();
@@ -1238,56 +1309,10 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);
 
-      ConstraintFix *fix = nullptr;
-      unsigned fixImpact = 1;
-
-      if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-        // If it is represetative for a key path root, let's emit a more
-        // specific diagnostic.
-        auto *keyPathRoot =
-            cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
-        if (keyPathRoot) {
-          fix = SpecifyKeyPathRootType::create(
-              cs, keyPathRoot->getImpl().getLocator());
-        } else {
-          auto path = dstLocator->getPath();
-          // Drop `generic parameter` locator element so that all missing
-          // generic parameters related to the same path can be coalesced later.
-          fix = DefaultGenericArgument::create(
-              cs, GP,
-              cs.getConstraintLocator(dstLocator->getAnchor(),
-                                      path.drop_back()));
-        }
-      } else if (TypeVar->getImpl().isClosureParameterType()) {
-        fix = SpecifyClosureParameterType::create(cs, dstLocator);
-      } else if (TypeVar->getImpl().isClosureResultType()) {
-        auto *locator = TypeVar->getImpl().getLocator();
-        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-        // If the whole body is being ignored due to a pre-check failure,
-        // let's not record a fix about result type since there is
-        // just not enough context to infer it without a body.
-        if (!cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
-                          FixKind::IgnoreInvalidFunctionBuilderBody))
-          fix = SpecifyClosureReturnType::create(cs, dstLocator);
-      } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
-        fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
-      } else if (srcLocator->isKeyPathRoot()) {
-        // If we recorded an invalid key path fix, let's skip this specify root
-        // type fix because it wouldn't produce a useful diagnostic.
-        auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
-        if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+      if (auto fix = fixForHole(cs)) {
+        if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
           return true;
-        
-        fix = SpecifyKeyPathRootType::create(cs, dstLocator);
-      } else if (dstLocator->directlyAt<NilLiteralExpr>()) {
-        fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
-        // This is a dramatic event, it means that there is absolutely
-        // no contextual information to resolve type of `nil`.
-        fixImpact = 10;
       }
-
-      if (fix && cs.recordFix(fix, fixImpact))
-        return true;
     }
   }
 
