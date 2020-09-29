@@ -1,6 +1,6 @@
-// RUN: %swift -swift-version 4 -typecheck %s -verify -target x86_64-apple-ios7.0 -parse-stdlib
+// RUN: %swift -swift-version 4 -typecheck %s -verify -target x86_64-apple-ios7.0-simulator -parse-stdlib
 // RUN: %swift -swift-version 4 -typecheck %s -verify -target x86_64-unknown-linux-simulator -parse-stdlib
-// RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target x86_64-apple-ios7.0
+// RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target x86_64-apple-ios7.0-simulator
 
 #if !targetEnvironment(simulator)
 // This block should not parse.
