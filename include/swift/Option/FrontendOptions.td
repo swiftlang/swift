@@ -175,40 +175,6 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
-} // end let Flags = [FrontendOption, NoDriverOption]
-
-def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
-class DebugCrashOpt : Group<debug_crash_Group>;
-
-
-// Flags that are saved into module interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
-
-def enable_objc_interop :
-  Flag<["-"], "enable-objc-interop">,
-  HelpText<"Enable Objective-C interop code generation and config directives">;
-
-def disable_objc_interop :
-  Flag<["-"], "disable-objc-interop">,
-  HelpText<"Disable Objective-C interop code generation and config directives">;
-
-def enable_objc_attr_requires_foundation_module :
-  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
-  HelpText<"Enable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def disable_objc_attr_requires_foundation_module :
-  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
-  HelpText<"Disable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
-
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Deprecated, use -enable-library-evolution instead">;
-
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules explicitly by the compiler">;
 
@@ -231,6 +197,37 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+} // end let Flags = [FrontendOption, NoDriverOption]
+
+def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
+class DebugCrashOpt : Group<debug_crash_Group>;
+
+
+// Flags that are saved into module interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
+  def enable_objc_interop :
+    Flag<["-"], "enable-objc-interop">,
+    HelpText<"Enable Objective-C interop code generation and config directives">;
+
+  def disable_objc_interop :
+    Flag<["-"], "disable-objc-interop">,
+    HelpText<"Disable Objective-C interop code generation and config directives">;
+
+  def enable_objc_attr_requires_foundation_module :
+    Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+    HelpText<"Enable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+  def disable_objc_attr_requires_foundation_module :
+    Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+    HelpText<"Disable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+     HelpText<"Deprecated, use -enable-library-evolution instead">;
 }
 
 // HIDDEN FLAGS
