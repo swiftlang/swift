@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cow-opts"
+
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SIL/SILFunction.h"
@@ -105,8 +106,8 @@ void TempLValueOptPass::run() {
     }
     // Do the optimizations.
     for (CopyAddrInst *copyInst : copyInsts) {
-      changed |=combineCopyAndDestroy(copyInst);
-      changed |=tempLValueOpt(copyInst);
+      changed |= combineCopyAndDestroy(copyInst);
+      changed |= tempLValueOpt(copyInst);
     }
   }
 
