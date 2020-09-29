@@ -283,6 +283,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // splits up copy_addr.
   P.addCopyForwarding();
 
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+
   // Optimize copies from a temporary (an "l-value") to a destination.
   P.addTempLValueOpt();
 
@@ -489,10 +493,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
+  // stdlib ownership model elimination is done within addFunctionPasses
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
