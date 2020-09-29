@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// REQUIRES: concurrency
 
 // Synthesis of for actor classes.
 import _Concurrency
@@ -25,9 +26,16 @@ actor class A6: A1, Actor { // expected-error{{redundant conformance of 'A6' to 
   // expected-note@-1{{'A6' inherits conformance to protocol 'Actor' from superclass here}}
 }
 
+// Explicitly satisfying the requirement.
+
 actor class A7 {
   // Okay: satisfy the requirement explicitly
   @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
+}
+
+// A non-actor class can conform to the Actor protocol, if it does it properly.
+class C1: Actor {
+  func enqueue(partialTask: PartialAsyncTask) { }
 }
 
 // Bad actors, that incorrectly try to satisfy the various requirements.
@@ -46,6 +54,9 @@ extension BA2 {
   @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
 }
 
+// No synthesis for non-actor classes.
+class C2: Actor { // expected-error{{type 'C2' does not conform to protocol 'Actor'}}
+}
 
 // Make sure the conformances actually happen.
 func acceptActor<T: Actor>(_: T.Type) { }

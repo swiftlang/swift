@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -113,6 +114,21 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     if (var->hasAttachedPropertyWrapper())
       (void) var->getPropertyWrapperBackingProperty();
   }
+
+  // If this is an actor class, check conformance to the Actor protocol to
+  // ensure that the actor storage will get created (if needed).
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (classDecl->isActor()) {
+      ASTContext &ctx = decl->getASTContext();
+      if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
+        SmallVector<ProtocolConformance *, 1> conformances;
+        classDecl->lookupConformance(
+            decl->getModuleContext(), actorProto, conformances);
+        for (auto conformance : conformances)
+          TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      }
+    }
+  }
 }
 
 ArrayRef<VarDecl *>
@@ -128,10 +144,16 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
+  ASTContext &ctx = decl->getASTContext();
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
+      if (!var->isStatic() && var->hasStorage()) {
+        // Actor storage always goes at the beginning.
+        if (var->getName() == ctx.Id_actorStorage)
+          results.insert(results.begin(), var);
+        else
+          results.push_back(var);
+      }
   }
 
   return decl->getASTContext().AllocateCopy(results);

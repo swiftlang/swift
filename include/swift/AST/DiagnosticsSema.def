@@ -4195,9 +4195,9 @@ ERROR(actorisolated_not_actor_instance_member,none,
       "'@actorIsolated' can only be applied to instance members of actors",
       ())
 
-ERROR(partial_task_type_missing,none,
-      "missing 'PartialAsyncTask' type, probably because the '_Concurrency' "
-      "module was not imported", ())
+ERROR(concurrency_lib_missing,none,
+      "missing '%0' declaration, probably because the '_Concurrency' "
+      "module was not imported", (StringRef))
 ERROR(enqueue_partial_task_not_in_context,none,
       "'enqueue(partialTask:)' can only be implemented in the definition of "
       "actor class %0", (Type))
