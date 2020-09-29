@@ -1114,6 +1114,29 @@ namespace {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
+    VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
+      auto *methodContext = DC->getInnermostMethodContext();
+      if (!methodContext) {
+        Ctx.Diags.diagnose(Loc, diag::super_not_in_class_method);
+        return nullptr;
+      }
+
+      // Do an actual lookup for 'self' in case it shows up in a capture list.
+      auto *methodSelf = methodContext->getImplicitSelfDecl();
+      auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                         Ctx.Id_self, Loc);
+      if (lookupSelf && lookupSelf != methodSelf) {
+        // FIXME: This is the wrong diagnostic for if someone manually declares a
+        // variable named 'self' using backticks.
+        Ctx.Diags.diagnose(Loc, diag::super_in_closure_with_capture);
+        Ctx.Diags.diagnose(lookupSelf->getLoc(),
+                           diag::super_in_closure_with_capture_here);
+        return nullptr;
+      }
+
+      return methodSelf;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
@@ -1155,6 +1178,17 @@ namespace {
 
         return std::make_pair(recursive, expr);
       };
+
+      // Resolve 'super' references.
+      if (auto *superRef = dyn_cast<SuperRefExpr>(expr)) {
+        auto loc = superRef->getLoc();
+        auto *selfDecl = getImplicitSelfDeclForSuperContext(loc);
+        if (selfDecl == nullptr)
+          return finish(true, new (Ctx) ErrorExpr(loc));
+
+        superRef->setSelf(selfDecl);
+        return finish(true, superRef);
+      }
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after

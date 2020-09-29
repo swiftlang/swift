@@ -853,29 +853,6 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
-static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
-                                                   DeclContext *DC,
-                                                   SourceLoc Loc) {
-  auto *methodContext = DC->getInnermostMethodContext();
-  if (!methodContext) {
-    P.diagnose(Loc, diag::super_not_in_class_method);
-    return nullptr;
-  }
-
-  // Do an actual lookup for 'self' in case it shows up in a capture list.
-  auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(DeclNameRef(P.Context.Id_self));
-  if (lookupSelf && lookupSelf != methodSelf) {
-    // FIXME: This is the wrong diagnostic for if someone manually declares a
-    // variable named 'self' using backticks.
-    P.diagnose(Loc, diag::super_in_closure_with_capture);
-    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
-    return nullptr;
-  }
-
-  return methodSelf;
-}
-
 /// parseExprSuper
 ///
 ///   expr-super:
@@ -903,12 +880,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
     return nullptr;
   }
 
-  VarDecl *selfDecl =
-      getImplicitSelfDeclForSuperContext(*this, CurDeclContext, superLoc);
-  if (!selfDecl)
-    return makeParserResult(new (Context) ErrorExpr(superLoc));
-
-  return makeParserResult(new (Context) SuperRefExpr(selfDecl, superLoc,
+  return makeParserResult(new (Context) SuperRefExpr(/*selfDecl=*/nullptr,
+                                                     superLoc,
                                                      /*Implicit=*/false));
 }
 
