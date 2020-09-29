@@ -684,7 +684,8 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   /// Reserves enough space to store `minimumCapacity` elements.
   /// If a new buffer needs to be allocated and `growForAppend` is true,
-  /// the new capacity is calculated using `_growArrayCapacity`.
+  /// the new capacity is calculated using `_growArrayCapacity`, but at least
+  /// kept at `minimumCapacity`.
   @_alwaysEmitIntoClient
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
@@ -706,7 +707,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// to the new buffer.
   /// The `minimumCapacity` is the lower bound for the new capacity.
   /// If `growForAppend` is true, the new capacity is calculated using
-  /// `_growArrayCapacity`.
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
   @_alwaysEmitIntoClient
   @inline(never)
   internal mutating func _createNewBuffer(
