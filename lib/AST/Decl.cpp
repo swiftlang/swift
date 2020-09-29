@@ -5957,7 +5957,7 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
-  if (!getDeclContext()->isLocalContext())
+  if (getDeclContext()->isTypeContext())
     return;
 
   if (auto *backingVar = getPropertyWrapperBackingProperty())
