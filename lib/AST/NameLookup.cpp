@@ -20,6 +20,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"

@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"

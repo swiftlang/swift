@@ -14,6 +14,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
