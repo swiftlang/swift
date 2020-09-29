@@ -1038,6 +1038,7 @@ extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
+    // Always show sugared representation for Arrays.
     return _makeCollectionDescription(withTypeName: "ContiguousArray")
   }
 }
