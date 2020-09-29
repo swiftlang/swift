@@ -538,10 +538,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
-  // Include property wrapper results in case we have a reference to a backing
-  // property wrapper or projected value
-  lookupOptions |= NameLookupFlags::IncludePropertyWrapperResults;
-
   if (Loc.isInvalid())
     DC = DC->getModuleScopeContext();
 

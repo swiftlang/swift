@@ -605,25 +605,19 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
 
     auto fullName = factory.Name.getFullName();
     if (!value->getName().matchesRef(fullName)) {
-      if (!factory.options.contains(UnqualifiedLookupFlags::IncludePropertyWrapperResults))
-        continue;
-
-      auto *varDecl = dyn_cast<VarDecl>(value);
-      if (!varDecl || !varDecl->hasAttachedPropertyWrapper())
-        continue;
-
-      auto wrapperInfo = varDecl->getPropertyWrapperBackingPropertyInfo();
-      if (!wrapperInfo)
-        continue;
-
-      if (wrapperInfo.backingVar->ValueDecl::getName().matchesRef(fullName)) {
-        value = wrapperInfo.backingVar;
-      } else if (wrapperInfo.projectionVar &&
-                 wrapperInfo.projectionVar->ValueDecl::getName().matchesRef(fullName)) {
-        value = wrapperInfo.projectionVar;
-      } else {
-        continue;
+      bool foundMatch = false;
+      if (auto *varDecl = dyn_cast<VarDecl>(value)) {
+        // Check if the name matches any auxiliary decls not in the AST
+        varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+          if (auxiliaryVar->ValueDecl::getName().matchesRef(fullName)) {
+            value = auxiliaryVar;
+            foundMatch = true;
+          }
+        });
       }
+
+      if (!foundMatch)
+        continue;
     }
 
     // In order to preserve the behavior of the existing context-based lookup,

@@ -211,8 +211,6 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
-  if (options.contains(NameLookupFlags::IncludePropertyWrapperResults))
-    newOptions |= UnqualifiedLookupFlags::IncludePropertyWrapperResults;
 
   return newOptions;
 }

@@ -192,8 +192,6 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 1 << 1,
-  /// Whether to consider property wrapper names
-  IncludePropertyWrapperResults = 1 << 2,
 };
 
 /// A set of options that control name lookup.
