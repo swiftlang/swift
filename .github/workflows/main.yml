@@ -134,7 +134,9 @@ jobs:
           name: macos-installable
           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz
       - name: Pack test results
-        run: tar cJf swift-test-results.tar.gz ../target-build/*/swift-macosx-x86_64/swift-test-results
+        run: |
+          cd ../
+          tar cJf swift-test-results.tar.gz target-build/*/swift-macosx-x86_64/swift-test-results
       - name: Upload test results
         uses: actions/upload-artifact@v1
         with:
