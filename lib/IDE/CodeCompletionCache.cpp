@@ -343,7 +343,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       if (R->getKind() == CodeCompletionResult::Declaration)
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
-        LE.write(~static_cast<uint8_t>(0u));
+        LE.write(static_cast<uint8_t>(~0u));
       if (R->isOperator())
         LE.write(static_cast<uint8_t>(R->getOperatorKind()));
       else
