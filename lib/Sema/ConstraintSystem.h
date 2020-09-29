@@ -4644,6 +4644,8 @@ private:
     /// `bind param` are present in the system.
     bool PotentiallyIncomplete = false;
 
+    ASTNode AssociatedCodeCompletionToken = ASTNode();
+
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 

@@ -377,6 +377,15 @@ void ConstraintSystem::PotentialBindings::finalize(
       PotentiallyIncomplete = true;
     }
 
+    // If this type variable is associated with a code completion token
+    // and it failed to infer any bindings let's adjust hole's locator
+    // to point to a code completion token to avoid attempting to "fix"
+    // this problem since its rooted in the fact that constraint system
+    // is under-constrained.
+    if (AssociatedCodeCompletionToken) {
+      locator = cs.getConstraintLocator(AssociatedCodeCompletionToken);
+    }
+
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
 
@@ -767,6 +776,18 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       return None;
 
     result.InvolvesTypeVariables = true;
+
+    // If current type variable is associated with a code completion token
+    // it's possible that it doesn't have enough contextual information
+    // to be resolved to anything, so let's note that fact in the potential
+    // bindings and use it when forming a hole if there are no other bindings
+    // available.
+    if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
+      if (locator->directlyAt<CodeCompletionExpr>()) {
+        result.AssociatedCodeCompletionToken = locator->getAnchor();
+        result.PotentiallyIncomplete = true;
+      }
+    }
 
     if (constraint->getKind() == ConstraintKind::Subtype &&
         kind == AllowedBindingKind::Subtypes) {
