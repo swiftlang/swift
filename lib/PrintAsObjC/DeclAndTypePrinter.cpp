@@ -1706,7 +1706,7 @@ private:
       auto *clangDecl = SD->getClangDecl();
       if (!clangDecl)
         return false;
-      return clangDecl->hasAttr<clang::SwiftNewtypeAttr>();
+      return clangDecl->hasAttr<clang::SwiftNewTypeAttr>();
     };
 
     // Use the type as bridged to Objective-C unless the element type is itself

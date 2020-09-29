@@ -2565,7 +2565,7 @@ namespace {
     /// Create a swift_newtype struct corresponding to a typedef. Returns
     /// nullptr if unable.
     Decl *importSwiftNewtype(const clang::TypedefNameDecl *decl,
-                             clang::SwiftNewtypeAttr *newtypeAttr,
+                             clang::SwiftNewTypeAttr *newtypeAttr,
                              DeclContext *dc, Identifier name);
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
@@ -5618,7 +5618,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 
 Decl *
 SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
-                                       clang::SwiftNewtypeAttr *newtypeAttr,
+                                       clang::SwiftNewTypeAttr *newtypeAttr,
                                        DeclContext *dc, Identifier name) {
   // The only (current) difference between swift_newtype(struct) and
   // swift_newtype(enum), until we can get real enum support, is that enums
@@ -5627,12 +5627,12 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   bool unlabeledCtor = false;
 
   switch (newtypeAttr->getNewtypeKind()) {
-  case clang::SwiftNewtypeAttr::NK_Enum:
+  case clang::SwiftNewTypeAttr::NK_Enum:
     unlabeledCtor = false;
     // TODO: import as enum instead
     break;
 
-  case clang::SwiftNewtypeAttr::NK_Struct:
+  case clang::SwiftNewTypeAttr::NK_Struct:
     unlabeledCtor = true;
     break;
     // No other cases yet
