@@ -6969,3 +6969,43 @@ bool InvalidEmptyKeyPathFailure::diagnoseAsError() {
   emitDiagnostic(diag::expr_swift_keypath_empty);
   return true;
 }
+
+bool MissingContextualTypeForNil::diagnoseAsError() {
+  auto *expr = castToExpr<NilLiteralExpr>(getAnchor());
+
+  // If this is a standalone `nil` literal expression e.g.
+  // `_ = nil`, let's diagnose it here because solver can't
+  // attempt any types for it.
+  auto *parentExpr = findParentExpr(expr);
+
+  while (parentExpr && isa<IdentityExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
+
+  // In cases like `_ = nil?` AST would have `nil`
+  // wrapped in `BindOptionalExpr`.
+  if (parentExpr && isa<BindOptionalExpr>(parentExpr))
+    parentExpr = findParentExpr(parentExpr);
+
+  if (parentExpr) {
+    // `_ = nil as? ...`
+    if (isa<ConditionalCheckedCastExpr>(parentExpr)) {
+      emitDiagnostic(diag::conditional_cast_from_nil);
+      return true;
+    }
+
+    // `_ = nil!`
+    if (isa<ForceValueExpr>(parentExpr)) {
+      emitDiagnostic(diag::cannot_force_unwrap_nil_literal);
+      return true;
+    }
+
+    // `_ = nil?`
+    if (isa<OptionalEvaluationExpr>(parentExpr)) {
+      emitDiagnostic(diag::unresolved_nil_literal);
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::unresolved_nil_literal);
+  return true;
+}

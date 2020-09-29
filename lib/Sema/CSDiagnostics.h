@@ -2268,6 +2268,23 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where there is no context to determine a
+/// type of `nil` literal e.g.
+///
+/// \code
+/// let _ = nil
+/// let _ = try nil
+/// let _ = nil!
+/// \endcode
+class MissingContextualTypeForNil final : public FailureDiagnostic {
+public:
+  MissingContextualTypeForNil(const Solution &solution,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

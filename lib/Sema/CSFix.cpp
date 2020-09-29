@@ -1603,3 +1603,15 @@ IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
   return new (cs.getAllocator())
       IgnoreInvalidFunctionBuilderBody(cs, phase, locator);
 }
+
+bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  MissingContextualTypeForNil failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyContextualTypeForNil *
+SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}

@@ -1015,80 +1015,13 @@ namespace {
     }
 
     Type visitNilLiteralExpr(NilLiteralExpr *expr) {
-      auto &DE = CS.getASTContext().Diags;
-      // If this is a standalone `nil` literal expression e.g.
-      // `_ = nil`, let's diagnose it here because solver can't
-      // attempt any types for it.
-      auto *parentExpr = CS.getParentExpr(expr);
-      bool hasContextualType = bool(CS.getContextualType(expr));
+      auto literalTy = visitLiteralExpr(expr);
+      // Allow `nil` to be a hole so we can diagnose it via a fix
+      // if it turns out that there is no contextual information.
+      if (auto *typeVar = literalTy->getAs<TypeVariableType>())
+        CS.recordPotentialHole(typeVar);
 
-      while (parentExpr) {
-        if (!isa<IdentityExpr>(parentExpr))
-          break;
-
-        // If there is a parent, use it, otherwise we need
-        // to check whether the last parent node in the chain
-        // had a contextual type associated with it because
-        // in situations like:
-        //
-        // \code
-        // func foo() -> Int? {
-        //   return (nil)
-        // }
-        // \endcode
-        //
-        // parentheses around `nil` are significant.
-        if (auto *nextParent = CS.getParentExpr(parentExpr)) {
-          parentExpr = nextParent;
-        } else {
-          hasContextualType |= bool(CS.getContextualType(parentExpr));
-          // Since current expression is an identity expr
-          // and there are no more parents, let's pretend
-          // that `nil`  don't have a parent since parens
-          // are not semantically significant for further checks.
-          parentExpr = nullptr;
-        }
-      }
-
-      // In cases like `_ = nil?` AST would have `nil`
-      // wrapped in `BindOptionalExpr`.
-      if (parentExpr && isa<BindOptionalExpr>(parentExpr))
-        parentExpr = CS.getParentExpr(parentExpr);
-
-      if (parentExpr) {
-        // `_ = nil as? ...`
-        if (isa<ConditionalCheckedCastExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::conditional_cast_from_nil);
-          return Type();
-        }
-
-        // `_ = nil!`
-        if (isa<ForceValueExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
-          return Type();
-        }
-
-        // `_ = nil?`
-        if (isa<OptionalEvaluationExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-          return Type();
-        }
-
-        // `_ = nil`
-        if (auto *assignment = dyn_cast<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-      }
-
-      if (!parentExpr && !hasContextualType) {
-        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-        return Type();
-      }
-
-      return visitLiteralExpr(expr);
+      return literalTy;
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
@@ -3042,11 +2975,19 @@ namespace {
                                             TVO_PrefersSubtypeBinding |
                                             TVO_CanBindToLValue |
                                             TVO_CanBindToNoEscape);
-      
+
+      auto *valueExpr = expr->getSubExpr();
+      // It's invalid to force unwrap `nil` literal e.g. `_ = nil!` or
+      // `_ = (try nil)!` and similar constructs.
+      if (auto *nilLiteral = dyn_cast<NilLiteralExpr>(
+              valueExpr->getSemanticsProvidingExpr())) {
+        CS.recordFix(SpecifyContextualTypeForNil::create(
+            CS, CS.getConstraintLocator(nilLiteral)));
+      }
+
       // The result is the object type of the optional subexpression.
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       CS.getType(expr->getSubExpr()), objectTy,
-                       locator);
+      CS.addConstraint(ConstraintKind::OptionalObject, CS.getType(valueExpr),
+                       objectTy, locator);
       return objectTy;
     }
 
