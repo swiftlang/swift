@@ -10,9 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import cmark
 from . import foundation
-from . import indexstoredb
 from . import libcxx
 from . import libdispatch
 from . import libicu
@@ -20,7 +21,10 @@ from . import llbuild
 from . import llvm
 from . import product
 from . import swift
+from . import swiftpm
 from . import xctest
+from .. import shell
+from .. import targets
 
 
 class SwiftDriver(product.Product):
@@ -51,24 +55,48 @@ class SwiftDriver(product.Product):
         return self.args.clean_swift_driver
 
     def clean(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'clean', host_target, self, self.args)
+        run_build_script_helper('clean', host_target, self, self.args)
 
     def build(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'build', host_target, self, self.args)
+        run_build_script_helper('build', host_target, self, self.args)
 
     def should_test(self, host_target):
         return self.args.test_swift_driver
 
     def test(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'test', host_target, self, self.args,
-            self.args.test_sourcekitlsp_sanitize_all)
+        run_build_script_helper('test', host_target, self, self.args)
 
     def should_install(self, host_target):
         return self.args.install_swift_driver
 
     def install(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'install', host_target, self, self.args)
+        run_build_script_helper('install', host_target, self, self.args)
+
+
+def run_build_script_helper(action, host_target, product, args):
+    script_path = os.path.join(
+        product.source_dir, 'Utilities', 'build-script-helper.py')
+
+    install_destdir = args.install_destdir
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
+                                                              host_target,
+                                                              product.build_dir)
+    toolchain_path = targets.toolchain_path(install_destdir,
+                                            args.install_prefix)
+    is_release = product.is_release()
+    configuration = 'release' if is_release else 'debug'
+    helper_cmd = [
+        script_path,
+        action,
+        '--package-path', product.source_dir,
+        '--build-path', product.build_dir,
+        '--configuration', configuration,
+        '--toolchain', toolchain_path,
+        '--ninja-bin', product.toolchain.ninja,
+        '--cmake-bin', product.toolchain.cmake,
+    ]
+    if args.verbose_build:
+        helper_cmd.append('--verbose')
+
+    shell.call(helper_cmd)
