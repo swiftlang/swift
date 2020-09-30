@@ -2040,8 +2040,8 @@ public:
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(
         Imported,
-        {ModuleDecl::ImportFilterKind::Public,
-         ModuleDecl::ImportFilterKind::Private,
+        {ModuleDecl::ImportFilterKind::Exported,
+         ModuleDecl::ImportFilterKind::Default,
          ModuleDecl::ImportFilterKind::ImplementationOnly});
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().importedModule;
@@ -2050,7 +2050,7 @@ public:
         continue;
       FurtherImported.clear();
       MD->getImportedModules(FurtherImported,
-                             ModuleDecl::ImportFilterKind::Public);
+                             ModuleDecl::ImportFilterKind::Exported);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
     }
   }
@@ -5993,8 +5993,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
       // Add results for all imported modules.
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       SF.getImportedModules(
-          Imports, {ModuleDecl::ImportFilterKind::Public,
-                    ModuleDecl::ImportFilterKind::Private,
+          Imports, {ModuleDecl::ImportFilterKind::Exported,
+                    ModuleDecl::ImportFilterKind::Default,
                     ModuleDecl::ImportFilterKind::ImplementationOnly});
 
       for (auto Imported : Imports) {

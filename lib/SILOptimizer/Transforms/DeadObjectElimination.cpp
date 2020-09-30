@@ -573,9 +573,9 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
     auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
     if (!TupleElt)
       return false;
-    if (TupleElt->getFieldNo() == 0 && !ArrayDef) {
+    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
       ArrayDef = TupleElt;
-    } else if (TupleElt->getFieldNo() == 1 && !StorageAddress) {
+    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
       StorageAddress = TupleElt;
     } else {
       return false;

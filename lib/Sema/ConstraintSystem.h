@@ -1293,6 +1293,11 @@ enum class ConstraintSystemFlags {
   /// Don't try to type check closure bodies, and leave them unchecked. This is
   /// used for source tooling functionalities.
   LeaveClosureBodyUnchecked = 0x20,
+
+  /// If set, we are solving specifically to determine the type of a
+  /// CodeCompletionExpr, and should continue in the presence of errors wherever
+  /// possible.
+  ForCodeCompletion = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2834,6 +2839,11 @@ public:
     return known->second;
   }
 
+  /// Retrieve type type of the given declaration to be used in
+  /// constraint system, this is better than calling `getType()`
+  /// directly because it accounts of constraint system flags.
+  Type getVarType(const VarDecl *var);
+
   /// Cache the type of the expression argument and return that same
   /// argument.
   template <typename T>
@@ -3055,6 +3065,12 @@ public:
 
   bool shouldReusePrecheckedType() const {
     return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
+  }
+
+  /// Whether we are solving to determine the possible types of a
+  /// \c CodeCompletionExpr.
+  bool isForCodeCompletion() const {
+    return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
   /// Log and record the application of the fix. Return true iff any
@@ -4628,6 +4644,8 @@ private:
     /// `bind param` are present in the system.
     bool PotentiallyIncomplete = false;
 
+    ASTNode AssociatedCodeCompletionToken = ASTNode();
+
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 
@@ -4759,7 +4777,7 @@ private:
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        const ConstraintSystem &cs,
+        ConstraintSystem &cs,
         llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
@@ -4767,17 +4785,17 @@ private:
 
     /// Infer bindings based on any protocol conformances that have default
     /// types.
-    void inferDefaultTypes(const ConstraintSystem &cs,
+    void inferDefaultTypes(ConstraintSystem &cs,
                            llvm::SmallPtrSetImpl<CanType> &existingTypes);
 
 public:
-    bool infer(const ConstraintSystem &cs,
+    bool infer(ConstraintSystem &cs,
                llvm::SmallPtrSetImpl<CanType> &exactTypes,
                Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(const ConstraintSystem &cs,
+    void finalize(ConstraintSystem &cs,
                   const llvm::SmallDenseMap<TypeVariableType *,
                                             ConstraintSystem::PotentialBindings>
                       &inferredBindings);
@@ -4846,7 +4864,7 @@ public:
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
   PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
-                                     bool finalize = true) const;
+                                     bool finalize = true);
 
 private:
   Optional<ConstraintSystem::PotentialBinding>
@@ -5615,6 +5633,11 @@ public:
   }
 
   bool attempt(ConstraintSystem &cs) const;
+
+  /// Determine what fix (if any) needs to be introduced into a
+  /// constraint system as part of resolving type variable as a hole.
+  Optional<std::pair<ConstraintFix *, unsigned>>
+  fixForHole(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const {
     PrintOptions PO;

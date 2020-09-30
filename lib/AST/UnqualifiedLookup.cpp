@@ -144,9 +144,6 @@ namespace {
     static const unsigned targetLookup;
 #endif
 
-  public: // for exp debugging
-    unsigned resultsSizeBeforeLocalsPass = ~0;
-
   public:
     // clang-format off
     UnqualifiedLookupFactory(DeclNameRef Name,
@@ -303,7 +300,9 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   DC->getParentSourceFile());
 
   if (Loc.isValid()) {
-    lookInASTScopes();
+    // Operator lookup is always global, for the time being.
+    if (!Name.isOperator())
+      lookInASTScopes();
   } else {
     assert(DC->isModuleScopeContext() &&
            "Unqualified lookup without a source location must start from "
@@ -543,8 +542,7 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
   stopForDebuggingIfStartingTargetLookup(true);
 #endif
 
-  ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
-                              Name, Loc, consumer);
+  ASTScope::unqualifiedLookup(DC->getParentSourceFile(), Loc, consumer);
 }
 
 void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
@@ -707,16 +705,10 @@ void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
 
 void UnqualifiedLookupFactory::printResults(raw_ostream &out) const {
   for (auto i : indices(Results)) {
-    if (i == resultsSizeBeforeLocalsPass)
-      out << "============== next pass ============\n";
     out << i << ": ";
     Results[i].print(out);
     out << "\n";
   }
-  if (resultsSizeBeforeLocalsPass == Results.size())
-    out << "============== next pass ============\n";
-  if (resultsSizeBeforeLocalsPass == ~0u)
-    out << "never tried locals\n\n";
 }
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
@@ -778,3 +770,58 @@ unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 const unsigned UnqualifiedLookupFactory::targetLookup = ~0;
 
 #endif // NDEBUG
+
+namespace {
+
+class ASTScopeDeclConsumerForLocalLookup
+    : public AbstractASTScopeDeclConsumer {
+  SmallVectorImpl<ValueDecl *> &results;
+  DeclName name;
+
+public:
+  ASTScopeDeclConsumerForLocalLookup(
+      SmallVectorImpl<ValueDecl *> &results, DeclName name)
+    : results(results), name(name) {}
+
+  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+               NullablePtr<DeclContext> baseDC) override {
+    for (auto *value: values) {
+      if (!value->getName().matchesRef(name))
+        continue;
+
+      results.push_back(value);
+    }
+
+    return !results.empty();
+  }
+
+  bool lookInMembers(DeclContext *const,
+                     NominalTypeDecl *const) override {
+    return true;
+  }
+
+#ifndef NDEBUG
+  void startingNextLookupStep() override {}
+  void finishingLookup(std::string) const override {}
+  bool isTargetLookup() const override { return false; }
+#endif
+};
+
+}
+
+/// Lookup that only finds local declarations and does not trigger
+/// interface type computation.
+void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+                                SmallVectorImpl<ValueDecl *> &results) {
+  ASTScopeDeclConsumerForLocalLookup consumer(results, name);
+  ASTScope::unqualifiedLookup(sf, loc, consumer);
+}
+
+ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
+                                           SourceLoc loc) {
+  SmallVector<ValueDecl *, 1> result;
+  ASTScope::lookupLocalDecls(sf, name, loc, result);
+  if (result.size() != 1)
+    return nullptr;
+  return result[0];
+}

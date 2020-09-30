@@ -572,8 +572,10 @@ public:
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
-      if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-        addCapture(CapturedValue(superE->getSelf(), 0, superE->getLoc()));
+      if (auto *selfDecl = superE->getSelf()) {
+        if (CurDC->isChildContextOf(selfDecl->getDeclContext()))
+          addCapture(CapturedValue(selfDecl, 0, superE->getLoc()));
+      }
       return { false, superE };
     }
 

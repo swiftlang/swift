@@ -69,9 +69,12 @@ class ModuleFileSharedCore {
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
-  // Full blob from the misc. version field of the metadata block. This should
-  // include the version string of the compiler that built the module.
+  /// Full blob from the misc. version field of the metadata block. This should
+  /// include the version string of the compiler that built the module.
   StringRef MiscVersion;
+
+  /// \c true if this module has incremental dependency information.
+  bool HasIncrementalInfo = false;
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -112,12 +115,12 @@ public:
 
    static Dependency forHeader(StringRef headerPath, bool exported) {
      auto importControl =
-         exported ? ImportFilterKind::Public : ImportFilterKind::Private;
+         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
      return Dependency(headerPath, StringRef(), true, importControl, false);
     }
 
     bool isExported() const {
-      return getImportControl() == ImportFilterKind::Public;
+      return getImportControl() == ImportFilterKind::Exported;
     }
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
@@ -490,6 +493,10 @@ public:
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
   }
+
+  /// Returns \c true if this module file contains a section with incremental
+  /// information.
+  bool hasIncrementalInfo() const { return HasIncrementalInfo; }
 };
 
 template <typename T, typename RawData>

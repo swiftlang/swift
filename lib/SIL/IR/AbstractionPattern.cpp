@@ -827,6 +827,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
     }
     getType().dump(out);
     out << ", ";
+    // [TODO: Improve-Clang-type-printing]
     // It would be better to use print, but we need a PrintingPolicy
     // for that, for which we need a clang LangOptions, and... ugh.
     clang::QualType(getClangType(), 0).dump();

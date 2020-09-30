@@ -517,6 +517,12 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// Returns true if this module was or is being compiled for testing.
+  bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
+  void setHasIncrementalInfo(bool enabled = true) {
+    Bits.ModuleDecl.HasIncrementalInfo = enabled;
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {
@@ -648,27 +654,52 @@ public:
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
-    Public = 1 << 0,
+    Exported = 1 << 0,
     /// Include "regular" imports with no special annotation.
-    Private = 1 << 1,
+    Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`
+    /// Include imports of SPIs declared with `@_spi`. Non-SPI imports are
+    /// included whether or not this flag is specified.
     SPIAccessControl = 1 << 3,
-    /// Include imports shadowed by a separately-imported overlay (i.e. a
-    /// cross-import overlay). Unshadowed imports are included whether or not
-    /// this flag is specified.
-    ShadowedBySeparateOverlay = 1 << 4
+    /// Include imports shadowed by a cross-import overlay. Unshadowed imports
+    /// are included whether or not this flag is specified.
+    ShadowedByCrossImportOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
 
   /// Looks up which modules are imported by this module.
   ///
-  /// \p filter controls whether public, private, or any imports are included
-  /// in this list.
+  /// \p filter controls which imports are included in the list.
+  ///
+  /// There are three axes for categorizing imports:
+  /// 1. Privacy: Exported/Private/ImplementationOnly (mutually exclusive).
+  /// 2. SPI/non-SPI: An import of any privacy level may be @_spi("SPIName").
+  /// 3. Shadowed/Non-shadowed: An import of any privacy level may be shadowed
+  ///    by a cross-import overlay.
+  ///
+  /// It is also possible for SPI imports to be shadowed by a cross-import
+  /// overlay.
+  ///
+  /// If \p filter contains multiple privacy levels, modules at all the privacy
+  /// levels are included.
+  ///
+  /// If \p filter contains \c ImportFilterKind::SPIAccessControl, then both
+  /// SPI and non-SPI imports are included. Otherwise, only non-SPI imports are
+  /// included.
+  ///
+  /// If \p filter contains \c ImportFilterKind::ShadowedByCrossImportOverlay,
+  /// both shadowed and non-shadowed imports are included. Otherwise, only
+  /// non-shadowed imports are included.
+  ///
+  /// Clang modules have some additional complexities; see the implementation of
+  /// \c ClangModuleUnit::getImportedModules for details.
+  ///
+  /// \pre \p filter must contain at least one privacy level, i.e. one of
+  ///      \c Exported or \c Private or \c ImplementationOnly.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilterKind::Public) const;
+                          ImportFilter filter = ImportFilterKind::Exported) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.

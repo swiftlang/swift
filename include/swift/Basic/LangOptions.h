@@ -251,9 +251,6 @@ namespace swift {
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Should  we stress ASTScope-based resolution for debugging?
-    bool StressASTScopeLookup = false;
-
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;

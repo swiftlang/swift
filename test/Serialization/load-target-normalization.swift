@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t/ForeignModule.swiftmodule)
 // RUN: touch %t/ForeignModule.swiftmodule/garbage-garbage-garbage.swiftmodule
 
-// SR-12363: This test crashes on master-next.
+// SR-12363: This test crashes on next branch.
 // XFAIL: asserts
 
 // Test format: We try to import ForeignModule with architectures besides

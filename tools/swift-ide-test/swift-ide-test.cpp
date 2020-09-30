@@ -3185,8 +3185,8 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
       scratch.clear();
       next.importedModule->getImportedModules(
-          scratch, ModuleDecl::ImportFilterKind::Public);
-      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+          scratch, ModuleDecl::ImportFilterKind::Exported);
+      // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.importedModule->getName();
         for (auto accessPathPiece : import.accessPath) {

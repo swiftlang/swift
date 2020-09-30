@@ -95,6 +95,8 @@ class SILModule::SerializationCallback final
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options)
     : Stage(SILStage::Raw), Options(Options), serialized(false),
+      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
+      regDeserializationNotificationHandlerForAllFuncOME(false),
       SerializeSILAction(), Types(TC) {
   assert(!context.isNull());
   if (auto *file = context.dyn_cast<FileUnit *>()) {

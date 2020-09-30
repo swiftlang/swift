@@ -55,9 +55,9 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
        "main": {
-            "aliases": ["master", "swift/master", "main"],
+            "aliases": ["master", "swift/main", "main"],
             "repos": {
-                "llvm-project": "swift/master",
+                "llvm-project": "swift/main",
                 "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
@@ -83,11 +83,11 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
-                        "swift/master-next",
+                        "swift/next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm-project": "swift/master-next",
+                "llvm-project": "swift/next",
                 "swift": "next",
                 "cmark": "main",
                 "llbuild": "main",
@@ -304,33 +304,6 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
-                "swift-format": "main"
-            }
-        },
-       "master-rebranch": {
-            "aliases": ["master-rebranch", "swift/master-rebranch"],
-            "repos": {
-                "llvm-project": "swift/master-rebranch",
-                "swift": "master-rebranch",
-                "cmark": "main",
-                "llbuild": "main",
-                "swift-tools-support-core": "main",
-                "swiftpm": "main",
-                "swift-argument-parser": "0.3.0",
-                "swift-driver": "main",
-                "swift-syntax": "main",
-                "swift-stress-tester": "main",
-                "swift-corelibs-xctest": "main",
-                "swift-corelibs-foundation": "main",
-                "swift-corelibs-libdispatch": "main",
-                "swift-integration-tests": "main",
-                "swift-xcode-playground-support": "main",
-                "ninja": "release",
-                "icu": "release-65-1",
-                "yams": "3.0.1",
-                "cmake": "v3.16.5",
-                "indexstore-db": "main",
-                "sourcekit-lsp": "main",
                 "swift-format": "main"
             }
         }

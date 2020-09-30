@@ -1788,7 +1788,7 @@ extension Array {
   /// and enums.
   ///
   /// The following example copies bytes from the `byteValues` array into
-  /// `numbers`, an array of `Int`:
+  /// `numbers`, an array of `Int32`:
   ///
   ///     var numbers: [Int32] = [0, 0]
   ///     var byteValues: [UInt8] = [0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
@@ -1799,6 +1799,8 @@ extension Array {
   ///         }
   ///     }
   ///     // numbers == [1, 2]
+  ///
+  /// - Note: This example shows the behavior on a little-endian platform.
   ///
   /// The pointer passed as an argument to `body` is valid only for the
   /// lifetime of the closure. Do not escape it from the closure for later
@@ -1837,12 +1839,14 @@ extension Array {
   /// The following example copies the bytes of the `numbers` array into a
   /// buffer of `UInt8`:
   ///
-  ///     var numbers = [1, 2, 3]
+  ///     var numbers: [Int32] = [1, 2, 3]
   ///     var byteBuffer: [UInt8] = []
   ///     numbers.withUnsafeBytes {
   ///         byteBuffer.append(contentsOf: $0)
   ///     }
-  ///     // byteBuffer == [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, ...]
+  ///     // byteBuffer == [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]
+  ///
+  /// - Note: This example shows the behavior on a little-endian platform.
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.

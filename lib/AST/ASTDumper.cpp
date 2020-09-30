@@ -3512,12 +3512,14 @@ namespace {
 
     void visitHoleType(HoleType *T, StringRef label) {
       printCommon(label, "hole_type");
-      auto originatorTy = T->getOriginatorType();
-      if (auto *typeVar = originatorTy.dyn_cast<TypeVariableType *>()) {
+      auto originator = T->getOriginator();
+      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         printRec("type_variable", typeVar);
+      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
+        VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
       } else {
         printRec("dependent_member_type",
-                 originatorTy.get<DependentMemberType *>());
+                 originator.get<DependentMemberType *>());
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3790,6 +3792,7 @@ namespace {
 
       OS << "\n";
       Indent += 2;
+      // [TODO: Improve-Clang-type-printing]
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
@@ -3840,6 +3843,7 @@ namespace {
       OS << '\n';
       T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
                                            Indent+2);
+      // [TODO: Improve-Clang-type-printing]
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);

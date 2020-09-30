@@ -2282,6 +2282,8 @@ bool swift::computeFixitsForOverridenDeclaration(
 namespace {
 
 class VarDeclUsageChecker : public ASTWalker {
+  DeclContext *DC;
+
   DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
   enum {
@@ -2318,7 +2320,8 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
+  VarDeclUsageChecker(DeclContext *DC,
+                      DiagnosticEngine &Diags) : DC(DC), Diags(Diags) {}
 
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
@@ -3140,7 +3143,10 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   struct ConservativeDeclMarker : public ASTWalker {
     VarDeclUsageChecker &VDUC;
-    ConservativeDeclMarker(VarDeclUsageChecker &VDUC) : VDUC(VDUC) {}
+    SourceFile *SF;
+
+    ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
+      : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
     Expr *walkToExprPost(Expr *E) override {
       // If we see a bound reference to a decl in an inactive #if block, then
@@ -3148,6 +3154,16 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        auto name = declRef->getName();
+        auto loc = declRef->getLoc();
+        if (name.isSimpleName() && loc.isValid()) {
+          auto *varDecl = dyn_cast_or_null<VarDecl>(
+            ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc));
+          if (varDecl)
+            VDUC.addMark(varDecl, RK_Read|RK_Written);
+        }
+      }
       return E;
     }
   };
@@ -3166,7 +3182,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
 void swift::
 performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
-  VarDeclUsageChecker checker(ctx.Diags);
+  VarDeclUsageChecker checker(TLCD, ctx.Diags);
   TLCD->walk(checker);
 }
 
@@ -3181,7 +3197,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // be checked as part of their parent function or TopLevelCodeDecl.
   if (!AFD->getDeclContext()->isLocalContext()) {
     auto &ctx = AFD->getDeclContext()->getASTContext();
-    VarDeclUsageChecker checker(ctx.Diags);
+    VarDeclUsageChecker checker(AFD, ctx.Diags);
     AFD->walk(checker);
   }
 

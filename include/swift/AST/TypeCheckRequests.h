@@ -212,6 +212,29 @@ private:
   evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
 
 public:
+// Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyInitKind initKind);
+void simple_display(llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr);
+
+/// Computes the kind of initializer call (self.init or super.init) performed
+/// in the body of a \c ConstructorDecl
+class BodyInitKindRequest :
+    public SimpleRequest<BodyInitKindRequest,
+                         BodyInitKindAndExpr(ConstructorDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BodyInitKindAndExpr evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
   // Caching.
   bool isCached() const { return true; }
 };
@@ -782,6 +805,25 @@ public:
 /// Determine whether the given function is an @asyncHandler.
 class IsAsyncHandlerRequest :
     public SimpleRequest<IsAsyncHandlerRequest,
+                         bool(FuncDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Determine whether the given function can be an @asyncHandler, without
+/// producing any diagnostics.
+class CanBeAsyncHandlerRequest :
+    public SimpleRequest<CanBeAsyncHandlerRequest,
                          bool(FuncDecl *),
                          RequestFlags::Cached> {
 public:

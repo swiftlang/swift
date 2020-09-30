@@ -1902,11 +1902,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::TupleElementAddrInst:
       operand = cast<TupleElementAddrInst>(&SI)->getOperand();
-      FieldNo = cast<TupleElementAddrInst>(&SI)->getFieldNo();
+      FieldNo = cast<TupleElementAddrInst>(&SI)->getFieldIndex();
       break;
     case SILInstructionKind::TupleExtractInst:
       operand = cast<TupleExtractInst>(&SI)->getOperand();
-      FieldNo = cast<TupleExtractInst>(&SI)->getFieldNo();
+      FieldNo = cast<TupleExtractInst>(&SI)->getFieldIndex();
       break;
     }
 

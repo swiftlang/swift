@@ -34,6 +34,10 @@ namespace clang {
 namespace swift {
   class SILModule;
 
+  namespace fine_grained_dependencies {
+    class SourceFileDepGraph;
+  }
+
 namespace serialization {
 
 using FilenamesTy = ArrayRef<std::string>;
@@ -389,14 +393,21 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
+  /// Serializes the given dependnecy graph into the incremental information
+  /// section of this swift module.
+  void writeIncrementalInfo(
+      const fine_grained_dependencies::SourceFileDepGraph *DepGraph);
+
   using SerializerBase::SerializerBase;
   using SerializerBase::writeToStream;
 
 public:
   /// Serialize a module to the given stream.
-  static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                            const SILModule *M,
-                            const SerializationOptions &options);
+  static void
+  writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                const SILModule *M,
+                const SerializationOptions &options,
+                const fine_grained_dependencies::SourceFileDepGraph *DepGraph);
 
   /// Records the use of the given Type.
   ///

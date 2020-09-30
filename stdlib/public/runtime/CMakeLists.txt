@@ -22,7 +22,7 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    ReflectionMirror.mm
+    ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)
 
 set(swift_runtime_sources
@@ -63,6 +63,7 @@ set(swift_runtime_sources
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
+    ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp)
 

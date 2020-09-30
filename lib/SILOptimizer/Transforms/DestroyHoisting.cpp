@@ -594,7 +594,7 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
   } else {
     auto *TEA = dyn_cast<TupleElementAddrInst>(projInst);
     newProj = projBuilder.createTupleElementAddr(TEA->getLoc(), baseAddr,
-                                            TEA->getFieldNo(), TEA->getType());
+                                            TEA->getFieldIndex(), TEA->getType());
   }
   assert(domTree->properlyDominates(newProj, ip) &&
          "new projection does not dominate insert point");

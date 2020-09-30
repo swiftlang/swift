@@ -673,7 +673,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
   return {osName, version};
 }
 
-FileUnit *SerializedModuleLoaderBase::loadAST(
+LoadedFile *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     StringRef moduleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
@@ -714,6 +714,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       M.setPrivateImportsEnabled();
     if (loadedModuleFile->isImplicitDynamicEnabled())
       M.setImplicitDynamicEnabled();
+    if (loadedModuleFile->hasIncrementalInfo())
+      M.setHasIncrementalInfo();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
@@ -1110,8 +1112,8 @@ void SerializedASTFile::getImportedModules(
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Public,
-                                    ModuleDecl::ImportFilterKind::Private});
+  File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Exported,
+                                    ModuleDecl::ImportFilterKind::Default});
 
   for (auto Import : Imports)
     Import.importedModule->collectLinkLibraries(callback);

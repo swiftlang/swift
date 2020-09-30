@@ -279,6 +279,9 @@ enum class FixKind : uint8_t {
 
   /// Ignore function builder body which fails `pre-check` call.
   IgnoreInvalidFunctionBuilderBody,
+
+  /// Resolve type of `nil` by providing a contextual type.
+  SpecifyContextualTypeForNil,
 };
 
 class ConstraintFix {
@@ -2024,6 +2027,26 @@ public:
 private:
   static IgnoreInvalidFunctionBuilderBody *
   create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
+};
+
+class SpecifyContextualTypeForNil final : public ConstraintFix {
+  SpecifyContextualTypeForNil(ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::SpecifyContextualTypeForNil, locator) {}
+
+public:
+  std::string getName() const override {
+    return "specify contextual type to resolve `nil` literal";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static SpecifyContextualTypeForNil *create(ConstraintSystem & cs,
+                                             ConstraintLocator * locator);
 };
 
 } // end namespace constraints

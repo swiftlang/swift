@@ -157,9 +157,6 @@ def disable_target_os_checking :
 def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
   HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
-def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
-  HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
-  
 def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
   HelpText<"Use stored Clang function types for computing canonical types.">;
 
@@ -177,36 +174,6 @@ def autolink_library : Separate<["-"], "autolink-library">,
 
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
-
-} // end let Flags = [FrontendOption, NoDriverOption]
-
-def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
-class DebugCrashOpt : Group<debug_crash_Group>;
-
-
-// Flags that are saved into module interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
-
-def enable_objc_interop :
-  Flag<["-"], "enable-objc-interop">,
-  HelpText<"Enable Objective-C interop code generation and config directives">;
-
-def disable_objc_interop :
-  Flag<["-"], "disable-objc-interop">,
-  HelpText<"Disable Objective-C interop code generation and config directives">;
-
-def enable_objc_attr_requires_foundation_module :
-  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
-  HelpText<"Enable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def disable_objc_attr_requires_foundation_module :
-  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
-  HelpText<"Disable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Deprecated, use -enable-library-evolution instead">;
 
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules explicitly by the compiler">;
@@ -230,6 +197,37 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+} // end let Flags = [FrontendOption, NoDriverOption]
+
+def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
+class DebugCrashOpt : Group<debug_crash_Group>;
+
+
+// Flags that are saved into module interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
+  def enable_objc_interop :
+    Flag<["-"], "enable-objc-interop">,
+    HelpText<"Enable Objective-C interop code generation and config directives">;
+
+  def disable_objc_interop :
+    Flag<["-"], "disable-objc-interop">,
+    HelpText<"Disable Objective-C interop code generation and config directives">;
+
+  def enable_objc_attr_requires_foundation_module :
+    Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+    HelpText<"Enable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+  def disable_objc_attr_requires_foundation_module :
+    Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+    HelpText<"Disable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+     HelpText<"Deprecated, use -enable-library-evolution instead">;
 }
 
 // HIDDEN FLAGS
@@ -391,10 +389,6 @@ def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
-
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
 
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,

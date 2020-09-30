@@ -3443,14 +3443,14 @@ void ClangModuleUnit::getImportedModules(
 
   // [NOTE: Pure-Clang-modules-privately-import-stdlib]:
   // Needed for implicitly synthesized conformances.
-  if (filter.contains(ModuleDecl::ImportFilterKind::Private))
+  if (filter.contains(ModuleDecl::ImportFilterKind::Default))
     if (auto stdlib = owner.getStdlibModule())
       imports.push_back({ImportPath::Access(), stdlib});
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
-    if (filter.contains(ModuleDecl::ImportFilterKind::Public)) {
+    if (filter.contains(ModuleDecl::ImportFilterKind::Exported)) {
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
     }
@@ -3458,11 +3458,11 @@ void ClangModuleUnit::getImportedModules(
   } else {
     clangModule->getExportedModules(imported);
 
-    if (filter.contains(ModuleDecl::ImportFilterKind::Private)) {
+    if (filter.contains(ModuleDecl::ImportFilterKind::Default)) {
       // Copy in any modules that are imported but not exported.
       llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
                                                          imported.end());
-      if (!filter.contains(ModuleDecl::ImportFilterKind::Public)) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Exported)) {
         // Remove the exported ones now that we're done with them.
         imported.clear();
       }

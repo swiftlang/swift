@@ -56,10 +56,6 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
-  // Dump the AST context, too.
-  if (auto *dc = locScope->getDeclContext().getPtrOrNull())
-    dc->printContext(llvm::errs());
-
   namelookup::ASTScopeDeclGatherer gatherer;
   // Print the local bindings introduced by this scope.
   locScope->lookupLocalsOrMembers(gatherer);
@@ -185,10 +181,6 @@ void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  decl->dumpRef(out);
-}
-
-void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 

@@ -17,7 +17,6 @@ import platform
 import re
 import sys
 import traceback
-from functools import reduce
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
@@ -357,7 +356,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
     """
     Dumps the current state of the repo into a new config file that contains a
-    master branch scheme with the relevant branches set to the appropriate
+    main branch scheme with the relevant branches set to the appropriate
     hashes.
     """
     new_config = {}
@@ -408,19 +407,16 @@ def validate_config(config):
                                'too.'.format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
-    #
-    # We do this by constructing a list consisting of len(names),
-    # set(names). Then we reduce over that list summing the counts and taking
-    # the union of the sets. We have uniqueness if the length of the union
-    # equals the length of the sum of the counts.
-    data = [(len(v['aliases']), set(v['aliases']))
-            for v in config['branch-schemes'].values()]
-    result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
-                    (0, set([])))
-    if result[0] == len(result[1]):
-        return
-    raise RuntimeError('Configuration file has schemes with duplicate '
-                       'aliases?!')
+    seen = dict()
+    for (scheme_name, scheme) in config['branch-schemes'].items():
+        aliases = scheme['aliases']
+        for alias in aliases:
+            if alias in seen:
+                raise RuntimeError('Configuration file defines the alias {0} '
+                                   'in both the {1} scheme and the {2} scheme?!'
+                                   .format(alias, seen[alias], scheme_name))
+            else:
+                seen[alias] = scheme_name
 
 
 def full_target_name(repository, target):

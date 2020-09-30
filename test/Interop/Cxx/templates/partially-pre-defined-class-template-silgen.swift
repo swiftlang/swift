@@ -1,10 +1,10 @@
 // RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
-import DeclWithDefinition
+import PartiallyPreDefinedClassTemplate
 
 public func getWrappedMagicInt() -> CInt {
   let myInt = IntWrapper(value: 21)
-  var magicInt = PartiallyDefinedMagicallyWrappedInt(t: myInt)
+  var magicInt = PartiallyPreDefinedMagicallyWrappedInt(t: myInt)
   return magicInt.getValuePlusArg(32)
 }
 

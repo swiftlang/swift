@@ -136,7 +136,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
   if (auto *T = dyn_cast<TupleExtractInst>(Value)) {
     // Make sure we are extracting the number value and not
     // the overflow flag.
-    if (T->getFieldNo() != 0)
+    if (T->getFieldIndex() != 0)
       return IsZeroKind::Unknown;
 
     auto *BI = dyn_cast<BuiltinInst>(T->getOperand());

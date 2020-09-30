@@ -406,7 +406,7 @@ template <typename LTy> struct tupleextractoperation_ty {
 
   template <typename ITy> bool match(ITy *V) {
     if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {
-      return TEI->getFieldNo() == index &&
+      return TEI->getFieldIndex() == index &&
              L.match((ValueBase *)TEI->getOperand());
     }
 

@@ -484,6 +484,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsSystemModule = 0;
   Bits.ModuleDecl.IsNonSwiftModule = 0;
   Bits.ModuleDecl.IsMainModule = 0;
+  Bits.ModuleDecl.HasIncrementalInfo = 0;
 }
 
 ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
@@ -1163,6 +1164,13 @@ void SourceFile::lookupPrecedenceGroupDirect(
 
 void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                     ModuleDecl::ImportFilter filter) const {
+  assert(filter.containsAny(ImportFilter({
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
+      ModuleDecl::ImportFilterKind::ImplementationOnly}))
+    && "filter should have at least one of Exported|Private|ImplementationOnly"
+  );
+
   FORWARD(getImportedModules, (modules, filter));
 }
 
@@ -1184,16 +1192,17 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.importOptions.contains(ImportFlags::Exported))
-      requiredFilter |= ModuleDecl::ImportFilterKind::Public;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
     else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
-      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
-      requiredFilter |= ModuleDecl::ImportFilterKind::Private;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Default;
+
+    if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
     if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
-      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay;
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
@@ -1445,8 +1454,8 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   SmallVector<ModuleDecl::ImportedModule, 32> stack;
 
   ModuleDecl::ImportFilter filter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   auto *topLevel = getParentModule();
@@ -1680,7 +1689,7 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   SmallVector<ModuleDecl::ImportedModule, 16> furtherImported;
   ModuleDecl *overlayModule = this;
 
-  getImportedModules(imported, ModuleDecl::ImportFilterKind::Public);
+  getImportedModules(imported, ModuleDecl::ImportFilterKind::Exported);
   while (!imported.empty()) {
     ModuleDecl *importedModule = imported.back().importedModule;
     imported.pop_back();
@@ -1706,7 +1715,7 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
     furtherImported.clear();
     importedModule->getImportedModules(furtherImported,
-                                       ModuleDecl::ImportFilterKind::Public);
+                                       ModuleDecl::ImportFilterKind::Exported);
     imported.append(furtherImported.begin(), furtherImported.end());
   }
 
@@ -1988,10 +1997,10 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   // Look through non-implementation-only imports to see if module is imported
   // in some other way. Otherwise we assume it's implementation-only imported.
   ModuleDecl::ImportFilter filter = {
-    ModuleDecl::ImportFilterKind::Public,
-    ModuleDecl::ImportFilterKind::Private,
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default,
     ModuleDecl::ImportFilterKind::SPIAccessControl,
-    ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay};
+    ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
   SmallVector<ModuleDecl::ImportedModule, 4> results;
   getImportedModules(results, filter);
 

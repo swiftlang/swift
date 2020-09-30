@@ -660,6 +660,24 @@ private:
            isa<ConstructorDecl>(DeclCtx);
   }
 
+  void createImportedModule(llvm::DIScope *Context,
+                            ModuleDecl::ImportedModule M, llvm::DIFile *File,
+                            unsigned Line) {
+    // For overlays of Clang modules also emit an import of the underlying Clang
+    // module. The helps the debugger resolve types that are present only in the
+    // underlying module.
+    if (const clang::Module *UnderlyingClangModule =
+            M.importedModule->findUnderlyingClangModule()) {
+      DBuilder.createImportedModule(
+          Context,
+          getOrCreateModule(
+              {*const_cast<clang::Module *>(UnderlyingClangModule)},
+              UnderlyingClangModule),
+          File, 0);
+    }
+    DBuilder.createImportedModule(Context, getOrCreateModule(M), File, Line);
+  }
+
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     uint64_t Signature = ~1ULL,
@@ -1866,13 +1884,12 @@ void IRGenDebugInfoImpl::finalize() {
   // from all ImportDecls).
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(
-      ModuleWideImports, {ModuleDecl::ImportFilterKind::Public,
-                          ModuleDecl::ImportFilterKind::Private,
+      ModuleWideImports, {ModuleDecl::ImportFilterKind::Exported,
+                          ModuleDecl::ImportFilterKind::Default,
                           ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))
-      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
-                                    0);
+      createImportedModule(MainFile, M, MainFile, 0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
@@ -2113,10 +2130,9 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
   ModuleDecl::ImportedModule Imported = { D->getAccessPath(), D->getModule() };
-  auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
-  DBuilder.createImportedModule(File, DIMod, File, L.Line);
+  createImportedModule(File, Imported, File, L.Line);
   ImportedModules.insert(Imported.importedModule);
 }
 

@@ -175,6 +175,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(
           !isModuleExternallyConsumed(module));
 
+  serializationOpts.ExperimentalCrossModuleIncrementalInfo =
+      opts.EnableExperimentalCrossModuleIncrementalBuild;
+
   return serializationOpts;
 }
 

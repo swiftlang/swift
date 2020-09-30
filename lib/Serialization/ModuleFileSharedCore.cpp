@@ -824,9 +824,9 @@ getActualImportControl(unsigned rawValue) {
   // values.
   switch (rawValue) {
   case static_cast<unsigned>(serialization::ImportControl::Normal):
-    return ModuleDecl::ImportFilterKind::Private;
+    return ModuleDecl::ImportFilterKind::Default;
   case static_cast<unsigned>(serialization::ImportControl::Exported):
-    return ModuleDecl::ImportFilterKind::Public;
+    return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
   default:
@@ -1420,6 +1420,17 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       }
 
       // With the main cursor, skip over the block and continue.
+      if (cursor.SkipBlock()) {
+        info.status = error(Status::Malformed);
+        return;
+      }
+      break;
+    }
+
+    case INCREMENTAL_INFORMATION_BLOCK_ID: {
+      HasIncrementalInfo = true;
+      // Skip incremental info if present. The Frontend currently doesn't do
+      // anything with this.
       if (cursor.SkipBlock()) {
         info.status = error(Status::Malformed);
         return;

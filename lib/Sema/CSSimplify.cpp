@@ -5893,6 +5893,12 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   }
   
 
+  if (optTy->isHole()) {
+    if (auto *typeVar = second->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+    return SolutionKind::Solved;
+  }
+
   Type objectTy = optTy->getOptionalObjectType();
   // If the base type is not optional, let's attempt a fix (if possible)
   // and assume that `!` is just not there.
@@ -7014,7 +7020,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // type but a hole.
       auto shouldRecordFixForHole = [&](HoleType *baseType) {
         auto *originator =
-            baseType->getOriginatorType().dyn_cast<TypeVariableType *>();
+            baseType->getOriginator().dyn_cast<TypeVariableType *>();
 
         if (!originator)
           return false;
@@ -8531,6 +8537,12 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
     const FunctionType *argFnType, unsigned numOptionalUnwraps,
     ConstraintLocatorBuilder locator) {
+  // Don't attempt to filter overloads when solving for code completion
+  // because presence of code completion token means that any call
+  // could be malformed e.g. missing arguments e.g. `foo([.#^MEMBER^#`
+  if (isForCodeCompletion())
+    return false;
+
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
     bool allHoles =
@@ -10066,7 +10078,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
-  case FixKind::IgnoreInvalidFunctionBuilderBody: {
+  case FixKind::IgnoreInvalidFunctionBuilderBody:
+  case FixKind::SpecifyContextualTypeForNil: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

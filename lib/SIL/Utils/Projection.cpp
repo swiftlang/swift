@@ -70,23 +70,23 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     return;
   case SILInstructionKind::StructElementAddrInst: {
     auto *SEAI = cast<StructElementAddrInst>(I);
-    Value = ValueTy(ProjectionKind::Struct, SEAI->getFieldNo());
+    Value = ValueTy(ProjectionKind::Struct, SEAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Struct);
-    assert(getIndex() == SEAI->getFieldNo());
+    assert(getIndex() == SEAI->getFieldIndex());
     break;
   }
   case SILInstructionKind::StructExtractInst: {
     auto *SEI = cast<StructExtractInst>(I);
-    Value = ValueTy(ProjectionKind::Struct, SEI->getFieldNo());
+    Value = ValueTy(ProjectionKind::Struct, SEI->getFieldIndex());
     assert(getKind() == ProjectionKind::Struct);
-    assert(getIndex() == SEI->getFieldNo());
+    assert(getIndex() == SEI->getFieldIndex());
     break;
   }
   case SILInstructionKind::RefElementAddrInst: {
     auto *REAI = cast<RefElementAddrInst>(I);
-    Value = ValueTy(ProjectionKind::Class, REAI->getFieldNo());
+    Value = ValueTy(ProjectionKind::Class, REAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Class);
-    assert(getIndex() == REAI->getFieldNo());
+    assert(getIndex() == REAI->getFieldIndex());
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
@@ -106,16 +106,16 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(I);
-    Value = ValueTy(ProjectionKind::Tuple, TEI->getFieldNo());
+    Value = ValueTy(ProjectionKind::Tuple, TEI->getFieldIndex());
     assert(getKind() == ProjectionKind::Tuple);
-    assert(getIndex() == TEI->getFieldNo());
+    assert(getIndex() == TEI->getFieldIndex());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst: {
     auto *TEAI = cast<TupleElementAddrInst>(I);
-    Value = ValueTy(ProjectionKind::Tuple, TEAI->getFieldNo());
+    Value = ValueTy(ProjectionKind::Tuple, TEAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Tuple);
-    assert(getIndex() == TEAI->getFieldNo());
+    assert(getIndex() == TEAI->getFieldIndex());
     break;
   }
   case SILInstructionKind::UncheckedEnumDataInst: {
@@ -321,6 +321,10 @@ void Projection::getFirstLevelProjections(
 
   if (auto *C = Ty.getClassOrBoundGenericClass()) {
     unsigned Count = 0;
+    for (auto *superDecl = C->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      Count += superDecl->getStoredProperties().size();
+    }
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Class, Count++);

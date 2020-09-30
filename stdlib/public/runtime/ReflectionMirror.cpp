@@ -34,9 +34,6 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
-#include <Foundation/Foundation.h>
-#include <objc/objc.h>
-#include <objc/runtime.h>
 #endif
 
 #if defined(_WIN32)
@@ -79,13 +76,6 @@ char *strndup(const char *s, size_t n) {
 #endif
 
 using namespace swift;
-
-#if SWIFT_OBJC_INTEROP
-// Declare the debugQuickLookObject selector.
-@interface DeclareSelectors
-- (id)debugQuickLookObject;
-@end
-#endif
 
 namespace {
 
@@ -751,16 +741,8 @@ struct ClassImpl : ReflectionMirrorImpl {
   }
 
 #if SWIFT_OBJC_INTEROP
-  id quickLookObject() {
-    id object = [*reinterpret_cast<const id *>(value) retain];
-    if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
-      id quickLookObject = [object debugQuickLookObject];
-      [quickLookObject retain];
-      [object release];
-      return quickLookObject;
-    }
-
-    return object;
+  id quickLookObject() override {
+    return _quickLookObjectForPointer(value);
   }
 #endif
 };

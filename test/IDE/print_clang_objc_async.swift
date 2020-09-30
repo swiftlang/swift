@@ -18,3 +18,11 @@
 // CHECK-DAG:     func findAnswerFailingly() async throws -> String?
 // CHECK-DAG:     func doSomethingFun(_ operation: String) async
 // CHECK: {{^[}]$}}
+
+// CHECK-LABEL: protocol RefrigeratorDelegate
+// CHECK-NEXT: @asyncHandler func someoneDidOpenRefrigerator(_ fridge: Any)
+// CHECK-NEXT: @asyncHandler func refrigerator(_ fridge: Any, didGetFilledWithItems items: [Any])
+// CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didGetFilledWithIntegers items: UnsafeMutablePointer<Int>, count: Int)
+// CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, willAddItem item: Any)
+// CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didRemoveItem item: Any) -> Bool
+// CHECK-NEXT: {{^[}]$}}

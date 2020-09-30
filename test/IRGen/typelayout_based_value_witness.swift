@@ -87,3 +87,22 @@ public struct A<T> {
 // OPT:   tail call void [[DESTROY]](%swift.opaque* noalias [[ADDR_T4]], %swift.type* [[T]])
 // OPT:   ret void
 // CHECK: }
+
+// Let's not crash on the following example.
+public protocol P {}
+
+public class Ref<T: P> {}
+
+public enum E1<R: P> {
+  case first(R)
+  case second(S<R>)
+}
+
+public struct S<T: P> {
+  public let f: E2<T>? = nil
+}
+
+public enum E2<T: P> {
+    case first(Ref<T>)
+    case second(String)
+}

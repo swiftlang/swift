@@ -1689,6 +1689,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     break;
   }
 
+  // Asynchronous functions.
+  if (fn->isAsync()) {
+    OpArgs.push_back('H');
+  }
+
   auto outerGenericSig = CurGenericSignature;
   CurGenericSignature = fn->getSubstGenericSignature();
   

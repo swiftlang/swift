@@ -38,7 +38,7 @@ class ModuleDecl;
 enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
-
+class SILPrintContext;
 
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
@@ -499,7 +499,7 @@ struct PrintOptions {
   }
 
   /// Retrieve the set of options suitable for diagnostics printing.
-  static PrintOptions printForDiagnostics() {
+  static PrintOptions printForDiagnostics(AccessLevel accessFilter) {
     PrintOptions result = printVerbose();
     result.PrintAccess = true;
     result.Indent = 4;
@@ -512,7 +512,7 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_Optimize);
     result.ExcludeAttrList.push_back(DAK_Rethrows);
     result.PrintOverrideKeyword = false;
-    result.AccessFilter = AccessLevel::Public;
+    result.AccessFilter = accessFilter;
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
@@ -522,7 +522,7 @@ struct PrintOptions {
 
   /// Retrieve the set of options suitable for interface generation.
   static PrintOptions printInterface() {
-    PrintOptions result = printForDiagnostics();
+    PrintOptions result = printForDiagnostics(AccessLevel::Public);
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
@@ -594,22 +594,7 @@ struct PrintOptions {
   static PrintOptions printDocInterface();
 
   /// Retrieve the set of options suitable for printing SIL functions.
-  static PrintOptions printSIL(bool printFullConvention = false) {
-    PrintOptions result;
-    result.PrintLongAttrsOnSeparateLines = true;
-    result.PrintStorageRepresentationAttrs = true;
-    result.AbstractAccessors = false;
-    result.PrintForSIL = true;
-    result.PrintInSILBody = true;
-    result.PreferTypeRepr = false;
-    result.PrintIfConfig = false;
-    result.OpaqueReturnTypePrinting =
-        OpaqueReturnTypePrintingMode::StableReference;
-    if (printFullConvention)
-      result.PrintFunctionRepresentationAttrs =
-          PrintOptions::FunctionRepresentationMode::Full;
-    return result;
-  }
+  static PrintOptions printSIL(const SILPrintContext *silPrintCtx = nullptr);
 
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();

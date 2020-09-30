@@ -22,7 +22,14 @@
 
 using namespace swift;
 
-bool swift::checkAsyncHandler(FuncDecl *func, bool diagnose) {
+/// Check whether the @asyncHandler attribute can be applied to the given
+/// function declaration.
+///
+/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
+///
+/// \returns \c true if there was a problem with adding the attribute, \c false
+/// otherwise.
+static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
   if (!func->getResultInterfaceType()->isVoid()) {
     if (diagnose) {
       func->diagnose(diag::asynchandler_returns_value)
@@ -78,7 +85,7 @@ bool swift::checkAsyncHandler(FuncDecl *func, bool diagnose) {
 void swift::addAsyncNotes(FuncDecl *func) {
   func->diagnose(diag::note_add_async_to_function, func->getName());
 
-  if (!checkAsyncHandler(func, /*diagnose=*/false)) {
+  if (func->canBeAsyncHandler()) {
     func->diagnose(
             diag::note_add_asynchandler_to_function, func->getName())
         .fixItInsert(func->getAttributeInsertionLoc(false), "@asyncHandler ");
@@ -108,7 +115,7 @@ bool IsAsyncHandlerRequest::evaluate(
     return false;
 
   // Is it possible to infer @asyncHandler for this function at all?
-  if (checkAsyncHandler(func, /*diagnose=*/false))
+  if (!func->canBeAsyncHandler())
     return false;
 
   // Add an implicit @asyncHandler attribute and return true. We're done.
@@ -155,6 +162,11 @@ bool IsAsyncHandlerRequest::evaluate(
   }
 
   return false;
+}
+
+bool CanBeAsyncHandlerRequest::evaluate(
+    Evaluator &evaluator, FuncDecl *func) const {
+  return !checkAsyncHandler(func, /*diagnose=*/false);
 }
 
 bool IsActorRequest::evaluate(
@@ -338,6 +350,55 @@ public:
 
 }
 
+namespace {
+  /// Describes the important parts of a partial apply thunk.
+  struct PartialApplyThunkInfo {
+    Expr *base;
+    Expr *fn;
+    bool isEscaping;
+  };
+}
+
+/// Try to decompose a call that might be an invocation of a partial apply
+/// thunk.
+static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
+    ApplyExpr *apply, Expr *parent) {
+  // Check for a call to the outer closure in the thunk.
+  auto outerAutoclosure = dyn_cast<AutoClosureExpr>(apply->getFn());
+  if (!outerAutoclosure ||
+      outerAutoclosure->getThunkKind()
+        != AutoClosureExpr::Kind::DoubleCurryThunk)
+    return None;
+
+  auto memberFn = outerAutoclosure->getUnwrappedCurryThunkExpr();
+  if (!memberFn)
+    return None;
+
+  // Determine whether the partial apply thunk was immediately converted to
+  // noescape.
+  bool isEscaping = true;
+  if (auto conversion = dyn_cast_or_null<FunctionConversionExpr>(parent)) {
+    auto fnType = conversion->getType()->getAs<FunctionType>();
+    isEscaping = fnType && !fnType->isNoEscape();
+  }
+
+  return PartialApplyThunkInfo{apply->getArg(), memberFn, isEscaping};
+}
+
+/// Find the immediate member reference in the given expression.
+static Optional<std::pair<ValueDecl *, SourceLoc>>
+findMemberReference(Expr *expr) {
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr))
+    return std::make_pair(declRef->getDecl(), declRef->getLoc());
+
+  if (auto otherCtor = dyn_cast<OtherConstructorDeclRefExpr>(expr)) {
+    return std::make_pair(
+        static_cast<ValueDecl *>(otherCtor->getDecl()), otherCtor->getLoc());
+  }
+
+  return None;
+}
+
 void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
   class ActorIsolationWalker : public ASTWalker {
     ASTContext &ctx;
@@ -377,18 +438,27 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return { true, expr };
       }
 
+      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        // If this is a call to a partial apply thunk, decompose it to check it
+        // like based on the original written syntax, e.g., "self.method".
+        if (auto partialApply = decomposePartialApplyThunk(
+                apply, Parent.getAsExpr())) {
+          if (auto memberRef = findMemberReference(partialApply->fn)) {
+            checkMemberReference(
+                partialApply->base, memberRef->first, memberRef->second,
+                partialApply->isEscaping);
+
+            partialApply->base->walk(*this);
+            return { false, expr };
+          }
+        }
+      }
+
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
-        if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
+        if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
-              call->getArg(), declRef->getDecl(), declRef->getLoc());
-          call->getArg()->walk(*this);
-          return { false, expr };
-        }
-
-        if (auto otherCtor = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-          checkMemberReference(
-              call->getArg(), otherCtor->getDecl(), otherCtor->getLoc());
+              call->getArg(), memberRef->first, memberRef->second);
           call->getArg()->walk(*this);
           return { false, expr };
         }
@@ -557,7 +627,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
     /// Check a reference with the given base expression to the given member.
     bool checkMemberReference(
-        Expr *base, ValueDecl *member, SourceLoc memberLoc) {
+        Expr *base, ValueDecl *member, SourceLoc memberLoc,
+        bool isEscapingPartialApply = false) {
       if (!base || !member)
         return false;
 
@@ -566,6 +637,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return false;
 
       case IsolationRestriction::ActorSelf: {
+        // Must reference actor-isolated state on 'self'.
         auto selfVar = getSelfReference(base);
         if (!selfVar) {
           ctx.Diags.diagnose(
@@ -583,6 +655,18 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
                    cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
           case ActorIsolation::ActorInstance:
           case ActorIsolation::ActorPrivileged:
+            // An escaping partial application of something that is part of
+            // the actor's isolated state is never permitted.
+            if (isEscapingPartialApply) {
+              ctx.Diags.diagnose(
+                  memberLoc, diag::actor_isolated_partial_apply,
+                  member->getDescriptiveKind(),
+                  member->getName());
+              noteIsolatedActorMember(member);
+              return true;
+            }
+            break;
+
           case ActorIsolation::Unspecified:
             // Okay
             break;
@@ -595,7 +679,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
                 member->getDescriptiveKind(),
                 member->getName());
             noteIsolatedActorMember(member);
-            break;
+            return true;
         }
 
         // Check whether we are in a context that will not execute concurrently

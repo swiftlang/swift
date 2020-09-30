@@ -101,8 +101,8 @@ static void printImports(raw_ostream &out,
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   // With -experimental-spi-imports:
@@ -116,7 +116,8 @@ static void printImports(raw_ostream &out,
 
     SmallVector<ModuleDecl::ImportedModule, 4> ioiImport;
     M->getImportedModules(ioiImport,
-                          ModuleDecl::ImportFilterKind::ImplementationOnly);
+                          {ModuleDecl::ImportFilterKind::ImplementationOnly,
+                           ModuleDecl::ImportFilterKind::SPIAccessControl});
     ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
   }
 
@@ -128,7 +129,7 @@ static void printImports(raw_ostream &out,
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
   SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Public);
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
   llvm::SmallSet<ModuleDecl::ImportedModule, 8,
                  ModuleDecl::OrderImportedModules> publicImportSet;
 
