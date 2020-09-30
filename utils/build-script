@@ -1077,7 +1077,7 @@ def parse_preset_args():
         help="use sccache",
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL,
-        default=os.environ.get('USE_SCCACHE') == '1')
+        default=os.environ.get('SWIFT_USE_SCCACHE') == '1')
     parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",

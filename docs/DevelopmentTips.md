@@ -36,7 +36,7 @@ $ sccache --start-server
 $ ./swift/utils/build-script MY_ARGS --sccache
 ```
 
-If you want to always use sccache, you can `export USE_SCCACHE=1` and the build script will pick it up.
+If you want to always use sccache, you can `export SWIFT_USE_SCCACHE=1` and the build script will pick it up.
 
 Given the size of artifacts generated, you might also want to bump the cache size from the default 10GB to something larger, say by putting `export SCCACHE_CACHE_SIZE="50G"` in your dotfile(s).
 
