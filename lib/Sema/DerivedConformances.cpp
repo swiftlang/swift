@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -72,6 +73,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
     return canDeriveHashable(Nominal);
+  }
+
+  if (*derivableKind == KnownDerivableProtocolKind::Actor) {
+    return canDeriveActor(Nominal, DC);
   }
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
@@ -357,6 +362,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
         return getRequirement(KnownProtocolKind::Hashable);
+    }
+
+    // Actor.enqueue(partialTask: PartialTask)
+    if (FuncDecl::isEnqueuePartialTaskName(ctx, name)) {
+      return getRequirement(KnownProtocolKind::Actor);
     }
 
     return nullptr;

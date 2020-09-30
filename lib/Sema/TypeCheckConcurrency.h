@@ -20,6 +20,7 @@
 namespace swift {
 
 class ActorIsolation;
+class ASTContext;
 class ClassDecl;
 class DeclContext;
 class Expr;
