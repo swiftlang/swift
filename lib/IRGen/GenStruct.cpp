@@ -1060,7 +1060,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       // Fall back to Swift lowering for the enum's representation as a struct.
       assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a Clang enum should wrap one value");
-    } else if (clangDecl->hasAttr<clang::SwiftNewtypeAttr>()) {
+    } else if (clangDecl->hasAttr<clang::SwiftNewTypeAttr>()) {
       // Fall back to Swift lowering for the underlying type's
       // representation as a struct member.
       assert(D->getStoredProperties().size() == 1 &&

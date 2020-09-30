@@ -494,10 +494,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-static clang::SwiftNewtypeAttr *
+static clang::SwiftNewTypeAttr *
 retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   // Retrieve the attribute.
-  auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
+  auto attr = decl->getAttr<clang::SwiftNewTypeAttr>();
   if (!attr)
     return nullptr;
 
@@ -510,7 +510,7 @@ retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   return attr;
 }
 
-clang::SwiftNewtypeAttr *
+clang::SwiftNewTypeAttr *
 importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                               ImportNameVersion version) {
   // Newtype was introduced in Swift 3

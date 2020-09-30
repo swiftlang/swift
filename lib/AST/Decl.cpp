@@ -7747,7 +7747,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
   // Make sure the clang node has swift_newtype attribute
   auto clangNode = structDecl->getClangDecl();
-  if (!clangNode || !clangNode->hasAttr<clang::SwiftNewtypeAttr>())
+  if (!clangNode || !clangNode->hasAttr<clang::SwiftNewTypeAttr>())
     return {};
 
   // Underlying type is the type of rawValue
