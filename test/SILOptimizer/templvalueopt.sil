@@ -3,7 +3,7 @@
 import Swift
 import Builtin
 
-// CHECK-LABEL: sil @test_enum_with_initialize
+// CHECK-LABEL: sil @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
 // CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
@@ -22,7 +22,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @test_enum_without_initialize
+// CHECK-LABEL: sil @test_enum_without_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr %0
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
@@ -48,7 +48,7 @@ struct ConformingStruct : Proto {
   @_hasStorage let a: Any
 }
 
-// CHECK-LABEL: sil @test_existential
+// CHECK-LABEL: sil @test_existential :
 // CHECK:      bb0(%0 : $*Proto, %1 : $*ConformingStruct):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_existential_addr %0
 // CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
@@ -80,7 +80,7 @@ struct AddressOnlyPayload {
 
 // There should only be a single copy_addr after optimization.
 //
-// CHECK-LABEL: sil @test_initialize_struct
+// CHECK-LABEL: sil @test_initialize_struct :
 // CHECK:      bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
 // CHECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
@@ -114,7 +114,7 @@ bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
   return %20 : $()
 }
 
-// CHECK-LABEL: sil @bail_on_write_to_dest
+// CHECK-LABEL: sil @bail_on_write_to_dest :
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   copy_addr
@@ -132,7 +132,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @write_to_dest_ok_if_before_liferange
+// CHECK-LABEL: sil @write_to_dest_ok_if_before_liferange :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr
 // CHECK-NEXT:   init_enum_data_addr
@@ -161,7 +161,7 @@ struct StructWithEnum : Proto {
   @_hasStorage let e: Enum
 }
 
-// CHECK-LABEL: sil @move_projections
+// CHECK-LABEL: sil @move_projections :
 // CHECK:      bb0(%0 : $*Proto, %1 : $*Any):
 // CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*Proto, $StructWithEnum
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
@@ -188,7 +188,7 @@ bb0(%0 : $*Proto, %1 : $*Any):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil @cant_move_projections
+// CHECK-LABEL: sil @cant_move_projections :
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   load
@@ -210,7 +210,7 @@ bb0(%0 : $*Any, %1 : $*Builtin.RawPointer):
 
 sil @init_optional : $@convention(thin) () -> @out Optional<Any>
 
-// CHECK-LABEL: sil @instructions_after_copy_addr
+// CHECK-LABEL: sil @instructions_after_copy_addr :
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   copy_addr
@@ -231,7 +231,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @dont_optimize_swap
+// CHECK-LABEL: sil @dont_optimize_swap :
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   copy_addr
