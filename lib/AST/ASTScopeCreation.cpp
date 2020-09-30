@@ -667,10 +667,30 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
+    SmallVector<ValueDecl *, 2> localFuncsAndTypes;
+    SmallVector<VarDecl *, 2> localVars;
+
+    // All types and functions are visible anywhere within a brace statement
+    // scope. When ordering matters (i.e. var decl) we will have split the brace
+    // statement into nested scopes.
+    for (auto braceElement : bs->getElements()) {
+      if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
+        if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
+          if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
+            localFuncsAndTypes.push_back(vd);
+          } else if (auto *var = dyn_cast<VarDecl>(localBinding)) {
+            localVars.push_back(var);
+          }
+        }
+      }
+    }
+
     auto maybeBraceScope =
-        scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(p, bs);
+        scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(
+            p, bs, std::move(localFuncsAndTypes), std::move(localVars));
     if (auto *s = scopeCreator.getASTContext().Stats)
       ++s->getFrontendCounters().NumBraceStmtASTScopes;
+
     return maybeBraceScope.getPtrOr(p);
   }
 

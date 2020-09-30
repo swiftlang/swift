@@ -371,20 +371,10 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
 }
 
 bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  // All types and functions are visible anywhere within a brace statement
-  // scope. When ordering matters (i.e. var decl) we will have split the brace
-  // statement into nested scopes.
-  //
-  // Don't stop at the first one, there may be local funcs with same base name
-  // and want them all.
-  SmallVector<ValueDecl *, 32> localBindings;
-  for (auto braceElement : stmt->getElements()) {
-    if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-      if (auto *vd = dyn_cast<ValueDecl>(localBinding))
-        localBindings.push_back(vd);
-    }
-  }
-  if (consumer.consume(localBindings, DeclVisibilityKind::LocalVariable))
+  if (consumer.consume(localFuncsAndTypes, DeclVisibilityKind::LocalVariable))
+    return true;
+
+  if (consumer.consumePossiblyNotInScope(localVars))
     return true;
 
   if (consumer.finishLookupInBraceStmt(stmt))

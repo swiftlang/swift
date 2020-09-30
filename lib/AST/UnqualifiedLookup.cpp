@@ -133,7 +133,12 @@ namespace {
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
     bool isFirstResultEnough() const;
-    
+
+    /// Do we want precise scoping of VarDecls? If IncludeOuterResults is on,
+    /// this is true, which allows us to resolve forward references to
+    /// local VarDecls from inside local function and closure bodies.
+    bool hasPreciseScopingOfVarDecls() const;
+
     /// Every time lookup finishes searching a scope, call me
     /// to record the dividing line between results from first fruitful scope and
     /// the result.
@@ -208,6 +213,8 @@ public:
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
+
+  bool consumePossiblyNotInScope(ArrayRef<VarDecl *> vars) override;
 
   /// returns true if finished
   bool lookInMembers(DeclContext *const scopeDC,
@@ -462,6 +469,10 @@ bool UnqualifiedLookupFactory::isFirstResultEnough() const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
+bool UnqualifiedLookupFactory::hasPreciseScopingOfVarDecls() const {
+  return !options.contains(Flags::IncludeOuterResults);
+}
+
 void UnqualifiedLookupFactory::recordCompletionOfAScope() {
   // OK to call (NOOP) if there are more inner results and Results is empty
   if (IndexOfFirstOuterResult == 0)
@@ -556,12 +567,18 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
 
-    // Try to resolve the base for unqualified instance member
-    // references. This is used by lookInMembers().
     if (auto *var = dyn_cast<VarDecl>(value)) {
+      // Try to resolve the base for unqualified instance member
+      // references. This is used by lookInMembers().
       if (var->getName() == factory.Ctx.Id_self) {
         maybeUpdateSelfDC(var);
       }
+
+      // Local VarDecls with a pattern binding are visited as part of their
+      // BraceStmt when hasPreciseScopingOfVarDecls() is off.
+      if (var->getParentPatternBinding() &&
+          !factory.hasPreciseScopingOfVarDecls())
+        continue;
     }
 
     if (!value->getName().matchesRef(factory.Name.getFullName()))
@@ -585,6 +602,21 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   }
   factory.recordCompletionOfAScope();
   return factory.isFirstResultEnough();
+}
+
+bool ASTScopeDeclConsumerForUnqualifiedLookup::consumePossiblyNotInScope(
+    ArrayRef<VarDecl *> vars) {
+  if (factory.hasPreciseScopingOfVarDecls())
+    return false;
+
+  for (auto *var : vars) {
+    if (!factory.Name.getFullName().isSimpleName(var->getName()))
+      continue;
+
+    factory.Results.push_back(LookupResultEntry(var));
+  }
+
+  return false;
 }
 
 bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,

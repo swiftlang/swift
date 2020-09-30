@@ -1658,10 +1658,22 @@ protected:
 };
 
 class BraceStmtScope final : public AbstractStmtScope {
+  BraceStmt *const stmt;
+
+  /// Declarations which are in scope from the beginning of the statement.
+  SmallVector<ValueDecl *, 2> localFuncsAndTypes;
+
+  /// Declarations that are normally in scope only after their
+  /// definition.
+  SmallVector<VarDecl *, 2> localVars;
 
 public:
-  BraceStmt *const stmt;
-  BraceStmtScope(BraceStmt *e) : stmt(e) {}
+  BraceStmtScope(BraceStmt *e,
+                 SmallVector<ValueDecl *, 2> localFuncsAndTypes,
+                 SmallVector<VarDecl *, 2> localVars)
+      : stmt(e),
+        localFuncsAndTypes(localFuncsAndTypes),
+        localVars(localVars) {}
   virtual ~BraceStmtScope() {}
 
 protected:

@@ -613,6 +613,14 @@ public:
   lookInMembers(DeclContext *const scopeDC,
                 NominalTypeDecl *const nominal) = 0;
 
+  /// Called for local VarDecls that might not yet be in scope.
+  ///
+  /// Note that the set of VarDecls visited here are going to be a
+  /// superset of those visited in consume().
+  virtual bool consumePossiblyNotInScope(ArrayRef<VarDecl *> values) {
+    return false;
+  }
+
   /// Called right before looking at the parent scope of a BraceStmt.
   ///
   /// \return true if the lookup should be stopped at this point.
