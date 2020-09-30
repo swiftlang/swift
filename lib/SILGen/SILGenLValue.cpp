@@ -1490,7 +1490,7 @@ namespace {
         auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
         if (!captureInfo.getCaptures().empty()) {
           SmallVector<ManagedValue, 4> captures;
-          SGF.emitCaptures(loc, setter, CaptureEmission::PartialApplication, captures);
+          SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
 
           for (auto capture : captures)
             capturedArgs.push_back(capture.forward(SGF));
