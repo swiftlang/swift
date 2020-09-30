@@ -489,8 +489,10 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
   SourceFile *currentFile = currentDC->getParentSourceFile();
-  if (!currentFile || currentDC->isLocalContext())
+  if (!currentFile)
     return std::make_tuple<>();
+
+  auto &ctx = current->getASTContext();
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
@@ -500,7 +502,17 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
     }
+  } else if (currentDC->isLocalContext()) {
+    if (ctx.LangOpts.DisableParserLookup) {
+      if (!current->isImplicit()) {
+        ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+                                   current->getLoc(),
+                                   /*stopAfterInnermostBraceStmt=*/true,
+                                   otherDefinitions);
+      }
+    }
   } else {
+    assert(currentDC->isModuleScopeContext());
     // Look within a module context.
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
@@ -512,7 +524,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   OverloadSignature currentSig = current->getOverloadSignature();
   CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
-  auto &ctx = current->getASTContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
     //
@@ -547,7 +558,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     // shadows a non-private one, but only in the file where the shadowing
     // happens. We will warn on conflicting non-private declarations in both
     // files.
-    if (!other->isAccessibleFrom(currentDC))
+    if (!currentDC->isLocalContext() &&
+        !other->isAccessibleFrom(currentDC))
       continue;
 
     // Skip invalid declarations.
