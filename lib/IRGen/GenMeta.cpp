@@ -5046,6 +5046,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
+  case KnownProtocolKind::Actor:
     return SpecialProtocol::None;
   }
 

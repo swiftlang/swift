@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -368,6 +369,32 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   return true;
 }
 
+/// Actor-isolated declarations cannot be @objc.
+static bool checkObjCActorIsolation(const ValueDecl *VD,
+                                    ObjCReason Reason) {
+  // Check actor isolation.
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
+
+  switch (getActorIsolation(const_cast<ValueDecl *>(VD))) {
+  case ActorIsolation::ActorInstance:
+    // Actor-isolated functions cannot be @objc.
+    if (Diagnose) {
+      VD->diagnose(
+          diag::actor_isolated_objc, VD->getDescriptiveKind(),  VD->getName());
+      describeObjCReason(VD, Reason);
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        addAsyncNotes(const_cast<FuncDecl *>(FD));
+      }
+    }
+    return true;
+
+  case ActorIsolation::ActorPrivileged:
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    return false;
+  }
+}
+
 static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   if (target.isMacOSX())
     return VersionRange::allGTE(llvm::VersionTuple(10, 15, 0));
@@ -511,6 +538,8 @@ bool swift::isRepresentableInObjC(
   if (checkObjCWithGenericParams(AFD, Reason))
     return false;
   if (checkObjCInExtensionContext(AFD, Diagnose))
+    return false;
+  if (checkObjCActorIsolation(AFD, Reason))
     return false;
 
   if (AFD->isOperator()) {
@@ -686,10 +715,12 @@ bool swift::isRepresentableInObjC(
     Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
-        addCompletionHandlerParam(tupleElt.getType());
+        if (addCompletionHandlerParam(tupleElt.getType()))
+          return false;
       }
     } else {
-      addCompletionHandlerParam(resultType);
+      if (addCompletionHandlerParam(resultType))
+        return false;
     }
 
     // For a throwing asynchronous function, an Error? parameter is added
@@ -939,6 +970,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
   if (checkObjCInForeignClassContext(VD, Reason))
     return false;
+  if (checkObjCActorIsolation(VD, Reason))
+    return false;
 
   if (!Diagnose || Result)
     return Result;
@@ -966,6 +999,8 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
   if (checkObjCWithGenericParams(SD, Reason))
+    return false;
+  if (checkObjCActorIsolation(SD, Reason))
     return false;
 
   // ObjC doesn't support class subscripts.

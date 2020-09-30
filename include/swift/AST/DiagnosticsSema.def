@@ -4101,6 +4101,9 @@ ERROR(not_objc_function_async,none,
       "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
+ERROR(actor_isolated_objc,none,
+      "actor-isolated %0 %1 cannot be @objc",
+       (DescriptiveDeclKind, DeclName))
 NOTE(protocol_witness_async_conflict,none,
      "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
      (bool))
@@ -4194,6 +4197,13 @@ ERROR(actorisolated_not_actor_member,none,
 ERROR(actorisolated_not_actor_instance_member,none,
       "'@actorIsolated' can only be applied to instance members of actors",
       ())
+
+ERROR(concurrency_lib_missing,none,
+      "missing '%0' declaration, probably because the '_Concurrency' "
+      "module was not imported", (StringRef))
+ERROR(enqueue_partial_task_not_in_context,none,
+      "'enqueue(partialTask:)' can only be implemented in the definition of "
+      "actor class %0", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

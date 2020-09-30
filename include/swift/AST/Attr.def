@@ -567,7 +567,7 @@ SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
   101)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
-  OnClass | ConcurrencyOnly |
+  DeclModifier | OnClass | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   102)
