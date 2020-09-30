@@ -25,6 +25,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1443,6 +1444,32 @@ namespace {
     }
 
   private:
+    /// If we should set the forbids associated objects on instances metadata
+    /// flag.
+    ///
+    /// We currently do this on:
+    ///
+    /// * Actor classes.
+    /// * classes marked with @_semantics("objc.forbidAssociatedObjects")
+    ///   (for testing purposes)
+    ///
+    /// TODO: Expand this as appropriate over time.
+    bool doesClassForbidAssociatedObjectsOnInstances() const {
+      auto *clsDecl = getClass();
+
+      // We ban this on actors without objc ancestry.
+      if (clsDecl->isActor() && !clsDecl->checkAncestry(AncestryFlags::ObjC))
+        return true;
+
+      // Otherwise, we only do it if our special semantics attribute is on the
+      // relevant class. This is for testing purposes.
+      if (clsDecl->hasSemanticsAttr(semantics::OBJC_FORBID_ASSOCIATED_OBJECTS))
+        return true;
+
+      // TODO: Add new cases here as appropriate over time.
+      return false;
+    }
+
     ObjCClassFlags buildFlags(ForMetaClass_t forMeta,
                               HasUpdateCallback_t hasUpdater) {
       ObjCClassFlags flags = ObjCClassFlags::CompiledByARC;
@@ -1462,6 +1489,11 @@ namespace {
 
       if (hasUpdater)
         flags |= ObjCClassFlags::HasMetadataUpdateCallback;
+
+      // If we know that our class does not support having associated objects
+      // placed upon instances, set the forbid associated object flag.
+      if (doesClassForbidAssociatedObjectsOnInstances())
+        flags |= ObjCClassFlags::ForbidsAssociatedObjects;
 
       // FIXME: set ObjCClassFlags::Hidden when appropriate
       return flags;
