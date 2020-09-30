@@ -504,6 +504,7 @@ enum MP {
 }
 
 sil @take_s : $@convention(thin) (@in S) -> ()
+sil @take_t : $@convention(thin) (@in T) -> ()
 sil @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
 
 // CHECK-LABEL: sil @expand_alloc_stack_of_enum1
@@ -568,6 +569,37 @@ bb3:
   return %11 : $()
 }
 
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_multiple_cases
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $T
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:        apply {{%[0-9]+}}([[A]])
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_multiple_cases'
+sil @expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (T) -> () {
+bb0(%0 : $T):
+  %1 = alloc_stack $X
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*X, #X.some!enumelt
+  store %0 to %2 : $*T
+  inject_enum_addr %1 : $*X, #X.some!enumelt
+  %7 = unchecked_take_enum_data_addr %1 : $*X, #X.some!enumelt
+  %8 = function_ref @take_t : $@convention(thin) (@in T) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@in T) -> ()
+  br bb3
+bb2:
+  inject_enum_addr %1 : $*X, #X.none!enumelt
+  destroy_addr %1 : $*X
+  br bb3
+bb3:
+  dealloc_stack %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}
+
 // CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_multiple_cases
 // CHECK:   alloc_stack $MP
 // CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
@@ -588,6 +620,28 @@ bb2:
 bb3:
   destroy_addr %1 : $*MP
   dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_multiple_cases2
+// CHECK:   alloc_stack $X
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases2'
+sil @dont_expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (T) -> () {
+bb0(%0 : $T):
+  %1 = alloc_stack $X
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*X, #X.some!enumelt
+  store %0 to %2 : $*T
+  inject_enum_addr %1 : $*X, #X.some!enumelt
+  br bb3
+bb2:
+  inject_enum_addr %1 : $*X, #X.none!enumelt
+  br bb3
+bb3:
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
   %11 = tuple ()
   return %11 : $()
 }
