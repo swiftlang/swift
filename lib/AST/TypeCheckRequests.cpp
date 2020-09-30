@@ -1137,23 +1137,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
-// HasCircularInheritanceRequest computation.
-//----------------------------------------------------------------------------//
-
-void HasCircularInheritanceRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
-}
-
-void HasCircularInheritanceRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
-}
-
-//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 

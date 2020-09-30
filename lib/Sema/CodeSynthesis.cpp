@@ -1076,12 +1076,11 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
     return true;
 
-  auto superclass = decl->getSuperclass();
-  assert(superclass);
+  auto superclassDecl = decl->getSuperclassDecl();
+  assert(superclassDecl);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
-  auto *superclassDecl = superclass->getClassOrBoundGenericClass();
   if (superclassDecl->getModuleContext() != decl->getParentModule() &&
       superclassDecl->hasMissingDesignatedInitializers())
     return false;
@@ -1357,7 +1356,7 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   // Don't synthesize a default for a subclass, it will attempt to inherit its
   // initializers from its superclass.
   if (auto *cd = dyn_cast<ClassDecl>(decl))
-    if (cd->getSuperclass())
+    if (cd->getSuperclassDecl())
       return false;
 
   // If the user has already defined a designated initializer, then don't

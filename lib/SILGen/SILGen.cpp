@@ -1288,8 +1288,8 @@ bool SILGenModule::requiresIVarDestroyer(ClassDecl *cd) {
   // Only needed if we have non-trivial ivars, we're not a root class, and
   // the superclass is not @objc.
   return (hasNonTrivialIVars(cd) &&
-          cd->getSuperclass() &&
-          !cd->getSuperclass()->getClassOrBoundGenericClass()->hasClangNode());
+          cd->getSuperclassDecl() &&
+          !cd->getSuperclassDecl()->hasClangNode());
 }
 
 /// TODO: This needs a better name.

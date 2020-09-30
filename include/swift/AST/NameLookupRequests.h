@@ -160,6 +160,10 @@ private:
   evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
   // Caching
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
