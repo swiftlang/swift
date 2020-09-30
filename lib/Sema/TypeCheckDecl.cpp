@@ -234,6 +234,34 @@ static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
 }
 
 bool
+HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                               ProtocolDecl *decl) const {
+  if (canSkipCircularityCheck(decl))
+    return false;
+
+  bool anyObject = false;
+  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+  for (auto &found : inherited) {
+    auto *protoDecl = dyn_cast<ProtocolDecl>(found.Item);
+    if (!protoDecl)
+      continue;
+
+    // If we have a cycle, handle it and return true.
+    auto result = evaluator(HasCircularInheritedProtocolsRequest{protoDecl});
+    if (!result) {
+      using Error = CyclicalRequestError<HasCircularInheritedProtocolsRequest>;
+      llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+      return true;
+    }
+
+    // If the underlying request handled a cycle and returned true, bail.
+    if (*result)
+      return true;
+  }
+  return false;
+}
+
+bool
 HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
                                      EnumDecl *decl) const {
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
