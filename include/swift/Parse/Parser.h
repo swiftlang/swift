@@ -50,6 +50,7 @@ namespace swift {
   class Lexer;
   class ParsedTypeSyntax;
   class PersistentParserState;
+  class RequirementRepr;
   class SILParserStateBase;
   class ScopeInfo;
   class SourceManager;
