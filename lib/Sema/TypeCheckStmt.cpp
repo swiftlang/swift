@@ -504,6 +504,8 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
     }
     elt.setPattern(pattern);
 
+    TypeChecker::diagnoseDuplicateBoundVars(pattern);
+
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
     auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
@@ -956,6 +958,8 @@ public:
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
 
+    TypeChecker::diagnoseDuplicateBoundVars(S->getPattern());
+
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
@@ -1031,6 +1035,8 @@ public:
       });
     }
     labelItem.setPattern(pattern, /*resolved=*/true);
+
+    TypeChecker::diagnoseDuplicateBoundVars(pattern);
 
     // Otherwise for each variable in the pattern, make sure its type is
     // identical to the initial case decl and stash the previous case decl as
@@ -2039,7 +2045,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
-  checkParameterAttributes(closure->getParameters());
+  TypeChecker::checkParameterList(closure->getParameters());
 
   BraceStmt *body = closure->getBody();
 

@@ -397,6 +397,28 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
     .fixItReplace(args->getSourceRange(), "([])");
 }
 
+template<typename T>
+static void diagnoseDuplicateDecls(const T &decls) {
+  llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
+  for (auto *current : decls) {
+    if (!current->getASTContext().LangOpts.DisableParserLookup)
+      return;
+
+    if (!current->hasName() || current->isImplicit())
+      continue;
+
+    auto found = names.insert(std::make_pair(current->getBaseName(), current));
+    if (!found.second) {
+      auto *other = found.first->second;
+
+      current->getASTContext().Diags.diagnoseWithNotes(
+        current->diagnose(diag::invalid_redecl,
+                          current->getName()), [&]() {
+        other->diagnose(diag::invalid_redecl_prev, other->getName());
+      });
+    }
+  }
+}
 
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
@@ -410,10 +432,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     checkInheritanceClause(gp);
   }
 
-  // Force visitation of each of the requirements here.
+  // Force resolution of interface types written in requirements here.
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+
+  // Check for duplicate generic parameter names.
+  diagnoseDuplicateDecls(*genericParams);
 }
 
 template <typename T>
@@ -1288,6 +1313,22 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
+void TypeChecker::checkParameterList(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+
+  // Check for duplicate parameter names.
+  diagnoseDuplicateDecls(*params);
+}
+
+void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
+  SmallVector<VarDecl *, 2> boundVars;
+  pattern->collectVariables(boundVars);
+
+  diagnoseDuplicateDecls(boundVars);
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1709,7 +1750,7 @@ public:
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TypeChecker::checkParameterAttributes(SD->getIndices());
+    TypeChecker::checkParameterList(SD->getIndices());
 
     checkDefaultArguments(SD->getIndices());
 
@@ -1735,6 +1776,7 @@ public:
 
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
+    checkGenericParams(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -2260,15 +2302,18 @@ public:
     (void) FD->getOperatorDecl();
     (void) FD->getDynamicallyReplacedDecl();
     
-    if (!FD->isInvalid()) {
-      checkGenericParams(FD);
-      TypeChecker::checkReferencedGenericParams(FD);
-      TypeChecker::checkProtocolSelfRequirements(FD);
+    if (!isa<AccessorDecl>(FD)) {
+      if (!FD->isInvalid()) {
+        checkGenericParams(FD);
+        TypeChecker::checkReferencedGenericParams(FD);
+        TypeChecker::checkProtocolSelfRequirements(FD);
+      }
+
+      checkAccessControl(FD);
+
+      TypeChecker::checkParameterList(FD->getParameters());
     }
 
-    checkAccessControl(FD);
-
-    TypeChecker::checkParameterAttributes(FD->getParameters());
     TypeChecker::checkDeclAttributes(FD);
 
     if (!checkOverrides(FD)) {
@@ -2376,7 +2421,7 @@ public:
     TypeChecker::checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TypeChecker::checkParameterAttributes(PL);
+      TypeChecker::checkParameterList(PL);
 
       checkDefaultArguments(PL);
     }
@@ -2532,7 +2577,7 @@ public:
     }
 
     TypeChecker::checkDeclAttributes(CD);
-    TypeChecker::checkParameterAttributes(CD->getParameters());
+    TypeChecker::checkParameterList(CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

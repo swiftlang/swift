@@ -497,7 +497,9 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
-void checkParameterAttributes(ParameterList *params);
+void checkParameterList(ParameterList *params);
+
+void diagnoseDuplicateBoundVars(Pattern *pattern);
 
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
