@@ -88,32 +88,6 @@ namespace {
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
     
-    enum class AddGenericParameters { Yes, No };
-
-#ifndef NDEBUG
-    /// A consumer for debugging that lets the UnqualifiedLookupFactory know when
-    /// finding something.
-    class InstrumentedNamedDeclConsumer : public NamedDeclConsumer {
-      virtual void anchor() override;
-      UnqualifiedLookupFactory *factory;
-      
-    public:
-      InstrumentedNamedDeclConsumer(UnqualifiedLookupFactory *factory,
-                                    DeclNameRef name,
-                                    SmallVectorImpl<LookupResultEntry> &results,
-                                    bool isTypeLookup)
-      : NamedDeclConsumer(name, results, isTypeLookup), factory(factory) {}
-      
-      virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
-                             DynamicLookupInfo dynamicLookupInfo = {}) override {
-        unsigned before = results.size();
-        NamedDeclConsumer::foundDecl(VD, Reason, dynamicLookupInfo);
-        unsigned after = results.size();
-        if (after > before)
-          factory->addedResult(results.back());
-      }
-    };
-#endif
     // Inputs
     const DeclNameRef Name;
     DeclContext *const DC;
@@ -128,12 +102,7 @@ namespace {
     const Options options;
     const bool isOriginallyTypeLookup;
     const NLOptions baseNLOptions;
-    // Transputs
-#ifndef NDEBUG
-    InstrumentedNamedDeclConsumer Consumer;
-#else
-    NamedDeclConsumer Consumer;
-#endif
+
     // Outputs
     SmallVectorImpl<LookupResultEntry> &Results;
     size_t &IndexOfFirstOuterResult;
@@ -279,11 +248,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-  #ifdef NDEBUG
-  Consumer(Name, Results, isOriginallyTypeLookup),
-  #else
-  Consumer(this, Name, Results, isOriginallyTypeLookup),
-  #endif
   Results(Results),
   IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
@@ -675,9 +639,6 @@ UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
 }
 
 #pragma mark debugging
-#ifndef NDEBUG
-void UnqualifiedLookupFactory::InstrumentedNamedDeclConsumer::anchor() {}
-#endif
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
   (void)factory;
