@@ -22,6 +22,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
