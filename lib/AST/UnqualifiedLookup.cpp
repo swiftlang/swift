@@ -736,13 +736,16 @@ namespace {
 
 class ASTScopeDeclConsumerForLocalLookup
     : public AbstractASTScopeDeclConsumer {
-  SmallVectorImpl<ValueDecl *> &results;
   DeclName name;
+  bool stopAfterInnermostBraceStmt;
+  SmallVectorImpl<ValueDecl *> &results;
 
 public:
   ASTScopeDeclConsumerForLocalLookup(
-      SmallVectorImpl<ValueDecl *> &results, DeclName name)
-    : results(results), name(name) {}
+      DeclName name, bool stopAfterInnermostBraceStmt,
+      SmallVectorImpl<ValueDecl *> &results)
+    : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
+      results(results) {}
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC) override {
@@ -753,12 +756,16 @@ public:
       results.push_back(value);
     }
 
-    return !results.empty();
+    return (!stopAfterInnermostBraceStmt && !results.empty());
   }
 
   bool lookInMembers(DeclContext *const,
                      NominalTypeDecl *const) override {
     return true;
+  }
+
+  bool finishLookupInBraceStmt(BraceStmt *stmt) override {
+    return stopAfterInnermostBraceStmt;
   }
 
 #ifndef NDEBUG
@@ -773,15 +780,19 @@ public:
 /// Lookup that only finds local declarations and does not trigger
 /// interface type computation.
 void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+                                bool stopAfterInnermostBraceStmt,
                                 SmallVectorImpl<ValueDecl *> &results) {
-  ASTScopeDeclConsumerForLocalLookup consumer(results, name);
+  ASTScopeDeclConsumerForLocalLookup consumer(name, stopAfterInnermostBraceStmt,
+                                              results);
   ASTScope::unqualifiedLookup(sf, loc, consumer);
 }
 
 ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
                                            SourceLoc loc) {
   SmallVector<ValueDecl *, 1> result;
-  ASTScope::lookupLocalDecls(sf, name, loc, result);
+  ASTScope::lookupLocalDecls(sf, name, loc,
+                             /*finishLookupInBraceStmt=*/false,
+                             result);
   if (result.size() != 1)
     return nullptr;
   return result[0];

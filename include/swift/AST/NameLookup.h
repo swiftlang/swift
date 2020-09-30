@@ -594,17 +594,32 @@ public:
   virtual ~AbstractASTScopeDeclConsumer() = default;
 
   /// Called for every ValueDecl visible from the lookup.
-  /// Returns true if the lookup can be stopped at this point.
-  /// BaseDC is per legacy
+  ///
   /// Takes an array in order to batch the consumption before setting
   /// IndexOfFirstOuterResult when necessary.
+  ///
+  /// \param baseDC either a type context or the local context of a
+  /// `self` parameter declaration. See LookupResult for a discussion
+  /// of type -vs- instance lookup results.
+  ///
+  /// \return true if the lookup should be stopped at this point.
   virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
-  /// Eventually this functionality should move into ASTScopeLookup
+  /// Look for members of a nominal type or extension scope.
+  ///
+  /// \return true if the lookup should be stopped at this point.
   virtual bool
   lookInMembers(DeclContext *const scopeDC,
                 NominalTypeDecl *const nominal) = 0;
+
+  /// Called right before looking at the parent scope of a BraceStmt.
+  ///
+  /// \return true if the lookup should be stopped at this point.
+  virtual bool
+  finishLookupInBraceStmt(BraceStmt *stmt) {
+    return false;
+  }
 
 #ifndef NDEBUG
   virtual void startingNextLookupStep() = 0;
@@ -661,7 +676,11 @@ public:
 
   /// Lookup that only finds local declarations and does not trigger
   /// interface type computation.
+  ///
+  /// \param stopAfterInnermostBraceStmt If lookup should consider
+  /// local declarations inside the innermost syntactic scope only.
   static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
+                               bool stopAfterInnermostBraceStmt,
                                SmallVectorImpl<ValueDecl *> &);
 
   /// Returns the result if there is exactly one, nullptr otherwise.
