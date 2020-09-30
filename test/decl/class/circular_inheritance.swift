@@ -2,6 +2,7 @@
 // RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
+// RUN: %FileCheck -check-prefix CHECK-DOT %s < %t.dot
 
 class Left // expected-error {{'Left' inherits from itself}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
@@ -40,14 +41,6 @@ class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note {
   class Inner<T> {}
 }
 
-// CHECK: ===CYCLE DETECTED===
-// CHECK-LABEL: `--{{.*}}HasCircularInheritanceRequest(circular_inheritance.(file).Left@
-// CHECK-NEXT:     `--{{.*}}SuperclassDeclRequest({{.*Left}}
-// CHECK:          `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
-// CHECK:              `--{{.*}}SuperclassDeclRequest
-// CHECK:                  `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
-// CHECK:                      `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
-
 // CHECK-DOT: digraph Dependencies
 // CHECK-DOT: label="InheritedTypeRequest
 
@@ -65,7 +58,6 @@ func crash() {
   _ = Circle()
 }
 
-// FIXME: We shouldn't emit the redundant "circular reference" diagnostics here.
 class WithDesignatedInit : WithDesignatedInit {
   // expected-error@-1 {{'WithDesignatedInit' inherits from itself}}
 

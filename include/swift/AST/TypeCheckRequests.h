@@ -1986,29 +1986,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Computes whether a class has a circular reference in its inheritance
-/// hierarchy.
-class HasCircularInheritanceRequest
-    : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, ClassDecl *decl) const;
-
-public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
-  // Cached.
-  bool isCached() const { return true; }
-};
-
 /// Computes whether a protocol has a circular reference in its list of
 /// inherited protocols.
 class HasCircularInheritedProtocolsRequest

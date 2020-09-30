@@ -4148,13 +4148,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   }
 }
 
-bool ClassDecl::hasCircularInheritance() const {
-  auto &ctx = getASTContext();
-  auto *mutableThis = const_cast<ClassDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           HasCircularInheritanceRequest{mutableThis}, true);
-}
-
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)

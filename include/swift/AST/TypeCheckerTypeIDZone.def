@@ -95,8 +95,6 @@ SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
 SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
               GenericSignature (GenericContext *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasCircularInheritanceRequest,
-              bool(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasCircularInheritedProtocolsRequest,
               bool(ProtocolDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
