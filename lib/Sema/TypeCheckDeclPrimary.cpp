@@ -573,18 +573,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                                        &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
     if (isRedeclaration || wouldBeSwift5Redeclaration) {
-      // If the two declarations occur in the same source file, make sure
-      // we get the diagnostic ordering to be sensible.
-      if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
-        if (currentFile == otherFile &&
-            current->getLoc().isValid() &&
-            other->getLoc().isValid() &&
-            ctx.SourceMgr.isBeforeInBuffer(current->getLoc(),
-                                           other->getLoc())) {
-          std::swap(current, other);
-        }
-      }
-
       // If we're currently looking at a .sil and the conflicting declaration
       // comes from a .sib, don't error since we won't be considering the sil
       // from the .sib. So it's fine for the .sil to shadow it, since that's the
@@ -798,11 +786,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
         }
       }
 
-      // Make sure we don't do this checking again for the same decl. We also
-      // set this at the beginning of the function, but we might have swapped
-      // the decls for diagnostics; so ensure we also set this for the actual
-      // decl we diagnosed on.
-      current->setCheckedRedeclaration();
       break;
     }
   }
