@@ -693,11 +693,13 @@ static void lookupVisibleMemberDeclsImpl(
     }
   }
 
+  auto lookupTy = BaseTy;
+
   const auto synthesizeAndLookupTypeMembers = [&](NominalTypeDecl *NTD) {
     synthesizeMemberDeclsForLookup(NTD, CurrDC);
 
     // Look in for members of a nominal type.
-    lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
+    lookupTypeMembers(BaseTy, lookupTy, Consumer, CurrDC, LS, Reason);
   };
 
   llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
@@ -725,7 +727,7 @@ static void lookupVisibleMemberDeclsImpl(
     Ancestors.insert(CD);
 
     Reason = getReasonForSuper(Reason);
-    BaseTy = CD->getSuperclass();
+    lookupTy = CD->getSuperclass();
 
     LS = LS.withOnSuperclass();
     if (CD->inheritsSuperclassInitializers())
@@ -734,7 +736,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   // Look into the inheritance chain.
   do {
-    const auto CurClass = BaseTy->getClassOrBoundGenericClass();
+    const auto CurClass = lookupTy->getClassOrBoundGenericClass();
 
     // FIXME: This path is no substitute for an actual circularity check.
     // The real fix is to check that the superclass doesn't introduce a
@@ -744,10 +746,10 @@ static void lookupVisibleMemberDeclsImpl(
 
     synthesizeAndLookupTypeMembers(CurClass);
 
-    BaseTy = CurClass->getSuperclass();
+    lookupTy = CurClass->getSuperclass();
     if (!CurClass->inheritsSuperclassInitializers())
       LS = LS.withoutInheritsSuperclassInitializers();
-  } while (BaseTy);
+  } while (lookupTy);
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
