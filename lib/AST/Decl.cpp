@@ -4148,13 +4148,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   }
 }
 
-bool ClassDecl::hasCircularInheritance() const {
-  auto &ctx = getASTContext();
-  auto *mutableThis = const_cast<ClassDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           HasCircularInheritanceRequest{mutableThis}, true);
-}
-
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
@@ -4276,7 +4269,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
 
 bool ClassDecl::inheritsSuperclassInitializers() const {
   // If there's no superclass, there's nothing to inherit.
-  if (!getSuperclass())
+  if (!getSuperclassDecl())
     return false;
 
   auto &ctx = getASTContext();
@@ -4294,19 +4287,11 @@ AncestryOptions ClassDecl::checkAncestry() const {
 AncestryFlags
 ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
                                     ClassDecl *value) const {
-  llvm::SmallPtrSet<const ClassDecl *, 8> visited;
-
   AncestryOptions result;
   const ClassDecl *CD = value;
   auto *M = value->getParentModule();
 
   do {
-    // If we hit circularity, we will diagnose at some point in typeCheckDecl().
-    // However we have to explicitly guard against that here because we get
-    // called as part of the interface type request.
-    if (!visited.insert(CD).second)
-      break;
-
     if (CD->isGenericContext())
       result |= AncestryFlags::Generic;
 
@@ -4496,10 +4481,9 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
 bool ClassDecl::walkSuperclasses(
     llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const {
 
-  SmallPtrSet<ClassDecl *, 8> seen;
   auto *cls = const_cast<ClassDecl *>(this);
 
-  while (cls && seen.insert(cls).second) {
+  while (cls) {
     switch (fn(cls)) {
     case TypeWalker::Action::Stop:
       return true;

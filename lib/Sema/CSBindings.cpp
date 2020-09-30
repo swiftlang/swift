@@ -22,7 +22,7 @@ using namespace swift;
 using namespace constraints;
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -144,7 +144,7 @@ isUnviableDefaultType(Type defaultType,
 }
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
   auto isDirectRequirement = [&](Constraint *constraint) -> bool {
     if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
       auto *repr = cs.getRepresentative(typeVar);
@@ -300,7 +300,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
-    const ConstraintSystem &cs,
+    ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -375,6 +375,15 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->directlyAt<NilLiteralExpr>()) {
       FullyBound = true;
       PotentiallyIncomplete = true;
+    }
+
+    // If this type variable is associated with a code completion token
+    // and it failed to infer any bindings let's adjust hole's locator
+    // to point to a code completion token to avoid attempting to "fix"
+    // this problem since its rooted in the fact that constraint system
+    // is under-constrained.
+    if (AssociatedCodeCompletionToken) {
+      locator = cs.getConstraintLocator(AssociatedCodeCompletionToken);
     }
 
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
@@ -620,8 +629,7 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
 }
 
 ConstraintSystem::PotentialBindings
-ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
-                                   bool finalize) const {
+ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
@@ -769,6 +777,18 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
     result.InvolvesTypeVariables = true;
 
+    // If current type variable is associated with a code completion token
+    // it's possible that it doesn't have enough contextual information
+    // to be resolved to anything, so let's note that fact in the potential
+    // bindings and use it when forming a hole if there are no other bindings
+    // available.
+    if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
+      if (locator->directlyAt<CodeCompletionExpr>()) {
+        result.AssociatedCodeCompletionToken = locator->getAnchor();
+        result.PotentiallyIncomplete = true;
+      }
+    }
+
     if (constraint->getKind() == ConstraintKind::Subtype &&
         kind == AllowedBindingKind::Subtypes) {
       result.SubtypeOf.insert(bindingTypeVar);
@@ -829,7 +849,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 bool ConstraintSystem::PotentialBindings::infer(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
     Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -1221,6 +1241,21 @@ Optional<std::pair<ConstraintFix *, unsigned>>
 TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
   auto *srcLocator = Binding.getLocator();
+
+  // FIXME: This check could be turned into an assert once
+  // all code completion kinds are ported to use
+  // `TypeChecker::typeCheckForCodeCompletion` API.
+  if (cs.isForCodeCompletion()) {
+    // If the hole is originated from code completion expression
+    // let's not try to fix this, anything connected to a
+    // code completion is allowed to be a hole because presence
+    // of a code completion token makes constraint system
+    // under-constrained due to e.g. lack of expressions on the
+    // right-hand side of the token, which are required for a
+    // regular type-check.
+    if (dstLocator->directlyAt<CodeCompletionExpr>())
+      return None;
+  }
 
   unsigned defaultImpact = 1;
 

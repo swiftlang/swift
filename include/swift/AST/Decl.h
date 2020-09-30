@@ -3920,9 +3920,6 @@ public:
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
 
-  /// Whether this class has a circular reference in its inheritance hierarchy.
-  bool hasCircularInheritance() const;
-
   /// Walk this class and all of the superclasses of this class, transitively,
   /// invoking the callback function for each class.
   ///

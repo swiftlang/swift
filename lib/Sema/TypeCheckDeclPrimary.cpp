@@ -2011,7 +2011,7 @@ public:
     checkGenericParams(CD);
 
     // Check for circular inheritance.
-    (void)CD->hasCircularInheritance();
+    (void)CD->getSuperclassDecl();
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
