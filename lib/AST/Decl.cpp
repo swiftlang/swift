@@ -4489,10 +4489,9 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
 bool ClassDecl::walkSuperclasses(
     llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const {
 
-  SmallPtrSet<ClassDecl *, 8> seen;
   auto *cls = const_cast<ClassDecl *>(this);
 
-  while (cls && seen.insert(cls).second) {
+  while (cls) {
     switch (fn(cls)) {
     case TypeWalker::Action::Stop:
       return true;
