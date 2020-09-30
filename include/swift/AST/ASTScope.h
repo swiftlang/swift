@@ -444,7 +444,6 @@ protected:
   // It is not an instance variable or inherited type.
 
   static bool lookupLocalBindingsInPattern(const Pattern *p,
-                                           DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
   /// When lookup must stop before the outermost scope, return the scope to stop

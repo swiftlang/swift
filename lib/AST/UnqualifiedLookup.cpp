@@ -211,7 +211,7 @@ public:
 
   void maybeUpdateSelfDC(VarDecl *var);
 
-  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   bool consumePossiblyNotInScope(ArrayRef<VarDecl *> vars) override;
@@ -561,8 +561,7 @@ void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
-    ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-    NullablePtr<DeclContext> baseDC) {
+    ArrayRef<ValueDecl *> values, NullablePtr<DeclContext> baseDC) {
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
@@ -609,7 +608,6 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consumePossiblyNotInScope(
 }
 
 bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
-                                   DeclVisibilityKind,
                                    NullablePtr<DeclContext>) {
   for (auto *v: valuesArg)
     values.push_back(v);
@@ -768,7 +766,7 @@ public:
     : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
       results(results) {}
 
-  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
     for (auto *value: values) {
       if (!value->getName().matchesRef(name))

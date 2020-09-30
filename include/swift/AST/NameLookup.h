@@ -603,7 +603,7 @@ public:
   /// of type -vs- instance lookup results.
   ///
   /// \return true if the lookup should be stopped at this point.
-  virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  virtual bool consume(ArrayRef<ValueDecl *> values,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
   /// Look for members of a nominal type or extension scope.
@@ -644,7 +644,7 @@ class ASTScopeDeclGatherer : public AbstractASTScopeDeclConsumer {
 public:
   virtual ~ASTScopeDeclGatherer() = default;
 
-  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
