@@ -4101,6 +4101,9 @@ ERROR(not_objc_function_async,none,
       "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
+ERROR(actor_isolated_objc,none,
+      "actor-isolated %0 %1 cannot be @objc",
+       (DescriptiveDeclKind, DeclName))
 NOTE(protocol_witness_async_conflict,none,
      "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
      (bool))
