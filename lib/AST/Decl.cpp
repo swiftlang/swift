@@ -4287,19 +4287,11 @@ AncestryOptions ClassDecl::checkAncestry() const {
 AncestryFlags
 ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
                                     ClassDecl *value) const {
-  llvm::SmallPtrSet<const ClassDecl *, 8> visited;
-
   AncestryOptions result;
   const ClassDecl *CD = value;
   auto *M = value->getParentModule();
 
   do {
-    // If we hit circularity, we will diagnose at some point in typeCheckDecl().
-    // However we have to explicitly guard against that here because we get
-    // called as part of the interface type request.
-    if (!visited.insert(CD).second)
-      break;
-
     if (CD->isGenericContext())
       result |= AncestryFlags::Generic;
 
