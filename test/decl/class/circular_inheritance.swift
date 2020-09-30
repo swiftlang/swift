@@ -2,13 +2,14 @@
 // RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
+// RUN: %FileCheck -check-prefix CHECK-DOT %s < %t.dot
 
-class Left // expected-error {{circular reference}} expected-note {{through reference here}}
+class Left // expected-error {{'Left' inherits from itself}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
-class Right // expected-note 2 {{through reference here}}
+class Right // expected-note {{through reference here}} expected-note{{class 'Right' declared here}}
   : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
@@ -23,58 +24,42 @@ protocol P : P {} // expected-error {{protocol 'P' refines itself}}
 class Isomorphism : Automorphism { }
 class Automorphism : Automorphism { } // expected-error{{'Automorphism' inherits from itself}}
 
-// FIXME: Useless error
-let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}
+let _ = A()
 
 class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 // expected-error {{circular reference}} expected-note {{through reference here}}
+class Outer2 // expected-error {{'Outer2' inherits from itself}} expected-note {{through reference here}}
     : Outer2.Inner { // expected-note {{through reference here}}
 
   class Inner {}
 }
 
-class Outer3 // expected-error {{circular reference}} expected-note {{through reference here}}
+class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note {{through reference here}}
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {}
 }
-
-// CHECK: ===CYCLE DETECTED===
-// CHECK-LABEL: `--{{.*}}HasCircularInheritanceRequest(circular_inheritance.(file).Left@
-// CHECK-NEXT:     `--{{.*}}SuperclassDeclRequest({{.*Left}}
-// CHECK:          `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
-// CHECK:              `--{{.*}}SuperclassDeclRequest
-// CHECK:                  `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
-// CHECK:                      `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
 // CHECK-DOT: label="InheritedTypeRequest
 
 protocol Initable {
   init()
-  // expected-note@-1 {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}}
-  // expected-note@-2 {{did you mean 'init'?}}
 }
 
 protocol Shape : Circle {}
 
 class Circle : Initable & Circle {}
 // expected-error@-1 {{'Circle' inherits from itself}}
-// expected-error@-2 {{type 'Circle' does not conform to protocol 'Initable'}}
+// expected-error@-2 {{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'Circle'}}
 
 func crash() {
-  Circle()
-  // expected-error@-1 {{'Circle' cannot be constructed because it has no accessible initializers}}
+  _ = Circle()
 }
 
-// FIXME: We shouldn't emit the redundant "circular reference" diagnostics here.
 class WithDesignatedInit : WithDesignatedInit {
   // expected-error@-1 {{'WithDesignatedInit' inherits from itself}}
-  // expected-error@-2 {{circular reference}}
-  // expected-note@-3 {{through reference here}}
-  // expected-note@-4 2 {{through reference here}}
 
-  init(x: Int) {} // expected-error {{circular reference}}
+  init(x: Int) {}
 }
