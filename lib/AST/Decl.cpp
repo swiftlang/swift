@@ -4276,7 +4276,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
 
 bool ClassDecl::inheritsSuperclassInitializers() const {
   // If there's no superclass, there's nothing to inherit.
-  if (!getSuperclass())
+  if (!getSuperclassDecl())
     return false;
 
   auto &ctx = getASTContext();

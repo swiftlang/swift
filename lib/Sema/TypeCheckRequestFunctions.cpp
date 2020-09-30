@@ -93,6 +93,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       return proto->getGenericSignature()
           ->getSuperclassBound(proto->getSelfInterfaceType());
     }
+
+    if (!proto->getSuperclassDecl())
+      return Type();
+  } else if (auto classDecl = dyn_cast<ClassDecl>(nominalDecl)) {
+    if (!classDecl->getSuperclassDecl())
+      return Type();
   }
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
