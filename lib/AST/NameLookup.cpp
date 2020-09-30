@@ -44,7 +44,6 @@ using namespace swift::namelookup;
 
 void VisibleDeclConsumer::anchor() {}
 void VectorDeclConsumer::anchor() {}
-void NamedDeclConsumer::anchor() {}
 
 ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)

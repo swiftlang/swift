@@ -396,31 +396,6 @@ public:
   }
 };
 
-/// A consumer that inserts found decls with a matching name into an
-/// externally-owned SmallVector.
-class NamedDeclConsumer : public VisibleDeclConsumer {
-  virtual void anchor() override;
-public:
-  DeclNameRef name;
-  SmallVectorImpl<LookupResultEntry> &results;
-  bool isTypeLookup;
-
-  NamedDeclConsumer(DeclNameRef name,
-                    SmallVectorImpl<LookupResultEntry> &results,
-                    bool isTypeLookup)
-    : name(name), results(results), isTypeLookup(isTypeLookup) {}
-
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
-                         DynamicLookupInfo dynamicLookupInfo = {}) override {
-    // Give clients an opportunity to filter out non-type declarations early,
-    // to avoid circular validation.
-    if (isTypeLookup && !isa<TypeDecl>(VD))
-      return;
-    if (VD->getName().matchesRef(name.getFullName()))
-      results.push_back(LookupResultEntry(VD));
-  }
-};
-
 /// A consumer that filters out decls that are not accessible from a given
 /// DeclContext.
 class AccessFilteringDeclConsumer final : public VisibleDeclConsumer {
