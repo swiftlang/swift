@@ -2,7 +2,7 @@
 
 // The `-serialize-diagnostics-path` flag is not allowed for batch mode invoked by swiftc
 // RUN: not %target-swiftc_driver -serialize-diagnostics-path %t.notexpected.dia %s %S/Inputs/serialized-diagnostics-batch-mode-helper.swift -c -o %t.o 2>&1 | %FileCheck %s
-// CHECK: <unknown>:0: error: option '-serialize-diagnostics-path' is not supported by 'swiftc'; did you mean to use 'swift'?
+// CHECK: error: option '-serialize-diagnostics-path' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not ls %t.notexpected.dia > /dev/null
 // RUN: not ls %t.o > /dev/null
 

@@ -45,6 +45,19 @@ SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
 //----------------------------------------------------------------------------//
 // Superclass declaration computation.
 //----------------------------------------------------------------------------//
+void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto nominalDecl = std::get<0>(getStorage());
+  diags.diagnose(nominalDecl, diag::circular_class_inheritance,
+                 nominalDecl->getName());
+}
+
+void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
 Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 

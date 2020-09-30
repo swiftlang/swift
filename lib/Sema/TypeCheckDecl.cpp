@@ -234,24 +234,6 @@ static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
 }
 
 bool
-HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
-                                        ClassDecl *decl) const {
-  if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
-    return false;
-
-  auto *superclass = decl->getSuperclassDecl();
-  auto result = evaluator(HasCircularInheritanceRequest{superclass});
-
-  // If we have a cycle, handle it and return true.
-  if (!result) {
-    using Error = CyclicalRequestError<HasCircularInheritanceRequest>;
-    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
-    return true;
-  }
-  return result.get();
-}
-
-bool
 HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                                ProtocolDecl *decl) const {
   if (canSkipCircularityCheck(decl))
