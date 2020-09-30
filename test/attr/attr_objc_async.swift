@@ -46,3 +46,6 @@ actor class MyActor {
   // CHECK: @objc @actorIndependent func synchronousGood()
   @objc @actorIndependent func synchronousGood() { }
 }
+
+// CHECK: @objc actor class MyObjCActor
+@objc actor class MyObjCActor: NSObject { }
