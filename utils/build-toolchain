@@ -85,13 +85,7 @@ while [ $# -ne 0 ]; do
       DISTCC_FLAG="--distcc"
   ;;
     --sccache)
-      SCCACHE=$(which sccache)
-      if [[ -z "${SCCACHE}" ]]; then
-          echo "Error! Asked to use sccache, but could not find sccache in PATH?!"
-          usage
-          exit 1
-      fi
-      SCCACHE_FLAG="--cmake-c-launcher=${SCCACHE} --cmake-cxx-launcher=${SCCACHE}"
+      SCCACHE_FLAG="--sccache"
   ;;
     --preset-file)
       shift
