@@ -916,16 +916,57 @@ static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
   return IsReleaseOfDest;
 }
 
+/// Returns true if any instruction in \p block may write memory.
+static bool blockMayWriteMemory(SILBasicBlock *block) {
+  for (auto instAndIdx : llvm::enumerate(*block)) {
+    if (instAndIdx.value().mayWriteToMemory())
+      return true;
+    // Only look at the first 20 instructions to avoid compile time problems for
+    // corner cases of very large blocks without memory writes.
+    // 20 instructions is more than enough.
+    if (instAndIdx.index() > 50)
+      return true;
+  }
+  return false;
+}
+
+// Returns true if \p block contains an injected an enum case into \p enumAddr
+// which is valid at the end of the block.
+static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr) {
+  for (auto instAndIdx : llvm::enumerate(llvm::reverse(*block))) {
+    SILInstruction &inst = instAndIdx.value();
+    if (auto *injectInst = dyn_cast<InjectEnumAddrInst>(&inst)) {
+      return injectInst->getOperand() == enumAddr;
+    }
+    if (inst.mayWriteToMemory())
+      return false;
+    // Only look at the first 20 instructions to avoid compile time problems for
+    // corner cases of very large blocks without memory writes.
+    // 20 instructions is more than enough.
+    if (instAndIdx.index() > 50)
+      return false;
+  }
+  return false;
+}
+
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
+  TermInst *destTerminator = DestBB->getTerminator();
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
-  if (DestBB->getTerminator()->isFunctionExiting())
+  if (destTerminator->isFunctionExiting())
     return false;
 
+  // Jump threading only makes sense if there is an argument on the branch
+  // (which is reacted on in the DestBB), or if this goes through a memory
+  // location (switch_enum_addr is the only adress-instruction which we
+  // currently handle).
+  if (BI->getArgs().empty() && !isa<SwitchEnumAddrInst>(destTerminator))
+    return false;
+      
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
   // leave that to LLVM).  However, doing limited code duplication can lead to
@@ -956,11 +997,29 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     }
   }
 
-  if (ThreadingBudget == 0 && isa<CondBranchInst>(DestBB->getTerminator())) {
-    for (auto V : BI->getArgs()) {
-      if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+  if (ThreadingBudget == 0) {
+    if (isa<CondBranchInst>(destTerminator)) {
+      for (auto V : BI->getArgs()) {
+        if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+          ThreadingBudget = 4;
+          break;
+        }
+      }
+    } else if (auto *SEA = dyn_cast<SwitchEnumAddrInst>(destTerminator)) {
+      // If the branch-block injects a certain enum case and the destination
+      // switches on that enum, it's worth jump threading. E.g.
+      //
+      //   inject_enum_addr %enum : $*Optional<T>, #Optional.some
+      //   ... // no memory writes here
+      //   br DestBB
+      // DestBB:
+      //   ... // no memory writes here
+      //   switch_enum_addr %enum : $*Optional<T>, case #Optional.some ...
+      //
+      SILValue enumAddr = SEA->getOperand();
+      if (!blockMayWriteMemory(DestBB) &&
+          hasInjectedEnumAtEndOfBlock(SrcBB, enumAddr)) {
         ThreadingBudget = 4;
-        break;
       }
     }
   }
@@ -976,7 +1035,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // control flow. Still, we make an exception for switch_enum.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
   if (DestIsLoopHeader) {
-    if (!isa<SwitchEnumInst>(DestBB->getTerminator()))
+    if (!isa<SwitchEnumInst>(destTerminator))
       return false;
   }
 
@@ -1286,8 +1345,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
-  if (!isVeryLargeFunction && !BI->getArgs().empty() &&
-      tryJumpThreading(BI))
+  if (!isVeryLargeFunction && tryJumpThreading(BI))
     return true;
 
   return Simplified;
