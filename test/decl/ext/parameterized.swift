@@ -128,3 +128,32 @@ _ = m.compacted() // ok
 let n = [1, 2, 3, 4]
 _ = n.compacted() // expected-error {{referencing instance method 'compacted()' on 'Collection' requires the types 'Int' and 'T?' be equivalent}}
                   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// Cannot extend generic type parameters
+
+extension<T> T { // expected-error {{cannot extend generic parameter type 'T'}}
+  func sayHello() {
+    print("Hello!")
+  }
+}
+
+protocol X {}
+protocol Y {}
+
+extension<T: X> T: Y { // expected-error {{cannot extend generic parameter type 'T'}}
+  func sayGoodbye() {
+    print("Goodbye!")
+  }
+}
+
+// Cannot extend concrete types (also specialized types)
+
+extension<T> Int {} // expected-error {{cannot have generic parameters when extending a concrete type}}
+
+extension<T> [Int] {} // expected-error {{cannot have generic parameters when extending a concrete type}}
+
+extension<T> [Int] where Element == T? {} // expected-error {{cannot have generic parameters when extending a concrete type}}
+
+extension<T> [T?] {} // ok
+
+extension<T> [[[T?]]] {} // ok

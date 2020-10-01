@@ -2829,10 +2829,28 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
+  // Cannot extend generic type parameters.
+  if (auto gpTy = extendedType->getAs<GenericTypeParamType>()) {
+    diags.diagnose(ext->getLoc(), diag::generic_param_extension,
+                   gpTy->getName())
+         .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
+  // Cannot extend a concrete type if the extension is parameterized.
+  bool isConcrete = !extendedType->getAnyNominal()->isGeneric();
+  bool isSpecialized = extendedType->isSpecialized() &&
+                      !extendedType->hasTypeParameter();
+  if ((isConcrete || isSpecialized) && ext->isParameterized()) {
+    diags.diagnose(ext->getLoc(), diag::concrete_generic_extension)
+        .highlight(extendedRepr->getSourceRange());
     return error();
   }
 

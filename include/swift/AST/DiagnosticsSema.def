@@ -1787,6 +1787,10 @@ ERROR(inferred_opaque_type,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
+ERROR(generic_param_extension,none,
+      "cannot extend generic parameter type %0", (Identifier))
+ERROR(concrete_generic_extension,none,
+      "cannot have generic parameters when extending a concrete type", ())
 WARNING(composition_in_extended_type,none,
         "extending a protocol composition is not supported; extending %0 "
         "instead", (Type))
