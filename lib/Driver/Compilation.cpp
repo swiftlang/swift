@@ -121,7 +121,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
                          bool OnlyOneDependencyFile,
-                         bool EnableTypeFingerprints,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
                          bool FineGrainedDependenciesIncludeIntrafileOnes,
@@ -149,7 +148,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
     OnlyOneDependencyFile(OnlyOneDependencyFile),
-    EnableTypeFingerprints(EnableTypeFingerprints),
     VerifyFineGrainedDependencyGraphAfterEveryImport(
       VerifyFineGrainedDependencyGraphAfterEveryImport),
     EmitFineGrainedDependencyDotFileAfterEveryImport(
@@ -829,12 +827,12 @@ namespace driver {
           FineGrainedDepGraph(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
-              Comp.getEnableTypeFingerprints(), Comp.getTraceDependencies(),
+              Comp.getTraceDependencies(),
               Comp.getStatsReporter()),
           FineGrainedDepGraphForRanges(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
-              Comp.getEnableTypeFingerprints(), Comp.getTraceDependencies(),
+              Comp.getTraceDependencies(),
               Comp.getStatsReporter()),
           TQ(std::move(TaskQueue)) {}
 

@@ -259,8 +259,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
   inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments,

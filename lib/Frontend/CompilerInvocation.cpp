@@ -438,11 +438,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
-  Opts.EnableTypeFingerprints =
-      Args.hasFlag(options::OPT_enable_type_fingerprints,
-                   options::OPT_disable_type_fingerprints,
-                   LangOptions().EnableTypeFingerprints);
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
