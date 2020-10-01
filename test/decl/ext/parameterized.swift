@@ -157,3 +157,19 @@ extension<T> [Int] where Element == T? {} // expected-error {{cannot have generi
 extension<T> [T?] {} // ok
 
 extension<T> [[[T?]]] {} // ok
+
+// Conditional Conformance (!!!)
+
+struct Wrapped<T> {
+  let value: T
+}
+
+extension<T: Equatable> Pair<T>: Equatable {}
+
+let o = Pair<Int>(first: 316, second: 128)
+let p = Pair<Int>(first: 316, second: 128)
+_ = o == p // ok
+
+let q = Pair<Wrapped<Int>>(first: .init(value: 316), second: .init(value: 128))
+let r = Pair<Wrapped<Int>>(first: .init(value: 316), second: .init(value: 128))
+_ = q == r // expected-error {{binary operator '==' cannot be applied to two 'Pair<Wrapped<Int>>' operands}}
