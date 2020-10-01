@@ -3,7 +3,7 @@ set -ex
 DESTINATION_TOOLCHAIN=$1
 SOURCE_PATH="$(cd "$(dirname $0)/../../.." && pwd)"
 
-FOUNDATION_BUILD="$SOURCE_PATH/target-build/Ninja-ReleaseAssert/foundation-wasi-wasm32"
+FOUNDATION_BUILD="$SOURCE_PATH/target-build/Ninja-Release/foundation-wasi-wasm32"
 
 mkdir -p $FOUNDATION_BUILD
 cd $FOUNDATION_BUILD
