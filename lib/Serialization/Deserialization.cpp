@@ -2679,6 +2679,7 @@ public:
                                                /*FailabilityLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
+                                               /*ThrowsType=*/nullptr,
                                                /*BodyParams=*/nullptr,
                                                genericParams, parent);
     declOrOffset = ctor;
@@ -3127,13 +3128,14 @@ public:
       return declOrOffset;
 
     const auto resultType = MF.getType(resultInterfaceTypeID);
+    // const auto throwsType = MF.getType(throwsTypeID); // How to retrieve the TypeRepr
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.getValue(), name,
-                                        async, throws, genericParams,
+                                        async, throws, nullptr, genericParams,
                                         resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(

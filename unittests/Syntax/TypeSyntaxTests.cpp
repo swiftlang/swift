@@ -469,6 +469,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto RightParen = SyntaxFactory::makeRightParenToken({},
                                                        {Trivia::spaces(1)});
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
+  auto Error = SyntaxFactory::makeTypeIdentifier("Error", {}, {});
   auto IntArg = SyntaxFactory::makeBlankTupleTypeElement()
     .withType(Int);
   auto Async = SyntaxFactory::makeIdentifier(
@@ -477,6 +478,15 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
   auto Arrow = SyntaxFactory::makeArrowToken({}, Trivia::spaces(1));
+
+  auto TypedThrows = SyntaxFactory::makeTypedThrowsOrRethrowsClause(Throws,
+                                                                    LeftParen,
+                                                                    Error,
+                                                                    RightParen);
+
+  auto TypedRethrows =
+      SyntaxFactory::makeTypedThrowsOrRethrowsClause(Rethrows, LeftParen,
+                                                     Error, RightParen);
 
   {
     SmallString<48> Scratch;
@@ -502,6 +512,7 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     RightParen,
                                     Async,
                                     Throws,
+                                    None,
                                     Arrow,
                                     Int)
       .print(OS);
@@ -523,6 +534,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
       .withName(y)
       .withColon(Colon)
       .withType(Int);
+    
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
 
     auto TypeList = SyntaxFactory::makeTupleTypeElementList({
       xArg, yArg
@@ -532,10 +545,42 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     RightParen,
                                     None,
                                     Throws,
+                                    None,
                                     Arrow,
                                     Int)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws -> Int");
+  }
+  {
+    SmallString<64> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+
+    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
+    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
+    auto xArg = SyntaxFactory::makeBlankTupleTypeElement()
+      .withName(x)
+      .withColon(Colon)
+      .withType(Int)
+      .withTrailingComma(Comma);
+    auto yArg = SyntaxFactory::makeBlankTupleTypeElement()
+      .withName(y)
+      .withColon(Colon)
+      .withType(Int);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
+
+    auto TypeList = SyntaxFactory::makeTupleTypeElementList({
+      xArg, yArg
+    });
+    SyntaxFactory::makeFunctionType(LeftParen,
+                                    TypeList,
+                                    RightParen,
+                                    None,
+                                    Throws,
+                                    TypedThrow,
+                                    Arrow,
+                                    Int)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws (Error) -> Int");
   }
   {
     SmallString<48> Scratch;
@@ -549,11 +594,30 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     RightParen,
                                     None,
                                     Rethrows,
+                                    None,
                                     Arrow,
                                     Int).print(OS);
     ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows -> Int");
   }
 
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
+    auto TypeList = SyntaxFactory::makeTupleTypeElementList({
+      IntArg.withTrailingComma(Comma),
+      IntArg
+    });
+    SyntaxFactory::makeFunctionType(LeftParen,
+                                    TypeList,
+                                    RightParen,
+                                    None,
+                                    Rethrows,
+                                    TypedThrow,
+                                    Arrow,
+                                    Int).print(OS);
+    ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows (Error) -> Int");
+  }
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -563,8 +627,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
                                     TypeList,
                                     RightParen,
                                     None,
-                                    TokenSyntax::missingToken(tok::kw_throws,
-                                                              "throws"),
+                                    None,
+                                    None,
                                     Arrow,
                                     Void).print(OS);
     ASSERT_EQ(OS.str().str(), "() -> ()");
@@ -576,12 +640,22 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RightParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
+  auto Error = SyntaxFactory::makeTypeIdentifier("Error", {}, {});
   auto IntArg = SyntaxFactory::makeTupleTypeElement(None, None, None, None,
                                                     Int, None, None, None);
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, { Trivia::spaces(1) });
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
   auto Arrow = SyntaxFactory::makeArrowToken({}, { Trivia::spaces(1) });
+  
+  auto TypedThrows = SyntaxFactory::makeTypedThrowsOrRethrowsClause(Throws,
+                                                                    LeftParen,
+                                                                    Error,
+                                                                    RightParen);
+
+  auto TypedRethrows =
+      SyntaxFactory::makeTypedThrowsOrRethrowsClause(Rethrows, LeftParen,
+                                                     Error, RightParen);
 
   {
     SmallString<48> Scratch;
@@ -607,6 +681,33 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
 
 
   }
+  
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
+    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
+    auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+    auto xArg = SyntaxFactory::makeTupleTypeElement(None, x, None, Colon,
+                                                    Int, None, None, Comma);
+    auto yArg = SyntaxFactory::makeTupleTypeElement(None, y, None, Colon,
+                                                    Int, None, None, None);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
+
+    SyntaxFactory::makeBlankFunctionType()
+      .withLeftParen(LeftParen)
+      .addArgument(xArg)
+      .addArgument(yArg)
+      .withRightParen(RightParen)
+      .withThrowsOrRethrowsKeyword(Throws)
+      .withThrowsOrRethrowsType(TypedThrow)
+      .withArrow(Arrow)
+      .withReturnType(Int)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws (Error) -> Int");
+
+
+  }
 
   {
     SmallString<48> Scratch;
@@ -621,6 +722,24 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
       .withReturnType(Int)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows -> Int");
+  }
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
+    
+    SyntaxFactory::makeBlankFunctionType()
+      .withLeftParen(LeftParen)
+      .withRightParen(RightParen)
+      .addArgument(IntArg.withTrailingComma(Comma))
+      .addArgument(IntArg)
+      .withThrowsOrRethrowsKeyword(Rethrows)
+      .withThrowsOrRethrowsType(TypedThrow)
+      .withArrow(Arrow)
+      .withReturnType(Int)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows (Error) -> Int");
   }
   {
     SmallString<48> Scratch;
@@ -640,6 +759,7 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
 TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
   auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
+  auto Error = SyntaxFactory::makeTypeIdentifier("Error", {}, {});
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RightParen = SyntaxFactory::makeRightParenToken({},
                                                          {Trivia::spaces(1)});
@@ -647,6 +767,15 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
   auto Rethrows = SyntaxFactory::makeRethrowsKeyword({},
                                                        { Trivia::spaces(1) });
   auto Arrow = SyntaxFactory::makeArrowToken({}, { Trivia::spaces(1) });
+
+  auto TypedThrows = SyntaxFactory::makeTypedThrowsOrRethrowsClause(Throws,
+                                                                    LeftParen,
+                                                                    Error,
+                                                                    RightParen);
+
+  auto TypedRethrows =
+      SyntaxFactory::makeTypedThrowsOrRethrowsClause(Rethrows, LeftParen,
+                                                     Error, RightParen);
 
   {
     SmallString<48> Scratch;
@@ -659,6 +788,7 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
                                                     Int, None, None, Comma);
     auto yArg = SyntaxFactory::makeTupleTypeElement(None, y, None, Colon,
                                                     Int, None, None, None);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
 
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
@@ -670,6 +800,32 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
 
     Builder.build().print(OS);
     ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws -> Int");
+  }
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    FunctionTypeSyntaxBuilder Builder;
+    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
+    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
+    auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+    auto xArg = SyntaxFactory::makeTupleTypeElement(None, x, None, Colon,
+                                                    Int, None, None, Comma);
+    auto yArg = SyntaxFactory::makeTupleTypeElement(None, y, None, Colon,
+                                                    Int, None, None, None);
+    auto TypedThrow = SyntaxFactory::makeParenthesizedExpression(LeftParen, Error, RightParen);
+
+    Builder.useLeftParen(LeftParen)
+      .useRightParen(RightParen)
+      .addArgument(xArg)
+      .addArgument(yArg)
+      .useThrowsOrRethrowsKeyword(Throws)
+      .useThrowsOrRethrowsType(TypedThrow)
+      .useArrow(Arrow)
+      .useReturnType(Int);
+
+    Builder.build().print(OS);
+    ASSERT_EQ(OS.str().str(), "(x: Int, y: Int) throws (Error) -> Int");
   }
 
   {

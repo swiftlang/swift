@@ -575,7 +575,7 @@ static ValueDecl *deriveDifferentiable_method(
   auto *const funcDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::None, declName, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/false,
+      /*Throws=*/false, /*ThrowsType=*/nullptr,
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   if (!nominal->getSelfClassDecl())
     funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);

@@ -628,12 +628,12 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
 
-  // Func name: encode(to: Encoder)
+  // Func name: encode(to: Encoder) throws
   DeclName name(C, C.Id_encode, params);
   auto *const encodeDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/true, /*GenericParams=*/nullptr, params, returnType,
+      /*Throws=*/true, /*ThrowsType=*/nullptr, /*GenericParams=*/nullptr, params, returnType,
       conformanceDC);
   encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
@@ -959,7 +959,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
                               /*Failable=*/false,SourceLoc(),
-                              /*Throws=*/true, SourceLoc(), paramList,
+                              /*Throws=*/true, SourceLoc(), /*ThrowsType=*/nullptr, paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();

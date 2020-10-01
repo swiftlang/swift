@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -349,13 +350,77 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 }
 
 
+/// parseTypeNotAllowingFunctionType
+///   type:
+///     attribute-list type-composition
+///
+ParserResult<TypeRepr>
+Parser::parseTypeNotAllowingFunctionType(Diag<> MessageID,
+                                         bool HandleCodeCompletion,
+                                         bool IsSILFuncDecl) {
+  // Start a context for creating type syntax.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
+  // Parse attributes.
+  ParamDecl::Specifier specifier;
+  SourceLoc specifierLoc;
+  TypeAttributes attrs;
+  parseTypeAttributeList(specifier, specifierLoc, attrs);
+
+  Optional<Scope> GenericsScope;
+  Optional<Scope> patternGenericsScope;
+
+  // Parse generic parameters in SIL mode.
+  GenericParamList *generics = nullptr;
+  SourceLoc substitutedLoc;
+  GenericParamList *patternGenerics = nullptr;
+  if (isInSILMode()) {
+    // If this is part of a sil function decl, generic parameters are visible in
+    // the function body; otherwise, they are visible when parsing the type.
+    if (!IsSILFuncDecl)
+      GenericsScope.emplace(this, ScopeKind::Generics);
+    generics = maybeParseGenericParams().getPtrOrNull();
+    
+    if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
+      consumeToken(tok::at_sign);
+      substitutedLoc = consumeToken(tok::identifier);
+      patternGenericsScope.emplace(this, ScopeKind::Generics);
+      patternGenerics = maybeParseGenericParams().getPtrOrNull();
+      if (!patternGenerics) {
+        diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
+        patternGenericsScope.reset();
+      }
+    }
+  }
+  
+  // In SIL mode, parse box types { ... }.
+  if (isInSILMode() && Tok.is(tok::l_brace)) {
+    if (patternGenerics) {
+      diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
+      patternGenericsScope.reset();
+    }
+    return parseSILBoxType(generics, attrs, GenericsScope);
+  }
+
+  ParserResult<TypeRepr> ty =
+    parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
+  if (ty.isNull())
+    return ty;
+  auto tyR = ty.get();
+  auto status = ParserStatus(ty);
+  
+  return makeParserResult(status, applyAttributeToType(tyR, attrs, specifier,
+                                                       specifierLoc));
+}
+
+
 /// parseType
 ///   type:
 ///     attribute-list type-composition
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type
+///     type-composition 'async'? 'throws'? throws-type? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -419,13 +484,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->' or 'async', so we
-  // can emit a more useful diagnostic when parsing a function decl.
+  // Don't consume 'throws', if the next token is not '->', 'async' or '(',
+  // so we can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
+  TypeRepr *throwsType = nullptr;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
       (peekToken().is(tok::arrow) ||
        (shouldParseExperimentalConcurrency() &&
-        peekToken().isContextualKeyword("async")))) {
+        peekToken().isContextualKeyword("async")) ||
+         peekToken().is(tok::l_paren))) {
     if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
       // 'rethrows' is only allowed on function declarations for now.
       // 'throw' or 'try' are probably typos for 'throws'.
@@ -434,7 +501,17 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
     }
+    
+    // backtracking, in case the type is lacking a '->' and therefore is no
+    // function type
+    BacktrackingScope backtrack(*this);
+    
     throwsLoc = consumeToken();
+    
+    
+    ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
+    
+    throwsType = throwsTypeResult.getPtrOrNull();
 
     // 'async' must preceed 'throws'; accept this but complain.
     if (shouldParseExperimentalConcurrency() &&
@@ -445,6 +522,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         .fixItRemove(asyncLoc)
         .fixItInsert(throwsLoc, "async ");
     }
+    
+    // type is indeed a function type, so we cancel the backtrack
+    if (Tok.is(tok::arrow)) backtrack.cancelBacktrack();
   }
 
   if (Tok.is(tok::arrow)) {
@@ -452,7 +532,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
@@ -466,8 +546,23 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
-      if (throwsLoc.isValid())
+      if (throwsLoc.isValid()) {
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
+        if (throwsType) {
+          auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
+          if (auto ParenthesizedTypeNode = InputNode.getAs<ParsedParenthesizedExpressionSyntax>()) {
+            auto LeftParen = ParenthesizedTypeNode->getDeferredLeftParen();
+            auto Type = ParenthesizedTypeNode->getDeferredThrowsType();
+            auto RightParen = ParenthesizedTypeNode->getDeferredRightParen();
+            
+            ParsedParenthesizedExpressionSyntaxBuilder ThrowTypeBuilder(*SyntaxContext);
+            ThrowTypeBuilder.useLeftParen(std::move(LeftParen));
+            ThrowTypeBuilder.useThrowsType(std::move(Type));
+            ThrowTypeBuilder.useRightParen(std::move(RightParen));
+            Builder.useThrowsOrRethrowsType(ThrowTypeBuilder.build());
+          }
+        }
+      }
       if (asyncLoc.isValid())
         Builder.useAsyncKeyword(SyntaxContext->popToken());
 
@@ -579,7 +674,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
     }
 
-    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc, throwsType,
                                          arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);

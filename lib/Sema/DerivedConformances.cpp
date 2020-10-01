@@ -445,7 +445,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
     AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
     /*GenericParams=*/nullptr, params,
     property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();

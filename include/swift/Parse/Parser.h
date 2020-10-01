@@ -1174,6 +1174,11 @@ public:
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
+  
+  ParserResult<TypeRepr>
+    parseTypeNotAllowingFunctionType(Diag<> MessageID,
+                                     bool HandleCodeCompletion = true,
+                                     bool IsSILFuncDecl = false);
 
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID,
@@ -1360,6 +1365,7 @@ public:
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &asyncLoc,
                                       SourceLoc &throws,
+                                      TypeRepr *&throwsType,
                                       bool &rethrows,
                                       TypeRepr *&retType);
 
@@ -1373,8 +1379,10 @@ public:
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
   void parseAsyncThrows(
-      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeRepr *&throwsType,
       bool *rethrows);
+  
+  ParserResult<TypeRepr> parseThrowsType();
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1581,6 +1589,7 @@ public:
           ParameterList *&params,
           SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
+          TypeRepr *&throwsType,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
           SourceLoc &inLoc);

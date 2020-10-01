@@ -7130,7 +7130,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc FuncLoc,
                                DeclName Name, SourceLoc NameLoc,
                                bool Async, SourceLoc AsyncLoc,
-                               bool Throws, SourceLoc ThrowsLoc,
+                               bool Throws, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
                                GenericParamList *GenericParams,
                                DeclContext *Parent,
                                ClangNode ClangN) {
@@ -7142,7 +7142,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                                   !ClangN.isNull());
   auto D = ::new (DeclPtr)
       FuncDecl(DeclKind::Func, StaticLoc, StaticSpelling, FuncLoc,
-               Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc,
+               Name, NameLoc, Async, AsyncLoc, Throws, ThrowsLoc, ThrowsType,
                HasImplicitSelfDecl, GenericParams, Parent);
   if (ClangN)
     D->setClangNode(ClangN);
@@ -7154,14 +7154,14 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
 
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
-                                       DeclName Name, bool Async, bool Throws,
+                                       DeclName Name, bool Async, bool Throws, TypeRepr *ThrowsType,
                                        GenericParamList *GenericParams,
                                        Type FnRetType, DeclContext *Parent) {
   assert(FnRetType && "Deserialized result type must not be null");
   auto *const FD =
       FuncDecl::createImpl(Context, SourceLoc(), StaticSpelling, SourceLoc(),
                            Name, SourceLoc(), Async, SourceLoc(), Throws,
-                           SourceLoc(), GenericParams, Parent, ClangNode());
+                           SourceLoc(), ThrowsType, GenericParams, Parent, ClangNode());
   FD->setResultInterfaceType(FnRetType);
   return FD;
 }
@@ -7169,13 +7169,13 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc, bool Async,
-                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
+                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc, TypeRepr *ThrowsType,
                            GenericParamList *GenericParams,
                            ParameterList *BodyParams, TypeRepr *ResultTyR,
                            DeclContext *Parent) {
   auto *const FD = FuncDecl::createImpl(
       Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc, Async,
-      AsyncLoc, Throws, ThrowsLoc, GenericParams, Parent, ClangNode());
+      AsyncLoc, Throws, ThrowsLoc, ThrowsType, GenericParams, Parent, ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
   return FD;
@@ -7184,13 +7184,13 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
 FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    StaticSpellingKind StaticSpelling,
                                    DeclName Name, SourceLoc NameLoc, bool Async,
-                                   bool Throws, GenericParamList *GenericParams,
+                                   bool Throws, TypeRepr *ThrowsType, GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
                                    DeclContext *Parent) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
-      SourceLoc(), Throws, SourceLoc(), GenericParams, Parent, ClangNode());
+      SourceLoc(), Throws, SourceLoc(), ThrowsType, GenericParams, Parent, ClangNode());
   FD->setImplicit();
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
@@ -7199,14 +7199,14 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
 
 FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
                                    DeclName Name, SourceLoc NameLoc,
-                                   bool Async, bool Throws,
+                                   bool Async, bool Throws, TypeRepr *ThrowsType,
                                    ParameterList *BodyParams,
                                    Type FnRetType, DeclContext *Parent,
                                    ClangNode ClangN) {
   assert(ClangN && FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpellingKind::None, FuncLoc, Name, NameLoc,
-      Async, SourceLoc(), Throws, SourceLoc(),
+      Async, SourceLoc(), Throws, SourceLoc(), ThrowsType,
       /*GenericParams=*/nullptr, Parent, ClangN);
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
@@ -7239,7 +7239,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        AbstractStorageDecl *storage,
                                        SourceLoc staticLoc,
                                        StaticSpellingKind staticSpelling,
-                                       bool throws, SourceLoc throwsLoc,
+                                       bool throws, SourceLoc throwsLoc, TypeRepr *throwsType,
                                        GenericParamList *genericParams,
                                        DeclContext *parent,
                                        ClangNode clangNode) {
@@ -7251,7 +7251,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
       AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
-                   storage, staticLoc, staticSpelling, throws, throwsLoc,
+                   storage, staticLoc, staticSpelling, throws, throwsLoc, throwsType,
                    hasImplicitSelfDecl, genericParams, parent);
   if (clangNode)
     D->setClangNode(clangNode);
@@ -7270,7 +7270,7 @@ AccessorDecl::createDeserialized(ASTContext &ctx, AccessorKind accessorKind,
   assert(fnRetType && "Deserialized result type must not be null");
   auto *const D = AccessorDecl::createImpl(
       ctx, SourceLoc(), SourceLoc(), accessorKind, storage, SourceLoc(),
-      staticSpelling, throws, SourceLoc(), genericParams, parent, ClangNode());
+      staticSpelling, throws, SourceLoc(), nullptr, genericParams, parent, ClangNode());
   D->setResultInterfaceType(fnRetType);
   return D;
 }
@@ -7282,7 +7282,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    AbstractStorageDecl *storage,
                                    SourceLoc staticLoc,
                                    StaticSpellingKind staticSpelling,
-                                   bool throws, SourceLoc throwsLoc,
+                                   bool throws, SourceLoc throwsLoc, TypeRepr *throwsType,
                                    GenericParamList *genericParams,
                                    ParameterList * bodyParams,
                                    Type fnRetType,
@@ -7290,7 +7290,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
       ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
-      staticLoc, staticSpelling, throws, throwsLoc,
+      staticLoc, staticSpelling, throws, throwsLoc, throwsType,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
@@ -7437,11 +7437,12 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Throws,
                                  SourceLoc ThrowsLoc,
+                                 TypeRepr *ThrowsType,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         /*Async=*/false, SourceLoc(), Throws, ThrowsLoc,
+                         /*Async=*/false, SourceLoc(), Throws, ThrowsLoc, ThrowsType,
                          /*HasImplicitSelfDecl=*/true,
                          GenericParams),
     FailabilityLoc(FailabilityLoc),
@@ -7473,7 +7474,7 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
                          /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                         /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                         /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
                          /*HasImplicitSelfDecl=*/true,
                          /*GenericParams=*/nullptr),
     SelfDecl(nullptr) {

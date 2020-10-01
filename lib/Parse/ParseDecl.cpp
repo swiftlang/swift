@@ -5223,7 +5223,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  AccessorKeywordLoc,
                                  Kind, storage,
                                  StaticLoc, StaticSpellingKind::None,
-                                 /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                 /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrowsType=*/nullptr,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
@@ -6337,9 +6337,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   ParameterList *BodyParams;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
+  TypeRepr *throwsType = nullptr;
   bool rethrows;
   Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
-                                   DefaultArgs, asyncLoc, throwsLoc, rethrows,
+                                   DefaultArgs, asyncLoc, throwsLoc, throwsType, rethrows,
                                    FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -6352,7 +6353,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Async=*/asyncLoc.isValid(), asyncLoc,
-                              /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                              /*Throws=*/throwsLoc.isValid(), throwsLoc, throwsType,
                               GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
@@ -7383,8 +7384,9 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse 'async' / 'throws' / 'rethrows'.
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
+  TypeRepr *throwsType;
   bool rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, &rethrows);
 
   if (rethrows) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
@@ -7403,7 +7405,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
-                                           throwsLoc.isValid(), throwsLoc,
+                                           throwsLoc.isValid(), throwsLoc, throwsType,
                                            Params.get(), GenericParams,
                                            CurDeclContext);
   CD->setImplicitlyUnwrappedOptional(IUO);

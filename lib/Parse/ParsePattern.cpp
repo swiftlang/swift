@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -773,6 +774,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &asyncLoc,
                                SourceLoc &throwsLoc,
+                               TypeRepr *&throwsType,
                                bool &rethrows,
                                TypeRepr *&retType) {
   SyntaxParsingContext SigContext(SyntaxContext, SyntaxKind::FunctionSignature);
@@ -787,7 +789,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
   // Check for the 'async' and 'throws' keywords.
   rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, throwsType, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;
@@ -802,7 +804,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Check for 'throws' and 'rethrows' after the arrow, but
     // before the type, and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -812,7 +814,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, throwsType, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -821,9 +823,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
-void Parser::parseAsyncThrows(
-    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-    bool *rethrows) {
+void Parser::parseAsyncThrows(SourceLoc existingArrowLoc, SourceLoc &asyncLoc,
+                              SourceLoc &throwsLoc, TypeRepr *&throwsType,
+                              bool *rethrows) {
   if (shouldParseExperimentalConcurrency() &&
       Tok.isContextualKeyword("async")) {
     asyncLoc = consumeToken();
@@ -846,11 +848,16 @@ void Parser::parseAsyncThrows(
       diagnose(Tok, diag::throw_in_function_type)
         .fixItReplace(Tok.getLoc(), "throws");
     }
-
-    StringRef keyword = Tok.getText();
+    StringRef keyword;
+    
+    keyword = Tok.getText();
     throwsLoc = consumeToken();
-
-    if (existingArrowLoc.isValid()) {
+    
+    ParserResult<TypeRepr> throwsTypeResult = parseThrowsType();
+    
+    throwsType = throwsTypeResult.getPtrOrNull();
+    
+    if (existingArrowLoc.isValid() && throwsLoc.isValid()) {
       diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
                rethrows ? (*rethrows ? 1 : 0) : 0)
         .fixItRemove(throwsLoc)
@@ -867,6 +874,52 @@ void Parser::parseAsyncThrows(
           existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
     }
   }
+}
+
+/// Parse a type in parentheses after a `throws` or `rethrows`
+///   throws-type:
+///     '(' type ')'
+/// Parses a parenthesized type. If the closing parenthesis is missing, it
+/// backtracks and parses a type, that is not a function type, to preserve
+/// the return type of the throwing function
+ParserResult<TypeRepr> Parser::parseThrowsType() {
+  // look for the left paren for throws (_type_)
+  
+  // backtracking, in case the closing parenthesis is missing
+  Optional<BacktrackingScope> backtracking;
+  
+  if (Tok.is(tok::l_paren)) {
+    SourceLoc lParenLoc = consumeToken();
+    
+    backtracking.emplace(*this);
+    
+    // we parse every type (including function types)
+    ParserResult<TypeRepr> throwsTypeRepr = parseType(diag::expected_parenthesized_type_after_throws);
+
+    // if the closing parenthesis is missing, we backtrack and parse the type
+    // again, this time excluding function types
+    if (auto typeRepr = throwsTypeRepr.getPtrOrNull()) {
+      if (isa<FunctionTypeRepr>(typeRepr) && !Tok.is(tok::r_paren)) {
+        backtracking.reset();
+        
+        throwsTypeRepr = parseTypeNotAllowingFunctionType(diag::expected_parenthesized_type_after_throws);
+      }
+    }
+    
+    // otherwise we cancel the backtrack
+    if (backtracking) backtracking->cancelBacktrack();
+    
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    parseMatchingToken(tok::r_paren, rParenLoc, diag::expected_rparen_thrown_type, lParenLoc);
+    
+    if (throwsTypeRepr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<TypeRepr>();
+    
+    return throwsTypeRepr;
+  }
+  
+  return nullptr;
 }
 
 /// Parse a pattern with an optional type annotation.
