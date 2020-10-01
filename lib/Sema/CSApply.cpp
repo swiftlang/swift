@@ -6800,6 +6800,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return result;
   }
 
+  case TypeKind::BoundGenericStruct: {
+    auto toStruct = cast<BoundGenericStructType>(desugaredToType);
+    if (toStruct->getDecl() != ctx.getArrayDecl() &&
+        toStruct->getDecl() != ctx.getDictionaryDecl())
+      break;
+
+    if (toStruct->getDecl() == cs.getType(expr)->getAnyNominal())
+      return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false,
+                                       locator);
+
+    break;
+  }
+
 #define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
 #define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
 #define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
@@ -6813,7 +6826,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::Metatype:
   case TypeKind::DynamicSelf:
   case TypeKind::PrimaryArchetype:
