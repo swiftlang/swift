@@ -1607,7 +1607,8 @@ void MultiConformanceChecker::checkAllConformances() {
   for (auto It = AllUsedCheckers.rbegin(); It != AllUsedCheckers.rend();
        ++It) {
     if (!It->getLocalMissingWitness().empty()) {
-      It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly);
+      if (It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly))
+        break;
     }
   }
 }
@@ -3099,13 +3100,30 @@ filterProtocolRequirements(
   return Filtered;
 }
 
-void ConformanceChecker::
+bool ConformanceChecker::
 diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   auto LocalMissing = getLocalMissingWitness();
 
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
-    return;
+    return false;
+
+  // Diagnose the missing witnesses.
+  for (auto &Missing : LocalMissing) {
+    auto requirement = Missing.requirement;
+    auto matches = Missing.matches;
+    auto nominal = Adoptee->getAnyNominal();
+    diagnoseOrDefer(requirement, true,
+      [requirement, matches, nominal](NormalProtocolConformance *conformance) {
+        auto dc = conformance->getDeclContext();
+        auto *protocol = conformance->getProtocol();
+        // Possibly diagnose reason for automatic derivation failure
+        DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
+        // Diagnose each of the matches.
+        for (const auto &match : matches)
+          diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+      });
+  }
 
   const auto InsertFixit = [](
       NormalProtocolConformance *Conf, SourceLoc ComplainLoc, bool EditorMode,
@@ -3226,19 +3244,19 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           });
     }
     clearGlobalMissingWitnesses();
-    return;
+    return true;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
     diagnoseOrDefer(
         LocalMissing[0].requirement, true, [](NormalProtocolConformance *) {});
-    return;
+    return true;
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
     InsertFixit(Conformance, Loc, IsEditorMode,
                 filterProtocolRequirements(GlobalMissingWitnesses.getArrayRef(),
                                            Adoptee));
     clearGlobalMissingWitnesses();
-    return;
+    return true;
   }
 }
 
@@ -3744,17 +3762,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
     GlobalMissingWitnesses.insert({requirement, matches});
-    diagnoseOrDefer(requirement, true,
-      [requirement, matches, nominal](NormalProtocolConformance *conformance) {
-        auto dc = conformance->getDeclContext();
-        auto *protocol = conformance->getProtocol();
-        // Possibly diagnose reason for automatic derivation failure
-        DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
-        // Diagnose each of the matches.
-        for (const auto &match : matches)
-          diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
-      });
-    return ResolveWitnessResult::ExplicitFailed;
+    return ResolveWitnessResult::Missing;
   }
 
   diagnoseOrDefer(requirement, true,

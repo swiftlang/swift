@@ -789,7 +789,10 @@ class ConformanceChecker : public WitnessChecker {
 
 public:
   /// Call this to diagnose currently known missing witnesses.
-  void diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
+  ///
+  /// \returns true if any witnesses were diagnosed.
+  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
+
   /// Emit any diagnostics that have been delayed.
   void emitDelayedDiags();
 
