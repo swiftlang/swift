@@ -384,7 +384,13 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
         localBindings.push_back(vd);
     }
   }
-  return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
+  if (consumer.consume(localBindings, DeclVisibilityKind::LocalVariable))
+    return true;
+
+  if (consumer.finishLookupInBraceStmt(stmt))
+    return true;
+
+  return false;
 }
 
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
