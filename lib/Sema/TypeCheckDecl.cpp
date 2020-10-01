@@ -2686,6 +2686,15 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
   for (auto *member : idc->getMembers()) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+      // If this is a witness to Actor.enqueue(partialTask:), put it at the
+      // beginning of the vtable.
+      if (auto func = dyn_cast<FuncDecl>(afd)) {
+        if (func->isActorEnqueuePartialTaskWitness()) {
+          result.insert(result.begin(), func);
+          continue;
+        }
+      }
+
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
       if (afd->isSynthesized()) {

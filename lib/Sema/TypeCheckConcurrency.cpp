@@ -180,6 +180,14 @@ bool IsActorRequest::evaluate(
     if (superclassDecl->isActor())
       return true;
 
+    // The superclass is 'NSObject', which is known to have no state and no
+    // superclass.
+    if (superclassDecl->hasClangNode() &&
+        superclassDecl->getName().is("NSObject") &&
+        superclassDecl->getModuleContext()->getName().is("ObjectiveC") &&
+        actorAttr != nullptr)
+      return true;
+
     // This class cannot be an actor; complain if the 'actor' modifier was
     // provided.
     if (actorAttr) {

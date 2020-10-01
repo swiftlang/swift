@@ -1103,6 +1103,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CFObject:
     M = getLoadedModule(Id_CoreFoundation);
     break;
+  case KnownProtocolKind::Actor:
+    M = getLoadedModule(Id_Concurrency);
+    break;
 
   // SWIFT_ENABLE_TENSORFLOW
   // NOTE: The `Differentiable` protocol is in the stdlib module on tensorflow

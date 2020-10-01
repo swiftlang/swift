@@ -4216,8 +4216,20 @@ void ConformanceChecker::resolveValueWitnesses() {
       auto witness = Conformance->getWitnessUncached(requirement).getDecl();
       if (!witness) return;
 
-      // Objective-C checking for @objc requirements.
       auto &C = witness->getASTContext();
+
+      // Ensure that Actor.enqueue(partialTask:) is implemented within the
+      // actor class itself.
+      if (FuncDecl::isEnqueuePartialTaskName(C, requirement->getName()) &&
+          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
+          DC != witness->getDeclContext() &&
+          Adoptee->getClassOrBoundGenericClass() &&
+          Adoptee->getClassOrBoundGenericClass()->isActor()) {
+        witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
+        return;
+      }
+
+      // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getName() == witness->getName() &&
           !requirement->getAttrs().isUnavailable(getASTContext())) {
@@ -5803,6 +5815,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
+
+  case KnownDerivableProtocolKind::Actor:
+    return derived.deriveActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(

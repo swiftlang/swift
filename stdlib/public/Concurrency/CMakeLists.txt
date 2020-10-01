@@ -11,6 +11,7 @@
 #===----------------------------------------------------------------------===#
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Actor.swift
   PartialAsyncTask.swift
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
