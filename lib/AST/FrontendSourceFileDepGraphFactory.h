@@ -35,8 +35,6 @@ public:
 
 private:
   static std::string getFingerprint(SourceFile *SF);
-
-  static bool computeIncludePrivateDeps(SourceFile *SF);
   static std::string getInterfaceHash(SourceFile *SF);
 
   void addAllDefinedDecls() override;

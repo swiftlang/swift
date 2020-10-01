@@ -182,11 +182,6 @@ Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
 HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps file.">;
 
-def fine_grained_dependency_include_intrafile :
-Flag<["-"], "fine-grained-dependency-include-intrafile">,
-Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Include within-file dependencies.">;
-
 def emit_fine_grained_dependency_sourcefile_dot_files :
 Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
 Flags<[FrontendOption, HelpHidden]>,

@@ -123,7 +123,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool OnlyOneDependencyFile,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
-                         bool FineGrainedDependenciesIncludeIntrafileOnes,
                          bool EnableSourceRangeDependencies,
                          bool CompareIncrementalSchemes,
                          StringRef CompareIncrementalSchemesPath,
@@ -152,8 +151,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       VerifyFineGrainedDependencyGraphAfterEveryImport),
     EmitFineGrainedDependencyDotFileAfterEveryImport(
       EmitFineGrainedDependencyDotFileAfterEveryImport),
-    FineGrainedDependenciesIncludeIntrafileOnes(
-      FineGrainedDependenciesIncludeIntrafileOnes),
     EnableSourceRangeDependencies(EnableSourceRangeDependencies),
     EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
     {

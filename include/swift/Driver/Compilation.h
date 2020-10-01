@@ -272,9 +272,6 @@ private:
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// Experiment with intrafile dependencies
-  const bool FineGrainedDependenciesIncludeIntrafileOnes;
-
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
 
@@ -318,7 +315,6 @@ public:
               bool OnlyOneDependencyFile = false,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
-              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
               bool CompareIncrementalSchemes = false,
               StringRef CompareIncrementalSchemesPath = "",
@@ -387,10 +383,6 @@ public:
 
   bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
     return EmitFineGrainedDependencyDotFileAfterEveryImport;
-  }
-
-  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
-    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
   bool getEnableSourceRangeDependencies() const {

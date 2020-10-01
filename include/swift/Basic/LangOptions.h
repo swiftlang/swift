@@ -334,11 +334,6 @@ namespace swift {
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;
 
-    /// To mimic existing system, set to false.
-    /// To experiment with including file-private and private dependency info,
-    /// set to true.
-    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
-
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
