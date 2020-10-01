@@ -48,9 +48,9 @@ deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
 
   SmallVector<Expr *, 8> elExprs;
   for (EnumElementDecl *elt : parentEnum->getAllElements()) {
-    auto *ref = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto *base = TypeExpr::createImplicit(enumTy, C);
-    auto *apply = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base);
+    auto *apply = new (C) MemberRefExpr(base, SourceLoc(),
+                                        elt, DeclNameLoc(), /*implicit*/true);
     elExprs.push_back(apply);
   }
   auto *arrayExpr = ArrayExpr::create(C, SourceLoc(), elExprs, {}, SourceLoc());
@@ -87,14 +87,11 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  ASTContext &C = TC.Context;
-
   // Build the necessary decl.
-  if (requirement->getBaseName() != C.Id_allCases) {
+  if (requirement->getBaseName() != Context.Id_allCases) {
     requirement->diagnose(diag::broken_case_iterable_requirement);
     return nullptr;
   }
-
 
   // Define the property.
   auto *returnTy = computeAllCasesType(Nominal);
@@ -102,7 +99,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) =
-      declareDerivedProperty(C.Id_allCases, returnTy, returnTy,
+      declareDerivedProperty(Context.Id_allCases, returnTy, returnTy,
                              /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
@@ -116,18 +113,16 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  if (checkAndDiagnoseDisallowedContext(assocType))
-    return nullptr;
-
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  if (assocType->getName() == TC.Context.Id_AllCases) {
+  if (assocType->getName() == Context.Id_AllCases) {
     return deriveCaseIterable_AllCases(*this);
   }
 
-  TC.diagnose(assocType->getLoc(), diag::broken_case_iterable_requirement);
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_case_iterable_requirement);
   return nullptr;
 }
 

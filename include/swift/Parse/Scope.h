@@ -19,8 +19,8 @@
 #define SWIFT_SEMA_SCOPE_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/TreeScopedHashTable.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   class ValueDecl;
@@ -46,7 +46,7 @@ private:
   unsigned ResolvableDepth = 0;
 
 public:
-  ValueDecl *lookupValueName(DeclName Name);
+  ValueDecl *lookupValueName(DeclNameRef Name);
 
   Scope *getCurrentScope() const { return CurScope; }
 
@@ -59,8 +59,7 @@ public:
   
   SavedScope saveCurrentScope();
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 enum class ScopeKind {
@@ -141,6 +140,8 @@ class Scope {
   bool isResolvable() const;
 
 public:
+  Scope(ScopeInfo &SI, ScopeKind SC, bool isInactiveConfigBlock = false);
+
   /// Create a lexical scope of the specified kind.
   Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock = false);
 
@@ -159,7 +160,7 @@ public:
   }
 };
 
-inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
+inline ValueDecl *ScopeInfo::lookupValueName(DeclNameRef Name) {
   // FIXME: this check can go away when SIL parser parses everything in
   // a toplevel scope.
   if (!CurScope)
@@ -168,8 +169,9 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   assert(CurScope && "no scope");
   // If we found nothing, or we found a decl at the top-level, return nothing.
   // We ignore results at the top-level because we may have overloading that
-  // will be resolved properly by name binding.
-  std::pair<unsigned, ValueDecl *> Res = HT.lookup(CurScope->HTScope, Name);
+  // will be resolved properly by name lookup.
+  std::pair<unsigned, ValueDecl *> Res = HT.lookup(CurScope->HTScope,
+                                                   Name.getFullName());
   if (Res.first < ResolvableDepth)
     return 0;
   return Res.second;

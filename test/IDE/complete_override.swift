@@ -150,6 +150,10 @@
 
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MISSING_ASSOC_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MISSING_ASSOC_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_2 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_3 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_4 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_4
 
 @objc
 class TagPA {}
@@ -724,9 +728,10 @@ class Override26 : OverrideBase, OverrideP {
   // Same as MODIFIER24
 }
 
-// MODIFIER1: Begin completions, 9 items
+// MODIFIER1: Begin completions, 10 items
 // MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
 // MODIFIER1-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
+// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
 // MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
@@ -736,7 +741,8 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER1: End completions
 
-// MODIFIER2: Begin completions, 5 items
+// MODIFIER2: Begin completions, 6 items
+// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
 // MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER2-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
@@ -760,7 +766,8 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER6: End completions
 
-// MODIFIER7: Begin completions, 7 items
+// MODIFIER7: Begin completions, 8 items
+// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classVar: Int; name=classVar: Int
 // MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER7-DAG: Decl[StaticMethod]/Super:           class func classMethod() {|}; name=classMethod()
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
@@ -785,11 +792,13 @@ class Override26 : OverrideBase, OverrideP {
 
 // MODIFIER13-NOT: Begin completions
 
-// MODIFIER15: Begin completions, 1 items
+// MODIFIER15: Begin completions, 2 items
+// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classVar: Int; name=classVar: Int
 // MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER15: End completions
 
-// MODIFIER17: Begin completions, 1 items
+// MODIFIER17: Begin completions, 2 items
+// MODIFIER17-DAG: Decl[StaticVar]/Super:             classVar: Int; name=classVar: Int
 // MODIFIER17-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER17: End completions
 
@@ -801,13 +810,15 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER22: Decl[StaticMethod]/Super/Erase[5]:     override func classMethod() {|}; name=classMethod()
 // MODIFIER22: End completions
 
-// MODIFIER23: Begin completions, 2 items
+// MODIFIER23: Begin completions, 3 items
 // MODIFIER23-DAG: Decl[StaticMethod]/Super:          override func classMethod() {|}; name=classMethod()
+// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classVar: Int; name=classVar: Int
 // MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER23: End completions
 
-// MODIFIER24: Begin completions, 2 items
+// MODIFIER24: Begin completions, 3 items
 // MODIFIER24-DAG: Decl[StaticMethod]/Super:          func classMethod() {|}; name=classMethod()
+// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classVar: Int; name=classVar: Int
 // MODIFIER24-DAG: Decl[StaticVar]/Super:             var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER24: End completions
 
@@ -850,7 +861,50 @@ struct MissingAssoc: AssocAndMethod {
   func #^MISSING_ASSOC_1^#
 }
 // MISSING_ASSOC_1: Begin completions
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: MissingAssoc.T) {|};
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: MissingAssoc.U) {|};
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: MissingAssoc.V) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: T) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: U) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: V) {|};
 // MISSING_ASSOC_1: End completions
+
+// Test that we don't skip out on synthesized conformance members.
+
+struct SynthesizedConformance1: Codable {
+  let foo: Int
+  #^OVERRIDE_SYNTHESIZED_1^#
+// OVERRIDE_SYNTHESIZED_1: Begin completions,  2 items
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super/IsSystem:       init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super/IsSystem:    func encode(to encoder: Encoder) throws {|};
+}
+
+open class SynthesizedConformance2: Codable {
+  let foo: Int
+  func encode(to encoder: Encoder) throws {}
+  #^OVERRIDE_SYNTHESIZED_2^#
+// OVERRIDE_SYNTHESIZED_2: Begin completions, 1 items
+// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super/IsSystem:           public required init(from decoder: Decoder) throws {|};
+}
+
+struct SynthesizedConformance3: Hashable {
+  let foo: Int
+  #^OVERRIDE_SYNTHESIZED_3^#
+// FIXME: Where did Equatable.(==) go?
+// OVERRIDE_SYNTHESIZED_3: Begin completions, 2 items
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int; name=hashValue: Int
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|}
+}
+
+enum SynthesizedConformance4: CaseIterable {
+  case a, b, c, d
+  #^OVERRIDE_SYNTHESIZED_4^#
+// OVERRIDE_SYNTHESIZED_4: Begin completions, 3 items
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|};
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[StaticVar]/Super/IsSystem:         static var allCases: [SynthesizedConformance4];
+}
+
+class SynthesizedConformance5: SynthesizedConformance2 {
+  #^OVERRIDE_SYNTHESIZED_5^#
+// OVERRIDE_SYNTHESIZED_5: Begin completions, 2 items
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super/IsSystem:    override func encode(to encoder: Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
+}

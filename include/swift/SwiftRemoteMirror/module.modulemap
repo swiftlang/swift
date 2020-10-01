@@ -1,0 +1,4 @@
+module SwiftRemoteMirror {
+  header "SwiftRemoteMirror.h"
+  export *
+}

@@ -28,6 +28,7 @@ namespace llvm {
 namespace swift {
   class CompilerInstance;
   class DiagnosticEngine;
+  class GeneratedModule;
   class IRGenOptions;
   class ModuleDecl;
   class SILOptions;
@@ -43,8 +44,8 @@ bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
 bool linkLLVMModules(llvm::Module *Module,
-                     std::unique_ptr<llvm::Module> SubModule);
-bool autolinkImportedModules(ModuleDecl *M, IRGenOptions &IRGenOpts);
+                     std::unique_ptr<llvm::Module> &&SubModule);
+bool autolinkImportedModules(ModuleDecl *M, const IRGenOptions &IRGenOpts);
 
 } // end namespace immediate
 } // end namespace swift

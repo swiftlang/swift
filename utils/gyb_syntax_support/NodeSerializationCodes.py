@@ -1,4 +1,4 @@
-from Node import error
+from .Node import error
 
 
 SYNTAX_NODE_SERIALIZATION_CODES = {
@@ -30,6 +30,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InOutExpr': 25,
     'PoundColumnExpr': 26,
     'TryExpr': 27,
+    'AwaitExpr': 249,
     'IdentifierExpr': 28,
     'SuperRefExpr': 29,
     'NilLiteralExpr': 30,
@@ -234,6 +235,21 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'SomeType': 230,
     'CustomAttribute': 231,
     'GenericRequirement': 232,
+    'DifferentiableAttributeArguments': 233,
+    'DifferentiabilityParamsClause': 234,
+    'DifferentiabilityParams': 235,
+    'DifferentiabilityParamList': 236,
+    'DifferentiabilityParam': 237,
+    # removed: 'DifferentiableAttributeFuncSpecifier': 238,
+    'FunctionDeclName': 239,
+    'PoundFilePathExpr': 240,
+    'DerivativeRegistrationAttributeArguments': 241,
+    'QualifiedDeclName': 242,
+    'CatchItem': 243,
+    'CatchItemList': 244,
+    'MultipleTrailingClosureElementList': 245,
+    'MultipleTrailingClosureElement': 246,
+    'PoundFileIDExpr': 247,
 }
 
 

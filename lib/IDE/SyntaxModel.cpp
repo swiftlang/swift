@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
@@ -56,7 +57,7 @@ struct SyntaxModelContext::Implementation {
 /// If the given tokens start with the expected tokens and they all appear on
 ///  the same line, the source location beyond the final matched token and
 ///  number of matched tokens are returned. Otherwise None is returned.
-static Optional<std::pair<SourceLoc, unsigned>>
+static Optional<Located<unsigned>>
 matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
   const unsigned NUM_TOKENS = 5;
   if (Tokens.size() < NUM_TOKENS)
@@ -75,8 +76,7 @@ matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
   if (Tokens[1].getText() != "resourceName")
     return None;
   auto EndToken = Tokens[NUM_TOKENS-1];
-  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
-                        NUM_TOKENS);
+  return Located<unsigned>(NUM_TOKENS, EndToken.getLoc().getAdvancedLoc(EndToken.getLength()));
 }
 
 /// Matches the tokens in the argument of an image literal expression if its
@@ -85,7 +85,7 @@ matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
 /// If the given tokens start with the expected tokens and they all appear on
 /// the same line, the source location beyond the final matched token and number
 /// of matched tokens are returned. Otherwise None is returned.
-static Optional<std::pair<SourceLoc, unsigned>>
+static Optional<Located<unsigned>>
 matchColorLiteralArg(ArrayRef<Token> Tokens) {
   const unsigned NUM_TOKENS = 17;
   if (Tokens.size() < NUM_TOKENS)
@@ -111,8 +111,7 @@ matchColorLiteralArg(ArrayRef<Token> Tokens) {
       Tokens[9].getText() != "blue" || Tokens[13].getText() != "alpha")
     return None;
   auto EndToken = Tokens[NUM_TOKENS-1];
-  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
-                        NUM_TOKENS);
+  return Located<unsigned>(NUM_TOKENS, EndToken.getLoc().getAdvancedLoc(EndToken.getLength()));
 }
 
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
@@ -171,9 +170,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_imageLiteral:
         if (auto Match = matchImageOrFileLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->first);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the extra matched tokens
-          I += Match->second - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }
@@ -181,9 +180,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_colorLiteral:
         if (auto Match = matchColorLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->first);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the matches tokens
-          I += Match->second - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }
@@ -345,6 +344,21 @@ class ModelASTWalker : public ASTWalker {
   /// When non-zero, we should avoid passing tokens as syntax nodes since a parent of several tokens
   /// is considered as one, e.g. object literal expression.
   uint8_t AvoidPassingSyntaxToken = 0;
+
+  class InactiveClauseRAII {
+    const bool wasInInactiveClause;
+    bool &isInInactiveClause;
+
+  public:
+    InactiveClauseRAII(bool &isInInactiveClauseArg, bool enteringInactiveClause)
+        : wasInInactiveClause(isInInactiveClauseArg),
+          isInInactiveClause(isInInactiveClauseArg) {
+      isInInactiveClause |= enteringInactiveClause;
+    }
+    ~InactiveClauseRAII() { isInInactiveClause = wasInInactiveClause; }
+  };
+  friend class InactiveClauseRAII;
+  bool inInactiveClause = false;
 
 public:
   SyntaxModelWalker &Walker;
@@ -524,8 +538,8 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
   // Avoid passing the individual syntax tokens corresponding to single-line
   // object literal expressions, as they will be reported as a single token.
   return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression &&
-    SM.getLineNumber(Node.Range.getStart()) ==
-    SM.getLineNumber(Node.Range.getEnd());
+         SM.getLineAndColumnInBuffer(Node.Range.getStart()).first ==
+             SM.getLineAndColumnInBuffer(Node.Range.getEnd()).first;
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
@@ -533,22 +547,24 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     return {false, E};
 
   auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
-    if (isCurrentCallArgExpr(ParentTupleExpr)) {
-      CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
-      SyntaxStructureNode SN;
-      SN.Kind = SyntaxStructureKind::Argument;
-      SN.NameRange = NR;
-      SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
-      if (NR.isValid()) {
-        SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
-                                                            Elem->getEndLoc()));
-        passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
-      }
-      else
-        SN.Range = SN.BodyRange;
+    if (isa<DefaultArgumentExpr>(Elem) ||
+        !isCurrentCallArgExpr(ParentTupleExpr))
+      return;
 
-      pushStructureNode(SN, Elem);
+    CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::Argument;
+    SN.NameRange = NR;
+    SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
+    if (NR.isValid()) {
+      SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
+                                                          Elem->getEndLoc()));
+      passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
     }
+    else
+      SN.Range = SN.BodyRange;
+
+    pushStructureNode(SN, Elem);
   };
 
   if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
@@ -647,9 +663,27 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     if (Closure->hasExplicitResultType())
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                          Closure->getExplicitResultTypeLoc().getSourceRange());
+                          Closure->getExplicitResultTypeRepr()->getSourceRange());
 
     pushStructureNode(SN, Closure);
+
+  } else if (auto *CLE = dyn_cast<CaptureListExpr>(E)) {
+    // The ASTWalker visits captured variables twice, from a `CaptureListEntry` they are visited
+    // from the `VarDecl` and the `PatternBindingDecl` entries.
+    // We take over visitation here to avoid walking the `PatternBindingDecl` ones.
+    for (auto c : CLE->getCaptureList()) {
+      if (auto *VD = c.Var) {
+        // We're skipping over the PatternBindingDecl so we need to handle the
+        // the VarDecl's attributes that we'd normally process visiting the PBD.
+        if (!handleAttrs(VD->getAttrs()))
+          return { false, nullptr };
+        VD->walk(*this);
+      }
+    }
+    if (auto *CE = CLE->getClosureBody())
+      CE->walk(*this);
+    return { false, walkToExprPost(E) };
+
   } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
     // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
     // twice. Skip pointers we've already seen.
@@ -835,8 +869,14 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (D->isImplicit())
     return false;
 
-  if (!handleAttrs(D->getAttrs()))
-    return false;
+  // The attributes of EnumElementDecls and VarDecls are handled when visiting
+  // their parent EnumCaseDecl/PatternBindingDecl (which the attributes are
+  // attached to syntactically).
+  if (!isa<EnumElementDecl>(D) &&
+      !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
+    if (!handleAttrs(D->getAttrs()))
+      return false;
+  }
 
   if (isa<AccessorDecl>(D)) {
     // Don't push structure nodes for accessors.
@@ -865,7 +905,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                         AFD->getSignatureSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                                    FD->getBodyResultTypeLoc().getSourceRange());
+                                    FD->getResultTypeSourceRange());
     }
     pushStructureNode(SN, AFD);
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -888,9 +928,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Normally bindExtension() would take care of computing the extended
-    // nominal. It must be done before asking for generic parameters.
-    ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;
@@ -924,6 +961,21 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                       PD->getTypeSourceRangeForDiagnostics());
     pushStructureNode(SN, PD);
+  } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    // Process the attributes of one of the contained VarDecls. Attributes that
+    // are syntactically attached to the PatternBindingDecl end up on the
+    // contained VarDecls.
+    VarDecl *Contained = nullptr;
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) -> void {
+        Contained = VD;
+      });
+      if (Contained) {
+        if (!handleAttrs(Contained->getAttrs()))
+          return false;
+        break;
+      }
+    }
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     SyntaxStructureNode SN;
@@ -938,7 +990,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (bracesRange.isValid())
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+    SourceLoc NREnd = (!VD->getName().empty()
+                       ? NRStart.getAdvancedLoc(VD->getName().getLength())
+                       : NRStart);
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
@@ -967,6 +1021,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
+      InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
       for (auto &Element : Clause.Elements) {
         if (auto *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
@@ -987,22 +1042,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
-    for (auto *EnumElemD : EnumCaseD->getElements()) {
-      for (auto *Att : EnumElemD->getAttrs()) {
-        if (Att->isDeclModifier() &&
-            SM.isBeforeInBuffer(Att->getLocation(), D->getSourceRange().Start)) {
-          passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
-                            charSourceRangeFromSourceRange(SM,
-                                                           Att->getLocation())});
-        }
-      }
+    if (!EnumCaseD->getElements().empty()) {
+      if (!handleAttrs(EnumCaseD->getElements().front()->getAttrs()))
+        return false;
     }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not
       // as members of the enum case decl. Walk them manually here so that they
       // end up as child nodes of enum case.
       for (auto *EnumElemD : EnumCaseD->getElements()) {
-        if (EnumElemD->getName().empty())
+        if (EnumElemD->getBaseIdentifier().empty())
           continue;
         SyntaxStructureNode SN;
         setDecl(SN, EnumElemD);
@@ -1015,7 +1064,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
         } else {
           SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                         EnumElemD->getName().getLength());
+                                         EnumElemD->getBaseIdentifier()
+                                           .getLength());
         }
 
         if (auto *E = EnumElemD->getRawValueUnchecked()) {
@@ -1048,7 +1098,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.NameRange = charSourceRangeFromSourceRange(SM,
                                         SubscriptD->getSignatureSourceRange());
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                            SubscriptD->getElementTypeLoc().getSourceRange());
+                            SubscriptD->getElementTypeSourceRange());
     pushStructureNode(SN, SubscriptD);
   } else if (auto *AssociatedTypeD = dyn_cast<AssociatedTypeDecl>(D)) {
     SyntaxStructureNode SN;
@@ -1094,11 +1144,11 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passTokenNodesUntil(IdT->getIdLoc(),
+    if (!passTokenNodesUntil(IdT->getStartLoc(),
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (TokenNodes.empty() ||
-        TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+        TokenNodes.front().Range.getStart() != IdT->getStartLoc())
       return false;
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
       return false;
@@ -1151,7 +1201,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (auto *CA = dyn_cast<CustomAttr>(D)) {
-      if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = CA->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1166,7 +1216,13 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
           return false;
       } else {
-          assert(0 && "Attribute's TokenNodes already consumed?");
+        // Only mispelled attributes, corrected in the AST but not
+        // recognised or present in TokenNodes should get us here.
+        // E.g. @availability(...) comes through as if @available(...) was
+        // specified, but there's no TokenNode because we don't highlight them
+        // (to indicate they're invalid).
+        assert(Next.Range.getStart() == D->getRange().Start &&
+               "Attribute's TokenNodes already consumed?");
       }
     } else {
         assert(0 && "No TokenNodes?");
@@ -1362,7 +1418,7 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
                                        const ASTNodeType& ASTNode) {
   SubStructureStack.emplace_back(Node, ASTNode);
   if (shouldTreatAsSingleToken(Node, SM))
-    AvoidPassingSyntaxToken ++;
+    ++AvoidPassingSyntaxToken;
 
   if (!passTokenNodesUntil(Node.Range.getStart(),
                            ExcludeNodeAtLocation).shouldContinue)
@@ -1455,7 +1511,6 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
                                         unsigned &Start,
                                         std::regex &Regex) {
-#ifdef SWIFT_HAVE_WORKING_STD_REGEX
   static const auto MailToPosition = std::find(URLProtocols.begin(),
                                                URLProtocols.end(),
                                                "mailto");
@@ -1487,7 +1542,6 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
       }
     }
   }
-#endif
   return false;
 }
 
@@ -1500,12 +1554,12 @@ static CharSourceRange sanitizeUnpairedParenthesis(CharSourceRange Range) {
   unsigned TrimLen = 0;
   for (char C : Text) {
     if (C == '(') {
-      Pairs ++;
+      ++Pairs;
     } else if (C == ')') {
       if (Pairs == 0)
-        TrimLen ++;
+        ++TrimLen;
       else
-        Pairs --;
+        --Pairs;
     } else {
       TrimLen = 0;
     }

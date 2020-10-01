@@ -11,23 +11,69 @@
 from __future__ import print_function
 
 import argparse
-import errno
 import json
 import os
 import platform
 import re
 import sys
 import traceback
-from functools import reduce
-from multiprocessing import freeze_support
+from multiprocessing import Lock, Pool, cpu_count, freeze_support
+
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 from swift_build_support.swift_build_support import shell
-from swift_build_support.swift_build_support.SwiftBuildSupport import \
-    SWIFT_SOURCE_ROOT
 
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+
+
+def child_init(lck):
+    global lock
+    lock = lck
+
+
+def run_parallel(fn, pool_args, n_processes=0):
+    """Function used to run a given closure in parallel.
+
+    NOTE: This function was originally located in the shell module of
+    swift_build_support and should eventually be replaced with a better
+    parallel implementation.
+    """
+
+    if n_processes == 0:
+        n_processes = cpu_count() * 2
+
+    lk = Lock()
+    print("Running ``%s`` with up to %d processes." %
+          (fn.__name__, n_processes))
+    pool = Pool(processes=n_processes, initializer=child_init, initargs=(lk,))
+    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
+    pool.close()
+    pool.join()
+    return results
+
+
+def check_parallel_results(results, op):
+    """Function used to check the results of run_parallel.
+
+    NOTE: This function was originally located in the shell module of
+    swift_build_support and should eventually be replaced with a better
+    parallel implementation.
+    """
+
+    fail_count = 0
+    if results is None:
+        return 0
+    for r in results:
+        if r is not None:
+            if fail_count == 0:
+                print("======%s FAILURES======" % op)
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
+            fail_count += 1
+            if r.stderr:
+                print(r.stderr)
+    return fail_count
 
 
 def confirm_tag_in_repo(tag, repo_name):
@@ -112,7 +158,15 @@ def update_single_repository(pool_args):
             if checkout_target:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                           echo=False)
-                shell.run(['git', 'checkout', checkout_target], echo=True)
+                try:
+                    shell.run(['git', 'checkout', checkout_target], echo=True)
+                except Exception as originalException:
+                    try:
+                        result = shell.run(['git', 'rev-parse', checkout_target])
+                        revision = result[0].strip()
+                        shell.run(['git', 'checkout', revision], echo=True)
+                    except Exception:
+                        raise originalException
 
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
@@ -201,8 +255,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    cross_repos_pr]
         pool_args.append(my_args)
 
-    return shell.run_parallel(update_single_repository, pool_args,
-                              args.n_processes)
+    return run_parallel(update_single_repository, pool_args, args.n_processes)
 
 
 def obtain_additional_swift_sources(pool_args):
@@ -296,14 +349,14 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
         print("Not cloning any repositories.")
         return
 
-    return shell.run_parallel(obtain_additional_swift_sources, pool_args,
-                              args.n_processes)
+    return run_parallel(
+        obtain_additional_swift_sources, pool_args, args.n_processes)
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
     """
     Dumps the current state of the repo into a new config file that contains a
-    master branch scheme with the relevant branches set to the appropriate
+    main branch scheme with the relevant branches set to the appropriate
     hashes.
     """
     new_config = {}
@@ -354,19 +407,16 @@ def validate_config(config):
                                'too.'.format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
-    #
-    # We do this by constructing a list consisting of len(names),
-    # set(names). Then we reduce over that list summing the counts and taking
-    # the union of the sets. We have uniqueness if the length of the union
-    # equals the length of the sum of the counts.
-    data = [(len(v['aliases']), set(v['aliases']))
-            for v in config['branch-schemes'].values()]
-    result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
-                    (0, set([])))
-    if result[0] == len(result[1]):
-        return
-    raise RuntimeError('Configuration file has schemes with duplicate '
-                       'aliases?!')
+    seen = dict()
+    for (scheme_name, scheme) in config['branch-schemes'].items():
+        aliases = scheme['aliases']
+        for alias in aliases:
+            if alias in seen:
+                raise RuntimeError('Configuration file defines the alias {0} '
+                                   'in both the {1} scheme and the {2} scheme?!'
+                                   .format(alias, seen[alias], scheme_name))
+            else:
+                seen[alias] = scheme_name
 
 
 def full_target_name(repository, target):
@@ -400,61 +450,14 @@ def skip_list_for_platform(config):
     return skip_list
 
 
-# Python 2.7 in Windows doesn't support os.symlink
-os_symlink = getattr(os, "symlink", None)
-if callable(os_symlink):
-    pass
-else:
-    def symlink_ms(source, link_name):
-        source = os.path.normpath(source)
-        link_name = os.path.normpath(link_name)
-        if os.path.isdir(link_name):
-            os.rmdir(link_name)
-        elif os.exists(link_name):
-            os.remove(link_name)
-        import ctypes
-        csl = ctypes.windll.kernel32.CreateSymbolicLinkW
-        csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
-        csl.restype = ctypes.c_ubyte
-        flags = 1 if os.path.isdir(source) else 0
-        if csl(link_name, source, flags) == 0:
-            raise ctypes.WinError()
-    os.symlink = symlink_ms
-
-
-def symlink_llvm_monorepo(args):
-    print("Create symlink for LLVM Project")
-    llvm_projects = ['clang',
-                     'llvm',
-                     'lldb',
-                     'compiler-rt',
-                     'libcxx',
-                     'clang-tools-extra']
-    for project in llvm_projects:
-        src_path = os.path.join(args.source_root,
-                                'llvm-project',
-                                project)
-        dst_path = os.path.join(args.source_root, project)
-        if not os.path.islink(dst_path):
-            try:
-                os.symlink(src_path, dst_path)
-            except OSError as e:
-                if e.errno == errno.EEXIST:
-                    print("File '%s' already exists. Remove it, so "
-                          "update-checkout can create the symlink to the "
-                          "llvm-monorepo." % dst_path)
-                else:
-                    raise e
-
-
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
+By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM
 repositories.
-
-By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
+""")
     parser.add_argument(
         "--clone",
         help="Obtain Sources for Swift and Related Projects",
@@ -594,12 +597,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     update_results = update_all_repositories(args, config, scheme,
                                              cross_repos_pr)
     fail_count = 0
-    fail_count += shell.check_parallel_results(clone_results, "CLONE")
-    fail_count += shell.check_parallel_results(update_results, "UPDATE")
+    fail_count += check_parallel_results(clone_results, "CLONE")
+    fail_count += check_parallel_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
-        symlink_llvm_monorepo(args)
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

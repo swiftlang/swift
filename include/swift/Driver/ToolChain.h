@@ -136,6 +136,13 @@ protected:
           ExtraEnvironment(std::move(extraEnv)) {}
   };
 
+  /// Handle arguments common to all invocations of the frontend (compilation,
+  /// module-merging, LLDB's REPL, etc).
+  virtual void addCommonFrontendArgs(const OutputInfo &OI,
+                                     const CommandOutput &output,
+                                     const llvm::opt::ArgList &inputArgs,
+                                     llvm::opt::ArgStringList &arguments) const;
+
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -154,6 +161,9 @@ protected:
                                              const JobContext &context) const;
   virtual InvocationInfo
   constructInvocation(const VerifyDebugInfoJobAction &job,
+                      const JobContext &context) const;
+  virtual InvocationInfo
+  constructInvocation(const VerifyModuleInterfaceJobAction &job,
                       const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const GeneratePCHJobAction &job,
                                              const JobContext &context) const;
@@ -200,6 +210,11 @@ protected:
   /// relative to the compiler.
   void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
                           const llvm::opt::ArgList &args, bool shared) const;
+
+  /// Get the secondary runtime library link path given the primary path.
+  void getSecondaryResourceDirPath(
+      SmallVectorImpl<char> &secondaryResourceDirPath,
+      StringRef primaryPath) const;
 
   /// Get the runtime library link paths, which typically include the resource
   /// dir path and the SDK.
@@ -282,6 +297,9 @@ public:
   void getClangLibraryPath(const llvm::opt::ArgList &Args,
                            SmallString<128> &LibPath) const;
 
+  // Returns the Clang driver executable to use for linking.
+  const char *getClangLinkerDriver(const llvm::opt::ArgList &Args) const;
+
   /// Returns the name the clang library for a given sanitizer would have on
   /// the current toolchain.
   ///
@@ -310,7 +328,18 @@ public:
   /// An override point for platform-specific subclasses to customize the
   /// validations that should be performed.
   virtual void validateArguments(DiagnosticEngine &diags,
-                                 const llvm::opt::ArgList &args) const {}
+                                 const llvm::opt::ArgList &args,
+                                 StringRef defaultTarget) const {}
+
+  /// Validate the output information.
+  ///
+  /// An override point for platform-specific subclasses to customize their
+  /// behavior once the outputs are known.
+  virtual void validateOutputInfo(DiagnosticEngine &diags,
+                                  const OutputInfo &outputInfo) const { }
+
+  llvm::Expected<file_types::ID>
+  remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const;
 };
 } // end namespace driver
 } // end namespace swift

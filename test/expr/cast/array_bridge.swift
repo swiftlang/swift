@@ -45,7 +45,9 @@ var aa: [[A]] = []
 var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('B' and 'A') are expected to be equal}}
 bb = aa // expected-error {{cannot assign value of type '[[A]]' to type '[[B]]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('A' and 'B') are expected to be equal}}
 
 class C {
 }

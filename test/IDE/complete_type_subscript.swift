@@ -11,7 +11,7 @@ struct S0 {
 }
 // TOP_LEVEL_0: Keyword/None:                       Any[#Any#];
 // TOP_LEVEL_0: Decl[Struct]/CurrModule:            S0[#S0#];
-// TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]:    Int[#Int#];
+// TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_1 | %FileCheck %s -check-prefix=MYSTRUCT_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_1 | %FileCheck %s -check-prefix=MYSTRUCT_0
@@ -20,7 +20,7 @@ struct S1 {
   subscript(x: MyStruct#^PARAM_1^#) -> Int { return 0 }
   subscript(x: MyStruct) -> MyStruct#^RETURN_1^# { }
 }
-// MYSTRUCT_0: Keyword/None:                       .Type[#S1.MyStruct.Type#];
+// MYSTRUCT_0: Keyword/None:                       .Type[#MyStruct.Type#];
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_2 | %FileCheck %s -check-prefix=MYSTRUCT_1
@@ -30,8 +30,8 @@ struct S2 {
   subscript(x: MyStruct.#^PARAM_2^#) -> Int { return 0 }
   subscript(x: MyStruct) -> MyStruct.#^RETURN_2^# { }
 }
-// MYSTRUCT_1: Keyword/None:                       Type[#S2.MyStruct.Type#];
-// MYSTRUCT_1-NOT: Keyword/CurrNominal:            self[#S2.MyStruct#];
+// MYSTRUCT_1: Keyword/None:                       Type[#MyStruct.Type#];
+// MYSTRUCT_1-NOT: Keyword/CurrNominal:            self[#MyStruct#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_PARAM_0 | %FileCheck %s -check-prefix=GEN_TOP_LEVEL_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_RETURN_0 | %FileCheck %s -check-prefix=GEN_TOP_LEVEL_0
@@ -42,7 +42,7 @@ struct G0<T> {
 // GEN_TOP_LEVEL_0: Keyword/None:                       Any[#Any#];
 // GEN_TOP_LEVEL_0: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
 // GEN_TOP_LEVEL_0: Decl[Struct]/CurrModule:            S0[#S0#];
-// GEN_TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]:    Int[#Int#];
+// GEN_TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_PARAM_1 | %FileCheck %s -check-prefix=GEN_PARAM_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_RETURN_1 | %FileCheck %s -check-prefix=GEN_PARAM_1
@@ -69,7 +69,7 @@ struct G3 {
 // GEN_TOP_LEVEL_1: Keyword/None:                       Any[#Any#];
 // GEN_TOP_LEVEL_1: Decl[GenericTypeParam]/Local:       T[#T#];
 // GEN_TOP_LEVEL_1: Decl[Struct]/CurrModule:            S0[#S0#];
-// GEN_TOP_LEVEL_1: Decl[Struct]/OtherModule[Swift]:    Int[#Int#];
+// GEN_TOP_LEVEL_1: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_PARAM_4 | %FileCheck %s -check-prefix=GEN_PARAM_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_RETURN_4 | %FileCheck %s -check-prefix=GEN_PARAM_4

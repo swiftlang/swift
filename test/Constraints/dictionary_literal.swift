@@ -63,8 +63,8 @@ var _: MyDictionary<String, Int>? = ["foo", 1]  // expected-error {{dictionary o
 var _: MyDictionary<String, Int>? = ["foo", 1, "bar", 42]  // expected-error {{dictionary of type 'MyDictionary<String, Int>' cannot be initialized with array literal}}
 // expected-note @-1 {{did you mean to use a dictionary literal instead?}} {{43-44=:}} {{53-54=:}}
 
-var _: MyDictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{cannot convert value of type '[Double]' to specified type 'MyDictionary<String, Int>?'}}
-// expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Double'}}
+var _: MyDictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{dictionary of type 'MyDictionary<String, Int>' cannot be initialized with array literal}}
+// expected-note@-1 {{did you mean to use a dictionary literal instead?}} {{none}}
 
 var _: MyDictionary<String, Int>? = ["foo" : 1.0]  // expected-error {{cannot convert value of type 'Double' to expected dictionary value type 'MyDictionary<String, Int>.Value' (aka 'Int')}}
 

@@ -39,7 +39,7 @@ extension DecodingError {
     /// - parameter value: The value whose type to describe.
     /// - returns: A string describing `value`.
     /// - precondition: `value` is one of the types below.
-    fileprivate static func _typeDescription(of value: Any) -> String {
+    private static func _typeDescription(of value: Any) -> String {
         if value is NSNull {
             return "a null value"
         } else if value is NSNumber /* FIXME: If swift-corelibs-foundation isn't updated to use NSNumber, this check will be necessary: || value is Int || value is Double */ {
@@ -55,3 +55,26 @@ extension DecodingError {
         }
     }
 }
+
+// Only support 64bit
+#if !(os(iOS) && (arch(i386) || arch(arm)))
+
+import Combine
+
+//===----------------------------------------------------------------------===//
+// Generic Decoding
+//===----------------------------------------------------------------------===//
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension JSONEncoder: TopLevelEncoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension PropertyListEncoder: TopLevelEncoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension JSONDecoder: TopLevelDecoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension PropertyListDecoder: TopLevelDecoder { }
+
+#endif /* !(os(iOS) && (arch(i386) || arch(arm))) */

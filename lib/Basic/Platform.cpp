@@ -19,52 +19,78 @@
 using namespace swift;
 
 bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isiOS() &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+          !tripleIsMacCatalystEnvironment(triple) &&
+          triple.isSimulatorEnvironment());
 }
 
 bool swift::tripleIsAppleTVSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
-  return (triple.isTvOS() &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+  return (triple.isTvOS() && triple.isSimulatorEnvironment());
 }
 
 bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
-  return (triple.isWatchOS() &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+  return (triple.isWatchOS() && triple.isSimulatorEnvironment());
 }
 
-bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
-  // FIXME: transitional, this should eventually just use the -environment
-  // field.
-  return triple.isSimulatorEnvironment() ||
-    tripleIsiOSSimulator(triple) ||
-    tripleIsWatchSimulator(triple) ||
-    tripleIsAppleTVSimulator(triple);
+bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
+  return triple.isiOS() && !triple.isTvOS() &&
+      triple.getEnvironment() == llvm::Triple::MacABI;
 }
 
+bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
+  switch (triple.getOS()) {
+  case llvm::Triple::IOS:
+  case llvm::Triple::TvOS:
+  case llvm::Triple::WatchOS:
+    return !triple.hasEnvironment() &&
+        (triple.getArch() == llvm::Triple::x86 ||
+         triple.getArch() == llvm::Triple::x86_64) &&
+        !tripleIsMacCatalystEnvironment(triple);
+
+  default:
+    return false;
+  }
+}
+
+bool swift::triplesAreValidForZippering(const llvm::Triple &target,
+                                        const llvm::Triple &targetVariant) {
+  // The arch and vendor must match.
+  if (target.getArchName() != targetVariant.getArchName() ||
+      target.getArch() != targetVariant.getArch() ||
+      target.getSubArch() != targetVariant.getSubArch() ||
+      target.getVendor() != targetVariant.getVendor()) {
+    return false;
+  }
+
+  // Allow a macOS target and an iOS-macabi target variant
+  // This is typically the case when zippering a library originally
+  // developed for macOS.
+  if (target.isMacOSX() && tripleIsMacCatalystEnvironment(targetVariant)) {
+    return true;
+  }
+
+  // Allow an iOS-macabi target and a macOS target variant. This would
+  // be the case when zippering a library originally developed for
+  // iOS.
+  if (targetVariant.isMacOSX() && tripleIsMacCatalystEnvironment(target)) {
+    return true;
+  }
+
+  return false;
+}
 
 bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
     // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
     // rpath-based install name until 10.15.
     return triple.isMacOSXVersionLT(10, 15);
+  }
 
-  } else if (triple.isiOS()) {
+  if (triple.isiOS()) {
     return triple.isOSVersionLT(12, 2);
+  }
 
-  } else if (triple.isWatchOS()) {
+  if (triple.isWatchOS()) {
     return triple.isOSVersionLT(5, 2);
   }
 
@@ -94,23 +120,6 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return DarwinPlatformKind::MacOS;
 
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
-DarwinPlatformKind swift::getNonSimulatorPlatform(DarwinPlatformKind platform) {
-  switch (platform) {
-  case DarwinPlatformKind::MacOS:
-    return DarwinPlatformKind::MacOS;
-  case DarwinPlatformKind::IPhoneOS:
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    return DarwinPlatformKind::IPhoneOS;
-  case DarwinPlatformKind::TvOS:
-  case DarwinPlatformKind::TvOSSimulator:
-    return DarwinPlatformKind::TvOS;
-  case DarwinPlatformKind::WatchOS:
-  case DarwinPlatformKind::WatchOSSimulator:
-    return DarwinPlatformKind::WatchOS;
-  }
   llvm_unreachable("Unsupported Darwin platform");
 }
 
@@ -146,7 +155,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
-  case llvm::Triple::OpenBSD:
   case llvm::Triple::Solaris:
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
@@ -162,7 +170,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
-  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -174,6 +181,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return triple.isAndroid() ? "android" : "linux";
   case llvm::Triple::FreeBSD:
     return "freebsd";
+  case llvm::Triple::OpenBSD:
+    return "openbsd";
   case llvm::Triple::Win32:
     switch (triple.getEnvironment()) {
     case llvm::Triple::Cygnus:
@@ -190,26 +199,24 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "ps4";
   case llvm::Triple::Haiku:
     return "haiku";
+  case llvm::Triple::WASI:
+    return "wasi";
   }
   llvm_unreachable("unsupported OS");
 }
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
   if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      return Triple.getArchName();
-      break;
+    switch (Triple.getSubArch()) {
     case llvm::Triple::SubArchType::ARMSubArch_v7:
       return "armv7";
-      break;
     case llvm::Triple::SubArchType::ARMSubArch_v6:
       return "armv6";
+    default:
       break;
     }
-  } else {
-    return Triple.getArchName();
   }
+  return Triple.getArchName();
 }
 
 // The code below is responsible for normalizing target triples into the form
@@ -255,6 +262,7 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   //          .Case ("armv7s", "armv7s")
   //          .Case ("armv7k", "armv7k")
   //          .Case ("armv7", "armv7")
+  //          .Case ("arm64e", "arm64e")
               .Default(tripleArchName);
 }
 
@@ -294,18 +302,11 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
 static Optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
-
-  // If the environment is empty, infer a "simulator" environment based on the
-  // OS and architecture combination. This feature is deprecated and exists for
-  // backwards compatibility only; build systems should pass the "simulator"
-  // environment explicitly if they know they're building for a simulator.
-  if (tripleEnvironment == "" && swift::tripleIsAnySimulator(triple))
-    return StringRef("simulator");
-
   return llvm::StringSwitch<Optional<StringRef>>(tripleEnvironment)
               .Cases("unknown", "", None)
   // These values are also supported, but are handled by the default case below:
   //          .Case ("simulator", StringRef("simulator"))
+  //          .Case ("macabi", StringRef("macabi"))
               .Default(tripleEnvironment);
 }
 
@@ -344,43 +345,175 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
   return triple;
 }
 
+llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
+  StringRef unversionedOSName = triple.getOSName().take_until(llvm::isDigit);
+  if (triple.getEnvironment()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        unversionedOSName, environment);
+  }
+
+  return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                      unversionedOSName);
+}
+
 Optional<llvm::VersionTuple>
-swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
+swift::getSwiftRuntimeCompatibilityVersionForTarget(
+    const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
-  
+
+  if (Triple.getArchName() == "arm64e")
+    return llvm::VersionTuple(5, 3);
+
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {
+      if (Triple.isAArch64() && Minor <= 16)
+        return llvm::VersionTuple(5, 3);
+
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {
-        return llvm::VersionTuple(5, 1);
-      } else {
-        return None;
+        if (Micro <= 3) {
+          return llvm::VersionTuple(5, 1);
+        } else {
+          return llvm::VersionTuple(5, 2);
+        }
       }
-    } else {
-      return None;
+    } else if (Major == 11) {
+      return llvm::VersionTuple(5, 3);
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
+
+    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+    // with Swift 5.3
+    if (Triple.isAArch64() && Major <= 14 &&
+        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
+      return llvm::VersionTuple(5, 3);
+
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {
-      return llvm::VersionTuple(5, 1);
-    } else {
-      return None;
+      if (Minor <= 3) {
+        return llvm::VersionTuple(5, 1);
+      } else {
+        return llvm::VersionTuple(5, 2);
+      }
     }
   } else if (Triple.isWatchOS()) {
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 6) {
-      return llvm::VersionTuple(5, 1);
-    } else {
-      return None;
+      if (Minor <= 1) {
+        return llvm::VersionTuple(5, 1);
+      } else {
+        return llvm::VersionTuple(5, 2);
+      }
     }
-  } else {
-    return None;
   }
+
+  return None;
 }
 
+
+/// Remap the given version number via the version map, or produce \c None if
+/// there is no mapping for this version.
+static Optional<llvm::VersionTuple> remapVersion(
+    const llvm::StringMap<llvm::VersionTuple> &versionMap,
+    llvm::VersionTuple version) {
+  // The build number is never used in the lookup.
+  version = version.withoutBuild();
+
+  // Look for this specific version.
+  auto known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If an extra ".0" was specified (in the subminor version), drop that
+  // and look again.
+  if (!version.getSubminor() || *version.getSubminor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If another extra ".0" wa specified (in the minor version), drop that
+  // and look again.
+  if (!version.getMinor() || *version.getMinor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  return None;
+}
+
+llvm::VersionTuple
+swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                           const llvm::Triple &triple) {
+  // Retrieve the SDK version.
+  auto SDKVersion = SDKInfo.getVersion();
+
+  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
+  // SDK version. Map that to the corresponding iOS version number to pass
+  // down to the linker.
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    return remapVersion(
+        SDKInfo.getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
+  }
+
+  return SDKVersion;
+}
+
+static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
+  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!BufOrErr) {
+    // FIXME: diagnose properly
+    return {};
+  }
+
+  std::string Key = "<key>";
+  Key += KeyName;
+  Key += "</key>";
+
+  StringRef Lines = BufOrErr.get()->getBuffer();
+  while (!Lines.empty()) {
+    StringRef CurLine;
+    std::tie(CurLine, Lines) = Lines.split('\n');
+    if (CurLine.find(Key) != StringRef::npos) {
+      std::tie(CurLine, Lines) = Lines.split('\n');
+      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
+      unsigned End = CurLine.find("</string>");
+      return CurLine.substr(Begin, End - Begin).str();
+    }
+  }
+
+  return {};
+}
+
+std::string swift::getSDKBuildVersionFromPlist(StringRef Path) {
+  return getPlistEntry(Path, "ProductBuildVersion");
+}
+
+std::string swift::getSDKBuildVersion(StringRef Path) {
+  return getSDKBuildVersionFromPlist((llvm::Twine(Path) +
+    "/System/Library/CoreServices/SystemVersion.plist").str());
+}
+
+std::string swift::getSDKName(StringRef Path) {
+  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
+                                   "CanonicalName");
+  if (Name.empty() && Path.endswith(".sdk")) {
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
+  }
+  return Name;
+}

@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -37,8 +37,10 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
+  BuiltinMath.swift
   Character.swift
   CocoaArray.swift
+  Codable.swift
   Collection.swift
   CollectionAlgorithms.swift
   Comparable.swift
@@ -58,9 +60,11 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
+  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
+  ExistentialCollection.swift
   Filter.swift
   FixedArray.swift
   FlatMap.swift
@@ -91,6 +95,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  Mirrors.swift
   Misc.swift
   MutableCollection.swift
   NativeDictionary.swift
@@ -103,7 +108,9 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   PrefixWhile.swift
+  Prespecialize.swift
   Print.swift
+  PtrAuth.swift
   Random.swift
   RandomAccessCollection.swift
   Range.swift
@@ -113,6 +120,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
+  Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
   Sequence.swift
@@ -152,6 +160,7 @@ set(SWIFTLIB_ESSENTIAL
   StringNormalization.swift
   StringRangeReplaceableCollection.swift
   StringStorage.swift
+  StringStorageBridge.swift
   StringSwitch.swift
   StringTesting.swift
   StringUnicodeScalarView.swift
@@ -162,6 +171,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
+  UnavailableStringAPIs.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
@@ -184,24 +194,12 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-  BuiltinMath.swift.gyb
-  Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
-  Mirrors.swift.gyb
-  Runtime.swift.gyb
-  UnavailableStringAPIs.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
-
-# Compile differentiable programming sources only if enabled.
-set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES)
-if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-  # TODO: Add `_Differentiable` protocol.
-  message(STATUS "Differentiable programming standard library additions enabled.")
-endif()
 
 # The complete list of sources in the core standard library.  Includes
 # all the essential sources listed above.
@@ -211,22 +209,24 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
+  DiscontiguousSlice.swift
   Diffing.swift
+  FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
+  RangeSet.swift
+  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
-  ${SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES}
   )
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-  ExistentialCollection.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -288,11 +288,16 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
 endif()
 
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
+endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
+
+# STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
@@ -322,7 +327,7 @@ add_swift_target_library(swiftCore
                   PRIVATE_LINK_LIBRARIES
                     ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES
-                    swiftRuntime swiftStdlibStubs
+                    swiftRuntime swiftLLVMSupport swiftDemangling swiftStdlibStubs
                   FRAMEWORK_DEPENDS
                     ${swift_core_framework_depends}
                   INSTALL_IN_COMPONENT

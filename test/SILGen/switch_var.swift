@@ -537,14 +537,13 @@ func test_multiple_patterns1() {
   case (0, let x), (let x, 0):
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
-    // CHECK:     debug_value [[FIRST_X:%.*]] :
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X:%.*]] : $Int)
     // CHECK:   [[FIRST_FAIL]]:
     // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
     // CHECK:   [[SECOND_MATCH_CASE]]:
-    // CHECK:     debug_value [[SECOND_X:%.*]] :
-    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X:%.*]] : $Int)
     // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:     debug_value [[BODY_VAR]] : $Int, let, name "x"
     // CHECK:     [[A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
@@ -595,7 +594,7 @@ enum Foo {
 func test_multiple_patterns3() {
   let f = Foo.C(0, 1, 2.0)
   switch f {
-    // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
@@ -625,11 +624,11 @@ enum Bar {
 func test_multiple_patterns4() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
-    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt: [[Y:bb[0-9]+]], case #Bar.Z!enumelt: [[Z:bb[0-9]+]]
   case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
-    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
@@ -659,11 +658,11 @@ func aaa(x x: inout Int) {}
 func test_multiple_patterns5() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
-    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt: [[Y:bb[0-9]+]], case #Bar.Z!enumelt: [[Z:bb[0-9]+]]
   case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
-    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
@@ -704,7 +703,7 @@ func f(_: D) -> Bool { return true }
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}test_multiple_patterns_value_semantics
 func test_multiple_patterns_value_semantics(_ y: C) {
   switch y {
-    // CHECK:   checked_cast_br {{%.*}} : $C to $D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
+    // CHECK:   checked_cast_br {{%.*}} : $C to D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
     // CHECK: [[AS_D]]({{.*}}):
     // CHECK:   cond_br {{%.*}}, [[F_TRUE:bb[0-9]+]], [[F_FALSE:bb[0-9]+]]
     // CHECK: [[F_TRUE]]:

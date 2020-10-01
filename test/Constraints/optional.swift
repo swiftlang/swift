@@ -64,15 +64,17 @@ func test5() -> Int? {
 }
 
 func test6<T>(_ x : T) {
-  // FIXME: this code should work; T could be Int? or Int??
-  // or something like that at runtime.  rdar://16374053
-  _ = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  _ = x as? Int? // Okay.  We know nothing about T, so cannot judge.
 }
 
 class B : A { }
 
 func test7(_ x : A) {
-  _ = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
+  _ = x as? B? // Okay: Injecting into an Optional
+}
+
+func test7a(_ x : B) {
+  _ = x as? A // expected-warning{{conditional cast from 'B' to 'A' always succeeds}}
 }
 
 func test8(_ x : AnyObject?) {
@@ -371,5 +373,89 @@ func rdar_53238058() {
     _ = S(Double(str)) // expected-error {{value of optional type 'Double?' must be unwrapped to a value of type 'Double'}}
     // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}
+
+// SR-8411 - Inconsistent ambiguity with optional and non-optional inout-to-pointer
+func sr8411() {
+  struct S {
+    init(_ x: UnsafeMutablePointer<Int>) {}
+    init(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func foo(_ x: UnsafeMutablePointer<Int>) {}
+    static func foo(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func bar(_ x: UnsafeMutablePointer<Int>, _ y: Int) {}
+    static func bar(_ x: UnsafeMutablePointer<Int>?, _ y: Int) {}
+  }
+
+  var foo = 0
+
+  _ = S(&foo)      // Ok
+  _ = S.init(&foo) // Ok
+  S.foo(&foo)  // Ok
+  S.bar(&foo, 42) // Ok
+}
+
+// SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes
+func sr_11104() {
+  func bar(_: Int) {}
+
+  bar(["hello"].first)
+  // expected-error@-1 {{cannot convert value of type 'String?' to expected argument type 'Int'}}
+}
+
+// rdar://problem/57668873 - Too eager force optional unwrap fix
+
+@objc class Window {}
+
+@objc protocol WindowDelegate {
+  @objc optional var window: Window? { get set }
+}
+
+func test_force_unwrap_not_being_too_eager() {
+  struct WindowContainer {
+    unowned(unsafe) var delegate: WindowDelegate? = nil
+  }
+
+  let obj: WindowContainer = WindowContainer()
+  if let _ = obj.delegate?.window { // Ok
+  }
+}
+
+// rdar://problem/57097401
+func invalidOptionalChaining(a: Any) {
+  a == "="? // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (FloatingPointSign, FloatingPointSign), (String, String), (Unicode.CanonicalCombiningClass, Unicode.CanonicalCombiningClass)}}
+}
+
+// SR-12309 - Force unwrapping 'nil' compiles without warning
+func sr_12309() {
+  struct S {
+    var foo: Int
+  }
+
+  _ = S(foo: nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = (nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = (nil)! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = ((nil))! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil?)) // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil))? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil)?) // expected-error {{'nil' requires a contextual type}}
+  _ = nil // expected-error {{'nil' requires a contextual type}}
+  _ = (nil) // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil)) // expected-error {{'nil' requires a contextual type}}
+  _ = (((nil))) // expected-error {{'nil' requires a contextual type}}
+  _ = ((((((nil)))))) // expected-error {{'nil' requires a contextual type}}
+  _ = (((((((((nil))))))))) // expected-error {{'nil' requires a contextual type}}
+
+  func test_with_contextual_type_one() -> Int? {
+    return (nil) // Ok
+  }
+
+  func test_with_contextual_type_many() -> Int? {
+    return (((nil))) // Ok
   }
 }

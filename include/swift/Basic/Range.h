@@ -126,8 +126,8 @@ public:
       *this -= 1;
       return copy;
     }
-    bool operator==(iterator rhs) { return Value == rhs.Value; }
-    bool operator!=(iterator rhs) { return Value != rhs.Value; }
+    bool operator==(iterator rhs) const { return Value == rhs.Value; }
+    bool operator!=(iterator rhs) const { return Value != rhs.Value; }
 
     iterator &operator+=(difference_type i) {
       Value = Traits::addOffset(Value, i);

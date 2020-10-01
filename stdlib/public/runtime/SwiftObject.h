@@ -23,12 +23,12 @@
 #include <utility>
 #include "swift/Runtime/HeapObject.h"
 #if SWIFT_OBJC_INTEROP
-#include "llvm/Support/Compiler.h"
 #include <objc/NSObject.h>
 #endif
 
 
 #if SWIFT_OBJC_INTEROP
+#if __OBJC__
 
 // Source code: "SwiftObject"
 // Real class name: mangled "Swift._SwiftObject"
@@ -83,5 +83,13 @@ id getDescription(OpaqueValue *value, const Metadata *type);
 }
 
 #endif
+#endif
+
+namespace swift {
+
+/// Get the NSObject metadata.
+const Metadata *getNSObjectMetadata();
+
+}
 
 #endif

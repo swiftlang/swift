@@ -59,7 +59,7 @@ static llvm::StringMap<OpStatEntry> OpStats;
 void Mangler::recordOpStatImpl(StringRef op, size_t OldPos) {
   if (PrintSwiftManglingStats) {
     OpStatEntry &E = OpStats[op];
-    E.num++;
+    ++E.num;
     E.size += Storage.size() - OldPos;
   }
 }
@@ -200,8 +200,10 @@ void Mangler::appendIdentifier(StringRef ident) {
   recordOpStat("<identifier>", OldPos);
 }
 
-void Mangler::dump() {
-  llvm::errs() << Buffer.str() << '\n';
+void Mangler::dump() const {
+  // FIXME: const_casting because llvm::raw_svector_ostream::str() is
+  // incorrectly not marked const.
+  llvm::errs() << const_cast<Mangler*>(this)->Buffer.str() << '\n';
 }
 
 bool Mangler::tryMangleSubstitution(const void *ptr) {
@@ -216,7 +218,7 @@ bool Mangler::tryMangleSubstitution(const void *ptr) {
 void Mangler::mangleSubstitution(unsigned Idx) {
   if (Idx >= 26) {
 #ifndef NDEBUG
-    numLargeSubsts++;
+    ++numLargeSubsts;
 #endif
     return appendOperator("A", Index(Idx - 26));
   }
@@ -224,7 +226,7 @@ void Mangler::mangleSubstitution(unsigned Idx) {
   char Subst = Idx + 'A';
   if (SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ false)) {
 #ifndef NDEBUG
-    mergedSubsts++;
+    ++mergedSubsts;
 #endif
   } else {
     appendOperator("A", StringRef(&Subst, 1));

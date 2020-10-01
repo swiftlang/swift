@@ -18,8 +18,10 @@ import os.path
 import platform
 import sys
 
+from build_swift.build_swift import cache_utils
+from build_swift.build_swift.wrappers import xcrun
+
 from . import product
-from .. import cache_util
 from .. import shell
 
 
@@ -42,7 +44,7 @@ class NinjaBuilder(product.ProductBuilder):
         self.args = args
         self.toolchain = toolchain
 
-    @cache_util.reify
+    @cache_utils.reify
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')
 
@@ -52,7 +54,6 @@ class NinjaBuilder(product.ProductBuilder):
 
         env = None
         if platform.system() == "Darwin":
-            from .. import xcrun
             sysroot = xcrun.sdk_path("macosx")
             osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None
@@ -62,8 +63,8 @@ class NinjaBuilder(product.ProductBuilder):
                     "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
                 ).format(sysroot=sysroot, osx_version=osx_version_min),
                 "LDFLAGS": (
-                    "-mmacosx-version-min={osx_version}"
-                ).format(osx_version=osx_version_min),
+                    "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
+                ).format(sysroot=sysroot, osx_version=osx_version_min),
             }
         elif self.toolchain.cxx:
             env = {

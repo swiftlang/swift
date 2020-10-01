@@ -49,6 +49,26 @@ func testCallable(
   d(x1: 1, 2.0, x2: 3)
 }
 
+func testCallableDiagnostics(
+  a: Callable, b: DiscardableResult, c: Throwing, d: KeywordArgumentCallable
+) {
+  a("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  b("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  try? c(1, 2, 3, 4)
+  // expected-error@-1:10 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-2:13 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-3:16 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-4:19 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  d(x1: "hello", x2: "world")
+  // expected-error@-1:9  {{cannot convert value of type 'String' to expected argument type 'Float'}}
+  // expected-error@-2:22 {{cannot convert value of type 'String' to expected argument type 'Float'}}
+}
+
 func testIUO(
   a: Callable!, b: DiscardableResult!, c: Throwing!, d: KeywordArgumentCallable!
 ) {
@@ -78,7 +98,7 @@ func testFunction(a: CallableReturningFunction) {
 //===----------------------------------------------------------------------===//
 
 // Arguments' type may not be variadic.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
 @dynamicCallable
 struct Invalid1 {
   func dynamicallyCall(withArguments arguments: [Int]...) -> Int {
@@ -87,7 +107,7 @@ struct Invalid1 {
 }
 
 // Keyword arguments' key type must be ExpressibleByStringLiteral.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
 @dynamicCallable
 struct Invalid2 {
   func dynamicallyCall(
@@ -108,8 +128,8 @@ protocol NoKeywordProtocol {
 }
 
 func testInvalidKeywordCall(x: NoKeyword, y: NoKeywordProtocol & AnyObject) {
-  x(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeyword' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}}
-  y(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}}
+  x(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeyword' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
+  y(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{educational-notes=dynamic-callable-requirements}}
 }
 
 // expected-error @+1 {{'@dynamicCallable' attribute cannot be applied to this declaration}}
@@ -431,7 +451,7 @@ struct A {
 }
 
 func test9239() {
-  _ = A()() // ok
+  A()() // ok
 }
 
 // SR-10313
@@ -467,3 +487,37 @@ struct B {
 
 B()("hello") // ok
 B()("\(1)") // ok
+
+// SR-12019
+@dynamicCallable 
+struct SR12019_S {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T]) { // expected-note {{where 'T' = 'Int'}}
+    print("hi")	
+  }
+}
+
+@dynamicCallable
+protocol SR12019 {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T])  // expected-note 2{{where 'T' = 'Int'}}
+}
+
+class SR12019Class: SR12019 {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T]) {} // expected-note {{where 'T' = 'Int'}}
+}
+
+class SR12019SubClass: SR12019Class {}
+
+let sr12019s = SR12019_S()
+sr12019s(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Protocol composition
+let sr12019: SR12019&AnyObject = SR12019Class()
+sr12019(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Protocol
+let sr12019c: SR12019 = SR12019Class()
+sr12019c(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Subclass
+let sr12019sub = SR12019SubClass()
+sr12019sub(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}

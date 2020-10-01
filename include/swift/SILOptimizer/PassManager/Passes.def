@@ -64,10 +64,14 @@ PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessEnforcementWMO, "access-enforcement-wmo",
      "Access Enforcement Whole Module Optimization")
+PASS(CrossModuleSerializationSetup, "cross-module-serialization-setup",
+     "Setup serialization flags for cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
+PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
+     "Dump Accessed Storage Analysis Summaries")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
-     "Dump Accessed Storage Summary")
+     "Dump Accessed Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
@@ -118,6 +122,10 @@ PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies")
+PASS(COWOpts, "cow-opts",
+     "Optimize COW operations")
+PASS(Differentiation, "differentiation",
+     "Automatic Differentiation")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
@@ -148,6 +156,9 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
+PASS(DifferentiabilityWitnessDevirtualizer,
+     "differentiability-witness-devirtualizer",
+     "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
@@ -198,6 +209,8 @@ PASS(LICM, "licm",
      "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
+PASS(LateDeadFunctionElimination, "late-deadfuncelim",
+     "Late Dead Function Elimination")
 PASS(LateInliner, "late-inline",
      "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
@@ -230,8 +243,6 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
-PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
-     "Opaque archetype specializer")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
@@ -239,8 +250,13 @@ PASS(OwnershipModelEliminator, "ownership-model-eliminator",
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
+PASS(NonStdlibNonTransparentFunctionOwnershipModelEliminator,
+     "non-stdlib-non-transparent-func-ownership-model-eliminator",
+     "Eliminate Ownership Annotations from non-transparent SIL Functions only when not processing the stdlib.")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
+PASS(AlwaysInlineInliner, "always-inline",
+     "Inline always inline functions")
 PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
@@ -249,6 +265,10 @@ PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
      "Predictable Memory Access Optimizations for Diagnostics")
 PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
+PASS(RedundantPhiElimination, "redundant-phi-elimination",
+     "Redundant Phi Block Argument Elimination")
+PASS(PhiExpansion, "phi-expansion",
+     "Replace Phi arguments by their only used field")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -265,6 +285,8 @@ PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
+PASS(TempLValueOpt, "temp-lvalue-opt",
+     "Remove short-lived immutable temporary l-values")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
@@ -277,6 +299,8 @@ PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
+PASS(EarlySROA, "early-sroa",
+     "Scalar Replacement of Aggregate Stack Objects on high-level SIL")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
@@ -295,7 +319,9 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
-PASS(SwiftArrayOpts, "array-specialize",
+PASS(StringOptimization, "string-optimization",
+     "Optimization for String operations")
+PASS(SwiftArrayPropertyOpt, "array-property-opt",
      "Loop Specialization for Array Properties")
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
@@ -303,25 +329,33 @@ PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
+PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
+     "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
-PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
-     "Temporary pass for staging in mark_uninitialized changes.")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(CMOSerializeSILPass, "cmo-serialize-sil",
+     "Utility pass. Serializes the current SILModule for cross-module-optimization")
 PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
      "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
      "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
+PASS(ForEachLoopUnroll, "for-each-loop-unroll",
+     "Unroll forEach loops over array literals")
 PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
-PASS_RANGE(AllPasses, AADumper, BugReducerTester)
+PASS(OptRemarkGenerator, "sil-opt-remark-generator",
+     "Emit small peephole opt remarks that do not use large analyses")
+PASS(PruneVTables, "prune-vtables",
+     "Mark class methods that do not require vtable dispatch")
+PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
 #undef PASS

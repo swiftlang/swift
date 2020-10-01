@@ -3,8 +3,9 @@
 import PackageDescription
 import Foundation
 
-var unsupportedTests: Set<String> = ["ObjectiveCNoBridgingStubs"]
+var unsupportedTests: Set<String> = []
 #if !os(macOS) && !os(iOS) && !os(watchOS) && !os(tvOS)
+unsupportedTests.insert("ObjectiveCNoBridgingStubs")
 unsupportedTests.insert("ObjectiveCBridging")
 unsupportedTests.insert("ObjectiveCBridgingStubs")
 #endif
@@ -21,19 +22,19 @@ func getSingleSourceLibraries(subDirectory: String) -> [String] {
   let fileURLs = try! f.contentsOfDirectory(at: dirURL,
                                             includingPropertiesForKeys: nil)
   return fileURLs.compactMap { (path: URL) -> String? in
-    let c = path.lastPathComponent.split(separator: ".")
-    // Too many components. Must be a gyb file.
-    if c.count > 2 {
+    guard let lastDot = path.lastPathComponent.lastIndex(of: ".") else {
       return nil
     }
-    if c[1] != "swift" {
-      return nil
-    }
+    let ext = String(path.lastPathComponent.suffix(from: lastDot))
+    guard ext == ".swift" else { return nil }
 
-    let name = String(c[0])
+    let name = String(path.lastPathComponent.prefix(upTo: lastDot))
 
-    // We do not support this test.
+    // Test names must have a single component.
+    if name.contains(".") { return nil }
+
     if unsupportedTests.contains(name) {
+      // We do not support this test.
       return nil
     }
 
@@ -123,6 +124,15 @@ singleSourceDeps.append(.target(name: "ObjectiveCTests"))
 #endif
 
 targets += singleSourceLibraries.map { name in
+  if name == "ObjectiveCNoBridgingStubs" {
+    return .target(
+      name: name,
+      dependencies: singleSourceDeps,
+      path: "single-source",
+      sources: ["\(name).swift"],
+      swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                    "-disable-swift-bridge-attr"])])
+  }
   return .target(name: name,
       dependencies: singleSourceDeps,
       path: "single-source",

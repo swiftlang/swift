@@ -12,8 +12,8 @@ struct StructWithNonExcludedLetMembers : Codable { // expected-error {{type 'Str
     // AnyHashable does not conform to Codable.
     let p3: AnyHashable? // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
     // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
-    let p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
-    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
+    let p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable!' does not conform to 'Decodable'}}
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable!' does not conform to 'Encodable'}}
 }
 
 struct StructWithExcludedLetMembers : Codable { // expected-error {{type 'StructWithExcludedLetMembers' does not conform to protocol 'Decodable'}}
@@ -46,8 +46,8 @@ struct StructWithNonExcludedVarMembers : Codable { // expected-error {{type 'Str
     // AnyHashable does not conform to Codable.
     var p3: AnyHashable? // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
     // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
-    var p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
-    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
+    var p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable!' does not conform to 'Decodable'}}
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable!' does not conform to 'Encodable'}}
 }
 
 struct StructWithExcludedVarMembers : Codable {

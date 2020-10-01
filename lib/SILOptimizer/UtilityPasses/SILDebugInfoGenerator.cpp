@@ -51,7 +51,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
     uint64_t Pos = 0;
 
     void write_impl(const char *Ptr, size_t Size) override {
-      for (size_t Idx = 0; Idx < Size; Idx++) {
+      for (size_t Idx = 0; Idx < Size; ++Idx) {
         char c = Ptr[Idx];
         if (c == '\n')
         ++LineNum;

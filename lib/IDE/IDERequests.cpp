@@ -267,6 +267,12 @@ bool CursorInfoResolver::visitCallArgName(Identifier Name,
                                           ValueDecl *D) {
   if (isDone())
     return false;
+
+  // Handle invalid code where the called decl isn't actually callable, so this
+  // argument label doesn't really refer to it.
+  if (isa<ModuleDecl>(D))
+    return true;
+
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     CursorInfo.IsKeywordArgument = true;
@@ -297,7 +303,7 @@ bool CursorInfoResolver::rangeContainsLoc(CharSourceRange Range) const {
   return Range.contains(LocToResolve);
 }
 
-llvm::Expected<ide::ResolvedCursorInfo>
+ide::ResolvedCursorInfo
 CursorInfoRequest::evaluate(Evaluator &eval, CursorInfoOwner CI) const {
   if (!CI.isValid())
     return ResolvedCursorInfo();
@@ -314,7 +320,7 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto LC = SM.getLineAndColumn(owner.Loc);
+  auto LC = SM.getPresumedLineAndColumnForLoc(owner.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -325,7 +331,7 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
   out << "Resolved cursor info at ";
   auto &SM = info.SF->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*info.SF->getBufferID());
-  auto LC = SM.getLineAndColumn(info.Loc);
+  auto LC = SM.getPresumedLineAndColumnForLoc(info.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -486,7 +492,7 @@ private:
           // Unbox the brace statement to find its type.
           if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
             if (!BS->getElements().empty()) {
-              return resolveNodeType(BS->getElements().back(),
+              return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
             }
           }
@@ -571,7 +577,7 @@ private:
   }
 
   DeclContext *getImmediateContext() {
-    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
+    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); ++It) {
       if (auto *DC = It->Parent.getAsDeclContext())
         return DC;
     }
@@ -641,7 +647,7 @@ public:
     while(StartIt != AllTokens.end()) {
       if (StartIt->getKind() != tok::comment)
         break;
-      StartIt ++;
+      ++StartIt;
     }
 
     // Erroneous case.
@@ -734,7 +740,7 @@ public:
     for (auto N : Nodes) {
       if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
         if (S->getKind() == StmtKind::Case)
-          CaseCount++;
+          ++CaseCount;
       }
     }
     // If there are more than one case/default statements, there are more than
@@ -1046,8 +1052,8 @@ void swift::simple_display(llvm::raw_ostream &out,
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto SLC = SM.getLineAndColumn(owner.StartLoc);
-  auto ELC = SM.getLineAndColumn(owner.EndLoc);
+  auto SLC = SM.getPresumedLineAndColumnForLoc(owner.StartLoc);
+  auto ELC = SM.getPresumedLineAndColumnForLoc(owner.EndLoc);
   out << ": (" << SLC.first << ":" << SLC.second << ", "
     << ELC.first << ":" << ELC.second << ")";
 }
@@ -1060,7 +1066,7 @@ RangeInfoOwner::RangeInfoOwner(SourceFile *File, unsigned Offset,
   EndLoc = SM.getLocForOffset(BufferId, Offset + Length);
 }
 
-llvm::Expected<ide::ResolvedRangeInfo>
+ide::ResolvedRangeInfo
 RangeInfoRequest::evaluate(Evaluator &eval, RangeInfoOwner CI) const {
   if (!CI.isValid())
     return ResolvedRangeInfo();
@@ -1086,10 +1092,10 @@ static Type getContextFreeInterfaceType(ValueDecl *VD) {
   return VD->getInterfaceType();
 }
 
-llvm::Expected<ArrayRef<ValueDecl*>>
+ArrayRef<ValueDecl *>
 ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
   // Skip decls that don't have valid names.
-  if (!VD->getFullName())
+  if (!VD->getName())
     return ArrayRef<ValueDecl*>();
 
   // Check if VD is from a protocol extension.
@@ -1101,7 +1107,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
   // the same name with VD.
   ResolvedMemberResult LookupResult =
   resolveValueMember(*P->getInnermostDeclContext(),
-                     P->getDeclaredInterfaceType(), VD->getFullName());
+                     P->getDeclaredInterfaceType(), VD->getName());
 
   auto VDType = getContextFreeInterfaceType(VD);
   for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
@@ -1120,7 +1126,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
 //----------------------------------------------------------------------------//
 // CollectOverriddenDeclsRequest
 //----------------------------------------------------------------------------//
-llvm::Expected<ArrayRef<ValueDecl*>>
+ArrayRef<ValueDecl *>
 CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
                                         OverridenDeclsOwner Owner) const {
   std::vector<ValueDecl*> results;
@@ -1149,7 +1155,7 @@ CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
 //----------------------------------------------------------------------------//
 // ResolveProtocolNameRequest
 //----------------------------------------------------------------------------//
-llvm::Expected<ProtocolDecl*>
+ProtocolDecl *
 ResolveProtocolNameRequest::evaluate(Evaluator &evaluator,
                                      ProtocolNameOwner Input) const {
   auto &ctx = Input.DC->getASTContext();

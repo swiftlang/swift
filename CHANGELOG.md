@@ -6,7 +6,8 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
-| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
+| [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
 | [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
 | [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
 | [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
@@ -23,8 +24,338 @@ CHANGELOG
 
 </details>
 
+Swift Next
+----------
+
+* [SE-0284][]:
+
+  Functions, subscripts, and initializers may now have more than one variadic parameter, as long as all parameters which follow variadic parameters are labeled. This makes declarations like the following valid:
+
+  ```swift
+  func foo(_ a: Int..., b: Double...) { }
+
+  struct Bar {
+    subscript(a: Int..., b b: Int...) -> [Int] { a + b }
+
+    init(a: String..., b: Float...) { }
+  }
+  ```
+
+* [SE-0287][]:
+
+  Implicit member expressions now support chains of member accesses, making the following valid:
+  
+  ```swift
+  let milky: UIColor = .white.withAlphaComponent(0.5)
+  let milky2: UIColor = .init(named: "white")!.withAlphaComponent(0.5)
+  let milkyChance: UIColor? = .init(named: "white")?.withAlphaComponent(0.5)
+  ```
+  
+  As is the case with the existing implicit member expression syntax, the resulting type of the chain must be the same as the (implicit) base, so it is not well-formed to write:
+  
+  ```swift
+  let cgMilky: CGColor = .white.withAlphaComponent(0.5).cgColor
+  ```
+  
+  (Unless, of course, appropriate `white` and `withAlphaComponent` members were defined on `CGColor`.)
+  
+  Members of a "chain" can be properties, method calls, subscript accesses, force unwraps, or optional chaining question marks. Furthermore, the type of each member along the chain is permitted to differ (again, as long as the base of the chain matches the resulting type) meaning the following successfully typechecks:
+  
+  ```swift
+  struct Foo {
+    static var foo = Foo()
+    static var bar = Bar()
+    
+    var anotherFoo: Foo { Foo() }
+    func getFoo() -> Foo { Foo() }
+    var optionalFoo: Foo? { Foo() }
+    subscript() -> Foo { Foo() }
+  }
+  
+  struct Bar {
+    var anotherFoo = Foo()
+  }
+
+  let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
+  ```
+
+**Add new entries to the top of this section, not here!**
+
+Swift 5.3
+---------
+
+### 2020-09-16 (Xcode 12.0)
+
+* [SE-0279][] & [SE-0286][]:
+
+  Trailing closure syntax has been extended to allow additional labeled closures to follow the initial unlabeled closure:
+  
+  ```swift
+  // Single trailing closure argument
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  }
+  // Multiple trailing closure arguments
+  UIView.animate(withDuration: 0.3) {
+    self.view.alpha = 0
+  } completion: { _ in
+    self.view.removeFromSuperview()
+  }
+  ```
+  
+  Additionally, trailing closure arguments now match the appropriate parameter according to a forward-scan rule (as opposed to the previous backward-scan rule):
+  
+  ```swift
+  func takesClosures(first: () -> Void, second: (Int) -> Void = { _ in }) {}
+  
+  takesClosures {
+    print("First")
+  }
+  ```
+  
+  In the above example, the trailing closure argument matches parameter `first`, whereas pre-Swift-5.3 it would have matched `second`. In order to ease the transition to this new rule, cases in which the forward-scan and backward-scan match a single trailing closure to different parameters, the backward-scan result is preferred and a warning is emitted. This is expected to be upgraded to an error in the next major version of Swift.
+
+* [SR-7083][]:
+
+  Property observers such as `willSet` and `didSet` are now supported on `lazy` properties:
+
+  ```swift
+  class C {
+    lazy var property: Int = 0 {
+      willSet { print("willSet called!") } // Okay
+      didSet { print("didSet called!") } // Okay
+    }
+  }
+  ```
+
+  Note that the initial value of the property will be forced and made available as the `oldValue` for the `didSet` observer, if the property hasn't been accessed yet.
+  
+  ```swift
+  class C {
+    lazy var property: Int = 0 {
+      didSet { print("Old value: ", oldValue) }
+    }
+  }
+
+  let c = C()
+  c.property = 1 // Prints 'Old value: 0'
+  ```
+
+  This could have side-effects, for example if the lazy property's initializer is doing other work.
+
+* [SR-11700][]:
+
+  Exclusivity violations within code that computes the `default`
+  argument during Dictionary access are now diagnosed.
+
+  ```swift
+  struct Container {
+     static let defaultKey = 0
+
+     var dictionary = [defaultKey:0]
+
+     mutating func incrementValue(at key: Int) {
+       dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+     }
+  }
+  // error: overlapping accesses to 'self.dictionary', but modification requires exclusive access; consider copying to a local variable
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // note: conflicting access is here
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //                              ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+  ```
+
+  The exclusivity violation can be avoided by precomputing the `default`
+  argument using a local variable.
+
+  ```swift
+  struct Container {
+    static let defaultKey = 0
+
+    var dictionary = [defaultKey:0]
+
+    mutating func incrementValue(at key: Int) {
+      let defaultValue = dictionary[Container.defaultKey]!
+      dictionary[key, default: defaultValue] += 1
+    }
+  }
+  // No error.
+  ```
+
+* [SE-0268][]:
+  
+  A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
+  
+  ```swift
+  class C {
+    var value: Int = 0 {
+      didSet { print("didSet called!") }
+    }
+  }
+  
+  let c = C()
+  // This does not trigger a call to the getter for 'value'
+  // because the 'didSet' observer on 'value' does not
+  // refer to the 'oldValue' in its body, which means
+  // the 'oldValue' does not need to be fetched.
+  c.value = 1
+  ```
+  
+* [SE-0276][]:
+
+  Catch clauses in a `do`-`catch` statement can now include multiple patterns in a comma-separated list. The body of a `catch` clause will be executed if a thrown error matches any of its patterns.
+
+  ```swift
+  do {
+    try performTask()
+  } catch TaskError.someFailure(let msg),
+          TaskError.anotherFailure(let msg) {
+    showMessage(msg)
+  }
+  ```
+
+* [SE-0280][]:
+  
+  Enum cases can now satisfy static protocol requirements. A static get-only property of type `Self` can be witnessed by an enum case with no associated values and a static function with arguments and returning `Self` can be witnessed by an enum case with associated values.
+  
+  ```swift
+  protocol P {
+    static var foo: Self { get }
+    static func bar(value: Int) -> Self
+  }
+  
+  enum E: P {
+    case foo // matches 'static var foo'
+    case bar(value: Int) // matches 'static func bar(value:)'
+  }
+  ```
+
+* [SE-0267][]:
+  
+  Non-generic members that support a generic parameter list, including nested type declarations, are now allowed to carry a contextual `where` clause against outer generic parameters. Previously, such declarations could only be expressed by placing the member inside a dedicated constrained extension.
+
+  ```swift
+  struct Box<Wrapped> {
+    func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
+  }
+  ```
+  Since contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method. In practice, this implies any instance of `Derived` that can access `Base.foo` must also be able to access `Derived.foo`.
+  
+  ```swift
+  class Base<T> {
+    func foo() where T == Int { ... }
+  }
+  
+  class Derived<U>: Base<U> {
+    // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
+    override func foo() where U: Equatable { ... } 
+  }
+
+* [SR-75][]:
+
+  Unapplied references to protocol methods are now supported. Previously this
+  only worked for methods defined in structs, enums and classes.
+
+  ```swift
+  protocol Cat {
+    func play(catToy: Toy)
+  }
+
+  let fn = Cat.play(catToy:)
+  fn(myCat)(myToy)
+  ```
+
+* [SE-0266][]:
+  
+  Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
+  
+  ```swift
+  enum Foo: Comparable {
+    case a(Int), b(Int), c
+  }
+  
+  // .a(0) < .a(1) < .b(0) < .b(1) < .c
+  ```
+
+* [SE-0269][]:
+
+  When an escaping closure explicitly captures `self` in its capture list, the
+  use of implicit `self` is enabled within that closure. This means that the
+  following code is now valid:
+  
+  ```swift
+  func doStuff(_ stuff: @escaping () -> Void) {}
+  
+  class C {
+    var x = 0
+
+    func method() {
+      doStuff { [self] in
+        x += 1
+      }
+    }
+  }
+  ```
+  
+  This proposal also introduces new diagnostics for inserting `self` into the
+  closure's capture list in addition to the existing 'use `self.` explicitly'
+  fix-it.
+
+**Add new entries to the top of this section, not here!**
+
 Swift 5.2
 ---------
+
+### 2020-03-24 (Xcode 11.4)
+
+* [SR-11841][]:
+
+  When chaining calls to `filter(_:)` on a lazy sequence or collection, the
+  filtering predicates will now be called in the same order as eager filters.
+  
+  ```swift
+  let evens = (1...10).lazy
+      .filter { $0.isMultiple(of: 2) }
+      .filter { print($0); return true }
+  _ = evens.count
+  // Prints 2, 4, 6, 8, and 10 on separate lines
+  ```
+  
+  Previously, the predicates were called in reverse order.
+  
+* [SR-2790][]:
+
+  The compiler will now emit a warning when attempting to pass a temporary
+  pointer argument produced from an array, string, or inout argument to a
+  parameter which is known to escape it. This includes the various initializers 
+  for the `UnsafePointer`/`UnsafeBufferPointer` family of types, as well as
+  memberwise initializers.
+
+  ```swift
+  struct S {
+    var ptr: UnsafePointer<Int8>
+  }
+
+  func foo() {
+    var i: Int8 = 0
+    let ptr = UnsafePointer(&i)
+    // warning: initialization of 'UnsafePointer<Int8>' results in a 
+    // dangling pointer
+    
+    let s1 = S(ptr: [1, 2, 3]) 
+    // warning: passing '[Int8]' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+    
+    let s2 = S(ptr: "hello")
+    // warning: passing 'String' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+  }
+  ```
+
+  All 3 of the above examples are unsound because each argument produces a
+  temporary pointer only valid for the duration of the call they are passed to.
+  Therefore the returned value in each case references a dangling pointer.
 
 * [SR-2189][]:
 
@@ -118,13 +449,30 @@ Swift 5.2
   * `mutating func callAsFunction` is supported.
   * `func callAsFunction` works with `throws` and `rethrows`.
   * `func callAsFunction` works with trailing closures.
+  
+* [SE-0249][]:
+
+  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value` 
+  function is allowed. Such an expression is implicitly converted to a key path 
+  application of `{ $0[keyPath: \Root.value] }`.
+  
+  For example:
+  
+  ```swift
+  struct User {
+    let email: String
+    let isAdmin: Bool
+  }
+  
+  users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
+  ```
 
 * [SR-4206][]:
 
   A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
-  ```
+  ```swift
   protocol P {}
   
   class Base {
@@ -152,8 +500,6 @@ Swift 5.2
   let s = Subscriptable()
   print(s[0])
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.1
 ---------
@@ -394,8 +740,6 @@ Swift 5.1
 
   `Array` and `ContiguousArray` now have `init(unsafeUninitializedCapacity:initializingWith:)`,
   which provides access to the array's uninitialized storage.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.0
 ---------
@@ -7805,10 +8149,22 @@ Swift 1.0
 [SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
+[SE-0249]: <https://github.com/apple/swift-evolution/blob/master/proposals/0249-key-path-literal-function-expressions.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
+[SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
+[SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
+[SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
+[SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
+[SE-0279]: <https://github.com/apple/swift-evolution/blob/master/proposals/0279-multiple-trailing-closures.md>
+[SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
+[SE-0284]: <https://github.com/apple/swift-evolution/blob/master/proposals/0284-multiple-variadic-parameters.md>
+[SE-0286]: <https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md>
+[SE-0287]: <https://github.com/apple/swift-evolution/blob/master/proposals/0287-implicit-member-chains.md>
 
+[SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
 [SR-631]: <https://bugs.swift.org/browse/SR-631>
@@ -7824,11 +8180,13 @@ Swift 1.0
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-2790]: <https://bugs.swift.org/browse/SR-2790>
 [SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
 [SR-6118]: <https://bugs.swift.org/browse/SR-6118>
+[SR-7083]: <https://bugs.swift.org/browse/SR-7083>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
 [SR-7601]: <https://bugs.swift.org/browse/SR-7601>
@@ -7840,3 +8198,5 @@ Swift 1.0
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
+[SR-11700]: <https://bugs.swift.org/browse/SR-11700>
+[SR-11841]: <https://bugs.swift.org/browse/SR-11841>

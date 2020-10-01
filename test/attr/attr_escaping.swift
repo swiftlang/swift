@@ -44,6 +44,11 @@ struct StoresClosure {
     return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
+  func autoclosureDictPack(_ fn: @autoclosure () -> Int) -> [String: () -> Int] {
+    // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{46-46= @escaping}}
+    return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  }
+
   func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 
@@ -72,15 +77,11 @@ struct GenericStruct<T> {}
 
 func misuseEscaping(_ a: @escaping Int) {} // expected-error{{@escaping attribute only applies to function types}} {{26-36=}}
 func misuseEscaping(_ a: (@escaping Int)?) {} // expected-error{{@escaping attribute only applies to function types}} {{27-36=}}
-func misuseEscaping(opt a: @escaping ((Int) -> Int)?) {} // expected-error{{@escaping attribute only applies to function types}} {{28-38=}}
-  // expected-note@-1{{closure is already escaping in optional type argument}}
+func misuseEscaping(opt a: @escaping ((Int) -> Int)?) {} // expected-error{{closure is already escaping in optional type argument}} {{28-38=}}
 
-func misuseEscaping(_ a: (@escaping (Int) -> Int)?) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-36=}}
-  // expected-note@-1{{closure is already escaping in optional type argument}}
-func misuseEscaping(nest a: (((@escaping (Int) -> Int))?)) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{32-41=}}
-  // expected-note@-1{{closure is already escaping in optional type argument}}
-func misuseEscaping(iuo a: (@escaping (Int) -> Int)!) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{29-38=}}
-  // expected-note@-1{{closure is already escaping in optional type argument}}
+func misuseEscaping(_ a: (@escaping (Int) -> Int)?) {} // expected-error{{closure is already escaping in optional type argument}} {{27-36=}}
+func misuseEscaping(nest a: (((@escaping (Int) -> Int))?)) {} // expected-error{{closure is already escaping in optional type argument}} {{32-41=}}
+func misuseEscaping(iuo a: (@escaping (Int) -> Int)!) {} // expected-error{{closure is already escaping in optional type argument}} {{29-38=}}
 
 func misuseEscaping(_ a: Optional<@escaping (Int) -> Int>, _ b: Int) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{35-44=}}
 func misuseEscaping(_ a: (@escaping (Int) -> Int, Int)) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-36=}}
@@ -226,3 +227,6 @@ extension SR_9760 {
   func fiz<T>(_: T, _: @escaping F) {} // Ok
   func baz<T>(_: @escaping G<T>) {} // Ok
 }
+
+// SR-9178
+func foo<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}

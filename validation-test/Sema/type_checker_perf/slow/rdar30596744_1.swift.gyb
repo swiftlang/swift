@@ -1,5 +1,5 @@
 // RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s --expected-exit-code 1
-// REQUIRES: asserts
+// REQUIRES: asserts,no_asan
 
 % enum_cases = N
 % array_elements = 3

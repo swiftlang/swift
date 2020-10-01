@@ -91,20 +91,14 @@ public:
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
-static void deleteEndBorrows(SILValue v) {
-  SmallVector<SILInstruction *, 4> endBorrowList;
-  for (auto *use : v->getUses()) {
-    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-      endBorrowList.push_back(ebi);
-    }
-  }
-  while (!endBorrowList.empty()) {
-    endBorrowList.pop_back_val()->eraseFromParent();
-  }
-}
-
 /// Propagate/remove basic block input values when all predecessors
 /// supply the same arguments.
+///
+/// NOTE: Since BranchInst always forwards guaranteed and owned parameters the
+/// same way (like owned parameters), we do not need to add any special handling
+/// for guaranteed parameters here. This is because if all of the incoming
+/// values into my guaranteed phi is the same, then we know that said incoming
+/// value must dominate the phi by definition.
 static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   // This functions would simplify the code as following:
   //
@@ -185,16 +179,9 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
 
-    // If this argument is guaranteed and Args[Idx] is a SILFunctionArgument,
-    // delete the end_borrow.
-    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
-        isa<SILFunctionArgument>(Args[Idx])) {
-      deleteEndBorrows(Arg);
-    }
-
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);
-    NumBasicBlockArgsPropagated++;
+    ++NumBasicBlockArgsPropagated;
   }
 
   // Remove args from the block.
@@ -208,9 +195,8 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 static bool constantFoldEnumTerminator(SILBasicBlock &BB,
                                        UnreachableUserCodeReportingState *State,
                                        SwitchEnumInstBase *SUI,
-                                       const EnumElementDecl *TheEnumElem,
-                                       SILValue value = SILValue(),
-                                       SILValue defaultValue = SILValue()) {
+                                       EnumElementDecl *TheEnumElem,
+                                       EnumInst *EnumInst) {
   SILBasicBlock *TheSuccessorBlock = nullptr;
   int ReachableBlockIdx = -1;
   for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
@@ -251,11 +237,9 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
     // value.
     SILValue branchOperand;
     if (TheSuccessorBlock != DB) {
-      assert(value);
-      branchOperand = value;
+      branchOperand = B.createUncheckedEnumData(Loc, EnumInst, TheEnumElem);
     } else {
-      assert(defaultValue);
-      branchOperand = defaultValue;
+      branchOperand = EnumInst;
     }
     B.createBranch(Loc, TheSuccessorBlock, branchOperand);
   } else
@@ -293,7 +277,82 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
 
   LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
   recursivelyDeleteTriviallyDeadInstructions(SUI, true);
-  NumTerminatorsFolded++;
+  ++NumTerminatorsFolded;
+  return true;
+}
+
+static bool constantFoldEnumAddrTerminator(
+    SILBasicBlock &BB, UnreachableUserCodeReportingState *State,
+    SwitchEnumInstBase *SUI, const EnumElementDecl *TheEnumElem) {
+  SILBasicBlock *TheSuccessorBlock = nullptr;
+  int ReachableBlockIdx = -1;
+  for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+    const EnumElementDecl *EI;
+    SILBasicBlock *BI;
+    std::tie(EI, BI) = SUI->getCase(Idx);
+    if (EI == TheEnumElem) {
+      TheSuccessorBlock = BI;
+      ReachableBlockIdx = Idx;
+      break;
+    }
+  }
+
+  SILBasicBlock *DB = nullptr;
+  if (!TheSuccessorBlock) {
+    if (SUI->hasDefault()) {
+      DB = SUI->getDefaultBB();
+      if (!isa<UnreachableInst>(DB->getTerminator())) {
+        TheSuccessorBlock = DB;
+        ReachableBlockIdx = SUI->getNumCases();
+      }
+    }
+  }
+
+  // Not fully covered switches will be diagnosed later. SILGen represents
+  // them with a Default basic block with an unreachable instruction.
+  // We are going to produce an error on all unreachable instructions not
+  // eliminated by DCE.
+  if (!TheSuccessorBlock)
+    return false;
+
+  // Replace the switch with a branch to the TheSuccessorBlock.
+  SILBuilderWithScope B(&BB, SUI);
+  SILLocation Loc = SUI->getLoc();
+  B.createBranch(Loc, TheSuccessorBlock);
+
+  // Produce diagnostic info if we are not within an inlined function or
+  // template instantiation.
+  // FIXME: Do not report if we are within a template instantiation.
+  assert(ReachableBlockIdx >= 0);
+  if (Loc.is<RegularLocation>() && State) {
+    // Find the first unreachable block in the switch so that we could use
+    // it for better diagnostics.
+    SILBasicBlock *UnreachableBlock = nullptr;
+    if (SUI->getNumCases() > 1) {
+      // More than one case.
+      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getCase(1).second
+                                                  : SUI->getCase(0).second;
+    } else {
+      if (SUI->getNumCases() == 1 && SUI->hasDefault()) {
+        // One case and a default.
+        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getDefaultBB()
+                                                    : SUI->getCase(0).second;
+      }
+    }
+
+    // Generate diagnostic info.
+    if (UnreachableBlock &&
+        !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
+      State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
+      State->MetaMap.insert(std::pair<const SILBasicBlock *, UnreachableInfo>(
+          UnreachableBlock,
+          UnreachableInfo{UnreachableKind::FoldedSwitchEnum, Loc, true}));
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
+  recursivelyDeleteTriviallyDeadInstructions(SUI, true);
+  ++NumTerminatorsFolded;
   return true;
 }
 
@@ -469,7 +528,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         CondIsTrue = true;
       }
       recursivelyDeleteTriviallyDeadInstructions(TI, true);
-      NumInstructionsRemoved++;
+      ++NumInstructionsRemoved;
 
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
@@ -493,7 +552,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
             UnreachableInfo{UnreachableKind::FoldedBranch, Loc, CondIsTrue}));
       }
 
-      NumTerminatorsFolded++;
+      ++NumTerminatorsFolded;
       return true;
     }
   }
@@ -506,10 +565,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //   br bb2
   if (auto *SEI = dyn_cast<SwitchEnumInst>(TI)) {
     if (auto *TheEnum = dyn_cast<EnumInst>(SEI->getOperand())) {
-      SILValue operand =
-          TheEnum->hasOperand() ? TheEnum->getOperand() : SILValue();
       return constantFoldEnumTerminator(BB, State, SEI, TheEnum->getElement(),
-                                        operand /*case*/, TheEnum /*default*/);
+                                        TheEnum);
     }
   }
   if (auto *SEAI = dyn_cast<SwitchEnumAddrInst>(TI)) {
@@ -520,7 +577,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
     //
     // TODO: This needs a better name.
     if (auto *IEAI = getAllocStackSingleInitializingInjectEnumAddr(SEAI)) {
-      return constantFoldEnumTerminator(BB, State, SEAI, IEAI->getElement());
+      return constantFoldEnumAddrTerminator(BB, State, SEAI,
+                                            IEAI->getElement());
     }
   }
 
@@ -553,7 +611,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         SILBuilderWithScope B(&BB, TI);
         B.createBranch(TI->getLoc(), TheSuccessorBlock);
         recursivelyDeleteTriviallyDeadInstructions(TI, true);
-        NumTerminatorsFolded++;
+        ++NumTerminatorsFolded;
         return true;
       }
       
@@ -719,7 +777,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       // noreturn function and therefore dead.
       setOutsideBlockUsesToUndef(CurrentInst);
 
-      NumInstructionsRemoved++;
+      ++NumInstructionsRemoved;
       continue;
     }
 
@@ -917,7 +975,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
     // Drop references to other blocks.
     recursivelyDeleteTriviallyDeadInstructions(BB->getTerminator(), true);
-    NumInstructionsRemoved++;
+    ++NumInstructionsRemoved;
   }
 
   // Delete dead instructions and everything that could become dead after
@@ -934,7 +992,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   for (auto I = F.begin(), E = F.end(); I != E;)
     if (!Reachable.count(&*I)) {
       I = F.getBlocks().erase(I);
-      NumBlocksRemoved++;
+      ++NumBlocksRemoved;
     } else
       ++I;
 

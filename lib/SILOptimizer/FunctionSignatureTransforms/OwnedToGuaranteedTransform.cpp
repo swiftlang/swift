@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "fso-owned-to-guaranteed-transform"
 #include "FunctionSignatureOpts.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -56,7 +57,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
-  auto Args = F->begin()->getFunctionArguments();
+  auto Args = F->begin()->getSILFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -258,9 +259,12 @@ void FunctionSignatureTransform::OwnedToGuaranteedAddResultRelease(
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyze() {
   if (FSODisableOwnedToGuaranteed)
     return false;
+  SILFunction *F = TransformDescriptor.OriginalFunction;
+  if (F->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER))
+    return false;
 
-  bool Result = OwnedToGuaranteedAnalyzeResults();
-  bool Params = OwnedToGuaranteedAnalyzeParameters();
+  const bool Result = OwnedToGuaranteedAnalyzeResults();
+  const bool Params = OwnedToGuaranteedAnalyzeParameters();
   return Params || Result;
 }
 

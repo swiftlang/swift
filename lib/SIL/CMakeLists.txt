@@ -1,57 +1,15 @@
 add_swift_host_library(swiftSIL STATIC
-  AbstractionPattern.cpp
-  BasicBlockUtils.cpp
-  Bridging.cpp
-  DebugUtils.cpp
-  Dominance.cpp
-  DynamicCasts.cpp
-  InstructionUtils.cpp
-  MemAccessUtils.cpp
-  Linker.cpp
-  LinearLifetimeChecker.cpp
-  LoopInfo.cpp
-  MemoryLifetime.cpp
-  Notifications.cpp
-  OperandOwnership.cpp
-  OptimizationRemark.cpp
-  OwnershipUtils.cpp
-  PrettyStackTrace.cpp
-  Projection.cpp
-  SIL.cpp
-  SILArgument.cpp
-  SILBasicBlock.cpp
-  SILBuilder.cpp
-  SILConstants.cpp
-  SILCoverageMap.cpp
-  SILDebugScope.cpp
-  SILDeclRef.cpp
-  SILDefaultWitnessTable.cpp
-  SILFunction.cpp
-  SILFunctionType.cpp
-  SILGlobalVariable.cpp
-  SILInstruction.cpp
-  SILInstructions.cpp
-  SILInstructionWorklist.cpp
-  SILLocation.cpp
-  SILModule.cpp
-  SILFunctionBuilder.cpp
-  SILOpenedArchetypesTracker.cpp
-  SILPrinter.cpp
-  SILProfiler.cpp
-  SILSuccessor.cpp
-  SILType.cpp
-  SILUndef.cpp
-  SILValue.cpp
-  SILVerifier.cpp
-  SILOwnershipVerifier.cpp
-  SILVTable.cpp
-  SILWitnessTable.cpp
-  TypeLowering.cpp
-  ValueOwnership.cpp
-  ValueUtils.cpp)
+  SIL.cpp)
+target_link_libraries(swiftSIL PUBLIC
+  swiftDemangling)
 target_link_libraries(swiftSIL PRIVATE
   swiftSema
   swiftSerialization)
+
+add_subdirectory(IR)
+add_subdirectory(Utils)
+add_subdirectory(Verifier)
+add_subdirectory(Parser)
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftSIL depends on these

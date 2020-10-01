@@ -24,8 +24,8 @@ extension Conformance: P1 where A: P2 {
 
 
 // CHECK-LABEL: sil_witness_table hidden <A where A : P2> Conformance<A>: P1 module conditional_conformance {
-// CHECK-NEXT:    method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Conformance<A>
-// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Conformance<A>
+// CHECK-NEXT:    method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Conformance<A>
+// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Conformance<A>
 // CHECK-NEXT:    conditional_conformance (A: P2): dependent
 // CHECK-NEXT:  }
 
@@ -35,8 +35,8 @@ extension ConformanceAssoc: P1 where A: P4, A.AT: P2 {
   func generic<T: P3>(_: T) {}
 }
 // CHECK-LABEL: sil_witness_table hidden <A where A : P4, A.AT : P2> ConformanceAssoc<A>: P1 module conditional_conformance {
-// CHECK-NEXT:    method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16ConformanceAssocVyxGAA2P1A2A2P4RzAA2P22ATRpzlAaEP6normalyyFTW // protocol witness for P1.normal() in conformance <A> ConformanceAssoc<A>
-// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16ConformanceAssocVyxGAA2P1A2A2P4RzAA2P22ATRpzlAaEP7genericyyqd__AA2P3Rd__lFTW // protocol witness for P1.generic<A>(_:) in conformance <A> ConformanceAssoc<A>
+// CHECK-NEXT:    method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16ConformanceAssocVyxGAA2P1A2A2P4RzAA2P22ATRpzlAaEP6normalyyFTW // protocol witness for P1.normal() in conformance <A> ConformanceAssoc<A>
+// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16ConformanceAssocVyxGAA2P1A2A2P4RzAA2P22ATRpzlAaEP7genericyyqd__AA2P3Rd__lFTW // protocol witness for P1.generic<A>(_:) in conformance <A> ConformanceAssoc<A>
 // CHECK-NEXT:    conditional_conformance (A: P4): dependent
 // CHECK-NEXT:    conditional_conformance (A.AT: P2): dependent
 // CHECK-NEXT:  }
@@ -48,8 +48,8 @@ extension SameTypeConcrete: P1 where B == Int {
 }
 
 // CHECK-LABEL: sil_witness_table hidden <B where B == Int> SameTypeConcrete<B>: P1 module conditional_conformance {
-// CHECK-NEXT:    method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> SameTypeConcrete<A>
-// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> SameTypeConcrete<A>
+// CHECK-NEXT:    method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> SameTypeConcrete<A>
+// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> SameTypeConcrete<A>
 // CHECK-NEXT:  }
 
 struct SameTypeGeneric<C, D> {}
@@ -79,8 +79,8 @@ extension Base: P1 where A: P2 {
   func generic<T: P3>(_: T) {}
 }
 // CHECK-LABEL: sil_witness_table hidden <A where A : P2> Base<A>: P1 module conditional_conformance {
-// CHECK-NEXT:  method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Base<A>
-// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Base<A>
+// CHECK-NEXT:  method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Base<A>
+// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Base<A>
 // CHECK-NEXT:    conditional_conformance (A: P2): dependent
 // CHECK-NEXT:  }
 

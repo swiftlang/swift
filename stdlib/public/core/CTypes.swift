@@ -56,6 +56,12 @@ public typealias CLong = Int
 /// The C 'long long' type.
 public typealias CLongLong = Int64
 
+/// The C '_Float16' type.
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
+public typealias CFloat16 = Float16
+
 /// The C 'float' type.
 public typealias CFloat = Float
 
@@ -93,6 +99,8 @@ public typealias CLongDouble = Double
 #if arch(arm)
 public typealias CLongDouble = Double
 #endif
+#elseif os(OpenBSD)
+public typealias CLongDouble = Float80
 #endif
 
 // FIXME: Is it actually UTF-32 on Darwin?
@@ -141,7 +149,7 @@ public struct OpaquePointer {
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -149,14 +157,14 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafeMutablePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -164,7 +172,7 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafeMutablePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -279,6 +287,10 @@ extension CVaListPointer: CustomDebugStringConvertible {
 
 #endif
 
+/// Copy `size` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `src..<src + size` and
+/// `dest..<dest + size` should not overlap.
 @inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
@@ -293,10 +305,10 @@ internal func _memcpy(
     /*volatile:*/ false._value)
 }
 
-/// Copy `count` bytes of memory from `src` into `dest`.
+/// Copy `size` bytes of memory from `src` into `dest`.
 ///
-/// The memory regions `source..<source + count` and
-/// `dest..<dest + count` may overlap.
+/// The memory regions `src..<src + size` and
+/// `dest..<dest + size` may overlap.
 @inlinable
 internal func _memmove(
   dest destination: UnsafeMutableRawPointer,

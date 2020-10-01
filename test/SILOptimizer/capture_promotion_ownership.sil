@@ -172,7 +172,7 @@ bb0:
 // CHECK:   [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
-// CHECK:   [[METHOD_FOO:%.*]] = class_method [[ARG0_COPY]] : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+// CHECK:   [[METHOD_FOO:%.*]] = class_method [[ARG0_COPY]] : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK:   [[BORROWED_ARG0_COPY:%.*]] = begin_borrow [[ARG0_COPY]]
 // CHECK:   [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]([[BORROWED_ARG0_COPY]]) : $@convention(method) (@guaranteed Foo) -> Int
 // CHECK:   end_borrow [[BORROWED_ARG0_COPY]]
@@ -206,7 +206,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0
   // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load [copy] %1 : $*Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
   end_borrow %9 : $Foo
@@ -253,7 +253,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>):
   // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load [copy] %1 : $*Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
   end_borrow %9 : $Foo
@@ -318,7 +318,7 @@ bb0(%0: $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0>
   // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load [copy] %17 : $*Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
   end_borrow %9 : $Foo

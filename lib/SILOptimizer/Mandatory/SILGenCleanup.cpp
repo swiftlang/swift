@@ -52,14 +52,12 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
       SILInstruction *deadOperInst = *deadOperands.begin();
       // Make sure at least the first instruction is removed from the set.
       deadOperands.erase(deadOperInst);
-      recursivelyDeleteTriviallyDeadInstructions(
-        deadOperInst, false,
-        [&](SILInstruction *deadInst) {
-          LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
-          if (nextII == deadInst->getIterator())
-            ++nextII;
-          deadOperands.erase(deadInst);
-        });
+      eliminateDeadInstruction(deadOperInst, [&](SILInstruction *deadInst) {
+        LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
+        if (nextII == deadInst->getIterator())
+          ++nextII;
+        deadOperands.erase(deadInst);
+      });
     }
     return nextII;
   }

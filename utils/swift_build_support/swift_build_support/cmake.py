@@ -14,12 +14,15 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
+
+from __future__ import absolute_import, unicode_literals
 
 import os
 import platform
 import re
 from numbers import Number
+
+import six
 
 from . import shell
 
@@ -43,7 +46,7 @@ class CMakeOptions(object):
             value = self.true_false(value)
         if value is None:
             value = ""
-        elif not isinstance(value, (str, Number)):
+        elif not isinstance(value, six.string_types + (Number,)):
             raise ValueError('define: invalid value for key %s: %s (%s)' %
                              (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
@@ -177,7 +180,7 @@ class CMake(object):
 
         elif args.cmake_generator == 'Xcode':
             build_args += ['-parallelizeTargets',
-                           '-jobs', str(jobs)]
+                           '-jobs', six.text_type(jobs)]
 
         return build_args
 
@@ -242,7 +245,8 @@ class CMake(object):
 
         cwd = os.getcwd()
         os.chdir(cmake_build_dir)
-        shell.call_without_sleeping([cmake_bootstrap], echo=True)
+        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui', '--',
+                                    '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
         shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
                                     echo=True)
         os.chdir(cwd)
@@ -268,7 +272,7 @@ class CMake(object):
             cmake_binary = 'cmake'
 
         installed_ver = self.installed_cmake_version(cmake_binary)
-        if installed_ver > self.cmake_source_version(cmake_source_dir):
+        if installed_ver >= self.cmake_source_version(cmake_source_dir):
             return
         else:
             # Build CMake from source and return the path to the executable.

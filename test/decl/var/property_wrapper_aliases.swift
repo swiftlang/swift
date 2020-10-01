@@ -16,7 +16,7 @@ struct Wrapper<T> {
 struct OldWrapper<T> {
   var wrappedValue: T
 
-  var wrapperValue: Wrapper<T> { // expected-warning{{property wrapper's `wrapperValue` property should be renamed to 'projectedValue'; use of 'wrapperValue' is deprecated}}{{7-19=projectedValue}}
+  var wrapperValue: Wrapper<T> { // expected-warning{{property wrapper's 'wrapperValue' property should be renamed to 'projectedValue'; use of 'wrapperValue' is deprecated}}{{7-19=projectedValue}}
     return Wrapper(wrappedValue: wrappedValue)
   }
 }
@@ -25,7 +25,7 @@ struct OldWrapper<T> {
 struct OldWrapperWithInit<T> {
   var wrappedValue: T
 
-  init(initialValue: T) { // expected-warning{{property wrapper's `init(initialValue:)` should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-8=wrappedValue }}
+  init(initialValue: T) { // expected-warning{{property wrapper's 'init(initialValue:)' should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-8=wrappedValue }}
     self.wrappedValue = initialValue
   }
 }
@@ -34,7 +34,7 @@ struct OldWrapperWithInit<T> {
 struct OldWrapperWithInit2<T> {
   var wrappedValue: T
 
-  init(initialValue value: T) { // expected-warning{{property wrapper's `init(initialValue:)` should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-20=wrappedValue}}
+  init(initialValue value: T) { // expected-warning{{property wrapper's 'init(initialValue:)' should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-20=wrappedValue}}
     self.wrappedValue = value
   }
 }

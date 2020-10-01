@@ -50,8 +50,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       ${FOUNDATION_LIBRARY}
       swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
-  elseif(SWIFT_HOST_VARIANT STREQUAL "linux")
-    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES "atomic")
   elseif(SWIFT_HOST_VARIANT STREQUAL "freebsd")
     find_library(EXECINFO_LIBRARY execinfo)
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
@@ -76,6 +74,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
@@ -83,7 +83,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   # with swiftCore_EXPORTS to permit exporting the stdlib interfaces.
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE
-                               swiftCore_EXPORTS)
+                               swiftCore_EXPORTS
+                               SWIFT_INLINE_NAMESPACE=__runtime)
+
+  target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/include)
 
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests

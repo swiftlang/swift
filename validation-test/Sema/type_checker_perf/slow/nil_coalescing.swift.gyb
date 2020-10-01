@@ -1,6 +1,6 @@
 // RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts
-// REQUIRES: rdar38963783
+// REQUIRES: asserts,no_asan
+// REQUIRES: rdar38963783,no_asan
 
 func t(_ x: Int?) -> Int {
   return (x ?? 0)

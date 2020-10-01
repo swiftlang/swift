@@ -1,0 +1,18 @@
+RUN: swift-demangle -display-stdlib-module=true sSi | %FileCheck %s --check-prefix=SWIFT-INT
+SWIFT-INT: {{ Swift.Int$}}
+RUN: swift-demangle -display-stdlib-module=false sSi | %FileCheck %s --check-prefix=INT
+INT: {{ Int$}}
+
+RUN: swift-demangle -display-objc-module=true sSo6CGRectVD | %FileCheck %s --check-prefix=OBJC-CGRECT
+OBJC-CGRECT: {{ __C.CGRect$}}
+RUN: swift-demangle -display-objc-module=false sSo6CGRectVD | %FileCheck %s --check-prefix=CGRECT
+CGRECT: {{ CGRect$}}
+
+RUN: swift-demangle -hiding-module=foo _TtC3foo3bar | %FileCheck %s --check-prefix=BAR
+BAR: {{ bar$}}
+
+RUN: swift-demangle -display-local-name-contexts=true s1a4mainyyFySRys5UInt8VGXEfU4_10ByteBufferL_aD | %FileCheck %s --check-prefix=LOCAL
+LOCAL: ByteBuffer #1 in closure #6
+
+RUN: swift-demangle -display-local-name-contexts=false s1a4mainyyFySRys5UInt8VGXEfU4_10ByteBufferL_aD | %FileCheck %s --check-prefix=NOLOCAL
+NOLOCAL: {{ ByteBuffer$}}

@@ -33,6 +33,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include <inttypes.h>
+
 namespace swift {
 namespace remote {
 
@@ -163,6 +165,7 @@ public:
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
 
 private:
@@ -346,11 +349,34 @@ public:
 
   std::shared_ptr<MemoryReader> Reader;
 
+  StoredPointer PtrAuthMask;
+
+  StoredPointer stripSignedPointer(StoredSignedPointer P) {
+    return P.SignedValue & PtrAuthMask;
+  }
+
+  RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
+    if (P.isResolved()) {
+      return RemoteAbsolutePointer("", 
+        P.getResolvedAddress().getAddressData() & PtrAuthMask);
+    }
+    return P;
+  }
+
+  StoredPointer queryPtrAuthMask() {
+    StoredPointer QueryResult;
+    if (Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
+                                nullptr, &QueryResult)) {
+      return QueryResult;
+    }
+    return ~StoredPointer(0);
+  }
+
   template <class... T>
   MetadataReader(std::shared_ptr<MemoryReader> reader, T &&... args)
     : Builder(std::forward<T>(args)...),
-      Reader(std::move(reader)) {
-
+      Reader(std::move(reader)),
+      PtrAuthMask(queryPtrAuthMask()) {
   }
 
   MetadataReader(const MetadataReader &other) = delete;
@@ -383,7 +409,7 @@ public:
       RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
         if (auto indirectAddress = readPointer(remoteAddress)) {
-          resolved = *indirectAddress;
+          resolved = stripSignedPointer(*indirectAddress);
         } else {
           return nullptr;
         }
@@ -437,12 +463,13 @@ public:
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(NodePointer Node) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  decodeMangledType(NodePointer Node) {
     return swift::Demangle::decodeMangledType(Builder, Node);
   }
 
   /// Get the remote process's swift_isaMask.
-  Optional<StoredPointer> readIsaMask() {
+  llvm::Optional<StoredPointer> readIsaMask() {
     auto encoding = getIsaEncoding();
     if (encoding != IsaEncodingKind::Masked) {
       // Still return success if there's no isa encoding at all.
@@ -456,7 +483,7 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
-  Optional<MetadataKind>
+  llvm::Optional<MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta) return None;
@@ -477,12 +504,13 @@ public:
 
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
-  Optional<unsigned>
-  readInstanceStartAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+  llvm::Optional<unsigned> readInstanceStartAndAlignmentFromClassMetadata(
+      StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
       return None;
 
+#if SWIFT_OBJC_INTEROP
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
@@ -498,12 +526,29 @@ public:
       return None;
 
     return start;
+#else
+    // All swift class instances start with an isa pointer,
+    // followed by the retain counts (which are the size of a long long).
+    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+    size_t start = isaAndRetainCountSize;
+
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    while (classMeta->Superclass) {
+      classMeta = cast<TargetClassMetadata<Runtime>>(
+          readMetadata(classMeta->Superclass));
+
+      // Subtract the size contribution of the isa and retain counts from 
+      // the super class.
+      start += classMeta->InstanceSize - isaAndRetainCountSize;
+    }
+    return start;
+#endif
   }
 
   /// Given a pointer to the metadata, attempt to read the value
   /// witness table. Note that it's not safe to access any non-mandatory
   /// members of the value witness table, like extra inhabitants or enum members.
-  Optional<TargetValueWitnessTable<Runtime>>
+  llvm::Optional<TargetValueWitnessTable<Runtime>>
   readValueWitnessTable(StoredPointer MetadataAddress) {
     // The value witness table pointer is at offset -1 from the metadata
     // pointer, that is, the pointer-sized word immediately before the
@@ -524,7 +569,7 @@ public:
   /// pointer to its metadata address, its value address, and whether this
   /// is a toll-free-bridged NSError or an actual Error existential wrapper
   /// around a native Swift value.
-  Optional<RemoteExistential>
+  llvm::Optional<RemoteExistential>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
@@ -605,7 +650,7 @@ public:
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
   /// metadata address and its value.
-  Optional<RemoteExistential>
+  llvm::Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
@@ -681,8 +726,8 @@ public:
 
     // Swift-native protocol.
     auto Demangled =
-      readDemanglingForContextDescriptor(ProtocolAddress.getSwiftProtocol(),
-                                         dem);
+      readDemanglingForContextDescriptor(
+        stripSignedPointer({ProtocolAddress.getSwiftProtocol()}), dem);
     if (!Demangled)
       return resolver.failure();
 
@@ -733,8 +778,8 @@ public:
           !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
         return BuiltType();
 
-      auto BuiltTuple = Builder.createTupleType(elementTypes, std::move(labels),
-                                                /*variadic*/ false);
+      auto BuiltTuple =
+          Builder.createTupleType(elementTypes, std::move(labels));
       TypeCache[MetadataAddress] = BuiltTuple;
       return BuiltTuple;
     }
@@ -759,7 +804,8 @@ public:
 
       auto flags = FunctionTypeFlags()
                        .withConvention(Function->getConvention())
-                       .withThrows(Function->throws())
+                       .withAsync(Function->isAsync())
+                       .withThrows(Function->isThrowing())
                        .withParameterFlags(Function->hasParameterFlags())
                        .withEscaping(Function->isEscaping());
       auto BuiltFunction =
@@ -799,7 +845,7 @@ public:
 
 #if SWIFT_OBJC_INTEROP
         BuiltProtocolDecl objcProtocol(StringRef name) {
-          return builder.createObjCProtocolDecl(name);
+          return builder.createObjCProtocolDecl(name.str());
         }
 #endif
       } resolver{Builder};
@@ -880,8 +926,8 @@ public:
     swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
-  BuiltType readTypeFromMangledName(const char *MangledTypeName,
-                                    size_t Length) {
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
+  readTypeFromMangledName(const char *MangledTypeName, size_t Length) {
     Demangle::Demangler Dem;
     Demangle::NodePointer Demangled =
       Dem.demangleSymbol(StringRef(MangledTypeName, Length));
@@ -1053,11 +1099,16 @@ public:
       demangledSymbol = demangledSymbol->getChild(0);
       assert(demangledSymbol->getKind() == Demangle::Node::Kind::Type);
       break;
-    // We don't handle pointers to other symbols yet.
-    // TODO: Opaque type descriptors could be useful.
+    // Pointers to opaque type descriptors demangle to the name of the opaque
+    // type declaration.
+    case Demangle::Node::Kind::OpaqueTypeDescriptor:
+      demangledSymbol = demangledSymbol->getChild(0);
+      break;
+      // We don't handle pointers to other symbols yet.
     default:
       return nullptr;
     }
+  
     return demangledSymbol;
   }
   
@@ -1133,14 +1184,14 @@ public:
                                 MangledNameKind::Type, Dem);
   }
 
-  BuiltType
+  TypeLookupErrorOr<typename BuilderType::BuiltType>
   readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
                                             unsigned ordinal) {
     Demangle::Demangler Dem;
     auto node = readUnderlyingTypeManglingForOpaqueTypeDescriptor(contextAddr,
                                                                   ordinal, Dem);
     if (!node)
-      return BuiltType();
+      return TypeLookupError("Failed to read type mangling for descriptor.");
     return decodeMangledType(node);
   }
 
@@ -1152,10 +1203,11 @@ public:
   }
 
   /// Read the isa pointer of an Object-C tagged pointer value.
-  Optional<StoredPointer>
+  llvm::Optional<StoredPointer>
   readMetadataFromTaggedPointer(StoredPointer objectAddress) {
-    auto readArrayElement = [&](StoredPointer base, StoredPointer tag)
-        -> Optional<StoredPointer> {
+    auto readArrayElement =
+        [&](StoredPointer base,
+            StoredPointer tag) -> llvm::Optional<StoredPointer> {
       StoredPointer addr = base + tag * sizeof(StoredPointer);
       StoredPointer isa;
       if (!Reader->readInteger(RemoteAddress(addr), &isa))
@@ -1181,7 +1233,7 @@ public:
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  Optional<StoredPointer>
+  llvm::Optional<StoredPointer>
   readMetadataFromInstance(StoredPointer objectAddress) {
     if (isTaggedPointer(objectAddress))
       return readMetadataFromTaggedPointer(objectAddress);
@@ -1252,9 +1304,8 @@ public:
   ///
   /// The offset is in units of words, from the start of the class's
   /// metadata.
-  Optional<int32_t>
-  readGenericArgsOffset(MetadataRef metadata,
-                        ContextDescriptorRef descriptor) {
+  llvm::Optional<int32_t>
+  readGenericArgsOffset(MetadataRef metadata, ContextDescriptorRef descriptor) {
     switch (descriptor->getKind()) {
     case ContextDescriptorKind::Class: {
       auto type = cast<TargetClassDescriptor<Runtime>>(descriptor);
@@ -1290,7 +1341,7 @@ public:
   using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
 
   // This follows computeMetadataBoundsForSuperclass.
-  Optional<ClassMetadataBounds>
+  llvm::Optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
     if (!subclass->hasResilientSuperclass())
@@ -1303,34 +1354,34 @@ public:
     }
 
     return forTypeReference<ClassMetadataBounds>(
-      subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
-      [&](ContextDescriptorRef superclass)
-            -> Optional<ClassMetadataBounds> {
-        if (!isa<TargetClassDescriptor<Runtime>>(superclass))
-          return None;
-        return readMetadataBoundsOfSuperclass(superclass);
-      },
-      [&](MetadataRef metadata) -> Optional<ClassMetadataBounds> {
-        auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
-        if (!cls)
-          return None;
+        subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
+        [&](ContextDescriptorRef superclass)
+            -> llvm::Optional<ClassMetadataBounds> {
+          if (!isa<TargetClassDescriptor<Runtime>>(superclass))
+            return None;
+          return readMetadataBoundsOfSuperclass(superclass);
+        },
+        [&](MetadataRef metadata) -> llvm::Optional<ClassMetadataBounds> {
+          auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
+          if (!cls)
+            return None;
 
-        return cls->getClassBoundsAsSwiftSuperclass();
-      },
-      [](StoredPointer objcClassName) -> Optional<ClassMetadataBounds> {
-        // We have no ability to look up an ObjC class by name.
-        // FIXME: add a query for this; clients may have a way to do it.
-        return None;
-      });
+          return cls->getClassBoundsAsSwiftSuperclass();
+        },
+        [](StoredPointer objcClassName) -> llvm::Optional<ClassMetadataBounds> {
+          // We have no ability to look up an ObjC class by name.
+          // FIXME: add a query for this; clients may have a way to do it.
+          return None;
+        });
   }
 
   template <class Result, class DescriptorFn, class MetadataFn,
             class ClassNameFn>
-  Optional<Result>
-  forTypeReference(TypeReferenceKind refKind, StoredPointer ref,
-                   const DescriptorFn &descriptorFn,
-                   const MetadataFn &metadataFn,
-                   const ClassNameFn &classNameFn) {
+  llvm::Optional<Result> forTypeReference(TypeReferenceKind refKind,
+                                          StoredPointer ref,
+                                          const DescriptorFn &descriptorFn,
+                                          const MetadataFn &metadataFn,
+                                          const ClassNameFn &classNameFn) {
     switch (refKind) {
     case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
@@ -1370,7 +1421,7 @@ public:
 
   /// Read a single generic type argument from a bound generic type
   /// metadata.
-  Optional<StoredPointer>
+  llvm::Optional<StoredPointer>
   readGenericArgFromMetadata(StoredPointer metadata, unsigned index) {
     auto Meta = readMetadata(metadata);
     if (!Meta)
@@ -1443,7 +1494,7 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  Optional<StoredPointer>
+  llvm::Optional<StoredPointer>
   readOffsetToFirstCaptureFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
@@ -1452,12 +1503,13 @@ public:
     auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return heapMeta->OffsetToFirstCapture;
   }
-  
-  Optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
+
+  llvm::Optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
     return Reader->readPointer(RemoteAddress(address), sizeof(StoredPointer));
   }
-  
-  Optional<StoredPointer> readResolvedPointerValue(StoredPointer address) {
+
+  llvm::Optional<StoredPointer>
+  readResolvedPointerValue(StoredPointer address) {
     if (auto pointer = readPointer(address)) {
       if (!pointer->isResolved())
         return None;
@@ -1465,7 +1517,7 @@ public:
     }
     return None;
   }
-  
+
   template<typename T, typename U>
   RemoteAbsolutePointer resolvePointerField(RemoteRef<T> base,
                                             const U &field) {
@@ -1475,7 +1527,7 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  Optional<RemoteAbsolutePointer>
+  llvm::Optional<RemoteAbsolutePointer>
   readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
@@ -1496,16 +1548,16 @@ protected:
                             RemoteRef<Base> base, const Field &field) {
     return (StoredPointer)base.resolveRelativeFieldData(field);
   }
-  
-  template<typename Base, typename Field>
-  Optional<RemoteAbsolutePointer> resolveRelativeIndirectableField(
-                            RemoteRef<Base> base, const Field &field) {
+
+  template <typename Base, typename Field>
+  llvm::Optional<RemoteAbsolutePointer>
+  resolveRelativeIndirectableField(RemoteRef<Base> base, const Field &field) {
     auto fieldRef = base.getField(field);
     int32_t offset;
     memcpy(&offset, fieldRef.getLocalBuffer(), sizeof(int32_t));
     
     if (offset == 0)
-      return Optional<RemoteAbsolutePointer>(nullptr);
+      return llvm::Optional<RemoteAbsolutePointer>(nullptr);
     bool indirect = offset & 1;
     offset &= ~1u;
     
@@ -1516,7 +1568,10 @@ protected:
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
-      return readPointer(resultAddress);
+      if (auto ptr = readPointer(resultAddress)) {
+        return stripSignedPointer(*ptr);
+      }
+      return None;
     }
     
     return RemoteAbsolutePointer("", resultAddress);
@@ -1655,25 +1710,6 @@ protected:
     return nullptr;
   }
 
-private:
-  template <template <class R> class M>
-  MetadataRef _readMetadata(StoredPointer address) {
-    return _readMetadata(address, sizeof(M<Runtime>));
-  }
-
-  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
-    auto size = sizeAfter;
-    uint8_t *buffer = (uint8_t *) malloc(size);
-    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
-      free(buffer);
-      return nullptr;
-    }
-
-    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
-    return MetadataRef(address, metadata);
-  }
-
   StoredPointer
   readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
                                      bool skipArtificialSubclasses = false) {
@@ -1681,7 +1717,11 @@ private:
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
-        auto descriptorAddress = classMeta->getDescription();
+        if (!classMeta->isTypeMetadata())
+          return 0;
+
+        StoredSignedPointer descriptorAddressSigned = classMeta->getDescriptionAsSignedPointer();
+        StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
 
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
@@ -1709,22 +1749,45 @@ private:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
-      return valueMeta->getDescription();
+      StoredSignedPointer descriptorAddressSigned = valueMeta->getDescriptionAsSignedPointer();
+      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      return descriptorAddress;
     }
         
     case MetadataKind::ForeignClass: {
       auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
-      return foreignMeta->Description;
+      StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
+      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      return descriptorAddress;
     }
 
     default:
       return 0;
     }
   }
-  
+
+private:
+  template <template <class R> class M>
+  MetadataRef _readMetadata(StoredPointer address) {
+    return _readMetadata(address, sizeof(M<Runtime>));
+  }
+
+  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
+    auto size = sizeAfter;
+    uint8_t *buffer = (uint8_t *) malloc(size);
+    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
+      free(buffer);
+      return nullptr;
+    }
+
+    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
+    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
+    return MetadataRef(address, metadata);
+  }
+
   /// Returns Optional(ParentContextDescriptorRef()) if there's no parent descriptor.
   /// Returns None if there was an error reading the parent descriptor.
-  Optional<ParentContextDescriptorRef>
+  llvm::Optional<ParentContextDescriptorRef>
   readParentContextDescriptor(ContextDescriptorRef base) {
     auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
@@ -1758,9 +1821,9 @@ private:
   }
 
   /// Read the name from a module, type, or protocol context descriptor.
-  Optional<std::string> readContextDescriptorName(
+  llvm::Optional<std::string> readContextDescriptorName(
       ContextDescriptorRef descriptor,
-      Optional<TypeImportInfo<std::string>> &importInfo) {
+      llvm::Optional<TypeImportInfo<std::string>> &importInfo) {
     std::string name;
     auto context = descriptor.getLocalBuffer();
 
@@ -1924,11 +1987,10 @@ private:
   /// If we have a context whose parent context is an anonymous context
   /// that provides the local/private name for the current context,
   /// produce a mangled node describing the name of \c context.
-  Demangle::NodePointer
-  adoptAnonymousContextName(ContextDescriptorRef contextRef,
-                        Optional<ParentContextDescriptorRef> &parentContextRef,
-                        Demangler &dem,
-                        Demangle::NodePointer &outerNode) {
+  Demangle::NodePointer adoptAnonymousContextName(
+      ContextDescriptorRef contextRef,
+      llvm::Optional<ParentContextDescriptorRef> &parentContextRef,
+      Demangler &dem, Demangle::NodePointer &outerNode) {
     outerNode = nullptr;
 
     // Bail if there is no parent, or if the parent is in another image.
@@ -1976,7 +2038,7 @@ private:
       return nullptr;
 
     // Read the name of the current context.
-    Optional<TypeImportInfo<std::string>> importInfo;
+    llvm::Optional<TypeImportInfo<std::string>> importInfo;
     auto contextName = readContextDescriptorName(contextRef, importInfo);
     if (!contextName)
       return nullptr;
@@ -2093,7 +2155,7 @@ private:
     }
 
     Demangle::Node::Kind nodeKind;
-    Optional<TypeImportInfo<std::string>> importInfo;
+    llvm::Optional<TypeImportInfo<std::string>> importInfo;
 
     auto getContextName = [&]() -> bool {
       if (nameNode)
@@ -2152,6 +2214,8 @@ private:
         readMangledName(RemoteAddress(extendedContextAddress),
                         MangledNameKind::Type,
                         dem);
+      if (!demangledExtendedContext)
+        return nullptr;
 
       auto demangling = dem.createNode(Node::Kind::Extension);
       demangling->addChild(parentDemangling, dem);
@@ -2583,6 +2647,7 @@ private:
     // WARNING: the following algorithm works on current modern Apple
     // runtimes but is not actually ABI.  But it is pretty reliable.
 
+#if SWIFT_OBJC_INTEROP
     StoredPointer dataPtr;
     if (!Reader->readInteger(RemoteAddress(classAddress +
                                TargetClassMetadata<Runtime>::offsetToData()),
@@ -2609,18 +2674,25 @@ private:
 
     // Otherwise, it's the RW-data; read the RO-data pointer from a
     // well-known position within the RW-data.
+    StoredSignedPointer signedDataPtr;
     static constexpr uint32_t OffsetToROPtr = 8;
-    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &dataPtr))
+    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &signedDataPtr))
       return StoredPointer();
+    dataPtr = stripSignedPointer(signedDataPtr);
 
     // Newer Objective-C runtimes implement a size optimization where the RO
     // field is a tagged union. If the low-bit is set, then the pointer needs
     // to be dereferenced once more to yield the real class_ro_t pointer.
-    if (dataPtr & 1)
-      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &dataPtr))
+    if (dataPtr & 1) {
+      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &signedDataPtr))
         return StoredPointer();
+      dataPtr = stripSignedPointer(signedDataPtr);
+    }
 
     return dataPtr;
+#else
+    return StoredPointer();
+#endif
   }
 
   IsaEncodingKind getIsaEncoding() {

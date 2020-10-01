@@ -325,6 +325,10 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
+void AbsolutePosition::dump() const {
+  dump(llvm::errs());
+}
+
 void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
                         OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
                         ArrayRef<TriviaPiece> TrailingTrivia) {

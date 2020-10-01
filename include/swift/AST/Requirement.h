@@ -18,6 +18,7 @@
 #define SWIFT_AST_REQUIREMENT_H
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -126,7 +127,7 @@ public:
   /// Get the canonical form of this requirement.
   Requirement getCanonical() const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
   void print(ASTPrinter &printer, const PrintOptions &opts) const;
@@ -141,7 +142,7 @@ public:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-      second = hash_value(requirement.getSecondType());
+      second = hash_value(requirement.getSecondType().getPointer());
       break;
 
     case RequirementKind::Layout:

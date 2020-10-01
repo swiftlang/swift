@@ -1,8 +1,8 @@
-//===--- Algorithms.swift.gyb ---------------------------------*- swift -*-===//
+//===--- Algorithms.swift -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -263,11 +263,11 @@ extension MutableCollection where Self: RandomAccessCollection {
     // If the difference moving forward and backward are relative primes,
     // the entire rotation will be completed in one cycle. Otherwise, repeat
     // cycle, moving the start point forward with each cycle.
-    let cycles = _gcd(numericCast(plus), -numericCast(minus))
+    let cycles = _gcd(plus, -minus)
 
     for cycle in 1...cycles {
       _rotateCycle(
-        start: index(startIndex, offsetBy: numericCast(cycle)),
+        start: index(startIndex, offsetBy: cycle),
         sourceOffsetForIndex: { $0 < pivot ? plus : minus })
     }
     return pivot
@@ -412,13 +412,13 @@ extension Concatenation : RandomAccessCollection
     case let .first(i):
       let d: Int = _base1.distance(from: i, to: _base1.endIndex)
       if n < d {
-        return Index(first: _base1.index(i, offsetBy: numericCast(n)))
+        return Index(first: _base1.index(i, offsetBy: n))
       } else {
         return Index(
-          second: _base2.index(_base2.startIndex, offsetBy: numericCast(n - d)))
+          second: _base2.index(_base2.startIndex, offsetBy: n - d))
       }
     case let .second(i):
-      return Index(second: _base2.index(i, offsetBy: numericCast(n)))
+      return Index(second: _base2.index(i, offsetBy: n))
     }
   }
 
@@ -427,14 +427,14 @@ extension Concatenation : RandomAccessCollection
   ) -> Index {
     switch i._position {
     case let .first(i):
-      return Index(first: _base1.index(i, offsetBy: -numericCast(n)))
+      return Index(first: _base1.index(i, offsetBy: -n))
     case let .second(i):
       let d: Int = _base2.distance(from: _base2.startIndex, to: i)
       if n <= d {
-        return Index(second: _base2.index(i, offsetBy: -numericCast(n)))
+        return Index(second: _base2.index(i, offsetBy: -n))
       } else {
         return Index(
-          first: _base1.index(_base1.endIndex, offsetBy: -numericCast(n - d)))
+          first: _base1.index(_base1.endIndex, offsetBy: -(n - d)))
       }
     }
   }
@@ -613,6 +613,11 @@ extension Collection {
   /// The collection must already be partitioned according to the
   /// predicate, as if `self.partition(by: predicate)` had already
   /// been called.
+  ///
+  /// - Efficiency: At most log(N) invocations of `predicate`, where 
+  ///   N is the length of `self`.  At most log(N) index offsetting
+  ///   operations if `self` conforms to `RandomAccessCollection`;
+  ///   at most N such operations otherwise.
   func partitionPoint(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index {

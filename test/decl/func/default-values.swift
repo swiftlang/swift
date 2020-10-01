@@ -20,7 +20,7 @@ func tupleTypes() {
   typealias ta1 = (a : Int = ()) // expected-error{{default argument not permitted in a tuple type}}{{28-32=}}
   // expected-error @-1{{cannot create a single-element tuple with an element label}}{{20-24=}}
   var c1 : (a : Int, b : Int, c : Int = 3, // expected-error{{default argument not permitted in a tuple type}}{{39-42=}}
-            d = 4) = (1, 2, 3, 4) // expected-error{{default argument not permitted in a tuple type}}{{15-18=}} expected-error{{use of undeclared type 'd'}}
+            d = 4) = (1, 2, 3, 4) // expected-error{{default argument not permitted in a tuple type}}{{15-18=}} expected-error{{cannot find type 'd' in scope}}
 }
 
 func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default argument not permitted in a tuple type}} {{45-49=}}
@@ -61,7 +61,7 @@ vi.g(i: 12)
 vi.g(f:12.5)
 
 // <rdar://problem/14564964> crash on invalid
-func foo(_ x: WonkaWibble = 17) { } // expected-error{{use of undeclared type 'WonkaWibble'}}
+func foo(_ x: WonkaWibble = 17) { } // expected-error{{cannot find type 'WonkaWibble' in scope}}
 
 // Default arguments for initializers.
 class SomeClass2 { 
@@ -73,7 +73,7 @@ class SomeDerivedClass2 : SomeClass2 {
   }
 }
 
-func shouldNotCrash(_ a : UndefinedType, bar b : Bool = true) { // expected-error {{use of undeclared type 'UndefinedType'}}
+func shouldNotCrash(_ a : UndefinedType, bar b : Bool = true) { // expected-error {{cannot find type 'UndefinedType' in scope}}
 }
 
 // <rdar://problem/20749423> Compiler crashed while building simple subclass
@@ -92,7 +92,7 @@ defaultArgTuplesNotMaterializable(identity(5))
 
 // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
-// expected-error@-1 {{cannot convert value of type '(Int, y: Int)' to expected argument type 'Int'}}
+// expected-error@-1 {{conflicting arguments to generic parameter 'T' ('(Int, y: Int)' vs. 'Int')}}
 
 
 // rdar://problem/21799331
@@ -174,3 +174,19 @@ let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments fo
 // Here b = false and g = nil, but we're checking that f doesn't get a default value
 let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
                                               // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}
+
+// SR-11085
+func sr_11085(x: Int) {}
+func sr_11085(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+sr_11085()
+
+class SR_11085_C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+let _ = SR_11085_C()
+
+// SR-11623
+func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x } // expected-error {{default argument value of type 'String' cannot be converted to type 'T'}}
+let _: Int = badGenericMagicLiteral()
+
+func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}
+let _: Int = genericMagicLiteral()
+let _: String = genericMagicLiteral() // expected-error {{global function 'genericMagicLiteral' requires that 'String' conform to 'ExpressibleByIntegerLiteral'}}

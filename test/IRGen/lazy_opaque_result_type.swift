@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-implicit-dynamic -disable-availability-checking -Xllvm -sil-disable-pass=OpaqueArchetypeSpecializer -parse-as-library -module-name=test -O -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -enable-implicit-dynamic -disable-availability-checking -parse-as-library -module-name=test -O -primary-file %s -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 
 protocol P { }

@@ -13,6 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -21,6 +22,7 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
@@ -87,15 +89,17 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
-                                    bool distinguishSimulator = true) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
-  const DarwinPlatformKind effectiveKind =
-      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
-  switch (effectiveKind) {
+  switch (kind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
+    // Here we return "osx" under the assumption that all the
+    // darwin runtime libraries are zippered and so the "osx" variants
+    // should be used for macCatalyst targets.
+    if (tripleIsMacCatalystEnvironment(triple))
+        return "osx";
     return "ios";
   case DarwinPlatformKind::IPhoneOSSimulator:
     return "iossim";
@@ -195,6 +199,19 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
   return !path.empty();
 }
 
+static bool findXcodeClangLibPath(const Twine &libName,
+                                  llvm::SmallVectorImpl<char> &path) {
+  assert(path.empty());
+
+  if (!findXcodeClangPath(path)) {
+    return false;
+  }
+  llvm::sys::path::remove_filename(path); // 'clang'
+  llvm::sys::path::remove_filename(path); // 'bin'
+  llvm::sys::path::append(path, "lib", libName);
+  return true;
+}
+
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              unsigned major, unsigned minor, unsigned micro) {
   llvm::SmallString<8> buf;
@@ -231,14 +248,18 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::Input});
+    II.FilelistInfos.push_back(
+        {Arguments.back(), context.OI.CompilerOutputType,
+         FilelistInfo::WhichFiles::InputJobsAndSourceInputActions});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
     addInputsOfType(Arguments, context.Inputs, context.Args,
@@ -266,11 +287,7 @@ static void findARCLiteLibPath(const toolchains::Darwin &TC,
     // If we don't have a 'lib/arc/' directory, find the "arclite" library
     // relative to the Clang in the active Xcode.
     ARCLiteLib.clear();
-    if (findXcodeClangPath(ARCLiteLib)) {
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-      llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-    }
+    findXcodeClangLibPath("arc", ARCLiteLib);
   }
 }
 
@@ -299,6 +316,15 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
   }
 }
 
+void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
+                                       const JobContext &context) const {
+  llvm::SmallString<128> LTOLibPath;
+  if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
+    Arguments.push_back("-lto_library");
+    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
+  }
+}
+
 void
 toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
                                      const DynamicLinkJobAction &job,
@@ -322,6 +348,26 @@ toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
                                      /*shared=*/false);
 }
 
+namespace {
+
+enum class BackDeployLibFilter {
+  executable,
+  all
+};
+
+// Whether the given job matches the backward-deployment library filter.
+bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
+  switch (filter) {
+  case BackDeployLibFilter::executable:
+    return jobKind == LinkKind::Executable;
+    
+  case BackDeployLibFilter::all:
+    return true;
+  }
+}
+
+}
+
 void
 toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                         const DynamicLinkJobAction &job,
@@ -338,6 +384,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                     options::OPT_runtime_compatibility_version);
     if (value.equals("5.0")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+    } else if (value.equals("5.1")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {
@@ -349,35 +397,31 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   }
   
   if (runtimeCompatibilityVersion) {
-    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-      // Swift 5.0 compatibility library
+    auto addBackDeployLib = [&](llvm::VersionTuple version,
+                                BackDeployLibFilter filter,
+                                StringRef libraryName) {
+      if (*runtimeCompatibilityVersion > version)
+        return;
+
+      if (!jobMatchesFilter(job.getKind(), filter))
+        return;
+      
       SmallString<128> BackDeployLib;
       BackDeployLib.append(SharedResourceDirPath);
-      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
+      llvm::sys::path::append(BackDeployLib, "lib" + libraryName + ".a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
         Arguments.push_back("-force_load");
         Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
       }
-    }
+    };
+
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName) \
+      addBackDeployLib(                                       \
+          llvm::VersionTuple Version, BackDeployLibFilter::Filter, LibraryName);
+    #include "swift/Frontend/BackDeploymentLibs.def"
   }
     
-  if (job.getKind() == LinkKind::Executable) {
-    if (runtimeCompatibilityVersion)
-      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-        // Swift 5.0 dynamic replacement compatibility library.
-        SmallString<128> BackDeployLib;
-        BackDeployLib.append(SharedResourceDirPath);
-        llvm::sys::path::append(BackDeployLib,
-                                "libswiftCompatibilityDynamicReplacements.a");
-
-        if (llvm::sys::fs::exists(BackDeployLib)) {
-          Arguments.push_back("-force_load");
-          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-        }
-      }
-  }
-
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   SmallVector<std::string, 4> RuntimeLibPaths;
@@ -430,6 +474,9 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     // package isn't installed.
     Arguments.push_back("-rpath");
     Arguments.push_back(context.Args.MakeArgString("/usr/lib/swift"));
+    // We don't need an rpath for /System/iOSSupport/usr/lib/swift because...
+    assert(!tripleIsMacCatalystEnvironment(getTriple())
+           && "macCatalyst not supported without Swift-in-the-OS");
   }
 }
 
@@ -455,7 +502,7 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
     }
 
     StringRef Sim;
-    if (tripleIsAnySimulator(Triple)) {
+    if (Triple.isSimulatorEnvironment()) {
       Sim = "sim";
     }
 
@@ -472,41 +519,145 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
   }
 }
 
+Optional<llvm::VersionTuple>
+toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
+  if (!SDKInfo)
+    return None;
+  return swift::getTargetSDKVersion(*SDKInfo, triple);
+}
+
 void
 toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
                                             const JobContext &context) const {
-  const llvm::Triple &Triple = getTriple();
-  // FIXME: Properly handle deployment targets.
-  assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
-  if (Triple.isiOS()) {
-    bool isiOSSimulator = tripleIsiOSSimulator(Triple);
-    if (Triple.isTvOS()) {
-      if (isiOSSimulator)
-        Arguments.push_back("-tvos_simulator_version_min");
-      else
-        Arguments.push_back("-tvos_version_min");
+  auto addPlatformVersionArg = [&](const llvm::Triple &triple) {
+    // Compute the name of the platform for the linker.
+    const char *platformName;
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      platformName = "mac-catalyst";
     } else {
-      if (isiOSSimulator)
-        Arguments.push_back("-ios_simulator_version_min");
-      else
-        Arguments.push_back("-iphoneos_version_min");
+      switch (getDarwinPlatformKind(triple)) {
+      case DarwinPlatformKind::MacOS:
+        platformName = "macos";
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+        platformName = "ios";
+        break;
+      case DarwinPlatformKind::IPhoneOSSimulator:
+        platformName = "ios-simulator";
+        break;
+      case DarwinPlatformKind::TvOS:
+        platformName = "tvos";
+        break;
+      case DarwinPlatformKind::TvOSSimulator:
+        platformName = "tvos-simulator";
+        break;
+      case DarwinPlatformKind::WatchOS:
+        platformName = "watchos";
+        break;
+      case DarwinPlatformKind::WatchOSSimulator:
+        platformName = "watchos-simulator";
+        break;
+      }
     }
+
+    // Compute the platform version.
     unsigned major, minor, micro;
-    Triple.getiOSVersion(major, minor, micro);
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      triple.getiOSVersion(major, minor, micro);
+
+      // Mac Catalyst on arm was introduced with an iOS deployment target of
+      // 14.0; the linker doesn't want to see a deployment target before that.
+      if (major < 14 && triple.isAArch64()) {
+        major = 14;
+        minor = 0;
+        micro = 0;
+      }
+
+      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // the linker doesn't want to see a deployment target before that.
+      if (major < 13) {
+        major = 13;
+        minor = 0;
+        micro = 0;
+      }
+    } else {
+      switch (getDarwinPlatformKind((triple))) {
+      case DarwinPlatformKind::MacOS:
+        triple.getMacOSXVersion(major, minor, micro);
+
+        // The first deployment of arm64 for macOS is version 10.16;
+        if (triple.isAArch64() && major <= 10 && minor < 16) {
+          llvm::VersionTuple firstMacARM64e(10, 16, 0);
+          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::macOS,
+                                                       firstMacARM64e);
+          major = firstMacARM64e.getMajor();
+          minor = firstMacARM64e.getMinor().getValueOr(0);
+          micro = firstMacARM64e.getSubminor().getValueOr(0);
+        }
+
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+      case DarwinPlatformKind::IPhoneOSSimulator:
+      case DarwinPlatformKind::TvOS:
+      case DarwinPlatformKind::TvOSSimulator:
+        triple.getiOSVersion(major, minor, micro);
+
+        // The first deployment of arm64 simulators is iOS/tvOS 14.0;
+        // the linker doesn't want to see a deployment target before that.
+        if (triple.isSimulatorEnvironment() && triple.isAArch64() &&
+            major < 14) {
+          major = 14;
+          minor = 0;
+          micro = 0;
+        }
+
+        break;
+      case DarwinPlatformKind::WatchOS:
+      case DarwinPlatformKind::WatchOSSimulator:
+        triple.getOSVersion(major, minor, micro);
+        break;
+      }
+    }
+
+    // Compute the SDK version.
+    unsigned sdkMajor = 0, sdkMinor = 0, sdkMicro = 0;
+    if (auto sdkVersion = getTargetSDKVersion(triple)) {
+      sdkMajor = sdkVersion->getMajor();
+      sdkMinor = sdkVersion->getMinor().getValueOr(0);
+      sdkMicro = sdkVersion->getSubminor().getValueOr(0);
+    }
+
+    Arguments.push_back("-platform_version");
+    Arguments.push_back(platformName);
     addVersionString(context.Args, Arguments, major, minor, micro);
-  } else if (Triple.isWatchOS()) {
-    if (tripleIsWatchSimulator(Triple))
-      Arguments.push_back("-watchos_simulator_version_min");
-    else
-      Arguments.push_back("-watchos_version_min");
-    unsigned major, minor, micro;
-    Triple.getOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  } else {
-    Arguments.push_back("-macosx_version_min");
-    unsigned major, minor, micro;
-    Triple.getMacOSXVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
+    addVersionString(context.Args, Arguments, sdkMajor, sdkMinor, sdkMicro);
+  };
+
+  addPlatformVersionArg(getTriple());
+
+  if (auto targetVariant = getTargetVariant()) {
+    assert(triplesAreValidForZippering(getTriple(), *targetVariant));
+    addPlatformVersionArg(*targetVariant);
+  }
+}
+
+void toolchains::Darwin::addCommonFrontendArgs(
+    const OutputInfo &OI, const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  ToolChain::addCommonFrontendArgs(OI, output, inputArgs, arguments);
+
+  if (auto sdkVersion = getTargetSDKVersion(getTriple())) {
+    arguments.push_back("-target-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(sdkVersion->getAsString()));
+  }
+
+  if (auto targetVariant = getTargetVariant()) {
+    if (auto variantSDKVersion = getTargetSDKVersion(*targetVariant)) {
+      arguments.push_back("-target-variant-sdk-version");
+      arguments.push_back(
+          inputArgs.MakeArgString(variantSDKVersion->getAsString()));
+    }
   }
 }
 
@@ -568,12 +719,16 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   llvm::sys::path::append(
       CompilerRTPath,
       Twine("libclang_rt.") +
-        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        getDarwinLibraryNameSuffixForTriple(Triple) +
         ".a");
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
   addArgsToLinkARCLite(Arguments, context);
+
+  if (job.shouldPerformLTO()) {
+    addLTOLibArgs(Arguments, context);
+  }
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
@@ -604,6 +759,11 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
 
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
+
+  // On Darwin, we only support libc++.
+  if (context.Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    Arguments.push_back("-lc++");
+  }
 
   addArgsToLinkStdlib(Arguments, job, context);
 
@@ -642,14 +802,17 @@ toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::Input});
+    II.FilelistInfos.push_back({Arguments.back(), context.OI.CompilerOutputType,
+                                FilelistInfo::WhichFiles::InputJobs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
   }
 
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
 
@@ -717,17 +880,58 @@ static void validateDeploymentTarget(const toolchains::Darwin &TC,
   }
 }
 
+static void validateTargetVariant(const toolchains::Darwin &TC,
+                                  DiagnosticEngine &diags,
+                                  const llvm::opt::ArgList &args,
+                                  StringRef defaultTarget) {
+  if (TC.getTargetVariant().hasValue()) {
+    auto target = TC.getTriple();
+    auto variant = *TC.getTargetVariant();
+
+    if (!triplesAreValidForZippering(target, variant)) {
+      diags.diagnose(SourceLoc(), diag::error_unsupported_target_variant,
+                    variant.str(),
+                    variant.isiOS());
+    }
+  }
+}
+
 void 
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
-                                      const llvm::opt::ArgList &args) const {
+                                      const llvm::opt::ArgList &args,
+                                      StringRef defaultTarget) const {
   // Validating arclite library path when link-objc-runtime.
   validateLinkObjcRuntimeARCLiteLib(*this, diags, args);
   
   // Validating apple platforms deployment targets.
   validateDeploymentTarget(*this, diags, args);
-    
+  validateTargetVariant(*this, diags, args, defaultTarget);
+
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
+
+  // If a C++ standard library is specified, it has to be libc++.
+  if (auto arg = args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    if (StringRef(arg->getValue()) != "libc++") {
+      diags.diagnose(SourceLoc(), diag::error_darwin_only_supports_libcxx); 
+    }
+  }
+}
+
+void
+toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
+                                       const OutputInfo &outputInfo) const {
+  // If we have been provided with an SDK, go read the SDK information.
+  if (!outputInfo.SDKPath.empty()) {
+    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+        *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
+    if (SDKInfoOrErr) {
+      SDKInfo = *SDKInfoOrErr;
+    } else {
+      llvm::consumeError(SDKInfoOrErr.takeError());
+      diags.diagnose(SourceLoc(), diag::warn_drv_darwin_sdk_invalid_settings);
+    }
   }
 }

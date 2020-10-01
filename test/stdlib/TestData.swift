@@ -1077,6 +1077,99 @@ class TestData : TestDataSuper {
         expectEqual(slice4[0], 8)
     }
 
+    func test_rangeOfDataProtocol() {
+        // https://bugs.swift.org/browse/SR-10689
+        
+        let base = Data([0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03,
+                         0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03])
+        let subdata = base[10..<13] // [0x02, 0x03, 0x00]
+        let oneByte = base[14..<15] // [0x02]
+        
+        do { // firstRange(of:in:)
+            func assertFirstRange(_ data: Data, _ fragment: Data, range: ClosedRange<Int>? = nil,
+                                  expectedStartIndex: Int?,
+                                  _ message: @autoclosure () -> String = "",
+                                  file: String = #file, line: UInt = #line) {
+                if let index = expectedStartIndex {
+                    let expectedRange: Range<Int> = index..<(index + fragment.count)
+                    if let someRange = range {
+                        expectEqual(data.firstRange(of: fragment, in: someRange), expectedRange, message(), file: file, line: line)
+                    } else {
+                        expectEqual(data.firstRange(of: fragment), expectedRange, message(), file: file, line: line)
+                    }
+                } else {
+                    if let someRange = range {
+                        expectNil(data.firstRange(of: fragment, in: someRange), message(), file: file, line: line)
+                    } else {
+                        expectNil(data.firstRange(of: fragment), message(), file: file, line: line)
+                    }
+                }
+            }
+            
+            assertFirstRange(base, base, expectedStartIndex: base.startIndex)
+            assertFirstRange(base, subdata, expectedStartIndex: 2)
+            assertFirstRange(base, oneByte, expectedStartIndex: 2)
+            
+            assertFirstRange(subdata, base, expectedStartIndex: nil)
+            assertFirstRange(subdata, subdata, expectedStartIndex: subdata.startIndex)
+            assertFirstRange(subdata, oneByte, expectedStartIndex: subdata.startIndex)
+            
+            assertFirstRange(oneByte, base, expectedStartIndex: nil)
+            assertFirstRange(oneByte, subdata, expectedStartIndex: nil)
+            assertFirstRange(oneByte, oneByte, expectedStartIndex: oneByte.startIndex)
+            
+            assertFirstRange(base, subdata, range: 1...14, expectedStartIndex: 2)
+            assertFirstRange(base, subdata, range: 6...8, expectedStartIndex: 6)
+            assertFirstRange(base, subdata, range: 8...10, expectedStartIndex: nil)
+            
+            assertFirstRange(base, oneByte, range: 1...14, expectedStartIndex: 2)
+            assertFirstRange(base, oneByte, range: 6...6, expectedStartIndex: 6)
+            assertFirstRange(base, oneByte, range: 8...9, expectedStartIndex: nil)
+        }
+        
+        do { // lastRange(of:in:)
+            func assertLastRange(_ data: Data, _ fragment: Data, range: ClosedRange<Int>? = nil,
+                                 expectedStartIndex: Int?,
+                                 _ message: @autoclosure () -> String = "",
+                                 file: String = #file, line: UInt = #line) {
+                if let index = expectedStartIndex {
+                    let expectedRange: Range<Int> = index..<(index + fragment.count)
+                    if let someRange = range {
+                        expectEqual(data.lastRange(of: fragment, in: someRange), expectedRange, message(), file: file, line: line)
+                    } else {
+                        expectEqual(data.lastRange(of: fragment), expectedRange, message(), file: file, line: line)
+                    }
+                } else {
+                  if let someRange = range {
+                      expectNil(data.lastRange(of: fragment, in: someRange), message(), file: file, line: line)
+                  } else {
+                      expectNil(data.lastRange(of: fragment), message(), file: file, line: line)
+                  }
+                }
+            }
+            
+            assertLastRange(base, base, expectedStartIndex: base.startIndex)
+            assertLastRange(base, subdata, expectedStartIndex: 10)
+            assertLastRange(base, oneByte, expectedStartIndex: 14)
+            
+            assertLastRange(subdata, base, expectedStartIndex: nil)
+            assertLastRange(subdata, subdata, expectedStartIndex: subdata.startIndex)
+            assertLastRange(subdata, oneByte, expectedStartIndex: subdata.startIndex)
+            
+            assertLastRange(oneByte, base, expectedStartIndex: nil)
+            assertLastRange(oneByte, subdata, expectedStartIndex: nil)
+            assertLastRange(oneByte, oneByte, expectedStartIndex: oneByte.startIndex)
+            
+            assertLastRange(base, subdata, range: 1...14, expectedStartIndex: 10)
+            assertLastRange(base, subdata, range: 6...8, expectedStartIndex: 6)
+            assertLastRange(base, subdata, range: 8...10, expectedStartIndex: nil)
+            
+            assertLastRange(base, oneByte, range: 1...14, expectedStartIndex: 14)
+            assertLastRange(base, oneByte, range: 6...6, expectedStartIndex: 6)
+            assertLastRange(base, oneByte, range: 8...9, expectedStartIndex: nil)
+        }
+    }
+
     func test_sliceAppending() {
         // https://bugs.swift.org/browse/SR-4473
         var fooData = Data()
@@ -3836,6 +3929,146 @@ class TestData : TestDataSuper {
             }
         }
     }
+
+    func test_increaseCount() {
+        guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                var data = Data(initial)
+                data.count += diff
+                expectEqualSequence(
+                    Array(initial) + Array(repeating: 0, count: diff),
+                    data)
+            }
+        }
+    }
+
+    func test_decreaseCount() {
+        guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                guard initial.count >= diff else { continue }
+                var data = Data(initial)
+                data.count -= diff
+                expectEqualSequence(
+                    initial.dropLast(diff),
+                    data)
+            }
+        }
+    }
+
+    // This is a (potentially invalid) sequence that produces a configurable number of 42s and has a freely customizable `underestimatedCount`.
+    struct TestSequence: Sequence {
+        typealias Element = UInt8
+        struct Iterator: IteratorProtocol {
+            var _remaining: Int
+            init(_ count: Int) {
+                _remaining = count
+            }
+            mutating func next() -> UInt8? {
+                guard _remaining > 0 else { return nil }
+                _remaining -= 1
+                return 42
+            }
+        }
+        let underestimatedCount: Int
+        let count: Int
+
+        func makeIterator() -> Iterator {
+            return Iterator(count)
+        }
+    }
+
+    func test_init_TestSequence() {
+        // Underestimated count
+        do {
+            let d = Data(TestSequence(underestimatedCount: 0, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Very underestimated count (to exercise realloc path)
+        do {
+            let d = Data(TestSequence(underestimatedCount: 0, count: 1000))
+            expectEqual(1000, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 1000), Array(d))
+        }
+
+        // Exact count
+        do {
+            let d = Data(TestSequence(underestimatedCount: 10, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Overestimated count. This is an illegal case, so trapping would be fine.
+        // However, for compatibility with the implementation in Swift 5, Data
+        // handles this case by simply truncating itself to the actual size.
+        do {
+            let d = Data(TestSequence(underestimatedCount: 20, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+    }
+
+    func test_append_TestSequence() {
+        let base = Data(Array(repeating: 23 as UInt8, count: 10))
+
+        // Underestimated count
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 0, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10),
+                           Array(d))
+        }
+
+        // Very underestimated count (to exercise realloc path)
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 0, count: 1000))
+            expectEqual(1010, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 1000), Array(d))
+        }
+
+        // Exact count
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 10, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Overestimated count. This is an illegal case, so trapping would be fine.
+        // However, for compatibility with the implementation in Swift 5, Data
+        // handles this case by simply truncating itself to the actual size.
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 20, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3882,6 +4115,7 @@ DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 DataTests.test("test_rangeZoo") { TestData().test_rangeZoo() }
+DataTests.test("test_rangeOfDataProtocol") { TestData().test_rangeOfDataProtocol() }
 DataTests.test("test_sliceAppending") { TestData().test_sliceAppending() }
 DataTests.test("test_replaceSubrange") { TestData().test_replaceSubrange() }
 DataTests.test("test_sliceWithUnsafeBytes") { TestData().test_sliceWithUnsafeBytes() }
@@ -4159,6 +4393,11 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     DataTests.test("test_nsdataSequence") { TestData().test_nsdataSequence() }
     DataTests.test("test_dispatchSequence") { TestData().test_dispatchSequence() }
 }
+DataTests.test("test_increaseCount") { TestData().test_increaseCount() }
+DataTests.test("test_decreaseCount") { TestData().test_decreaseCount() }
+DataTests.test("test_increaseCount") { TestData().test_init_TestSequence() }
+DataTests.test("test_decreaseCount") { TestData().test_append_TestSequence() }
+
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
@@ -4228,4 +4467,3 @@ DataTests.test("bounding failure subscript") {
 
 runAllTests()
 #endif
-

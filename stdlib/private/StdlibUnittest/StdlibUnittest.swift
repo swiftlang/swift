@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,10 +15,10 @@ import SwiftPrivate
 import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import Foundation
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -748,6 +748,9 @@ extension ProcessTerminationStatus {
     case .signal(let signal):
 #if os(Windows)
       return CInt(signal) == SIGILL
+#elseif os(WASI)
+      // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+      return false
 #else
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
 #endif
@@ -1725,7 +1728,7 @@ public final class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }
@@ -1741,11 +1744,13 @@ public enum OSVersion : CustomStringConvertible {
   case watchOSSimulator
   case linux
   case freeBSD
+  case openBSD
   case android
   case ps4
   case windowsCygnus
   case windows
   case haiku
+  case wasi
 
   public var description: String {
     switch self {
@@ -1767,6 +1772,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case .freeBSD:
       return "FreeBSD"
+    case .openBSD:
+      return "OpenBSD"
     case .ps4:
       return "PS4"
     case .android:
@@ -1777,6 +1784,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Windows"
     case .haiku:
       return "Haiku"
+    case .wasi:
+      return "WASI"
     }
   }
 }
@@ -1811,6 +1820,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(OpenBSD)
+  return .openBSD
 #elseif os(PS4)
   return .ps4
 #elseif os(Android)
@@ -1821,6 +1832,8 @@ func _getOSVersion() -> OSVersion {
   return .windows
 #elseif os(Haiku)
   return .haiku
+#elseif os(WASI)
+  return .wasi
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -1866,6 +1879,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case iOSAny(/*reason:*/ String)
   case iOSMajor(Int, reason: String)
+  case iOSMajorRange(ClosedRange<Int>, reason: String)
   case iOSMinor(Int, Int, reason: String)
   case iOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case iOSBugFix(Int, Int, Int, reason: String)
@@ -1875,6 +1889,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case tvOSAny(/*reason:*/ String)
   case tvOSMajor(Int, reason: String)
+  case tvOSMajorRange(ClosedRange<Int>, reason: String)
   case tvOSMinor(Int, Int, reason: String)
   case tvOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case tvOSBugFix(Int, Int, Int, reason: String)
@@ -1884,6 +1899,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case watchOSAny(/*reason:*/ String)
   case watchOSMajor(Int, reason: String)
+  case watchOSMajorRange(ClosedRange<Int>, reason: String)
   case watchOSMinor(Int, Int, reason: String)
   case watchOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case watchOSBugFix(Int, Int, Int, reason: String)
@@ -1935,6 +1951,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "iOS(*, reason: \(reason))"
     case .iOSMajor(let major, let reason):
       return "iOS(\(major).*, reason: \(reason))"
+    case .iOSMajorRange(let range, let reason):
+      return "iOS([\(range)], reason: \(reason))"
     case .iOSMinor(let major, let minor, let reason):
       return "iOS(\(major).\(minor), reason: \(reason))"
     case .iOSMinorRange(let major, let minorRange, let reason):
@@ -1951,6 +1969,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "tvOS(*, reason: \(reason))"
     case .tvOSMajor(let major, let reason):
       return "tvOS(\(major).*, reason: \(reason))"
+    case .tvOSMajorRange(let range, let reason):
+      return "tvOS([\(range)], reason: \(reason))"
     case .tvOSMinor(let major, let minor, let reason):
       return "tvOS(\(major).\(minor), reason: \(reason))"
     case .tvOSMinorRange(let major, let minorRange, let reason):
@@ -1967,6 +1987,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "watchOS(*, reason: \(reason))"
     case .watchOSMajor(let major, let reason):
       return "watchOS(\(major).*, reason: \(reason))"
+    case .watchOSMajorRange(let range, let reason):
+      return "watchOS([\(range)], reason: \(reason))"
     case .watchOSMinor(let major, let minor, let reason):
       return "watchOS(\(major).\(minor), reason: \(reason))"
     case .watchOSMinorRange(let major, let minorRange, let reason):
@@ -2081,6 +2103,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .iOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .iOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .iOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, _):
@@ -2137,6 +2167,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .tvOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .tvOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .tvOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, _):
@@ -2189,6 +2227,14 @@ public enum TestRunPredicate : CustomStringConvertible {
       switch _getRunningOSVersion() {
       case .watchOS(major, _, _):
         return true
+      default:
+        return false
+      }
+
+    case .watchOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(let major, _, _):
+        return range.contains(major)
       default:
         return false
       }
@@ -2818,7 +2864,7 @@ public func checkLosslessStringConvertible<Instance>(
 }
 
 public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
-  return x.index(x.startIndex, offsetBy: numericCast(n))
+  return x.index(x.startIndex, offsetBy: n)
 }
 
 public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {

@@ -22,6 +22,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_DOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_NODOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_NODOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_TestProtocol2 | %FileCheck %s -check-prefix=OVERRIDE_TestProtocol2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_ConcreteTestProtocol2 | %FileCheck %s -check-prefix=POSTFIX_ConcreteTestProtocol2
+
 protocol MyProtocol {
   associatedtype Mistery
 }
@@ -92,7 +95,7 @@ protocol HasAssocWithSuperClassConstraint {
 }
 protocol HasAssocWithCompositionConstraint {
   associatedtype AssocWithCompositionConstraint: MyClass & MyProtocol
-  subscript<T>(idx: T) -> AssocWithCompositionConstraint where T: Comparable { get }
+  subscript(idx: Int) -> AssocWithCompositionConstraint { get }
 }
 protocol HasAssocWithDefault {
   associatedtype AssocWithDefault = MyEnum
@@ -102,6 +105,22 @@ protocol HasAssocWithConstraintAndDefault {
   associatedtype AssocWithConstraintAndDefault: MyProtocol = ConcreteMyProtocol
   func returnAssocWithConstraintAndDefault() -> AssocWithConstraintAndDefault
 }
+protocol HasAssocWithAnyObjectConstraint {
+  associatedtype AssocWithAnyObjectConstraint: AnyObject & MyProtocol 
+  func returnAssocWithAnyObjectConstraint() -> AssocWithAnyObjectConstraint
+}
+protocol HasAssocWithConstraintOnProto where Self.AssocWithConstraintOnProto : MyProtocol {
+  associatedtype AssocWithConstraintOnProto
+  func returnAssocWithConstraintOnProto() -> AssocWithConstraintOnProto
+}
+protocol HasAssocWithSameTypeConstraint where Self.AssocWithSameTypeConstraint == ConcreteMyProtocol {
+  associatedtype AssocWithSameTypeConstraint : MyProtocol
+  func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint
+}
+protocol HasAssocWithConformanceConstraintGeneric {
+  associatedtype AssocWithConformanceConstraintGeneric: MyProtocol
+  func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric
+}
 
 class TestClass :
     HasAssocPlain,
@@ -109,16 +128,23 @@ class TestClass :
     HasAssocWithSuperClassConstraint,
     HasAssocWithCompositionConstraint,
     HasAssocWithDefault,
-    HasAssocWithConstraintAndDefault {
+    HasAssocWithConstraintAndDefault,
+    HasAssocWithAnyObjectConstraint,
+    HasAssocWithConstraintOnProto,
+    HasAssocWithSameTypeConstraint,
+    HasAssocWithConformanceConstraintGeneric {
   #^OVERRIDE_TestClass^#
-// OVERRIDE: found code completion token OVERRIDE_[[BASETYPE:[A-Za-z0-9]+]] at
 // OVERRIDE: Begin completions
-// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> [[BASETYPE]].AssocPlain {|};
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> AssocPlain {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> some MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            var valAssocWithSuperClassConstraint: some MyClass;
-// OVERRIDE-DAG: Decl[Subscript]/Super:              subscript<T>(idx: T) -> some MyClass & MyProtocol where T : Comparable {|};
+// OVERRIDE-DAG: Decl[Subscript]/Super:              subscript(idx: Int) -> some MyClass & MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithDefault() -> MyEnum {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintAndDefault() -> ConcreteMyProtocol {|};
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithAnyObjectConstraint() -> some MyProtocol & AnyObject {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintOnProto() -> some MyProtocol {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> ConcreteMyProtocol {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric {|}
 // OVERRIDE: End completions
 }
 
@@ -128,7 +154,11 @@ struct TestStruct :
     HasAssocWithSuperClassConstraint,
     HasAssocWithCompositionConstraint,
     HasAssocWithDefault,
-    HasAssocWithConstraintAndDefault {
+    HasAssocWithConstraintAndDefault,
+    HasAssocWithAnyObjectConstraint,
+    HasAssocWithConstraintOnProto,
+    HasAssocWithSameTypeConstraint,
+    HasAssocWithConformanceConstraintGeneric {
   #^OVERRIDE_TestStruct^#
 }
 
@@ -173,3 +203,36 @@ func postfixExpr() {
 // POSTFIX_TestProtocol_NODOT-DAG: BuiltinOperator/None:                = {#TestProtocol#}[#Void#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#TestProtocol#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: End completions
+
+protocol TestProtocol2 {
+  associatedtype Assoc: Comparable
+  func foo() -> Assoc
+  func bar() -> Assoc
+  func baz(x: @autoclosure () -> Assoc) -> (Assoc) -> Assoc
+}
+extension TestProtocol2 {
+  func inExt() -> Assoc { fatalError() }
+}
+struct ConcreteTestProtocol2: TestProtocol2 {
+  func foo() -> some Comparable { 1 }
+  #^OVERRIDE_TestProtocol2^#
+// OVERRIDE_TestProtocol2: Begin completions
+// OVERRIDE_TestProtocol2-NOT: foo()
+// OVERRIDE_TestProtocol2-NOT: inExt()
+// OVERRIDE_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func bar() -> Assoc {|};
+// OVERRIDE_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func baz(x: @autoclosure () -> Assoc) -> (Assoc) -> Assoc {|};
+// OVERRIDE_TestProtocol2-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#};
+// OVERRIDE_TestProtocol2-NOT: foo()
+// OVERRIDE_TestProtocol2-NOT: inExt()
+// OVERRIDE_TestProtocol2: End completions
+}
+func testUseTestProtocol2(value: ConcreteTestProtocol2) {
+  value.#^POSTFIX_ConcreteTestProtocol2^#
+// POSTFIX_ConcreteTestProtocol2: Begin completions
+// POSTFIX_ConcreteTestProtocol2-DAG: Keyword[self]/CurrNominal:          self[#ConcreteTestProtocol2#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Comparable#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: ConcreteTestProtocol2.Assoc#})[#(ConcreteTestProtocol2.Assoc) -> ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2: End completions
+}

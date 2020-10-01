@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 #include "CompatibilityOverride.h"
 
 #include "ImageInspection.h"
@@ -27,7 +29,7 @@ using namespace swift;
 /// The definition of the contents of the override section.
 ///
 /// The runtime looks in the main executable (not any libraries!) for a
-/// __swift51_hooks section and uses the hooks defined therein. This struct
+/// __swift53_hooks section and uses the hooks defined therein. This struct
 /// defines the layout of that section. These hooks allow extending
 /// runtime functionality when running apps built with a more recent
 /// compiler. If additional hooks are needed, they may be added at the
@@ -51,9 +53,8 @@ static OverrideSection *getOverrideSectionPtr() {
   static swift_once_t Predicate;
   swift_once(&Predicate, [](void *) {
     size_t Size;
-    OverrideSectionPtr = static_cast<OverrideSection *>(lookupSection("__DATA",
-                                                                      "__swift51_hooks",
-                                                                      &Size));
+    OverrideSectionPtr = static_cast<OverrideSection *>(
+                             lookupSection("__DATA", "__swift53_hooks", &Size));
     if (Size < sizeof(OverrideSection))
       OverrideSectionPtr = nullptr;
   }, nullptr);
@@ -69,3 +70,5 @@ static OverrideSection *getOverrideSectionPtr() {
     return Section->name;                                           \
   }
 #include "CompatibilityOverride.def"
+
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES

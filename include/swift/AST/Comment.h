@@ -93,15 +93,27 @@ public:
 };
 
 /// Get a parsed documentation comment for the declaration, if there is one.
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
 DocComment *getSingleDocComment(swift::markup::MarkupContext &Context,
-                                const Decl *D);
+                                const Decl *D, bool AllowSerialized = false);
 
-const Decl *getDocCommentProvidingDecl(const Decl *D);
+/// Get the declaration that actually provides a doc comment for another.
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
+const Decl *getDocCommentProvidingDecl(const Decl *D,
+                                       bool AllowSerialized = false);
 
 /// Attempt to get a doc comment from the declaration, or other inherited
 /// sources, like from base classes or protocols.
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
 DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
-                                   const Decl *D);
+                                   const Decl *D,
+                                   bool AllowSerialized = false);
 
 /// Extract comments parts from the given Markup node.
 swift::markup::CommentParts

@@ -72,6 +72,9 @@ struct NonRecur: P2 {
 
 // Conditional conformance.
 
+// CHECK: Generic signature: <T>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic
 struct Generic<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic
 // CHECK-NEXT: (normal_conformance type=Generic<T> protocol=P1
@@ -85,6 +88,10 @@ extension Generic: P1 where T: P1 {
 
 
 // Satisfying associated types with requirements with generic params
+
+// CHECK: Generic signature: <T, U>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_0_1>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Super
 class Super<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Super
 // CHECK-NEXT: (normal_conformance type=Super<T, U> protocol=P2

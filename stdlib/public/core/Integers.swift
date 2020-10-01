@@ -1,8 +1,8 @@
-//===--- Integers.swift.gyb -----------------------------------*- swift -*-===//
+//===--- Integers.swift ---------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -696,7 +696,7 @@ public protocol BinaryInteger :
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `RandomAccessCollection` protocol
-  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  /// with an `Element` type of `UInt` and `Index` type of `Int`.
   associatedtype Words: RandomAccessCollection
       where Words.Element == UInt, Words.Index == Int
 
@@ -1211,7 +1211,7 @@ public protocol BinaryInteger :
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`. The remainder has the same sign as `rhs`.
+  ///   divided by `rhs`. The remainder has the same sign as `lhs`.
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
@@ -1557,6 +1557,7 @@ extension BinaryInteger {
   }
 
   /// A textual representation of this value.
+  @_semantics("binaryInteger.description")
   public var description: String {
     return _description(radix: 10, uppercase: false)
   }
@@ -2732,11 +2733,6 @@ extension FixedWidthInteger {
     in range: ClosedRange<Self>,
     using generator: inout T
   ) -> Self {
-    _precondition(
-      !range.isEmpty,
-      "Can't get random value with an empty range"
-    )
-
     // Compute delta, the distance between the lower and upper bounds. This
     // value may not representable by the type Bound if Bound is signed, but
     // is always representable as Bound.Magnitude.
@@ -3366,7 +3362,7 @@ extension FixedWidthInteger {
     using generator: inout R
   ) -> Self {
     if bitWidth <= UInt64.bitWidth {
-      return Self(truncatingIfNeeded: generator.next() as UInt64)
+      return Self(truncatingIfNeeded: generator.next())
     }
 
     let (quotient, remainder) = bitWidth.quotientAndRemainder(
@@ -3618,24 +3614,11 @@ extension SignedInteger where Self: FixedWidthInteger {
 /// Returns the given integer as the equivalent value in a different integer
 /// type.
 ///
-/// The `numericCast(_:)` function traps on overflow in `-O` and `-Onone`
-/// builds.
+/// Calling the `numericCast(_:)` function is equivalent to calling an
+/// initializer for the destination type. `numericCast(_:)` traps on overflow 
+/// in `-O` and `-Onone` builds.
 ///
-/// You can use `numericCast(_:)` to convert a value when the destination type
-/// can be inferred from the context. In the following example, the
-/// `random(in:)` function uses `numericCast(_:)` twice to convert the
-/// argument and return value of the `arc4random_uniform(_:)` function to the
-/// appropriate type.
-///
-///     func random(in range: Range<Int>) -> Int {
-///         return numericCast(arc4random_uniform(numericCast(range.count)))
-///             + range.lowerBound
-///     }
-///
-///     let number = random(in: -10...<10)
-///     // number == -3, perhaps
-///
-/// - Parameter x: The integer to convert, and instance of type `T`.
+/// - Parameter x: The integer to convert, an instance of type `T`.
 /// - Returns: The value of `x` converted to type `U`.
 @inlinable
 public func numericCast<T: BinaryInteger, U: BinaryInteger>(_ x: T) -> U {

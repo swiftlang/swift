@@ -89,7 +89,7 @@ func bridgeToObjC(_ s: BridgedStruct) -> BridgedClass {
 }
 
 func bridgeToAnyObject(_ s: BridgedStruct) -> AnyObject {
-  return s // expected-error{{return expression of type 'BridgedStruct' does not conform to 'AnyObject'}}
+  return s // expected-error{{return expression of type 'BridgedStruct' expected to be an instance of a class or class-constrained type}}
   return s as AnyObject
 }
 
@@ -180,7 +180,7 @@ func dictionaryToNSDictionary() {
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
-  return d == d // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
+  return d == d // expected-error{{referencing operator function '==' on 'Dictionary' requires that 'NotEquatable' conform to 'Equatable'}}
 }
 
 // NSString -> String
@@ -248,9 +248,9 @@ func rdar19770981(_ s: String, ns: NSString) {
   _ = ns as String > s
 
   // 'as' has lower precedence than '+' so add parens with the fixit:
-  s + ns // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{7-7=(}}{{9-9= as String)}}
+  s + ns // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{9-9= as String}}
   _ = s + (ns as String)
-  ns + s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{3-3=(}}{{5-5= as String)}}
+  ns + s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{5-5= as String}}
   _ = (ns as String) + s
 }
 
@@ -265,6 +265,7 @@ func rdar19831698() {
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
+  // expected-note@-1{{overloads for '+'}}
   var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
   var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
@@ -344,14 +345,14 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = g as AnyObject
   z = h as AnyObject
 
-  z = a // expected-error{{does not conform to 'AnyObject'}}
+  z = a // expected-error{{value of type 'T' expected to be an instance of a class or class-constrained type in assignment}}
   z = b
-  z = c // expected-error{{does not conform to 'AnyObject'}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
-  z = d // expected-error{{does not conform to 'AnyObject'}}
+  z = c // expected-error{{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
+  z = d // expected-error{{value of type 'KnownUnbridged' expected to be an instance of a class or class-constrained type in assignment}}
   z = e
   z = f
   z = g
-  z = h // expected-error{{does not conform to 'AnyObject'}}
+  z = h // expected-error{{value of type 'String' expected to be an instance of a class or class-constrained type in assignment}}
 
   _ = z
 }
@@ -372,5 +373,14 @@ func bridgeTupleToAnyObject() {
 
 // Array defaulting and bridging type checking error per rdar://problem/54274245
 func rdar54274245(_ arr: [Any]?) {
-  _ = (arr ?? []) as [NSObject]
+  _ = (arr ?? []) as [NSObject] // expected-warning {{coercion from '[Any]' to '[NSObject]' may fail; use 'as?' or 'as!' instead}}
+}
+
+// rdar://problem/60501780 - failed to infer NSString as a value type of a dictionary
+func rdar60501780() {
+  func foo(_: [String: NSObject]) {}
+
+  func bar(_ v: String) {
+    foo(["": "", "": v as NSString])
+  }
 }

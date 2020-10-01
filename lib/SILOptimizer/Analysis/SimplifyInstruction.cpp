@@ -62,9 +62,11 @@ namespace {
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+    SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
+    SILValue visitMetatypeInst(MetatypeInst *MTI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -84,7 +86,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
-    for (unsigned i = 0, e = SI->getNumOperands(); i < e; i++) {
+    for (unsigned i = 0, e = SI->getNumOperands(); i < e; ++i) {
       auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(i));
       // Must be an extract.
       if (!Ex)
@@ -95,7 +97,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
         return SILValue();
 
       // And the order of the field must be identical to the construction order.
-      if (Ex->getFieldNo() != i)
+      if (Ex->getFieldIndex() != i)
         return SILValue();
     }
 
@@ -119,7 +121,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
-    for (unsigned i = 0, e = TI->getNumOperands(); i < e; i++) {
+    for (unsigned i = 0, e = TI->getNumOperands(); i < e; ++i) {
       auto *Ex = dyn_cast<TupleExtractInst>(TI->getOperand(i));
       // Must be an extract.
       if (!Ex)
@@ -130,7 +132,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
         return SILValue();
 
       // And the order of the field must be identical to the construction order.
-      if (Ex->getFieldNo() != i)
+      if (Ex->getFieldIndex() != i)
         return SILValue();
     }
 
@@ -143,11 +145,11 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
   if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-    return TheTuple->getElement(TEI->getFieldNo());
+    return TheTuple->getElement(TEI->getFieldIndex());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
-  if (TEI->getFieldNo() == 0)
+  if (TEI->getFieldIndex() == 0)
     if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
       return simplifyOverflowBuiltin(BI);
 
@@ -179,8 +181,8 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
 }
 
 // Simplify:
-//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1
-//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C
+//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt
+//   %2 = enum $Optional<C>, #Optional.Some!enumelt, %1 : $C
 // to %0 since we are building the same enum.
 static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   assert(EI->hasOperand() && "Expected an enum with an operand!");
@@ -208,11 +210,11 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (EI && EI->getType() == SEI->getEnumOperand()->getType()) {
     // Simplify a select_enum on an enum instruction.
-    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
+    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
     //   %29 = integer_literal $Builtin.Int1, 0
     //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
-    //                                         case #Optional.Some!enumelt.1: %29
+    //                                         case #Optional.Some!enumelt: %29
     // We will return %29.
     return SEI->getCaseResult(EI->getElement());
   }
@@ -328,6 +330,21 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   return SILValue();
 }
 
+/// If the only use of a cast is a destroy, just destroy the cast operand.
+static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
+  for (Operand *op : Cast->getUses()) {
+    switch (op->getUser()->getKind()) {
+      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::StrongReleaseInst:
+      case SILInstructionKind::StrongRetainInst:
+        break;
+      default:
+        return SILValue();
+    }
+  }
+  return Cast->getOperand(0);
+}
+
 SILValue
 InstSimplifier::
 visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
@@ -350,7 +367,8 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   if (OPRI->getOperand()->getType() == OPRI->getType())
     return OPRI->getOperand();
 
-  return SILValue();
+  // (destroy_value (unchecked_ref_cast x)) -> destroy_value x
+  return simplifyDeadCast(OPRI);
 }
 
 SILValue
@@ -374,7 +392,8 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
     if (URCI->getOperand()->getType() == UI->getType())
       return URCI->getOperand();
 
-  return SILValue();
+  // (destroy_value (upcast x)) -> destroy_value x
+  return simplifyDeadCast(UI);
 }
 
 #define LOADABLE_REF_STORAGE(Name, ...) \
@@ -407,6 +426,11 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
       return Op->getOperand();
 
   return SILValue();
+}
+
+SILValue InstSimplifier::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
+  // (destroy_value (end_cow_mutation x)) -> destroy_value x
+  return simplifyDeadCast(ECM);
 }
 
 SILValue
@@ -449,6 +473,24 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
         return isIncidentalUse(operand->getUser());
       })) {
     return BAI->getOperand();
+  }
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
+  auto metaType = MI->getType().castTo<MetatypeType>();
+  auto instanceType = metaType.getInstanceType();
+  // Tuple, Struct, and Enum MetatypeTypes have a single value.
+  // If this metatype is already passed as an argument reuse it to enable
+  // downstream CSE/SILCombine optimizations.
+  // Note: redundant metatype instructions are already handled by CSE.
+  if (isa<TupleType>(instanceType)
+      || instanceType.getStructOrBoundGenericStruct()
+      || instanceType.getEnumOrBoundGenericEnum()) {
+    for (SILArgument *argument : MI->getFunction()->getArguments()) {
+      if (argument->getType().getASTType() == metaType)
+        return argument;
+    }
   }
   return SILValue();
 }

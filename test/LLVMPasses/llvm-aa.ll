@@ -5,7 +5,7 @@ target triple = "x86_64-apple-macosx10.9"
 
 declare void @swift_retain(i8 *) nounwind
 
-; CHECK-LABEL: define{{( protected)?}} i8 @test_eliminate_loads_over_retain(i8*) {
+; CHECK-LABEL: define{{( protected)?}} i8 @test_eliminate_loads_over_retain(i8* %0) {
 ; CHECK: load
 ; CHECK-NOT: load
 define i8 @test_eliminate_loads_over_retain(i8*) {

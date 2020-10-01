@@ -5,7 +5,7 @@
 // directly.  It is not specific to Linux, it is just that on
 // Apple platforms we are using the NSString bridge right now.
 
-// REQUIRES-ANY: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+// REQUIRES: OS=linux-gnu || OS=linux-android || OS=linux-androideabi
 
 import StdlibUnittest
 

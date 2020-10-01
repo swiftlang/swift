@@ -58,3 +58,64 @@
     }
   ]
 }
+{
+  key.results: [
+    {
+      key.typename: "Direction",
+      key.typeusr: "$s17typecontext_basic9DirectionOD",
+      key.implicitmembers: [
+        {
+          key.name: "east",
+          key.sourcetext: "east",
+          key.description: "east"
+        },
+        {
+          key.name: "west",
+          key.sourcetext: "west",
+          key.description: "west"
+        },
+        {
+          key.name: "vector(x:y:)",
+          key.sourcetext: "vector(x: <#T##Int#>, y: <#T##Int#>)",
+          key.description: "vector(x: Int, y: Int)"
+        },
+        {
+          key.name: "distance(_:)",
+          key.sourcetext: "distance(<#T##Int#>)",
+          key.description: "distance(Int)"
+        }
+      ]
+    },
+    {
+      key.typename: "Target",
+      key.typeusr: "$s17typecontext_basic6TargetVD",
+      key.implicitmembers: [
+        {
+          key.name: "me",
+          key.sourcetext: "me",
+          key.description: "me",
+          key.doc.brief: "Mine."
+        },
+        {
+          key.name: "you",
+          key.sourcetext: "you",
+          key.description: "you",
+          key.doc.brief: "Yours."
+        },
+        {
+          key.name: "them",
+          key.sourcetext: "them",
+          key.description: "them",
+          key.doc.brief: "Theirs."
+        },
+        {
+          key.name: "all",
+          key.sourcetext: "all",
+          key.description: "all",
+          key.doc.brief: "One for all."
+        }
+      ]
+    }
+  ],
+  key.reusingastcontext: 1
+}

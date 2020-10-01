@@ -44,16 +44,16 @@ public:
     return nullptr;
   }
 
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override {}
 
   virtual void
-  lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  lookupClassMembers(ImportPath::Access accessPath,
                      VisibleDeclConsumer &consumer) const override {}
 
   virtual void
-  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ImportPath::Access accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl *> &decls) const override {}
 
   void lookupObjCMethods(
@@ -99,13 +99,13 @@ static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
               "DWARFModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
-    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+    SourceLoc importLoc, ImportPath::Module path) {
   // There's no importing from debug info if no importer is installed.
   if (!DWARFImporter)
     return nullptr;
 
   // FIXME: Implement submodule support!
-  Identifier name = path[0].first;
+  Identifier name = path[0].Item;
   auto it = DWARFModuleUnits.find(name);
   if (it != DWARFModuleUnits.end())
     return it->second->getParentModule();
@@ -118,14 +118,26 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   decl->addFile(*wrapperUnit);
 
   // Force load overlay modules for all imported modules.
-  (void) namelookup::getAllImports(decl);
+  assert(namelookup::getAllImports(decl).size() == 1 &&
+         namelookup::getAllImports(decl).front().importedModule == decl &&
+         "DWARF module depends on additional modules?");
 
   // Register the module with the ASTContext so it is available for lookups.
-  ModuleDecl *&loaded = SwiftContext.LoadedModules[name];
-  if (!loaded)
-    loaded = decl;
+  if (!SwiftContext.getLoadedModule(name))
+    SwiftContext.addLoadedModule(decl);
 
   return decl;
+}
+
+// This function exists to defeat the lazy member importing mechanism. The
+// DWARFImporter is not capable of loading individual members, so it cannot
+// benefit from this optimization yet anyhow. Besides, if you're importing a
+// type here, you more than likely want to dump it and its fields. Loading all
+// members populates lookup tables in the Clang Importer and ensures the
+// absence of cache-fill-related side effects.
+static void forceLoadAllMembers(IterableDeclContext *IDC) {
+  if (!IDC) return;
+  IDC->loadAllMembers();
 }
 
 void ClangImporter::Implementation::lookupValueDWARF(
@@ -149,9 +161,11 @@ void ClangImporter::Implementation::lookupValueDWARF(
     if (!swiftDecl)
       continue;
 
-    if (swiftDecl->getFullName().matchesRef(name) &&
-        swiftDecl->getDeclContext()->isModuleScopeContext())
+    if (swiftDecl->getName().matchesRef(name) &&
+        swiftDecl->getDeclContext()->isModuleScopeContext()) {
+      forceLoadAllMembers(dyn_cast<IterableDeclContext>(swiftDecl));
       results.push_back(swiftDecl);
+    }
   }
 }
 
@@ -174,8 +188,10 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
     Decl *importedDecl = cast_or_null<ValueDecl>(
         importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion));
 
-    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDecl))
+    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDecl)) {
+      forceLoadAllMembers(dyn_cast<IterableDeclContext>(importedType));
       receiver(importedType);
+    }
   }
 }
 

@@ -128,10 +128,10 @@ namespace swift {
     ArrayRef<FileDependency> Dependencies;
 
     bool AutolinkForceLoad = false;
-    bool EnableNestedTypeLookupTable = false;
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
+    bool ExperimentalCrossModuleIncrementalInfo = false;
   };
 
 } // end namespace swift

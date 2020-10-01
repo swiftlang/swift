@@ -616,6 +616,18 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata,
          ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
+// SWIFT_RUNTIME_EXPORT
+// SWIFT_CC(swift)
+// bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
+//                                          const TypeContextDescriptor *rhs);
+FUNCTION(CompareTypeContextDescriptors, 
+         swift_compareTypeContextDescriptors, SwiftCC, 
+         CompareTypeContextDescriptorsAvailability,
+         RETURNS(Int1Ty),
+         ARGS(TypeContextDescriptorPtrTy, 
+              TypeContextDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
 //                                             TypeContextDescriptor *type);
 FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata,
@@ -631,6 +643,14 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata,
          SwiftCC, AlwaysAvailable,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, Int8PtrTy, TypeContextDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// MetadataResponse swift_getCanonicalSpecializedMetadata(MetadataRequest request,
+//                                                        Metadata *candidate);
+FUNCTION(GetCanonicalSpecializedMetadata, swift_getCanonicalSpecializedMetadata,
+         SwiftCC, GetCanonicalSpecializedMetadataAvailability,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // MetadataResponse swift_getOpaqueTypeMetadata(MetadataRequest request,
@@ -721,6 +741,18 @@ FUNCTION(GetAssociatedConformanceWitness,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadNone))
+
+// SWIFT_RUNTIME_EXPORT
+//     SWIFT_CC(swift) bool swift_compareProtocolConformanceDescriptors(
+//         const ProtocolConformanceDescriptor *lhs,
+//         const ProtocolConformanceDescriptor *rhs);
+FUNCTION(CompareProtocolConformanceDescriptors, 
+         swift_compareProtocolConformanceDescriptors, SwiftCC, 
+         CompareProtocolConformanceDescriptorsAvailability,
+         RETURNS(Int1Ty),
+         ARGS(ProtocolConformanceDescriptorPtrTy, 
+              ProtocolConformanceDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
@@ -1313,6 +1345,12 @@ FUNCTION(ProtocolAddProtocol, protocol_addProtocol,
          ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(ObjCOptSelf, objc_opt_self,
+         C_CC, AlwaysAvailable,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(Malloc, malloc, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy),
@@ -1407,6 +1445,20 @@ FUNCTION(GetTypeByMangledNameInContext, swift_getTypeByMangledNameInContext,
          SwiftCC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// const Metadata *swift_getTypeByMangledNameInContextInMetadataState(
+//                        size_t metadataState,
+//                        const char *typeNameStart,
+//                        size_t typeNameLength,
+//                        const TargetContextDescriptor<InProcess> *context,
+//                        const void * const *genericArgs)
+FUNCTION(GetTypeByMangledNameInContextInMetadataState,
+         swift_getTypeByMangledNameInContextInMetadataState, SwiftCC,
+         GetTypesInAbstractMetadataStateAvailability,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy,
+              Int8PtrPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

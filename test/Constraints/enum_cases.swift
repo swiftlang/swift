@@ -19,17 +19,14 @@ enum G_E<T> {
 let arr: [String] = []
 let _ = arr.map(E.foo) // Ok
 let _ = arr.map(E.bar) // Ok
-let _ = arr.map(E.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int, Int) -> E)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(E.two) // expected-error {{cannot convert value of type '(Int, Int) -> E' to expected argument type '(String) throws -> E'}}
 
-let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> E)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(E.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> E' to expected argument type '(String) throws -> E'}}
 
 let _ = arr.map(G_E<String>.foo) // Ok
 let _ = arr.map(G_E<String>.bar) // Ok
 let _ = arr.map(G_E<String>.two) // expected-error {{cannot convert value of type '(String, String) -> G_E<String>' to expected argument type '(String) throws -> G_E<String>'}}
-let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> G_E<Int>)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) throws -> G_E<Int>'}}
 
 let _ = E.foo("hello") // expected-error {{missing argument label 'bar:' in call}}
 let _ = E.bar("hello") // Ok
@@ -54,7 +51,7 @@ bar_1(E.tuple) // Ok - it's going to be ((x: Int, y: Int))
 bar_2(G_E<String>.foo) // Ok
 bar_2(G_E<Int>.bar) // Ok
 bar_2(G_E<Int>.two) // expected-error {{cannot convert value of type '(Int, Int) -> G_E<Int>' to expected argument type '(Int) -> G_E<Int>'}}
-bar_2(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(_) -> G_E<_>'}}
+bar_2(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(Int) -> G_E<Int>'}}
 bar_3(G_E<Int>.tuple) // Ok
 
 // Regular enum case assigned as a value
@@ -103,8 +100,9 @@ enum E_32551313<L, R> {
 
 struct Foo_32551313 {
   static func bar() -> E_32551313<(String, Foo_32551313?), (String, String)>? {
-    return E_32551313.Left("", Foo_32551313()) // expected-error {{enum case 'Left' expects a single parameter of type 'L' [with L = (String, Foo_32551313?)]}}
-    // expected-note@-1 {{did you mean to pass a tuple?}} {{28-28=(}} {{46-46=)}}
+    return E_32551313.Left("", Foo_32551313())
+    // expected-error@-1 {{cannot convert value of type 'String' to expected argument type '(String, Foo_32551313?)'}}
+    // expected-error@-2 {{extra argument in call}}
   }
 }
 
@@ -119,7 +117,7 @@ func rdar34583132() {
 
   func bar(_ s: S) {
     guard s.foo(1 + 2) == .timeout else {
-    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'}}
+    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'?}}
       fatalError()
     }
   }
@@ -153,5 +151,23 @@ func rdar_49159472() {
     }
 
     func baz(e: E) {}
+  }
+}
+
+struct EnumElementPatternFromContextualType<T> {
+  enum E {
+    case plain
+    case payload(T)
+  }
+
+  func foo(x: Any) where T == EnumElementPatternFromContextualType<Bool>.E {
+    switch x {
+    case T.plain: // Ok
+      break
+    case T.payload(true): // Ok
+      break
+    default:
+      break
+    }
   }
 }

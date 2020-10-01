@@ -24,7 +24,7 @@ public enum Animal {
 sil [ossa] @$test_copy_destroy_value : $@convention(thin) (@guaranteed Saddle) -> () {
 bb0(%0 : @guaranteed $Saddle):
   %3 = copy_value %0 : $Saddle
-  %4 = enum $Animal, #Animal.horse!enumelt.1, %3 : $Saddle
+  %4 = enum $Animal, #Animal.horse!enumelt, %3 : $Saddle
   %5 = copy_value %4 : $Animal
   destroy_value %4 : $Animal
   destroy_value %5 : $Animal
@@ -35,7 +35,7 @@ bb0(%0 : @guaranteed $Saddle):
 // CHECK-LABEL: sil @$test_copy_destroy_value : $@convention(thin) (@guaranteed Saddle) -> () {
 // CHECK:       bb0(%0 : $Saddle):
 // CHECK:         strong_retain %0 : $Saddle
-// CHECK:         %2 = enum $Animal, #Animal.horse!enumelt.1, %0 : $Saddle
+// CHECK:         %2 = enum $Animal, #Animal.horse!enumelt, %0 : $Saddle
 // CHECK:         release_value %2 : $Animal
 // CHECK:         %4 = tuple ()
 // CHECK:         return %4 : $()

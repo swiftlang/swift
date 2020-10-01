@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -Xllvm -enable-opaque-archetype-specializer -disable-availability-checking -primary-file %s %S/Inputs/specialize_opaque_type_archetypes_multifile_A.swift -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -O -disable-availability-checking -primary-file %s %S/Inputs/specialize_opaque_type_archetypes_multifile_A.swift -emit-sil | %FileCheck %s
 
 protocol P {}
 

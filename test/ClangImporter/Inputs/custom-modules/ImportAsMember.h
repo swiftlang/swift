@@ -68,4 +68,12 @@ struct IAMMultipleNested {
 typedef int MNInnerInt __attribute__((swift_name("IAMMultipleNested.Inner")));
 typedef float MNInnerFloat __attribute__((swift_name("IAMMultipleNested.Inner")));
 
+typedef int IAMBadInnerInt
+    __attribute__((swift_name("IAMNonexistent.Inner")));
+// CHECK: ImportAsMember.h:[[@LINE-1]]:{{[0-9]+}}: warning: imported declaration 'IAMBadInnerInt' could not be mapped to 'IAMNonexistent.Inner'
+// CHECK: ImportAsMember.h:[[@LINE-2]]:{{[0-9]+}}: note: please report this issue to the owners of 'ImportAsMember'
+typedef int IAMBadInnerIntAPINotes;
+// CHECK: ImportAsMember.h:[[@LINE-1]]:{{[0-9]+}}: warning: imported declaration 'IAMBadInnerIntAPINotes' could not be mapped to 'IAMNonexistent.Inner2'
+// CHECK: ImportAsMember.h:[[@LINE-2]]:{{[0-9]+}}: note: please report this issue to the owners of 'ImportAsMember'
+
 #endif // IMPORT_AS_MEMBER_H

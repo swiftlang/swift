@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Dispatch
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 /// dispatch_assert
 

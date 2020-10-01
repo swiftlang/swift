@@ -292,7 +292,23 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       // If this is an implicit statement or expression, just skip over it,
       // don't emit a diagnostic here.
       if (auto *S = ESD.dyn_cast<Stmt*>()) {
-        if (S->isImplicit()) continue;
+        // Return statement in a single-expression closure or function is
+        // implicit, but the result isn't. So, skip over return statements
+        // that are implicit and either have no results or the result is
+        // implicit. Otherwise, don't so we can emit unreachable code
+        // diagnostics.
+        if (S->isImplicit() && isa<ReturnStmt>(S)) {
+          auto returnStmt = cast<ReturnStmt>(S);
+          if (!returnStmt->hasResult()) {
+            continue;
+          }
+          if (returnStmt->getResult()->isImplicit()) {
+            continue;
+          }
+        }
+        if (S->isImplicit() && !isa<ReturnStmt>(S)) {
+          continue;
+        }
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         // Optional chaining expressions are wrapped in a structure like.
         //
@@ -346,7 +362,13 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      SGF.visit(ESD.get<Decl*>());
+      auto *D = ESD.get<Decl*>();
+
+      // Hoisted declarations are emitted at the top level by emitSourceFile().
+      if (D->isHoisted())
+        continue;
+
+      SGF.visit(D);
     }
   }
 }
@@ -482,6 +504,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     RValue RV = emitRValue(ret).ensurePlusOne(*this, CleanupLocation(ret));
     std::move(RV).forwardAll(*this, directResults);
   }
+
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
 }
 
@@ -781,8 +804,12 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
-  Type formalExnType =
-    S->getCatches().front()->getErrorPattern()->getType();
+  Type formalExnType = S->getCatches()
+                           .front()
+                           ->getCaseLabelItems()
+                           .front()
+                           .getPattern()
+                           ->getType();
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   // Create the throw destination at the end of the function.
@@ -856,10 +883,6 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   emitOrDeleteBlock(SGF, endDest, CleanupLocation(S->getBody()));
 }
 
-void StmtEmitter::visitCatchStmt(CatchStmt *S) {
-  llvm_unreachable("catch statement outside of context?");
-}
-
 void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *loopBB = createBasicBlock();
@@ -902,14 +925,28 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
+  // Dig out information about the sequence conformance.
+  auto sequenceConformance = S->getSequenceConformance();
+  Type sequenceType = S->getSequence()->getType();
+  auto sequenceProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::Sequence);
+  auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
+      sequenceProto, sequenceType, sequenceConformance);
+
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
     auto initialization =
         SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
     SILLocation loc = SILLocation(S->getSequence());
+
+    // Compute the reference to the Sequence's makeIterator().
+    FuncDecl *makeIteratorReq = SGF.getASTContext().getSequenceMakeIterator();
+    ConcreteDeclRef makeIteratorRef(makeIteratorReq, sequenceSubs);
+
+    // Call makeIterator().
     RValue result = SGF.emitApplyMethod(
-        loc, S->getMakeIterator(), ArgumentSource(S->getSequence()),
+        loc, makeIteratorRef, ArgumentSource(S->getSequence()),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
         SGFContext(initialization.get()));
     if (!result.isInContext()) {
@@ -931,7 +968,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   if (S->getConvertElementExpr()) {
     optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
   } else {
-    optTy = OptionalType::get(S->getSequenceConformance()->getTypeWitnessByName(
+    optTy = OptionalType::get(S->getSequenceConformance().getTypeWitnessByName(
                                   S->getSequence()->getType(),
                                   SGF.getASTContext().Id_Element))
                 ->getCanonicalType();
@@ -951,8 +988,26 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
+  // Compute the reference to the the iterator's next().
+  auto iteratorProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::IteratorProtocol);
+  ValueDecl *iteratorNextReq = iteratorProto->getSingleRequirement(
+      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
+               ArrayRef<Identifier>()));
+  auto iteratorAssocType =
+      sequenceProto->getAssociatedType(SGF.getASTContext().Id_Iterator);
+  auto iteratorMemberRef = DependentMemberType::get(
+      sequenceProto->getSelfInterfaceType(), iteratorAssocType);
+  auto iteratorType = sequenceConformance.getAssociatedType(
+      sequenceType, iteratorMemberRef);
+  auto iteratorConformance = sequenceConformance.getAssociatedConformance(
+      sequenceType, iteratorMemberRef, iteratorProto);
+  auto iteratorSubs = SubstitutionMap::getProtocolSubstitutions(
+      iteratorProto, iteratorType, iteratorConformance);
+  ConcreteDeclRef iteratorNextRef(iteratorNextReq, iteratorSubs);
+
   auto buildArgumentSource = [&]() {
-    if (cast<FuncDecl>(S->getIteratorNext().getDecl())->getSelfAccessKind() ==
+    if (cast<FuncDecl>(iteratorNextRef.getDecl())->getSelfAccessKind() ==
         SelfAccessKind::Mutating) {
       LValue lv =
           SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
@@ -968,7 +1023,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
     RValue result;
     result = SGF.emitApplyMethod(
-        loc, S->getIteratorNext(), buildArgumentSource(),
+        loc, iteratorNextRef, buildArgumentSource(),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
         S->getElementExpr() ? SGFContext() : ctx);
     if (S->getElementExpr()) {

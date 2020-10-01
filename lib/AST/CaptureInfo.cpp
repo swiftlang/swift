@@ -57,7 +57,7 @@ CaptureInfo CaptureInfo::empty() {
 
 bool CaptureInfo::hasLocalCaptures() const {
   for (auto capture : getCaptures())
-    if (capture.getDecl()->getDeclContext()->isLocalContext())
+    if (capture.getDecl()->isLocalCapture())
       return true;
   return false;
 }
@@ -71,7 +71,7 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
 
   // Filter out global variables.
   for (auto capture : getCaptures()) {
-    if (!capture.getDecl()->getDeclContext()->isLocalContext())
+    if (!capture.getDecl()->isLocalCapture())
       continue;
 
     Result.push_back(capture);

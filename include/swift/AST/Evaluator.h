@@ -19,7 +19,9 @@
 #define SWIFT_AST_EVALUATOR_H
 
 #include "swift/AST/AnyRequest.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -53,7 +55,7 @@ using AbstractRequestFunction = void(void);
 /// Form the specific request function for the given request type.
 template<typename Request>
 using RequestFunction =
-  llvm::Expected<typename Request::OutputType>(const Request &, Evaluator &);
+  typename Request::OutputType(const Request &, Evaluator &);
 
 /// Pretty stack trace handler for an arbitrary request.
 template<typename Request>
@@ -63,7 +65,7 @@ class PrettyStackTraceRequest : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceRequest(const Request &request) : request(request) { }
 
-  void print(llvm::raw_ostream &out) const {
+  void print(llvm::raw_ostream &out) const override {
     out << "While evaluating request ";
     simple_display(out, request);
     out << "\n";
@@ -83,9 +85,9 @@ public:
   CyclicalRequestError(const Request &request, const Evaluator &evaluator)
     : request(request), evaluator(evaluator) {}
 
-  virtual void log(llvm::raw_ostream &out) const;
+  virtual void log(llvm::raw_ostream &out) const override;
 
-  virtual std::error_code convertToErrorCode() const {
+  virtual std::error_code convertToErrorCode() const override {
     // This is essentially unused, but is a temporary requirement for
     // llvm::ErrorInfo subclasses.
     llvm_unreachable("shouldn't get std::error_code from CyclicalRequestError");
@@ -186,6 +188,9 @@ class Evaluator {
   /// Whether to dump detailed debug info for cycles.
   bool debugDumpCycles;
 
+  /// Whether we're building a request dependency graph.
+  bool buildDependencyGraph;
+
   /// Used to report statistics about which requests were evaluated, if
   /// non-null.
   UnifiedStatsReporter *stats = nullptr;
@@ -204,7 +209,7 @@ class Evaluator {
 
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
-  llvm::SetVector<AnyRequest> activeRequests;
+  llvm::SetVector<ActiveRequest> activeRequests;
 
   /// A cache that stores the results of requests.
   llvm::DenseMap<AnyRequest, AnyValue> cache;
@@ -219,6 +224,8 @@ class Evaluator {
   /// (DAG). However, cyclic dependencies will be recorded within this graph,
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
+
+  evaluator::DependencyRecorder recorder;
 
   /// Retrieve the request function for the given zone and request IDs.
   AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
@@ -236,7 +243,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags, bool debugDumpCycles=false);
+  Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
@@ -252,26 +259,38 @@ public:
   void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
-  /// Evaluate the given request and produce its result,
-  /// consulting/populating the cache as required.
-  template<typename Request>
+  void enumerateReferencesInFile(
+      const SourceFile *SF,
+      evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    return recorder.enumerateReferencesInFile(SF, f);
+  }
+
+  /// Retrieve the result produced by evaluating a request that can
+  /// be cached.
+  template<typename Request,
+           typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    // Check for a cycle.
-    if (checkDependency(getCanonicalRequest(request))) {
-      return llvm::Error(
-        llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
-    }
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
+    // The request can be cached, but check a predicate to determine
+    // whether this particular instance is cached. This allows more
+    // fine-grained control over which instances get cache.
+    if (request.isCached())
+      return getResultCached(request);
 
-    // Make sure we remove this from the set of active requests once we're
-    // done.
-    SWIFT_DEFER {
-      assert(activeRequests.back().castTo<Request>() == request);
-      activeRequests.pop_back();
-    };
+    return getResultUncached(request);
+  }
 
-    // Get the result.
-    return getResult(request);
+  /// Retrieve the result produced by evaluating a request that
+  /// will never be cached.
+  template<typename Request,
+           typename std::enable_if<!Request::isEverCached>::type * = nullptr>
+  llvm::Expected<typename Request::OutputType>
+  operator()(const Request &request) {
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
+    return getResultUncached(request);
   }
 
   /// Evaluate a set of requests and return their results as a tuple.
@@ -300,7 +319,14 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({getCanonicalRequest(request), std::move(output)});
+    cache.insert({AnyRequest(request), std::move(output)});
+  }
+
+  /// Do not introduce new callers of this function.
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  void clearCachedOutput(const Request &request) {
+    cache.erase(AnyRequest(request));
   }
 
   /// Clear the cache stored within this evaluator.
@@ -312,24 +338,13 @@ public:
   /// Is the given request, or an equivalent, currently being evaluated?
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
-    return activeRequests.count(AnyRequest(request));
+    return activeRequests.count(ActiveRequest(request));
   }
 
 private:
-  template <typename Request>
-  const AnyRequest &getCanonicalRequest(const Request &request) {
-    // FIXME: DenseMap ought to let us do this with one hash lookup.
-    auto iter = dependencies.find_as(request);
-    if (iter != dependencies.end())
-      return iter->first;
-    auto insertResult = dependencies.insert({AnyRequest(request), {}});
-    assert(insertResult.second && "just checked if the key was already there");
-    return insertResult.first->first;
-  }
-
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
-  void diagnoseCycle(const AnyRequest &request);
+  void diagnoseCycle(const ActiveRequest &request);
 
   /// Check the dependency from the current top of the stack to
   /// the given request, including cycle detection and diagnostics.
@@ -337,39 +352,31 @@ private:
   /// \returns true if a cycle was detected, in which case this function has
   /// already diagnosed the cycle. Otherwise, returns \c false and adds this
   /// request to the \c activeRequests stack.
-  bool checkDependency(const AnyRequest &request);
-
-  /// Retrieve the result produced by evaluating a request that can
-  /// be cached.
-  template<typename Request,
-           typename std::enable_if<Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResult(const Request &request) {
-    // The request can be cached, but check a predicate to determine
-    // whether this particular instance is cached. This allows more
-    // fine-grained control over which instances get cache.
-    if (request.isCached())
-      return getResultCached(request);
-
-    return getResultUncached(request);
-  }
-
-  /// Retrieve the result produced by evaluating a request that
-  /// will never be cached.
-  template<typename Request,
-           typename std::enable_if<!Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResult(const Request &request) {
-    return getResultUncached(request);
-  }
+  bool checkDependency(const ActiveRequest &request);
 
   /// Produce the result of the request without caching.
   template<typename Request>
   llvm::Expected<typename Request::OutputType>
   getResultUncached(const Request &request) {
+    auto activeReq = ActiveRequest(request);
+
+    // Check for a cycle.
+    if (checkDependency(activeReq)) {
+      return llvm::Error(
+          std::make_unique<CyclicalRequestError<Request>>(request, *this));
+    }
+
+    // Make sure we remove this from the set of active requests once we're
+    // done.
+    SWIFT_DEFER {
+      assert(activeRequests.back() == activeReq);
+      activeRequests.pop_back();
+    };
+
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
-    dependencies.find_as(request)->second.clear();
+    if (buildDependencyGraph)
+      dependencies.find_as(request)->second.clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
@@ -377,7 +384,9 @@ private:
     FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
-    return getRequestFunction<Request>()(request, *this);
+    auto &&r = getRequestFunction<Request>()(request, *this);
+    reportEvaluatedResult<Request>(request, r);
+    return std::move(r);
   }
 
   /// Get the result of a request, consulting an external cache
@@ -388,8 +397,10 @@ private:
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     // If there is a cached result, return it.
-    if (auto cached = request.getCachedResult())
+    if (auto cached = request.getCachedResult()) {
+      reportEvaluatedResult<Request>(request, *cached);
       return *cached;
+    }
 
     // Compute the result.
     auto result = getResultUncached(request);
@@ -414,7 +425,9 @@ private:
     // If we already have an entry for this request in the cache, return it.
     auto known = cache.find_as(request);
     if (known != cache.end()) {
-      return known->second.template castTo<typename Request::OutputType>();
+      auto r = known->second.template castTo<typename Request::OutputType>();
+      reportEvaluatedResult<Request>(request, r);
+      return r;
     }
 
     // Compute the result.
@@ -423,8 +436,27 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({getCanonicalRequest(request), *result});
+    cache.insert({AnyRequest(request), *result});
     return result;
+  }
+
+private:
+  // Report the result of evaluating a request that is not a dependency sink.
+  template <typename Request, typename std::enable_if<
+                                  !Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {
+    recorder.replay(activeRequests, ActiveRequest(r));
+  }
+
+  // Report the result of evaluating a request that is a dependency sink.
+  template <typename Request,
+            typename std::enable_if<Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {
+    return recorder.record(activeRequests, [&r, &o](auto &c) {
+      return r.writeDependencySink(c, o);
+    });
   }
 
 public:
@@ -452,17 +484,13 @@ public:
 
   /// Dump the dependencies of the given request to the debugging stream
   /// as a tree.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependencies(const AnyRequest &request) const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependencies(const AnyRequest &request));
 
   /// Print all dependencies known to the evaluator as a single Graphviz
   /// directed graph.
   void printDependenciesGraphviz(llvm::raw_ostream &out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependenciesGraphviz() const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependenciesGraphviz());
 };
 
 template <typename Request>

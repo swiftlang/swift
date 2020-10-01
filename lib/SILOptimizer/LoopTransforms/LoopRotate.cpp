@@ -25,14 +25,20 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
-static llvm::cl::opt<bool> ShouldRotate("sil-looprotate",
-                                        llvm::cl::init(true));
+/// The size limit for the loop block to duplicate.
+///
+/// Larger blocks will not be duplicated to avoid too much code size increase.
+/// It's very seldom that the default value of 20 is exceeded (< 0.3% of all
+/// loops in the swift benchmarks).
+static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
+                                              llvm::cl::init(20));
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -59,6 +65,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                               SILBasicBlock *bb,
                               SmallVectorImpl<SILInstruction *> &moves) {
   llvm::DenseSet<SILInstruction *> invariants;
+  int cost = 0;
   for (auto &instRef : *bb) {
     auto *inst = &instRef;
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
@@ -69,6 +76,10 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
       moves.push_back(inst);
       invariants.insert(inst);
     } else if (!inst->isTriviallyDuplicatable())
+      return false;
+    // It wouldn't make sense to rotate dealloc_stack without also rotating the
+    // alloc_stack, which is covered by isTriviallyDuplicatable.
+    else if (isa<DeallocStackInst>(inst))
       return false;
     else if (isa<FunctionRefInst>(inst)) {
       moves.push_back(inst);
@@ -88,10 +99,12 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
+    } else {
+      cost += (int)instructionInlineCost(instRef);
     }
   }
 
-  return true;
+  return cost < LoopRotateSizeLimit;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -118,9 +131,9 @@ static void updateSSAForUseOfValue(
   assert(Res->getType() == MappedValue->getType() && "The types must match");
 
   insertedPhis.clear();
-  updater.Initialize(Res->getType());
-  updater.AddAvailableValue(Header, Res);
-  updater.AddAvailableValue(EntryCheckBlock, MappedValue);
+  updater.initialize(Res->getType());
+  updater.addAvailableValue(Header, Res);
+  updater.addAvailableValue(EntryCheckBlock, MappedValue);
 
   // Because of the way that phi nodes are represented we have to collect all
   // uses before we update SSA. Modifying one phi node can invalidate another
@@ -142,7 +155,7 @@ static void updateSSAForUseOfValue(
 
     assert(user->getParent() != EntryCheckBlock
            && "The entry check block should dominate the header");
-    updater.RewriteUse(*use);
+    updater.rewriteUse(*use);
   }
   // Canonicalize inserted phis to avoid extra BB Args.
   for (SILPhiArgument *arg : insertedPhis) {
@@ -185,7 +198,7 @@ static void rewriteNewLoopEntryCheckBlock(
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
                           entryCheckBlock, &inst);
-    instIter++;
+    ++instIter;
   }
 }
 
@@ -434,11 +447,6 @@ class LoopRotation : public SILFunctionTransform {
 
     if (loopInfo->empty()) {
       LLVM_DEBUG(llvm::dbgs() << "No loops in " << f->getName() << "\n");
-      return;
-    }
-    if (!ShouldRotate) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Skipping loop rotation in " << f->getName() << "\n");
       return;
     }
     LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << f->getName() << "\n");

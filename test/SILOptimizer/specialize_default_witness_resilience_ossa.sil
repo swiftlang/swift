@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt -enable-library-evolution -enable-sil-verify-all -generic-specializer -sil-generic-specializer-enable-ownership %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public protocol ResilientProtocol {
+  func defaultA()
+  func defaultB()
+}
+
+public struct ConformingStruct : ResilientProtocol {
+  public func defaultA()
+  public func defaultB()
+}
+
+class Klass {}
+
+// Used to make sure we also handle non-trivial structs correctly.
+public struct ConformingNonTrivialStruct : ResilientProtocol {
+  var k: Klass
+
+  public func defaultA()
+  public func defaultB()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
+// CHECK-NEXT:    store %0 to [trivial] [[TMP]] : $*ConformingStruct
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[TMP]] : $*ConformingStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
+// CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
+// CHECK } // end sil function 's8defaultA4main16ConformingStructV_Tg5'
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main26ConformingNonTrivialStructV_Tg5
+// CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingNonTrivialStruct
+// CHECK-NEXT:    store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main26ConformingNonTrivialStructV_Tg5
+// CHECK-NEXT:    [[LOAD:%.*]] = load_borrow [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
+// CHECK:         dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK } // end sil function 's8defaultA4main16ConformingNonTrivialStructV_Tg5'
+
+sil [ossa] @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %fn = function_ref @defaultB : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<Self>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main16ConformingStructV_Tg5 :
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
+// CHECK-NEXT:    store %0 to [trivial] [[TMP]] : $*ConformingStruct
+// CHECK:    dealloc_stack [[TMP]] : $*ConformingStruct
+// CHECK: } // end sil function '$s8defaultB4main16ConformingStructV_Tg5'
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main26ConformingNonTrivialStructV_Tg5 :
+// CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingNonTrivialStruct
+// CHECK-NEXT:    store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK:    dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK: } // end sil function '$s8defaultB4main26ConformingNonTrivialStructV_Tg5'
+
+sil [ossa] @defaultB : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_specialize_default_witness_method
+// CHECK:       bb0(%0 : $*ConformingStruct):
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK-NEXT:    [[VALUE:%.*]] = load [trivial] %0 : $*ConformingStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
+// CHECK-NEXT:    return [[RESULT]]
+
+sil hidden [ossa] @test_specialize_default_witness_method : $@convention(thin) (@in_guaranteed ConformingStruct) -> () {
+bb0(%0 : $*ConformingStruct):
+  %fn = function_ref @defaultA : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_specialize_default_witness_method_nontrivial
+// CHECK:       bb0(%0 : $*ConformingNonTrivialStruct):
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main26ConformingNonTrivialStructV_Tg5
+// CHECK-NEXT:    [[VALUE:%.*]] = load_borrow %0 : $*ConformingNonTrivialStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
+// CHECK: } // end sil function 'test_specialize_default_witness_method_nontrivial'
+
+sil hidden [ossa] @test_specialize_default_witness_method_nontrivial : $@convention(thin) (@in_guaranteed ConformingNonTrivialStruct) -> () {
+bb0(%0 : $*ConformingNonTrivialStruct):
+  %fn = function_ref @defaultA : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<ConformingNonTrivialStruct>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}

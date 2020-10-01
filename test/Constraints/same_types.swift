@@ -89,15 +89,14 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
 }
 
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
-	// expected-warning@-1{{redundant same-type constraint 'T.Bar.Foo' == 'X'}}
-        // expected-note@-2{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+	// expected-warning@-1{{neither type in same-type constraint ('Y.Foo' (aka 'X') or 'X') refers to a generic parameter or associated type}}
   return (t.bar, t.bar.foo)
 }
 
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
-  T.Bar == Y, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
-  T.Bar.Foo == Z { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
+  T.Bar == Y,
+  T.Bar.Foo == Z { // expected-error{{generic signature requires types 'Y.Foo' (aka 'X') and 'Z' to be the same}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
@@ -149,7 +148,7 @@ rdar19137463(1)
 struct Brunch<U : Fooable> where U.Foo == X {}
 
 struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}}
-  typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
+  typealias Foo = DoesNotExist // expected-error{{cannot find type 'DoesNotExist' in scope}}
   var foo: Foo { while true {} }
 }
 
@@ -319,4 +318,39 @@ struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
     // expected-warning@-2 {{redundant same-type constraint 'A.Assoc' == 'C.Assoc'}}
     fatalError()
   }
+}
+
+protocol P7 {
+  associatedtype A
+  static func fn(args: A)
+}
+
+class R<T>: P7 where T: P7, T.A == T.Type { // expected-note {{'T' declared as parameter to type 'R'}}
+  typealias A = T.Type
+  static func fn(args: T.Type) {}
+}
+
+R.fn(args: R.self) // expected-error {{generic parameter 'T' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+
+// rdar://problem/58607155
+protocol AssocType1 { associatedtype A }
+protocol AssocType2 { associatedtype A }
+
+func rdar58607155() {
+  func f<T1: AssocType1, T2: AssocType2>(t1: T1, t2: T2) where T1.A == T2.A {}
+  // expected-note@-1 2 {{where 'T2' = 'MissingConformance'}}
+  // expected-note@-2 2 {{where 'T1' = 'MissingConformance'}}
+
+  class Conformance: AssocType1, AssocType2 { typealias A = Int }
+  class MissingConformance {}
+
+  // One generic argument has a conformance failure
+  f(t1: MissingConformance(), t2: Conformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  f(t1: Conformance(), t2: MissingConformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
+
+  // Both generic arguments have a conformance failure
+  f(t1: MissingConformance(), t2: MissingConformance())
+  // expected-error@-1 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  // expected-error@-2 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
 }

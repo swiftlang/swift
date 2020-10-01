@@ -116,6 +116,7 @@ public:
 
   CursorInfoTest()
       : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+                                    /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
     // This is avoiding destroying \p SourceKit::Context because another
@@ -151,14 +152,14 @@ public:
       [&](const RequestResult<CursorInfoData> &Result) {
         assert(!Result.isCancelled());
         if (Result.isError()) {
-          TestInfo.Error = Result.getError();
+          TestInfo.Error = Result.getError().str();
           sema.signal();
           return;
         }
         const CursorInfoData &Info = Result.value();
-        TestInfo.Name = Info.Name;
-        TestInfo.Typename = Info.TypeName;
-        TestInfo.Filename = Info.Filename;
+        TestInfo.Name = Info.Name.str();
+        TestInfo.Typename = Info.TypeName.str();
+        TestInfo.Filename = Info.Filename.str();
         TestInfo.DeclarationLoc = Info.DeclarationLoc;
         sema.signal();
       });
@@ -189,10 +190,10 @@ private:
 } // anonymous namespace
 
 TEST_F(CursorInfoTest, FileNotExist) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let foo = 0\n";
-  const char *Args[] = { "/<not-existent-file>" };
+  const char *Args[] = { "<not-existent-file>" };
 
   open(DocName, Contents);
   auto FooOffs = findOffset("foo =", Contents);
@@ -205,7 +206,7 @@ static const char *ExpensiveInit =
     "[0:0,0:0,0:0,0:0,0:0,0:0,0:0]";
 
 TEST_F(CursorInfoTest, EditAfter) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -240,7 +241,7 @@ TEST_F(CursorInfoTest, EditAfter) {
 }
 
 TEST_F(CursorInfoTest, EditBefore) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let foo = 0\n"
     "let value = foo;\n";
@@ -277,7 +278,7 @@ TEST_F(CursorInfoTest, EditBefore) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -307,7 +308,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -337,7 +338,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -368,7 +369,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";
   const char *Args[] = {"-parse-as-library"};

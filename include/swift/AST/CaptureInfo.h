@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CAPTURE_INFO_H
 #define SWIFT_AST_CAPTURE_INFO_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
@@ -21,7 +22,6 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
-#include <vector>
 
 namespace swift {
 class CapturedValue;
@@ -169,7 +169,7 @@ public:
 
   ArrayRef<CapturedValue> getCaptures() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return None;
     return StorageAndFlags.getPointer()->getCaptures();
@@ -187,7 +187,7 @@ public:
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return false;
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
@@ -201,7 +201,7 @@ public:
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return nullptr;
     return StorageAndFlags.getPointer()->getDynamicSelfType();
@@ -213,13 +213,13 @@ public:
 
   OpaqueValueExpr *getOpaqueValue() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return nullptr;
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(raw_ostream &OS) const;
 };
 

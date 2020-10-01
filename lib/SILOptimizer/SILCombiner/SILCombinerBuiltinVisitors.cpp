@@ -109,6 +109,49 @@ SILInstruction *SILCombiner::optimizeBuiltinIsConcrete(BuiltinInst *BI) {
   return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), 1);
 }
 
+/// Replace
+/// \code
+///   %b = builtin "COWBufferForReading" %r
+///   %a = ref_element_addr %b
+/// \endcode
+/// with
+/// \code
+///   %a = ref_element_addr [immutable] %r
+/// \endcode
+/// The same for ref_tail_addr.
+SILInstruction *SILCombiner::optimizeBuiltinCOWBufferForReading(BuiltinInst *BI) {
+  auto useIter = BI->use_begin();
+  while (useIter != BI->use_end()) {
+    auto nextIter = std::next(useIter);
+    SILInstruction *user = useIter->getUser();
+    SILValue ref = BI->getOperand(0);
+    switch (user->getKind()) {
+      case SILInstructionKind::RefElementAddrInst: {
+        auto *REAI = cast<RefElementAddrInst>(user);
+        REAI->setOperand(ref);
+        REAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::RefTailAddrInst: {
+        auto *RTAI = cast<RefTailAddrInst>(user);
+        RTAI->setOperand(ref);
+        RTAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::StrongReleaseInst:
+        cast<StrongReleaseInst>(user)->setOperand(ref);
+        break;
+      default:
+        break;
+    }
+    useIter = nextIter;
+  }
+  // If there are unknown users, keep the builtin, and IRGen will handle it.
+  if (BI->use_empty())
+    return eraseInstFromFunction(*BI);
+  return nullptr;
+}
+
 static unsigned getTypeWidth(SILType Ty) {
   if (auto BuiltinIntTy = Ty.getAs<BuiltinIntegerType>()) {
     if (BuiltinIntTy->isFixedWidth()) {
@@ -252,7 +295,11 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     };
     return B.createTuple(I->getLoc(), Ty, Elements);
   }
-      
+
+  // Replace the type check with 'true'.
+  case BuiltinValueKind::IsSameMetatype:
+    return Builder.createIntegerLiteral(I->getLoc(), I->getType(), true);
+
   default:
     break;
   }
@@ -530,10 +577,15 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 }
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+  if (I->getFunction()->hasOwnership())
+    return nullptr;
+
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
     return optimizeBuiltinIsConcrete(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::COWBufferForReading)
+    return optimizeBuiltinCOWBufferForReading(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayNoAlias ||

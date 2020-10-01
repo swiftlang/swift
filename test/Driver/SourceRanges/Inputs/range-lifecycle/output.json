@@ -1,0 +1,21 @@
+{
+  "./main.swift": {
+    "object": "./main.o",
+    "swift-dependencies": "./main.swiftdeps"
+  },
+  "./fileA.swift": {
+    "object": "./fileA.o",
+    "swift-dependencies": "./fileA.swiftdeps"
+  },
+  "./fileB.swift": {
+    "object": "./fileB.o",
+    "swift-dependencies": "./fileB.swiftdeps"
+  },
+  "./fileC.swift": {
+    "object": "./fileC.o",
+    "swift-dependencies": "./fileC.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}

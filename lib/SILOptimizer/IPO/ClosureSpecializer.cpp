@@ -340,7 +340,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   for (auto Arg : AI.getArguments()) {
     if (Index != CSDesc.getClosureIndex())
       NewArgs.push_back(Arg);
-    Index++;
+    ++Index;
   }
 
   // ... and appending the captured arguments. We also insert retains here at
@@ -649,7 +649,11 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
              || ParamConv == ParameterConvention::Indirect_Inout
              || ParamConv == ParameterConvention::Indirect_InoutAliasable);
     } else {
-      ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(*ClosureUser)
+      ParamConv = ClosedOverFunConv
+                          .getSILType(PInfo, CallSiteDesc.getApplyInst()
+                                                 .getFunction()
+                                                 ->getTypeExpansionContext())
+                          .isTrivial(*ClosureUser)
                       ? ParameterConvention::Direct_Unowned
                       : ParameterConvention::Direct_Owned;
     }
@@ -665,13 +669,13 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getSubstGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getInvocationGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
       ClosureUserFunTy->getOptionalErrorResult(),
-      ClosureUserFunTy->getSubstitutions(),
-      ClosureUserFunTy->isGenericSignatureImplied(),
+      ClosureUserFunTy->getPatternSubstitutions(),
+      ClosureUserFunTy->getInvocationSubstitutions(),
       M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
@@ -780,7 +784,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
 /// Populate the body of the cloned closure, modifying instructions as
 /// necessary. This is where we create the actual specialized BB Arguments
 void ClosureSpecCloner::populateCloned() {
-  bool needToUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
   SILFunction *Cloned = getCloned();
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
@@ -800,8 +804,9 @@ void ClosureSpecCloner::populateCloned() {
     }
 
     // Otherwise, create a new argument which copies the original argument
+    auto typeInContext = Cloned->getLoweredType(Arg->getType());
     SILValue MappedValue =
-        ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
+        ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
     entryArgs.push_back(MappedValue);
   }
 
@@ -813,6 +818,7 @@ void ClosureSpecCloner::populateCloned() {
   // such arguments. After this pass is done the only thing that will reference
   // the arguments is the partial apply that we will create.
   SILFunction *ClosedOverFun = CallSiteDesc.getClosureCallee();
+  SILBuilder &Builder = getBuilder();
   auto ClosedOverFunConv = ClosedOverFun->getConventions();
   unsigned NumTotalParams = ClosedOverFunConv.getNumParameters();
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
@@ -820,7 +826,10 @@ void ClosureSpecCloner::populateCloned() {
   llvm::DenseMap<SILValue, SILValue> CapturedMap;
   unsigned idx = 0;
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
-    auto paramTy = ClosedOverFunConv.getSILType(PInfo);
+    auto paramTy =
+        ClosedOverFunConv.getSILType(PInfo, Builder.getTypeExpansionContext());
+    // Get the type in context of the new function.
+    paramTy = Cloned->getLoweredType(paramTy);
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(paramTy);
     NewPAIArgs.push_back(MappedValue);
     auto CapturedVal =
@@ -828,7 +837,6 @@ void ClosureSpecCloner::populateCloned() {
     CapturedMap[CapturedVal] = MappedValue;
   }
 
-  SILBuilder &Builder = getBuilder();
   Builder.setInsertionPoint(ClonedEntryBB);
 
   // Clone FRI and PAI, and replace usage of the removed closure argument
@@ -877,11 +885,11 @@ void ClosureSpecCloner::populateCloned() {
           Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                      Builder.getDefaultAtomicity());
         else
-          needToUpdateStackNesting |=
+          invalidatedStackNesting |=
               CallSiteDesc.destroyIfPartialApplyStack(Builder, NewClosure);
         for (auto PAI : NeedsRelease) {
           if (PAI->isOnStack())
-            needToUpdateStackNesting |=
+            invalidatedStackNesting |=
                 CallSiteDesc.destroyIfPartialApplyStack(Builder, PAI);
           else
             Builder.createReleaseValue(Loc, SILValue(PAI),
@@ -906,11 +914,11 @@ void ClosureSpecCloner::populateCloned() {
         Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                    Builder.getDefaultAtomicity());
       else
-        needToUpdateStackNesting |=
+        invalidatedStackNesting |=
             CallSiteDesc.destroyIfPartialApplyStack(Builder, NewClosure);
       for (auto PAI : NeedsRelease) {
         if (PAI->isOnStack())
-          needToUpdateStackNesting |=
+          invalidatedStackNesting |=
               CallSiteDesc.destroyIfPartialApplyStack(Builder, PAI);
         else
           Builder.createReleaseValue(Loc, SILValue(PAI),
@@ -918,7 +926,7 @@ void ClosureSpecCloner::populateCloned() {
       }
     }
   }
-  if (needToUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(Cloned);
   }
 }
@@ -968,16 +976,23 @@ void SILClosureSpecializerTransform::run() {
     // specialized all of their uses.
     LLVM_DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
     sortUnique(PropagatedClosures);
+    bool invalidatedStackNesting = false;
+
     for (auto *Closure : PropagatedClosures) {
       LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
       if (!tryDeleteDeadClosure(Closure)) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
-        NumPropagatedClosuresNotEliminated++;
+        ++NumPropagatedClosuresNotEliminated;
         continue;
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Deleted closure!\n");
       ++NumPropagatedClosuresEliminated;
+      invalidatedStackNesting = true;
+    }
+
+    if (invalidatedStackNesting) {
+      StackNesting().correctStackNesting(F);
     }
   }
 

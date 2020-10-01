@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t/ForeignModule.swiftmodule)
 // RUN: touch %t/ForeignModule.swiftmodule/garbage-garbage-garbage.swiftmodule
 
+// SR-12363: This test crashes on next branch.
+// XFAIL: asserts
+
 // Test format: We try to import ForeignModule with architectures besides
 // garbage-garbage-garbage and check the target triple listed in the error
 // message to make sure it was normalized correctly. This works in lieu of a
@@ -65,11 +68,12 @@ import ForeignModule
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target arm64-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target aarch64-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64-apple-ios %s
 
-// armv7s, armv7k, armv7 should be accepted.
+// armv7s, armv7k, armv7, arm64e should be accepted.
 
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7s-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7s-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7k-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7k-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7-apple-ios %s
+// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target arm64e-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64e-apple-ios %s
 
 // x86_64h should be accepted.
 
@@ -107,15 +111,6 @@ import ForeignModule
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-ios40.0-simulator 2>&1 | %FileCheck -DNORM=i386-apple-ios-simulator %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-tvos40-simulator 2>&1 | %FileCheck -DNORM=i386-apple-tvos-simulator %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-watchos9.1.1-simulator 2>&1 | %FileCheck -DNORM=i386-apple-watchos-simulator %s
-
-// simulator should be inferred when an Intel architecture is used with iOS, tvOS, or watchOS.
-
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-ios40.0 2>&1 | %FileCheck -DNORM=x86_64-apple-ios-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-tvos40 2>&1 | %FileCheck -DNORM=x86_64-apple-tvos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-watchos9.1.1 2>&1 | %FileCheck -DNORM=x86_64-apple-watchos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-ios40.0 2>&1 | %FileCheck -DNORM=i386-apple-ios-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-tvos40 2>&1 | %FileCheck -DNORM=i386-apple-tvos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-watchos9.1.1 2>&1 | %FileCheck -DNORM=i386-apple-watchos-simulator %s
 
 // Other environments should be passed through.
 

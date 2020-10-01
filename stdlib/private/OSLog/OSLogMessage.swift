@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,19 +14,6 @@
 // the new OS log APIs. These are prototype implementations and should not be
 // used outside of tests.
 
-/// Formatting options supported by the logging APIs for logging integers.
-/// These can be specified in the string interpolation passed to the log APIs.
-/// For Example,
-///     log.info("Writing to file with permissions: \(perm, format: .octal)")
-///
-/// See `OSLogInterpolation.appendInterpolation` definitions for default options
-/// for integer types.
-public enum IntFormat {
-  case decimal
-  case hex
-  case octal
-}
-
 /// Privacy qualifiers for indicating the privacy level of the logged data
 /// to the logging system. These can be specified in the string interpolation
 /// passed to the log APIs.
@@ -35,19 +22,24 @@ public enum IntFormat {
 ///
 /// See `OSLogInterpolation.appendInterpolation` definitions for default options
 /// for each supported type.
-public enum Privacy {
+public enum OSLogPrivacy {
   case `private`
   case `public`
+  case auto
 }
 
 /// Maximum number of arguments i.e., interpolated expressions that can
 /// be used in the string interpolations passed to the log APIs.
 /// This limit is imposed by the ABI of os_log.
-@_transparent
+@_semantics("constant_evaluable")
+@inlinable
+@_optimize(none)
 public var maxOSLogArgumentCount: UInt8 { return 48 }
 
-@usableFromInline
+/// Note that this is marked transparent instead of @inline(__always) as it is
+/// used in optimize(none) functions.
 @_transparent
+@usableFromInline
 internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
@@ -97,12 +89,15 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @usableFromInline
   @frozen
   internal enum ArgumentFlag {
+    case autoFlag
     case privateFlag
     case publicFlag
 
     @inlinable
     internal var rawValue: UInt8 {
       switch self {
+      case .autoFlag:
+        return 0
       case .privateFlag:
         return 0x1
       case .publicFlag:
@@ -180,24 +175,12 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   // constant evaluation and folding. Note that these methods will be inlined,
   // constant evaluated/folded and optimized in the context of a caller.
 
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public init(literalCapacity: Int, interpolationCount: Int) {
-    // Since the format string is fully constructed at compile time,
-    // the parameter `literalCapacity` is ignored.
-    formatString = ""
-    arguments = OSLogArguments(capacity: interpolationCount)
-    preamble = 0
-    argumentCount = 0
-    totalBytesForSerializingArguments = 0
-  }
-
-  /// An internal initializer that should be used only when there are no
-  /// interpolated expressions. This function must be constant evaluable.
-  @inlinable
-  @_semantics("constant_evaluable")
-  @_optimize(none)
-  internal init() {
+    // Since the format string and the arguments array are fully constructed
+    // at compile time, the parameters are ignored.
     formatString = ""
     arguments = OSLogArguments()
     preamble = 0
@@ -205,7 +188,8 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
     totalBytesForSerializingArguments = 0
   }
 
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendLiteral(_ literal: String) {
     formatString += literal.percentEscapedString
@@ -219,13 +203,15 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
-  internal func isPrivate(_ privacy: Privacy) -> Bool {
-    // Do not use equality comparisons on enums as it is not supported by
-    // the constant evaluator.
-    if case .private = privacy {
-      return true
+  internal func getArugmentFlag(_ privacy: OSLogPrivacy) -> ArgumentFlag {
+    switch privacy {
+    case .public:
+      return .publicFlag
+    case .private:
+      return .privateFlag
+    default:
+      return .autoFlag
     }
-    return false
   }
 
   /// Compute a byte-sized argument header consisting of flag and type.
@@ -237,10 +223,10 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_effects(readonly)
   @_optimize(none)
   internal func getArgumentHeader(
-    isPrivate: Bool,
+    privacy: OSLogPrivacy,
     type: ArgumentType
   ) -> UInt8 {
-    let flag: ArgumentFlag = isPrivate ? .privateFlag : .publicFlag
+    let flag = getArugmentFlag(privacy)
     let flagAndType: UInt8 = (type.rawValue &<< 4) | flag.rawValue
     return flagAndType
   }
@@ -252,11 +238,13 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_effects(readonly)
   @_optimize(none)
   internal func getUpdatedPreamble(
-    isPrivate: Bool,
+    privacy: OSLogPrivacy,
     isScalar: Bool
   ) -> UInt8 {
     var preamble = self.preamble
-    if isPrivate {
+    // Equality comparisions on enums is not yet supported by the constant
+    // evaluator.
+    if case .private = privacy {
       preamble |= PreambleBitMask.privateBitMask.rawValue
     }
     if !isScalar {
@@ -305,7 +293,7 @@ public struct OSLogMessage :
   @_semantics("oslog.message.init_stringliteral")
   @_semantics("constant_evaluable")
   public init(stringLiteral value: String) {
-    var s = OSLogInterpolation()
+    var s = OSLogInterpolation(literalCapacity: 1, interpolationCount: 0)
     s.appendLiteral(value)
     self.interpolation = s
   }
@@ -313,7 +301,8 @@ public struct OSLogMessage :
   /// The byte size of the buffer that will be passed to the C os_log ABI.
   /// It will contain the elements of `interpolation.arguments` and the two
   /// summary bytes: preamble and argument count.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public var bufferSize: Int {
     return interpolation.totalBytesForSerializingArguments + 2
@@ -340,23 +329,18 @@ internal struct OSLogArguments {
   internal var argumentClosures: [(inout ByteBufferPointer,
     inout StorageObjects) -> ()]
 
-  /// This function must be constant evaluable.
-  @inlinable
   @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   internal init() {
     argumentClosures = []
   }
 
-  @usableFromInline
-  internal init(capacity: Int) {
-    argumentClosures = []
-    argumentClosures.reserveCapacity(capacity)
-  }
-
   /// Append a byte-sized header, constructed by
   /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
-  @usableFromInline
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append(_ header: UInt8) {
     argumentClosures.append({ (position, _) in
       serialize(header, at: &position)
@@ -364,28 +348,13 @@ internal struct OSLogArguments {
   }
 
   /// `append` for other types must be implemented by extensions.
-
-  /// Serialize the arguments tracked by self in a byte buffer.
-  /// - Parameters:
-  ///   - bufferPosition: the pointer to a location within a byte buffer where
-  ///   the argument must be serialized. This will be incremented by the number
-  ///   of bytes used up to serialize the arguments.
-  ///   - storageObjects: An array to store references to objects representing
-  ///   auxiliary storage created during serialization. This is only used while
-  ///   serializing strings.
-  @usableFromInline
-  internal func serializeAt(
-    _ bufferPosition: inout ByteBufferPointer,
-    using storageObjects: inout StorageObjects
-  ) {
-    argumentClosures.forEach { $0(&bufferPosition, &storageObjects) }
-  }
 }
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
 /// and increment the `bufferPosition` with the byte size of the serialized value.
-@usableFromInline
+@inlinable
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func serialize(
   _ value: UInt8,
   at bufferPosition: inout ByteBufferPointer)

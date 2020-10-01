@@ -108,8 +108,8 @@
 /// `load(fromByteOffset:as:)` method to read values.
 ///
 ///     let rawPointer = UnsafeRawPointer(uint64Pointer)
-///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
-///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///     let fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     let firstByte = rawPointer.load(as: UInt8.self)      // OK
 ///
 /// Performing Typed Pointer Arithmetic
 /// ===================================
@@ -260,7 +260,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
   ///         return ptr.pointee < 0
   ///     }
   ///
@@ -430,8 +430,8 @@ public struct UnsafePointer<Pointee>: _Pointer {
 /// to read and write values.
 ///
 ///     let rawPointer = UnsafeMutableRawPointer(uint64Pointer)
-///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
-///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///     let fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     let firstByte = rawPointer.load(as: UInt8.self)      // OK
 ///
 /// Performing Typed Pointer Arithmetic
 /// ===================================
@@ -530,7 +530,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameter other: The immutable pointer to convert.
   @_transparent
-  public init(mutating other: UnsafePointer<Pointee>) {
+  public init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
@@ -540,7 +540,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafePointer<Pointee>?) {
+  public init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
@@ -550,7 +550,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///		
   /// - Parameter other: The pointer to convert.		
   @_transparent		
-  public init(_ other: UnsafeMutablePointer<Pointee>) {		
+  public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
    self._rawValue = other._rawValue		
   }		
 
@@ -560,7 +560,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the		
   ///   result is `nil`.		
   @_transparent		
-  public init?(_ other: UnsafeMutablePointer<Pointee>?) {		
+  public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }		
    self.init(unwrapped)		
   }		
@@ -784,7 +784,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
+  public func moveInitialize(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
@@ -855,7 +857,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(from source: UnsafeMutablePointer, count: Int) {
+  public func moveAssign(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
     _debugPrecondition(
@@ -907,7 +911,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
   ///         return ptr.pointee < 0
   ///     }
   ///

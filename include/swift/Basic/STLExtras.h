@@ -71,40 +71,6 @@ struct function_traits<R (T::*)(Args...) const> {
 
 /// @{
 
-/// An STL-style algorithm similar to std::for_each that applies a second
-/// functor between every pair of elements.
-///
-/// This provides the control flow logic to, for example, print a
-/// comma-separated list:
-/// \code
-///   interleave(names.begin(), names.end(),
-///              [&](StringRef name) { OS << name; },
-///              [&] { OS << ", "; });
-/// \endcode
-template <typename ForwardIterator, typename UnaryFunctor,
-          typename NullaryFunctor>
-inline void interleave(ForwardIterator begin, ForwardIterator end,
-                       UnaryFunctor each_fn,
-                       NullaryFunctor between_fn) {
-  if (begin == end)
-    return;
-  each_fn(*begin);
-  ++begin;
-  for (; begin != end; ++begin) {
-    between_fn();
-    each_fn(*begin);
-  }
-}
-
-template <typename Container, typename UnaryFunctor, typename NullaryFunctor>
-inline void interleave(const Container &c, UnaryFunctor each_fn,
-                       NullaryFunctor between_fn) {
-  interleave(c.begin(), c.end(), each_fn, between_fn);
-}
-
-/// @}
-/// @{
-
 /// The equivalent of std::for_each, but for two lists at once.
 template <typename InputIt1, typename InputIt2, typename BinaryFunction>
 inline void for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2, BinaryFunction f) {
@@ -517,19 +483,18 @@ makeOptionalTransformRange(Range range, OptionalTransform op) {
 /// the result in an optional to indicate success or failure.
 template<typename Subclass>
 struct DowncastAsOptional {
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))> {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
     return None;
   }
 
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(const Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))>
-  {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
@@ -636,6 +601,16 @@ inline bool is_sorted_and_uniqued(const Container &C) {
 template <typename Container, typename T, typename BinaryOperation>
 inline T accumulate(const Container &C, T init, BinaryOperation op) {
   return std::accumulate(C.begin(), C.end(), init, op);
+}
+
+template <typename Container, typename T>
+inline bool binary_search(const Container &C, const T &value) {
+  return std::binary_search(C.begin(), C.end(), value);
+}
+
+template <typename Container, typename T, typename BinaryOperation>
+inline bool binary_search(const Container &C, const T &value, BinaryOperation op) {
+  return std::binary_search(C.begin(), C.end(), value, op);
 }
 
 /// Returns true if the range defined by \p mainBegin ..< \p mainEnd starts with

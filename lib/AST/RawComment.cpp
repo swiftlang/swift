@@ -59,10 +59,11 @@ SingleRawComment::SingleRawComment(CharSourceRange Range,
                                    const SourceManager &SourceMgr)
     : Range(Range), RawText(SourceMgr.extractText(Range)),
       Kind(static_cast<unsigned>(getCommentKind(RawText))) {
-  auto StartLineAndColumn = SourceMgr.getLineAndColumn(Range.getStart());
+  auto StartLineAndColumn =
+      SourceMgr.getPresumedLineAndColumnForLoc(Range.getStart());
   StartLine = StartLineAndColumn.first;
   StartColumn = StartLineAndColumn.second;
-  EndLine = SourceMgr.getLineNumber(Range.getEnd());
+  EndLine = SourceMgr.getLineAndColumnInBuffer(Range.getEnd()).first;
 }
 
 SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
@@ -128,7 +129,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   return Result;
 }
 
-RawComment Decl::getRawComment() const {
+RawComment Decl::getRawComment(bool SerializedOK) const {
   if (!this->canHaveComment())
     return RawComment();
 
@@ -147,9 +148,24 @@ RawComment Decl::getRawComment() const {
   // Ask the parent module.
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (SerializedOK) {
+      if (const auto *CachedLocs = getSerializedLocs()) {
+        if (!CachedLocs->DocRanges.empty()) {
+          SmallVector<SingleRawComment, 4> SRCs;
+          for (const auto &Range : CachedLocs->DocRanges) {
+            SRCs.push_back({ Range, Context.SourceMgr });
+          }
+          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
+
+          if (!RC.isEmpty()) {
+            Context.setRawComment(this, RC);
+            return RC;
+          }
+        }
+      }
+    }
+
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      swift::markup::MarkupContext MC;
-      Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
     }

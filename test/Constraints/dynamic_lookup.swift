@@ -4,6 +4,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
+
+// FIXME(rdar://64425653): We should re-enable this test for other platforms.
+// REQUIRES: OS=macosx
+
 import Foundation
 import PrivateObjC
 
@@ -224,7 +228,7 @@ let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
 // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{13-13= as AnyObject)}}
 _ = (anyValue as AnyObject).bar()
-_ = (anyValue as! X).bar()
+(anyValue as! X).bar()
 
 var anyDict: [String : Any] = Dictionary<String, Any>()
 anyDict["test"] = anyValue
@@ -267,7 +271,7 @@ func rdar29960565(_ o: AnyObject) {
 
 @objc class DynamicIUO : NSObject, Q {
   @objc var t: String! = ""
-  @objc func bar() -> String! {}
+  @objc func baz() -> String! {}
   @objc subscript(_: DynamicIUO) -> DynamicIUO! {
     get {
       return self
@@ -299,11 +303,11 @@ let _: String = o.t
 let _: String = o.t!
 let _: String = o.t!!
 let _: String? = o.t
-let _: String = o.bar()
-let _: String = o.bar!()
-let _: String = o.bar()!
-let _: String = o.bar!()!
-let _: String? = o.bar()
+let _: String = o.baz()
+let _: String = o.baz!()
+let _: String = o.baz()!
+let _: String = o.baz!()!
+let _: String? = o.baz()
 let _: DynamicIUO = o[dyn_iuo]
 let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
@@ -338,7 +342,7 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 
 func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // Test that we correctly diagnose ambiguity for different typed members available
@@ -354,7 +358,11 @@ func dynamicInitCrash(ao: AnyObject.Type) {
   func unambiguousMethodParam(_ x: Int)
 
   subscript(ambiguousSubscript _: Int) -> String { get } // expected-note {{found this candidate}}
-  subscript(unambiguousSubscript _: String) -> Int { get } // expected-note {{found this candidate}}
+  subscript(unambiguousSubscript _: String) -> Int { get }
+
+  subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+    @objc(differentSelector1:) get
+  }
 }
 
 class C1 {
@@ -368,7 +376,15 @@ class C1 {
   @objc func unambiguousMethodParam(_ x: Int) {}
 
   @objc subscript(ambiguousSubscript _: Int) -> Int { return 0 } // expected-note {{found this candidate}}
-  @objc subscript(unambiguousSubscript _: String) -> Int { return 0 } // expected-note {{found this candidate}}
+  @objc subscript(unambiguousSubscript _: String) -> Int { return 0 }
+
+  @objc subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+    @objc(differentSelector2:) get { return 0 }
+  }
+}
+
+class C2 {
+  @objc subscript(singleCandidate _: Int) -> Int { return 0 }
 }
 
 func testAnyObjectAmbiguity(_ x: AnyObject) {
@@ -384,10 +400,19 @@ func testAnyObjectAmbiguity(_ x: AnyObject) {
   _ = x.ambiguousMethodParam // expected-error {{ambiguous use of 'ambiguousMethodParam'}}
   _ = x.unambiguousMethodParam
 
-  _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
+  // SR-12799: Don't emit a "single-element" tuple error.
+  _ = x[singleCandidate: 0]
 
-  // FIX-ME(SR-8611): This is currently ambiguous but shouldn't be.
-  _ = x[unambiguousSubscript: ""] // expected-error {{ambiguous use of 'subscript(unambiguousSubscript:)'}}
+  _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
+  _ = x[ambiguousSubscript: 0] as Int
+  _ = x[ambiguousSubscript: 0] as String
+
+  // SR-8611: Make sure we can coalesce subscripts with the same types and
+  // selectors through AnyObject lookup.
+  _ = x[unambiguousSubscript: ""]
+
+  // But not if they have different selectors.
+  _ = x[differentSelectors: 0] // expected-error {{ambiguous use of 'subscript(differentSelectors:)}}
 }
 
 // SR-11648
@@ -397,4 +422,14 @@ class HasMethodWithDefault {
 
 func testAnyObjectWithDefault(_ x: AnyObject) {
   x.hasDefaultParam()
+}
+
+// SR-11829: Don't perform dynamic lookup for callAsFunction.
+class ClassWithObjcCallAsFunction {
+  @objc func callAsFunction() {}
+}
+
+func testCallAsFunctionAnyObject(_ x: AnyObject) {
+  x() // expected-error {{cannot call value of non-function type 'AnyObject'}}
+  x.callAsFunction() // Okay.
 }

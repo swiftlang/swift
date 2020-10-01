@@ -236,9 +236,9 @@ extension P4 where Self.AssocP4 == Bool {
 }
 
 func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
-  s4a.extP4a() // expected-error{{no exact matches in call to instance method 'extP4a()'}}
+  s4a.extP4a() // expected-error{{no exact matches in call to instance method 'extP4a'}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{no exact matches in call to instance method 'extP4a()'}}
+  s4c.extP4a() // expected-error{{no exact matches in call to instance method 'extP4a'}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
@@ -270,7 +270,7 @@ protocol ExtendedProtocol {
 }
 
 extension ExtendedProtocol where Self : DerivedWithAlias {
-  func f0(x: T) {} // expected-error {{use of undeclared type 'T'}}
+  func f0(x: T) {} // expected-error {{cannot find type 'T' in scope}}
 
   func f1(x: ConcreteAlias) {
     let _: Int = x
@@ -1039,9 +1039,9 @@ protocol Empty2 {}
 struct Concrete1 {}
 extension Concrete1 : Empty1 & Empty2 {}
 
-typealias T = Empty1 & Empty2
+typealias TA = Empty1 & Empty2
 struct Concrete2 {}
-extension Concrete2 : T {}
+extension Concrete2 : TA {}
 
 func f<T : Empty1 & Empty2>(_: T) {}
 

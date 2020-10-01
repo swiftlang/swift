@@ -29,7 +29,7 @@ class SILUndef : public ValueBase {
 
 public:
   void operator=(const SILArgument &) = delete;
-  void operator delete(void *, size_t) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *, size_t) = delete;
 
   static SILUndef *get(SILType ty, SILModule &m, ValueOwnershipKind ownershipKind);
   static SILUndef *get(SILType ty, const SILFunction &f);

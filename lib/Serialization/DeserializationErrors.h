@@ -21,8 +21,10 @@
 
 namespace swift {
 class ModuleFile;
+class ModuleFileSharedCore;
 
 StringRef getNameOfModule(const ModuleFile *);
+StringRef getNameOfModule(const ModuleFileSharedCore *);
 
 namespace serialization {
 
@@ -350,6 +352,13 @@ public:
     this->numVTableEntries = numVTableEntries;
   }
 
+  template <typename UnderlyingErrorT>
+  bool underlyingReasonIsA() const {
+    if (!underlyingReason)
+      return false;
+    return underlyingReason->isA<UnderlyingErrorT>();
+  }
+
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize type for '" << name << "'";
     if (underlyingReason) {
@@ -411,6 +420,26 @@ public:
   }
 };
 
+// Decl was not deserialized because its attributes did not match the filter.
+//
+// \sa getDeclChecked
+class DeclAttributesDidNotMatch : public llvm::ErrorInfo<DeclAttributesDidNotMatch> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  DeclAttributesDidNotMatch() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Decl attributes did not match filter";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 LLVM_NODISCARD
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {
@@ -433,6 +462,17 @@ public:
 
   void print(raw_ostream &os) const override {
     os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+  }
+};
+
+class PrettyStackTraceModuleFileCore : public llvm::PrettyStackTraceEntry {
+  const ModuleFileSharedCore &MF;
+public:
+  explicit PrettyStackTraceModuleFileCore(ModuleFileSharedCore &module)
+      : MF(module) {}
+
+  void print(raw_ostream &os) const override {
+    os << "While reading from \'" << getNameOfModule(&MF) << "'\n";
   }
 };
 

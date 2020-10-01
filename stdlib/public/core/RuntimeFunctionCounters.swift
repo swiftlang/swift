@@ -108,7 +108,7 @@ struct _RuntimeFunctionCounters {
   public static let runtimeFunctionCountersOffsets =
     _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
   public static let numRuntimeFunctionCounters =
-    _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
+    Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
   public static let runtimeFunctionNameToIndex: [String: Int] =
     getRuntimeFunctionNameToIndex()
 
@@ -121,7 +121,7 @@ struct _RuntimeFunctionCounters {
   public static func getRuntimeFunctionNames() -> [String] {
     let names = _RuntimeFunctionCounters._getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
-      _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
+      Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
     var functionNames: [String] = []
     functionNames.reserveCapacity(numRuntimeFunctionCounters)
     for index in 0..<numRuntimeFunctionCounters {
@@ -140,7 +140,7 @@ struct _RuntimeFunctionCounters {
   /// Get the number of different runtime functions whose calls are being
   /// tracked.
   @_silgen_name("_swift_getNumRuntimeFunctionCounters")
-  public static func getNumRuntimeFunctionCounters() -> Int
+  public static func getNumRuntimeFunctionCounters() -> UInt64
 
   /// Dump all per-object runtime function counters.
   @_silgen_name("_swift_dumpObjectsRuntimeFunctionPointers")
@@ -166,7 +166,7 @@ struct _RuntimeFunctionCounters {
   internal static func getRuntimeFunctionNameToIndex() -> [String: Int] {
     let runtimeFunctionNames = _RuntimeFunctionCounters.getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
-      _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
+      Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
     var runtimeFunctionNameToIndex: [String: Int] = [:]
     runtimeFunctionNameToIndex.reserveCapacity(numRuntimeFunctionCounters)
 

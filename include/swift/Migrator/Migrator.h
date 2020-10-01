@@ -28,8 +28,7 @@ namespace migrator {
 /// If needed, run the migrator on the compiler invocation's input file and emit
 /// a "replacement map" describing the requested changes to the source file.
 /// \return true on error.
-bool updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance,
-                                    const CompilerInvocation &Invocation);
+bool updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance);
 
 /// Specify options when running syntactic migration pass.
 struct SyntacticPassOptions {

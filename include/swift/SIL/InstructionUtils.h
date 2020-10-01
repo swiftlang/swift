@@ -25,13 +25,6 @@ namespace swift {
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
 
-/// Strip off indexing and address projections.
-///
-/// This is similar to getUnderlyingObject, except that it does not strip any
-/// object-to-address projections, like ref_element_addr. In other words, the
-/// result is always an address value.
-SILValue getUnderlyingAddressRoot(SILValue V);
-
 SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
 SILValue stripSinglePredecessorArgs(SILValue V);
@@ -55,11 +48,6 @@ SILValue stripUpCasts(SILValue V);
 /// Return the underlying SILValue after stripping off all
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
-
-/// Return the underlying SILValue after stripping off non-projection address
-/// casts. The result will still be an address--this does not look through
-/// pointer-to-address.
-SILValue stripAddressAccess(SILValue V);
 
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
@@ -129,6 +117,10 @@ bool mayCheckRefCount(SILInstruction *User);
 /// Return true when the instruction represents added instrumentation for
 /// run-time sanitizers.
 bool isSanitizerInstrumentation(SILInstruction *Instruction);
+
+/// Return true when the instruction represents added instrumentation for
+/// run-time sanitizers or code coverage.
+bool isInstrumentation(SILInstruction *Instruction);
 
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.

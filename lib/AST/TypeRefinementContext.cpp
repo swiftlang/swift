@@ -301,7 +301,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
     Decl *D = Node.getAsDecl();
     OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      OS << VD->getFullName();
+      OS << VD->getName();
     } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       OS << "extension." << ED->getExtendedType().getString();
     }

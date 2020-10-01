@@ -30,6 +30,7 @@
 #include <mach-o/getsect.h>
 
 #include <CoreFoundation/CFDictionary.h>
+#include <TargetConditionals.h>
 
 /// The "public" interface follows. All of these functions are the same
 /// as the corresponding swift_reflection_* functions, except for taking
@@ -99,6 +100,11 @@ swift_reflection_interop_typeRefForMangledTypeName(
   SwiftReflectionInteropContextRef ContextRef,
   const char *MangledName,
   uint64_t Length);
+
+static inline char *
+swift_reflection_interop_copyDemangledNameForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef,
+  swift_typeref_interop_t OpaqueTypeRef);
 
 static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
@@ -248,6 +254,9 @@ struct SwiftReflectionFunctions {
   swift_typeref_t (*typeRefForMangledTypeName)(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
+
+  char * (*copyDemangledNameForTypeRef)(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
 
   swift_typeinfo_t (*infoForTypeRef)(SwiftReflectionContextRef ContextRef,
                                       swift_typeref_t OpaqueTypeRef);
@@ -463,6 +472,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   LOAD(typeRefForMetadata);
   LOAD(typeRefForInstance);
   LOAD(typeRefForMangledTypeName);
+  LOAD_OPT(copyDemangledNameForTypeRef);
   LOAD(infoForTypeRef);
   LOAD(childOfTypeRef);
   LOAD(infoForMetadata);
@@ -476,7 +486,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   LOAD(dumpInfoForTypeRef);
   
   Library->IsLegacy = IsLegacy;
-  Context->LibraryCount++;
+  ++Context->LibraryCount;
   
   return 1;
   
@@ -535,12 +545,30 @@ swift_reflection_interop_minimalDataLayoutQueryFunction4(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  (void)ReaderContext;
+  (void)inBuffer;
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 4;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0;
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0x1000;
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline int
@@ -548,12 +576,51 @@ swift_reflection_interop_minimalDataLayoutQueryFunction8(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  (void)ReaderContext;
+  (void)inBuffer;
+  // Caveat: This assumes the process being examined is
+  // running in the same kind of environment as this host code.
+#if defined(__APPLE__) && __APPLE__
+    int applePlatform = 1;
+#else
+    int applePlatform = 0;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
+    int iosDerivedPlatform = 1;
+#else
+    int iosDerivedPlatform = 0;
+#endif
+
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 8;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+    if (applePlatform && !iosDerivedPlatform) {
+      *result = 1;
+    } else {
+      *result = 0;
+    }
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+    if (applePlatform) {
+      // On 64-bit Apple platforms, Swift reserves the first 4GiB
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else.
+      *result = 0x1000;
+    }
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline SwiftReflectionInteropContextRef
@@ -574,7 +641,7 @@ swift_reflection_interop_createReflectionContext(
 
   return swift_reflection_interop_createReflectionContextWithDataLayout(
     ReaderContext,
-    NULL,
+    DataLayout,
     FreeBytes,
     ReadBytes,
     GetStringLength,
@@ -910,6 +977,17 @@ swift_reflection_interop_typeRefForMangledTypeName(
   Result.Typeref = 0;
   Result.Library = 0;
   return Result;
+}
+
+static inline char *
+swift_reflection_interop_copyDemangledNameForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef,
+  swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  if (Library->Functions.copyDemangledNameForTypeRef)
+    return Library->Functions.copyDemangledNameForTypeRef(Library->Context,
+                                                          OpaqueTypeRef.Typeref);
+  return NULL;
 }
 
 static inline swift_typeinfo_t

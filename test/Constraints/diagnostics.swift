@@ -51,9 +51,9 @@ f0(i, i, // expected-error@:7 {{cannot convert value of type 'Int' to expected a
 
 
 // Cannot conform to protocols.
-f5(f4)  // expected-error {{type '(Int) -> Int' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
-f5((1, "hello"))  // expected-error {{type '(Int, String)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
-f5(Int.self) // expected-error {{type 'Int.Type' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5(f4)  // expected-error {{type '(Int) -> Int' cannot conform to 'P2'; only concrete types such as structs, enums and classes can conform to protocols}}
+f5((1, "hello"))  // expected-error {{type '(Int, String)' cannot conform to 'P2'; only concrete types such as structs, enums and classes can conform to protocols}}
+f5(Int.self) // expected-error {{type 'Int.Type' cannot conform to 'P2'; only concrete types such as structs, enums and classes can conform to protocols}}
 
 // Tuple element not convertible.
 f0(i,
@@ -72,7 +72,7 @@ f3(
 f4(i, d) // expected-error {{extra argument in call}}
 
 // Missing member.
-i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
+i.missingMember() // expected-error{{value of type 'Int' has no member 'missingMember'}}
 
 // Generic member does not conform.
 extension Int {
@@ -86,7 +86,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
+for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -104,7 +104,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' 
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only concrete types such as structs, enums and classes can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -127,7 +127,9 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(_ x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
+  return t.select(x) 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 precedencegroup Starry {
@@ -146,7 +148,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +161,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{'myMap' is unavailable: call the 'map()' method on the sequence}}
+  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
     ()
     return x
   })
@@ -169,7 +171,7 @@ func rdar20142523() {
 func rdar21080030() {
   var s = "Hello"
   // SR-7599: This should be `cannot_call_non_function_value`
-  if s.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -184,7 +186,9 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  // expected-error {{unexpected non-void return value in void function}}
+  return h * w  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -195,15 +199,15 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x! {  }  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if y {}    // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
 func validateSaveButton(_ text: String) {
-  return (text.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
+  return (text.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}} expected-note {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
@@ -248,7 +252,7 @@ _ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' re
 
 // Type variables not getting erased with nested closures
 struct Toe {
-  let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
+  let toenail: Nail // expected-error {{cannot find type 'Nail' in scope}}
 
   func clip() {
     toenail.inspect { x in
@@ -288,11 +292,11 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{unable to infer closure type in the current context}}
+_ = { $0 }  // expected-error {{unable to infer type of a closure parameter $0 in the current context}}
 
 
 
@@ -387,102 +391,6 @@ func rdar19804707() {
   _ = knownOps
 }
 
-
-func f7(_ a: Int) -> (_ b: Int) -> Int {
-  return { b in a+b }
-}
-
-_ = f7(1)(1)
-f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-let f8 = f7(2)
-_ = f8(1)
-f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-
-class CurriedClass {
-  func method1() {}
-  func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
-  func method3(_ a: Int, b : Int) {}  // expected-note 3 {{'method3(_:b:)' declared here}}
-}
-
-let c = CurriedClass()
-_ = c.method1
-c.method1(1)         // expected-error {{argument passed to call that takes no arguments}}
-_ = c.method2(1)
-_ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1)(2)
-c.method2(1)(c: 2)   // expected-error {{extraneous argument label 'c:' in call}}
-c.method2(1)(c: 2.0) // expected-error {{extraneous argument label 'c:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-CurriedClass.method1(c)()
-_ = CurriedClass.method1(c)
-CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
-// expected-error@-1:27 {{argument passed to call that takes no arguments}}
-
-CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
-_ = CurriedClass.method2(c)
-_ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
-// expected-error@-1 {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
-CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-// expected-error@-1 {{extraneous argument label 'b:' in call}}
-CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-CurriedClass.method3(c)(32, b: 1)
-_ = CurriedClass.method3(c)
-_ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
-_ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
-_ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'method3' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
-// expected-error@-1 {{missing argument label 'b:' in call}}
-CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
-// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
-
-extension CurriedClass {
-  func f() {
-    method3(1, b: 2)
-    method3()            // expected-error {{missing arguments for parameters #1, 'b' in call}} {{13-13=<#Int#>, b: <#Int#>}}
-    method3(42)          // expected-error {{missing argument for parameter 'b' in call}}
-    method3(self)
-    // expected-error@-1:13 {{cannot convert value of type 'CurriedClass' to expected argument type 'Int'}}
-    // expected-error@-2:17 {{missing argument for parameter 'b' in call}} {{17-17=, b: <#Int#>}}
-  }
-}
-
-extension CurriedClass {
-  func m1(_ a : Int, b : Int) {}
-  
-  func m2(_ a : Int) {}
-}
-
-// <rdar://problem/23718816> QoI: "Extra argument" error when accidentally currying a method
-CurriedClass.m1(2, b: 42)   // expected-error {{instance member 'm1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
-
-
-// <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{instance member 'm2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
-
-
-
-
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
   case Red
@@ -491,14 +399,17 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
 
-// FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> Array<_>' is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
+// expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
+// expected-error@-2 {{cannot infer contextual base in reference to member 'Unknown'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -506,18 +417,17 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
-let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
+let _: Color = .Unknown // expected-error {{member 'Unknown(description:)' expects argument of type 'String'}}
 let _: Color = .Unknown(42) // expected-error {{missing argument label 'description:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
-let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
+let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type '(Double, Float)' to specified type '(Int, Float)'}}
 
-let _ : Color = .rainbow  // expected-error {{member 'rainbow' is a function; did you mean to call it?}} {{25-25=()}}
+let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function that produces expected type 'Color'; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
-// expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
+let _: Color = .overload(1.0)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .overload(1)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -528,10 +438,10 @@ let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' t
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .svar() // expected-error {{static property 'svar' is not a function}}
-someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
+var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
+someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
+someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
+someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
@@ -552,7 +462,7 @@ protocol r22020088P {}
 func r22020088Foo<T>(_ t: T) {}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs) // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
@@ -632,11 +542,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
@@ -660,9 +570,10 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
+  // re-think the way errors in tuple elements are detected because it's currently impossible to detect
+  // exactly what went wrong here and aggregate fixes for different elements at the same time.
+  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
 }
 
 
@@ -700,11 +611,10 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 struct Radar21692808<Element> {
-  init(count: Int, value: Element) {}
+  init(count: Int, value: Element) {} // expected-note {{'init(count:value:)' declared here}}
 }
 func radar21692808() -> Radar21692808<Int> {
-  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, @escaping () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
+  return Radar21692808<Int>(count: 1) { // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
     return 1
   }
 }
@@ -721,7 +631,6 @@ func r23560128() {
   var a : (Int,Int)?
   a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -731,7 +640,6 @@ struct ExampleStruct21890157 {
 var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}
@@ -751,7 +659,9 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
   let actualAcceptableContentTypes: Set<String> = []
-  return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
+  return actualAcceptableContentTypes.contains(contentType)  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
@@ -778,7 +688,9 @@ enum AssocTest {
   case one(Int)
 }
 
-if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '==' cannot be applied to two 'AssocTest' operands}}
+// FIXME(rdar://problem/65688291) - on iOS simulator this diagnostic is flaky,
+// either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
+if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{requires that 'AssocTest' conform to 'Equatable'}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 
 
@@ -841,10 +753,6 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
 }
 
-func secondArgumentNotLabeled(a: Int, _ b: Int) { }
-secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{missing argument label 'a:' in call}}
-
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}
 func testImplConversion(a : Int?) -> Bool {
@@ -862,8 +770,8 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{unexpected non-void return value in void function}}
-    return (self.title != other.title && self.message != other.message)
+    // expected-error@+1 {{unexpected non-void return value in void function}} 
+    return (self.title != other.title && self.message != other.message) // expected-note {{did you mean to add a return type?}}
   }
 }
 
@@ -889,7 +797,9 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 // expected-error {{unexpected non-void return value in void function}}
+  return a <= 480 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // SR-1752: Warning about unused result with ternary operator
@@ -902,59 +812,26 @@ let sr1752: SR1752?
 
 true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
 
-// <rdar://problem/27891805> QoI: FailureDiagnosis doesn't look through 'try'
-struct rdar27891805 {
-  init(contentsOf: String, encoding: String) throws {}
-  init(contentsOf: String, usedEncoding: inout String) throws {}
-  init<T>(_ t: T) {}
-}
-
-try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
-// expected-error@-1 {{incorrect argument label in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:usedEncoding:')}}
-// expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
-// expected-error@-3 {{'nil' is not compatible with expected argument type 'String'}}
-
 // Make sure RawRepresentable fix-its don't crash in the presence of type variables
 class NSCache<K, V> {
   func object(forKey: K) -> V? {}
 }
 
 class CacheValue {
-  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
-  func value(y: String) -> String {} // expected-note {{found this candidate}}
+  func value(x: Int) -> Int {} // expected-note {{found candidate with type '(Int) -> Int'}}
+  func value(y: String) -> String {} // expected-note {{found candidate with type '(String) -> String'}}
 }
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
-
-// SR-2242: poor diagnostic when argument label is omitted
-
-func r27212391(x: Int, _ y: Int) {
-  // expected-note@-1 {{candidate '(Int, Int) -> ()' requires 2 arguments, but 3 were provided}}
-  let _: Int = x + y
-}
-
-func r27212391(a: Int, x: Int, _ y: Int) {
-  // expected-note@-1 {{incorrect labels for candidate (have: '(a:y:x:)', expected: '(a:x:_:)')}}
-  let _: Int = a + x + y
-}
-
-r27212391(3, 5)             // expected-error {{missing argument label 'x:' in call}}
-r27212391(3, y: 5)          // expected-error {{incorrect argument labels in call (have '_:y:', expected 'x:_:')}}
-r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{11-11=x: 5, }} {{12-18=}}
-r27212391(y: 3, x: 5)       // expected-error {{incorrect argument labels in call (have 'y:x:', expected 'x:_:')}} {{11-12=x}} {{17-20=}}
-r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
-r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
-r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
-r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{no exact matches in call to global function 'r27212391'}}
-r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // SR-1255
 func foo1255_1() {
-  return true || false // expected-error {{unexpected non-void return value in void function}}
+  return true || false 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 func foo1255_2() -> Int {
   return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
@@ -1076,7 +953,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1146,29 +1023,12 @@ for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; cons
   _ = i + 1
 }
 
-// rdar://problem/32726044 - shrink reduced domains too far
-
-public protocol P_32726044 {}
-
-extension Int: P_32726044 {}
-extension Float: P_32726044 {}
-
-public func *(lhs: P_32726044, rhs: P_32726044) -> Double {
-  fatalError()
-}
-
-func rdar32726044() -> Float {
-  var f: Float = 0
-  f = Float(1) * 100 // Ok
-  let _: Float = Float(42) + 0 // Ok
-  return f
-}
-
 // SR-5045 - Attempting to return result of reduce(_:_:) in a method with no return produces ambiguous error
 func sr5045() {
   let doubles: [Double] = [1, 2, 3]
   return doubles.reduce(0, +)
   // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // rdar://problem/32934129 - QoI: misleading diagnostic
@@ -1184,7 +1044,9 @@ class L_32934129<T : Comparable> {
 
   func length() -> Int {
     func inner(_ list: L_32934129<T>?, _ count: Int) {
-    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+    guard let list = list else { return count } 
+      // expected-error@-1 {{unexpected non-void return value in void function}}
+      // expected-note@-2 {{did you mean to add a return type?}}
       return inner(list.next, count + 1)
     }
 
@@ -1223,31 +1085,6 @@ class ListExpr_28456467 : AST_28456467, Expr_28456467 {
   }
 }
 
-// rdar://problem/31849281 - Let's play "bump the argument"
-
-struct rdar31849281 { var foo, a, b, c: Int }
-_ = rdar31849281(a: 101, b: 102, c: 103, foo: 104) // expected-error {{argument 'foo' must precede argument 'a'}} {{18-18=foo: 104, }} {{40-50=}}
-
-_ = rdar31849281(a: 101, c: 103, b: 102, foo: 104) // expected-error {{argument 'foo' must precede argument 'a'}} {{18-18=foo: 104, }} {{40-50=}}
-_ = rdar31849281(foo: 104, a: 101, c: 103, b: 102) // expected-error {{argument 'b' must precede argument 'c'}} {{36-36=b: 102, }} {{42-50=}}
-
-_ = rdar31849281(b: 102, c: 103, a: 101, foo: 104) // expected-error {{incorrect argument labels in call (have 'b:c:a:foo:', expected 'foo:a:b:c:')}} {{18-19=foo}} {{26-27=a}} {{34-35=b}} {{42-45=c}}
-_ = rdar31849281(foo: 104, b: 102, c: 103, a: 101) // expected-error {{argument 'a' must precede argument 'b'}} {{28-28=a: 101, }} {{42-50=}}
-
-func var_31849281(_ a: Int, _ b: Int..., c: Int) {}
-var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{unnamed argument #3 must precede argument 'c'}} {{17-17=3, 4, 5, 6, 7, 8, 9, }} {{22-43=}}
-
-func fun_31849281(a: (Bool) -> Bool, b: (Int) -> (String), c: [Int?]) {}
-fun_31849281(c: [nil, 42], a: { !$0 }, b: { (num: Int) -> String in return "\(num)" })
-// expected-error @-1 {{incorrect argument labels in call (have 'c:a:b:', expected 'a:b:c:')}} {{14-15=a}} {{28-29=b}} {{40-41=c}}
-fun_31849281(a: { !$0 }, c: [nil, 42], b: { (num: Int) -> String in return String(describing: num) })
-// expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { (num: Int) -> String in return String(describing: num) }, }} {{38-101=}}
-fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
-// expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { "\\($0)" }, }} {{38-54=}}
-
-func f_31849281(x: Int, y: Int, z: Int) {}
-f_31849281(42, y: 10, x: 20) // expected-error {{incorrect argument labels in call (have '_:y:x:', expected 'x:y:z:')}} {{12-12=x: }} {{23-24=z}}
-
 func sr5081() {
   var a = ["1", "2", "3", "4", "5"]
   var b = [String]()
@@ -1266,9 +1103,10 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) {
+    // expected-error@-1{{missing argument label 'into:' in call}}
+    // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Int?' operands}}
-    // expected-error@-2 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
 }
 
@@ -1283,28 +1121,30 @@ func platypus<T>(a: [T]) {
 // Another case of the above.
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
+  // Notes, attached to declarations, explain that there is a difference between Array.init(_:) and
+  // RangeReplaceableCollection.init(_:) which are both applicable in this case.
   let array = [Int](sequence)
-  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{ambiguous reference to member '=='}}
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
 }
 
-func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
-rdar43525641(1, c: 2, 3) // Ok
+do {
+  struct Array {}
+  let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Element>'}}
+  // expected-error@-1 {{generic parameter 'Element' could not be inferred}}
 
-struct Array {}
-let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Any>'}}
-
-struct Error {}
-let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
-let baz: (Swift.Error) = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
-let baz2: Swift.Error = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
-let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
-let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+  struct Error {}
+  let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+  let baz: (Swift.Error) = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+  let baz2: Swift.Error = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+  let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+  let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+}
 
 // SyntaxSugarTypes with unresolved types
 func takesGenericArray<T>(_ x: [T]) {}
@@ -1318,16 +1158,198 @@ takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of ty
 func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
 takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int?]'}}
 func takesGenericDictionary<T, U>(_ x: [T : U]) {}  // expected-note {{in call to function 'takesGenericDictionary'}}
-takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Any]'}}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : U]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 typealias Z = Int
 func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {} // expected-note {{in call to function 'takesGenericDictionaryWithTypealias'}}
-takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Z]' (aka 'Dictionary<Any, Int>'}}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : Z]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesGenericFunction<T>(_ x: ([T]) -> Void) {} // expected-note {{in call to function 'takesGenericFunction'}}
-takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any]) -> Void'}}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T]) -> Void'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
-takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any], [Any])'}}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// Void function returns non-void result fix-it
+
+func voidFunc() {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{16-16= -> <#Return Type#>}}
+}
+
+func voidFuncWithArgs(arg1: Int) {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{33-33= -> <#Return Type#>}}
+}
+
+func voidFuncWithCondFlow() {
+  if Bool.random() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  } else {
+    return 2
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  }
+}
+
+func voidFuncWithNestedVoidFunc() {
+  func nestedVoidFunc() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{24-24= -> <#Return Type#>}}
+  }
+}
+
+// Special cases: These should not offer a note + fix-it
+
+func voidFuncExplicitType() -> Void {
+  return 1 // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithDeinit {
+  deinit {
+    return 0 // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+class ClassWithVoidProp {
+  var propertyWithVoidType: () { return 5 } // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithPropContainingSetter {
+  var propWithSetter: Int {
+    get { return 0 }
+    set { return 1 } // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+// https://bugs.swift.org/browse/SR-11964
+struct Rect {
+    let width: Int
+    let height: Int
+}
+
+struct Frame {
+    func rect(width: Int, height: Int) -> Rect {
+        Rect(width: width, height: height)
+    }
+
+    let rect: Rect
+}
+
+func foo(frame: Frame) {
+    frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+    // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
+}
+
+// Make sure we prefer the conformance failure.
+func f11(_ n: Int) {}
+func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
+f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
+
+let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' == 'P2')}}
+f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
+
+// SR-12242
+struct SR_12242_R<Value> {}
+struct SR_12242_T {}
+
+protocol SR_12242_P {}
+
+func fSR_12242() -> SR_12242_R<[SR_12242_T]> {}
+
+func genericFunc<SR_12242_T: SR_12242_P>(_ completion:  @escaping (SR_12242_R<[SR_12242_T]>) -> Void) {
+  let t = fSR_12242()
+  completion(t) // expected-error {{cannot convert value of type 'diagnostics.SR_12242_R<[diagnostics.SR_12242_T]>' to expected argument type 'diagnostics.SR_12242_R<[SR_12242_T]>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('diagnostics.SR_12242_T' and 'SR_12242_T') are expected to be equal}}
+}
+
+func assignGenericMismatch() {
+  var a: [Int]?
+  var b: [String]
+
+  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+
+  b = a // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[Int]?' must be unwrapped to a value of type '[Int]'}}
+  // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+// [Int] to [String]? argument to param conversion
+let value: [Int] = []
+func gericArgToParamOptional(_ param: [String]?) {}
+
+gericArgToParamOptional(value) // expected-error {{convert value of type '[Int]' to expected argument type '[String]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+// Inout Expr conversions
+func gericArgToParamInout1(_ x: inout [[Int]]) {}
+func gericArgToParamInout2(_ x: inout [[String]]) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+}
+
+func gericArgToParamInoutOptional(_ x: inout [[String]]?) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]?' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[[String]]?' must be unwrapped to a value of type '[[String]]'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variable type to '[[String]]?' if it doesn't need to be declared as '[[Int]]'}}
+  gericArgToParamInoutOptional(&x) // expected-error {{cannot convert value of type '[[Int]]' to expected argument type '[[String]]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
+}
+
+// SR-12725
+struct SR12725<E> {} // expected-note {{arguments to generic parameter 'E' ('Int' and 'Double') are expected to be equal}}
+func generic<T>(_ value: inout T, _ closure: (SR12725<T>) -> Void) {}
+
+let arg: Int
+generic(&arg) { (g: SR12725<Double>) -> Void in } // expected-error {{cannot convert value of type '(SR12725<Double>) -> Void' to expected argument type '(SR12725<Int>) -> Void'}}
+
+// rdar://problem/62428353 - bad error message for passing `T` where `inout T` was expected
+func rdar62428353<T>(_ t: inout T) {
+  let v = t // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  rdar62428353(v) // expected-error {{cannot pass immutable value as inout argument: 'v' is a 'let' constant}}
+}
+
+func rdar62989214() {
+  struct Flag {
+    var isTrue: Bool
+  }
+
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    subscript<Subject>(
+      dynamicMember keyPath: WritableKeyPath<Value, Subject>
+    ) -> Wrapper<Subject> {
+      get { fatalError() }
+    }
+  }
+
+  func test(arr: Wrapper<[Flag]>, flag: Flag) {
+    arr[flag].isTrue // expected-error {{cannot convert value of type 'Flag' to expected argument type 'Int'}}
+  }
+}
+
+// SR-5688
+func SR5688_1() -> String? { "" }
+SR5688_1!.count // expected-error {{function 'SR5688_1' was used as a property; add () to call it}} {{9-9=()}}
+
+func SR5688_2() -> Int? { 0 }
+let _: Int = SR5688_2! // expected-error {{function 'SR5688_2' was used as a property; add () to call it}} {{22-22=()}}

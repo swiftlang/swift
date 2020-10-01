@@ -61,9 +61,17 @@ extension Extended {
   func callAsFunction() -> Extended {
     return self
   }
+
+  func callAsFunction(_: Int) -> Extended {
+    return self
+  }
 }
 var extended = Extended()
 extended()().callAsFunction()()
+
+// Test diagnostic location
+extended()().callAsFunction()(1) // expected-warning@:30 {{result of call to 'callAsFunction' is unused}}
+extended()().callAsFunction(1) // expected-warning@:14 {{result of call to 'callAsFunction' is unused}}
 
 struct TakesTrailingClosure {
   func callAsFunction(_ fn: () -> Void) {
@@ -102,14 +110,12 @@ struct Mutating {
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
-  // TODO(SR-11378): Improve this error to match the error using a direct `callAsFunction` member reference.
-  // expected-error @+2 {{cannot call value of non-function type 'Mutating'}}
-  // expected-error @+1 {{cannot invoke 'x' with no arguments}}
+  // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = x()
   // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = x.callAsFunction()
-  _ = y()
-  _ = y.callAsFunction()
+  y()
+  y.callAsFunction()
 }
 
 struct Inout {
@@ -187,8 +193,54 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = d()?.callAsFunction()?()
   _ = e()
   _ = e(1, 2, 3)
-  _ = f()
-  _ = g(&inoutInt)
+  f()
+  g(&inoutInt)
   _ = try? h()
   _ = try? h { throw DummyError() }
+}
+
+// SR-11778
+struct DoubleANumber {
+  func callAsFunction(_ x: Int, completion: (Int) -> Void = { _ in }) {
+    completion(x + x)
+  }
+}
+
+func testDefaults(_ x: DoubleANumber) {
+  x(5)
+  x(5, completion: { _ in })
+}
+
+// SR-11881
+struct IUOCallable {
+  static var callable: IUOCallable { IUOCallable() }
+  func callAsFunction(_ x: Int) -> IUOCallable! { nil }
+}
+
+func testIUOCallAsFunction(_ x: IUOCallable) {
+  let _: IUOCallable = x(5)
+  let _: IUOCallable? = x(5)
+  let _ = x(5)
+
+  let _: IUOCallable = .callable(5)
+  let _: IUOCallable? = .callable(5)
+}
+
+// Test access control.
+struct PrivateCallable {
+  private func callAsFunction(_ x: Int) {} // expected-note {{'callAsFunction' declared here}}
+}
+
+func testAccessControl(_ x: PrivateCallable) {
+  x(5) // expected-error {{'callAsFunction' is inaccessible due to 'private' protection level}}
+}
+
+struct SR_11909 {
+  static let s = SR_11909()
+  func callAsFunction(_ x: Int = 0) -> SR_11909 { SR_11909() }
+}
+
+func testDefaultsWithUMEs(_ x: SR_11909) {
+  let _: SR_11909 = .s()
+  let _: SR_11909 = .s(5)
 }

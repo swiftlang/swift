@@ -15,7 +15,6 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -25,6 +24,8 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -49,39 +50,12 @@ using namespace sourcekitd_test;
 #if defined(_WIN32)
 namespace {
 int STDOUT_FILENO = _fileno(stdout);
-const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
-char *realpath(const char *path, char *resolved_path) {
-  wchar_t full_path[MAXPATHLEN] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(path, utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
-    return nullptr;
-  DWORD success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  if (!success) return nullptr;
-
-  std::string utf8Path;
-  llvm::ArrayRef<char> pathRef((const char *)full_path,
-                               (const char *)(full_path + MAX_PATH));
-  if (!llvm::convertUTF16ToUTF8String(pathRef, utf8Path))
-    return nullptr;
-
-  if (!resolved_path) {
-    resolved_path = static_cast<char *>(malloc(utf8Path.length() + 1));
-  }
-  std::copy(std::begin(utf8Path), std::end(utf8Path), resolved_path);
-  return resolved_path;
-}
 }
 #endif
 
-static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+static bool sendGlobalConfigRequest();
+static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
+                                bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            const std::string &SourceFile,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
@@ -266,6 +240,7 @@ static void skt_main(skt_args *args) {
   // invocations.
   TestOptions InitOpts;
   auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
     for (auto Arg: Args) {
@@ -275,15 +250,17 @@ static void skt_main(skt_args *args) {
     }
     if (i == Args.size())
       break;
-    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts,
+                                       firstInvocation)) {
       sourcekitd_shutdown();
       args->ret = ret;
       return;
     }
     Args = Args.slice(i + 1);
+    firstInvocation = false;
   }
 
-  if (int ret = handleTestInvocation(Args, InitOpts)) {
+  if (int ret = handleTestInvocation(Args, InitOpts, firstInvocation)) {
     sourcekitd_shutdown();
     args->ret = ret;
     return;
@@ -312,7 +289,8 @@ static inline std::string getInterfaceGenDocumentName() {
   // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
-  return path.str();
+  llvm::sys::path::native(path);
+  return std::string(path.str());
 }
 
 static int printAnnotations();
@@ -320,35 +298,49 @@ static int printDiags();
 
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename);
 
-static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
+static void addRequestOptions(sourcekitd_object_t Req, TestOptions &Opts,
+                              sourcekitd_uid_t Key, StringRef(prefix)) {
   if (!Opts.RequestOptions.empty()) {
     sourcekitd_object_t CCOpts =
         sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
     for (auto &Opt : Opts.RequestOptions) {
       auto KeyValue = StringRef(Opt).split('=');
-      std::string KeyStr("key.codecomplete.");
-      KeyStr.append(KeyValue.first);
+      std::string KeyStr(prefix.str());
+      KeyStr.append(KeyValue.first.str());
       sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
 
       // FIXME: more robust way to determine the option type.
       if (KeyValue.first == "filtertext") {
         sourcekitd_request_dictionary_set_stringbuf(
             CCOpts, Key, KeyValue.second.data(), KeyValue.second.size());
+      } else if (KeyValue.first == "expectedtypes") {
+        SmallVector<StringRef, 4> expectedTypeNames;
+        KeyValue.second.split(expectedTypeNames, ';');
+
+        auto typenames = sourcekitd_request_array_create(nullptr, 0);
+        for (auto &name : expectedTypeNames) {
+          std::string n = name.str();
+          sourcekitd_request_array_set_string(typenames,
+                                              SOURCEKITD_ARRAY_APPEND,
+                                              n.c_str());
+        }
+        // NOTE: 'key.expectedtypes' directly to the request.
+        sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes,
+                                                typenames);
       } else {
         int64_t Value = 0;
         KeyValue.second.getAsInteger(0, Value);
         sourcekitd_request_dictionary_set_int64(CCOpts, Key, Value);
       }
     }
-    sourcekitd_request_dictionary_set_value(Req, KeyCodeCompleteOptions,
-                                            CCOpts);
+    sourcekitd_request_dictionary_set_value(Req, Key, CCOpts);
     sourcekitd_request_release(CCOpts);
   }
 }
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;
@@ -409,10 +401,20 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
   return Error ? 1 : 0;
 }
 
+static int performShellExecution(ArrayRef<const char *> Args) {
+  auto Program = llvm::sys::findProgramByName(Args[0]);
+  if (std::error_code ec = Program.getError()) {
+    llvm::errs() << "command not found: " << Args[0] << "\n";
+    return ec.value();
+  }
+  SmallVector<StringRef, 8> execArgs(Args.begin(), Args.end());
+  return llvm::sys::ExecuteAndWait(*Program, execArgs);
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
-                                TestOptions &InitOpts) {
+                                TestOptions &InitOpts, bool firstInvocation) {
 
   unsigned Optargc = 0;
   for (auto Arg: Args) {
@@ -425,8 +427,24 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
+  if (!Opts.ModuleCachePath.empty())
+    InitOpts.ModuleCachePath = Opts.ModuleCachePath;
+
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
+      !Opts.SuppressDefaultConfigRequest) {
+    // We don't fail if this request fails for now so that sourcekitd-test is
+    // still usable with older versions of sourcekitd that don't have the
+    // global-configuration request.
+    if (sendGlobalConfigRequest()) {
+      llvm::outs() << "warning: global configuration request failed\n";
+    }
+  }
+
+  if (Opts.ShellExecution)
+    return performShellExecution(Opts.CompilerArgs);
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -440,26 +458,26 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   return 0;
 }
 
-static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
-                            sourcekitd_object_t Req) {
-  for (auto &Opt : Opts.RequestOptions) {
-    auto KeyValue = StringRef(Opt).split('=');
-    if (KeyValue.first == "expectedtypes") {
-      SmallVector<StringRef, 4> expectedTypeNames;
-      KeyValue.second.split(expectedTypeNames, ';');
+static bool sendGlobalConfigRequest() {
+  TestOptions Opts;
+  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
+                                                                 nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
 
-      auto typenames = sourcekitd_request_array_create(nullptr, 0);
-      for (auto &name : expectedTypeNames) {
-        std::string n = name;
-        sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
-      }
-      sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
-    } else {
-      llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
-      return 1;
-    }
-  }
-  return 0;
+  // For test invocations we default to setting OptimizeForIDE to true. This
+  // matches the use case of the most popular clients of sourcekitd (editors)
+  // and also disables loading locations from .swiftsourceinfo files. This is
+  // desirable for testing because the .swiftsourceinfo for the stdlib is
+  // available when sourcekitd is tested, and can make some stdlib-dependent
+  // sourcekitd tests unstable due to changing source locations from the stdlib
+  // module.
+  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+  bool IsError = sourcekitd_response_is_error(Resp);
+  if (IsError)
+    sourcekitd_response_description_dump(Resp);
+  sourcekitd_request_release(Req);
+  return IsError;
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
@@ -475,13 +493,14 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
-    SourceFile = AbsSourceFile.str();
+    llvm::sys::path::native(AbsSourceFile);
+    SourceFile = std::string(AbsSourceFile.str());
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
     auto Buf = getBufferForFilename(Opts.TextInputFile, Opts.VFSFiles);
-    Opts.SourceText = Buf->getBuffer();
+    Opts.SourceText = Buf->getBuffer().str();
   }
 
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
@@ -504,10 +523,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       ByteOffset;
   }
 
+  bool compilerArgsAreClang = false;
+
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
   ActiveRequest = Opts.Request;
-  bool ShouldIgnoreSourceInfo = true;
   switch (Opts.Request) {
   case SourceKitRequest::None:
     llvm::errs() << "request is not set\n";
@@ -515,6 +535,21 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     //        In other words, despite returning 1 here, the program still exits
     //        with a zero (successful) exit code.
     return 1;
+
+  case SourceKitRequest::GlobalConfiguration:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      std::string KeyStr("key.");
+      KeyStr.append(KeyValue.first.str());
+      sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
+
+      int64_t Value = 0;
+      KeyValue.second.getAsInteger(0, Value);
+      sourcekitd_request_dictionary_set_int64(Req, Key, Value);
+    }
+    break;
 
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
@@ -557,6 +592,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    // Default to sort by name.
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
@@ -564,7 +603,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestCodeCompleteOpen);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    addCodeCompleteOptions(Req, Opts);
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteClose:
@@ -579,7 +618,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestCodeCompleteUpdate);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    addCodeCompleteOptions(Req, Opts);
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteCacheOnDisk:
@@ -628,13 +667,16 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestTypeContextInfo);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    addRequestOptions(Req, Opts, KeyTypeContextInfoOptions,
+                      "key.typecontextinfo.");
     break;
 
   case SourceKitRequest::ConformingMethodList:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    setExpectedTypes(Opts, Req);
+    addRequestOptions(Req, Opts, KeyConformingMethodListOptions,
+                      "key.conformingmethods.");
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -666,7 +708,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::CollectExpresstionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
-    setExpectedTypes(Opts, Req);
+    // NOTE: KeyCodeCompletion and the prefix are just dummy. This request
+    // only accepts 'expectedtypes' which is placed to the Req root dictionary.
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions,
+                      "key.expression.type.");
     break;
   }
 
@@ -732,13 +777,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       return 1;
     }
     if (!BaseName.empty()) {
-      std::string S = BaseName;
+      std::string S = BaseName.str();
       sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
     }
     if (!ArgPieces.empty()) {
       sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
       for (StringRef A : ArgPieces) {
-        std::string S = A;
+        std::string S = A.str();
         sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
                                             S.c_str());
       }
@@ -865,9 +910,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     } else {
       if (Opts.UsingSwiftArgs)
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
+      else
+        compilerArgsAreClang = true;
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
-      ShouldIgnoreSourceInfo = false;
     }
 
     sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
@@ -955,23 +1001,30 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (Opts.SourceText) {
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                              Opts.SourceText->c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
+                                             SemaName.c_str());
   }
 
   if (!Opts.CompilerArgs.empty()) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
+    if (!Opts.ModuleCachePath.empty()) {
+      if (compilerArgsAreClang) {
+        // We need -fmodules or else the clang argument parsing does not honour
+        // -fmodules-cache-path. In reality, the swift ClangImporter will always
+        // enable modules when importing, so this should only impact the
+        // clang argument parsing. This is needed even if the header doesn't
+        // use modules, since Swift itself will import its shims module, and
+        // that needs to honour the -module-cache-path option when testing.
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-fmodules");
+        std::string opt = "-fmodules-cache-path=" + Opts.ModuleCachePath;
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, opt.c_str());
+      } else {
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
+      }
+    }
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
-    if (ShouldIgnoreSourceInfo) {
-      // Ignore .swiftsourceinfo file when testing sourcekitd.
-      // .swiftsourceinfo for stdlib will be available when sourcekitd is tested,
-      // which may make some stdlib-depending sourcekitd tests volatile.
-      // We cannot append the flags when the compiler arguments are for clang
-      // invocation.
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-ignore-module-source-info");
-    }
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
     sourcekitd_request_release(Args);
   }
@@ -1118,6 +1171,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
+    case SourceKitRequest::GlobalConfiguration:
     case SourceKitRequest::ProtocolVersion:
     case SourceKitRequest::CompilerVersion:
     case SourceKitRequest::Close:
@@ -1246,7 +1300,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           for (auto &FmtOpt : Opts.RequestOptions) {
             auto KeyValue = StringRef(FmtOpt).split('=');
             std::string KeyStr("key.editor.format.");
-            KeyStr.append(KeyValue.first);
+            KeyStr.append(KeyValue.first.str());
             sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
             int64_t Value = 0;
             KeyValue.second.getAsInteger(0, Value);
@@ -1298,9 +1352,24 @@ static void getSemanticInfoImpl(sourcekitd_variant_t Info) {
     sourcekitd_variant_dictionary_get_value(Info, KeyDiagnostics);
 }
 
-static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
-  getSemanticInfoImpl(Info);
+static void getSemanticInfoImplAfterDocUpdate(sourcekitd_variant_t EditOrOpen,
+                                              sourcekitd_variant_t DocUpdate) {
+  if (sourcekitd_variant_dictionary_get_uid(EditOrOpen, KeyDiagnosticStage) ==
+      SemaDiagnosticStage) {
+    // FIXME: currently we only return annotations once, so if the original edit
+    // or open request was slow enough, it may "take" the annotations. If that
+    // is fixed, we can skip checking the diagnostic stage and always use the
+    // DocUpdate variant.
+    assert(sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
+               DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL);
 
+    getSemanticInfoImpl(EditOrOpen);
+  } else {
+    getSemanticInfoImpl(DocUpdate);
+  }
+}
+
+static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
   // Wait for the notification that semantic info is available.
   // But only for 1 min.
   bool expired = semaSemaphore.wait(60 * 1000);
@@ -1312,7 +1381,9 @@ static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
     llvm::report_fatal_error(
       llvm::Twine("Got notification for different doc name: ") + semaName);
   }
-  getSemanticInfoImpl(sourcekitd_response_get_value(semaResponse));
+
+  getSemanticInfoImplAfterDocUpdate(
+      Info, sourcekitd_response_get_value(semaResponse));
 }
 
 static int printAnnotations() {
@@ -1444,10 +1515,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  std::string Filename = FilenameIn.str();
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = std::string(output.str());
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1616,10 +1687,10 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  std::string Filename = FilenameIn.str();
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(Filename, output))
+    Filename = std::string(output.str());
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
@@ -2033,53 +2104,85 @@ static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS) {
   });
 }
 
-static void initializeRewriteBuffer(StringRef Input,
-                                    clang::RewriteBuffer &RewriteBuf) {
-  RewriteBuf.Initialize(Input);
-  StringRef CheckStr = "CHECK";
-  size_t Pos = 0;
-  while (true) {
-    Pos = Input.find(CheckStr, Pos);
-    if (Pos == StringRef::npos)
-      break;
-    Pos = Input.substr(0, Pos).rfind("//");
-    assert(Pos != StringRef::npos);
-    size_t EndLine = Input.find('\n', Pos);
-    assert(EndLine != StringRef::npos);
-    ++EndLine;
-    RewriteBuf.RemoveText(Pos, EndLine-Pos);
-    Pos = EndLine;
+static std::string initializeSource(StringRef Input) {
+  std::string result;
+  {
+    llvm::raw_string_ostream OS(result);
+    StringRef CheckStr = "CHECK";
+    size_t Pos = 0;
+    while (true) {
+      auto checkPos = Input.find(CheckStr, Pos);
+      if (checkPos == StringRef::npos)
+        break;
+      checkPos = Input.substr(0, checkPos).rfind("//");
+      assert(checkPos != StringRef::npos);
+      size_t EndLine = Input.find('\n', checkPos);
+      assert(EndLine != StringRef::npos);
+      ++EndLine;
+      OS << Input.slice(Pos, checkPos);
+      Pos = EndLine;
+    }
+
+    OS << Input.slice(Pos, StringRef::npos);
   }
+  return result;
 }
 
-static std::vector<std::pair<unsigned, unsigned>>
-getPlaceholderRanges(StringRef Source) {
+static Optional<std::pair<unsigned, unsigned>>
+firstPlaceholderRange(StringRef Source, unsigned from) {
   const char *StartPtr = Source.data();
-  std::vector<std::pair<unsigned, unsigned>> Ranges;
+  Source = Source.drop_front(from);
+
   while (true) {
     size_t Pos = Source.find("<#");
     if (Pos == StringRef::npos)
       break;
     unsigned OffsetStart = Source.data() + Pos - StartPtr;
     Source = Source.substr(Pos+2);
+    if (Source.startswith("__skip__") || Source.startswith("T##__skip__"))
+      continue;
     Pos = Source.find("#>");
     if (Pos == StringRef::npos)
       break;
     unsigned OffsetEnd = Source.data() + Pos + 2 - StartPtr;
     Source = Source.substr(Pos+2);
-    Ranges.emplace_back(OffsetStart, OffsetEnd-OffsetStart);
+    return std::make_pair(OffsetStart, OffsetEnd-OffsetStart);
   }
-  return Ranges;
+  return llvm::None;
 }
 
 static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
                                llvm::raw_ostream &OS) {
-  clang::RewriteBuffer RewriteBuf;
-  initializeRewriteBuffer(SourceBuf->getBuffer(), RewriteBuf);
-  auto Ranges = getPlaceholderRanges(SourceBuf->getBuffer());
-  for (auto Range : Ranges) {
-    unsigned Offset = Range.first;
-    unsigned Length = Range.second;
+  auto syncEdit = [=](unsigned offset, unsigned length, const char *text) {
+    auto SourceBufID = SourceBuf->getBufferIdentifier();
+    auto req = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_uid(req, KeyRequest,
+                                          RequestEditorReplaceText);
+    sourcekitd_request_dictionary_set_stringbuf(req, KeyName,
+                                                SourceBufID.data(),
+                                                SourceBufID.size());
+    sourcekitd_request_dictionary_set_int64(req, KeyOffset, offset);
+    sourcekitd_request_dictionary_set_int64(req, KeyLength, length);
+    sourcekitd_request_dictionary_set_string(req, KeySourceText, text);
+
+    sourcekitd_response_t resp = sourcekitd_send_request_sync(req);
+    if (sourcekitd_response_is_error(resp)) {
+      sourcekitd_response_description_dump(resp);
+      exit(1);
+    }
+    sourcekitd_request_release(req);
+    sourcekitd_response_dispose(resp);
+  };
+
+  std::string source = initializeSource(SourceBuf->getBuffer());
+  // Sync contents with modified source.
+  syncEdit(0, SourceBuf->getBuffer().size(), source.c_str());
+
+  unsigned cursor = 0;
+
+  while (auto Range = firstPlaceholderRange(source, cursor)) {
+    unsigned Offset = Range->first;
+    unsigned Length = Range->second;
     sourcekitd_object_t Exp = sourcekitd_request_dictionary_create(nullptr,
                                                                    nullptr, 0);
     sourcekitd_request_dictionary_set_uid(Exp, KeyRequest,
@@ -2101,16 +2204,25 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     const char *Text = sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
     if (!Text) {
+      cursor = Offset + Length;
       sourcekitd_response_dispose(Resp);
       continue;
     }
     unsigned EditOffset = sourcekitd_variant_dictionary_get_int64(Info, KeyOffset);
     unsigned EditLength = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
-    RewriteBuf.ReplaceText(EditOffset, EditLength, Text);
+
+    // Apply edit locally.
+    source.replace(EditOffset, EditLength, Text);
+
+    // Apply edit on server.
+    syncEdit(EditOffset, EditLength, Text);
+
+    // Adjust cursor to after the edit (we do not expand recursively).
+    cursor = EditOffset + strlen(Text);
     sourcekitd_response_dispose(Resp);
   }
 
-  RewriteBuf.write(OS);
+  OS << source;
 }
 
 static std::pair<unsigned, unsigned>

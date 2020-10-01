@@ -72,7 +72,7 @@ static RemoteASTContext &getRemoteASTContext() {
 
 // FIXME: swiftcall
 /// func printType(forMetadata: Any.Type)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 printMetadataType(const Metadata *typeMetadata) {
   auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
@@ -90,7 +90,7 @@ printMetadataType(const Metadata *typeMetadata) {
 
 // FIXME: swiftcall
 /// func printDynamicType(_: AnyObject)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 printHeapMetadataType(void *object) {
   auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
@@ -145,7 +145,7 @@ static void printMemberOffset(const Metadata *typeMetadata,
 
 // FIXME: swiftcall
 /// func printTypeMemberOffset(forType: Any.Type, memberName: StaticString)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 printTypeMemberOffset(const Metadata *typeMetadata,
                                       const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ false);
@@ -154,7 +154,7 @@ printTypeMemberOffset(const Metadata *typeMetadata,
 // FIXME: swiftcall
 /// func printTypeMetadataMemberOffset(forType: Any.Type,
 ///                                    memberName: StaticString)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 printTypeMetadataMemberOffset(const Metadata *typeMetadata,
                               const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
@@ -162,7 +162,7 @@ printTypeMetadataMemberOffset(const Metadata *typeMetadata,
 
 // FIXME: swiftcall
 /// func printDynamicTypeAndAddressForExistential<T>(_: T)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 printDynamicTypeAndAddressForExistential(void *object,
                                          const Metadata *typeMetadata) {
   auto &remoteAST = getRemoteASTContext();
@@ -192,7 +192,7 @@ printDynamicTypeAndAddressForExistential(void *object,
 
 // FIXME: swiftcall
 /// func stopRemoteAST(_: AnyObject)
-LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+extern "C" void SWIFT_REMOTEAST_TEST_ABI LLVM_ATTRIBUTE_USED
 stopRemoteAST() {
   if (remoteContext)
     remoteContext.reset();

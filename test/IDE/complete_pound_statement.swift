@@ -18,11 +18,19 @@
 {
   #available(iOS >= 7.0, #^PLATFORM4^#
 }
-// PLATFORM1: Keyword/None:                       *[#Platform#]; name=*{{$}}
-// PLATFORM1: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
-// PLATFORM1: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
-// PLATFORM1: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
-// PLATFORM1: Keyword/None:                       OSX[#Platform#]; name=OSX{{$}}
+// PLATFORM1: Begin completions
+// PLATFORM1-DAG: Keyword/None:                       *[#Platform#]; name=*{{$}}
+// PLATFORM1-DAG: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
+// PLATFORM1-DAG: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
+// PLATFORM1-DAG: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
+// PLATFORM1-DAG: Keyword/None:                       macOS[#Platform#]; name=macOS{{$}}
+// PLATFORM1-DAG: Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
+// PLATFORM1-DAG: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
+// PLATFORM1-DAG: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
+// PLATFORM1-DAG: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
+// PLATFORM1-DAG: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
+// PLATFORM1-DAG: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
+// PLATFORM1: End completions
 
 class C1 {
   func foo() {

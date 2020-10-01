@@ -15,7 +15,7 @@ import witness_accessibility_other
 // CHECK-LABEL: sil [ossa] @$s27witness_accessibility_multi22callsPublicRequirement1sy0a1_B6_other1SV_tF : $@convention(thin) (S) -> ()
 public func callsPublicRequirement(s: S) {
 
-  // CHECK: witness_method $S, #P.publicRequirement!1 : <Self where Self : witness_accessibility_other.P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: witness_method $S, #P.publicRequirement : <Self where Self : witness_accessibility_other.P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   s.publicRequirement()
 
   // CHECK: function_ref @$s27witness_accessibility_other1QPAAE19internalRequirementyyF : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> ()

@@ -7,8 +7,6 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# XFAIL: OS=macosx
-# https://bugs.swift.org/browse/SR-9847
 
 from __future__ import print_function
 
@@ -26,6 +24,9 @@ for module_file in os.listdir(sdk_overlay_dir):
         continue
     # Skip the standard library because it's tested elsewhere.
     if module_name == "Swift":
+        continue
+    # TODO(TF-1229): Fix the "_Differentiation" module.
+    if module_name == "_Differentiation":
         continue
     print("# " + module_name)
 

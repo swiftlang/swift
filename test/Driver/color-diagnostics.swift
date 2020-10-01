@@ -1,4 +1,4 @@
-// RUN: not %target-swiftc_driver -color-diagnostics -emit-executable -o %t %s 2>&1 \
+// RUN: not %target-swiftc_driver -color-diagnostics -diagnostic-style=llvm -emit-executable -o %t %s 2>&1 \
 // RUN:     | %FileCheck -check-prefix=CHECK-CD %s
 // CHECK-CD: [0m1 = 2{{$}}
 

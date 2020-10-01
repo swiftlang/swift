@@ -1,0 +1,7 @@
+framework module CategoryOverrides {
+  umbrella header "CategoryOverrides.h"
+  module * {
+    export *
+  }
+  exclude header "Private.h"
+}

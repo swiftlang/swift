@@ -17,7 +17,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -46,11 +45,13 @@ public:
 
   /// Loads an OutputFileMap from the given \p Path into the receiver, if
   /// possible.
-  static llvm::Expected<OutputFileMap> loadFromPath(StringRef Path,
-                                                    StringRef workingDirectory);
+  static llvm::Expected<OutputFileMap>
+  loadFromPath(StringRef Path, StringRef workingDirectory,
+               bool addEntriesForSourceRangeDependencies);
 
   static llvm::Expected<OutputFileMap>
-  loadFromBuffer(StringRef Data, StringRef workingDirectory);
+  loadFromBuffer(StringRef Data, StringRef workingDirectory,
+                 bool addEntriesForSourceRangeDependencies);
 
   /// Loads an OutputFileMap from the given \p Buffer, taking ownership
   /// of the buffer in the process.
@@ -59,7 +60,8 @@ public:
   /// the output file map.
   static llvm::Expected<OutputFileMap>
   loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                 StringRef workingDirectory);
+                 StringRef workingDirectory,
+                 bool addEntriesForSourceRangeDependencies);
 
   /// Get the map of outputs for the given \p Input, if present in the
   /// OutputFileMap. (If not present, returns nullptr.)
@@ -88,7 +90,8 @@ private:
   /// Parses the given \p Buffer and returns either an OutputFileMap or
   /// error, taking ownership of \p Buffer in the process.
   static llvm::Expected<OutputFileMap>
-  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);
+  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory,
+        bool addEntriesForSourceRangeDependencies);
 };
 
 } // end namespace swift

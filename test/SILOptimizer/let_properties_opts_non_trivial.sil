@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Point {
+  let x: Int64 = 0
+  let y: Int64 = 0
+}
+
+class HasCenter {
+  let centerPoint: Point = Point()
+  public func getCenter() -> Int64
+}
+
+// Point.init()
+sil hidden [ossa] @$s19let_properties_opts5PointCACycfc : $@convention(method) (@owned Point) -> @owned Point {
+bb0(%0 : @owned $Point):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  
+  %3 = begin_borrow %0 : $Point
+  %6 = ref_element_addr %3 : $Point, #Point.x
+  store %2 to [trivial] %6 : $*Int64
+  end_borrow %3 : $Point
+
+  %9 = begin_borrow %0 : $Point
+  %12 = ref_element_addr %9 : $Point, #Point.y
+  store %2 to [trivial] %12 : $*Int64
+  end_borrow %9 : $Point
+
+  %15 = copy_value %0 : $Point
+  destroy_value %0 : $Point
+  return %15 : $Point
+}
+
+// HasCenter.init()
+sil hidden [ossa] @$s19let_properties_opts9HasCenterCACycfc : $@convention(method) (@owned HasCenter) -> @owned HasCenter {
+// %0                                             // users: %2, %1
+bb0(%0 : @owned $HasCenter):
+  %1 = alloc_ref $Point
+  // function_ref Point.init()
+  %2 = function_ref @$s19let_properties_opts5PointCACycfc : $@convention(method) (@owned Point) -> @owned Point
+  %3 = apply %2(%1) : $@convention(method) (@owned Point) -> @owned Point
+
+  %5 = begin_borrow %0 : $HasCenter               // users: %8, %6
+  %6 = ref_element_addr %5 : $HasCenter, #HasCenter.centerPoint // user: %7
+  
+  store %3 to [init] %6 : $*Point                       // id: %7
+  end_borrow %5 : $HasCenter                      // id: %8
+  
+  %9 = copy_value %0 : $HasCenter                 // user: %11
+  destroy_value %0 : $HasCenter                   // id: %10
+  return %9 : $HasCenter                          // id: %11
+} // end sil function '$s19let_properties_opts9HasCenterCACycfc'
+
+// HasCenter.centerPoint.getter
+sil hidden [transparent] [ossa] @$s19let_properties_opts9HasCenterC11centerPointAA0G0Cvg : $@convention(method) (@guaranteed HasCenter) -> @owned Point {
+// %0                                             // users: %2, %1
+bb0(%0 : @guaranteed $HasCenter):
+  debug_value %0 : $HasCenter, let, name "self", argno 1 // id: %1
+  %2 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint // user: %3
+  %3 = load [copy] %2 : $*Point                   // user: %4
+  return %3 : $Point                              // id: %4
+} // end sil function '$s19let_properties_opts9HasCenterC11centerPointAA0G0Cvg'
+
+// HasCenter.getCenter()
+// CHECK-LABEL: sil hidden [ossa] @$s19let_properties_opts9HasCenterC03getE0s5Int64VyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
+// CHECK: return [[INT]] : $Int64
+// CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC03getE0s5Int64VyF'
+sil hidden [ossa] @$s19let_properties_opts9HasCenterC03getE0s5Int64VyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+// %0                                             // users: %2, %1
+bb0(%0 : @guaranteed $HasCenter):
+  debug_value %0 : $HasCenter, let, name "self", argno 1 // id: %1
+  %2 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint // user: %3
+  %3 = load [copy] %2 : $*Point                   // users: %8, %4
+  %4 = begin_borrow %3 : $Point                   // users: %7, %5
+  %5 = ref_element_addr %4 : $Point, #Point.x     // user: %6
+  %6 = load [trivial] %5 : $*Int64                // user: %9
+  end_borrow %4 : $Point                          // id: %7
+  destroy_value %3 : $Point                       // id: %8
+  return %6 : $Int64                              // id: %9
+} // end sil function '$s19let_properties_opts9HasCenterC03getE0s5Int64VyF'

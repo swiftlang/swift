@@ -188,7 +188,7 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{value of protocol type 'Any' cannot conform to 'Hashable'; only struct/enum/class types can conform to protocols}}
+_ = [] as Set  // expected-error {{protocol 'Any' as a type cannot conform to 'Hashable'; only concrete types such as structs, enums and classes can conform to protocols}}
 // expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 
@@ -234,8 +234,7 @@ class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as p
 Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, Int>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-// TODO(diagnostics): We should try to produce a single note in this case.
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 2 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 1 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
 // expected-error@-1 {{generic parameter 'B' could not be inferred}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
@@ -835,4 +834,27 @@ func sr_11491(_ value: [String]) {
   var arr: Set<String> = []
   arr.insert(value)
   // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
+}
+
+func test_dictionary_with_generic_mismatch_in_key_or_value() {
+  struct S<T> : Hashable {}
+  // expected-note@-1 2 {{arguments to generic parameter 'T' ('Int' and 'Bool') are expected to be equal}}
+
+  let _: [Int: S<Bool>] = [0: S<Bool>(), 1: S<Int>()]
+  // expected-error@-1 {{cannot convert value of type 'S<Int>' to expected dictionary value type 'S<Bool>'}}
+
+  let _: [S<Bool>: Int] = [S<Int>(): 42]
+  // expected-error@-1 {{cannot convert value of type 'S<Int>' to expected dictionary key type 'S<Bool>'}}
+}
+
+
+// rdar://problem/56212087 - unable to infer type for generic parameter `T`
+func rdar56212087() {
+  func setValue(_: Any?, forKey: String) {}
+
+  func foo<T: ExpressibleByStringLiteral>(_: String, _: T) -> T {
+    fatalError()
+  }
+
+  setValue(foo("", ""), forKey: "") // Ok (T is inferred as a `String` instead of `Any?`)
 }

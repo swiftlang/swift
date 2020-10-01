@@ -86,7 +86,7 @@ func testTR1() -> Int? {
 // RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: oi[#Int?#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: testTR1()[#Int?#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i[#Int#]{{; name=.+$}}
-// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testReturnInt1()[#Void#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testReturnInt1()[#Void#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[LocalVar]/Local:               fs[#FooStruct#]{{; name=.+$}}
 }
 
@@ -99,8 +99,8 @@ func testTR2(_ g : Gen) -> Int? {
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]{{; name=.+$}}
-// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
-// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
+// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
+// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
 
 func testTR3(_ g : Gen) -> Int? {
   return g.IG.#^RETURN_TR3^#
@@ -111,8 +111,8 @@ func testTR3(_ g : Gen) -> Int? {
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]{{; name=.+$}}
-// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
-// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
+// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
+// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
 
 struct TestStruct {
   func testTR1_method() -> Int? {

@@ -52,6 +52,8 @@ CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosu
 
 CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initializer", memberwise.init.local.refactoring)
 
+CURSOR_REFACTORING(AddEquatableConformance, "Add Equatable Conformance", add.equatable.conformance)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)
@@ -69,6 +71,10 @@ RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert
 RANGE_REFACTORING(ConvertIfLetExprToGuardExpr, "Convert To Guard Expression", convert.iflet.to.guard.expr)
 
 RANGE_REFACTORING(ConvertGuardExprToIfLetExpr, "Convert To IfLet Expression", convert.to.iflet.expr)
+
+RANGE_REFACTORING(ConvertToComputedProperty, "Convert To Computed Property", convert.to.computed.property)
+
+RANGE_REFACTORING(ConvertToSwitchStmt, "Convert To Switch Statement", convert.switch.stmt)
 
 // These internal refactorings are designed to be helpful for working on
 // the compiler/standard library, etc., but are likely to be just confusing and

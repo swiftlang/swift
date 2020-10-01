@@ -11,8 +11,14 @@
 # ----------------------------------------------------------------------------
 
 import abc
+import os
 
 from .. import cmake
+from .. import targets
+
+
+def is_release_variant(build_variant):
+    return build_variant in ['Release', 'RelWithDebInfo']
 
 
 class Product(object):
@@ -32,6 +38,16 @@ class Product(object):
         It provides a customization point for Product subclasses. It is set to
         the value of product_name() by default for this reason.
         """
+
+        llvm_projects = ['clang',
+                         'clang-tools-extra',
+                         'compiler-rt',
+                         'libcxx',
+                         'lldb',
+                         'llvm']
+
+        if cls.product_name() in llvm_projects:
+            return "llvm-project/{}".format(cls.product_name())
         return cls.product_name()
 
     @classmethod
@@ -40,7 +56,42 @@ class Product(object):
 
         Whether this product is produced by build-script-impl.
         """
-        return True
+        raise NotImplementedError
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        """is_swiftpm_unified_build_product -> bool
+
+        Whether this product should be built in the unified build of SwiftPM
+        products.
+        """
+        return False
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        """Returns true if this target should be skipped in darwin builds when
+        inferring dependencies.
+        """
+        return False
+
+    @classmethod
+    def get_dependencies(cls):
+        """Return a list of products that this product depends upon"""
+        raise NotImplementedError
+
+    def should_clean(self, host_target):
+        """should_clean() -> Bool
+
+        Whether or not this product should be cleaned before being built
+        """
+        return False
+
+    def clean(self, host_target):
+        """clean() -> void
+
+        Perform the clean, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
 
     def should_build(self, host_target):
         """should_build() -> Bool
@@ -104,6 +155,26 @@ class Product(object):
         self.source_dir = source_dir
         self.build_dir = build_dir
         self.cmake_options = cmake.CMakeOptions()
+
+    def is_release(self):
+        """is_release() -> Bool
+
+        Whether or not this target is built as a release variant
+        """
+        return is_release_variant(self.args.build_variant)
+
+    def install_toolchain_path(self, host_target):
+        """toolchain_path() -> string
+
+        Returns the path to the toolchain that is being created as part of this
+        build.
+        """
+        install_destdir = self.args.install_destdir
+        if self.args.cross_compile_hosts:
+            build_root = os.path.dirname(self.build_dir)
+            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+        return targets.toolchain_path(install_destdir,
+                                      self.args.install_prefix)
 
 
 class ProductBuilder(object):

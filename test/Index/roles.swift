@@ -16,19 +16,23 @@ let x = 2
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySivp | Def | rel: 0
 // CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref | rel: 0
+// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
 
 // Read of x + Write of y
 y = x + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref | rel: 0
+// CHECK: [[@LINE-3]]:7 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
+
 
 // Read of y + Write of y
 y += x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref | rel: 0
-// CHECK: [[@LINE-3]]:6 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
+// CHECK: [[@LINE-4]]:6 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
 
 var z: Int {
 // CHECK: [[@LINE-1]]:5 | variable/Swift | z | s:14swift_ide_test1zSivp | Def | rel: 0
@@ -118,8 +122,9 @@ struct AStruct {
     // CHECK: [[@LINE-6]]:5 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test7AStructV1xSivs | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
     // CHECK-NEXT: RelRec | struct/Swift | AStruct | [[AStruct_USR]]
-    // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
+    // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref,Call,RelRec,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
+    // CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
   }
 
   // RelationChildOf, RelationAccessorOf
@@ -515,3 +520,21 @@ func useDefaultInits() {
   // CHECK: [[@LINE-1]]:15 | instance-property/Swift | y | s:14swift_ide_test7BStructV1ySbvp | Ref,RelCont
   // CHECK: [[@LINE-2]]:7 | constructor/Swift | init(x:y:z:) | s:14swift_ide_test7BStructV1x1y1zACSi_SbSStcfc | Ref,Call,RelCall,RelCont | rel: 1
 }
+
+internal protocol FromInt {
+    init(_ uint64: Int)
+}
+extension Int: FromInt { }
+func test<M>(_: M, value: Int?) {
+    if let idType = M.self as? FromInt.Type {
+        _ = value.flatMap(idType.init) as? M
+// CHECK: [[@LINE-1]]:34 | constructor/Swift | init(_:) | s:14swift_ide_test7FromIntPyxSicfc | Ref,RelCont | rel: 1
+    }
+}
+
+func `escapedName`(`x`: Int) {}
+// CHECK: [[@LINE-1]]:6 | function/Swift | escapedName(x:) | {{.*}} | Def | rel: 0
+`escapedName`(`x`: 2)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref,Call | rel: 0
+`escapedName`(`x`:)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref | rel: 0

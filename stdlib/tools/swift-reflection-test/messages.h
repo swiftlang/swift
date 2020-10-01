@@ -25,5 +25,7 @@ typedef enum InstanceKind {
   Object,
   Existential,
   ErrorExistential,
-  Closure
+  Closure,
+  Enum,
+  EnumValue
 } InstanceKind;

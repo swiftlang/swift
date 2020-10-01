@@ -34,7 +34,7 @@ func instanceMethods(_ b: B) {
 func extensionMethods(b b: B) {
   // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK-NEXT: [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK:      [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
   // CHECK-NOT:  [[T0]]
   // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)
@@ -49,10 +49,6 @@ func initCallToAllocInit(i i: CInt) {
 
 // CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfC"
 // CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
-
-// CHECK: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
-// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
 // Indexed subscripting
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir19indexedSubscripting1b3idx1aySo1BC_SiSo1ACtF"
@@ -87,7 +83,7 @@ func propertyAccess(b b: B) {
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$s7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
   // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
-  // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
+  // CHECK: [[T0:%.*]] = call %objc_class* @{{.*}}(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]], {{.*}}) [[NOUNWIND:#[0-9]+]]
   return a as! B
@@ -98,7 +94,7 @@ func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
   as1.objectForKeyedSubscript(a)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir13protocolTypes1a1bySo7NSMinceC_So9NSRuncing_ptF"(%TSo7NSMinceC*, %objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir13protocolTypes1a1bySo7NSMinceC_So9NSRuncing_ptF"(%TSo7NSMinceC* %0, %objc_object* %1) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
   a.eat(with: b)
@@ -106,7 +102,7 @@ func protocolTypes(a a: NSMince, b: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir6getset1pySo8FooProto_p_tF"(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir6getset1pySo8FooProto_p_tF"(%objc_object* %0) {{.*}} {
 func getset(p p: FooProto) {
   // CHECK: load i8*, i8** @"\01L_selector(bar)"
   // CHECK: load i8*, i8** @"\01L_selector(setBar:)"
@@ -114,7 +110,7 @@ func getset(p p: FooProto) {
   p.bar = prop
 }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir16protocolMetatype1pSo8FooProto_pXpSoAD_p_tF"(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir16protocolMetatype1pSo8FooProto_pXpSoAD_p_tF"(%objc_object* %0) {{.*}} {
 func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: = call %swift.type* @swift_getObjectType(%objc_object* %0)
   // CHECK-NOT: {{retain|release}}
@@ -131,7 +127,7 @@ class Impl: FooProto, AnotherProto {
   @objc var bar: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir27protocolCompositionMetatype1pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir27protocolCompositionMetatype1pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
@@ -144,7 +140,7 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   return type
 } // CHECK: }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir28protocolCompositionMetatype21pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir28protocolCompositionMetatype21pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
@@ -157,7 +153,7 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   return type
 } // CHECK: }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir17pointerPropertiesyySo14PointerWrapperCF"(%TSo14PointerWrapperC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir17pointerPropertiesyySo14PointerWrapperCF"(%TSo14PointerWrapperC* %0) {{.*}} {
 func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
@@ -167,7 +163,7 @@ func pointerProperties(_ obj: PointerWrapper) {
   obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir16strangeSelectorsyySo13SwiftNameTestCF"(%TSo13SwiftNameTestC*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir16strangeSelectorsyySo13SwiftNameTestCF"(%TSo13SwiftNameTestC* %0) {{.*}} {
 func strangeSelectors(_ obj: SwiftNameTest) {
   // CHECK: load i8*, i8** @"\01L_selector(:b:)"
   obj.empty(a: 0, b: 0)
@@ -351,22 +347,26 @@ func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstr
 
 // CHECK-LABEL: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF
 func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
-  // CHECK: {{call swiftcc.*sSo13HasBlockArrayC05blockC0SayyyXBGyFTcTO}}
+  // CHECK: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tFSayyyXBGycAEcfu_AFycfu0_TA
   let _ = hba.blockPointerType()
   return hba.blockArray
 }
 
 
+// CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
+// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
+// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
+
 // CHECK: attributes [[NOUNWIND]] = { nounwind }
 
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[LET_SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})

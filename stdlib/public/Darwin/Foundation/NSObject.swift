@@ -12,6 +12,7 @@
 
 @_exported import Foundation // Clang module
 import ObjectiveC
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 // This exists to allow for dynamic dispatch on KVO methods added to NSObject.
 // Extending NSObject with these methods would disallow overrides.
@@ -36,7 +37,7 @@ public protocol NSKeyValueObservingCustomization : NSObjectProtocol {
     static func automaticallyNotifiesObservers(for key: AnyKeyPath) -> Bool
 }
 
-fileprivate extension NSObject {
+private extension NSObject {
     
     @objc class func __old_unswizzled_automaticallyNotifiesObservers(forKey key: String?) -> Bool {
         fatalError("Should never be reached")
@@ -113,7 +114,7 @@ fileprivate extension NSObject {
     /// Temporarily maps a `String` to an `AnyKeyPath` that can be retrieved with `_bridgeKeyPath(_:)`.
     ///
     /// This uses a per-thread storage so key paths on other threads don't interfere.
-    @nonobjc fileprivate static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
+    @nonobjc static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
         _ = __KVOKeyPathBridgeMachinery.swizzler
         let key = BridgeKey(keyPathString)
         let oldValue = Thread.current.threadDictionary[key]
@@ -122,7 +123,7 @@ fileprivate extension NSObject {
         block()
     }
     
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
+    @nonobjc static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
         guard let keyPath = keyPath else { return nil }
         return Thread.current.threadDictionary[BridgeKey(keyPath)] as? AnyKeyPath
     }
@@ -173,6 +174,9 @@ public class NSKeyValueObservation : NSObject {
         // workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
         // specifically, overriding observeValue(forKeyPath:of:change:context:) complains that it's not Obj-C-compatible
         @nonobjc static let swizzler: () = {
+            let cls = NSClassFromString("_NSKVOCompatibility") as? _NSKVOCompatibilityShim.Type
+            cls?._noteProcessHasUsedKVOSwiftOverlay()
+            
             let bridgeClass: AnyClass = Helper.self
             let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
             let swapSel = #selector(Helper._swizzle_me_observeValue(forKeyPath:of:change:context:))

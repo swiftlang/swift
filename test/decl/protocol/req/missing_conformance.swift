@@ -17,7 +17,6 @@ extension LikeOptionSet where RawValue : FixedWidthInteger {
 struct X : LikeOptionSet {}
 // expected-error@-1 {{type 'X' does not conform to protocol 'LikeSetAlgebra'}}
 // expected-error@-2 {{type 'X' does not conform to protocol 'RawRepresentable'}}
-// expected-note@-3 {{do you want to add protocol stubs?}}
 
 protocol IterProtocol {}
 protocol LikeSequence {
@@ -110,4 +109,33 @@ struct S3 : P12 { // expected-error {{type 'S3' does not conform to protocol 'P1
     func bar() -> P11 { return 0 }
     // expected-note@-1 {{candidate can not infer 'A' = 'P11' because 'P11' is not a nominal type and so can't conform to 'P11'}}
 }
+
+// SR-12759
+struct CountSteps1<T> : Collection {
+  init(count: Int) { self.count = count }
+  var count: Int
+
+  var startIndex: Int { 0 }
+  var endIndex: Int { count }
+  func index(after i: Int) -> Int {
+    totalSteps += 1 // expected-error {{cannot find 'totalSteps' in scope}}
+    return i + 1
+  }
+  subscript(i: Int) -> Int { return i }
+}
+
+extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform to protocol 'RandomAccessCollection'}}
+  // expected-error@-1 {{conditional conformance of type 'CountSteps1<T>' to protocol 'RandomAccessCollection' does not imply conformance to inherited protocol 'BidirectionalCollection'}}
+  // expected-note@-2 {{did you mean to explicitly state the conformance like 'extension CountSteps1: BidirectionalCollection where ...'?}}
+  // expected-error@-3 {{type 'CountSteps1<T>' does not conform to protocol 'BidirectionalCollection'}}
+  : RandomAccessCollection
+     where T : Equatable
+{
+  typealias Index = Int
+  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'Index'}}
+  func index(_ i: Index, offsetBy d: Int) -> Index {
+    return i + d
+  }
+}
+
 

@@ -49,7 +49,8 @@ public:
   static std::unique_ptr<IRGenDebugInfo>
   createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
                        IRGenModule &IGM, llvm::Module &M,
-                       StringRef MainOutputFilenameForDebugInfo);
+                       StringRef MainOutputFilenameForDebugInfo,
+                       StringRef PrivateDiscriminator);
   virtual ~IRGenDebugInfo();
 
   /// Finalize the llvm::DIBuilder owned by this object.

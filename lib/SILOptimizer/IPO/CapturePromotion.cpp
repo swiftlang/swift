@@ -160,6 +160,8 @@ public:
     return !(*this == RHS);
   }
 
+  ReachingBlockSet(const ReachingBlockSet &RHS)
+      : Bits(RHS.Bits), NumBitWords(RHS.NumBitWords) {}
   const ReachingBlockSet &operator=(const ReachingBlockSet &RHS) {
     assert(NumBitWords == RHS.NumBitWords && "mismatched sets");
     for (size_t i = 0, e = NumBitWords; i != e; ++i)
@@ -337,10 +339,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
   LLVM_DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
-  auto fnTy = F->getLoweredFunctionType();
-
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -353,7 +352,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
     LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
                << (PromotableIndices.count(ArgIndex)?"yes":"no")
-               << " Param: "; param.dump());
+               << " Param: "; param.print(llvm::dbgs()));
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
@@ -363,13 +362,16 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getSILStorageType(fnConv.silConv.getModule(),
-                                           fnConv.funcTy);
+    auto paramTy =
+        param.getSILStorageType(fnConv.silConv.getModule(), fnConv.funcTy,
+                                TypeExpansionContext::minimal());
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = getSILBoxFieldType(paramBoxTy, Types, 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
+    auto paramBoxedTy =
+        getSILBoxFieldType(TypeExpansionContext(*F), paramBoxTy, Types, 0);
+    assert(expansion == F->getResilienceExpansion());
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, *F);
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
@@ -427,10 +429,9 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      SubstitutionMap(), false,
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), SubstitutionMap(), SubstitutionMap(),
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -481,8 +482,9 @@ ClosureCloner::populateCloned() {
     auto BoxTy = (*I)->getType().castTo<SILBoxType>();
     assert(BoxTy->getLayout()->getFields().size() == 1 &&
            "promoting compound box not implemented");
-    auto BoxedTy = getSILBoxFieldType(BoxTy, Cloned->getModule().Types, 0)
-      .getObjectType();
+    auto BoxedTy = getSILBoxFieldType(TypeExpansionContext(*Cloned), BoxTy,
+                                      Cloned->getModule().Types, 0)
+                       .getObjectType();
     SILValue MappedValue =
         ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
 
@@ -1000,7 +1002,8 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (getSILBoxFieldType(BoxTy, M.Types, 0).isAddressOnly(*F)) {
+  if (getSILBoxFieldType(TypeExpansionContext(*Fn), BoxTy, M.Types, 0)
+          .isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;
@@ -1197,7 +1200,7 @@ constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
 /// 2. We only see a mark_uninitialized when paired with an (alloc_box,
 ///    project_box). e.x.:
 ///
-///       (mark_uninitialized (project_box (alloc_box)))
+///       (project_box (mark_uninitialized (alloc_box)))
 ///
 /// The asserts are to make sure that if the initial safety condition check
 /// is changed, this code is changed as well.
@@ -1209,15 +1212,16 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   }
 
   // Otherwise, handle the alloc_box case. If we have a mark_uninitialized on
-  // the box, we create the project value through that.
+  // the box, we know that we will have a project_box of that value due to SIL
+  // verifier invariants.
   SingleValueInstruction *Box = cast<AllocBoxInst>(PartialOperand);
-  if (auto *Op = Box->getSingleUse()) {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(Op->getUser())) {
-      Box = MUI;
+  if (auto *MUI = Box->getSingleUserOfType<MarkUninitializedInst>()) {
+    if (auto *PBI = MUI->getSingleUserOfType<ProjectBoxInst>()) {
+      return PBI;
     }
   }
 
-  // Just return a project_box.
+  // Otherwise, create a new project_box.
   SILBuilderWithScope B(std::next(Box->getIterator()));
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }
@@ -1274,8 +1278,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
-    SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
+    SubstCalleeFunctionTy = CalleeFunctionTy->substGenericArgs(
+        M, PAI->getSubstitutionMap(), TypeExpansionContext(*F));
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
@@ -1319,7 +1323,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
-    assert(calleeConv.getSILType(CPInfo) == Box->getType() &&
+    assert(calleeConv.getSILType(CPInfo, B.getTypeExpansionContext()) ==
+               Box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(B, PAI->getLoc(), Box, CPInfo);
     ++NumCapturesPromoted;

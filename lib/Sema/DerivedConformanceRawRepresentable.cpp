@@ -43,6 +43,9 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
                                      /*implicit*/ true);
     if (floatLit->isNegative())
       cast<FloatLiteralExpr>(clone)->setNegative(expr->getLoc());
+  } else if (auto boolLit = dyn_cast<BooleanLiteralExpr>(expr)) {
+    clone = new (C) BooleanLiteralExpr(boolLit->getValue(), expr->getLoc(),
+                                       /*implicit*/true);
   } else {
     llvm_unreachable("invalid raw literal expr");
   }
@@ -88,10 +91,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     // a bitcast.
 
     // return unsafeBitCast(self, to: RawType.self)
-    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
-    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
-                                                     DeclRefKind::Ordinary,
-                                                     DeclNameLoc());
+    auto functionRef = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
     auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
     auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
     auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
@@ -107,9 +108,9 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -120,8 +121,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
                                      /*case body var decls*/ None));
   }
 
@@ -136,7 +137,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
 static void maybeMarkAsInlinable(DerivedConformance &derived,
                                  AbstractFunctionDecl *afd) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
   if (!parentDC->getParentModule()->isResilient()) {
     AccessScope access =
@@ -150,7 +151,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
 }
 
 static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
@@ -197,7 +198,7 @@ struct RuntimeVersionCheck {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
                             Platform, SourceLoc(),
-                            Version, SourceLoc()
+                            Version, Version, SourceLoc()
                         );
 
     // otherSpec = "*"
@@ -205,7 +206,7 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -331,9 +332,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // Create a statement which assigns the case to self.
 
     // valueExpr = "\(enumType).\(elt)"
-    auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(),
+                                           elt, DeclNameLoc(), /*implicit*/true);
     
     // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -349,21 +350,22 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
-                                     SourceLoc(), SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     CaseLabelItem(litPat), SourceLoc(),
+                                     SourceLoc(), body,
                                      /*case body var decls*/ None));
-    Idx++;
+    ++Idx;
   }
 
-  auto anyPat = new (C) AnyPattern(SourceLoc());
-  anyPat->setImplicit();
+  auto anyPat = AnyPattern::createImplicit(C);
   auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
-                                   SourceLoc(), dfltBody,
+  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                   dfltLabelItem, SourceLoc(), SourceLoc(),
+                                   dfltBody,
                                    /*case body var decls*/ None));
 
   auto rawDecl = initDecl->getParameters()->get(0);
@@ -371,9 +373,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Expr *switchArg = rawRef;
   if (isStringEnum) {
     // Call _findStringSwitchCase with an array of strings as argument.
-    auto *Fun = new (C) UnresolvedDeclRefExpr(
-                  C.getIdentifier("_findStringSwitchCase"),
-                  DeclRefKind::Ordinary, DeclNameLoc());
+    auto *Fun = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("_findStringSwitchCase"));
     auto *strArray = ArrayExpr::create(C, SourceLoc(), stringExprs, {},
                                        SourceLoc());;
     Identifier tableId = C.getIdentifier("cases");
@@ -393,19 +394,18 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
 static ConstructorDecl *
 deriveRawRepresentable_init(DerivedConformance &derived) {
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
-  auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
-                                       KnownProtocolKind::Equatable);
+  auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
+                                                 KnownProtocolKind::Equatable);
   assert(equatableProto);
-  assert(TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                         enumDecl, None));
+  assert(
+      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl));
   (void)equatableProto;
   (void)rawType;
 
@@ -429,30 +429,27 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
-  // Compute the interface type of the initializer.
-  (void)initDecl->getInterfaceType();
-
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.
   maybeMarkAsInlinable(derived, initDecl);
 
-  C.addSynthesizedDecl(initDecl);
-
   derived.addMembersToConformanceContext({initDecl});
   return initDecl;
 }
 
-static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
-  auto enumDecl = cast<EnumDecl>(derived.Nominal);
-  auto &tc = derived.TC;
+bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
+                                                   NominalTypeDecl *type) {
+  auto enumDecl = dyn_cast<EnumDecl>(type);
+  if (!enumDecl)
+    return false;
 
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;
-  auto parentDC = cast<DeclContext>(derived.ConformanceDecl);
-  rawType       = parentDC->mapTypeIntoContext(rawType);
+
+  rawType = DC->mapTypeIntoContext(rawType);
 
   auto inherited = enumDecl->getInherited();
   if (!inherited.empty() && inherited.front().wasValidated() &&
@@ -462,14 +459,30 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
   auto equatableProto =
-      tc.getProtocol(enumDecl->getLoc(), KnownProtocolKind::Equatable);
+      TypeChecker::getProtocol(enumDecl->getASTContext(), enumDecl->getLoc(),
+                               KnownProtocolKind::Equatable);
   if (!equatableProto)
     return false;
 
-  if (!TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                       enumDecl, None))
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC)
+          .isInvalid())
     return false;
-  
+
+  auto &C = type->getASTContext();
+  auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
+  if (rawValueDecls.size() > 1)
+    return false;
+
+  // Check that the RawValue matches the expected raw type.
+  if (!rawValueDecls.empty()) {
+    if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
+      auto ty = alias->getDeclaredInterfaceType();
+      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+        return false;
+      }
+    }
+  }
+
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())
     return false;
@@ -483,8 +496,6 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
     if (elt->hasAssociatedValues())
       return false;
 
-    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-    (void)elt->getInterfaceType();
     if (elt->isInvalid()) {
       return false;
     }
@@ -496,39 +507,32 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
 
 ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
-    return nullptr;
-
-  if (requirement->getBaseName() == TC.Context.Id_rawValue)
+  if (requirement->getBaseName() == Context.Id_rawValue)
     return deriveRawRepresentable_raw(*this);
 
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveRawRepresentable_init(*this);
 
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_raw_representable_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_raw_representable_requirement);
   return nullptr;
 }
 
 Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
-    return nullptr;
-
-  if (assocType->getName() == TC.Context.Id_RawValue) {
+  if (assocType->getName() == Context.Id_RawValue) {
     return deriveRawRepresentable_Raw(*this);
   }
 
-  TC.diagnose(assocType->getLoc(), diag::broken_raw_representable_requirement);
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_raw_representable_requirement);
   return nullptr;
 }

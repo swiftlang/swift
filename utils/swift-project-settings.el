@@ -363,7 +363,7 @@ everything in the Swift project" )
 
 (defconst swift-project-single-frontend-swiftc-args
   (append swift-project-common-swiftc-args
-           (list "-force-single-frontend-invocation" "-parse-as-library"))
+           (list "-whole-module-optimization" "-parse-as-library"))
   "The arguments we'll pass to swiftc for syntax-checking
 libraries that require a single frontend invocation" )
 

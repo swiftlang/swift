@@ -79,7 +79,7 @@
 ///     var destBytes = someBytes[0..<n]
 ///
 /// Next, the bytes referenced by `destBytes` are copied into `byteArray`, a
-/// new `[UInt]` array, and then the remainder of `someBytes` is appended to
+/// new `[UInt8]` array, and then the remainder of `someBytes` is appended to
 /// `byteArray`:
 ///
 ///     var byteArray: [UInt8] = Array(destBytes)
@@ -429,7 +429,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
   @inlinable
-  public init(start: Unsafe${Mutable}RawPointer?, count: Int) {
+  public init(
+    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
+  ) {
     _precondition(count >= 0, "${Self} with negative count")
     _precondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")

@@ -172,7 +172,7 @@
 // CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
 
 // "UTF8" initialisms.
-// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>!)
+// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<CChar>!)
 
 // Don't strip prefixes from globals.
 // CHECK-FOUNDATION: let NSGlobalConstant: String

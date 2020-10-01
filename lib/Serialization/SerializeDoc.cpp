@@ -64,7 +64,7 @@ class YamlGroupInputParser {
       if (!ParentName.empty()) {
         CombinedName = (llvm::Twine(ParentName) + Separator + GroupName).str();
       } else {
-        CombinedName = GroupName;
+        CombinedName = GroupName.str();
       }
 
       for (llvm::yaml::Node &Entry : *Value) {
@@ -75,7 +75,7 @@ class YamlGroupInputParser {
           GroupNameAndFileName.append(CombinedName);
           GroupNameAndFileName.append(Separator);
           GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
-          Map[FileName] = GroupNameAndFileName.str();
+          Map[FileName] = std::string(GroupNameAndFileName.str());
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
           if (parseRoot(Map, &Entry, CombinedName))
             return true;
@@ -313,17 +313,13 @@ static bool hasDoubleUnderscore(Decl *D) {
   // base names.
   static StringRef Prefix = "__";
 
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // If it's a function with a parameter with leading double underscore,
-    // it's a private function.
-    if (AFD->getParameters()->hasInternalParameter(Prefix))
+  // If it's a function or subscript with a parameter with leading
+  // double underscore, it's a private function or subscript.
+  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+    if (getParameterList(cast<ValueDecl>(D))->hasInternalParameter(Prefix))
       return true;
   }
 
-  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
-      return true;
-  }
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     auto Name = VD->getBaseName();
     if (!Name.isSpecial() &&
@@ -344,6 +340,11 @@ static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
     if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
       return false;
   }
+
+  // Skip SPI decls.
+  if (D->isSPI())
+    return false;
+
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
   }
@@ -446,7 +447,6 @@ static void writeDeclCommentTable(
       return { false, E };
     }
 
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
     bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };
@@ -522,6 +522,7 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 namespace {
 struct DeclLocationsTableData {
   uint32_t SourceFileOffset;
+  uint32_t DocRangesOffset;
   LineColumn Loc;
   LineColumn StartLoc;
   LineColumn EndLoc;
@@ -614,17 +615,75 @@ public:
   }
 };
 
+
+/**
+ Records the locations of `SingleRawComment` pieces for a declaration
+ and emits them into a blob for the DOC_RANGES record.
+
+ See: \c decl_locs_block::DocRangesLayout
+ */
+class DocRangeWriter {
+  llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
+  llvm::SmallString<1024> Buffer;
+public:
+  DocRangeWriter() {
+    /**
+     Offset 0 is reserved to mean "no offset", meaning that a declaration
+     didn't have a doc comment.
+     */
+    Buffer.push_back(0);
+  }
+
+  /**
+   \returns the offset into the doc ranges buffer for a declaration. Calling this
+   twice on the same declaration will not duplicate data but return the
+   original offset.
+   */
+  uint32_t getDocRangesOffset(const Decl *D,
+      ArrayRef<std::pair<LineColumn, uint32_t>> DocRanges) {
+    if (DocRanges.empty()) {
+      return 0;
+    }
+    const auto EntryAndAlreadyFound = DeclOffsetMap.insert({ D, Buffer.size() });
+    const auto StartOffset = EntryAndAlreadyFound.first->getSecond();
+    const auto AlreadyInMap = !EntryAndAlreadyFound.second;
+    if (AlreadyInMap) {
+      return StartOffset;
+    }
+
+    llvm::raw_svector_ostream OS(Buffer);
+
+    endian::write<uint32_t>(OS, DocRanges.size(), little);
+
+    for (const auto &LineColumnAndLength : DocRanges) {
+      endian::write<uint32_t>(OS, LineColumnAndLength.first.Line, little);
+      endian::write<uint32_t>(OS, LineColumnAndLength.first.Column, little);
+      endian::write<uint32_t>(OS, LineColumnAndLength.second, little);
+    }
+
+    return StartOffset;
+  }
+
+  void emitDocRangesRecord(llvm::BitstreamWriter &Out) {
+    decl_locs_block::DocRangesLayout DocRangesBlob(Out);
+    SmallVector<uint64_t, 8> Scratch;
+    DocRangesBlob.emit(Scratch, Buffer);
+  }
+};
+
 struct BasicDeclLocsTableWriter : public ASTWalker {
   llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
   StringWriter &FWriter;
+  DocRangeWriter &DocWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           StringWriter &FWriter): USRWriter(USRWriter),
-                           FWriter(FWriter) {}
+                           StringWriter &FWriter,
+                           DocRangeWriter &DocWriter): USRWriter(USRWriter),
+                           FWriter(FWriter),
+                           DocWriter(DocWriter) {}
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
-  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 
@@ -632,6 +691,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::raw_svector_ostream out(Buffer);
     endian::Writer writer(out, little);
     writer.write<uint32_t>(data.SourceFileOffset);
+    writer.write<uint32_t>(data.DocRangesOffset);
 #define WRITE_LINE_COLUMN(X)                                                  \
 writer.write<uint32_t>(data.X.Line);                                          \
 writer.write<uint32_t>(data.X.Column);
@@ -649,16 +709,6 @@ writer.write<uint32_t>(data.X.Column);
     return USRWriter.getNewUSRId(OS.str());
   }
 
-  LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
-    LineColumn Result;
-    if (Loc.isValid()) {
-      auto LC = SM.getLineAndColumn(Loc);
-      Result.Line = LC.first;
-      Result.Column = LC.second;
-    }
-    return Result;
-  }
-
   Optional<DeclLocationsTableData> getLocData(Decl *D) {
     auto *File = D->getDeclContext()->getModuleScopeContext();
     auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
@@ -668,6 +718,8 @@ writer.write<uint32_t>(data.X.Column);
     llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
     llvm::sys::fs::make_absolute(AbsolutePath);
     Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
+    Result.DocRangesOffset = DocWriter.getDocRangesOffset(D,
+      llvm::makeArrayRef(Locs->DocRanges));
 #define COPY_LINE_COLUMN(X)                                                   \
 Result.X.Line = Locs->X.Line;                                                 \
 Result.X.Column = Locs->X.Column;
@@ -692,7 +744,7 @@ Result.X.Column = Locs->X.Column;
     };
     // .swiftdoc doesn't include comments for double underscored symbols, but
     // for .swiftsourceinfo, having the source location for these symbols isn't
-    // a concern becuase these symbols are in .swiftinterface anyway.
+    // a concern because these symbols are in .swiftinterface anyway.
     if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
       return false;
     if (!shouldSerializeSourceLoc(D))
@@ -713,10 +765,11 @@ Result.X.Column = Locs->X.Column;
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 ModuleOrSourceFile MSF,
                                 DeclUSRsTableWriter &USRWriter,
-                                StringWriter &FWriter) {
+                                StringWriter &FWriter,
+                                DocRangeWriter &DocWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
-  BasicDeclLocsTableWriter Writer(USRWriter, FWriter);
+  BasicDeclLocsTableWriter Writer(USRWriter, FWriter, DocWriter);
   if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
     SF->walk(Writer);
   } else {
@@ -754,6 +807,7 @@ public:
     BLOCK_RECORD(decl_locs_block, BASIC_DECL_LOCS);
     BLOCK_RECORD(decl_locs_block, DECL_USRS);
     BLOCK_RECORD(decl_locs_block, TEXT_DATA);
+    BLOCK_RECORD(decl_locs_block, DOC_RANGES);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -791,7 +845,8 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
-      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
+      DocRangeWriter DocWriter;
+      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we
       // don't need to repeat USR texts for newly added records.
@@ -799,6 +854,8 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       // A blob of 0 terminated strings referenced by the location records,
       // e.g. file paths.
       FPWriter.emitSourceFilesRecord(S.Out);
+      // A blob of fixed-size location records of `SingleRawComment` pieces.
+      DocWriter.emitDocRangesRecord(S.Out);
     }
   }
 

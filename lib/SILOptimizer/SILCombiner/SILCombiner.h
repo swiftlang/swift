@@ -65,6 +65,10 @@ class SILCombiner :
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
 
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
   /// The current iteration of the SILCombine.
   unsigned Iteration;
 
@@ -143,6 +147,10 @@ public:
     return nullptr;
   }
 
+  // Erases \p inst and all of its users, recursively.
+  // The caller has to make sure that all users are removable (e.g. dead).
+  void eraseInstIncludingUsers(SILInstruction *inst);
+
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         bool AddOperandsToWorklist = true) {
     SILBasicBlock::iterator nullIter;
@@ -159,8 +167,6 @@ public:
   /// Instruction visitors.
   SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
-  SILInstruction *visitReleaseValueAddrInst(ReleaseValueAddrInst *DI);
-  SILInstruction *visitRetainValueAddrInst(RetainValueAddrInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
@@ -174,6 +180,7 @@ public:
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
+  bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
@@ -181,6 +188,7 @@ public:
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
+  SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *visitUnconditionalCheckedCastInst(
@@ -204,14 +212,12 @@ public:
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
-  SILInstruction *visitSelectValueInst(SelectValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
   SILInstruction *
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
-  SILInstruction *visitEnumInst(EnumInst *EI);
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
@@ -225,6 +231,8 @@ public:
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
 
+  SILInstruction *optimizeBuiltinCOWBufferForReading(BuiltinInst *BI);
+
   // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
   // the following holds true: N1 > M1 and M2>= M1
   SILInstruction *optimizeBuiltinTruncOrBitCast(BuiltinInst *I);
@@ -236,13 +244,16 @@ public:
   // the result bit.
   SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);
 
-  SILInstruction *tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI);
-
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
 
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
+  bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
+  bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
+  bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
@@ -253,7 +264,14 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
+  InstModCallbacks getInstModCallbacks() {
+    return InstModCallbacks(
+        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
+        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
+        [this](SILValue oldValue, SILValue newValue) {
+          replaceValueUsesWith(oldValue, newValue);
+        });
+  }
 
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>

@@ -67,10 +67,9 @@ ParameterList *ParameterList::clone(const ASTContext &C,
     if (options & Implicit)
       decl->setImplicit();
 
-    // If the argument isn't named, and we're cloning for an inherited
-    // constructor, give the parameter a name so that silgen will produce a
-    // value for it.
-    if (decl->getName().empty() && (options & Inherited))
+    // If the argument isn't named, give the parameter a name so that
+    // silgen will produce a value for it.
+    if (decl->getName().empty() && (options & NamedArguments))
       decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.

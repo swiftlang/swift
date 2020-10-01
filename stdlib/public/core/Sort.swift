@@ -692,7 +692,7 @@ extension UnsafeMutableBufferPointer {
       
       result = try result && _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
-      assert(runs.count == 1, "Didn't complete final merge")
+      _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
 
     // FIXME: Remove this, it works around rdar://problem/45044610

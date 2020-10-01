@@ -17,6 +17,8 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 
+#include "llvm/Support/Host.h"
+
 namespace swift {
 namespace unittest {
 
@@ -27,7 +29,9 @@ namespace unittest {
 class TestContextBase {
 public:
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions ClangImporterOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 

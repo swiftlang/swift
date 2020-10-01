@@ -14,7 +14,7 @@ import TestsUtils
 
 // Mini benchmark implementing the gist of SwiftNIO's ChannelPipeline as
 // implemented by NIO 1 and NIO 2.[01]
-let t: [BenchmarkCategory] = [.runtime, .refcount]
+let t: [BenchmarkCategory] = [.runtime, .refcount, .cpubench]
 let N = 100
 
 public let NIOChannelPipeline = [

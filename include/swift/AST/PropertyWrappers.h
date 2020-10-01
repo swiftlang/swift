@@ -123,25 +123,31 @@ struct PropertyWrapperMutability {
 
 void simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m);
 
+/// Describes whether the reference to a property wrapper instance used for
+/// accessing a wrapped property should be an l-value or not.
+struct PropertyWrapperLValueness {
+  llvm::SmallVector<bool, 4> isLValueForGetAccess;
+  llvm::SmallVector<bool, 4> isLValueForSetAccess;
+
+  PropertyWrapperLValueness(unsigned numWrappers)
+      : isLValueForGetAccess(numWrappers), isLValueForSetAccess(numWrappers) {}
+
+  bool operator==(PropertyWrapperLValueness other) const {
+    return (isLValueForGetAccess == other.isLValueForGetAccess &&
+            isLValueForSetAccess == other.isLValueForSetAccess);
+  }
+};
+
+void simple_display(llvm::raw_ostream &os, PropertyWrapperLValueness l);
+
 /// Describes the backing property of a property that has an attached wrapper.
 struct PropertyWrapperBackingPropertyInfo {
   /// The backing property.
   VarDecl *backingVar = nullptr;
 
-  /// The storage wrapper property, if any. When present, this takes the name
-  /// '$foo' from `backingVar`.
-  VarDecl *storageWrapperVar = nullptr;
-
-  /// When the original default value is specified in terms of an '='
-  /// initializer on the initial property, e.g.,
-  ///
-  /// \code
-  /// @Lazy var i = 17
-  /// \end
-  ///
-  /// This is the specified initial value (\c 17), which is suitable for
-  /// embedding in the expression \c initializeFromOriginal.
-  Expr *originalInitialValue = nullptr;
+  /// The synthesized projection property, if any. When present, this takes the name
+  /// of the original wrapped property prefixed with \c $
+  VarDecl *projectionVar = nullptr;
 
   /// An expression that initializes the backing property from a value of
   /// the original property's type (e.g., via `init(wrappedValue:)`), or
@@ -150,19 +156,17 @@ struct PropertyWrapperBackingPropertyInfo {
 
   /// When \c initializeFromOriginal is non-NULL, the opaque value that
   /// is used as a stand-in for a value of the original property's type.
-  OpaqueValueExpr *underlyingValue = nullptr;
+  PropertyWrapperValuePlaceholderExpr *wrappedValuePlaceholder = nullptr;
 
   PropertyWrapperBackingPropertyInfo() { }
   
   PropertyWrapperBackingPropertyInfo(VarDecl *backingVar,
-                                      VarDecl *storageWrapperVar,
-                                      Expr *originalInitialValue,
-                                      Expr *initializeFromOriginal,
-                                      OpaqueValueExpr *underlyingValue)
-    : backingVar(backingVar), storageWrapperVar(storageWrapperVar),
-      originalInitialValue(originalInitialValue),
+                                     VarDecl *projectionVar,
+                                     Expr *initializeFromOriginal,
+                                     PropertyWrapperValuePlaceholderExpr *placeholder)
+    : backingVar(backingVar), projectionVar(projectionVar),
       initializeFromOriginal(initializeFromOriginal),
-      underlyingValue(underlyingValue) { }
+      wrappedValuePlaceholder(placeholder) { }
 
   /// Whether this is a valid property wrapper.
   bool isValid() const {
@@ -186,12 +190,13 @@ void simple_display(
     llvm::raw_ostream &out,
     const PropertyWrapperBackingPropertyInfo &backingInfo);
 
-/// Given the initializer for the given property with an attached property
-/// wrapper, dig out the original initialization expression.
+/// Given the initializer for a property with an attached property wrapper,
+/// dig out the wrapped value placeholder for the original initialization
+/// expression.
 ///
-/// Cannot just dig out the getOriginalInit() value because this function checks
-/// types, etc. Erroneous code won't return a result from here.
-Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
+/// \note The wrapped value placeholder is injected for properties that can
+/// be initialized out-of-line using an expression of the wrapped property type.
+PropertyWrapperValuePlaceholderExpr *findWrappedValuePlaceholder(Expr *init);
 
 } // end namespace swift
 

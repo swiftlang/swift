@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "clang/Index/IndexSymbol.h"
-#include "llvm/ADT/SmallString.h"
 
 namespace swift {
 class Decl;

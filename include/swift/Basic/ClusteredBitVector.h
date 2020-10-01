@@ -31,6 +31,7 @@
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Optional.h"
+#include "swift/Basic/Debug.h"
 #include <cassert>
 
 namespace swift {
@@ -276,7 +277,7 @@ public:
 
   /// Pretty-print the vector.
   void print(llvm::raw_ostream &out) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace swift

@@ -388,15 +388,6 @@ protected:
 
 /// Top-level entry point: allocate storage for all opaque/resilient values.
 void OpaqueStorageAllocation::allocateOpaqueStorage() {
-  // TODO: I think we need a GenericContextScope for mapTypeIntoContext, but all
-  // tests are currently passing without it.
-#if 0
-  auto canFnType = pass.F->getLoweredFunctionType();
-
-  // Setup a generic context for argument and result types.
-  swift::Lowering::GenericContextScope scope(pass.F->getModule().Types,
-                                             canFnType->getGenericSignature());
-#endif
   // Fixup this function's argument types with temporary loads.
   convertIndirectFunctionArgs();
 
@@ -456,7 +447,8 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   auto &ctx = pass.F->getModule().getASTContext();
   unsigned argIdx = 0;
-  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes()) {
+  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(
+           pass.F->getTypeExpansionContext())) {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
         ParamDecl(SourceLoc(), SourceLoc(),
@@ -899,7 +891,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   if (origCallInst->getType().is<TupleType>()) {
     for (Operand *operand : origCallInst->getUses()) {
       if (auto *extract = dyn_cast<TupleExtractInst>(operand->getUser()))
-        origDirectResultValues[extract->getFieldNo()] = extract;
+        origDirectResultValues[extract->getFieldIndex()] = extract;
       else
         nonCanonicalUses.push_back(operand);
     }
@@ -953,7 +945,9 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
 
       if (loweredCalleeConv.isSILIndirect(resultInfo)) {
         SILValue indirectResultAddr = materializeIndirectResultAddress(
-            origDirectResultVal, loweredCalleeConv.getSILType(resultInfo));
+            origDirectResultVal,
+            loweredCalleeConv.getSILType(
+                resultInfo, callBuilder.getTypeExpansionContext()));
         // Record the new indirect call argument.
         newCallArgs[newResultArgIdx++] = indirectResultAddr;
         // Leave a placeholder for indirect results.
@@ -1008,7 +1002,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
       assert(pass.valueStorageMap.contains(origCallInst));
       continue;
     }
-    unsigned origResultIdx = extractInst->getFieldNo();
+    unsigned origResultIdx = extractInst->getFieldIndex();
     auto resultInfo = origFnConv.getResults()[origResultIdx];
 
     if (extractInst->getType().isAddressOnly(*pass.F)) {
@@ -1140,9 +1134,10 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   } else if (newDirectResults.size() == 1) {
     newReturnVal = newDirectResults[0];
   } else {
-    newReturnVal =
-        B.createTuple(returnInst->getLoc(),
-                      pass.loweredFnConv.getSILResultType(), newDirectResults);
+    newReturnVal = B.createTuple(
+        returnInst->getLoc(),
+        pass.loweredFnConv.getSILResultType(B.getTypeExpansionContext()),
+        newDirectResults);
   }
   SILValue origFullResult = returnInst->getOperand();
   returnInst->setOperand(newReturnVal);

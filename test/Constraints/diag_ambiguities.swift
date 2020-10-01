@@ -18,8 +18,8 @@ func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}
 1 +++ 2 // expected-error{{ambiguous use of operator '+++'}}
 
 class C {
-  init(_ action: (Int) -> ()) {} // expected-note{{found this candidate}}
-  init(_ action: (Int, Int) -> ()) {} // expected-note{{found this candidate}}
+  init(_ action: (Int) -> ()) {} 
+  init(_ action: (Int, Int) -> ()) {} 
 }
 
 func g(_ x: Int) -> () {} // expected-note{{found this candidate}}
@@ -27,7 +27,7 @@ func g(_ x: Int, _ y: Int) -> () {} // expected-note{{found this candidate}}
 C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
-C(h) // expected-error{{ambiguous use of 'init(_:)'}}
+_ = C(h) // OK - init(_: (Int) -> ())
 
 func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
 func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}

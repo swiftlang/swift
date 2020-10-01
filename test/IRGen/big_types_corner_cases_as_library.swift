@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-large-loadable-types %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-large-loadable-types -disable-type-layout %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public struct BigStruct {
   var i0 : Int32 = 0

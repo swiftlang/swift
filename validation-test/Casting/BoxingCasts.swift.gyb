@@ -1,0 +1,264 @@
+// BoxingCasts.swift - Tests for boxing/unboxing casts
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+// -----------------------------------------------------------------------------
+///
+/// Contains tests for existential, optional, and other casts that box/unbox values.
+///
+// -----------------------------------------------------------------------------
+// RUN: %empty-directory(%t)
+//
+// RUN: %gyb %s -o %t/BoxingCasts.swift
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -swift-version 5 -Onone %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
+// RUN: %target-codesign %t/a.swift5.Onone.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
+//
+// Note: The RUN directives above override the default test optimizations.
+// This test is deliberately run non-optimized in order to verify the
+// behavior of runtime methods that may not be called for optimized casts.
+//
+// XXX FIXME XXX TODO XXX  _Also_ build this with optimizations in order to
+// verify compiler behaviors.
+//
+// REQUIRES: executable_test
+
+import StdlibUnittest
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
+fileprivate func runtimeCast<From, To> (_ x: From, to: To.Type) -> To? {
+  return x as? To
+}
+
+fileprivate func optional<T>(_ x: T) -> Optional<T> {
+  return runtimeCast(x, to: Optional<T>.self)!
+}
+
+fileprivate protocol FilePrivateProtocol {}
+internal protocol InternalProtocol {}
+public protocol PublicProtocol {}
+protocol UnimplementedProtocol {}
+
+fileprivate enum EmptyEnum: FilePrivateProtocol, InternalProtocol, PublicProtocol { }
+
+fileprivate enum SingleCaseEnum: FilePrivateProtocol, InternalProtocol, PublicProtocol {
+case case0
+  init() {self = .case0}
+}
+
+fileprivate enum TrivialPayloadEnum: FilePrivateProtocol, InternalProtocol, PublicProtocol {
+case payloadCase(Int)
+  init() {self = .payloadCase(42)}
+}
+
+extension TrivialPayloadEnum: Hashable {}
+
+fileprivate enum MultiPayloadEnum: FilePrivateProtocol, InternalProtocol, PublicProtocol {
+case case0(String)
+case case1(Int)
+  init() {self = .case1(42)}
+}
+
+extension MultiPayloadEnum: Hashable {}
+
+fileprivate class ClassInt: FilePrivateProtocol, InternalProtocol, PublicProtocol {
+  public var value: Int
+  private var tracker = LifetimeTracked(77)
+  init(_ v: Int = 42) {value = v}
+}
+
+extension ClassInt: Equatable, Hashable {
+  static func ==(left: ClassInt, right: ClassInt) -> Bool {left.value == right.value}
+  func hash(into hasher: inout Hasher) { value.hash(into: &hasher) }
+}
+
+fileprivate struct StructInt: FilePrivateProtocol, InternalProtocol, PublicProtocol {
+  public var value: Int
+  private var tracker = LifetimeTracked(77)
+  init(_ v: Int = 42) { value = v}
+}
+
+extension StructInt: Hashable, Equatable { }
+
+#if _runtime(_ObjC)
+fileprivate class OCClassInt: NSObject, FilePrivateProtocol, InternalProtocol, PublicProtocol {
+  public var value: Int
+  private var tracker = LifetimeTracked(77)
+  init(_ v: Int = 42) { value = v}
+}
+#endif
+
+let BoxingCasts = TestSuite("BoxingCasts")
+
+%{
+import random
+# The test body goes into a named function and the test case just invokes that
+# function by name.  This makes debugging easier, since it's easier to set break
+# points on named functions than on arbitrary closures.
+# The function names are included in the test name
+# for ease of reference.
+testNumber = 0
+def testFunctionName():
+  return "test{number}".format(number=testNumber)
+def nextTestNumber():
+  global testNumber
+  testNumber += 1
+
+# Type used for intermediate casts.  The base object gets
+# cast to one or more of these before the final test.
+class Box:
+  def __init__(self, name, typeName=None, cast=None):
+    self.name = name
+    self.typeName = typeName or name
+    self.cast_template = cast or "runtimeCast({expr}, to: {typeName}.self)!"
+  def cast_oper(self, expr):
+    return self.cast_template.format(expr=expr, typeName=self.typeName)
+
+anyHashableBox = Box(name="AnyHashable")
+all_boxes = [
+    Box(name="Any", typeName="Any"),
+    Box(name="AnyStatic", cast="({expr} as Any)"),
+    Box(name="AnyObject"),
+    Box(name="SwiftValueBox", cast="_bridgeAnythingToObjectiveC({expr})"),
+    Box(name="Optional", cast="optional({expr})")
+]
+protocol_boxes = [
+    Box(name="PublicProtocol"),
+#    Box(name="FilePrivateProtocol"), # Blocked by SR-2620 aka rdar://28281488
+    Box(name="InternalProtocol"),
+]
+
+# Describes a base object that will be subject to a variety of casts
+default_protocols = [
+  "PublicProtocol",
+  "InternalProtocol",
+  # "FilePrivateProtocol" # Blocked by SR-2620 aka rdar://28281488
+]
+
+class Contents:
+  def __init__(self, name, constructor=None, extra_targets=[], hashable=True, roundtrips=True, protocols=default_protocols, objc_only=False):
+    self.name = name
+    self.constructor = constructor or "{name}()".format(name=name)
+    self.objc_only = objc_only
+
+    self.targets = ["Any"]
+    self.targets.extend(protocols)
+    self.targets.extend(extra_targets)
+    if roundtrips:
+      self.targets.append(self.name)
+
+    self.boxes = []
+    self.boxes.extend(all_boxes)
+    self.boxes.extend([Box(name=n) for n in protocols])
+    if hashable:
+      self.boxes.append(anyHashableBox)
+
+contents = [
+  Contents(name="StructInt",
+    # extra_targets=["StructInt?"],
+  ),
+  Contents(name="StructInt?",
+    constructor="Optional<StructInt>.some(StructInt())",
+    extra_targets=["StructInt"],
+    roundtrips=False, # Compiler bug rejects roundtrip cast T? => Any => T?
+  ),
+  Contents(name="ClassInt"),
+  Contents(name="OCClassInt", objc_only=True),
+  Contents(name="SingleCaseEnum"),
+  Contents(name="TrivialPayloadEnum"),
+  Contents(name="TrivialPayloadEnum"),
+  Contents(name="MultiPayloadEnum"),
+  Contents(name="StructInt.Type",
+    constructor="StructInt.self",
+    hashable=False,
+    protocols=[],
+  ),
+  Contents(name="StructInt.Type?",
+    constructor="Optional<StructInt.Type>.some(StructInt.self)",
+    hashable=False,
+    protocols=[],
+    extra_targets=["StructInt.Type"],
+    roundtrips=False, # Compiler bug rejects roundtrip cast T? => Any => T?
+  ),
+  Contents(name="PublicProtocol.Protocol",
+    constructor="PublicProtocol.self",
+    hashable=False,
+    protocols=[],
+  ),
+]
+
+# Code below generates a separate test case for each combination of content,
+# target type, and one or more box/intermediate types.
+}%
+
+% for content in contents:
+%   if content.objc_only:
+#if _runtime(_ObjC)
+%   end
+%   for target in content.targets:
+%     for box in content.boxes:
+%       nextTestNumber()
+BoxingCasts.test("${testFunctionName()}(): Casting ${box.name}(${content.name}) to ${target}") {
+  // TODO: Selectively enable/disable cases that work with earlier stdlib
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    ${testFunctionName()}()
+  }
+}
+func ${testFunctionName()}() {
+  let a = ${content.constructor}
+  let b = ${box.cast_oper("a")}
+%       # // Skip trivial cast from T? to T
+%       if not (content.name == target and box.name == "Optional"):
+%         # // Skip trivial cast from protocol box to protocol
+%         if box.name != target:
+%           # // Skip trivial cast from T? => P
+%           if not (target.endswith("Protocol") and box.name == "Optional"):
+  let c = /* ${box.name}(${content.name})) */ b as? ${target}
+  expectNotNil(c)
+%           end
+%         end
+%       end
+  let d = runtimeCast(/* ${box.name}(${content.name}) */ b, to: ${target}.self)
+  expectNotNil(d)
+}
+
+%       for innerBox in [random.choice(content.boxes)]:
+%         nextTestNumber()
+BoxingCasts.test("${testFunctionName()}(): Casting ${box.name}(${innerBox.name}(${content.name})) to ${target}") {
+  // TODO: Selectively enable/disable cases that work with earlier stdlib
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    ${testFunctionName()}()
+  }
+}
+func ${testFunctionName()}() {
+  let a = ${content.constructor}
+  let b = ${innerBox.cast_oper("a")}
+  let c = ${box.cast_oper("b")}
+%         # // Skip trivial cast from T? to T
+%         if not (innerBox.name == target and box.name == "Optional"):
+%           # // Skip trivial cast from protocol box to protocol
+%           if box.name != target:
+  let d = /* ${box.name}(${innerBox.name}(${content.name})) */ c as? ${target}
+  expectNotNil(d)
+%           end
+%         end
+  let e = runtimeCast(/* ${box.name}(${innerBox.name}(${content.name})) */ c, to: ${target}.self)
+  expectNotNil(e)
+}
+%       end
+%     end
+%   end
+%   if content.objc_only:
+#endif
+%   end
+% end
+
+runAllTests()

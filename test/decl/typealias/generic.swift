@@ -45,7 +45,7 @@ typealias Tuple3<T1> = (T1, T1) where T1 : Hashable
 
 let _ : Tuple2<Int, String> = (1, "foo")
 let _ : Tuple2 = (1, "foo")
-let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value of type '(String, String)' to specified type 'Tuple2<Int, String>' (aka '(Int, String)')}}
                                "foo")
 
 func f() {
@@ -94,8 +94,7 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-// TODO QoI: Cannot infer T1/T2.
-let _ : F = { a in a }  // expected-error {{type of expression is ambiguous without more context}}
+let _ : F = { a in a } // expected-error {{unable to infer type of a closure parameter 'a' in the current context}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)
@@ -104,7 +103,7 @@ _ = A<String, Int>(a: "foo", // expected-error {{cannot convert value of type 'S
   b: 42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 _ = B(a: 12, b: 42)
 _ = B(a: 12, b: 42 as Float)
-_ = B(a: "foo", b: 42)     // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+_ = B(a: "foo", b: 42)     // expected-error {{conflicting arguments to generic parameter 'T1' ('Int' vs. 'String')}}
 _ = C(a: "foo", b: 42)
 _ = C(a: 42,        // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   b: 42)
@@ -304,7 +303,7 @@ extension A {}
 
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
 extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
-extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
+extension C<T> {}  // expected-error {{cannot find type 'T' in scope}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 

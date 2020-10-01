@@ -82,13 +82,15 @@ var _ : TheDevil = God()^
 var _ : God = ^TheDevil()
 var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
-let _ = God()^TheDevil() // expected-error{{cannot convert value of type 'God' to expected argument type 'TheDevil'}}
+let _ = God()^TheDevil() // expected-error{{operator argument #2 must precede operator argument #1}} {{9-9=TheDevil()}} {{14-25=}}
 
 postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
 var _ : God = Man()^() // expected-error{{cannot convert value of type 'Man' to expected argument type 'TheDevil'}}
+// expected-error@-1 {{cannot convert value of type '()' to expected argument type 'God'}}
+// expected-error@-2 {{cannot convert value of type 'Man' to specified type 'God'}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 

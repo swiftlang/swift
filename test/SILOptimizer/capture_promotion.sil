@@ -154,7 +154,7 @@ bb0:
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
 // CHECK-NEXT: strong_retain {{.*}} : $Foo
-// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@convention(method) (@guaranteed Foo) -> Int
 
 // The struct_element_addr of %3 followed by a load is replaced by a struct_extract of the Baz argument
@@ -184,7 +184,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 } <Baz>, %4
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
@@ -226,7 +226,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Foo>):
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = function_ref @mutate_foo : $@convention(thin) (@inout Foo) -> ()
   %13 = apply %12(%1) : $@convention(thin) (@inout Foo) -> ()
@@ -291,7 +291,7 @@ bb0(%0: $*Int, %1 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %17 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
@@ -341,7 +341,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 } <Baz>, %4
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
@@ -484,7 +484,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Foo>, %2 : $<τ_0_0> { var τ_0_0 } <Baz>, %4
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int

@@ -23,6 +23,7 @@
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
@@ -44,6 +45,7 @@ namespace constraints {
 
 class ConstraintLocator;
 class ConstraintSystem;
+enum class TrailingClosureMatching;
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -115,6 +117,11 @@ enum class ConstraintKind : char {
   /// name, and the type of that member, when referenced as a value, is the
   /// second type.
   UnresolvedValueMember,
+  /// The first type conforms to the protocol in which the member requirement
+  /// resides. Once the conformance is resolved, the value witness will be
+  /// determined, and the type of that witness, when referenced as a value,
+  /// will be bound to the second type.
+  ValueWitness,
   /// The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -155,6 +162,21 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
+  /// The second type is the type of a function parameter, and the first type
+  /// is the type of a reference to that function parameter within the body.
+  /// Once the second type has been fully determined (and mapped down to a
+  /// concrete type), this constraint will be treated like a 'BindParam'
+  /// constraint.
+  OneWayBindParam,
+  /// If there is no contextual info e.g. `_ = { 42 }` default first type
+  /// to a second type (inferred closure type). This is effectively a
+  /// `Defaultable` constraint which a couple of differences:
+  ///
+  /// - References inferred closure type and all of the outer parameters
+  ///   referenced by closure body.
+  /// - Handled specially by binding inference, specifically contributes
+  ///   to the bindings only if there are no contextual types available.
+  DefaultClosureType,
 };
 
 /// Classification of the different kinds of constraints.
@@ -228,6 +250,22 @@ enum class ConversionRestrictionKind {
   ObjCTollFreeBridgeToCF,
 };
 
+/// Specifies whether a given conversion requires the creation of a temporary
+/// value which is only valid for a limited scope. For example, the
+/// array-to-pointer conversion produces a pointer that is only valid for the
+/// duration of the call that it's passed to. Such ephemeral conversions cannot
+/// be passed to non-ephemeral parameters.
+enum class ConversionEphemeralness {
+  /// The conversion requires the creation of a temporary value.
+  Ephemeral,
+  /// The conversion does not require the creation of a temporary value.
+  NonEphemeral,
+  /// It is not currently known whether the conversion will produce a temporary
+  /// value or not. This can occur for example with an inout-to-pointer
+  /// conversion of a member whose base type is an unresolved type variable.
+  Unresolved,
+};
+
 /// Return a string representation of a conversion restriction.
 llvm::StringRef getName(ConversionRestrictionKind kind);
 
@@ -279,6 +317,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefKind : 2;
 
+  /// The trailing closure matching for an applicable function constraint,
+  /// if any. 0 = None, 1 = Forward, 2 = Backward.
+  unsigned trailingClosureMatching : 2;
+
   union {
     struct {
       /// The first type.
@@ -298,9 +340,18 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The type of the member.
       Type Second;
 
-      /// If non-null, the name of a member of the first type is that
-      /// being related to the second type.
-      DeclName Member;
+      union {
+        /// If non-null, the name of a member of the first type is that
+        /// being related to the second type.
+        ///
+        /// Used for ValueMember an UnresolvedValueMember constraints.
+        DeclNameRef Name;
+
+        /// If non-null, the member being referenced.
+        ///
+        /// Used for ValueWitness constraints.
+        ValueDecl *Ref;
+      } Member;
 
       /// The DC in which the use appears.
       DeclContext *UseDC;
@@ -343,9 +394,15 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new member constraint.
-  Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
+  Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
              DeclContext *useDC, FunctionRefKind functionRefKind,
              ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
+  /// Construct a new value witness constraint.
+  Constraint(ConstraintKind kind, Type first, Type second,
+             ValueDecl *requirement, DeclContext *useDC,
+             FunctionRefKind functionRefKind, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
@@ -369,9 +426,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
 public:
   /// Create a new constraint.
-  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
-                            Type First, Type Second,
-                            ConstraintLocator *locator);
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind,
+                            Type First, Type Second, ConstraintLocator *locator,
+                            ArrayRef<TypeVariableType *> extraTypeVars = {});
 
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
@@ -383,15 +440,21 @@ public:
   /// alternatives.
   static Constraint *createMemberOrOuterDisjunction(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-      DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
-                                  Type first, Type second, DeclName member,
+                                  Type first, Type second, DeclNameRef member,
                                   DeclContext *useDC,
                                   FunctionRefKind functionRefKind,
                                   ConstraintLocator *locator);
+
+  /// Create a new value witness constraint.
+  static Constraint *createValueWitness(
+      ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+      ValueDecl *requirement, DeclContext *useDC,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
@@ -423,6 +486,12 @@ public:
                                        ConstraintLocator *locator,
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
+
+  /// Create a new Applicable Function constraint.
+  static Constraint *createApplicableFunction(
+      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      Optional<TrailingClosureMatching> trailingClosureMatching,
+      ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -497,10 +566,13 @@ public:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam:
+    case ConstraintKind::DefaultClosureType:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
+    case ConstraintKind::ValueWitness:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
@@ -531,6 +603,7 @@ public:
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
+    case ConstraintKind::ValueWitness:
       return Member.First;
 
     default:
@@ -547,6 +620,7 @@ public:
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
+    case ConstraintKind::ValueWitness:
       return Member.Second;
 
     default:
@@ -569,22 +643,23 @@ public:
   ProtocolDecl *getProtocol() const;
 
   /// Retrieve the name of the member for a member constraint.
-  DeclName getMember() const {
+  DeclNameRef getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::UnresolvedValueMember);
-    return Member.Member;
+    return Member.Member.Name;
   }
 
-  /// Determine whether this constraint kind has a second type.
-  static bool hasMember(ConstraintKind kind) {
-    return kind == ConstraintKind::ValueMember
-        || kind == ConstraintKind::UnresolvedValueMember;
+  /// Retrieve the requirement being referenced by a value witness constraint.
+  ValueDecl *getRequirement() const {
+    assert(Kind == ConstraintKind::ValueWitness);
+    return Member.Member.Ref;
   }
 
   /// Determine the kind of function reference we have for a member reference.
   FunctionRefKind getFunctionRefKind() const {
     if (Kind == ConstraintKind::ValueMember ||
-        Kind == ConstraintKind::UnresolvedValueMember)
+        Kind == ConstraintKind::UnresolvedValueMember ||
+        Kind == ConstraintKind::ValueWitness)
       return static_cast<FunctionRefKind>(TheFunctionRefKind);
 
     // Conservative answer: drop all of the labels.
@@ -612,7 +687,8 @@ public:
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual;
+    return Kind == ConstraintKind::OneWayEqual ||
+        Kind == ConstraintKind::OneWayBindParam;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
@@ -630,9 +706,14 @@ public:
   /// Retrieve the DC in which the member was used.
   DeclContext *getMemberUseDC() const {
     assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember);
+           Kind == ConstraintKind::UnresolvedValueMember ||
+           Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
   }
+
+  /// For an applicable function constraint, retrieve the trailing closure
+  /// matching rule.
+  Optional<TrailingClosureMatching> getTrailingClosureMatching() const;
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
@@ -642,13 +723,9 @@ public:
 
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));

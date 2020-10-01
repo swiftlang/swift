@@ -8,6 +8,10 @@ enum Either<T,U> {
 
 @_functionBuilder
 struct TupleBuilder {
+  static func buildBlock<T1>(_ t1: T1) -> (T1) {
+    return (t1)
+  }
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
@@ -28,7 +32,6 @@ struct TupleBuilder {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -37,10 +40,12 @@ struct TupleBuilder {
   static func buildEither<T,U>(second value: U) -> Either<T,U> {
     return .second(value)
   }
+
+  static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
-  print(body(cond))
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) throws -> T) rethrows {
+  print(try body(cond))
 }
 
 // CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
@@ -352,14 +357,20 @@ func acceptComponentBuilder(@ComponentBuilder _ body: () -> Component) {
   print(body())
 }
 
+func colorWithAutoClosure(_ color: @autoclosure () -> Color) -> Color {
+  return color()
+}
+
+var trueValue = true
 acceptComponentBuilder {
   "hello"
-  if true {
+  if trueValue {
     3.14159
+    colorWithAutoClosure(.red)
   }
   .red
 }
-// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159)]))), main.Component.color(main.Color.red)])
+// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159), main.Component.color(main.Color.red)]))), main.Component.color(main.Color.red)])
 
 // rdar://53325810
 
@@ -409,3 +420,371 @@ testForEach1.show()
 
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.first("begin", true))
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))
+
+func test_single_stmt_closure_support() {
+  @_functionBuilder
+  struct MyBuilder {
+    static func buildBlock(_ numbers: Int...) -> Int {
+      return 42
+    }
+  }
+
+  func test(@MyBuilder builder: () -> Int) -> Int {
+    builder()
+  }
+
+  let _ = test { 0 } // ok
+}
+
+// Check a case involving nested closures that refer to parameters of their
+// enclosing closures.
+struct X<C: Collection, T> {
+  init(_ c: C, @TupleBuilder body: (C.Element) -> T) { }
+}
+
+struct Y<T> {
+  init(@TupleBuilder body: () -> T) { }
+}
+
+struct Z<T> {
+  init(@TupleBuilder body: () -> T) { }
+}
+
+func testNestedClosuresWithDependencies(cond: Bool) {
+  tuplify(cond) { _ in
+    X([1, 2, 3]) { x in
+      Y {
+        Z {
+          x
+          1
+        }
+      }
+    }
+  }
+}
+
+// Check that we can handle multiple conditions in an 'if' statement.
+func testIfConditions(cond: Bool, c1: Bool, i1: Int, i2: Int) {
+  tuplify(cond) { x in
+    "testIfConditions"
+    if i1 == i2, c1, x {
+      1
+      "hello"
+    }
+    3.14159
+  }
+}
+testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
+// CHECK: testIfConditions
+// CHECK-SAME: hello
+
+// Use a "let" declaration within a function builder.
+tuplify(true) { c in
+  "testLetDeclarations"
+  let (a, b) = (c, c && true)
+  if a == b {
+    "hello"
+    b
+  }
+  a
+}
+// CHECK: testLetDeclarations"
+// CHECK-SAME: hello
+// CHECK-SAME: true
+
+// Use if let / if case with various forms of decomposition.
+func getOptionalInt(_: Bool) -> Int? { return 25 }
+
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func getE(_ i: Int) -> E {
+  switch i {
+  case 0:
+    return .a
+  case 1:
+    return .b(17, "hello")
+  case 2:
+    return .b(42, nil)
+  default:
+    fatalError("Unhandled case")
+  }
+}
+
+tuplify(true) { c in
+  "testIfLetMatching"
+  if let theValue = getOptionalInt(c) {
+    theValue + 17
+  }
+  if case let .a = getE(0) {
+    "matched without payload"
+  }
+  if case let .b(i, s?) = getE(1) {
+    "matched with payload"
+    s + "!"
+    i + 17
+  }
+  if case let .b(i, s?) = getE(2) {
+    fatalError("cannot match this")
+  } else {
+    "intentional mismatch"
+  }
+}
+// CHECK: testIfLetMatching
+// CHECK-SAME: Optional(42)
+// CHECK-SAME: Optional("matched without payload")
+// CHECK-SAME: "matched with payload", "hello!", 34
+// CHECK-SAME: "intentional mismatch"
+
+class Super { }
+
+class Sub : Super {
+  func subMethod() -> String {
+    return "subMethod"
+  }
+}
+
+func getSuper(wantSubclass: Bool) -> Super {
+  return wantSubclass ? Sub() : Super()
+}
+
+tuplify(true) { c in
+  "testIfLetAsMatching"
+  if case let sub as Sub = getSuper(wantSubclass: true) {
+    sub.subMethod()
+  }
+  if case let sub as Sub = getSuper(wantSubclass: false) {
+    fatalError("cannot match this")
+  } else {
+    "Superclass instance"
+  }
+}
+// CHECK: testIfLetAsMatching
+// CHECK-SAME: "subMethod"
+// CHECK-SAME: "Superclass instance"
+
+
+// switch statements
+func testSwitch(_ e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.first("a"))
+testSwitch(getE(0))
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.second(34, "hello!"))
+testSwitch(getE(1))
+
+// CHECK: testSwitch
+// CHECK-SAME: second("just 42")
+testSwitch(getE(2))
+
+func testSwitchCombined(_ eIn: E) {
+  var e = eIn
+  tuplify(true) { c in
+    "testSwitchCombined"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, _?), .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: main.Either<Swift.String, Swift.String>.first("a")
+testSwitchCombined(getE(0))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 17")
+testSwitchCombined(getE(1))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 42")
+testSwitchCombined(getE(2))
+
+
+// Test buildOptional(_:) as an alternative to buildIf(_:).
+@_functionBuilder
+struct TupleBuilderWithOpt {
+  static func buildBlock<T1>(_ t1: T1) -> (T1) {
+    return (t1)
+  }
+
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildOptional<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+}
+
+func tuplifyWithOpt<T>(_ cond: Bool, @TupleBuilderWithOpt body: (Bool) -> T) {
+  print(body(cond))
+}
+tuplifyWithOpt(true) { c in
+  "1"
+  3.14159
+}
+
+// Test for-each loops with buildArray.
+// CHECK: testForEach
+// CHECK-SAME: (1, "separator")
+// CHECK-SAME: (2, "separator")
+// CHECK-SAME: (3, "separator")
+// CHECK-SAME: (4, "separator")
+// CHECK-SAME: (5, "separator")
+// CHECK-SAME: (6, "separator")
+// CHECK-SAME: (7, "separator")
+// CHECK-SAME: (8, "separator")
+// CHECK-SAME: (9, "separator")
+// CHECK-SAME: (10, "separator")
+tuplify(true) { c in
+  "testForEach"
+  for i in 0 ..< (c ? 10 : 5) {
+    i + 1
+    "separator"
+  }
+}
+
+// Test the use of function builders partly implemented through a protocol.
+indirect enum FunctionBuilder<Expression> {
+    case expression(Expression)
+    case block([FunctionBuilder])
+    case either(Either<FunctionBuilder, FunctionBuilder>)
+    case optional(FunctionBuilder?)
+}
+
+protocol FunctionBuilderProtocol {
+    associatedtype Expression
+    typealias Component = FunctionBuilder<Expression>
+    associatedtype Return
+
+    static func buildExpression(_ expression: Expression) -> Component
+    static func buildBlock(_ components: Component...) -> Component
+    static func buildOptional(_ optional: Component?) -> Component
+    static func buildArray(_ components: [Component]) -> Component
+    static func buildLimitedAvailability(_ component: Component) -> Component
+
+    static func buildFinalResult(_ components: Component) -> Return
+}
+
+extension FunctionBuilderProtocol {
+    static func buildExpression(_ expression: Expression) -> Component { .expression(expression) }
+    static func buildBlock(_ components: Component...) -> Component { .block(components) }
+    static func buildOptional(_ optional: Component?) -> Component { .optional(optional) }
+    static func buildArray(_ components: [Component]) -> Component { .block(components) }
+    static func buildLimitedAvailability(_ component: Component) -> Component { component }
+}
+
+@_functionBuilder
+enum ArrayBuilder<E>: FunctionBuilderProtocol {
+    typealias Expression = E
+    typealias Component = FunctionBuilder<E>
+    typealias Return = [E]
+
+    static func buildFinalResult(_ components: Component) -> Return {
+        switch components {
+        case .expression(let e): return [e]
+        case .block(let children): return children.flatMap(buildFinalResult)
+        case .either(.first(let child)): return buildFinalResult(child)
+        case .either(.second(let child)): return buildFinalResult(child)
+        case .optional(let child?): return buildFinalResult(child)
+        case .optional(nil): return []
+        }
+    }
+}
+
+
+func buildArray(@ArrayBuilder<String> build: () -> [String]) -> [String] {
+    return build()
+}
+
+
+let a = buildArray {
+    "1"
+    "2"
+    if Bool.random() {
+        "maybe 3"
+    }
+}
+// CHECK: ["1", "2"
+print(a)
+
+// Throwing in function builders.
+enum MyError: Error {
+  case boom
+}
+
+// CHECK: testThrow
+do {
+  print("testThrow")
+  try tuplify(true) { c in
+    "ready to throw"
+    throw MyError.boom
+  }
+} catch MyError.boom {
+  // CHECK: caught it!
+  print("caught it!")
+} catch {
+  fatalError("Threw something else?")
+}
+
+// CHECK: testStoredProperties
+struct MyTupleStruct<T, U> {
+  @TupleBuilder let first: () -> T
+  @TupleBuilder let second: U
+}
+
+print("testStoredProperties")
+let ts1 = MyTupleStruct {
+  1
+  "hello"
+  if true {
+    "conditional"
+  }
+} second: {
+  3.14159
+  "blah"
+}
+
+// CHECK: MyTupleStruct<(Int, String, Optional<String>), (Double, String)>(first: (Function), second: (3.14159, "blah"))
+print(ts1)

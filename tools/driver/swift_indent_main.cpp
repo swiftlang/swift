@@ -41,14 +41,11 @@ private:
   CompilerInvocation CompInv;
   std::unique_ptr<ParserUnit> Parser;
   class FormatterDiagConsumer : public swift::DiagnosticConsumer {
-    void handleDiagnostic(
-        SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-        StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-        const swift::DiagnosticInfo &Info,
-        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+    void handleDiagnostic(SourceManager &SM,
+                          const swift::DiagnosticInfo &Info) override {
       llvm::errs() << "Parse error: ";
-      DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                             FormatArgs);
+      DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                             Info.FormatArgs);
       llvm::errs() << "\n";
     }
   } DiagConsumer;
@@ -64,6 +61,7 @@ public:
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
     Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
                                 BufferID, CompInv.getLangOptions(),
+                                CompInv.getTypeCheckerOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     Parser->parse();
@@ -149,7 +147,8 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Format Tool", options::SwiftIndentOption, 0,
                        /*ShowAllAliases*/false);
@@ -185,7 +184,7 @@ public:
       LineRanges.push_back("1:" + std::to_string(UINT_MAX));
     }
 
-    std::string Output = Doc.memBuffer().getBuffer();
+    std::string Output = Doc.memBuffer().getBuffer().str();
     for (unsigned Range = 0; Range < LineRanges.size(); ++Range) {
       unsigned FromLine;
       unsigned ToLine;

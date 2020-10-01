@@ -9,6 +9,71 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
+  # All Darwin platforms have ABI stability.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+else()
+  # Any new platform should have non-stable ABI to start with.
+  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
+endif()
+
+#
+# User-configurable options for the standard library.
+#
+
+option(SWIFT_STDLIB_STABLE_ABI
+  "Should stdlib be built with stable ABI (library evolution, resilience)."
+  "${SWIFT_STDLIB_STABLE_ABI_default}")
+
+option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
+  "Support back-deploying compatibility fixes for newer apps running on older runtimes."
+  TRUE)
+
+option(SWIFT_RUNTIME_MACHO_NO_DYLD
+  "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+  FALSE)
+
+option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    "Build the standard libraries assuming that they will be used in an environment with only a single thread."
+    FALSE)
+
+option(SWIFT_STDLIB_OS_VERSIONING
+    "Build stdlib with availability based on OS versions (Darwin only)."
+    TRUE)
+
+option(SWIFT_ENABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       "${SWIFT_STDLIB_STABLE_ABI}")
+
+option(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH
+       "Build Differentation without tgmath (and dependency on platform runtime libraries)"
+       FALSE)
+
+#
+# End of user-configurable options.
+#
+
 include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.
@@ -24,10 +89,9 @@ set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 
-# NOTE(compnerd) save the original compiler for the host swiftReflection that
-# we build
-set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
@@ -66,11 +130,8 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-if(CMAKE_VERSION VERSION_LESS 3.12)
-  append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-else()
-  add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
-endif()
+add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1>)
+include_directories(BEFORE ${CMAKE_PROJECT_SOURCE_DIR}/include)
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)

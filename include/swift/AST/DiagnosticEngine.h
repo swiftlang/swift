@@ -18,11 +18,15 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "llvm/ADT/StringMap.h"
+#include "swift/AST/TypeLoc.h"
+#include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -105,7 +109,7 @@ namespace swift {
       int IntegerVal;
       unsigned UnsignedVal;
       StringRef StringVal;
-      DeclName IdentifierVal;
+      DeclNameRef IdentifierVal;
       ObjCSelector ObjCSelectorVal;
       ValueDecl *TheValueDecl;
       Type TypeVal;
@@ -133,14 +137,20 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
+    DiagnosticArgument(DeclNameRef R)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(R) {}
+
     DiagnosticArgument(DeclName D)
-        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+        : Kind(DiagnosticArgumentKind::Identifier),
+          IdentifierVal(DeclNameRef(D)) {}
 
     DiagnosticArgument(DeclBaseName D)
-        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+        : Kind(DiagnosticArgumentKind::Identifier),
+          IdentifierVal(DeclNameRef(D)) {}
 
     DiagnosticArgument(Identifier I)
-      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
+      : Kind(DiagnosticArgumentKind::Identifier),
+        IdentifierVal(DeclNameRef(I)) {
     }
 
     DiagnosticArgument(ObjCSelector S)
@@ -225,7 +235,7 @@ namespace swift {
       return UnsignedVal;
     }
 
-    DeclName getAsIdentifier() const {
+    DeclNameRef getAsIdentifier() const {
       assert(Kind == DiagnosticArgumentKind::Identifier);
       return IdentifierVal;
     }
@@ -340,7 +350,7 @@ namespace swift {
     std::vector<Diagnostic> ChildNotes;
     SourceLoc Loc;
     bool IsChildNote = false;
-    const Decl *Decl = nullptr;
+    const swift::Decl *Decl = nullptr;
 
     friend DiagnosticEngine;
 
@@ -623,7 +633,7 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
   };
-    
+
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -655,7 +665,11 @@ namespace swift {
     /// A set of all strings involved in current transactional chain.
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
-    llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+    llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
+
+    /// Diagnostic producer to handle the logic behind retrieving a localized
+    /// diagnostic message.
+    std::unique_ptr<diag::LocalizationProducer> localization;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
@@ -670,8 +684,8 @@ namespace swift {
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
 
-    /// Use descriptive diagnostic style when available.
-    bool useDescriptiveDiagnostics = false;
+    /// Path to diagnostic documentation directory.
+    std::string diagnosticDocumentationPath = "";
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -696,6 +710,11 @@ namespace swift {
       return state.getShowDiagnosticsAfterFatalError();
     }
 
+    void flushConsumers() {
+      for (auto consumer : Consumers)
+        consumer->flush();
+    }
+
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
@@ -716,11 +735,36 @@ namespace swift {
       return printDiagnosticNames;
     }
 
-    void setUseDescriptiveDiagnostics(bool val) {
-       useDescriptiveDiagnostics = val;
+    void setDiagnosticDocumentationPath(std::string path) {
+      diagnosticDocumentationPath = path;
     }
-    bool getUseDescriptiveDiagnostics() const {
-      return useDescriptiveDiagnostics;
+    StringRef getDiagnosticDocumentationPath() {
+      return diagnosticDocumentationPath;
+    }
+
+    void setLocalization(std::string locale, std::string path) {
+      assert(!locale.empty());
+      assert(!path.empty());
+      llvm::SmallString<128> filePath(path);
+      llvm::sys::path::append(filePath, locale);
+      llvm::sys::path::replace_extension(filePath, ".db");
+
+      // If the serialized diagnostics file not available,
+      // fallback to the `YAML` file.
+      if (llvm::sys::fs::exists(filePath)) {
+        if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
+          localization = std::make_unique<diag::SerializedLocalizationProducer>(
+              std::move(file.get()));
+        }
+      } else {
+        llvm::sys::path::replace_extension(filePath, ".yaml");
+        // In case of missing localization files, we should fallback to messages
+        // from `.def` files.
+        if (llvm::sys::fs::exists(filePath)) {
+          localization =
+              std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+        }
+      }
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -944,8 +988,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id,
-                                           bool printDiagnosticName);
+    llvm::StringRef diagnosticStringFor(const DiagID id,
+                                        bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -1012,6 +1056,21 @@ namespace swift {
         Engine.TransactionStrings.clear();
         Engine.TransactionAllocator.Reset();
       }
+    }
+
+    bool hasErrors() const {
+      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
+                                           PrevDiagnostics,
+                                       Engine.TentativeDiagnostics.end());
+
+      for (auto &diagnostic : diagnostics) {
+        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
+        if (behavior == DiagnosticState::Behavior::Fatal ||
+            behavior == DiagnosticState::Behavior::Error)
+          return true;
+      }
+
+      return false;
     }
 
     /// Abort and close this transaction and erase all diagnostics

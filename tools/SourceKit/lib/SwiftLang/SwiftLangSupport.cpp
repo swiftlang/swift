@@ -12,6 +12,7 @@
 
 #include "SwiftLangSupport.h"
 #include "SwiftASTManager.h"
+#include "SwiftEditorDiagConsumer.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/FileSystemProvider.h"
@@ -23,8 +24,10 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 
@@ -79,6 +82,10 @@ static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.filep
 static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
+static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
+static UIdent EffectiveAccess_Internal("source.decl.effective_access.internal");
+static UIdent EffectiveAccess_FilePrivate("source.decl.effective_access.fileprivate");
+static UIdent EffectiveAccess_LessThanFilePrivate("source.decl.effective_access.less_than_fileprivate");
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -254,45 +261,46 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
 };
 }
 
+static void
+configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
+                            std::shared_ptr<GlobalConfig> GlobalConfig) {
+  auto Opts = GlobalConfig->getCompletionOpts();
+  CompletionInst->setOptions({
+    Opts.MaxASTContextReuseCount,
+    Opts.CheckDependencyInterval
+  });
+}
+
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
-  RuntimeResourcePath = LibPath.str();
+  RuntimeResourcePath = std::string(LibPath.str());
+  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
-  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
-                                             RuntimeResourcePath);
+  ASTMgr = std::make_shared<SwiftASTManager>(
+      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats,
+      RuntimeResourcePath, DiagnosticDocumentationPath);
+
+  CompletionInst = std::make_shared<CompletionInstance>();
+  configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
+
   // By default, just use the in-memory cache.
-  CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+  CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
 
   // Provide a default file system provider.
-  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
+  setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
 }
 
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
-    const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
+void SwiftLangSupport::globalConfigurationUpdated(
+    std::shared_ptr<GlobalConfig> Config) {
+  configureCompletionInstance(CompletionInst, Config);
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
@@ -807,6 +815,20 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
   return None;
 }
 
+UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Scope) {
+  if (Scope.isPublic()) {
+    return EffectiveAccess_Public;
+  } else if (Scope.isInternal()) {
+    return EffectiveAccess_Internal;
+  } else if (Scope.isFileScope()) {
+    return EffectiveAccess_FilePrivate;
+  } else if (Scope.isPrivate()) {
+    return EffectiveAccess_LessThanFilePrivate;
+  } else {
+    llvm_unreachable("Unsupported access scope");
+  }
+}
+
 std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
   std::vector<UIdent> AttrUIDs;
 
@@ -824,7 +846,7 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getFullName();
+  OS << D->getName();
   return false;
 }
 
@@ -896,12 +918,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     }
     OS << ')';
   };
-  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
-    if (auto params = EED->getParameterList())
-      printParams(params);
-  } else if (auto *FD = dyn_cast<FuncDecl>(VD)) {
-    if (auto params = FD->getParameters())
-      printParams(params);
+  if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
+    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+      printParams(ParamList);
+    }
   } else if (isa<VarDecl>(VD)) {
     // Var decl doesn't have parameters.
   } else {
@@ -910,37 +930,11 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 }
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
-  std::string InputPath = FilePath;
-#if !defined(_WIN32)
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(InputPath.c_str(), full_path))
-    return path;
-
-  return InputPath;
-#else
-  wchar_t full_path[MAX_PATH] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
+  std::string InputPath = FilePath.str();
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-
-  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  std::string utf8Path;
-  if (numChars > 0 && numChars <= MAX_PATH) {
-    llvm::ArrayRef<char> pathRef((const char *)full_path,
-                                 (const char *)(full_path + numChars));
-    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
-                                                             : InputPath;
-  }
-  return InputPath;
-#endif
+  return std::string(output.str());
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
@@ -989,6 +983,69 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
 
   // Fallback to the real filesystem.
   return llvm::vfs::getRealFileSystem();
+}
+
+bool SwiftLangSupport::performCompletionLikeOperation(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error,
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  assert(FileSystem);
+
+  // Resolve symlinks for the input file; we resolve them for the input files
+  // in the arguments as well.
+  // FIXME: We need the Swift equivalent of Clang's FileEntry.
+  llvm::SmallString<128> bufferIdentifier;
+  if (auto err = FileSystem->getRealPath(
+          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
+    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
+
+  // Create a buffer for code completion. This contains '\0' at 'Offset'
+  // position of 'UnresolvedInputFile' buffer.
+  auto origOffset = Offset;
+  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
+      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  PrintingDiagnosticConsumer PrintDiags;
+  EditorDiagConsumer TraceDiags;
+  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
+
+  Diags.addConsumer(PrintDiags);
+  if (TracedOp.enabled()) {
+    Diags.addConsumer(TraceDiags);
+    trace::SwiftInvocation SwiftArgs;
+    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
+    TracedOp.setDiagnosticProvider(
+        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          TraceDiags.getAllDiagnostics(diags);
+        });
+    TracedOp.start(
+        SwiftArgs,
+        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
+         std::make_pair("Offset", std::to_string(Offset))});
+  }
+  ForwardingDiagnosticConsumer CIDiags(Diags);
+
+  CompilerInvocation Invocation;
+  bool Failed = getASTManager()->initCompilerInvocation(
+      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
+      Error);
+  if (Failed)
+    return false;
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+    Error = "no input filenames specified";
+    return false;
+  }
+
+  // Pin completion instance.
+  auto CompletionInst = getCompletionInstance();
+
+  return CompletionInst->performOperation(Invocation, Args, FileSystem,
+                                          newBuffer.get(), Offset,
+                                          Error, &CIDiags, Callback);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

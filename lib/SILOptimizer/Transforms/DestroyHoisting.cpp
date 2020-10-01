@@ -95,9 +95,14 @@ class DestroyHoisting {
 
   void getUsedLocationsOfAddr(Bits &bits, SILValue addr);
 
+  void getUsedLocationsOfOperands(Bits &bits, SILInstruction *I);
+
   void getUsedLocationsOfInst(Bits &bits, SILInstruction *Inst);
 
   void moveDestroys(MemoryDataflow &dataFlow);
+
+  bool locationOverlaps(const MemoryLocations::Location *loc,
+                        const Bits &destroys);
 
   void moveDestroysInBlock(SILBasicBlock *block, Bits &activeDestroys,
                            SmallVectorImpl<SILInstruction *> &toRemove);
@@ -206,9 +211,16 @@ void DestroyHoisting::expandStores(MemoryDataflow &dataFlow) {
 // Initialize the dataflow for moving destroys up the control flow.
 void DestroyHoisting::initDataflow(MemoryDataflow &dataFlow) {
   for (BlockState &st : dataFlow) {
-    st.entrySet.set();
     st.genSet.reset();
     st.killSet.reset();
+    if (st.isInInfiniteLoop()) {
+      // Ignore blocks which are in an infinite loop and prevent any destroy
+      // hoisting across such block borders.
+      st.entrySet.reset();
+      st.exitSet.reset();
+      continue;
+    }
+    st.entrySet.set();
     if (isa<UnreachableInst>(st.block->getTerminator())) {
       if (canIgnoreUnreachableBlock(st.block, dataFlow)) {
         st.exitSet.set();
@@ -282,7 +294,7 @@ bool DestroyHoisting::canIgnoreUnreachableBlock(SILBasicBlock *block,
   SILBasicBlock *singlePred = block->getSinglePredecessorBlock();
   if (!singlePred)
     return false;
-  if (!dataFlow.getState(singlePred)->exitReachable)
+  if (!dataFlow.getState(singlePred)->exitReachable())
     return false;
 
   // Check if none of the locations are touched in the unreachable-block.
@@ -308,6 +320,12 @@ void DestroyHoisting::getUsedLocationsOfAddr(Bits &bits, SILValue addr) {
   }
 }
 
+void DestroyHoisting::getUsedLocationsOfOperands(Bits &bits, SILInstruction *I) {
+  for (Operand &op : I->getAllOperands()) {
+    getUsedLocationsOfAddr(bits, op.get());
+  }
+}
+
 // Set all bits of locations which instruction \p I is using. It's including
 // parent and sub-locations (see comment in getUsedLocationsOfAddr).
 void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
@@ -318,15 +336,21 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    case SILInstructionKind::EndApplyInst:
+      // Operands passed to begin_apply are alive throughout an end_apply ...
+      getUsedLocationsOfOperands(bits, cast<EndApplyInst>(I)->getBeginApply());
+      break;
+    case SILInstructionKind::AbortApplyInst:
+      // ... or abort_apply.
+      getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
+      break;
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
-      for (Operand &op : I->getAllOperands()) {
-        getUsedLocationsOfAddr(bits, op.get());
-      }
+      getUsedLocationsOfOperands(bits, I);
       break;
     case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::DestroyAddrInst:
@@ -360,6 +384,10 @@ void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
     if (isa<UnreachableInst>(block->getTerminator()) && state.exitSet.any())
       continue;
 
+    // Ignore blocks which are in an infinite loop.
+    if (state.isInInfiniteLoop())
+      continue;
+
     // Do the inner-block processing.
     activeDestroys = state.exitSet;
     moveDestroysInBlock(block, activeDestroys, toRemove);
@@ -390,6 +418,19 @@ void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
   }
 }
 
+bool DestroyHoisting::locationOverlaps(const MemoryLocations::Location *loc,
+                                       const Bits &destroys) {
+  // We cannot just check if 'loc->subLocations' has any common bits with
+  // 'destroys', because subLocations don't include the "self" bit if all sub
+  // locations cover the whole location.
+  for (int subIdx = loc->subLocations.find_first(); subIdx >= 0;
+       subIdx = loc->subLocations.find_next(subIdx)) {
+    if (destroys.anyCommon(locations.getLocation(subIdx)->selfAndParents))
+      return true;
+  }
+  return false;
+}
+
 void DestroyHoisting::moveDestroysInBlock(
                                 SILBasicBlock *block, Bits &activeDestroys,
                                 SmallVectorImpl<SILInstruction *> &toRemove) {
@@ -410,11 +451,9 @@ void DestroyHoisting::moveDestroysInBlock(
       // debug_value_addr does not count as real use of a location. If we are
       // moving a destroy_addr above a debug_value_addr, just delete that
       // debug_value_addr.
-      if (auto *dvaLoc = locations.getLocation(DVA->getOperand())) {
-        if (activeDestroys.anyCommon(dvaLoc->subLocations) ||
-            activeDestroys.anyCommon(dvaLoc->selfAndParents))
-          toRemove.push_back(DVA);
-      }
+      auto *dvaLoc = locations.getLocation(DVA->getOperand());
+      if (dvaLoc && locationOverlaps(dvaLoc, activeDestroys))
+        toRemove.push_back(DVA);
     } else if (I.mayHaveSideEffects()) {
       // Delete all destroy_addr and debug_value_addr which are scheduled for
       // removal.
@@ -524,15 +563,17 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
   assert(!isa<BeginAccessInst>(loc->representativeValue) &&
          "only a root location can be a begin_access");
 
-  SingleValueInstruction *&cachedProj = addressProjections[locIdx];
-  if (cachedProj)
-    return cachedProj;
-
   if (!domTree)
     domTree = DA->get(function);
+    
+  SILInstruction *ip = &*builder.getInsertionPoint();
+
+  SingleValueInstruction *&cachedProj = addressProjections[locIdx];
+  if (cachedProj && domTree->properlyDominates(cachedProj, ip))
+    return cachedProj;
 
   auto *projInst = cast<SingleValueInstruction>(loc->representativeValue);
-  if (domTree->properlyDominates(projInst, &*builder.getInsertionPoint())) {
+  if (domTree->properlyDominates(projInst, ip)) {
     cachedProj = projInst;
     return projInst;
   }
@@ -553,9 +594,9 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
   } else {
     auto *TEA = dyn_cast<TupleElementAddrInst>(projInst);
     newProj = projBuilder.createTupleElementAddr(TEA->getLoc(), baseAddr,
-                                            TEA->getFieldNo(), TEA->getType());
+                                            TEA->getFieldIndex(), TEA->getType());
   }
-  assert(domTree->properlyDominates(newProj, &*builder.getInsertionPoint()) &&
+  assert(domTree->properlyDominates(newProj, ip) &&
          "new projection does not dominate insert point");
   // We need to remember the new projection instruction because in tailMerging
   // we might call locations.getLocationIdx() on such a new instruction.
@@ -700,6 +741,10 @@ public:
       return;
 
     if (!F->hasOwnership())
+      return;
+
+    // If we are not supposed to perform ossa optimizations, bail.
+    if (!F->getModule().getOptions().EnableOSSAOptimizations)
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "

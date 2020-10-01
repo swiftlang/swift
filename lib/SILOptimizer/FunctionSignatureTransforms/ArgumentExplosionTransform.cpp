@@ -320,7 +320,7 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  auto Args = F->begin()->getFunctionArguments();
+  auto Args = F->begin()->getSILFunctionArguments();
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(
       RCIA->get(F), F, {SILArgumentConvention::Direct_Owned});
 

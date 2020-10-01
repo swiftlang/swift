@@ -1,0 +1,46 @@
+//===--- MetadataAllocatorTags.def - Metadata allocator tags. ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of tags used
+// to mark metadata allocations when
+// SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION is enabled.
+//
+//===----------------------------------------------------------------------===//
+
+// #define TAG(name, value)
+
+#ifndef TAG
+#error "Must define TAG to include MetadataAllocatorTags.def"
+#endif
+
+TAG(NotSet, 0)
+TAG(Boxes, 1)
+TAG(ObjCClassWrappers, 2)
+TAG(FunctionTypes, 3)
+TAG(MetatypeTypes, 4)
+TAG(ExistentialMetatypeValueWitnessTables, 5)
+TAG(ExistentialMetatypes, 6)
+TAG(ExistentialTypes, 7)
+TAG(OpaqueExistentialValueWitnessTables, 8)
+TAG(ClassExistentialValueWitnessTables, 9)
+TAG(ForeignWitnessTables, 10)
+TAG(ResilientMetadataAllocator, 11)
+TAG(Metadata, 12)
+TAG(TupleCache, 13)
+TAG(GenericMetadataCache, 14)
+TAG(ForeignMetadataCache, 15)
+TAG(GenericWitnessTableCache, 16)
+TAG(GenericClassMetadata, 17)
+TAG(GenericValueMetadata, 18)
+TAG(SingletonGenericWitnessTableCache, 19)
+
+#undef TAG

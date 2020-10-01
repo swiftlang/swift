@@ -9,6 +9,8 @@ add_swift_host_library(swiftClangImporter STATIC
   ClangAdapter.cpp
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
+  ClangModuleDependencyScanner.cpp
+  ClangSourceBufferImporter.cpp
   DWARFImporter.cpp
   IAMInference.cpp
   ImportDecl.cpp
@@ -16,11 +18,17 @@ add_swift_host_library(swiftClangImporter STATIC
   ImportMacro.cpp
   ImportName.cpp
   ImportType.cpp
+  Serializability.cpp
   SwiftLookupTable.cpp
 )
 target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
-  swiftParse)
+  swiftParse
+  clangTooling
+  LLVMBitstreamReader)
+
+target_link_libraries(swiftClangImporter INTERFACE
+  clangDependencyScanning)
 
 # This property is only set by calls to clang_tablegen. It will not be set on
 # standalone builds, so it can always be safely passed.

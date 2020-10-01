@@ -12,11 +12,13 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/USRGeneration.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -165,7 +167,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   return false;
 }
 
-llvm::Expected<std::string>
+std::string
 swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
                                       const ValueDecl *D) const {
   if (auto *VD = dyn_cast<VarDecl>(D))
@@ -214,7 +216,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
       if (!Ignore) {
-        return Buffer.str();
+        return std::string(Buffer.str());
       } else {
         return std::string();
       }
@@ -224,11 +226,11 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 
     auto ClangMacroInfo = ClangN.getAsMacro();
     bool Ignore = clang::index::generateUSRForMacro(
-        D->getBaseName().getIdentifier().str(),
+        D->getBaseIdentifier().str(),
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
-      return Buffer.str();
+      return std::string(Buffer.str());
     else
       return std::string();
   }
@@ -237,13 +239,11 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (printObjCUSR(D, OS)) {
       return std::string();
     } else {
-      return OS.str();
+      return std::string(OS.str());
     }
   }
 
   auto declIFaceTy = D->getInterfaceType();
-  if (!declIFaceTy)
-    return std::string();
 
   // Invalid code.
   if (declIFaceTy.findIf([](Type t) -> bool {
@@ -255,12 +255,9 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
-llvm::Expected<std::string>
+std::string
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
-  if (!D->getInterfaceType())
-    return std::string();
-
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
 
@@ -310,7 +307,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 
   Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
-                          SD, getUSRSpacePrefix());
+                          SD, getUSRSpacePrefix(), SD->isStatic());
 
   OS << Mangled;
 

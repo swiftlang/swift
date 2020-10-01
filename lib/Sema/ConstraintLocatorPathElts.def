@@ -54,6 +54,9 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// The type of a closure body.
+CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
+
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
 
@@ -72,9 +75,15 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
 /// The result type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 
+/// The result type of a function builder body.
+SIMPLE_LOCATOR_PATH_ELT(FunctionBuilderBodyResult)
+
 /// A generic argument.
 /// FIXME: Add support for named generic arguments?
 CUSTOM_LOCATOR_PATH_ELT(GenericArgument)
+
+/// An implicit reference to a 'callAsFunction' method of a nominal type.
+SIMPLE_LOCATOR_PATH_ELT(ImplicitCallAsFunction)
 
 /// Locator for a binding from an IUO disjunction choice.
 SIMPLE_LOCATOR_PATH_ELT(ImplicitlyUnwrappedDisjunctionChoice)
@@ -166,6 +175,25 @@ CUSTOM_LOCATOR_PATH_ELT(Witness)
 
 /// The condition associated with 'if' expression or ternary operator.
 SIMPLE_LOCATOR_PATH_ELT(Condition)
+
+SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
+
+/// The 'true' or 'false' branch of a ternary operator.
+CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
+
+/// Performing a pattern patch.
+CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
+
+/// Points to a particular attribute associated with one of
+/// the arguments e.g. `inout` or its type e.g. `@escaping`.
+///
+/// This is very useful when dealing with argument-to-parameter
+/// failures because it allows to express in the locator kind
+/// of a problem.
+CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
+
+/// The result of a chain of member accesses off an UnresolvedMemberExpr
+SIMPLE_LOCATOR_PATH_ELT(UnresolvedMemberChainResult)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

@@ -1,8 +1,8 @@
-//===---------- IndexSubset.h - Fixed-size subset of indices --------------===//
+//===--- IndexSubset.h - Fixed-size subset of indices ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_INDEXSUBSET_H
 #define SWIFT_AST_INDEXSUBSET_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -92,7 +93,7 @@ private:
     for (auto i : indices.set_bits()) {
       unsigned bitWordIndex, offset;
       std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
-      getBitWord(bitWordIndex) |= (1 << offset);
+      getBitWord(bitWordIndex) |= (1ull << offset);
     }
   }
 
@@ -180,7 +181,7 @@ public:
   bool contains(unsigned index) const {
     unsigned bitWordIndex, offset;
     std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
-    return getBitWord(bitWordIndex) & (1 << offset);
+    return getBitWord(bitWordIndex) & (1ull << offset);
   }
 
   bool isEmpty() const {
@@ -206,9 +207,7 @@ public:
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(llvm::raw_ostream &s = llvm::errs())
-                                const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump());
 
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }

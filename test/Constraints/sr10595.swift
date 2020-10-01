@@ -15,6 +15,6 @@ class B<Y> : Nested { // expected-error {{type 'B<Y>' does not conform to protoc
 
 class C<M> {
     func cFunc(_ a: A<M>) {
-        let function: (B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void = a.f // expected-error {{cannot convert value of type '(_, WritableKeyPath<M, _.U>) -> ()' to specified type '(B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void'}}
+        let function: (B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void = a.f // expected-error {{cannot convert value of type '(B<Int>, WritableKeyPath<M, B<Int>.U>) -> ()' to specified type '(B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void'}}
     }
 }

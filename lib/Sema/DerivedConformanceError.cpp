@@ -42,8 +42,9 @@ deriveBodyBridgedNSError_enum_nsErrorDomain(AbstractFunctionDecl *domainDecl,
   auto self = domainDecl->getImplicitSelfDecl();
 
   auto selfRef = new (C) DeclRefExpr(self, DeclNameLoc(), /*implicit*/ true);
-  auto stringType = TypeExpr::createForDecl(SourceLoc(), C.getStringDecl(),
-                                            domainDecl, /*implicit*/ true);
+  auto stringType = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), C.getStringDecl(), domainDecl,
+      C.getStringDecl()->getInterfaceType());
   auto initReflectingCall =
     CallExpr::createImplicit(C, stringType,
                              { selfRef }, { C.getIdentifier("reflecting") });
@@ -90,15 +91,13 @@ deriveBridgedNSError_enum_nsErrorDomain(
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
-
-  auto stringTy = C.getStringDecl()->getDeclaredType();
+  auto stringTy = derived.Context.getStringDecl()->getDeclaredInterfaceType();
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
+      derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
       /*isFinal=*/true);
 
   // Define the getter.
@@ -115,7 +114,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
   if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain) {
+  if (requirement->getBaseName() == Context.Id_nsErrorDomain) {
     auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
 
     auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
@@ -127,6 +126,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
     return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
   }
 
-  TC.diagnose(requirement->getLoc(), diag::broken_errortype_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_errortype_requirement);
   return nullptr;
 }

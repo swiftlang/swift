@@ -21,3 +21,11 @@ acceptMeta(A) // expected-error {{expected member name or constructor call after
 
 acceptMeta((A) -> Void) // expected-error {{expected member name or constructor call after type name}}
 // expected-note@-1 {{use '.self' to reference the type object}}
+
+func id<T>(_ x: T.Type) -> T.Type { x }
+
+// rdar://62890683: Don't allow arbitrary subtyping for a metatype's instance type.
+let _: A?.Type = B.self // expected-error {{cannot convert value of type 'B.Type' to specified type 'A?.Type'}}
+let _: A?.Type = id(B.self) // expected-error {{cannot convert value of type 'B.Type' to specified type 'A?.Type'}}
+let _: S?.Type = id(S.self) // expected-error {{cannot convert value of type 'S.Type' to specified type 'S?.Type'}}
+

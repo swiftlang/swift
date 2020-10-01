@@ -95,12 +95,12 @@ void SplitterStep::computeFollowupSteps(
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();
   if (numComponents < 2) {
-    steps.push_back(llvm::make_unique<ComponentStep>(
+    steps.push_back(std::make_unique<ComponentStep>(
         CS, 0, &CS.InactiveConstraints, Solutions));
     return;
   }
 
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.
     CG.verify();
@@ -126,7 +126,7 @@ void SplitterStep::computeFollowupSteps(
 
     // If there are no dependencies, build a normal component step.
     if (components[i].dependsOn.empty()) {
-      steps.push_back(llvm::make_unique<ComponentStep>(
+      steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
       continue;
@@ -141,7 +141,7 @@ void SplitterStep::computeFollowupSteps(
 
     // Otherwise, build a dependent component "splitter" step, which
     // handles all combinations of incoming partial solutions.
-    steps.push_back(llvm::make_unique<DependentComponentSplitterStep>(
+    steps.push_back(std::make_unique<DependentComponentSplitterStep>(
         CS, &Components[i], solutionIndex, std::move(components[i]),
         llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
   }
@@ -220,6 +220,7 @@ bool SplitterStep::mergePartialSolutions() const {
   ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool anySolutions = false;
+  size_t solutionMemory = 0;
   do {
     // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
@@ -236,13 +237,20 @@ bool SplitterStep::mergePartialSolutions() const {
     if (!CS.worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = CS.finalize();
-      if (isDebugMode())
+      solutionMemory += solution.getTotalMemory();
+      if (CS.isDebugMode())
         getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
+
+    // Since merging partial solutions can go exponential, make sure we didn't
+    // pass the "too complex" thresholds including allocated memory and time.
+    if (CS.getExpressionTooComplex(solutionMemory))
+      return false;
+
   } while (nextCombination(counts, indices));
 
   return anySolutions;
@@ -252,7 +260,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
   // "split" is considered a failure if previous step failed,
   // or there is a failure recorded by constraint system, or
   // system can't be simplified.
-  if (prevFailed || CS.failedConstraint || CS.simplify())
+  if (prevFailed || CS.getFailedConstraint() || CS.simplify())
     return done(/*isSuccess=*/false);
 
   // Figure out the sets of partial solutions that this component depends on.
@@ -273,7 +281,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
     }
 
     followup.push_back(
-        llvm::make_unique<ComponentStep>(CS, Index, Constraints, Component,
+        std::make_unique<ComponentStep>(CS, Index, Constraints, Component,
                                          std::move(dependsOnSolutions),
                                          Solutions));
   } while (nextCombination(dependsOnSetsRef, indices));
@@ -329,70 +337,39 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
   auto bestBindings = CS.determineBestBindings();
 
-  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
-                                        !bestBindings->FullyBound))) {
+  if (bestBindings &&
+      (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
-        llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(
-        llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  } else if (!CS.solverState->allowsFreeTypeVariables() &&
+             CS.hasFreeTypeVariables()) {
+    // If there are no disjunctions or type variables to bind
+    // we can't solve this system unless we have free type variables
+    // allowed in the solution.
+    return finalize(/*isSuccess=*/false);
   }
 
-  // If there are no disjunctions or type variables to bind
-  // we can't solve this system unless we have free type variables
-  // allowed in the solution.
-  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
-    if (!CS.shouldAttemptFixes())
-      return finalize(/*isSuccess=*/false);
-
-    // Let's see if all of the free type variables are associated with
-    // generic parameters and if so, let's default them to `Any` and continue
-    // solving so we can properly diagnose the problem later by suggesting
-    // to explictly specify them.
-
-    llvm::SmallDenseMap<ConstraintLocator *,
-                        llvm::SmallVector<GenericTypeParamType *, 4>>
-        defaultableGenericParams;
-
-    for (auto *typeVar : CS.getTypeVariables()) {
-      if (typeVar->getImpl().hasRepresentativeOrFixed())
-        continue;
-
-      // If this free type variable is not a generic parameter
-      // we are done.
-      auto *locator = typeVar->getImpl().getLocator();
-
-      auto *anchor = locator->getAnchor();
-      if (!(anchor && locator->isForGenericParameter()))
-        return finalize(/*isSuccess=*/false);
-
-      // Increment the score for every missing generic argument
-      // to make ranking of the solutions with different number
-      // of generic arguments easier.
-      CS.increaseScore(ScoreKind::SK_Fix);
-      // Default argument to `Any`.
-      CS.assignFixedType(typeVar, CS.getASTContext().TheAnyType);
-      // Note that this generic argument has been given a default value.
-      CS.DefaultedConstraints.push_back(locator);
-
-      auto path = locator->getPath();
-      // Let's drop `generic parameter '...'` part of the locator to
-      // group all of the missing generic parameters related to the
-      // same path together.
-      defaultableGenericParams[CS.getConstraintLocator(anchor,
-                                                       path.drop_back())]
-          .push_back(locator->getGenericParameter());
+  // If we don't have any disjunction or type variable choices left, we're done
+  // solving. Make sure we don't have any unsolved constraints left over, using
+  // report_fatal_error to make sure we trap in release builds instead of
+  // potentially miscompiling.
+  if (!CS.ActiveConstraints.empty()) {
+    CS.print(llvm::errs());
+    llvm::report_fatal_error("Active constraints left over?");
+  }
+  if (!CS.solverState->allowsFreeTypeVariables()) {
+    if (!CS.InactiveConstraints.empty()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Inactive constraints left over?");
     }
-
-    for (const auto &missing : defaultableGenericParams) {
-      auto *locator = missing.first;
-      auto &missingParams = missing.second;
-      auto *fix =
-          ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
-      if (CS.recordFix(fix))
-        return finalize(/*isSuccess=*/false);
+    if (CS.hasFreeTypeVariables()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Free type variables left over?");
     }
   }
 
@@ -414,7 +391,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
 
   Solutions.push_back(std::move(solution));
@@ -431,7 +408,7 @@ StepResult ComponentStep::finalize(bool isSuccess) {
   // Rewind all modifications done to constraint system.
   ComponentScope.reset();
 
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
     log << (isSuccess ? "finished" : "failed") << " component #" << Index
         << ")\n";
@@ -463,14 +440,16 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
 
     log << "Initial bindings: ";
     interleave(InitialBindings.begin(), InitialBindings.end(),
                [&](const Binding &binding) {
-                 log << TypeVar->getString()
-                     << " := " << binding.BindingType->getString();
+                 log << TypeVar->getString(PO)
+                     << " := " << binding.BindingType->getString(PO);
                },
                [&log] { log << ", "; });
 
@@ -499,7 +478,7 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   // Rewind back all of the changes made to constraint system.
   ActiveChoice.reset();
 
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
   // Let's check if we should stop right before
@@ -538,7 +517,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   // Rewind back the constraint system information.
   ActiveChoice.reset();
 
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
   // Attempt next disjunction choice (if any left).
@@ -551,7 +530,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   bool attemptFixes = CS.shouldAttemptFixes();
   // Enable all disabled choices in "diagnostic" mode.
   if (!attemptFixes && choice.isDisabled()) {
-    if (isDebugMode()) {
+    if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
       choice.print(log, &ctx.SourceMgr);
@@ -565,7 +544,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (!attemptFixes && choice.isUnavailable())
     return true;
 
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   // Don't attempt to solve for generic operators if we already have
@@ -654,7 +633,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
 
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   if (auto restriction = currentChoice->getRestriction()) {
@@ -682,7 +661,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
       isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
       !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
-      !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
+      !ctx.TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
     return true;
   }
 

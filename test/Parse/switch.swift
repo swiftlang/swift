@@ -28,7 +28,7 @@ func parseError4(x: Int) {
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{12-13=_}}
+  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
   }
 }
 
@@ -64,7 +64,7 @@ case _ where x % 2 == 0,
   x = 1
 case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+case _ where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   x = 0
 default:
   x = 1
@@ -317,7 +317,7 @@ func enumElementSyntaxOnTuple() {
 // sr-176
 enum Whatever { case Thing }
 func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
-    switch value { // expected-error {{use of unresolved identifier 'value'; did you mean 'values'?}}
+    switch value { // expected-error {{cannot find 'value' in scope; did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }
@@ -336,6 +336,7 @@ func f1(x: String, y: Whichever) {
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
     case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-note@-1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
         break
     default:
       break

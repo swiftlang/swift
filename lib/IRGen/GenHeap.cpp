@@ -33,6 +33,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -54,6 +55,10 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                        SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                     llvm::Type *type, \
                                     Size size, Alignment alignment, \
@@ -138,6 +143,10 @@ namespace {
                              alignment, IsNotPOD, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarPOD = false }; \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);             \
+    } \
     llvm::Type *getScalarType() const { \
       return ValueTypeAndIsOptional.getPointer(); \
     } \
@@ -276,14 +285,14 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
                                    const swift::irgen::HeapLayout &layout) {
   llvm::Value *offset = nullptr;
   if (i == 0) {
-    auto startoffset = layout.getSize();
-    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, startoffset.getValue());
+    auto startOffset = layout.getHeaderSize();
+    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, startOffset.getValue());
     return offset;
   }
   auto &prevElt = layout.getElement(i - 1);
   auto prevType = layout.getElementTypes()[i - 1];
   // Start calculating offsets from the last fixed-offset field.
-  Size lastFixedOffset = layout.getElement(i - 1).getByteOffset();
+  Size lastFixedOffset = layout.getElement(i - 1).getByteOffsetDuringLayout();
   if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
     // If the last fixed-offset field is also fixed-size, we can
     // statically compute the end of the fixed-offset fields.
@@ -473,7 +482,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   ConstantInitBuilder builder(IGM);
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
-  fields.add(dtorFn);
+  fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
+                          PointerAuthEntity::Special::HeapDestructor);
   fields.addNullPointer(IGM.WitnessTablePtrTy);
   {
     auto kindStruct = fields.beginStruct(IGM.TypeMetadataStructTy);
@@ -1229,11 +1239,37 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
                             llvm::Attribute::NoInline);
 
   // Give the function an empty body.
-  auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
-  llvm::ReturnInst::Create(LLVMContext, entry);
+  auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
+  llvm::ReturnInst::Create(getLLVMContext(), entry);
   
   FixLifetimeFn = fixLifetime;
   return fixLifetime;
+}
+
+llvm::Constant *IRGenModule::getFixedClassInitializationFn() {
+  if (FixedClassInitializationFn)
+    return *FixedClassInitializationFn;
+  
+  // If ObjC interop is disabled, we don't need to do fixed class
+  // initialization.
+  llvm::Constant *fn;
+  if (!ObjCInterop) {
+    fn = nullptr;
+  } else {
+    // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
+    // to realize a class.
+    if (getAvailabilityContext()
+         .isContainedIn(Context.getSwift51Availability())) {
+      fn = getObjCOptSelfFn();
+    }
+    // Otherwise, the Swift runtime always provides a `get
+    else {
+      fn = getGetInitializedObjCClassFn();
+    }
+  }
+  
+  FixedClassInitializationFn = fn;
+  return fn;
 }
 
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
@@ -1460,7 +1496,7 @@ public:
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
-        env ? env->getGenericSignature()->getCanonicalSignature()
+        env ? env->getGenericSignature().getCanonicalSignature()
             : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
@@ -1528,8 +1564,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Multi-field boxes
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  auto &eltTI = IGM.getTypeInfoForLowered(
-    getSILBoxFieldLoweredType(T, IGM.getSILModule().Types, 0));
+  auto &eltTI = IGM.getTypeInfoForLowered(getSILBoxFieldLoweredType(
+      IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1577,8 +1613,9 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // Produce a tailored box metadata for the type.
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return new FixedBoxTypeInfo(IGM,
-      getSILBoxFieldType(T, IGM.getSILModule().Types, 0));
+  return new FixedBoxTypeInfo(
+      IGM, getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
+                              T, IGM.getSILModule().Types, 0));
 }
 
 OwnedAddress
@@ -1588,9 +1625,12 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.allocate(IGF,
-                  getSILBoxFieldType(boxType, IGF.IGM.getSILModule().Types, 0),
-                        env, name);
+  return boxTI.allocate(
+      IGF,
+      getSILBoxFieldType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          boxType, IGF.IGM.getSILModule().Types, 0),
+      env, name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
@@ -1599,8 +1639,10 @@ void irgen::emitDeallocateBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.deallocate(IGF, box,
-                 getSILBoxFieldType(boxType, IGF.IGM.getSILModule().Types, 0));
+  return boxTI.deallocate(
+      IGF, box,
+      getSILBoxFieldType(IGF.IGM.getMaximalTypeExpansionContext(), boxType,
+                         IGF.IGM.getSILModule().Types, 0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
@@ -1609,8 +1651,10 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.project(IGF, box,
-                 getSILBoxFieldType(boxType, IGF.IGM.getSILModule().Types, 0));
+  return boxTI.project(
+      IGF, box,
+      getSILBoxFieldType(IGF.IGM.getMaximalTypeExpansionContext(), boxType,
+                         IGF.IGM.getSILModule().Types, 0));
 }
 
 Address irgen::emitAllocateExistentialBoxInBuffer(

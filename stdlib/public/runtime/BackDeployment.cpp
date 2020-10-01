@@ -15,7 +15,7 @@
 #include "../SwiftShims/FoundationShims.h"
 #include <stdlib.h>
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) && defined(SWIFT_RUNTIME_OS_VERSIONING)
 
 #if SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE
 static unsigned long long computeIsSwiftMask() {
@@ -30,7 +30,7 @@ _swift_classIsSwiftMask = computeIsSwiftMask();
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif // SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE
 
-static swift::_SwiftNSOperatingSystemVersion swiftInOSVersion = {
+static _SwiftNSOperatingSystemVersion swiftInOSVersion = {
 #if __MAC_OS_X_VERSION_MIN_REQUIRED
   10, 14, 4
 // WatchOS also pretends to be iOS, so check it first.
@@ -43,8 +43,8 @@ static swift::_SwiftNSOperatingSystemVersion swiftInOSVersion = {
 #endif
 };
 
-static bool versionLessThan(swift::_SwiftNSOperatingSystemVersion lhs,
-                            swift::_SwiftNSOperatingSystemVersion rhs) {
+static bool versionLessThan(_SwiftNSOperatingSystemVersion lhs,
+                            _SwiftNSOperatingSystemVersion rhs) {
   if (lhs.majorVersion < rhs.majorVersion) return true;
   if (lhs.majorVersion > rhs.majorVersion) return false;
   
@@ -58,7 +58,7 @@ static bool versionLessThan(swift::_SwiftNSOperatingSystemVersion lhs,
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _swift_isBackDeploying() {
-  auto version = swift::_swift_stdlib_operatingSystemVersion();
+  auto version = _swift_stdlib_operatingSystemVersion();
   return versionLessThan(version, swiftInOSVersion);
 }
 #endif

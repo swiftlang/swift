@@ -18,6 +18,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
@@ -243,9 +244,15 @@ private:
     if (!Options.QualifyEntities)
       return false;
 
-    if (Context->getKind() == Node::Kind::Module &&
-        Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX)) {
-      return Options.DisplayDebuggerGeneratedModule;
+    if (Context->getKind() == Node::Kind::Module) {
+      if (Context->getText() == swift::STDLIB_NAME)
+        return Options.DisplayStdlibModule;
+      if (Context->getText() == swift::MANGLING_MODULE_OBJC)
+        return Options.DisplayObjCModule;
+      if (Context->getText() == Options.HidingCurrentModule)
+        return false;
+      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+        return Options.DisplayDebuggerGeneratedModule;
     }
     return true;
   }
@@ -351,6 +358,10 @@ private:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
+    case Node::Kind::DifferentiableFunctionType:
+    case Node::Kind::EscapingDifferentiableFunctionType:
+    case Node::Kind::LinearFunctionType:
+    case Node::Kind::EscapingLinearFunctionType:
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
@@ -386,13 +397,19 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
+    case Node::Kind::ImplDifferentiable:
+    case Node::Kind::ImplLinear:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
+    case Node::Kind::ImplDifferentiability:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplInvocationSubstitutions:
+    case Node::Kind::ImplPatternSubstitutions:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
+    case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
@@ -438,6 +455,7 @@ private:
     case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
+    case Node::Kind::MetadataInstantiationCache:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolSelfConformanceDescriptor:
@@ -493,6 +511,7 @@ private:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
+    case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
@@ -530,6 +549,13 @@ private:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
     case Node::Kind::OpaqueReturnTypeOf:
+    case Node::Kind::CanonicalSpecializedGenericMetaclass:
+    case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    case Node::Kind::NoncanonicalSpecializedGenericTypeMetadata:
+    case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
+    case Node::Kind::GlobalVariableOnceDeclList:
+    case Node::Kind::GlobalVariableOnceFunction:
+    case Node::Kind::GlobalVariableOnceToken:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -689,7 +715,7 @@ private:
       auto Label = LabelList->getChild(Index);
       assert(Label && (Label->getKind() == Node::Kind::Identifier ||
                        Label->getKind() == Node::Kind::FirstElementMarker));
-      return Label->getKind() == Node::Kind::Identifier ? Label->getText()
+      return Label->getKind() == Node::Kind::Identifier ? Label->getText().str()
                                                         : "_";
     };
 
@@ -697,40 +723,76 @@ private:
     bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
 
     Printer << '(';
-    interleave(Parameters->begin(), Parameters->end(),
-               [&](NodePointer Param) {
-                 assert(Param->getKind() == Node::Kind::TupleElement);
+    llvm::interleave(
+        Parameters->begin(), Parameters->end(),
+        [&](NodePointer Param) {
+          assert(Param->getKind() == Node::Kind::TupleElement);
 
-                 if (hasLabels) {
-                   Printer << getLabelFor(Param, ParamIndex) << ':';
-                 } else if (!showTypes) {
-                   if (auto Label = getChildIf(Param,
-                                               Node::Kind::TupleElementName))
-                     Printer << Label->getText() << ":";
-                   else
-                     Printer << "_:";
-                 }
+          if (hasLabels) {
+            Printer << getLabelFor(Param, ParamIndex) << ':';
+          } else if (!showTypes) {
+            if (auto Label = getChildIf(Param, Node::Kind::TupleElementName))
+              Printer << Label->getText() << ":";
+            else
+              Printer << "_:";
+          }
 
-                 if (hasLabels && showTypes)
-                   Printer << ' ';
+          if (hasLabels && showTypes)
+            Printer << ' ';
 
-                 ++ParamIndex;
+          ++ParamIndex;
 
-                 if (showTypes)
-                   print(Param);
-               },
-               [&]() { Printer << (showTypes ? ", " : ""); });
+          if (showTypes)
+            print(Param);
+        },
+        [&]() { Printer << (showTypes ? ", " : ""); });
     Printer << ')';
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    if (node->getNumChildren() != 2 && node->getNumChildren() != 3) {
+    if (node->getNumChildren() < 2 || node->getNumChildren() > 4) {
       setInvalid();
       return;
     }
+
+    switch (node->getKind()) {
+    case Node::Kind::FunctionType:
+    case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::NoEscapeFunctionType:
+      break;
+    case Node::Kind::AutoClosureType:
+    case Node::Kind::EscapingAutoClosureType:
+      Printer << "@autoclosure "; break;
+    case Node::Kind::ThinFunctionType:
+      Printer << "@convention(thin) "; break;
+    case Node::Kind::CFunctionPointer:
+      Printer << "@convention(c) "; break;
+    case Node::Kind::ObjCBlock:
+      Printer << "@convention(block) "; break;
+    case Node::Kind::EscapingObjCBlock:
+      Printer << "@escaping @convention(block) "; break;
+    case Node::Kind::DifferentiableFunctionType:
+      Printer << "@differentiable "; break;
+    case Node::Kind::EscapingDifferentiableFunctionType:
+      Printer << "@escaping @differentiable "; break;
+    case Node::Kind::LinearFunctionType:
+      Printer << "@differentiable(linear) "; break;
+    case Node::Kind::EscapingLinearFunctionType:
+      Printer << "@escaping @differentiable(linear) "; break;
+    default:
+      assert(false && "Unhandled function type in printFunctionType!");
+    }
+
     unsigned startIndex = 0;
-    if (node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation)
-      startIndex = 1;
+    bool isAsync = false, isThrows = false;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+      ++startIndex;
+      isThrows = true;
+    }
+    if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
+      ++startIndex;
+      isAsync = true;
+    }
 
     printFunctionParameters(LabelList, node->getChild(startIndex),
                             Options.ShowFunctionArgumentTypes);
@@ -738,19 +800,31 @@ private:
     if (!Options.ShowFunctionArgumentTypes)
       return;
 
-    if (startIndex == 1)
+    if (isAsync)
+      Printer << " async";
+
+    if (isThrows)
       Printer << " throws";
 
     print(node->getChild(startIndex + 1));
   }
 
   void printImplFunctionType(NodePointer fn) {
+    NodePointer patternSubs = nullptr;
+    NodePointer invocationSubs = nullptr;
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
       for (; curState != newState; curState = State(curState + 1)) {
         switch (curState) {
-        case Attrs: Printer << '('; continue;
+        case Attrs:
+          if (patternSubs) {
+            Printer << "@substituted ";
+            print(patternSubs->getChild(0));
+            Printer << ' ';
+          }
+          Printer << '(';
+          continue;
         case Inputs: Printer << ") -> ("; continue;
         case Results: printer_unreachable("no state after Results");
         }
@@ -764,10 +838,15 @@ private:
         transitionTo(Inputs);
         print(child);
       } else if (child->getKind() == Node::Kind::ImplResult
+                 || child->getKind() == Node::Kind::ImplYield
                  || child->getKind() == Node::Kind::ImplErrorResult) {
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
         print(child);
+      } else if (child->getKind() == Node::Kind::ImplPatternSubstitutions) {
+        patternSubs = child;
+      } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
+        invocationSubs = child;
       } else {
         assert(curState == Attrs);
         print(child);
@@ -776,6 +855,17 @@ private:
     }
     transitionTo(Results);
     Printer << ')';
+
+    if (patternSubs) {
+      Printer << " for <";
+      printChildren(patternSubs->getChild(1));
+      Printer << '>';
+    }
+    if (invocationSubs) {
+      Printer << " for <";
+      printChildren(invocationSubs->getChild(0));
+      Printer << '>';
+    }
   }
 
   void printFunctionSigSpecializationParams(NodePointer Node);
@@ -953,7 +1043,7 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
             print(child);
           }
         }
-        argNum++;
+        ++argNum;
         break;
     }
   }
@@ -979,7 +1069,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
 }
 
 NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
-  switch (Node->getKind()) {
+  switch (auto kind = Node->getKind()) {
   case Node::Kind::Static:
     Printer << "static ";
     print(Node->getChild(0));
@@ -1085,8 +1175,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "):";
     }
     print(Node->getChild(1));
-    if (Node->getNumChildren() == 3)
-      print(Node->getChild(2));
+    if (Node->getNumChildren() == 3) {
+      // Currently the runtime does not mangle the generic signature.
+      // This is an open to-do in swift::_buildDemanglingForContext().
+      if (!Options.PrintForTypeName)
+        print(Node->getChild(2));
+    }
     return nullptr;
   case Node::Kind::Variable:
     return printEntity(Node, asPrefixContext, TypePrinting::WithColon,
@@ -1119,7 +1213,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Suffix:
     if (Options.DisplayUnmangledSuffix) {
-      Printer << " with unmangled suffix " << QuotedString(Node->getText());
+      Printer << " with unmangled suffix "
+              << QuotedString(Node->getText().str());
     }
     return nullptr;
   case Node::Kind::Initializer:
@@ -1156,7 +1251,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
                        /*hasName*/true);
   case Node::Kind::LocalDeclName:
     print(Node->getChild(1));
-    Printer << " #" << (Node->getChild(0)->getIndex() + 1);
+    if (Options.DisplayLocalNameContexts)
+      Printer << " #" << (Node->getChild(0)->getIndex() + 1);
     return nullptr;
   case Node::Kind::PrivateDeclName:
     if (Node->getNumChildren() > 1) {
@@ -1190,23 +1286,19 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::UnknownIndex:
     Printer << "unknown index";
     return nullptr;
-  case Node::Kind::NoEscapeFunctionType:
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::EscapingAutoClosureType:
-    Printer << "@autoclosure ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::AutoClosureType:
-    Printer << "@autoclosure ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::ThinFunctionType:
-    Printer << "@convention(thin) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
+  case Node::Kind::NoEscapeFunctionType:
+  case Node::Kind::AutoClosureType:
+  case Node::Kind::EscapingAutoClosureType:
+  case Node::Kind::ThinFunctionType:
+  case Node::Kind::CFunctionPointer:
+  case Node::Kind::ObjCBlock:
+  case Node::Kind::EscapingObjCBlock:
+  case Node::Kind::DifferentiableFunctionType:
+  case Node::Kind::EscapingDifferentiableFunctionType:
+  case Node::Kind::LinearFunctionType:
+  case Node::Kind::EscapingLinearFunctionType:
     printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::ArgumentTuple:
@@ -1487,7 +1579,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::PartialApplyObjCForwarder:
@@ -1498,7 +1590,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
@@ -1529,13 +1621,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     bool isSerialized = false;
     if (lastChild->getKind() == Node::Kind::IsSerialized) {
       isSerialized = true;
-      lastChildIndex--;
+      --lastChildIndex;
       lastChild = Node->getChild(lastChildIndex - 1);
     }
 
     if (lastChild->getKind() == Node::Kind::DependentGenericSignature) {
       print(lastChild);
-      lastChildIndex--;
+      --lastChildIndex;
     }
 
     Printer << "(";
@@ -1799,21 +1891,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::DynamicSelf:
     Printer << "Self";
     return nullptr;
-  case Node::Kind::CFunctionPointer: {
-    Printer << "@convention(c) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
-  case Node::Kind::ObjCBlock: {
-    Printer << "@convention(block) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
-  case Node::Kind::EscapingObjCBlock: {
-    Printer << "@escaping @convention(block) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
   case Node::Kind::SILBoxType: {
     Printer << "@box ";
     NodePointer type = Node->getChild(0);
@@ -1826,7 +1903,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
     NodePointer type = Node->getChild(Idx)->getChild(0);
     printWithParens(type);
@@ -1843,7 +1920,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
 
     NodePointer type = Node->getChild(Idx);
@@ -1893,8 +1970,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       printChildren(type_list, " & ");
       Printer << " & ";
     }
-    if (Options.QualifyEntities)
-      Printer << "Swift.";
+    if (Options.QualifyEntities && Options.DisplayStdlibModule)
+      Printer << swift::STDLIB_NAME << ".";
     Printer << "AnyObject";
     return nullptr;
   }
@@ -1997,24 +2074,62 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::LabelList:
     return nullptr;
+  case Node::Kind::ImplDifferentiable:
+    Printer << "@differentiable";
+    return nullptr;
+  case Node::Kind::ImplLinear:
+    Printer << "@differentiable(linear)";
+    return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
+  case Node::Kind::ImplDifferentiability:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with trailing space.
+    Printer << Node->getText() << ' ';
+    return nullptr;
   case Node::Kind::ImplFunctionAttribute:
     Printer << Node->getText();
     return nullptr;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
-    LLVM_FALLTHROUGH;
+    printChildren(Node, " ");
+    return nullptr;
+  case Node::Kind::ImplYield:
+    Printer << "@yields ";
+    printChildren(Node, " ");
+    return nullptr;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
-    printChildren(Node, " ");
+    // Children: `convention, differentiability?, type`
+    // Print convention.
+    print(Node->getChild(0));
+    Printer << " ";
+    // Print differentiability, if it exists.
+    if (Node->getNumChildren() == 3)
+      print(Node->getChild(1));
+    // Print type.
+    print(Node->getLastChild());
     return nullptr;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);
+    return nullptr;
+  case Node::Kind::ImplInvocationSubstitutions:
+    Printer << "for <";
+    printChildren(Node->getChild(0), ", ");
+    Printer << '>';
+    return nullptr;
+  case Node::Kind::ImplPatternSubstitutions:
+    Printer << "@substituted ";
+    print(Node->getChild(0));
+    Printer << " for <";
+    printChildren(Node->getChild(1), ", ");
+    Printer << '>';
     return nullptr;
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
@@ -2170,6 +2285,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0));
     return nullptr;
 
+  case Node::Kind::AsyncAnnotation:
+    Printer<< " async ";
+    return nullptr;
   case Node::Kind::ThrowsAnnotation:
     Printer<< " throws ";
     return nullptr;
@@ -2326,6 +2444,48 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AccessorFunctionReference:
     Printer << "accessor function at " << Node->getIndex();
     return nullptr;
+  case Node::Kind::CanonicalSpecializedGenericMetaclass:
+    Printer << "specialized generic metaclass for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    Printer << "canonical specialized generic type metadata accessor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::MetadataInstantiationCache:
+    Printer << "metadata instantiation cache for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoncanonicalSpecializedGenericTypeMetadata:
+    Printer << "noncanonical specialized generic type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoncanonicalSpecializedGenericTypeMetadataCache:
+    Printer << "cache variable for noncanonical specialized generic type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceToken:
+  case Node::Kind::GlobalVariableOnceFunction:
+    Printer << (kind == Node::Kind::GlobalVariableOnceToken
+                  ? "one-time initialization token for "
+                  : "one-time initialization function for ");
+    printContext(Node->getChild(0));
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::GlobalVariableOnceDeclList:
+    if (Node->getNumChildren() == 1) {
+      print(Node->getChild(0));
+    } else {
+      Printer << '(';
+      for (unsigned i = 0, e = Node->getNumChildren(); i < e; ++i) {
+        if (i != 0) {
+          Printer << ", ";
+        }
+        print(Node->getChild(i));
+      }
+      Printer << ')';
+    }
+    return nullptr;
   }
   printer_unreachable("bad node kind!");
 }
@@ -2362,8 +2522,9 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   bool MultiWordName = ExtraName.contains(' ');
   // Also a local name (e.g. Mystruct #1) does not look good if its context is
   // printed in prefix form.
-  if (hasName &&
-      Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName)
+  bool LocalName =
+      hasName && Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName;
+  if (LocalName && Options.DisplayLocalNameContexts)
     MultiWordName = true;
 
   if (asPrefixContext && (TypePr != TypePrinting::NoType || MultiWordName)) {
@@ -2448,7 +2609,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       printEntityType(Entity, type, genericFunctionTypeList);
     }
   }
-  if (!asPrefixContext && PostfixContext) {
+  if (!asPrefixContext && PostfixContext &&
+      (!LocalName || Options.DisplayLocalNameContexts)) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||

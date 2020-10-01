@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -35,15 +35,11 @@ protocol Pattern {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
 }
 
 extension Pattern {
   func found<C: Collection>(in c: C) -> (extent: Range<Index>, data: MatchData)?
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     var i = c.startIndex
     while i != c.endIndex {
@@ -72,8 +68,6 @@ where T.Element : Equatable {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     var i = c.startIndex
     for p in pattern {
@@ -93,8 +87,6 @@ struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, C.Element == Element 
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     return c.isEmpty
     ? .notFound(resumeAt: c.endIndex)
@@ -126,8 +118,6 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     var src0 = c[c.startIndex..<c.endIndex]
     while true {
@@ -166,8 +156,6 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
   where C.Index == M0.Index, C.Element == M0.Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     var lastEnd = c.startIndex
     var rest = c.dropFirst(0)
@@ -176,11 +164,11 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   searchLoop:
     while !rest.isEmpty {
       switch singlePattern.matched(atStartOf: rest) {
-      case .found(let x):
-        data.append(x)
-        lastEnd = x.end
+      case .found(let end1, let data1):
+        data.append((end1, data1))
+        lastEnd = end1
         if data.count == repeatLimits.upperBound { break }
-        rest = rest[x.end..<rest.endIndex]
+        rest = rest[end1..<rest.endIndex]
       case .notFound(let r):
         if !repeatLimits.contains(data.count)  {
           return .notFound(resumeAt: r)
@@ -236,8 +224,6 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     switch matchers.0.matched(atStartOf: c) {
     case .found(let end, let data):
@@ -292,8 +278,6 @@ struct MatchStaticString : Pattern {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, C.Element == Element 
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
 {
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
@@ -315,7 +299,7 @@ extension StaticString {
 extension Collection where Iterator.Element == UTF8.CodeUnit {
   var u8str : String {
     var a = Array<UTF8.CodeUnit>()
-    a.reserveCapacity(numericCast(count) + 1)
+    a.reserveCapacity(count + 1)
     a.append(contentsOf: self)
     a.append(0)
     return String(reflecting: String(cString: a))
@@ -327,8 +311,7 @@ extension Pattern where Element == UTF8.CodeUnit {
     in c: C,
     format: (MatchData)->String = { String(reflecting: $0) })
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection {
+  {
     print("searching for /\(self)/ in \(c.u8str)...", terminator: "")
     if let (extent, data) = self.found(in: c) {
       print(
@@ -382,8 +365,6 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection  
   {
     guard let closer = c.first.flatMap({ pairs[$0] }) else {
       return .notFound(resumeAt: nil)

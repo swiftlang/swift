@@ -17,7 +17,7 @@ struct M<L : P, R> {
   }
 }
 
-protocol P {
+protocol P { // expected-note {{where 'Self' = 'M<WritableKeyPath<X, Int>, R>'}}
   associatedtype A
   associatedtype B
 
@@ -28,7 +28,6 @@ protocol P {
 
 extension P {
   static func ≈> <R>(f: Self,  b: @escaping (inout B) -> R) -> M<Self, R> {}
-  // expected-note@-1 {{in call to operator '≈>'}}
 }
 
 extension WritableKeyPath : P {
@@ -43,5 +42,5 @@ extension WritableKeyPath : P {
 struct X { var y: Int = 0 }
 var x = X()
 x ~> \X.y ≈> { a in a += 1; return 3 }
-// expected-error@-1 {{generic parameter 'R' could not be inferred}}
-// FIXME: Used to be better: "cannot convert call result type 'M<WritableKeyPath<X, Int>, _>' to expected type 'WritableKeyPath<_, _>'"
+// expected-error@-1 {{referencing operator function '~>' on 'P' requires that 'M<WritableKeyPath<X, Int>, R>' conform to 'P'}}
+// expected-error@-2 {{unable to infer complex closure return type; add explicit type to disambiguate}}

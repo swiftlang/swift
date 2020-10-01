@@ -12,6 +12,7 @@ add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BU
   CheckRangeReplaceableSliceType.swift
   CheckSequenceInstance.swift
   CheckSequenceType.swift
+  COWLoggingArray.swift
   LoggingWrappers.swift
   MinimalCollections.swift
   RangeSelection.swift
@@ -20,6 +21,7 @@ add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BU
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT

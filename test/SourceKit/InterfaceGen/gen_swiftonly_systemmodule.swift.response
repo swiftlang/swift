@@ -170,7 +170,6 @@ public func publicFunc()
     key.name: "PublicClass",
     key.offset: 33,
     key.length: 21,
-    key.runtime_name: "_TtC4main11PublicClass",
     key.nameoffset: 39,
     key.namelength: 11,
     key.bodyoffset: 52,

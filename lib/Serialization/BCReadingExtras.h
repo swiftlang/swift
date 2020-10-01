@@ -13,7 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_BCREADINGEXTRAS_H
 #define SWIFT_SERIALIZATION_BCREADINGEXTRAS_H
 
-#include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 
 namespace swift {
 namespace serialization {
@@ -38,7 +38,8 @@ public:
 
   ~BCOffsetRAII() {
     if (Cursor)
-      Cursor->JumpToBit(Offset);
+      cantFail(Cursor->JumpToBit(Offset),
+               "BCOffsetRAII must be able to go back");
   }
 };
 

@@ -100,6 +100,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -150,6 +151,11 @@ namespace {
                                           const SpareBitVector &spareBits) {
       return new ThinFuncTypeInfo(formalType, storageType, size, align,
                                   spareBits);
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -209,6 +215,11 @@ namespace {
       llvm_unreachable("[" #name "] function type"); \
     }
 #include "swift/AST/ReferenceStorage.def"
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
 
     static Size getFirstElementSize(IRGenModule &IGM) {
       return IGM.getPointerSize();
@@ -378,6 +389,10 @@ namespace {
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
   };
   
   /// The type info class for the on-stack representation of an ObjC block.
@@ -396,6 +411,10 @@ namespace {
         CaptureOffset(captureOffset)
     {}
     
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
     // The lowered type should be an LLVM struct comprising the block header
     // (IGM.ObjCBlockStructTy) as its first element and the capture as its
     // second.
@@ -479,6 +498,16 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
+  // Handle `@differentiable` and `@differentiable(linear)` functions.
+  switch (T->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::Normal:
+    return convertNormalDifferentiableFunctionType(T);
+  case DifferentiabilityKind::Linear:
+    return convertLinearDifferentiableFunctionType(T);
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  }
+
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:
     return new BlockTypeInfo(CanSILFunctionType(T),
@@ -587,10 +616,10 @@ static void emitApplyArgument(IRGenFunction &IGF,
                               Explosion &in,
                               Explosion &out) {
   auto silConv = IGF.IGM.silConv;
-
+  auto context = IGF.IGM.getMaximalTypeExpansionContext();
   bool isSubstituted =
-      (silConv.getSILType(substParam, substFnTy)
-         != silConv.getSILType(origParam, origFnTy));
+      (silConv.getSILType(substParam, substFnTy, context)
+         != silConv.getSILType(origParam, origFnTy, context));
 
   // For indirect arguments, we just need to pass a pointer.
   if (silConv.isSILIndirect(origParam)) {
@@ -599,8 +628,8 @@ static void emitApplyArgument(IRGenFunction &IGF,
     
     // If a substitution is in play, just bitcast the address.
     if (isSubstituted) {
-      auto origType =
-          IGF.IGM.getStoragePointerType(silConv.getSILType(origParam, origFnTy));
+      auto origType = IGF.IGM.getStoragePointerType(
+          silConv.getSILType(origParam, origFnTy, context));
       addr = IGF.Builder.CreateBitCast(addr, origType);
     }
     
@@ -616,26 +645,34 @@ static void emitApplyArgument(IRGenFunction &IGF,
   // Handle the last unsubstituted case.
   if (!isSubstituted) {
     auto &substArgTI = cast<LoadableTypeInfo>(
-      IGF.getTypeInfo(silConv.getSILType(substParam, substFnTy)));
+        IGF.getTypeInfo(silConv.getSILType(substParam, substFnTy, context)));
     substArgTI.reexplode(IGF, in, out);
     return;
   }
 
-  reemitAsUnsubstituted(IGF, silConv.getSILType(origParam, origFnTy),
-                        silConv.getSILType(substParam, substFnTy), in, out);
+  reemitAsUnsubstituted(IGF, silConv.getSILType(origParam, origFnTy, context),
+                        silConv.getSILType(substParam, substFnTy, context), in,
+                        out);
 }
 
-static CanType getArgumentLoweringType(CanType type,
-                                       SILParameterInfo paramInfo) {
+static CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
+                                       bool isNoEscape) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
+    return type;
+  // Capture indirect parameters if the closure is not [onstack]. [onstack]
+  // closures don't take ownership of their arguments so we just capture the
+  // address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
-    return type;
+    if (isNoEscape)
+      return CanInOutType::get(type);
+    else
+      return type;
 
   // Capture inout parameters by pointer.
   case ParameterConvention::Indirect_Inout:
@@ -653,7 +690,8 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
   if (param.isFormalIndirect())
     return false;
 
-  SILType argType = IGM.silConv.getSILType(param, substType);
+  SILType argType = IGM.silConv.getSILType(
+      param, substType, IGM.getMaximalTypeExpansionContext());
   auto &ti = IGF.getTypeInfoForLowered(argType.getASTType());
   // Empty values don't matter.
   return ti.getSchema().empty();
@@ -736,9 +774,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
     SILFunctionConventions origConv(origType, IGM.getSILModule());
-    auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+    auto &outResultTI = IGM.getTypeInfo(
+        outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
-    auto &origResultTI = IGM.getTypeInfo(origConv.getSILResultType());
+    auto &origResultTI = IGM.getTypeInfo(
+        origConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &origNativeSchema = origResultTI.nativeReturnValueSchema(IGM);
 
     // Forward the indirect return values. We might have to reabstract the
@@ -747,34 +787,39 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       assert(origNativeSchema.requiresIndirect());
       auto resultAddr = origParams.claimNext();
       resultAddr = subIGF.Builder.CreateBitCast(
-          resultAddr, IGM.getStoragePointerType(origConv.getSILResultType()));
+          resultAddr, IGM.getStoragePointerType(origConv.getSILResultType(
+                          IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr);
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
       auto stackAddr = outResultTI.allocateStack(
-          subIGF, outConv.getSILResultType(), "return.temp");
+          subIGF,
+          outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
+          "return.temp");
       resultValueAddr = stackAddr.getAddress();
       auto resultAddr = subIGF.Builder.CreateBitCast(
-          resultValueAddr,
-          IGM.getStoragePointerType(origConv.getSILResultType()));
+          resultValueAddr, IGM.getStoragePointerType(origConv.getSILResultType(
+                               IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr.getAddress());
     }
 
-    for (auto resultType : origConv.getIndirectSILResultTypes()) {
+    for (auto resultType : origConv.getIndirectSILResultTypes(
+             IGM.getMaximalTypeExpansionContext())) {
       auto addr = origParams.claimNext();
       addr = subIGF.Builder.CreateBitCast(
           addr, IGM.getStoragePointerType(resultType));
       args.add(addr);
     }
-    
+
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
       auto origParamInfo = origType->getParameters()[i];
-      auto &ti = IGM.getTypeInfoForLowered(
-                   origParamInfo.getArgumentType(IGM.getSILModule(), origType));
+      auto &ti = IGM.getTypeInfoForLowered(origParamInfo.getArgumentType(
+          IGM.getSILModule(), origType, IGM.getMaximalTypeExpansionContext()));
       auto schema = ti.getSchema();
-      
-      auto origParamSILType = IGM.silConv.getSILType(origParamInfo, origType);
+
+      auto origParamSILType = IGM.silConv.getSILType(
+          origParamInfo, origType, IGM.getMaximalTypeExpansionContext());
       // Forward the address of indirect value params.
       auto &nativeSchemaOrigParam = ti.nativeParameterValueSchema(IGM);
       bool isIndirectParam = origConv.isSILIndirect(origParamInfo);
@@ -801,7 +846,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
 
       // Map from the native calling convention into the explosion schema.
-      auto outTypeParamSILType = IGM.silConv.getSILType(origParamInfo, origType);
+      auto outTypeParamSILType = IGM.silConv.getSILType(
+          origParamInfo, origType, IGM.getMaximalTypeExpansionContext());
       auto &nativeSchemaOutTypeParam =
           IGM.getTypeInfo(outTypeParamSILType).nativeParameterValueSchema(IGM);
       Explosion nativeParam;
@@ -914,8 +960,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
               subIGF, substType, outType);
       auto paramInfo = substType->getParameters()[paramI];
-      auto &ti = IGM.getTypeInfoForLowered(
-                     paramInfo.getArgumentType(IGM.getSILModule(), substType));
+      auto &ti = IGM.getTypeInfoForLowered(paramInfo.getArgumentType(
+          IGM.getSILModule(), substType, IGM.getMaximalTypeExpansionContext()));
       Explosion param;
       auto ref = rawData;
       // We can get a '{ swift.refcounted* }' type for AnyObject on linux.
@@ -943,6 +989,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   bool isWitnessMethodCallee = origType->getRepresentation() ==
       SILFunctionTypeRepresentation::WitnessMethod;
   Explosion witnessMethodSelfValue;
+
+  llvm::Value *lastCapturedFieldPtr = nullptr;
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -1036,32 +1084,57 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
-      auto fieldSchema = fieldTI.getSchema();
+      lastCapturedFieldPtr = fieldAddr.getAddress();
       
       Explosion param;
       switch (fieldConvention) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant: {
-        // The +1 argument is passed indirectly, so we need to copy into a
-        // temporary.
-        needsAllocas = true;
-        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
-        auto addressPointer = stackAddr.getAddress().getAddress();
-        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                   fieldTy, false);
-        param.add(addressPointer);
-        
-        // Remember to deallocate later.
-        addressesToDeallocate.push_back(
-            AddressToDeallocate{fieldTy, fieldTI, stackAddr});
 
+        auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
+                              &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
+                                       Address fieldAddr) {
+          // The +1 argument is passed indirectly, so we need to copy into a
+          // temporary.
+          needsAllocas = true;
+          auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
+          auto addressPointer = stackAddr.getAddress().getAddress();
+          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
+                                     fieldTy, false);
+          param.add(addressPointer);
+
+          // Remember to deallocate later.
+          addressesToDeallocate.push_back(
+              AddressToDeallocate{fieldTy, fieldTI, stackAddr});
+        };
+
+        if (outType->isNoEscape()) {
+          // If the closure is [onstack] it only captured the address of the
+          // value. Load that address from the context.
+          Explosion addressExplosion;
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr,
+                                                     addressExplosion);
+          assert(fieldTy.isAddress());
+          auto newFieldTy = fieldTy.getObjectType();
+          auto &newFieldTI =
+              subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
+          fieldAddr =
+              newFieldTI.getAddressForPointer(addressExplosion.claimNext());
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+        } else {
+          initStackCopy(fieldTI, fieldTy, fieldAddr);
+        }
         break;
       }
       case ParameterConvention::Indirect_In_Guaranteed:
-        // The argument is +0, so we can use the address of the param in
-        // the context directly.
-        param.add(fieldAddr.getAddress());
-        dependsOnContextLifetime = true;
+        if (outType->isNoEscape()) {
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        } else {
+          // The argument is +0, so we can use the address of the param in
+          // the context directly.
+          param.add(fieldAddr.getAddress());
+          dependsOnContextLifetime = true;
+        }
         break;
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -1092,7 +1165,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         if (!isABIIgnoredParameterWithoutStorage(IGM, subIGF, substType,
                                                  origParamI))
           break;
-        origParamI++;
+        ++origParamI;
       }
 
       if (origParamI < origType->getParameters().size()) {
@@ -1138,8 +1211,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   FunctionPointer fnPtr = [&]() -> FunctionPointer {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
-      assert(staticFnPtr->getPointer()->getType() == fnTy &&
-             "static function type mismatch?!");
+      if (staticFnPtr->getPointer()->getType() != fnTy) {
+        auto fnPtr = staticFnPtr->getPointer();
+        fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
+        return FunctionPointer(fnPtr, origSig);
+      }
       return *staticFnPtr;
     }
 
@@ -1152,7 +1228,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer(fnPtr, origSig);
+    assert(lastCapturedFieldPtr);
+    auto authInfo = PointerAuthInfo::emit(subIGF,
+                            IGM.getOptions().PointerAuth.PartialApplyCapture,
+                            lastCapturedFieldPtr,
+                            PointerAuthEntity::Special::PartialApplyCapture);
+
+    return FunctionPointer(fnPtr, authInfo, origSig);
   }();
 
   // Derive the context argument if needed.  This is either:
@@ -1227,7 +1309,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // Reabstract the result value as substituted.
   SILFunctionConventions origConv(origType, IGM.getSILModule());
-  auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+  auto &outResultTI = IGM.getTypeInfo(
+      outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
   auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
   if (call->getType()->isVoidTy()) {
     if (!resultValueAddr.isValid())
@@ -1240,9 +1323,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       cast<LoadableTypeInfo>(outResultTI)
           .loadAsTake(subIGF, resultValueAddr, loadedResult);
       Explosion nativeResult = nativeResultSchema.mapIntoNative(
-          IGM, subIGF, loadedResult, outConv.getSILResultType(), false);
-      outResultTI.deallocateStack(subIGF, resultValueAddr,
-                                  outConv.getSILResultType());
+          IGM, subIGF, loadedResult,
+          outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()),
+          false);
+      outResultTI.deallocateStack(
+          subIGF, resultValueAddr,
+          outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
       if (nativeResult.size() == 1)
         subIGF.Builder.CreateRet(nativeResult.claimNext());
       else {
@@ -1259,7 +1345,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     llvm::Value *callResult = call;
     // If the result type is dependent on a type parameter we might have to
     // cast to the result type - it could be substituted.
-    if (origConv.getSILResultType().hasTypeParameter()) {
+    if (origConv.getSILResultType(IGM.getMaximalTypeExpansionContext())
+            .hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
       if (ResType != callResult->getType())
         callResult = subIGF.coerceValue(callResult, ResType, subIGF.IGM.DataLayout);
@@ -1288,9 +1375,35 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+  // A context's HeapLayout stores all of the partially applied args.
+  // A HeapLayout is "fixed" if all of its fields have a fixed layout.
+  // Otherwise the HeapLayout is "non-fixed".
+  // Only a non-fixed HeapLayout needs TypeMetadata of the non-fixed fields
+  // during IRGen of the HeapLayout's destructor function.
+  // We should not consider partially applied args as TypeMetadata sources,
+  // because they are available only in the caller and the partial application
+  // forwarder, but not in the destructor function.
+  // It is safe to consider partially applied args as TypeMetadata sources for
+  // "fixed" HeapLayout, because they are not accessed during the IRGen of the
+  // destructor function.
+  bool considerParameterSources = true;
+  for (auto param : params) {
+    SILType argType = IGF.IGM.silConv.getSILType(
+        param, origType, IGF.IGM.getMaximalTypeExpansionContext());
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
+                                                 outType->isNoEscape());
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    if (!isa<FixedTypeInfo>(ti)) {
+      considerParameterSources = false;
+      break;
+    }
+  }
+
   // Reserve space for polymorphic bindings.
-  auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subs);
+  auto bindings = NecessaryBindings::forPartialApplyForwarder(
+      IGF.IGM, origType, subs, considerParameterSources);
+
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -1303,9 +1416,11 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // Collect the type infos for the context parameters.
   for (auto param : params) {
-    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
+    SILType argType = IGF.IGM.silConv.getSILType(
+        param, origType, IGF.IGM.getMaximalTypeExpansionContext());
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
+                                                 outType->isNoEscape());
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
@@ -1394,6 +1509,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       singleRefcountedConvention = origType->getCalleeConvention();
     }
   }
+
+  auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
   
   // If we have a single refcounted pointer context (and no polymorphic args
   // to capture), and the dest ownership semantics match the parameter's,
@@ -1408,7 +1525,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       hasSingleSwiftRefcountedContext == Yes &&
       outType->getCalleeConvention() == *singleRefcountedConvention) {
     assert(args.size() == 1);
-    auto fnPtr = fn.getPointer();
+    auto fnPtr = emitPointerAuthResign(IGF, fn, outAuthInfo).getPointer();
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
@@ -1447,6 +1564,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
                                       origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
+    forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
     forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
 
@@ -1489,7 +1607,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
       stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+          IGF.IGM.Int8Ty, layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize() , Alignment(16));
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
       data = stackAddr->getAddress().getAddress();
@@ -1521,7 +1639,15 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       // We don't add non-constant function pointers to the explosion above,
       // so we need to handle them specially now.
       if (i == nonStaticFnIndex) {
-        llvm::Value *fnPtr = fn.getPointer();
+        llvm::Value *fnPtr;
+        if (auto &schema = IGF.getOptions().PointerAuth.PartialApplyCapture) {
+          auto schemaAuthInfo =
+            PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
+                           PointerAuthEntity::Special::PartialApplyCapture);
+          fnPtr = emitPointerAuthResign(IGF, fn, schemaAuthInfo).getPointer();
+        } else {
+          fnPtr = fn.getPointer();
+        }
         fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
         IGF.Builder.CreateStore(fnPtr, fieldAddr);
         continue;
@@ -1532,9 +1658,15 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                 isOutlined);
+        if (outType->isNoEscape()) {
+          cast<LoadableTypeInfo>(fieldLayout.getType())
+              .initialize(IGF, args, fieldAddr, isOutlined);
+        } else {
+          auto addr =
+              fieldLayout.getType().getAddressForPointer(args.claimNext());
+          fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr,
+                                                   fieldTy, isOutlined);
+        }
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1564,6 +1696,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                               subs,
                                                               &layout,
                                                               argConventions);
+  forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
   out.add(data);
@@ -1684,8 +1817,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
-  auto invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
-                                                  IGF.IGM.FunctionPtrTy);
+  llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
+                                                      IGF.IGM.FunctionPtrTy);
   
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
@@ -1693,7 +1826,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
   llvm::IntegerType *UnsignedLongTy =
-      llvm::IntegerType::get(IGF.IGM.LLVMContext,
+      llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
                              ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
   descriptorFields.addInt(UnsignedLongTy, 0);
   descriptorFields.addInt(UnsignedLongTy,
@@ -1701,8 +1834,14 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   if (!isPOD) {
     // Define the copy and dispose helpers.
-    descriptorFields.add(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
-    descriptorFields.add(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.addSignedPointer(
+                       emitBlockCopyHelper(IGF.IGM, blockTy, storageTL),
+                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockCopyHelper);
+    descriptorFields.addSignedPointer(
+                       emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL),
+                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockDisposeHelper);
   }
   
   // Build the descriptor signature.
@@ -1725,8 +1864,17 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
   IGF.Builder.CreateStore(reserved,
                           IGF.Builder.CreateStructGEP(headerAddr, 2, layout));
-  IGF.Builder.CreateStore(invokeVal,
-                          IGF.Builder.CreateStructGEP(headerAddr, 3, layout));
+
+  auto invokeAddr = IGF.Builder.CreateStructGEP(headerAddr, 3, layout);
+  if (auto &schema =
+        IGF.getOptions().PointerAuth.BlockInvocationFunctionPointers) {
+    auto invokeAuthInfo = PointerAuthInfo::emit(IGF, schema,
+                                                invokeAddr.getAddress(),
+                                                invokeTy);
+    invokeVal = emitPointerAuthSign(IGF, invokeVal, invokeAuthInfo);
+  }
+  IGF.Builder.CreateStore(invokeVal, invokeAddr);
+
   IGF.Builder.CreateStore(descriptorVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }

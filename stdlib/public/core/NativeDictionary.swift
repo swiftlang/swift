@@ -161,7 +161,7 @@ extension _NativeDictionary { // Low-level lookup operations
   @inlinable
   @inline(__always)
   internal func find(_ key: Key) -> (bucket: Bucket, found: Bool) {
-    return find(key, hashValue: self.hashValue(for: key))
+    return _storage.find(key)
   }
 
   /// Search for a given element, assuming it has the specified hash value.
@@ -174,58 +174,54 @@ extension _NativeDictionary { // Low-level lookup operations
     _ key: Key,
     hashValue: Int
   ) -> (bucket: Bucket, found: Bool) {
-    let hashTable = self.hashTable
-    var bucket = hashTable.idealBucket(forHashValue: hashValue)
-    while hashTable._isOccupied(bucket) {
-      if uncheckedKey(at: bucket) == key {
-        return (bucket, true)
-      }
-      bucket = hashTable.bucket(wrappedAfter: bucket)
-    }
-    return (bucket, false)
+    return _storage.find(key, hashValue: hashValue)
   }
 }
 
 extension _NativeDictionary { // ensureUnique
-  @inlinable
-  internal mutating func resize(capacity: Int) {
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal mutating func _copyOrMoveAndResize(
+    capacity: Int,
+    moveElements: Bool
+  ) {
     let capacity = Swift.max(capacity, self.capacity)
     let newStorage = _DictionaryStorage<Key, Value>.resize(
       original: _storage,
       capacity: capacity,
-      move: true)
+      move: moveElements)
     let result = _NativeDictionary(newStorage)
     if count > 0 {
       for bucket in hashTable {
-        let key = (_keys + bucket.offset).move()
-        let value = (_values + bucket.offset).move()
+        let key: Key
+        let value: Value
+        if moveElements {
+          key = (_keys + bucket.offset).move()
+          value = (_values + bucket.offset).move()
+        } else {
+          key = self.uncheckedKey(at: bucket)
+          value = self.uncheckedValue(at: bucket)
+        }
         result._unsafeInsertNew(key: key, value: value)
       }
-      // Clear out old storage, ensuring that its deinit won't overrelease the
-      // elements we've just moved out.
-      _storage._hashTable.clear()
-      _storage._count = 0
+      if moveElements {
+        // Clear out old storage, ensuring that its deinit won't overrelease the
+        // elements we've just moved out.
+        _storage._hashTable.clear()
+        _storage._count = 0
+      }
     }
     _storage = result._storage
   }
 
   @inlinable
-  @_semantics("optimize.sil.specialize.generic.size.never")
+  internal mutating func resize(capacity: Int) {
+    _copyOrMoveAndResize(capacity: capacity, moveElements: true)
+  }
+
+  @inlinable
   internal mutating func copyAndResize(capacity: Int) {
-    let capacity = Swift.max(capacity, self.capacity)
-    let newStorage = _DictionaryStorage<Key, Value>.resize(
-      original: _storage,
-      capacity: capacity,
-      move: false)
-    let result = _NativeDictionary(newStorage)
-    if count > 0 {
-      for bucket in hashTable {
-        result._unsafeInsertNew(
-          key: self.uncheckedKey(at: bucket),
-          value: self.uncheckedValue(at: bucket))
-      }
-    }
-    _storage = result._storage
+    _copyOrMoveAndResize(capacity: capacity, moveElements: false)
   }
 
   @inlinable

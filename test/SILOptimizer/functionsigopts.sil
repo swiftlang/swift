@@ -63,6 +63,11 @@ public class KlassBar : KlassFoo {
   init()
 }
 
+indirect public enum IndirectEnum : Hashable {
+  case A
+  case B(IndirectEnum)
+}
+
 sil @use_Int : $@convention(thin) (Int) -> ()
 sil @use_Int64 : $@convention(thin) (Int64) -> ()
 sil @use_Generic : $@convention(thin) <T>(@in_guaranteed T) -> ()
@@ -513,6 +518,39 @@ bb0(%0 : $boo):
   release_value %2: $foo
   return %0 : $boo
 }
+
+// CHECK-LABEL: sil @no_fso_recursive_result_is_not_returned :
+// CHECK-NOT:  release_value
+// CHECK:      bb2:
+// CHECK-NEXT:   retain_value %0
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'no_fso_recursive_result_is_not_returned'
+sil @no_fso_recursive_result_is_not_returned : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum {
+bb0(%0 : $IndirectEnum, %1 : $IndirectEnum):
+  switch_enum %1 : $IndirectEnum, case #IndirectEnum.B!enumelt: bb1, default bb2
+
+bb1(%3 : ${ var IndirectEnum }):
+  %4 = project_box %3 : ${ var IndirectEnum }, 0
+  %5 = load %4 : $*IndirectEnum
+  %6 = function_ref @no_fso_recursive_result_is_not_returned : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum
+
+  // The result of the self-recursion is not returned (but put in a box).
+  // This prevents guaranteed -> owned return value specialization.
+  %7 = apply %6(%0, %5) : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum
+  %8 = alloc_box ${ var IndirectEnum }
+  %9 = project_box %8 : ${ var IndirectEnum }, 0
+  store %7 to %9 : $*IndirectEnum
+  %11 = enum $IndirectEnum, #IndirectEnum.B!enumelt, %8 : ${ var IndirectEnum }
+  br bb3(%11 : $IndirectEnum)
+
+bb2:
+  retain_value %0 : $IndirectEnum
+  br bb3(%0 : $IndirectEnum)
+
+bb3(%35 : $IndirectEnum):
+  return %35 : $IndirectEnum
+}
+
 
 // Make sure we do not move the retain_value in the throw block.
 //
@@ -1342,7 +1380,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 
 sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
 bb0(%0 : $Optional<(foo, foo)>):
-  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt.1
+  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt
   %282 = tuple_extract %281 : $(foo, foo), 0
   %283 = tuple_extract %281 : $(foo, foo), 1
   strong_release %283 : $foo
@@ -1537,7 +1575,7 @@ bb0(%0 : $Builtin.Int32):
 
 sil hidden [noinline] @generic_owned_to_guaranteed : $@convention(thin) <T where T : KlassFoo> (@owned T) -> Int64 {
 bb0(%0 : $T):
-  %2 = witness_method $T, #KlassFoo.bar!1 : <Self where Self : KlassFoo> (Self) -> () -> Int64 : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
+  %2 = witness_method $T, #KlassFoo.bar : <Self where Self : KlassFoo> (Self) -> () -> Int64 : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
   %3 = apply %2<T>(%0) : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
   strong_release %0 : $T
   return %3 : $Int64
@@ -1577,7 +1615,7 @@ bb0(%0 : $T):
 
 sil hidden [noinline] @generic_in_to_guaranteed : $@convention(thin) <T where T : P> (@in T) -> Int64 {
 bb0(%0 : $*T):
-  %2 = witness_method $T, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %2 = witness_method $T, #P.foo : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %3 = apply %2<T>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %0 : $*T
   return %3 : $Int64

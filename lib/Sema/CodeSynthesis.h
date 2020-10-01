@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPECHECKING_CODESYNTHESIS_H
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
@@ -33,14 +34,11 @@ class ConstructorDecl;
 class FuncDecl;
 class GenericParamList;
 class NominalTypeDecl;
+class ObjCReason;
 class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
-
-class TypeChecker;
-
-class ObjCReason;
 
 enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this
@@ -53,15 +51,30 @@ enum class SelfAccessorKind {
   Super,
 };
 
-Expr *buildSelfReference(VarDecl *selfDecl,
-                         SelfAccessorKind selfAccessorKind,
-                         bool isLValue,
-                         ASTContext &ctx);
+/// Builds a reference to the \c self decl in a function.
+///
+/// \param selfDecl The self decl to reference.
+/// \param selfAccessorKind The kind of access being performed.
+/// \param isLValue Whether the resulting expression is an lvalue.
+/// \param convertTy The type of the resulting expression. For a reference to
+/// super, this can be a superclass type to upcast to.
+Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
+                         bool isLValue, Type convertTy = Type());
 
 /// Build an expression that evaluates the specified parameter list as a tuple
 /// or paren expr, suitable for use in an apply expr.
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
+
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
+
+// Returns true if given nominal type declaration has a `let` stored property
+// with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
+/// Add `@_fixed_layout` attribute to the nominal type, if possible.
+void addFixedLayoutAttr(NominalTypeDecl *nominal);
 
 } // end namespace swift
 

@@ -10,5 +10,5 @@ try:
     isPosix = (sys.platform != "win32")
     subprocess.check_call(shlex.split(sys.argv[1], posix=isPosix))
     sys.exit(1)
-except subprocess.CalledProcessError as e:
+except subprocess.CalledProcessError:
     sys.exit(0)

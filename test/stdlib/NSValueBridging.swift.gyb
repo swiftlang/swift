@@ -23,10 +23,6 @@ import StdlibUnittestFoundationExtras
 import Foundation
 import CoreGraphics
 
-#if os(iOS) || os(tvOS) || os(watchOS)
-import UIKit
-#endif
-
 var nsValueBridging = TestSuite("NSValueBridging")
 
 func rangesEqual(_ x: NSRange, _ y: NSRange) -> Bool {
@@ -70,7 +66,13 @@ ${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      N
 
 #endif
 
-#if os(iOS) || os(tvOS) || os(watchOS)
+// The last supported iOS version for 32-bit platforms is iOS 10.3, which didn't
+// ship with the UIKit overlay, so we cannot run NSValue bridging tests there.
+//
+// FIXME: Test back-deployment scenarios with the Swift 5.0 compatibility
+// runtime rather than a freshly built stdlib. (rdar://62694723)
+#if canImport(UIKit) && !(os(iOS) && (arch(arm) || arch(i386)))
+import UIKit
 
 ${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
 ${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "cgPoint",           "(==)") }

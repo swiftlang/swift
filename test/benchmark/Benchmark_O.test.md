@@ -11,8 +11,8 @@ These script therefore depend on the supported command line options and the
 format of its console output. The following [`lit` tests][Testing] also serve
 as a verification of this public API to prevent its accidental breakage.
 
-[BD]: https://github.com/apple/swift/blob/master/benchmark/scripts/Benchmark_Driver
-[Testing]: https://github.com/apple/swift/blob/master/docs/Testing.md
+[BD]: https://github.com/apple/swift/blob/main/benchmark/scripts/Benchmark_Driver
+[Testing]: https://github.com/apple/swift/blob/main/docs/Testing.md
 
 Note: Following tests use *Existential.* as an example of a benchmarks that are
 excluded from the default "pre-commit" list because they are marked `skip` and
@@ -103,9 +103,9 @@ ALPHASORT: FatCompactMap
 Substring filters using + and - prefix
 
 ````
-RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII.Small \
+RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII2.Small \
 RUN:             | %FileCheck %s --check-prefix FILTERS
-FILTERS: AngryPhonebook.ASCII.Small
+FILTERS: AngryPhonebook.ASCII2.Small
 FILTERS-NOT: AngryPhonebook.Armenian
 FILTERS-NOT: AngryPhonebook.Cyrillic.Small
 FILTERS: AngryPhonebook.Cyrillic

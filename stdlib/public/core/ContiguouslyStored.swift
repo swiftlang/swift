@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: The below is necessary for fast String initialization from untyped
+// memory. When we add Collection.withContiguousRawStorageIfAvailabe(), we can
+// deprecate this functionality.
+
 @usableFromInline
 internal protocol _HasContiguousBytes {
   func withUnsafeBytes<R>(

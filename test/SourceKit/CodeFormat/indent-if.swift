@@ -15,8 +15,8 @@ if condition,
 
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
-// CHECK: key.sourcetext: "    !condition,"
-// CHECK: key.sourcetext: "    condition,"
-// CHECK: key.sourcetext: "    condition,"
+// CHECK: key.sourcetext: "   !condition,"
+// CHECK: key.sourcetext: "        condition,"
+// CHECK: key.sourcetext: "         condition,"
 // CHECK: key.sourcetext: "    !condition,"
 // CHECK: key.sourcetext: "    condition {"

@@ -31,23 +31,19 @@ namespace swift {
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
-  class TypeChecker;
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                     const DeclContext *DC,
+void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
-void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
+void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                        AbstractFunctionDecl *AFD,
-                                        BraceStmt *body);
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 
 /// Perform diagnostics on the top level code declaration.
-void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
+void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///
@@ -75,16 +71,22 @@ bool diagnoseArgumentLabelError(ASTContext &ctx,
 /// with a non-owning attribute, such as 'weak' or 'unowned' and the initializer
 /// expression refers to a class constructor, emit a warning that the assigned
 /// instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const AssignExpr *assignExpr);
 
 /// If \p pattern binds to a declaration with a non-owning attribute, such as
 /// 'weak' or 'unowned' and \p initializer refers to a class constructor,
 /// emit a warning that the bound instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const Pattern *pattern,
                                           SourceLoc equalLoc,
                                           const Expr *initializer);
+
+/// If \p expr is a call to a known function with a requirement that some
+/// arguments must be constants, whether those arguments are passed only
+/// constants. Otherwise, diagnose and emit errors.
+void diagnoseConstantArgumentRequirement(const Expr *expr,
+                                         const DeclContext *declContext);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user
@@ -101,7 +103,7 @@ bool computeFixitsForOverridenDeclaration(
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
-void fixItEncloseTrailingClosure(TypeChecker &TC,
+void fixItEncloseTrailingClosure(ASTContext &ctx,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);

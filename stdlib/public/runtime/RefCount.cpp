@@ -17,7 +17,7 @@ namespace swift {
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
                                             uint32_t n) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return;
   }
   else if (oldbits.hasSideTable()) {
@@ -36,7 +36,7 @@ template void RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountB
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
                                                      uint32_t n) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return;
   }
   else if (oldbits.hasSideTable()) {
@@ -52,7 +52,7 @@ template void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTable
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return true;
   }
   else if (oldbits.hasSideTable())
@@ -65,7 +65,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementNonAtomicSlow(RefCountBits oldbits) {
-  if (oldbits.isImmortal()) {
+  if (oldbits.isImmortal(false)) {
     return true;
   }
   else if (oldbits.hasSideTable())
@@ -155,6 +155,28 @@ void _swift_stdlib_immortalize(void *obj) {
   auto heapObj = reinterpret_cast<HeapObject *>(obj);
   heapObj->refCounts.setIsImmortal(true);
 }
+
+#ifndef NDEBUG
+// SideTableRefCountBits specialization intentionally does not exist.
+template <>
+bool RefCounts<InlineRefCountBits>::isImmutableCOWBuffer() {
+  if (!hasSideTable())
+    return false;
+  HeapObjectSideTableEntry *sideTable = allocateSideTable(false);
+  assert(sideTable);
+  return sideTable->isImmutableCOWBuffer();
+}
+
+template <>
+bool RefCounts<InlineRefCountBits>::setIsImmutableCOWBuffer(bool immutable) {
+  HeapObjectSideTableEntry *sideTable = allocateSideTable(false);
+  assert(sideTable);
+  bool oldValue = sideTable->isImmutableCOWBuffer();
+  sideTable->setIsImmutableCOWBuffer(immutable);
+  return oldValue;
+}
+
+#endif
 
 // namespace swift
 } // namespace swift

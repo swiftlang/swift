@@ -13,13 +13,13 @@
 #ifndef SWIFT_DRIVER_JOB_H
 #define SWIFT_DRIVER_JOB_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -149,6 +149,9 @@ class CommandOutput {
 public:
   CommandOutput(file_types::ID PrimaryOutputType, OutputFileMap &Derived);
 
+  /// For testing dependency graphs that use Jobs
+  CommandOutput(StringRef dummyBaseName, OutputFileMap &);
+
   /// Return the primary output type for this CommandOutput.
   file_types::ID getPrimaryOutputType() const;
 
@@ -193,6 +196,11 @@ public:
   /// first primary input.
   StringRef getAdditionalOutputForType(file_types::ID type) const;
 
+  /// Assuming (and asserting) that there are one or more input pairs, return true if there exists
+  /// an _additional_ (not primary) output of type \p type associated with the
+  /// first primary input.
+  bool hasAdditionalOutputForType(file_types::ID type) const;
+
   /// Return a vector of additional (not primary) outputs of type \p type
   /// associated with the primary inputs.
   ///
@@ -220,7 +228,7 @@ public:
   void writeOutputFileMap(llvm::raw_ostream &out) const;
 
   void print(raw_ostream &Stream) const;
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
 
   /// For use in assertions: check the CommandOutput's state is consistent with
   /// its invariants.
@@ -313,6 +321,12 @@ public:
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile) {}
 
+  /// For testing dependency graphs that use Jobs
+  Job(OutputFileMap &OFM, StringRef dummyBaseName)
+      : Job(CompileJobAction(file_types::TY_Object),
+            SmallVector<const Job *, 4>(),
+            std::make_unique<CommandOutput>(dummyBaseName, OFM), nullptr, {}) {}
+
   virtual ~Job();
 
   const JobAction &getSource() const {
@@ -373,7 +387,7 @@ public:
     Callback(this, static_cast<Job::PID>(OSPid));
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
@@ -381,6 +395,10 @@ public:
   bool hasResponseFile() const { return ResponseFile.hasValue(); }
 
   bool writeArgsToResponseFile() const;
+
+  /// Assumes that, if a compile job, has one primary swift input
+  /// May return empty if none.
+  StringRef getFirstSwiftPrimaryInput() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

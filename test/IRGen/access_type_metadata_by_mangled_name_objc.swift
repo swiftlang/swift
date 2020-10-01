@@ -12,7 +12,8 @@ public func test() {
   var x: Any.Type
 
   // Access ObjC classes by mangled name.
-  // CHECK: @"$sSo8NSObjectCMD"
+  // FIXME: Disabled for now.
+  // CHECK: @"$sSo8NSObjectCMa"
   x = NSObject.self
 
   // Use the metadata accessor for CF classes that already has to exist.

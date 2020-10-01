@@ -1,8 +1,8 @@
-//===-------- IndexSubset.cpp - Swift Differentiable Programming ----------===//
+//===--- IndexSubset.cpp - Fixed-size subset of indices -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,6 @@ using namespace swift;
 
 IndexSubset *
 IndexSubset::getFromString(ASTContext &ctx, StringRef string) {
-  if (string.size() < 0) return nullptr;
   unsigned capacity = string.size();
   llvm::SmallBitVector indices(capacity);
   for (unsigned i : range(capacity)) {
@@ -81,12 +80,14 @@ IndexSubset *IndexSubset::extendingCapacity(
 
 void IndexSubset::print(llvm::raw_ostream &s) const {
   s << '{';
-  interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
-             [&s] { s << ", "; });
+  llvm::interleave(
+      range(capacity), [this, &s](unsigned i) { s << contains(i); },
+      [&s] { s << ", "; });
   s << '}';
 }
 
-void IndexSubset::dump(llvm::raw_ostream &s) const {
+void IndexSubset::dump() const {
+  auto &s = llvm::errs();
   s << "(index_subset capacity=" << capacity << " indices=(";
   interleave(getIndices(), [&s](unsigned i) { s << i; },
              [&s] { s << ", "; });
@@ -125,7 +126,7 @@ int IndexSubset::findPrevious(int endIndex) const {
     offset = (int)indexAndOffset.second - 1;
   }
   for (; bitWordIndex >= 0; --bitWordIndex, offset = numBitsPerBitWord - 1) {
-    for (; offset < (int)numBitsPerBitWord; --offset) {
+    for (; offset >= 0; --offset) {
       auto index = bitWordIndex * (int)numBitsPerBitWord + offset;
       auto bitWord = getBitWord(bitWordIndex);
       if (!bitWord)

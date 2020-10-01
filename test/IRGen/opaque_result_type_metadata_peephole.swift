@@ -12,9 +12,9 @@ func foo() -> some P {
 // The mangled underlying type in foo2 ought to look through foo()'s opaque type
 // CHECK-LABEL: @"$s36opaque_result_type_metadata_peephole4foo2QryFQOMQ" = {{.*}} constant
 // DEFAULT-SAME:            @"symbolic Si"
-// DEFAULT-SAME:            @"get_witness_table S2i36opaque_result_type_metadata_external1PHpyHC
+// DEFAULT-SAME:            @"get_witness_table Si36opaque_result_type_metadata_external1PHpyHC
 // IMPLICIT-DYNAMIC-SAME:   @"symbolic _____yQo_ 36opaque_result_type_metadata_peephole3fooQryFQO"
-// IMPLICIT-DYNAMIC-SAME:   @"get_witness_table 36opaque_result_type_metadata_peephole3fooQryFQOyQo_0a1_b1_c1_D9_external1P
+// IMPLICIT-DYNAMIC-SAME:   @"get_witness_table x36opaque_result_type_metadata_external1PHD1_0a1_b1_c1_D9_peephole3fooQryFQOyQo_HO
 func foo2() -> some P {
   return foo()
 }

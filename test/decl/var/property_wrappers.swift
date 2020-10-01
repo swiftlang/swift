@@ -9,12 +9,11 @@ struct Wrapper<T> {
   init(stored: T) {
     self._stored = stored
   }
-  
+
   var wrappedValue: T {
     get { _stored }
     set { _stored = newValue }
   }
-  
 }
 
 @propertyWrapper
@@ -59,7 +58,7 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}
 
 @propertyWrapper
 struct StaticValue {
@@ -77,7 +76,7 @@ protocol CannotBeAWrapper {
 
 @propertyWrapper
 struct NonVisibleValueWrapper<Value> {
-  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}}
+  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{educational-notes=property-wrapper-requirements}}
 }
 
 @propertyWrapper
@@ -93,7 +92,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}} {{educational-notes=property-wrapper-requirements}}
     self.wrappedValue = initialValue!
   }
 }
@@ -113,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{educational-notes=property-wrapper-requirements}}
     return nil
   }
 }
@@ -122,7 +121,7 @@ struct InitialValueFailable<Value> {
 struct InitialValueFailableIUO<Value> {
   var wrappedValue: Value
 
-  init!(wrappedValue initialValue: Value) {  // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init!(wrappedValue initialValue: Value) {  // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -216,7 +215,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{cannot convert value of type 'Int' to expected argument type 'WrapperWithInitialValue<Int>'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -244,10 +247,8 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -303,7 +304,7 @@ struct IntWrapper {
 }
 
 @propertyWrapper
-struct WrapperForHashable<T: Hashable> { // expected-note{{property wrapper type 'WrapperForHashable' declared here}}
+struct WrapperForHashable<T: Hashable> { // expected-note{{where 'T' = 'NotHashable'}}
   var wrappedValue: T
 }
 
@@ -318,9 +319,8 @@ struct UseWrappersWithDifferentForm {
   @IntWrapper
   var x: Int
 
-  // FIXME: Diagnostic should be better here
-  @WrapperForHashable
-  var y: NotHashable // expected-error{{property type 'NotHashable' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperForHashable'}}
+  @WrapperForHashable // expected-error {{generic struct 'WrapperForHashable' requires that 'NotHashable' conform to 'Hashable'}}
+  var y: NotHashable
 
   @WrapperForHashable
   var yOkay: Int
@@ -328,9 +328,8 @@ struct UseWrappersWithDifferentForm {
   @WrapperWithTwoParams
   var zOkay: (Int, Float)
 
-  // FIXME: Need a better diagnostic here
-  @HasNestedWrapper.NestedWrapper
-  var w: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'HasNestedWrapper.NestedWrapper'}}
+  @HasNestedWrapper.NestedWrapper // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify}}
+  var w: Int
 
   @HasNestedWrapper<Double>.NestedWrapper
   var wOkay: Int
@@ -340,14 +339,17 @@ struct UseWrappersWithDifferentForm {
 }
 
 @propertyWrapper
-struct Function<T, U> { // expected-note{{property wrapper type 'Function' declared here}}
+struct Function<T, U> { // expected-note{{'U' declared as parameter to type 'Function'}}
   var wrappedValue: (T) -> U?
 }
 
 struct TestFunction {
   @Function var f: (Int) -> Float?
-  
-  @Function var f2: (Int) -> Float // expected-error{{property type '(Int) -> Float' does not match that of the 'wrappedValue' property of its wrapper type 'Function'}}
+
+  // FIXME: This diagnostic should be more specific
+  @Function var f2: (Int) -> Float // expected-error {{property type '(Int) -> Float' does not match 'wrappedValue' type '(Int) -> U?'}}
+  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+  // expected-note@-2 {{explicitly specify}}
 
   func test() {
     let _: Int = _f // expected-error{{cannot convert value of type 'Function<Int, Float>' to specified type 'Int'}}
@@ -357,9 +359,9 @@ struct TestFunction {
 // ---------------------------------------------------------------------------
 // Nested wrappers
 // ---------------------------------------------------------------------------
-struct HasNestedWrapper<T> {
+struct HasNestedWrapper<T> { // expected-note {{'T' declared as parameter to type 'HasNestedWrapper'}}
   @propertyWrapper
-  struct NestedWrapper<U> { // expected-note{{property wrapper type 'NestedWrapper' declared here}}
+  struct NestedWrapper<U> {
     var wrappedValue: U
     init(wrappedValue initialValue: U) {
       self.wrappedValue = initialValue
@@ -440,6 +442,15 @@ struct UseWillSetDidSet {
 
     didSet {
       print(oldValue)
+    }
+  }
+}
+
+struct DidSetUsesSelf {
+  @Wrapper
+  var x: Int {
+    didSet {
+      print(self)
     }
   }
 }
@@ -817,11 +828,67 @@ struct TestProjectionValuePropertyAttr {
 @propertyWrapper
 struct BrokenLazy { }
 // expected-error@-1{{property wrapper type 'BrokenLazy' does not contain a non-static property named 'wrappedValue'}}
-// expected-note@-2{{'BrokenLazy' declared here}}
 
 struct S {
-  @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
+  @BrokenLazy
   var wrappedValue: Int
+}
+
+@propertyWrapper
+struct DynamicSelfStruct {
+  var wrappedValue: Self { self } // okay
+  var projectedValue: Self { self } // okay
+}
+
+@propertyWrapper
+class DynamicSelf {
+  var wrappedValue: Self { self } // expected-error {{property wrapper wrapped value cannot have dynamic Self type}}
+  var projectedValue: Self? { self } // expected-error {{property wrapper projected value cannot have dynamic Self type}}
+}
+
+struct UseDynamicSelfWrapper {
+  @DynamicSelf() var value
+}
+
+// ---------------------------------------------------------------------------
+// Invalid redeclaration
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct WrapperWithProjectedValue<T> {
+  var wrappedValue: T
+  var projectedValue: T { return wrappedValue }
+}
+
+class TestInvalidRedeclaration1 {
+
+  @WrapperWithProjectedValue var i = 17
+  // expected-note@-1 {{'i' previously declared here}}
+  // expected-note@-2 {{'$i' synthesized for property wrapper projected value}}
+  // expected-note@-3 {{'_i' synthesized for property wrapper backing storage}}
+
+  @WrapperWithProjectedValue var i = 39
+  // expected-error@-1 {{invalid redeclaration of 'i'}}
+  // expected-error@-2 {{invalid redeclaration of synthesized property '$i'}}
+  // expected-error@-3 {{invalid redeclaration of synthesized property '_i'}}
+}
+
+// SR-12839
+struct TestInvalidRedeclaration2 {
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+}
+
+struct TestInvalidRedeclaration3 {
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
+}
+
+// Diagnose when wrapped property uses the name we use for lazy variable storage property.
+struct TestInvalidRedeclaration4 {
+  @WrapperWithProjectedValue var __lazy_storage_$_foo: Int
+  // expected-error@-1 {{invalid redeclaration of synthesized property '$__lazy_storage_$_foo'}}
+  // expected-note@-2 {{'$__lazy_storage_$_foo' synthesized for property wrapper projected value}}
+  lazy var foo = 1
 }
 
 // ---------------------------------------------------------------------------
@@ -833,6 +900,42 @@ struct UsesExplicitClosures {
 
   @WrapperAcceptingAutoclosure(body: { return 42 })
   var y: Int
+}
+
+// ---------------------------------------------------------------------------
+// Enclosing instance diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+struct MyObservedValueType {
+  @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
 }
 
 // ---------------------------------------------------------------------------
@@ -872,12 +975,12 @@ struct UsesWrapperRequiringP {
 
 // SR-10899 / rdar://problem/51588022
 @propertyWrapper
-struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrapper' declared here}}
+struct SR_10899_Wrapper {
   var wrappedValue: String { "hi" }
 }
 
 struct SR_10899_Usage {
-  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'wrappedValue' property of its wrapper type 'SR_10899_Wrapper'}}
+  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
 }
 
 // SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches
@@ -941,7 +1044,7 @@ struct WrapperB<Value> {
 }
 
 @propertyWrapper
-struct WrapperC<Value> {
+struct WrapperC<Value> { // expected-note {{'Value' declared as parameter to type 'WrapperC'}}
   var wrappedValue: Value?
 
   init(wrappedValue initialValue: Value?) {
@@ -950,7 +1053,7 @@ struct WrapperC<Value> {
 }
 
 @propertyWrapper
-struct WrapperD<Value, X, Y> { // expected-note{{property wrapper type 'WrapperD' declared here}}
+struct WrapperD<Value, X, Y> {
   var wrappedValue: Value
 }
 
@@ -964,17 +1067,71 @@ struct TestComposition {
   @WrapperA @WrapperB @WrapperC var p2 = "Hello"
   @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
-  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
+  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{generic parameter 'Value' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match former 'wrappedValue' type 'WrapperC<Value>'}}
 
-	func triggerErrors(d: Double) {
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
+	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+    // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 		_p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     _p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Property wrapper composition type inference
+// ---------------------------------------------------------------------------
+
+protocol DefaultValue {
+  static var defaultValue: Self { get }
+}
+
+extension Int: DefaultValue {
+  static var defaultValue: Int { 0 }
+}
+
+struct TestCompositionTypeInference {
+  @propertyWrapper
+  struct A<Value: DefaultValue> {
+    var wrappedValue: Value
+
+    init(wrappedValue: Value = .defaultValue, key: String) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  @propertyWrapper
+  struct B<Value: DefaultValue>: DefaultValue {
+    var wrappedValue: Value
+
+    init(wrappedValue: Value = .defaultValue) {
+      self.wrappedValue = wrappedValue
+    }
+
+    static var defaultValue: B<Value> { B() }
+  }
+
+  // All of these are okay
+
+  @A(key: "b") @B
+  var a: Int = 0
+
+  @A(key: "b") @B
+  var b: Int
+
+  @A(key: "c") @B @B
+  var c: Int
 }
 
 // ---------------------------------------------------------------------------
@@ -1579,14 +1736,12 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
+extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
-  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'Self.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -1805,4 +1960,91 @@ func test_rdar56350060() {
       return self[keyPath: keyPath] // Ok
     }
   }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
+}
+
+// SR-11994
+@propertyWrapper
+open class OpenPropertyWrapperWithPublicInit {
+  public init(wrappedValue: String) { // Okay
+    self.wrappedValue = wrappedValue
+  }
+
+  open var wrappedValue: String = "Hello, world"
+}
+
+// SR-11654
+
+struct SR_11654_S {}
+
+class SR_11654_C {
+  @Foo var property: SR_11654_S?
+}
+
+func sr_11654_generic_func<T>(_ argument: T?) -> T? {
+  return argument
+}
+
+let sr_11654_c = SR_11654_C()
+_ = sr_11654_generic_func(sr_11654_c.property) // Okay
+
+// rdar://problem/59471019 - property wrapper initializer requires empty parens
+// for default init
+@propertyWrapper
+struct DefaultableIntWrapper {
+  var wrappedValue: Int
+
+  init() {
+    self.wrappedValue = 0
+  }
+}
+
+struct TestDefaultableIntWrapper {
+  @DefaultableIntWrapper var x
+  @DefaultableIntWrapper() var y
+  @DefaultableIntWrapper var z: Int
+
+  mutating func test() {
+    x = y
+    y = z
+  }
+}
+
+@propertyWrapper
+public struct NonVisibleImplicitInit {
+// expected-error@-1 {{internal initializer 'init()' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleImplicitInit' (which is public)}}
+  public var wrappedValue: Bool {
+    return false
+  }
+}
+
+@propertyWrapper
+struct OptionalWrapper<T> {
+  init() {}
+  var wrappedValue: T? { nil }
+}
+
+struct UseOptionalWrapper {
+  @OptionalWrapper var p: Int?? // Okay
 }

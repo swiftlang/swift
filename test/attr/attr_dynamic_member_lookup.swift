@@ -600,11 +600,7 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
 
 func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
   for idx in 0..<arr.count {
-    // expected-error@-1 {{protocol 'Sequence' requires that 'Lens<Int>' conform to 'Strideable'}}
-    // expected-error@-2 {{protocol 'Sequence' requires that 'Lens<Int>.Stride' conform to 'SignedInteger'}}
-    // expected-error@-3 {{cannot convert value of type 'Int' to expected argument type 'Lens<Int>'}}
-    // expected-error@-4 {{referencing operator function '..<' on 'Comparable' requires that 'Lens<Int>' conform to 'Comparable'}}
-    // expected-error@-5 {{variable 'idx' is not bound by any pattern}}
+    // expected-error@-1 {{cannot convert value of type 'Lens<Int>' to expected argument type 'Int'}}
     let _ = arr[idx]
   }
 }
@@ -745,5 +741,84 @@ struct SR_10557_S1 {
   subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
     fatalError()
+  }
+}
+
+@dynamicMemberLookup
+struct SR11877 {
+  subscript(dynamicMember member: Substring) -> Int { 0 }
+}
+
+_ = \SR11877.okay
+
+func test_infinite_self_recursion() {
+  @dynamicMemberLookup
+  struct Recurse<T> {
+    subscript<U>(dynamicMember member: KeyPath<Recurse<T>, U>) -> Int {
+      return 1
+    }
+  }
+
+  _ = Recurse<Int>().foo
+  // expected-error@-1 {{value of type 'Recurse<Int>' has no dynamic member 'foo' using key path from root type 'Recurse<Int>'}}
+}
+
+// rdar://problem/60225883 - crash during solution application (ExprRewritter::buildKeyPathDynamicMemberIndexExpr)
+func test_combination_of_keypath_and_string_lookups() {
+  @dynamicMemberLookup
+  struct Outer {
+    subscript(dynamicMember member: String) -> Outer {
+      Outer()
+    }
+
+    subscript(dynamicMember member: KeyPath<Inner, Inner>) -> Outer {
+      Outer()
+    }
+  }
+
+  @dynamicMemberLookup
+  struct Inner {
+    subscript(dynamicMember member: String) -> Inner {
+      Inner()
+    }
+  }
+
+  func test(outer: Outer) {
+    _ = outer.hello.world // Ok
+  }
+}
+
+// SR-12626
+@dynamicMemberLookup
+struct SR12626 {
+  var i: Int
+
+  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+    get { self[keyPath: member] }
+    set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
+  }
+}
+
+// SR-12245
+public struct SR12425_S {}
+
+@dynamicMemberLookup
+public struct SR12425_R {}
+
+internal var rightStructInstance: SR12425_R = SR12425_R()
+
+public extension SR12425_R {
+  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
+      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}
+
+@dynamicMemberLookup
+public struct SR12425_R1 {}
+
+public extension SR12425_R1 {
+  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
+    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
   }
 }

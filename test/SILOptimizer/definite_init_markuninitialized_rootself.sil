@@ -109,7 +109,9 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
 // CHECK: end_borrow [[BORROWED_SELF]]
 // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[BORROWED_SELF]]
-// CHECK: destroy_addr [[SELF_FIELD]]
+// CHECK: [[SELF_FIELD_ACCESS:%.*]] = begin_access [deinit] [static] [[SELF_FIELD]]
+// CHECK: destroy_addr [[SELF_FIELD_ACCESS]]
+// CHECK: end_access [[SELF_FIELD_ACCESS]]
 // CHECK: end_borrow [[BORROWED_SELF]]
 // CHECK: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
 // CHECK: dealloc_partial_ref [[SELF]] : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type

@@ -1,5 +1,5 @@
 // RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s --polynomial-threshold=1.7
-// REQUIRES: asserts
+// REQUIRES: asserts,no_asan
 
 enum Operation {
   case binaryOperation((Double, Double) -> Double)

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -swift-version 4
 // RUN: diff -u %s.expected %t.result
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 func migrate<T, U: Sequence, V: Collection>(lseq: LazySequence<T>, lcol: LazyCollection<T>, seq: U, col: V, test: Bool) {
   _ = lseq.compactMap { test ? nil : $0 }

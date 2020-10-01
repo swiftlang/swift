@@ -8,8 +8,8 @@
 
 // REQUIRES: asserts
 
-// CHECK: 3 Serialization - # of nested types resolved without full lookup
-// Unfortunately this isn't 4 because of the shadowed nested type from Clang.
+// CHECK: 4 Serialization - # of nested types resolved without full lookup
+// Unfortunately this isn't 5 because of the shadowed nested type from Clang.
 
 import HasOverlay
 
@@ -20,3 +20,9 @@ public func resolveNestedTypes(
 
 public var shadowedFromClang = getShadowedFromClang()
 public var shadowedFromSwift = HasOverlay.shadowedFromSwift
+
+extension CustomError.Code {
+  public static var failedSuccessfully: CustomError.Code {
+    return CustomError.Code(rawValue: -9999)
+  }
+}

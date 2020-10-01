@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
-// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.swiftmodule | %FileCheck %s
 
 sil_stage canonical
 
 import Swift
+import Builtin
 
 // CHECK-NOT: sil_global hidden @hidden_global_unused
 sil_global hidden @hidden_global_unused : $Int
@@ -15,6 +16,17 @@ sil_global @public_global_unused : $Int
 // CHECK: sil_global @public_global_used
 sil_global @public_global_used : $Int
 
+// CHECK:      sil_global [serialized] @initialized_global_object : $Int64 = {
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 27
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int64, 28
+// CHECK-NEXT:   %initval = object $GlobalObject (%0 : $Builtin.Int64, [tail_elems] %1 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK-NEXT: }
+sil_global [serialized] @initialized_global_object : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = integer_literal $Builtin.Int64, 28
+  %initval = object $GlobalObject (%0 : $Builtin.Int64, [tail_elems] %1 : $Builtin.Int64, %1 : $Builtin.Int64)
+}
+
 // CHECK: sil_global [serialized] @serialized_global
 sil_global [serialized] @serialized_global : $Int
 
@@ -24,3 +36,19 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 }
+
+// CHECK:      sil_global [serialized] @initialized_global_int : $Int64 = {
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 27
+// CHECK-NEXT:   %initval = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT: }
+sil_global [serialized] @initialized_global_int : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+class GlobalObject {
+  @_hasStorage let e: Builtin.Int64
+  
+}
+
+

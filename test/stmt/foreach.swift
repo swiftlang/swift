@@ -6,7 +6,6 @@ struct BadContainer1 {
 
 func bad_containers_1(bc: BadContainer1) {
   for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
-  // expected-error@-1{{variable 'e' is not bound by any pattern}}
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
@@ -15,7 +14,6 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
 
 func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
-  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
@@ -24,19 +22,17 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
-  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note 2 {{do you want to add protocol stubs?}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
 
 func bad_containers_4(bc: BadContainer4) {
   for e in bc { }
-  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 // Pattern type-checking
@@ -72,7 +68,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error {{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    sum = sum + f  // expected-error {{cannot convert value of type 'Float' to expected argument type 'Int'}} {{17-17=Int(}} {{18-18=)}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
@@ -130,19 +126,18 @@ func testForEachInference() {
 
   // Overloaded sequence not resolved contextually
   for v in getOvlSeq() { } // expected-error{{ambiguous use of 'getOvlSeq()'}}
-  // expected-error@-1{{variable 'v' is not bound by any pattern}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }
   for d: Double in getGenericSeq() { }
-  
+
   // Inference of generic arguments in the element type from the
   // sequence.
-  for x: X in getXIntSeq() { 
+  for x: X in getXIntSeq() {
     let z = x.value + 1
   }
 
-  for x: X in getOvlSeq() { 
+  for x: X in getOvlSeq() {
     let z = x.value + 1
   }
 
@@ -177,14 +172,12 @@ func testMatchingPatterns() {
 func testOptionalSequence() {
   let array : [Int]?
   for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'Sequence'; did you mean to unwrap optional?}}
-    // expected-error@-1{{variable 'x' is not bound by any pattern}}
   }
 }
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{value of protocol type 'Sequence' cannot conform to 'Sequence'; only struct/enum/class types can conform to protocols}}
-    // expected-error@-1{{variable 'x' is not bound by any pattern}}
+  for x in s { // expected-error {{protocol 'Sequence' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
     _ = x
   }
 }
@@ -226,4 +219,22 @@ extension Int : P { }
 
 func testRepeated(ri: RepeatedSequence<Int>) {
   for x in ri { _ = x }
+}
+
+// SR-12398: Poor pattern matching diagnostic: "for-in loop requires '[Int]' to conform to 'Sequence'"
+func sr_12398(arr1: [Int], arr2: [(a: Int, b: String)]) {
+  for (x, y) in arr1 {}
+  // expected-error@-1 {{tuple pattern cannot match values of non-tuple type 'Int'}}
+
+  for (x, y, _) in arr2 {}
+  // expected-error@-1 {{pattern cannot match values of type '(a: Int, b: String)'}}
+}
+
+// rdar://62339835
+func testForEachWhereWithClosure(_ x: [Int]) {
+  func foo<T>(_ fn: () -> T) -> Bool { true }
+
+  for i in x where foo({ i }) {}
+  for i in x where foo({ i.byteSwapped == 5 }) {}
+  for i in x where x.contains(where: { $0.byteSwapped == i }) {}
 }

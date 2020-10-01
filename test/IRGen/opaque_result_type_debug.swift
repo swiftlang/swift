@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -g -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -disable-availability-checking -g -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s
 
 public protocol P {}
 extension Int: P {} 
@@ -24,6 +24,7 @@ public var prop: some P {
 // CHECK: @"$s24opaque_result_type_debug3FooVQrycipQOMQ" = {{.*}}constant{{.*}} @"$s24opaque_result_type_debug3FooVQrycipMXX"
 
 public struct Foo {
+  public init() {}
   public subscript() -> some P {
     return 0
   }
@@ -33,6 +34,7 @@ public struct Foo {
 
 @_silgen_name("use") public func use<T: P>(_: T)
 
+@inlinable
 public func bar<T: P>(genericValue: T) {
   use(genericValue)
 

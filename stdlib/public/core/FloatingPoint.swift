@@ -125,7 +125,9 @@
 ///
 ///     let temperatureData = ["21.5", "19.25", "27", "no data", "28.25", "no data", "23"]
 ///     let tempsCelsius = temperatureData.map { Double($0) ?? .nan }
-///     // tempsCelsius == [21.5, 19.25, 27, nan, 28.25, nan, 23.0]
+///     print(tempsCelsius)
+///     // Prints "[21.5, 19.25, 27, nan, 28.25, nan, 23.0]"
+///
 ///
 /// Note that some elements in the `temperatureData ` array are not valid
 /// numbers. When these invalid strings are parsed by the `Double` failable
@@ -135,7 +137,8 @@
 /// Next, the observations in Celsius are converted to Fahrenheit:
 ///
 ///     let tempsFahrenheit = tempsCelsius.map { $0 * 1.8 + 32 }
-///     // tempsFahrenheit == [70.7, 66.65, 80.6, nan, 82.85, nan, 73.4]
+///     print(tempsFahrenheit)
+///     // Prints "[70.7, 66.65, 80.6, nan, 82.85, nan, 73.4]"
 ///
 /// The NaN values in the `tempsCelsius` array are propagated through the
 /// conversion and remain NaN in `tempsFahrenheit`.
@@ -144,14 +147,14 @@
 /// every value of the `tempsFahrenheit` array, any NaN values cause the
 /// result to also be NaN, as seen in this example:
 ///
-///     let badAverage = tempsFahrenheit.reduce(0.0, combine: +) / Double(tempsFahrenheit.count)
+///     let badAverage = tempsFahrenheit.reduce(0.0, +) / Double(tempsFahrenheit.count)
 ///     // badAverage.isNaN == true
 ///
 /// Instead, when you need an operation to have a specific numeric result,
 /// filter out any NaN values using the `isNaN` property.
 ///
 ///     let validTemps = tempsFahrenheit.filter { !$0.isNaN }
-///     let average = validTemps.reduce(0.0, combine: +) / Double(validTemps.count)
+///     let average = validTemps.reduce(0.0, +) / Double(validTemps.count)
 ///
 /// Finally, report the average temperature and observation counts:
 ///
@@ -1104,7 +1107,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
   ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
+  ///     print(numbers)
+  ///     // Prints "[-9.5, 2.5, 3.0, 21.25, nan]"
   ///
   /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
   /// relation as defined by the [IEEE 754 specification][spec].
@@ -1742,7 +1746,6 @@ extension BinaryFloatingPoint {
     )
   }
 
-  @inlinable
   public // @testable
   static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
@@ -1858,23 +1861,24 @@ extension BinaryFloatingPoint {
     if source.significandWidth <= leadingBitIndex {
       return (value, true)
     }
-    // We promise to round to the closest representation, and if two
-    // representable values are equally close, the value with more trailing
-    // zeros in its significand bit pattern. Therefore, we must take a look at
-    // the bits that we've just truncated.
+    // We promise to round to the closest representation. Therefore, we must
+    // take a look at the bits that we've just truncated.
     let ulp = (1 as Source.RawSignificand) << -shift
     let truncatedBits = source.significandBitPattern & (ulp - 1)
     if truncatedBits < ulp / 2 {
       return (value, false)
     }
     let rounded = source.sign == .minus ? value.nextDown : value.nextUp
-    guard _fastPath(
-      truncatedBits != ulp / 2 ||
-        exponentBitPattern.trailingZeroBitCount <
-          rounded.exponentBitPattern.trailingZeroBitCount) else {
-      return (value, false)
+    if _fastPath(truncatedBits > ulp / 2) {
+      return (rounded, false)
     }
-    return (rounded, false)
+    // If two representable values are equally close, we return the value with
+    // more trailing zeros in its significand bit pattern.
+    return
+      significandBitPattern.trailingZeroBitCount >
+        rounded.significandBitPattern.trailingZeroBitCount
+      ? (value, false)
+      : (rounded, false)
   }
 
   /// Creates a new instance from the given value, rounded to the closest
@@ -1886,7 +1890,55 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init<Source: BinaryFloatingPoint>(_ value: Source) {
-    self = Self._convert(from: value).value
+    // If two IEEE 754 binary interchange formats share the same exponent bit
+    // count and significand bit count, then they must share the same encoding
+    // for finite and infinite values.
+    switch (Source.exponentBitCount, Source.significandBitCount) {
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+    case (5, 10):
+      guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+        // Convert signaling NaN to quiet NaN by multiplying by 1.
+        self = Self._convert(from: value).value * 1
+        break
+      }
+      let value_ = value as? Float16 ?? Float16(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt16(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(Float(value_))
+#endif
+    case (8, 23):
+      let value_ = value as? Float ?? Float(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt32(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
+    case (11, 52):
+      let value_ = value as? Double ?? Double(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+    case (15, 63):
+      let value_ = value as? Float80 ?? Float80(
+        sign: value.sign,
+        exponentBitPattern:
+          UInt(truncatingIfNeeded: value.exponentBitPattern),
+        significandBitPattern:
+          UInt64(truncatingIfNeeded: value.significandBitPattern))
+      self = Self(value_)
+#endif
+    default:
+      // Convert signaling NaN to quiet NaN by multiplying by 1.
+      self = Self._convert(from: value).value * 1
+    }
   }
 
   /// Creates a new instance from the given value, if it can be represented
@@ -1930,7 +1982,6 @@ extension BinaryFloatingPoint {
 
 extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   
-  @inlinable
   public // @testable
   static func _convert<Source: BinaryInteger>(
     from source: Source
@@ -2009,206 +2060,5 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_
-  }
-
-  /// Returns a random value within the specified range, using the given
-  /// generator as a source for randomness.
-  ///
-  /// Use this method to generate a floating-point value within a specific
-  /// range when you are using a custom random number generator. This example
-  /// creates three new values in the range `10.0 ..< 20.0`.
-  ///
-  ///     for _ in 1...3 {
-  ///         print(Double.random(in: 10.0 ..< 20.0, using: &myGenerator))
-  ///     }
-  ///     // Prints "18.1900709259179"
-  ///     // Prints "14.2286325689993"
-  ///     // Prints "13.1485686260762"
-  ///
-  /// The `random(in:using:)` static method chooses a random value from a
-  /// continuous uniform distribution in `range`, and then converts that value
-  /// to the nearest representable value in this type. Depending on the size
-  /// and span of `range`, some concrete values may be represented more
-  /// frequently than others.
-  ///
-  /// - Note: The algorithm used to create random values may change in a future
-  ///   version of Swift. If you're passing a generator that results in the
-  ///   same sequence of floating-point values each time you run your program,
-  ///   that sequence may change when your program is compiled using a
-  ///   different version of Swift.
-  ///
-  /// - Parameters:
-  ///   - range: The range in which to create a random value.
-  ///     `range` must be finite and non-empty.
-  ///   - generator: The random number generator to use when creating the
-  ///     new random value.
-  /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
-    in range: Range<Self>,
-    using generator: inout T
-  ) -> Self {
-    _precondition(
-      !range.isEmpty,
-      "Can't get random value with an empty range"
-    )
-    let delta = range.upperBound - range.lowerBound
-    //  TODO: this still isn't quite right, because the computation of delta
-    //  can overflow (e.g. if .upperBound = .maximumFiniteMagnitude and
-    //  .lowerBound = -.upperBound); this should be re-written with an
-    //  algorithm that handles that case correctly, but this precondition
-    //  is an acceptable short-term fix.
-    _precondition(
-      delta.isFinite,
-      "There is no uniform distribution on an infinite range"
-    )
-    let rand: Self.RawSignificand
-    if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
-      rand = generator.next()
-    } else {
-      let significandCount = Self.significandBitCount + 1
-      let maxSignificand: Self.RawSignificand = 1 << significandCount
-      // Rather than use .next(upperBound:), which has to work with arbitrary
-      // upper bounds, and therefore does extra work to avoid bias, we can take
-      // a shortcut because we know that maxSignificand is a power of two.
-      rand = generator.next() & (maxSignificand - 1)
-    }
-    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
-    let randFloat = delta * unitRandom + range.lowerBound
-    if randFloat == range.upperBound {
-      return Self.random(in: range, using: &generator)
-    }
-    return randFloat
-  }
-
-  /// Returns a random value within the specified range.
-  ///
-  /// Use this method to generate a floating-point value within a specific
-  /// range. This example creates three new values in the range
-  /// `10.0 ..< 20.0`.
-  ///
-  ///     for _ in 1...3 {
-  ///         print(Double.random(in: 10.0 ..< 20.0))
-  ///     }
-  ///     // Prints "18.1900709259179"
-  ///     // Prints "14.2286325689993"
-  ///     // Prints "13.1485686260762"
-  ///
-  /// The `random()` static method chooses a random value from a continuous
-  /// uniform distribution in `range`, and then converts that value to the
-  /// nearest representable value in this type. Depending on the size and span
-  /// of `range`, some concrete values may be represented more frequently than
-  /// others.
-  ///
-  /// This method is equivalent to calling `random(in:using:)`, passing in the
-  /// system's default random generator.
-  ///
-  /// - Parameter range: The range in which to create a random value.
-  ///   `range` must be finite and non-empty.
-  /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random(in range: Range<Self>) -> Self {
-    var g = SystemRandomNumberGenerator()
-    return Self.random(in: range, using: &g)
-  }
-  
-  /// Returns a random value within the specified range, using the given
-  /// generator as a source for randomness.
-  ///
-  /// Use this method to generate a floating-point value within a specific
-  /// range when you are using a custom random number generator. This example
-  /// creates three new values in the range `10.0 ... 20.0`.
-  ///
-  ///     for _ in 1...3 {
-  ///         print(Double.random(in: 10.0 ... 20.0, using: &myGenerator))
-  ///     }
-  ///     // Prints "18.1900709259179"
-  ///     // Prints "14.2286325689993"
-  ///     // Prints "13.1485686260762"
-  ///
-  /// The `random(in:using:)` static method chooses a random value from a
-  /// continuous uniform distribution in `range`, and then converts that value
-  /// to the nearest representable value in this type. Depending on the size
-  /// and span of `range`, some concrete values may be represented more
-  /// frequently than others.
-  ///
-  /// - Note: The algorithm used to create random values may change in a future
-  ///   version of Swift. If you're passing a generator that results in the
-  ///   same sequence of floating-point values each time you run your program,
-  ///   that sequence may change when your program is compiled using a
-  ///   different version of Swift.
-  ///
-  /// - Parameters:
-  ///   - range: The range in which to create a random value. Must be finite.
-  ///   - generator: The random number generator to use when creating the
-  ///     new random value.
-  /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random<T: RandomNumberGenerator>(
-    in range: ClosedRange<Self>,
-    using generator: inout T
-  ) -> Self {
-    _precondition(
-      !range.isEmpty,
-      "Can't get random value with an empty range"
-    )
-    let delta = range.upperBound - range.lowerBound
-    //  TODO: this still isn't quite right, because the computation of delta
-    //  can overflow (e.g. if .upperBound = .maximumFiniteMagnitude and
-    //  .lowerBound = -.upperBound); this should be re-written with an
-    //  algorithm that handles that case correctly, but this precondition
-    //  is an acceptable short-term fix.
-    _precondition(
-      delta.isFinite,
-      "There is no uniform distribution on an infinite range"
-    )
-    let rand: Self.RawSignificand
-    if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
-      rand = generator.next()
-      let tmp: UInt8 = generator.next() & 1
-      if rand == Self.RawSignificand.max && tmp == 1 {
-        return range.upperBound
-      }
-    } else {
-      let significandCount = Self.significandBitCount + 1
-      let maxSignificand: Self.RawSignificand = 1 << significandCount
-      rand = generator.next(upperBound: maxSignificand + 1)
-      if rand == maxSignificand {
-        return range.upperBound
-      }
-    }
-    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
-    let randFloat = delta * unitRandom + range.lowerBound
-    return randFloat
-  }
-  
-  /// Returns a random value within the specified range.
-  ///
-  /// Use this method to generate a floating-point value within a specific
-  /// range. This example creates three new values in the range
-  /// `10.0 ... 20.0`.
-  ///
-  ///     for _ in 1...3 {
-  ///         print(Double.random(in: 10.0 ... 20.0))
-  ///     }
-  ///     // Prints "18.1900709259179"
-  ///     // Prints "14.2286325689993"
-  ///     // Prints "13.1485686260762"
-  ///
-  /// The `random()` static method chooses a random value from a continuous
-  /// uniform distribution in `range`, and then converts that value to the
-  /// nearest representable value in this type. Depending on the size and span
-  /// of `range`, some concrete values may be represented more frequently than
-  /// others.
-  ///
-  /// This method is equivalent to calling `random(in:using:)`, passing in the
-  /// system's default random generator.
-  ///
-  /// - Parameter range: The range in which to create a random value. Must be finite.
-  /// - Returns: A random value within the bounds of `range`.
-  @inlinable
-  public static func random(in range: ClosedRange<Self>) -> Self {
-    var g = SystemRandomNumberGenerator()
-    return Self.random(in: range, using: &g)
   }
 }

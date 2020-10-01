@@ -1,0 +1,3 @@
+module BrokenCModule {
+  header "broken_c.h"
+}

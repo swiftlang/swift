@@ -10,7 +10,7 @@
 // CHECK-DAG: [[INT:%TSi]] = type <{ i64 }>
 // CHECK-DAG: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
-// CHECK: @_DATA__TtC8subclass1A = private constant {{.* } }}{
+// CHECK: @_DATA__TtC8subclass1A = internal constant {{.* } }}{
 // CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.* }>]] <{
 // CHECK-SAME:   void ([[A]]*)* @"$s8subclass1ACfD",
 // CHECK-DIRECT-SAME:   i8** @"$sBoWV",
@@ -24,7 +24,7 @@
 // CHECK-SAME:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
-// CHECK: @_DATA__TtC8subclass1B = private constant {{.* } }}{
+// CHECK: @_DATA__TtC8subclass1B = internal constant {{.* } }}{
 // CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void ([[B]]*)* @"$s8subclass1BCfD",
 // CHECK-DIRECT-SAME:   i8** @"$sBoWV",
@@ -61,7 +61,7 @@ class G<T> : A {
 // Ensure that downcasts to generic types instantiate generic metadata instead
 // of trying to reference global metadata. <rdar://problem/14265663>
 
-// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
+// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC* %0) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
   // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s8subclass1GCySiGMD")
   // CHECK: call i8* @swift_dynamicCastClassUnconditional

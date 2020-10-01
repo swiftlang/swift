@@ -1,3 +1,4 @@
+// REQUIRES: tsan_runtime
 // RUN: %target-swift-emit-silgen -sanitize=thread %s | %FileCheck %s
 
 // TSan is only supported on 64 bit.
@@ -49,7 +50,7 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass
 // CHECK:  end_access [[READ]]
 // CHECK:  [[BORROWED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
-// CHECK:  [[MODIFY:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!modify.1 :
+// CHECK:  [[MODIFY:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!modify :
 // CHECK:  ([[BUFFER_ADDRESS:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[BORROWED_CLASS]]) : $@yield_once @convention(method) (@guaranteed MyClass) -> @yields @inout Int
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[BUFFER_ADDRESS]] : $*Int) : $()
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @$s20tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()

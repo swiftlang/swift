@@ -1082,8 +1082,60 @@ struct TypeNamePair {
 ///   -> (UnsafePointer<UInt8>, Int)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 TypeNamePair
-swift_getTypeName(const Metadata *type, bool qualified);  
+swift_getTypeName(const Metadata *type, bool qualified);
+
+/// Return the mangled name of a Swift type represented by a metadata object.
+/// func _getMangledTypeName(_ type: Any.Type)
+///   -> (UnsafePointer<UInt8>, Int)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+TypeNamePair
+swift_getMangledTypeName(const Metadata *type);
 
 } // end namespace swift
+
+#if SWIFT_OBJC_INTEROP
+/// Standard ObjC lifecycle methods for Swift objects
+#define STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS \
+- (id)retain { \
+  auto SELF = reinterpret_cast<HeapObject *>(self); \
+  swift_retain(SELF); \
+  return self; \
+} \
+- (oneway void)release { \
+  auto SELF = reinterpret_cast<HeapObject *>(self); \
+  swift_release(SELF); \
+} \
+- (id)autorelease { \
+  return _objc_rootAutorelease(self); \
+} \
+- (NSUInteger)retainCount { \
+  return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self)); \
+} \
+- (BOOL)_isDeallocating { \
+  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self)); \
+} \
+- (BOOL)_tryRetain { \
+  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr; \
+} \
+- (BOOL)allowsWeakReference { \
+  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self)); \
+} \
+- (BOOL)retainWeakReference { \
+  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr; \
+} \
+- (void)_setWeaklyReferenced { \
+  auto heapObj = reinterpret_cast<HeapObject *>(self); \
+  heapObj->refCounts.setPureSwiftDeallocation(false); \
+} \
+- (void)_noteAssociatedObjects { \
+  auto heapObj = reinterpret_cast<HeapObject *>(self); \
+  heapObj->refCounts.setPureSwiftDeallocation(false); \
+} \
+- (void)dealloc { \
+  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self)); \
+}
+
+#endif // SWIFT_OBJC_INTEROP
+
 
 #endif // SWIFT_RUNTIME_ALLOC_H

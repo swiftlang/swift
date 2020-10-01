@@ -20,9 +20,9 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: owned: Yes. Liveness: MustBeLive
-// CHECK-NEXT: guaranteed:  Yes. Liveness: MustBeLive
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: guaranteed:  No.
 // CHECK-NEXT: any: Yes. Liveness: MustBeLive
 // CHECK: Visiting: {{.*}}%1 = mark_uninitialized [var] undef : $Klass
 // CHECK-NEXT: Operand Ownership Map:
@@ -36,9 +36,9 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: owned: Yes. Liveness: MustBeLive
-// CHECK-NEXT: guaranteed:  Yes. Liveness: MustBeLive
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: guaranteed:  No.
 // CHECK-NEXT: any: Yes. Liveness: MustBeLive
 // CHECK: Visiting: {{.*}}%4 = struct $MyInt (undef : $Builtin.Int32)
 // CHECK-NEXT: Operand Ownership Map:

@@ -1,32 +1,40 @@
 
 module gizmo {
   header "Gizmo.h"
+  export *
 }
 
 module SRoA {
   header "SRoA.h"
+  export *
 }
 
 module ObjectiveC {
   header "BridgeTestObjectiveC.h"
+  export *
 }
 
 module CoreCooling {
   header "CoreCooling.h"
+  export *
 }
 
 module Foundation {
   header "BridgeTestFoundation.h"
+  export *
 }
 
 module CoreFoundation {
   header "BridgeTestCoreFoundation.h"
+  export *
 }
 
 module ObjCInterop {
   header "ObjCInterop.h"
+  export *
 }
 
 module error_domains {
   header "error_domains.h"
+  export *
 }

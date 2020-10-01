@@ -1,3 +1,5 @@
+@import ObjectiveC;
+
 typedef const void *CFTypeRef __attribute__((objc_bridge(id)));
 
 typedef const struct __attribute__((objc_bridge(id))) CCPowerSupply *CCPowerSupplyRef;

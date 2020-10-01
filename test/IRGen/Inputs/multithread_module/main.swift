@@ -23,6 +23,10 @@ public struct MyStruct : MyProto {
 	return x + 3
 }
 
+public func mutateMyStructArray(_ arr: inout [MyStruct], _ x: MyStruct) {
+  arr.append(x)
+}
+
 public var g1 = 234
 
 let i = testit(27)

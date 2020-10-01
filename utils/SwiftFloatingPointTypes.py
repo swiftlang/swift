@@ -38,6 +38,8 @@ class SwiftFloatType(object):
 
 def floating_point_bits_to_type():
     return {
+        16: SwiftFloatType(name="Float16", cFuncSuffix="f", significandBits=10,
+                           exponentBits=5, significandSize=16, totalBits=16),
         32: SwiftFloatType(name="Float", cFuncSuffix="f", significandBits=23,
                            exponentBits=8, significandSize=32, totalBits=32),
         64: SwiftFloatType(name="Double", cFuncSuffix="", significandBits=52,

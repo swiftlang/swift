@@ -85,7 +85,7 @@ class X6 {
 
 struct Y1 {
   var stored: Int
-  subscript(_: i, j: Int) -> Int { // expected-error {{use of undeclared type 'i'}}
+  subscript(_: i, j: Int) -> Int { // expected-error {{cannot find type 'i' in scope}}
     get {
       return stored + j
     }
@@ -127,10 +127,10 @@ struct A1 {
   subscript (i : Int) // expected-error{{expected '->' for subscript element type}}
      Int {
     get {
-      return stored // expected-error{{use of unresolved identifier}}
+      return stored // expected-error{{cannot find 'stored' in scope}}
     }
     set {
-      stored = newValue// expected-error{{use of unresolved identifier}}
+      stored = newValue// expected-error{{cannot find 'stored' in scope}}
     }
   }
 }
@@ -142,7 +142,7 @@ struct A2 {
       return stored
     }
     set {
-      stored = newValue // expected-error{{use of unresolved identifier}}
+      stored = newValue // expected-error{{cannot find 'stored' in scope}}
     }
   }
 }
@@ -175,7 +175,7 @@ struct A6 {
                                      // expected-error@-1 {{function types cannot have argument labels}}
                                      // expected-note@-2 {{did you mean}}
     get {
-      return i + j // expected-error {{use of unresolved identifier}}
+      return i + j // expected-error {{cannot find 'j' in scope}}
     }
   }
 }

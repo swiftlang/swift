@@ -21,7 +21,7 @@ class E {
 // CHECK-NEXT: return
 sil @test_unconditional_checked_cast : $@convention(thin) <T_0_0, T_0_1> (RawBuffer) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $RawBuffer):
-  %3 = unconditional_checked_cast %0 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  %3 = unconditional_checked_cast %0 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
@@ -60,7 +60,7 @@ bb0(%0 : $*D, %1 : $*E, %2 : $*D):
 sil @test_unconditional_checked_cast_other_use : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : $C):
   strong_retain %0 : $C
-  %3 = unconditional_checked_cast %0 : $C to $C
+  %3 = unconditional_checked_cast %0 : $C to C
   strong_release %0 : $C
   return %3 : $C
 }
@@ -77,7 +77,7 @@ class G : Class {
 sil @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
 bb0(%0 : $Class):
   strong_retain %0 : $Class
-  %2 = unconditional_checked_cast %0 : $Class to $G
+  %2 = unconditional_checked_cast %0 : $Class to G
   strong_release %0 : $Class
   return %2 : $G
 }

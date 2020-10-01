@@ -22,6 +22,16 @@ func ==(x: C, y: C)
 
 func resyncParser2() {}
 
+Swift(label: 3)
+
+enum Outer1 {
+  case Inner1(IDontExist)
+}
+
+enum Outer2 {
+  case Inner2(x: Undefined)
+}
+
 // RUN: %sourcekitd-test -req=cursor -pos=4:13 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: source.lang.swift.decl.var.local (4:13-4:14)
 // CHECK1: c
@@ -59,3 +69,13 @@ func resyncParser2() {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:6 %s -- %s | %FileCheck -check-prefix=EQEQ3 %s
 // EQEQ3: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>
+
+// RUN: %sourcekitd-test -req=cursor -pos=25:7 %s -- %s | %FileCheck -check-prefix=DIAG %s
+
+// RUN: %sourcekitd-test -req=cursor -pos=28:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM1 %s
+// INVALID_ENUM1: source.lang.swift.decl.enumelement (28:8-28:14)
+// INVALID_ENUM1: Inner1(_:)
+
+// RUN: %sourcekitd-test -req=cursor -pos=32:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM2 %s
+// INVALID_ENUM2: source.lang.swift.decl.enumelement (32:8-32:14)
+// INVALID_ENUM2: Inner2(x:)

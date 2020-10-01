@@ -6,10 +6,6 @@
 // REQUIRES: foundation
 // UNSUPPORTED: OS=tvos
 
-// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
-// don't support TSan.
-// UNSUPPORTED: remote_run
-
 import Foundation
 
 let sem = DispatchSemaphore(value: 0)

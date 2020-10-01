@@ -235,24 +235,21 @@ inline bool operator<=(OperationCost l, OperationCost r) {
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:
-  using int_type = uint32_t;
+  using int_type = uint64_t;
 
-  constexpr Alignment() : Value(0) {}
-  constexpr explicit Alignment(int_type Value) : Value(Value) {}
-  explicit Alignment(clang::CharUnits value) : Value(value.getQuantity()) {}
+  constexpr Alignment() : Shift(0) {}
+  explicit Alignment(int_type Value) : Shift(llvm::Log2_64(Value)) {
+    assert(llvm::isPowerOf2_64(Value));
+  }
+  explicit Alignment(clang::CharUnits value) : Alignment(value.getQuantity()) {}
 
-  constexpr int_type getValue() const { return Value; }
-  constexpr int_type getMaskValue() const { return Value - 1; }
-
-  bool isOne() const { return Value == 1; }
-  bool isZero() const { return Value == 0; }
+  constexpr int_type getValue() const { return int_type(1) << Shift; }
+  constexpr int_type getMaskValue() const { return getValue() - 1; }
 
   Alignment alignmentAtOffset(Size S) const;
   Size asSize() const;
 
-  unsigned log2() const {
-    return llvm::Log2_64(Value);
-  }
+  unsigned log2() const { return Shift; }
 
   operator clang::CharUnits() const {
     return asCharUnits();
@@ -261,17 +258,24 @@ public:
     return clang::CharUnits::fromQuantity(getValue());
   }
 
-  explicit operator bool() const { return Value != 0; }
+  explicit operator llvm::MaybeAlign() const { return llvm::MaybeAlign(getValue()); }
 
-  friend bool operator< (Alignment L, Alignment R){ return L.Value <  R.Value; }
-  friend bool operator<=(Alignment L, Alignment R){ return L.Value <= R.Value; }
-  friend bool operator> (Alignment L, Alignment R){ return L.Value >  R.Value; }
-  friend bool operator>=(Alignment L, Alignment R){ return L.Value >= R.Value; }
-  friend bool operator==(Alignment L, Alignment R){ return L.Value == R.Value; }
-  friend bool operator!=(Alignment L, Alignment R){ return L.Value != R.Value; }
+  friend bool operator< (Alignment L, Alignment R){ return L.Shift <  R.Shift; }
+  friend bool operator<=(Alignment L, Alignment R){ return L.Shift <= R.Shift; }
+  friend bool operator> (Alignment L, Alignment R){ return L.Shift >  R.Shift; }
+  friend bool operator>=(Alignment L, Alignment R){ return L.Shift >= R.Shift; }
+  friend bool operator==(Alignment L, Alignment R){ return L.Shift == R.Shift; }
+  friend bool operator!=(Alignment L, Alignment R){ return L.Shift != R.Shift; }
+
+  template<unsigned Value>
+  static constexpr Alignment create() {
+    Alignment result;
+    result.Shift = llvm::CTLog2<Value>();
+    return result;
+  }
 
 private:
-  int_type Value;
+  unsigned char Shift;
 };
 
 /// A size value, in eight-bit units.

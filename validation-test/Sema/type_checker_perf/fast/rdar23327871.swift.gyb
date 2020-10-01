@@ -1,8 +1,0 @@
-// RUN: %scale-test --begin 8 --end 16 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts
-
-let i = 1
-_ = 1.0 * Float(i)
-%for i in range(0, N):
-  + 1.0 * Float(i)
-%end

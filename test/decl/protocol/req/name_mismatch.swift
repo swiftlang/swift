@@ -54,7 +54,7 @@ protocol P3 {
 }
 
 class MislabeledSubscript : P3 {
-  subscript(val: String, label: String) -> Int { // expected-error{{method 'subscript(_:_:)' has different argument labels from those required by protocol 'P3' ('subscript(_:label:)')}}
+  subscript(val: String, label: String) -> Int { // expected-error{{subscript 'subscript(_:_:)' has different argument labels from those required by protocol 'P3' ('subscript(_:label:)')}}
     return 1
   }
 }

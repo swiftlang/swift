@@ -7,10 +7,10 @@ import CoreServices
 func test(_ url: CFURL, ident: CSIdentity) {
   _ = CSBackupIsItemExcluded(url, nil) // okay
 
-  _ = nil as TypeThatDoesNotExist? // expected-error {{use of undeclared type 'TypeThatDoesNotExist'}}
+  _ = nil as TypeThatDoesNotExist? // expected-error {{cannot find type 'TypeThatDoesNotExist' in scope}}
   _ = nil as CoreServices.Collection? // okay
 
-  _ = kCollectionNoAttributes // expected-error{{use of unresolved identifier 'kCollectionNoAttributes'}}
+  _ = kCollectionNoAttributes // expected-error{{cannot find 'kCollectionNoAttributes' in scope}}
 
   var name: Unmanaged<CFString>?
   _ = LSCopyDisplayNameForURL(url, &name) as OSStatus // okay
@@ -22,6 +22,6 @@ func test(_ url: CFURL, ident: CSIdentity) {
   _ = CSIdentityCreateCopy(nil, ident) // okay
 
   var vers: UInt32 = 0
-  _ = KCGetKeychainManagerVersion(&vers) as OSStatus// expected-error{{use of unresolved identifier 'KCGetKeychainManagerVersion'}}
+  _ = KCGetKeychainManagerVersion(&vers) as OSStatus// expected-error{{cannot find 'KCGetKeychainManagerVersion' in scope}}
   _ = CoreServices.KCGetKeychainManagerVersion(&vers) as OSStatus// okay
 }

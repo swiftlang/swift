@@ -55,8 +55,8 @@ sil @klass_deinit : $@convention(method) (@guaranteed Klass) -> @owned Builtin.N
 sil @klass_dealloc_deinit : $@convention(method) (@owned Klass) -> ()
 
 sil_vtable Klass {
-  #Klass.init!allocator.1: (Klass.Type) -> () -> Klass : @klass_alloc_init
-  #Klass.deinit!deallocator.1: @klass_dealloc_deinit
+  #Klass.init!allocator: (Klass.Type) -> () -> Klass : @klass_alloc_init
+  #Klass.deinit!deallocator: @klass_dealloc_deinit
 }
 
 sil @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
@@ -271,11 +271,11 @@ sil hidden @generic_capture_args : $@convention(thin) <A where A : Addable> () -
 bb0(%0 : $*A):
   %1 = alloc_stack $A, let, name "x"
   %2 = metatype $@thick A.Type
-  %3 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %3 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %4 = apply %3<A>(%1, %2) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %5 = alloc_stack $A, let, name "y"
   %6 = metatype $@thick A.Type
-  %7 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %7 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %8 = apply %7<A>(%5, %6) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %9 = function_ref @first_of_three_addables : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable>
  { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -289,7 +289,7 @@ bb0(%0 : $*A):
   strong_retain %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
   %19 = metatype $@thick A.Type
   %20 = alloc_stack $A
-  %21 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %21 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %22 = apply %21<A>(%20, %19) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %23 = apply %16(%0, %20) : $@callee_guaranteed (@in_guaranteed A) -> @out A
   destroy_addr %20 : $*A
@@ -676,11 +676,11 @@ sil [ossa] @generic_capture_args_ossa : $@convention(thin) <A where A : Addable>
 bb0(%0 : $*A):
   %1 = alloc_stack $A, let, name "x"
   %2 = metatype $@thick A.Type
-  %3 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %3 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %4 = apply %3<A>(%1, %2) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %5 = alloc_stack $A, let, name "y"
   %6 = metatype $@thick A.Type
-  %7 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %7 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %8 = apply %7<A>(%5, %6) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %9 = function_ref @first_of_three_addables : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable>
  { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -693,7 +693,7 @@ bb0(%0 : $*A):
   %16 = partial_apply [callee_guaranteed] %9<A>(%10, %13) : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %19 = metatype $@thick A.Type
   %20 = alloc_stack $A
-  %21 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %21 = witness_method $A, #Addable.an!getter : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %22 = apply %21<A>(%20, %19) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
   %23 = apply %16(%0, %20) : $@callee_guaranteed (@in_guaranteed A) -> @out A
   destroy_addr %20 : $*A
@@ -888,3 +888,33 @@ bb0:
   return %13 : $MyInt
 } // end sil function 'mixed_nocapture_mixedargs_ossa'
 
+
+// CHECK-LABEL: sil [ossa] @dont_remove_polymorphic_builtin
+// CHECK: builtin "generic_add"
+// CHECK-LABEL: end sil function 'dont_remove_polymorphic_builtin'
+sil [ossa] @dont_remove_polymorphic_builtin : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  %3 = alloc_stack $Klass
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %3 : $*Klass
+
+  %6 = alloc_stack $Klass
+  %7 = copy_value %0 : $Klass
+  store %7 to [init] %6 : $*Klass
+
+  %9 = alloc_stack $Klass
+  %10 = copy_value %0 : $Klass
+  store %10 to [init] %9 : $*Klass
+
+  // builtin "add" is maked read none so it could be removed below. However,
+  // builtin "generic_add" does modify memory so, it cannot be removed.
+  // Make sure we don't remove it.
+  %12 = builtin "generic_add"<Klass>(%3 : $*Klass, %6 : $*Klass, %9 : $*Klass) : $()
+
+  dealloc_stack %9 : $*Klass
+  dealloc_stack %6 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

@@ -14,10 +14,10 @@
 # Utility code for later in this template
 #
 
+from __future__ import division
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 
-from string import maketrans, capitalize
 from itertools import chain
 
 # Number of bits in the Builtin.Word type
@@ -1124,7 +1124,7 @@ public struct ${Self}
 %   end
 
 %   for (FloatType, FloatBits) in [
-%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
+%     ('Float16', 16), ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
 
 %     if FloatType == 'Float80':
@@ -1151,14 +1151,21 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
+%     if FloatType == 'Float16':
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+%     end
   @_transparent
   public init(_ source: ${FloatType}) {
     _precondition(source.isFinite,
       "${FloatType} value cannot be converted to ${Self} because it is either infinite or NaN")
+%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     _precondition(source > ${str(lower)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(source < ${str(upper)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+%     end
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
@@ -1176,12 +1183,21 @@ public struct ${Self}
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
+%     if FloatType == 'Float16':
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+%     end
   @_transparent
   public init?(exactly source: ${FloatType}) {
     // The value passed as `source` must not be infinite, NaN, or exceed the
     // bounds of the integer type; the result of `fptosi` or `fptoui` is
     // undefined if it overflows.
+%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+%     else:
+    guard source.isFinite else {
+%     end
       return nil
     }
     guard source == source.rounded(.towardZero) else {
@@ -1648,7 +1664,7 @@ extension ${Self}: Hashable {
     return Hasher._hash(
       seed: seed,
       bytes: UInt64(truncatingIfNeeded: ${U}${Self}(_value)),
-      count: ${bits / 8})
+      count: ${bits // 8})
     % end
   }
 }

@@ -24,7 +24,7 @@ class Gadget: NSObject, Hoozit {
 // CHECK: [[NEW_SELF:%.*]] = apply [[INIT]]([[SELF]]) : $@convention(method) (@owned Gadget) -> @owned Gadget
 // CHECK: return [[NEW_SELF]]
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17objc_dynamic_init6GadgetCAA6HoozitA2aDPxycfCTW : $@convention(witness_method: Hoozit) (@thick Gadget.Type) -> @out Gadget {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17objc_dynamic_init6GadgetCAA6HoozitA2aDPxycfCTW :
 // CHECK:         function_ref @$s17objc_dynamic_init6GadgetCACycfC
 
 class Gizmo: Gadget, Wotsit {
@@ -57,7 +57,7 @@ func callInit() {
 }
 
 // CHECK-LABEL: sil_vtable Gadget {
-// CHECK-NOT:     #Gadget.init!allocator.1
+// CHECK-NOT:     #Gadget.init!allocator
 
 // CHECK-LABEL: sil_vtable Gizmo {
-// CHECK-NOT:     #Gadget.init!allocator.1
+// CHECK-NOT:     #Gadget.init!allocator

@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -419,10 +420,6 @@ public:
       // Always verify the node as a parsed node.
       verifyParsed(node);
 
-      // If we've bound names already, verify as a bound node.
-      if (!SF || SF->ASTStage >= SourceFile::NameBound)
-        verifyBound(node);
-
       // If we've checked types already, do some extra verification.
       if (!SF || SF->ASTStage >= SourceFile::TypeChecked) {
         verifyCheckedAlways(node);
@@ -512,8 +509,8 @@ public:
       if (auto *DC = dyn_cast<DeclContext>(D)) {
         if (D->getDeclContext() != DC->getParent()) {
           Out << "Decl's DeclContext not in sync with DeclContext's parent\n";
-          D->getDeclContext()->dumpContext();
-          DC->getParent()->dumpContext();
+          D->getDeclContext()->printContext(Out);
+          DC->getParent()->printContext(Out);
           abort();
         }
       }
@@ -522,11 +519,6 @@ public:
     void verifyParsedBase(T ASTNode) {
       verifyParsed(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
-
-    void verifyBound(Expr *E) {}
-    void verifyBound(Stmt *S) {}
-    void verifyBound(Pattern *P) {}
-    void verifyBound(Decl *D) {}
 
     /// @{
     /// These verification functions are always run on type checked ASTs
@@ -980,17 +972,6 @@ public:
       verifyCheckedBase(S);
     }
 
-    bool shouldVerifyChecked(CatchStmt *S) {
-      return shouldVerifyChecked(S->getErrorPattern());
-    }
-
-    void verifyChecked(CatchStmt *S) {
-      checkSameType(S->getErrorPattern()->getType(),
-                    checkExceptionTypeExists("catch statement"),
-                    "catch pattern");
-      verifyCheckedBase(S);
-    }
-
     bool shouldVerifyChecked(ReturnStmt *S) {
       return !S->hasResult() || shouldVerifyChecked(S->getResult());
     }
@@ -1008,6 +989,14 @@ public:
       }
       
       if (S->hasResult()) {
+        if (isa<ConstructorDecl>(func)) {
+          Out << "Expected ReturnStmt not to have a result. A constructor "
+                 "should not return a result. Returned expression: ";
+          S->getResult()->dump(Out);
+          Out << "\n";
+          abort();
+        }
+
         auto result = S->getResult();
         auto returnType = result->getType();
         // Make sure that the return has the same type as the function.
@@ -1052,7 +1041,8 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
+          checkSameType(E->getType(),
+                        Ctx.getBoolDecl()->getDeclaredInterfaceType(),
                         "condition type");
         break;
       }
@@ -1216,9 +1206,7 @@ public:
       // it should be parented by the innermost function.
       auto enclosingScope = Scopes[Scopes.size() - 2];
       auto enclosingDC = enclosingScope.dyn_cast<DeclContext*>();
-      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)
-          && !(isa<SourceFile>(enclosingDC)
-               && cast<SourceFile>(enclosingDC)->Kind == SourceFileKind::REPL)){
+      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)){
         auto parentDC = E->getParent();
         if (!isa<Initializer>(parentDC)) {
           Out << "a closure in non-local context should be parented "
@@ -1647,12 +1635,13 @@ public:
         abort();
       }
 
-      checkSameType(E->getType(), anyHashableDecl->getDeclaredType(),
+      checkSameType(E->getType(),
+                    anyHashableDecl->getDeclaredInterfaceType(),
                     "AnyHashableErasureExpr and the standard AnyHashable type");
 
       if (E->getConformance().getRequirement() != hashableDecl) {
         Out << "conformance on AnyHashableErasureExpr was not for Hashable\n";
-        E->getConformance().dump();
+        E->getConformance().dump(Out);
         abort();
       }
 
@@ -1714,7 +1703,7 @@ public:
           // Look through optional evaluations.
           if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
             subExpr = optionalEval->getSubExpr();
-            optionalDepth++;
+            ++optionalDepth;
             continue;
           }
 
@@ -1813,7 +1802,7 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->throws()) {
+      } else if (E->throws() && !FT->isThrowing()) {
         Out << "apply expression is marked as throwing, but function operand"
                "does not have a throwing function type\n";
         E->dump(Out);
@@ -1839,30 +1828,30 @@ public:
         Out << "\n";
         abort();
       }
-      
+
+      if (!isa<VarDecl>(E->getMember().getDecl())) {
+        Out << "Member reference to a non-VarDecl\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      }
+
+      auto baseType = E->getBase()->getType();
+      if (baseType->is<InOutType>()) {
+        Out << "Member reference to an inout type\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      }
+
       // The base of a member reference cannot be an existential type.
-      if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isExistentialType()) {
+      if (baseType->getWithoutSpecifierType()->isExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
 
-      // The only time the base is allowed to be inout is if we are accessing
-      // a computed property or if the base is a protocol or existential.
-      if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
-        if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
-          auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || !VD->requiresOpaqueAccessors()) {
-            Out << "member_ref_expr on value of inout type\n";
-            E->dump(Out);
-            Out << "\n";
-            abort();
-          }
-        }
-      }
-      
       // FIXME: Check container/member types through substitutions.
 
       verifyCheckedBase(E);
@@ -2645,7 +2634,8 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType);
+          auto replacementType =
+              normal->getTypeWitnessUncached(assocType).getWitnessType();
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2677,7 +2667,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req);
+          const auto &witness = normal->getWitnessUncached(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             Generics.push_back(genericEnv->getGenericSignature());
@@ -2753,7 +2743,18 @@ public:
       PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
 
       const DeclContext *DC = GTPD->getDeclContext();
-      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+
+      // Skip verification of deserialized generic param decls that have the
+      // file set as their parent. This happens when they have not yet had their
+      // correct parent set.
+      // FIXME: This is a hack to workaround the fact that we don't necessarily
+      // parent a GenericTypeParamDecl if we just deserialize its type.
+      if (auto *fileDC = dyn_cast<FileUnit>(DC)) {
+        if (fileDC->getKind() == FileUnitKind::SerializedAST)
+          return;
+      }
+
+      if (!DC->isInnermostContextGeneric()) {
         Out << "DeclContext of GenericTypeParamDecl does not have "
                "generic params\n";
         abort();
@@ -2833,8 +2834,8 @@ public:
 
       // All of the parameter names should match.
       if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
+        auto paramNames = AFD->getName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getName();
         auto *firstParams = AFD->getParameters();
 
         if (checkParamNames &&
@@ -2865,15 +2866,6 @@ public:
 
     void verifyParsed(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
-
-      auto *DC = CD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !CD->isInvalid()) {
-        Out << "ConstructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(CD);
     }
 
@@ -2954,30 +2946,14 @@ public:
         Out << "DestructorDecl cannot be generic";
         abort();
       }
-
-      auto *DC = DD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !DD->isInvalid()) {
-        Out << "DestructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(DD);
     }
 
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      if (!AFD->hasInterfaceType()) {
-        if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
-          return;
-
-        Out << "All functions except implicit accessors should be "
-               "validated by now\n";
-        AFD->dump(Out);
-        abort();
-      }
+      if (!AFD->hasInterfaceType())
+        return;
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.
@@ -3019,8 +2995,23 @@ public:
         }
       }
 
-      // Throwing @objc methods must have a foreign error convention.
+      // Asynchronous @objc methods must have a foreign async convention.
       if (AFD->isObjC() &&
+          static_cast<bool>(AFD->getForeignAsyncConvention())
+            != AFD->hasAsync()) {
+        if (AFD->hasAsync())
+          Out << "@objc method async but does not have a foreign async "
+              << "convention";
+        else
+          Out << "@objc method has a foreign async convention but is not "
+              << "async";
+        abort();
+      }
+
+      // Synchronous throwing @objc methods must have a foreign error
+      // convention.
+      if (AFD->isObjC() &&
+          !AFD->hasAsync() &&
           static_cast<bool>(AFD->getForeignErrorConvention())
             != AFD->hasThrows()) {
         if (AFD->hasThrows())
@@ -3049,7 +3040,7 @@ public:
       if (AFD->hasImplicitSelfDecl())
         fnTy = fnTy->getResult()->castTo<FunctionType>();
 
-      if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
+      if (AFD->hasThrows() != fnTy->getExtInfo().isThrowing()) {
         Out << "function 'throws' flag does not match function type\n";
         AFD->dump(Out);
         abort();
@@ -3155,12 +3146,12 @@ public:
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
-              storageDecl->isNativeDynamic()) &&
+              storageDecl->shouldUseNativeDynamicDispatch()) &&
             // We allow a non dynamic getter if there is a dynamic read.
             !(FD->isGetter() &&
               (storageDecl->getReadImpl() == ReadImplKind::Read ||
                storageDecl->getReadImpl() == ReadImplKind::Address) &&
-              storageDecl->isNativeDynamic())) {
+              storageDecl->shouldUseNativeDynamicDispatch())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
           abort();
         }
@@ -3200,7 +3191,7 @@ public:
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
           if (isa<DestructorDecl>(Member)) {
-            NumDestructors++;
+            ++NumDestructors;
           }
         }
         if (NumDestructors > 1) {
@@ -3382,7 +3373,7 @@ public:
 
     Type checkExceptionTypeExists(const char *where) {
       auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredType();
+      if (exn) return exn->getDeclaredInterfaceType();
 
       Out << "exception type does not exist in " << where << "\n";
       abort();
@@ -3639,17 +3630,7 @@ public:
     void checkErrors(Stmt *S) {}
     void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
-    void checkErrors(ValueDecl *D) {
-      PrettyStackTraceDecl debugStack("verifying errors", D);
-
-      if (!D->hasInterfaceType())
-        return;
-      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
-        Out << "Valid decl has error type!\n";
-        D->dump(Out);
-        abort();
-      }
-    }
+    void checkErrors(ValueDecl *D) {}
   };
 } // end anonymous namespace
 

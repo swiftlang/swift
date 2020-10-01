@@ -62,20 +62,22 @@ extension Derived : Abstractable {}
 // CHECK: bb0(%0 : $*Derived):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %0 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
-// CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!modify.1
+// CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!modify
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : ${{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -90,18 +92,20 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s6modify4BaseC19finalStoredFunctionSiycvM
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : $*{{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -115,18 +119,20 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s6modify4BaseC14staticFunctionSiycvMZ
 // CHECK-NEXT: ([[SUPER_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT: [[SUB_ADDR:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK-NEXT: [[SUPER_FN:%.*]] = load [take] [[SUPER_ADDR]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegd_SiIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUPER_FN]])
-// CHECK-NEXT: store [[T1]] to [init] [[SUB_ADDR]]
-// CHECK-NEXT: yield [[SUB_ADDR]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+// CHECK-NEXT: [[T2:%.*]] = convert_function [[T1]]
+// CHECK-NEXT: store [[T2]] to [init] [[SUB_ADDR]]
+// CHECK-NEXT: yield [[SUB_ADDR]] : $*{{.*}}, resume bb1, unwind bb2
 // CHECK:    bb1:
 // CHECK-NEXT: [[SUB_FN:%.*]] = load [take] [[SUB_ADDR]]
+// CHECK-NEXT: [[CVT_FN:%.*]] = convert_function [[SUB_FN]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @$sSiIegr_SiIegd_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out Int) -> Int
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[SUB_FN]])
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
@@ -165,18 +171,19 @@ class HasDidSet : Base {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s6modify9HasDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasDidSet) -> @yields @inout Int {
-// CHECK: bb0([[SELF:%.*]] : @guaranteed $HasDidSet):
-// CHECK:   [[ADDR:%.*]] = alloc_stack $Int
-// CHECK:   [[T0:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivg
-// CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   store [[T1]] to [trivial] [[ADDR]] : $*Int
-// CHECK:   yield [[ADDR]]
-// CHECK:   [[T2:%.*]] = load [trivial] [[ADDR]]
-// CHECK:   [[T3:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivs
-// CHECK:   apply [[T3]]([[T2]], [[SELF]])
-// CHECK:   dealloc_stack [[ADDR]]
-// CHECK:   return {{%.*}} : $()
+// CHECK-LABEL: sil hidden [ossa] @$s6modify9HasDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasDidSet) -> @yields @inout Int {
+// CHECK:      bb0([[SELF:%.*]] : @guaranteed $HasDidSet):
+// CHECK:        [[COPY_VAL:%.*]] = copy_value [[SELF]] : $HasDidSet
+// CHECK-NEXT:   [[UPCAST:%.*]] = upcast [[COPY_VAL]] : $HasDidSet to $Base
+// CHECK-NEXT:   [[BEGIN_BORROW:%.*]] = begin_borrow [[UPCAST]]
+// CHECK-NEXT:   // function_ref Base.stored.modify
+// CHECK-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s6modify4BaseC6storedSivM
+// CHECK-NEXT:   ([[VAL:%.*]], [[IGNORE:%.*]]) = begin_apply [[FUNC_REF]]([[BEGIN_BORROW]])
+// CHECK-NEXT:   yield [[VAL]] : $*Int, resume bb1, unwind bb2
+// CHECK:        [[DIDSET:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivW
+// CHECK-NEXT:   apply [[DIDSET]]([[SELF]])
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:   return [[TUPLE]]
 // CHECK: }
 
   override var computed: Int {
@@ -204,20 +211,15 @@ class HasStoredDidSet {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s6modify15HasStoredDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasStoredDidSet) -> @yields @inout Int {
+// sil hidden [ossa] @$s6modify15HasStoredDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasStoredDidSet) -> @yields @inout Int {
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $HasStoredDidSet):
-// CHECK:   [[ADDR:%.*]] = alloc_stack $Int
-// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
-// CHECK:   [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
-// CHECK:   [[T2:%.*]] = load [trivial] [[T1]]
-// CHECK:   end_access [[T1]] : $*Int
-// CHECK:   store [[T2]] to [trivial] [[ADDR]]
-// CHECK:   yield [[ADDR]]
-// CHECK:   [[T0:%.*]] = load [trivial] [[ADDR]]
-// CHECK:   [[SETTER:%.*]] = function_ref @$s6modify15HasStoredDidSetC6storedSivs
-// CHECK:   apply [[SETTER]]([[T0]], [[SELF]])
-// CHECK:   dealloc_stack [[ADDR]]
-// CHECK:   return {{%.*}} : $()
+// CHECK:   [[REF_ADDR:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
+// CHECK:   [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ADDR]] : $*Int
+// CHECK:   yield [[BEGIN_ACCESS]]
+// CHECK:   [[DIDSET:%.*]] = function_ref @$s6modify15HasStoredDidSetC6storedSivW
+// CHECK:   apply [[DIDSET]]([[SELF]])
+// CHECK:   [[TUPLE:%.*]] = tuple ()
+// CHECK:   return [[TUPLE]]
 // CHECK: }
 }
 
@@ -290,7 +292,7 @@ struct Bill : Totalled {
 // CHECK:   end_access [[ACCESS]]
 // CHECK: }
 
-// CHECK-LABEL:  sil private [transparent] [thunk] [ossa] @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW : $@yield_once @convention(witness_method: Totalled) (@inout Bill) -> @yields @inout Int {
+// CHECK-LABEL:  sil private [transparent] [thunk] [ossa] @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW :
 // CHECK:        bb0([[SELF:%.*]] : $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @$s6modify4BillV5totalSivM
 // CHECK-NEXT:     ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[SELF]])
@@ -468,7 +470,7 @@ class LazyClassProperty {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6modify30inoutAccessOfLazyClassProperty1lyAA0efG0Cz_tF
-// CHECK:    class_method {{.*}} : $LazyClassProperty, #LazyClassProperty.cat!modify.1
+// CHECK:    class_method {{.*}} : $LazyClassProperty, #LazyClassProperty.cat!modify
 func inoutAccessOfLazyClassProperty(l: inout LazyClassProperty) {
   increment(&l.cat)
 }
@@ -543,16 +545,16 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK:         function_ref @$s6modify23HasConditionalSubscriptVA2A0cD0RzlEyACyxGSicig
 
 // CHECK-LABEL: sil_vtable DerivedForOverride {
-// CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC11valueStoredSivg
-// CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivs
-// CHECK:   #BaseForOverride.valueStored!modify.1: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
-// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC13valueComputedSivg
-// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivs
-// CHECK:   #BaseForOverride.valueComputed!modify.1: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
+// CHECK:   #BaseForOverride.valueStored!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC11valueStoredSivg
+// CHECK:   #BaseForOverride.valueStored!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivs
+// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
+// CHECK:   #BaseForOverride.valueComputed!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC13valueComputedSivg
+// CHECK:   #BaseForOverride.valueComputed!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivs
+// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module modify {
-// CHECK:   method #Totalled.total!getter.1: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivgTW
-// CHECK:   method #Totalled.total!setter.1: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivsTW
-// CHECK:   method #Totalled.total!modify.1: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW
+// CHECK:   method #Totalled.total!getter: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivgTW
+// CHECK:   method #Totalled.total!setter: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivsTW
+// CHECK:   method #Totalled.total!modify: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW
 // CHECK: }

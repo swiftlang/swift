@@ -19,7 +19,6 @@
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {

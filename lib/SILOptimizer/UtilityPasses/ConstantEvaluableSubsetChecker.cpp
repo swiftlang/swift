@@ -29,7 +29,6 @@ using namespace swift;
 
 namespace {
 
-static const StringRef constantEvaluableSemanticsAttr = "constant_evaluable";
 static const StringRef testDriverSemanticsAttr = "test_driver";
 
 template <typename... T, typename... U>
@@ -83,8 +82,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       Optional<SILBasicBlock::iterator> nextInstOpt;
       Optional<SymbolicValue> errorVal;
 
-      if (!applyInst || !callee ||
-          !callee->hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+      if (!applyInst || !callee || !isConstantEvaluable(callee)) {
 
         // Ignore these instructions if we had a fatal error already.
         if (previousEvaluationHadFatalError) {
@@ -148,7 +146,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
       SILModule &calleeModule = callee->getModule();
       if (callee->isAvailableExternally() &&
-          callee->hasSemanticsAttr(constantEvaluableSemanticsAttr) &&
+          hasConstantEvaluableAnnotation(callee) &&
           callee->getOptimizationMode() != OptimizationMode::NoOptimization) {
         diagnose(calleeModule.getASTContext(),
                  callee->getLocation().getSourceLoc(),
@@ -164,7 +162,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
     for (SILFunction &fun : *module) {
       // Record functions annotated as constant evaluable.
-      if (fun.hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+      if (hasConstantEvaluableAnnotation(&fun)) {
         constantEvaluableFunctions.insert(&fun);
         continue;
       }

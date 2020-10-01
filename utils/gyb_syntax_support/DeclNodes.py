@@ -1,6 +1,6 @@
 # flake8: noqa I201
-from Child import Child
-from Node import Node
+from .Child import Child
+from .Node import Node
 
 
 DECL_NODES = [
@@ -72,10 +72,13 @@ DECL_NODES = [
          ]),
 
     # function-signature ->
-    #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
+    #   '(' parameter-list? ')' async? (throws | rethrows)? '->'? type?
     Node('FunctionSignature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
@@ -89,7 +92,7 @@ DECL_NODES = [
     #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
     Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundKeyword', kind='Token', 
+             Child('PoundKeyword', kind='Token',
                    classification='BuildConfigId',
                    token_choices=[
                        'PoundIfToken',
@@ -115,7 +118,7 @@ DECL_NODES = [
          children=[
              Child('Clauses', kind='IfConfigClauseList',
                    collection_element_name='Clause'),
-             Child('PoundEndif', kind='PoundEndifToken', 
+             Child('PoundEndif', kind='PoundEndifToken',
                    classification='BuildConfigId'),
          ]),
 
@@ -137,7 +140,7 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken')
          ]),
 
-    Node('PoundSourceLocation', kind='Decl', 
+    Node('PoundSourceLocation', kind='Decl',
          traits=['Parenthesized'],
          children=[
              Child('PoundSourceLocation', kind='PoundSourceLocationToken'),
@@ -148,12 +151,12 @@ DECL_NODES = [
 
     Node('PoundSourceLocationArgs', kind='Syntax',
          children=[
-             Child('FileArgLabel', kind='IdentifierToken', 
+             Child('FileArgLabel', kind='IdentifierToken',
                    text_choices=['file']),
              Child('FileArgColon', kind='ColonToken'),
              Child('FileName', kind='StringLiteralToken'),
              Child('Comma', kind='CommaToken'),
-             Child('LineArgLabel', kind='IdentifierToken', 
+             Child('LineArgLabel', kind='IdentifierToken',
                    text_choices=['line']),
              Child('LineArgColon', kind='ColonToken'),
              Child('LineNumber', kind='IntegerLiteralToken'),
@@ -167,7 +170,8 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating', 'indirect', '__consuming'
+                       'mutating', 'nonmutating', 'indirect', '__consuming',
+                       'actor'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),
@@ -294,11 +298,11 @@ DECL_NODES = [
     # member-decl = decl ';'?
     Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,
          description='''
-         A member declaration of a type consisting of a declaration and an \
+         A member declaration of a type consisting of a declaration and an
          optional semicolon;
          ''',
          children=[
-             Child('Decl', kind='Decl', 
+             Child('Decl', kind='Decl',
                    description='The declaration of the type member.'),
              Child('Semicolon', kind='SemicolonToken', is_optional=True,
                    description='An optional trailing semicolon.'),
@@ -477,12 +481,14 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPathComponent"
     Node('AccessPathComponent', kind='Syntax',
          children=[
             Child('Name', kind='IdentifierToken'),
             Child('TrailingDot', kind='PeriodToken', is_optional=True),
          ]),
 
+    # FIXME: technically misnamed; should be "ImportPath"
     Node('AccessPath', kind='SyntaxCollection', element='AccessPathComponent'),
 
     Node('ImportDecl', kind='Decl',
@@ -518,11 +524,11 @@ DECL_NODES = [
              Child('Modifier', kind='DeclModifier', is_optional=True),
              Child('AccessorKind', kind='Token',
                    text_choices=[
-                      'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
-                      'addressWithOwner', 'addressWithNativeOwner', 
-                      'unsafeMutableAddress', 
-                      'mutableAddressWithOwner', 
-                      'mutableAddressWithNativeOwner', 
+                      'get', 'set', 'didSet', 'willSet', 'unsafeAddress',
+                      'addressWithOwner', 'addressWithNativeOwner',
+                      'unsafeMutableAddress',
+                      'mutableAddressWithOwner',
+                      'mutableAddressWithNativeOwner',
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
@@ -572,7 +578,7 @@ DECL_NODES = [
 
     Node('EnumCaseElement', kind='Syntax',
          description='''
-         An element of an enum case, containing the name of the case and, \
+         An element of an enum case, containing the name of the case and,
          optionally, either associated values or an assignment to a raw value.
          ''',
          traits=['WithTrailingComma'],
@@ -587,7 +593,7 @@ DECL_NODES = [
                    '''),
              Child('TrailingComma', kind='CommaToken', is_optional=True,
                    description='''
-                   The trailing comma of this element, if the case has \
+                   The trailing comma of this element, if the case has
                    multiple elements.
                    '''),
          ]),
@@ -598,7 +604,7 @@ DECL_NODES = [
 
     Node('EnumCaseDecl', kind='Decl',
          description='''
-         A `case` declaration of a Swift `enum`. It can have 1 or more \
+         A `case` declaration of a Swift `enum`. It can have 1 or more
          `EnumCaseElement`s inside, each declaring a different case of the
          enum.
          ''',
@@ -649,13 +655,13 @@ DECL_NODES = [
              Child('InheritanceClause', kind='TypeInheritanceClause',
                    is_optional=True,
                    description='''
-                   The inheritance clause describing conformances or raw \
+                   The inheritance clause describing conformances or raw
                    values for this enum.
                    '''),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True,
                    description='''
-                   The `where` clause that applies to the generic parameters of \
+                   The `where` clause that applies to the generic parameters of
                    this enum.
                    '''),
              Child('Members', kind='MemberDeclBlock',
@@ -664,7 +670,7 @@ DECL_NODES = [
                    ''')
          ]),
 
-    # operator-decl -> attribute? modifiers? 'operator' operator 
+    # operator-decl -> attribute? modifiers? 'operator' operator
     Node('OperatorDecl', kind='Decl', traits=['IdentifiedDecl'],
          description='A Swift `operator` declaration.',
          children=[
@@ -762,7 +768,7 @@ DECL_NODES = [
          groups.
          ''',
          children=[
-             Child('HigherThanOrLowerThan', kind='IdentifierToken', 
+             Child('HigherThanOrLowerThan', kind='IdentifierToken',
                    classification='Keyword',
                    text_choices=[
                       'higherThan', 'lowerThan',
@@ -823,7 +829,7 @@ DECL_NODES = [
          are grouped together in the absence of grouping parentheses.
          ''',
          children=[
-             Child('AssociativityKeyword', kind='IdentifierToken', 
+             Child('AssociativityKeyword', kind='IdentifierToken',
                    classification='Keyword', text_choices=['associativity']),
              Child('Colon', kind='ColonToken'),
              Child('Value', kind='IdentifierToken',

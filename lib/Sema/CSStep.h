@@ -213,8 +213,9 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  ResolvedOverloadSetListItem *getResolvedOverloads() const {
-    return CS.resolvedOverloadSets;
+  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
+  getResolvedOverloads() const {
+    return CS.ResolvedOverloads;
   }
 
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
@@ -227,16 +228,11 @@ protected:
   Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
-    if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, minimize);
+    CS.filterSolutions(solutions, minimize);
   }
 
-  /// Check whether constraint solver is running in "debug" mode,
-  /// which should output diagnostic information.
-  bool isDebugMode() const { return CS.TC.getLangOpts().DebugConstraintSolver; }
-
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     return indent ? log.indent(CS.solverState->depth * 2) : log;
   }
 };
@@ -469,10 +465,10 @@ private:
     if (IsSingle)
       return;
 
-    if (isDebugMode())
+    if (CS.isDebugMode())
       getDebugLogger() << "(solving component #" << Index << '\n';
 
-    ComponentScope = llvm::make_unique<Scope>(*this);
+    ComponentScope = std::make_unique<Scope>(*this);
 
     // If this component has orphaned constraint attached,
     // let's return it to the graph.
@@ -513,7 +509,7 @@ public:
       if (shouldStopAt(*choice))
         break;
 
-      if (isDebugMode()) {
+      if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
         choice->print(log, &CS.getASTContext().SourceMgr);
@@ -521,14 +517,14 @@ public:
       }
 
       {
-        auto scope = llvm::make_unique<Scope>(CS);
+        auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
-          return suspend(llvm::make_unique<SplitterStep>(CS, Solutions));
+          return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
 
-      if (isDebugMode())
+      if (CS.isDebugMode())
         getDebugLogger() << ")\n";
 
       // If this binding didn't match, let's check if we've attempted
@@ -599,7 +595,9 @@ public:
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "TypeVariableStep for " << TypeVar->getString(PO) << " with #"
         << InitialBindings.size() << " initial bindings\n";
   }
 
@@ -615,6 +613,13 @@ protected:
   /// Check whether attempting type variable binding choices should
   /// be stopped, because optimal solution has already been found.
   bool shouldStopAt(const TypeVariableBinding &choice) const override {
+    // Let's always attempt default types inferred from literals in diagnostic
+    // mode because that could lead to better diagnostics if the problem is
+    // contextual like argument/parameter conversion or collection element
+    // mismatch.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If we were able to solve this without considering
     // default literals, don't bother looking at default literals.
     return AnySolved && choice.hasDefaultedProtocol() &&
@@ -622,6 +627,11 @@ protected:
   }
 
   bool shouldStopAfter(const TypeVariableBinding &choice) const override {
+    // Let's always attempt additional bindings in diagnostic mode, as that
+    // could lead to better diagnostic for e.g trying the unwrapped type.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If there has been at least one solution so far
     // at a current batch of bindings is done it's a
     // success because each new batch would be less
@@ -706,12 +716,12 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto *resolved = getResolvedOverloads(); resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
+    for (auto elt : getResolvedOverloads()) {
+      auto resolved = elt.second;
+      if (!resolved.boundType->isEqual(repr))
         continue;
 
-      auto &representative = resolved->Choice;
+      auto &representative = resolved.choice;
       if (!representative.isDecl())
         return;
 

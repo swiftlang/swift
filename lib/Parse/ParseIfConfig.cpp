@@ -296,6 +296,8 @@ public:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
         DiagName = "target environment"; break;
+      case PlatformConditionKind::PtrAuth:
+        DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
@@ -310,6 +312,16 @@ public:
       for (auto suggestion : suggestedValues)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
+    }
+    else if (!suggestedValues.empty()) {
+      // The value the user gave has been replaced by something newer.
+      assert(suggestedValues.size() == 1 && "only support one replacement");
+      auto replacement = suggestedValues.front();
+
+      auto Loc = Arg->getLoc();
+      D.diagnose(Loc, diag::renamed_platform_condition_argument,
+                 *ArgStr, replacement)
+        .fixItReplace(Arg->getSourceRange(), replacement);
     }
 
     return E;
@@ -591,17 +603,42 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 /// Delegate callback function to parse elements in the blocks.
 ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+  assert(Tok.is(tok::pound_if));
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
 
   SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
+  // Find the region containing code completion token.
+  SourceLoc codeCompletionClauseLoc;
+  if (SourceMgr.hasCodeCompletionBuffer() &&
+      SourceMgr.getCodeCompletionBufferID() == L->getBufferID() &&
+      SourceMgr.isBeforeInBuffer(Tok.getLoc(),
+                                 SourceMgr.getCodeCompletionLoc())) {
+    llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
+    BacktrackingScope backtrack(*this);
+    do {
+      auto startLoc = Tok.getLoc();
+      consumeToken();
+      skipUntilConditionalBlockClose();
+      auto endLoc = PreviousLoc;
+      if (SourceMgr.rangeContainsTokenLoc(SourceRange(startLoc, endLoc),
+                                          SourceMgr.getCodeCompletionLoc())){
+        codeCompletionClauseLoc = startLoc;
+        break;
+      }
+    } while (Tok.isNot(tok::pound_endif, tok::eof));
+  }
+
   bool shouldEvaluate =
       // Don't evaluate if it's in '-parse' mode, etc.
-      State->PerformConditionEvaluation &&
+      shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
-      !getScopeInfo().isInactiveConfigBlock();
+      !getScopeInfo().isInactiveConfigBlock() &&
+      // If this directive contains code completion location, 'isActive' is
+      // determined solely by which block has the completion token.
+      !codeCompletionClauseLoc.isValid();
 
   bool foundActive = false;
   bool isVersionCondition = false;
@@ -646,6 +683,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       }
     }
 
+    // Treat the region containing code completion token as "active".
+    if (codeCompletionClauseLoc.isValid() && !foundActive)
+      isActive = (ClauseLoc == codeCompletionClauseLoc);
+
     foundActive |= isActive;
 
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
@@ -664,6 +705,11 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     SmallVector<ASTNode, 16> Elements;
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
+    // Disable updating the interface hash inside inactive blocks.
+    Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> T;
+    if (!isActive)
+      T.emplace(CurrentTokenHash, None);
+
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else if (SyntaxContext->isEnabled()) {

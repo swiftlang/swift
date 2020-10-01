@@ -30,6 +30,9 @@ class FileUnit : public DeclContext {
 #pragma clang diagnostic pop
   virtual void anchor();
 
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
   // FIXME: Stick this in a PointerIntPair.
   const FileUnitKind Kind;
 
@@ -79,20 +82,20 @@ public:
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const {}
 
   /// Finds all class members defined in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ImportPath::Access accessPath,
                                   VisibleDeclConsumer &consumer) const {}
 
   /// Finds class members defined in this file with the given name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+  virtual void lookupClassMember(ImportPath::Access accessPath,
                                  DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
 
@@ -101,6 +104,31 @@ public:
                  ObjCSelector selector,
                  SmallVectorImpl<AbstractFunctionDecl *> &results) const = 0;
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  virtual void lookupImportedSPIGroups(
+                            const ModuleDecl *importedModule,
+                            SmallSetVector<Identifier, 4> &spiGroups) const {};
+
+protected:
+  /// Look up an operator declaration. Do not call directly, use
+  /// \c DirectOperatorLookupRequest instead.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  ///
+  /// \param fixity One of Prefix, Infix, or Postfix.
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const {}
+
+  /// Look up a precedence group. Do not call directly, use
+  /// \c DirectPrecedenceGroupLookupRequest instead.
+  ///
+  /// \param name The precedence group name.
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {}
+
+public:
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
@@ -152,6 +180,28 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+  /// Finds top-level decls in this file filtered by their attributes.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  ///
+  /// \param Results Vector collecting the decls.
+  ///
+  /// \param matchAttributes Check on the attributes of a decl to keep only
+  /// decls with matching attributes. The subclass SerializedASTFile checks the
+  /// attributes first to only deserialize decls with accepted attributes,
+  /// limiting deserialization work.
+  virtual void
+  getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &Results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const;
+
+  /// Finds all operator decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const {}
 
   /// Finds all precedence group decls in this file.
   ///
@@ -191,7 +241,7 @@ public:
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Public);
+    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
   }
 
   /// Generates the list of libraries needed to link this file, based on its
@@ -199,16 +249,31 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
 
+  /// Returns the path of the file or directory that defines the module
+  /// represented by this \c FileUnit, or empty string if there is none.
+  /// Cross-import overlay specifiers are found relative to this path.
+  virtual StringRef getModuleDefiningPath() const {
+    return "";
+  }
+
   /// True if this file contains the main class for the module.
   bool hasMainClass() const {
     return getMainClass();
   }
-  virtual ClassDecl *getMainClass() const {
-    assert(hasEntryPoint());
-    return nullptr;
+  ClassDecl *getMainClass() const {
+    return dyn_cast_or_null<ClassDecl>(getMainDecl());
+  }
+  bool hasMainDecl() const { return getMainDecl(); }
+  virtual Decl *getMainDecl() const { return nullptr; }
+  FuncDecl *getMainFunc() const {
+    return dyn_cast_or_null<FuncDecl>(getMainDecl());
   }
   virtual bool hasEntryPoint() const {
     return false;
+  }
+
+  virtual ModuleDecl *getUnderlyingModuleIfOverlay() const {
+    return nullptr;
   }
 
   /// Returns the associated clang module if one exists.
@@ -314,26 +379,13 @@ public:
     return StringRef();
   }
 
-  /// Look up an operator declaration.
-  ///
-  /// \param name The operator name ("+", ">>", etc.)
-  ///
-  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
-  virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
-    return nullptr;
-  }
-
-  /// Look up a precedence group.
-  ///
-  /// \param name The precedence group name.
-  virtual PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name) const {
-    return nullptr;
-  }
-
   /// Returns the Swift module that overlays a Clang module.
   virtual ModuleDecl *getOverlayModule() const { return nullptr; }
 
   virtual bool isSystemModule() const { return false; }
+
+  /// Checks whether an error was encountered while loading the file.
+  virtual bool hadLoadError() const { return false; }
 
   /// Retrieve the set of generic signatures stored within this module.
   ///
@@ -354,6 +406,7 @@ public:
   }
 };
 
+void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&

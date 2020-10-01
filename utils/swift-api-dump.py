@@ -102,6 +102,8 @@ def create_parser():
     parser.add_argument('--enable-infer-import-as-member', action='store_true',
                         help='Infer when a global could be imported as a ' +
                         'member.')
+    parser.add_argument('--enable-experimental-concurrency', action='store_true',
+                        help='Enable experimental concurrency model.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
@@ -161,8 +163,11 @@ def print_command(cmd, outfile=""):
 # Dump the API for the given module.
 
 
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
-                     verbose)):
+def dump_module_api_star(pack):
+    dump_module_api(*pack)
+
+
+def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet, verbose):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 
@@ -325,6 +330,8 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_infer_import_as_member:
         extra_args = extra_args + ['-enable-infer-import-as-member']
+    if args.enable_experimental_concurrency:
+        extra_args = extra_args + ['-enable-experimental-concurrency']
     if args.swift_version:
         extra_args = extra_args + ['-swift-version', '%s' % args.swift_version]
 
@@ -341,7 +348,7 @@ def main():
 
     # Execute the API dumps
     pool = multiprocessing.Pool(processes=args.jobs)
-    pool.map(dump_module_api, jobs)
+    pool.map(dump_module_api_star, jobs)
 
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])

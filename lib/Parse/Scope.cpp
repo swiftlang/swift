@@ -50,14 +50,14 @@ static bool isResolvableScope(ScopeKind SK) {
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock)
-  : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
-    PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC),
-    IsInactiveConfigBlock(isInactiveConfigBlock) {
+    : Scope(P->getScopeInfo(), SC, isInactiveConfigBlock) {}
+
+Scope::Scope(ScopeInfo &SI, ScopeKind SC, bool isInactiveConfigBlock)
+    : SI(SI), HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
+      IsInactiveConfigBlock(isInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
-  
+
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
     IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
@@ -114,7 +114,7 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
 
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getFullName());
+  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getName());
 
   // A redefinition is a hit in the scoped table at the same depth.
   if (EntryI != HT.end() && EntryI->first == CurScope->getDepth()) {
@@ -141,7 +141,7 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
   }
 
   HT.insertIntoScope(CurScope->HTScope,
-                     D->getFullName(),
+                     D->getName(),
                      std::make_pair(CurScope->getDepth(), D));
 }
 

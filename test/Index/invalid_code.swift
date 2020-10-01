@@ -1,6 +1,5 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -include-locals -source-filename %s | %FileCheck %s
 
-// CHECK: [[@LINE+1]]:8 | struct/Swift | Int | {{.*}} | Ref | rel: 0
 var _: Int { get { return 1 } }
 
 func test() {
@@ -17,7 +16,7 @@ class CrashTest {
   init() { }
 }
 // CHECK: [[@LINE+1]]:13 | instance-method/Swift | returnSelf
-CrashTest().returnSelf(["": 0]).something()
+CrashTest().returnSelf(["": 0]).something
 
 class CrashTest2 {
 // CHECK: [[@LINE+1]]:8 | instance-method/Swift | bar

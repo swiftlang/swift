@@ -39,6 +39,8 @@ enum class ResolutionKind {
   TypesOnly
 };
 
+void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
+
 /// Performs a lookup into the given module and it's imports.
 ///
 /// If 'moduleOrFile' is a ModuleDecl, we search the module and it's
@@ -63,7 +65,7 @@ void lookupInModule(const DeclContext *moduleOrFile,
 /// reexports, observing proper shadowing rules.
 void
 lookupVisibleDeclsInModule(const DeclContext *moduleOrFile,
-                           ModuleDecl::AccessPathTy accessPath,
+                           ImportPath::Access accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,

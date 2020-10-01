@@ -13,11 +13,11 @@
 #ifndef SWIFT_PARSE_PARSEDRAWSYNTAXNODE_H
 #define SWIFT_PARSE_PARSEDRAWSYNTAXNODE_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
-#include <vector>
 
 namespace swift {
 
@@ -98,8 +98,8 @@ class ParsedRawSyntaxNode {
     assert(DeferredToken.NumTrailingTrivia == numTrailingTrivia &&
            "numLeadingTrivia is too large value!");
   }
-  ParsedRawSyntaxNode(ParsedRawSyntaxNode &other) = delete;
-  ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) = delete;
 
 public:
   ParsedRawSyntaxNode()
@@ -327,9 +327,7 @@ public:
   }
 
   /// Dump this piece of syntax recursively for debugging or testing.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dump() const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this piece of syntax recursively.
   void dump(raw_ostream &OS, unsigned Indent = 0) const;

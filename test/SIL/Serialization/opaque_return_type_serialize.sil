@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module -emit-module-path %t/OpaqueReturnTypeExporter.swiftmodule -module-name OpaqueReturnTypeExporter %S/Inputs/OpaqueReturnTypeExporter.swift
+// RUN: %target-swift-frontend -disable-availability-checking  -enable-library-evolution -emit-module -emit-module-path %t/OpaqueReturnTypeExporter.swiftmodule -module-name OpaqueReturnTypeExporter %S/Inputs/OpaqueReturnTypeExporter.swift
 // RUN: %target-sil-opt -I %t %s -emit-sib -module-name test -o %t/test.sib
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir %t/test.sib
 
@@ -12,7 +12,7 @@ typealias SomeButt2 = @_opaqueReturnTypeOf("$sSi24OpaqueReturnTypeExporterE8some
 sil @$s24OpaqueReturnTypeExporter07exportsaB0QryF : $@convention(thin) () -> @out SomeButt
 sil @$sSi24OpaqueReturnTypeExporterE8someButtQryF : $@convention(thin) (Int) -> @out SomeButt2
 
-sil @use_opaque_type : $@convention(thin) (Int) -> () {
+sil [serialized] @use_opaque_type : $@convention(thin) (Int) -> () {
 entry(%a : $Int):
   %f = function_ref @$s24OpaqueReturnTypeExporter07exportsaB0QryF : $@convention(thin) () -> @out SomeButt
   %x = alloc_stack $SomeButt

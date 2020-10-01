@@ -113,30 +113,35 @@ SliceTests.test("${Collection}.Slice.{startIndex,endIndex}") {
 %   end
 % end
 
+SliceTests.test("${Collection}.Slice.withContiguousStorageIfAvailable") {
+  for test in subscriptRangeTests {
+    let c = ${Collection}(elements: test.collection)
+    let bounds = test.bounds(in: c)
+    var slice = Slice(base: c, bounds: bounds)
+    let r = slice.withContiguousStorageIfAvailable { _ in }
+    expectNil(r) // None of the minimal collection types implement this.
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // MutableSlice<Base>
 //===----------------------------------------------------------------------===//
 
-/*
-FIXME: uncomment this test when the following bug is fixed:
-
-<rdar://problem/21935030> Recast Slice and MutableSlice in terms of Collection
-and MutableCollection
-
-extension MutableSlice {
+extension Slice {
   func _checkBaseSubSequenceElementIsElement() {
+    expectEqualType(
       Element.self,
       Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Iterator.Element.self,
       Base.Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Iterator.Element.self,
+      Iterator.Element.self)
+    expectEqualType(
+      Element.self,
       Base.SubSequence.Iterator.Element.self)
   }
 }
-*/
 
 runAllTests()

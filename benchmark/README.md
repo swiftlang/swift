@@ -8,11 +8,11 @@ To run Swift benchmarks, pass the `--benchmark` flag to `build-script`. The
 current benchmark results will be compared to the previous run's results if
 available. Results for each benchmark run are logged for future comparison.
 
-For branch based development, take a baseline benchmark on the Swift `master`
+For branch based development, take a baseline benchmark on the Swift `main`
 branch, switch to a development branch containing potentially performance
 impacting changes, and run the benchmarks again. Upon benchmark completion, the
 benchmark results for the development branch will be compared to the most
-recent benchmark results for `master`.
+recent benchmark results for `main`.
 
 ## Building the Swift Benchmarks
 
@@ -67,10 +67,14 @@ The following build options are available:
     * Enable this option to link the benchmark binaries against the target
       machine's Swift standard library and runtime installed with the OS.
     (default: OFF)
+* `-DSWIFT_BENCHMARK_GENERATE_DEBUG_INFO`
+    * Enable this option to compile benchmark binaries with debug info.
+    (default: ON)
 
 The following build targets are available:
 
 * `swift-benchmark-macosx-x86_64`
+* `swift-benchmark-iphoneos-arm64e`
 * `swift-benchmark-iphoneos-arm64`
 * `swift-benchmark-iphoneos-armv7`
 * `swift-benchmark-appletvos-arm64`
@@ -177,7 +181,7 @@ benchmarks will be compiled with -Onone!**
 * `--list`
     * Print a list of available tests matching specified criteria
 * `--tags`
-    * Run tests that are labeled with specified [tags](https://github.com/apple/swift/blob/master/benchmark/utils/TestsUtils.swift#L19)
+    * Run tests that are labeled with specified [tags](https://github.com/apple/swift/blob/main/benchmark/utils/TestsUtils.swift#L19)
      (comma separated list); multiple tags are interpreted as logical AND, i.e.
      run only test that are labeled with all the supplied tags
 * `--skip-tags`

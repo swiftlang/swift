@@ -1,0 +1,1 @@
+int fooHelperSubFunc(int arg);

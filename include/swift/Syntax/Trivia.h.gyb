@@ -87,6 +87,7 @@
 #ifndef SWIFT_SYNTAX_TRIVIA_H
 #define SWIFT_SYNTAX_TRIVIA_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OwnedString.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/ByteTreeSerialization.h"
@@ -299,7 +300,7 @@ struct Trivia {
   void appendOrSquash(const TriviaPiece &Next);
 
   /// Dump a debug representation of this Trivia collection to standard error.
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   /// Dump a debug representation of this Trivia collection to the provided
   /// stream and indentation level.

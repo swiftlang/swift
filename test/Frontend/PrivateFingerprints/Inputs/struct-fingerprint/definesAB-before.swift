@@ -1,0 +1,4 @@
+struct A {
+}
+struct B {
+}

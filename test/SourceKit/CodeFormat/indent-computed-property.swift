@@ -33,8 +33,8 @@ print()
 }
 
 class C3 {
-  var value : Int
-  {}
+    var value : Int
+    {}
 }
 // RUN: %sourcekitd-test -req=format -line=1 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=2 -length=1 %s >>%t.response
@@ -71,4 +71,4 @@ class C3 {
 // CHECK: key.sourcetext: "    didSet {"
                           "    didSet {"
 // CHECK: key.sourcetext: "        print()"
-// CHECK: key.sourcetext: "  {}"
+// CHECK: key.sourcetext: "    {}"

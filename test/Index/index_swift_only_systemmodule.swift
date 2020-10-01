@@ -34,6 +34,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -66,6 +67,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -89,12 +91,13 @@ print(someFunc())
 // RUN:     %s
 //
 // --- Ensure module cache is populated.
-// RUN: find %t/modulecache -maxdepth 1 -name 'SomeModule-*.swiftmodule' | grep .
+// RUN: ls %t/modulecache/SomeModule-*.swiftmodule
 //
 // --- Built with indexing
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -123,6 +126,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \

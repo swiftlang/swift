@@ -59,6 +59,11 @@ module HasSubmodule {
   }
 }
 
+module ImageInitializers {
+  header "ImageInitializers.h"
+  export *
+}
+
 module ImportsMissingHeader {
   header "ImportsMissingHeader.h"
   export *
@@ -165,6 +170,7 @@ module SubclassExistentialsExtra {
 
 module SwiftPrivateAttr {
   header "SwiftPrivateAttr.h"
+  export *
 }
 
 module TestProtocols { header "Protocols.h" }
@@ -215,6 +221,10 @@ module BlocksReturningBool {
   header "BlocksReturningBool.h"
 }
 
+module MacOSVersionCanonicalization {
+  header "MacOSVersionCanonicalization.h"
+}
+
 module Warnings1 { header "Warnings1.h" }
 module Warnings2 { header "Warnings2.h" }
 module Warnings3 { header "Warnings3.h" }
@@ -232,4 +242,12 @@ module ConditionallyFoo {
 
 module ForwardDeclarationsHelper {
   header "ForwardDeclarationsHelper.h"
+}
+
+module LocalVsFileScopeBase {
+  header "LocalVsFileScopeBase.h"
+}
+module LocalVsFileScope {
+  header "LocalVsFileScope.h"
+  export *
 }

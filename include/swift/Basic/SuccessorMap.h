@@ -23,6 +23,7 @@
 #ifndef SWIFT_BASIC_SUCCESSORMAP_H
 #define SWIFT_BASIC_SUCCESSORMAP_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
@@ -59,7 +60,7 @@ class SuccessorMap {
     K Begin, End;
     V Value;
 
-    void dump() const {
+    SWIFT_DEBUG_DUMP {
       dumpNode(this);
     }
   };
@@ -159,11 +160,8 @@ public:
 #endif
   }
 
-  void dump() const {
-    // We call dump() on the object instead of using dumpNode here so
-    // that the former will be available in a debug build as long as
-    // something in the program calls dump on the collection.
-    if (Root) Root->dump();
+  SWIFT_DEBUG_DUMP {
+    if (Root) dumpNode(Root);
     else llvm::errs() << "(empty)\n";
   }
 

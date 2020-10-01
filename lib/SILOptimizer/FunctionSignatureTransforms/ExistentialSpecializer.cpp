@@ -75,10 +75,6 @@ public:
       return;
     }
 
-    // FIXME: This pass should be able to support ownership.
-    if (F->hasOwnership())
-      return;
-
     /// Get CallerAnalysis information handy.
     CA = PM->getAnalysis<CallerAnalysis>();
 
@@ -130,7 +126,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
   auto *F = Apply.getReferencedFunctionOrNull();
-  auto CalleeArgs = F->begin()->getFunctionArguments();
+  auto CalleeArgs = F->begin()->getSILFunctionArguments();
   bool returnFlag = false;
 
   /// Analyze the argument for protocol conformance.  Iterator over the callee's
@@ -207,7 +203,6 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 
 /// Determine if this callee function can be specialized or not.
 bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
-
   /// Determine the caller of the apply.
   auto *Callee = Apply.getReferencedFunctionOrNull();
   if (!Callee)
@@ -219,6 +214,16 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// External function definitions.
   if (!Callee->isDefinition())
+    return false;
+
+  // Ignore generic functions. Generic functions should be fully specialized
+  // before attempting to introduce new generic parameters for existential
+  // arguments. Otherwise, there's no guarantee that the generic specializer
+  // will be able to specialize the new generic parameter created by this pass.
+  //
+  // Enabling this would require additional implementation work to correctly
+  // substitute the original archetypes into the new generic signature.
+  if (Callee->getLoweredFunctionType()->getSubstGenericSignature())
     return false;
 
   /// Ignore functions with indirect results.
@@ -308,7 +313,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
       /// Save the arguments in a descriptor.
       llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
       llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
-      auto Args = Callee->begin()->getFunctionArguments();
+      auto Args = Callee->begin()->getSILFunctionArguments();
       for (unsigned i : indices(Args)) {
         ArgumentDescList.emplace_back(Args[i], Allocator);
       }

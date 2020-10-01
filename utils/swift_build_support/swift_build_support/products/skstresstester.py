@@ -13,9 +13,21 @@
 import os
 import platform
 
+from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
+
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import swiftsyntax
+from . import xctest
 from .. import shell
-from .. import targets
 
 
 class SKStressTester(product.Product):
@@ -27,36 +39,41 @@ class SKStressTester(product.Product):
         """
         return "swift-stress-tester"
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
+
     def package_name(self):
         return 'SourceKitStressTester'
 
-    def run_build_script_helper(self, action, additional_params=[]):
+    def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
-        toolchain_path = targets.toolchain_path(self.args.install_destdir,
-                                                self.args.install_prefix)
-
-        configuration = 'debug' if self.args.build_variant == 'Debug' else \
-            'release'
+        configuration = 'release' if self.is_release() else 'debug'
 
         helper_cmd = [
             script_path,
             action,
             '--package-dir', self.package_name(),
-            '--toolchain', toolchain_path,
+            '--toolchain', self.install_toolchain_path(host_target),
             '--config', configuration,
             '--build-dir', self.build_dir,
+            '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
+            # There might have been a Package.resolved created by other builds
+            # or by the package being opened using Xcode. Discard that and
+            # reset the dependencies to be local.
+            '--update'
         ]
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)
-
-    @classmethod
-    def is_build_script_impl_product(cls):
-        return False
 
     def should_build(self, host_target):
         return True
@@ -67,19 +84,36 @@ class SKStressTester(product.Product):
                                "than Darwin".format(
                                    product=self.package_name()))
 
-        self.run_build_script_helper('build')
+        self.run_build_script_helper('build', host_target)
 
     def should_test(self, host_target):
         return self.args.test_skstresstester
 
     def test(self, host_target):
-        self.run_build_script_helper('test')
+        self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
         return self.args.install_skstresstester
 
     def install(self, host_target):
-        install_prefix = self.args.install_destdir + self.args.install_prefix
-        self.run_build_script_helper('install', [
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(self.args,
+                                                              host_target,
+                                                              self.build_dir)
+        install_prefix = install_destdir + self.args.install_prefix
+        self.run_build_script_helper('install', host_target, [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM,
+                swiftsyntax.SwiftSyntax]

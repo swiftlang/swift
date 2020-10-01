@@ -1,5 +1,5 @@
 // RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts
+// REQUIRES: asserts,no_asan
 
 class rdar19394804 {
   let data = [

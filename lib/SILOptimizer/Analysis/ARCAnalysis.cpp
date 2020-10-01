@@ -103,7 +103,8 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
-    if (II.hasAttribute(llvm::Attribute::ReadNone)) {
+    auto attrs = II.getOrCreateAttributes(F->getASTContext());
+    if (attrs.hasFnAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
           return true;
@@ -473,6 +474,10 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
       // FIXME: this is overly conservative. It should return true only of the
       // RC identity of the single operand matches Ptr.
       return true;
+    case SILInstructionKind::BeginCOWMutationInst:
+      // begin_cow_mutation takes the argument as owned and produces a new
+      // owned result.
+      return false;
     default:
       llvm_unreachable("Unexpected check-ref-count instruction.");
     }
@@ -843,7 +848,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingDestroyAddresses(
   SILFunction::iterator anotherEpilogueBB =
       (Kind == ExitKind::Return) ? F->findThrowBB() : F->findReturnBB();
 
-  for (auto *arg : F->begin()->getFunctionArguments()) {
+  for (auto *arg : F->begin()->getSILFunctionArguments()) {
     if (arg->isIndirectResult())
       continue;
     if (arg->getArgumentConvention() != SILArgumentConvention::Indirect_In)
@@ -988,131 +993,6 @@ findMatchingReleases(SILBasicBlock *BB) {
 }
 
 //===----------------------------------------------------------------------===//
-//                    Code for Determining Final Releases
-//===----------------------------------------------------------------------===//
-
-// Propagate liveness backwards from an initial set of blocks in our
-// LiveIn set.
-static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
-                              SILBasicBlock *DefBB) {
-  // First populate a worklist of predecessors.
-  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
-  for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPredecessorBlocks())
-      Worklist.push_back(Pred);
-
-  // Now propagate liveness backwards until we hit the alloc_box.
-  while (!Worklist.empty()) {
-    auto *BB = Worklist.pop_back_val();
-
-    // If it's already in the set, then we've already queued and/or
-    // processed the predecessors.
-    if (BB == DefBB || !LiveIn.insert(BB).second)
-      continue;
-
-    for (auto Pred : BB->getPredecessorBlocks())
-      Worklist.push_back(Pred);
-  }
-}
-
-// Is any successor of BB in the LiveIn set?
-static bool successorHasLiveIn(SILBasicBlock *BB,
-                               llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
-  for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.count(Succ))
-      return true;
-
-  return false;
-}
-
-// Walk backwards in BB looking for the last use of a given
-// value, and add it to the set of release points.
-static bool addLastUse(SILValue V, SILBasicBlock *BB,
-                       ReleaseTracker &Tracker) {
-  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
-    if (Tracker.isUser(&*I)) {
-      Tracker.trackLastRelease(&*I);
-      return true;
-    }
-  }
-
-  llvm_unreachable("BB is expected to have a use of a closure");
-  return false;
-}
-
-/// TODO: Refactor this code so the decision on whether or not to accept an
-/// instruction.
-bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
-  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
-  llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
-
-  // First attempt to get the BB where this value resides.
-  auto *DefBB = V->getParentBlock();
-  if (!DefBB)
-    return false;
-
-  bool seenRelease = false;
-  SILInstruction *OneRelease = nullptr;
-
-  // We'll treat this like a liveness problem where the value is the def. Each
-  // block that has a use of the value has the value live-in unless it is the
-  // block with the value.
-  SmallVector<Operand *, 8> Uses(V->getUses());
-  while (!Uses.empty()) {
-    auto *Use = Uses.pop_back_val();
-    auto *User = Use->getUser();
-    auto *BB = User->getParent();
-
-    if (Tracker.isUserTransitive(User)) {
-      Tracker.trackUser(User);
-      auto *CastInst = cast<SingleValueInstruction>(User);
-      Uses.append(CastInst->getUses().begin(), CastInst->getUses().end());
-      continue;
-    }
-
-    if (!Tracker.isUserAcceptable(User))
-      return false;
-
-    Tracker.trackUser(User);
-
-    if (BB != DefBB)
-      LiveIn.insert(BB);
-
-    // Also keep track of the blocks with uses.
-    UseBlocks.insert(BB);
-
-    // Try to speed up the trivial case of single release/dealloc.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User) ||
-        isa<DestroyValueInst>(User) || isa<ReleaseValueInst>(User)) {
-      if (!seenRelease)
-        OneRelease = User;
-      else
-        OneRelease = nullptr;
-
-      seenRelease = true;
-    }
-  }
-
-  // Only a single release/dealloc? We're done!
-  if (OneRelease) {
-    Tracker.trackLastRelease(OneRelease);
-    return true;
-  }
-
-  propagateLiveness(LiveIn, DefBB);
-
-  // Now examine each block we saw a use in. If it has no successors
-  // that are in LiveIn, then the last use in the block is the final
-  // release/dealloc.
-  for (auto *BB : UseBlocks)
-    if (!successorHasLiveIn(BB, LiveIn))
-      if (!addLastUse(V, BB, Tracker))
-        return false;
-
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                            Leaking BB Analysis
 //===----------------------------------------------------------------------===//
 
@@ -1204,11 +1084,11 @@ swift::getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
     if (!TE || TE->getOperand() != BI)
       return Failed;
 
-    if (TE->getFieldNo() == 0 && !GuaranteedValue) {
+    if (TE->getFieldIndex() == 0 && !GuaranteedValue) {
       GuaranteedValue = TE;
       continue;
     }
-    if (TE->getFieldNo() == 1 && !Token) {
+    if (TE->getFieldIndex() == 1 && !Token) {
       Token = TE;
       continue;
     }

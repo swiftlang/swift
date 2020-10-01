@@ -40,6 +40,11 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
+  // begin_access is defined to have side effects, but this is not relevant for
+  // DCE.
+  if (isa<BeginAccessInst>(I))
+    return false;
+
   if (I->mayHaveSideEffects())
     return true;
 
@@ -162,10 +167,10 @@ class DCE : public SILFunctionTransform {
   void addReverseDependency(SILInstruction *From, SILInstruction *To);
   bool removeDead(SILFunction &F);
 
-  void computeLevelNumbers(PostDomTreeNode *Node, unsigned Level);
+  void computeLevelNumbers(PostDomTreeNode *root);
   bool hasInfiniteLoops(SILFunction &F);
   void computePredecessorDependence(SILFunction &F);
-  unsigned computeMinPredecessorLevels(PostDomTreeNode *Node);
+  void computeMinPredecessorLevels(PostDomTreeNode *root);
   void insertControllingInfo(SILBasicBlock *Block, unsigned Level);
 
   void markValueLive(SILNode *V);
@@ -175,7 +180,7 @@ class DCE : public SILFunctionTransform {
   void propagateLiveBlockArgument(SILArgument *Arg);
   void propagateLiveness(SILInstruction *I);
   void collectControllingBlocksInTree(ControllingInfo &QueryInfo,
-                                      PostDomTreeNode *Node,
+                                      PostDomTreeNode *root,
                            llvm::SmallPtrSetImpl<SILBasicBlock *> &Controlling);
   void collectControllingBlocks(SILBasicBlock *Block,
                                 llvm::SmallPtrSetImpl<SILBasicBlock *> &);
@@ -256,6 +261,10 @@ void DCE::markLive(SILFunction &F) {
         } else {
           markValueLive(FLI);
         }
+        continue;
+      }
+      if (auto *endAccess = dyn_cast<EndAccessInst>(&I)) {
+        addReverseDependency(endAccess->getBeginAccess(), &I);
         continue;
       }
       if (seemsUseful(&I))
@@ -400,21 +409,17 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::SwitchEnumInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
-  case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
     markValueLive(I->getOperand(0));
     return;
 
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastValueBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::YieldInst:
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
-    return;
-
-  case TermKind::CheckedCastAddrBranchInst:
-    markValueLive(I->getOperand(0));
-    markValueLive(I->getOperand(1));
     return;
   }
   llvm_unreachable("corrupt instruction!");
@@ -484,7 +489,7 @@ bool DCE::removeDead(SILFunction &F) {
 
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
-      I++;
+      ++I;
       if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
         continue;
 
@@ -541,7 +546,7 @@ bool DCE::removeDead(SILFunction &F) {
 // Returns true upon success, false if nodes that are not present in the
 // post-dominator tree are detected.
 bool DCE::precomputeControlInfo(SILFunction &F) {
-  computeLevelNumbers(PDT->getRootNode(), 0);
+  computeLevelNumbers(PDT->getRootNode());
   if (hasInfiniteLoops(F))
     return false;
   computePredecessorDependence(F);
@@ -561,12 +566,22 @@ void DCE::insertControllingInfo(SILBasicBlock *Block, unsigned Level) {
   ControllingInfoMap[Block] = Info;
 }
 
-// Assign a level number to each node in the post-dominator tree, and
-void DCE::computeLevelNumbers(PostDomTreeNode *Node, unsigned Level) {
-  insertControllingInfo(Node->getBlock(), Level);
+// Assign a level number to each node in the post-dominator tree.
+void DCE::computeLevelNumbers(PostDomTreeNode *root) {
+  llvm::SmallVector<std::pair<PostDomTreeNode *, unsigned>, 32> workList;
+  workList.push_back({root, 0});
 
-  for (auto Child = Node->begin(), End = Node->end(); Child != End; ++Child)
-    computeLevelNumbers(*Child, Level + 1);
+  while (!workList.empty()) {
+    auto entry = workList.pop_back_val();
+    PostDomTreeNode *node = entry.first;
+    unsigned level = entry.second;
+    
+    insertControllingInfo(node->getBlock(), level);
+    
+    for (PostDomTreeNode *child : *node) {
+      workList.push_back({child, level + 1});
+    }
+  }
 }
 
 // Structurally infinite loops like:
@@ -609,51 +624,65 @@ void DCE::computePredecessorDependence(SILFunction &F) {
   }
 }
 
-// Return the minimum post-dominator tree level of any of the
-// direct controlling predecessors of this node or any child.
-unsigned DCE::computeMinPredecessorLevels(PostDomTreeNode *Node) {
-  unsigned Min = -1;
+// Assign the minimum post-dominator tree level to each node in the tree.
+void DCE::computeMinPredecessorLevels(PostDomTreeNode *root) {
+  llvm::SmallVector<PostDomTreeNode *, 32> postDomOrder;
+  postDomOrder.reserve(ControllingInfoMap.size());
+  postDomOrder.push_back(root);
 
-  auto *Block = Node->getBlock();
+  for (unsigned idx = 0; idx < postDomOrder.size(); ++idx) {
+    PostDomTreeNode *node = postDomOrder[idx];
+    for (PostDomTreeNode *child : *node) {
+      postDomOrder.push_back(child);
+    }
+  }
 
-  assert(ControllingInfoMap.find(Block) != ControllingInfoMap.end() &&
-         "Expected to have map entry for node!");
+  for (PostDomTreeNode *node : llvm::reverse(postDomOrder)) {
+    SILBasicBlock *block = node->getBlock();
+    assert(ControllingInfoMap.find(block) != ControllingInfoMap.end() &&
+           "Expected to have map entry for node!");
 
-  auto &MapElement = ControllingInfoMap[Block];
-  for (auto &PredInfo : MapElement.ControllingPreds)
-    Min = std::min(Min, PredInfo.second);
-
-  for (auto Child = Node->begin(), End = Node->end(); Child != End; ++Child)
-    Min = std::min(Min, computeMinPredecessorLevels(*Child));
-
-  MapElement.MinTreePredLevel = Min;
-
-  return Min;
+    ControllingInfo &nodeInfo = ControllingInfoMap[block];
+    for (auto &pred : nodeInfo.ControllingPreds) {
+      nodeInfo.MinTreePredLevel = std::min(nodeInfo.MinTreePredLevel, pred.second);
+    }
+    if (PostDomTreeNode *parentNode = node->getIDom()) {
+      ControllingInfo &parentInfo = ControllingInfoMap[parentNode->getBlock()];
+      parentInfo.MinTreePredLevel = std::min(parentInfo.MinTreePredLevel, nodeInfo.MinTreePredLevel);
+    }
+  }
 }
 
 void DCE::collectControllingBlocksInTree(ControllingInfo &QueryInfo,
-                                         PostDomTreeNode *Node,
+                                         PostDomTreeNode *root,
                           llvm::SmallPtrSetImpl<SILBasicBlock *> &Controlling) {
-  auto *Block = Node->getBlock();
+  llvm::SmallVector<PostDomTreeNode *, 32> workList;
+  workList.push_back(root);
 
-  assert(ControllingInfoMap.find(Block) != ControllingInfoMap.end() &&
-         "Expected to have map entry for node!");
+  while (!workList.empty()) {
+    PostDomTreeNode *node = workList.pop_back_val();
+    SILBasicBlock *block = node->getBlock();
 
-  auto &MapEntry = ControllingInfoMap[Block];
-  if (MapEntry.MinTreePredLevel > QueryInfo.Level)
-    return;
+    assert(ControllingInfoMap.find(block) != ControllingInfoMap.end() &&
+          "Expected to have map entry for node!");
 
-  for (auto &PredInfo : MapEntry.ControllingPreds)
-    if (PredInfo.second <= QueryInfo.Level) {
-      assert(PDT->properlyDominates(
-                            PDT->getNode(PredInfo.first)->getIDom()->getBlock(),
-                                         QueryInfo.Block) &&
-             "Expected predecessor's post-dominator to post-dominate node.");
-      Controlling.insert(PredInfo.first);
+    auto &nodeInfo = ControllingInfoMap[block];
+    if (nodeInfo.MinTreePredLevel > QueryInfo.Level)
+      continue;
+
+    for (auto &PredInfo : nodeInfo.ControllingPreds) {
+      if (PredInfo.second <= QueryInfo.Level) {
+        assert(PDT->properlyDominates(
+                              PDT->getNode(PredInfo.first)->getIDom()->getBlock(),
+                                           QueryInfo.Block) &&
+               "Expected predecessor's post-dominator to post-dominate node.");
+        Controlling.insert(PredInfo.first);
+      }
     }
-
-  for (auto Child = Node->begin(), End = Node->end(); Child != End; ++Child)
-    collectControllingBlocksInTree(QueryInfo, (*Child), Controlling);
+    for (PostDomTreeNode *child : *node) {
+      workList.push_back(child);
+    }
+  }
 }
 
 // Walk the post-dominator tree from the query block down, building

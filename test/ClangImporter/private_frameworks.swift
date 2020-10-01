@@ -39,8 +39,8 @@
 import SomeKit
 
 func testWidget(widget: SKWidget) {
-  _ = widget.someObjCMethod()
-  _ = widget.someObjCExtensionMethod()
+  widget.someObjCMethod()
+  widget.someObjCExtensionMethod()
 
   let ext = widget.extensionMethod()
   ext.foo()

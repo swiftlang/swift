@@ -9,8 +9,6 @@ public func captureBeforeDefLet(amount: Int) -> () -> Int {
   }
   let closure = getter
   let modifiedAmount = amount // expected-note{{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{initialization of immutable value 'modifiedAmount' was never used; consider replacing with assignment to '_' or removing it}}
   return closure
 }
 
@@ -21,8 +19,6 @@ public func captureBeforeDefVar(amount: Int) -> () -> Int {
   }
   let closure = incrementor
   var currentTotal = 0 // expected-note{{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{variable 'currentTotal' was written to, but never read}}
   currentTotal = 1
   return closure
 }
@@ -33,8 +29,6 @@ public func captureBeforeDefWeakVar(obj: AnyObject) -> () -> AnyObject? {
   }
   let closure = getter
   weak var weakObj: AnyObject? = obj // expected-note{{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{variable 'weakObj' was written to, but never read}}
   return closure
 }
 
@@ -44,8 +38,6 @@ public func captureBeforeDefUnownedLet(obj: AnyObject) -> () -> AnyObject? {
   }
   let closure = getter
   unowned let unownedObj: AnyObject = obj // expected-note{{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{immutable value 'unownedObj' was never used; consider replacing with '_' or removing it}}
   return closure
 }
 
@@ -55,8 +47,7 @@ public func captureBeforeDefUnownedVar(obj: AnyObject) -> () -> AnyObject? {
   }
   let closure = getter
   unowned var unownedObj: AnyObject = obj // expected-note{{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{variable 'unownedObj' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-1 {{variable 'unownedObj' was never mutated; consider changing to 'let' constant}}
   return closure
 }
 
@@ -122,8 +113,6 @@ func captureInClosure() {
   }
 
   var currentTotal = 0 // expected-note {{captured value declared here}}
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{initialization of variable 'currentTotal' was never used; consider replacing with assignment to '_' or removing it}}
 
   _ = x
 }
@@ -139,8 +128,6 @@ func sr3210_crash() {
 
   let b = 2 // expected-note {{captured value declared here}}
   // expected-warning@-1 {{code after 'return' will never be executed}}
-  // FIXME: Bogus warning!
-  // expected-warning@-3 {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 func sr3210() {
@@ -149,8 +136,6 @@ func sr3210() {
   }
 
   let b = 2
-  // FIXME: Bogus warning!
-  // expected-warning@-2 {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 class SR4812 {
@@ -193,8 +178,7 @@ class rdar40600800 {
 
     func innerFunction() {
       let closure = {
-      // FIXME: Bogus warning!
-      // expected-warning@-2 {{initialization of immutable value 'closure' was never used; consider replacing with assignment to '_' or removing it}}
+      // expected-warning@-1 {{initialization of immutable value 'closure' was never used; consider replacing with assignment to '_' or removing it}}
         callback() // expected-note {{captured here}}
       }
     }

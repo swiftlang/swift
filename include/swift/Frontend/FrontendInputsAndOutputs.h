@@ -17,7 +17,7 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -153,6 +153,7 @@ public:
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
   bool shouldTreatAsModuleInterface() const;
+  bool shouldTreatAsObjCHeader() const;
 
   bool areAllNonPrimariesSIB() const;
 
@@ -173,7 +174,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-  friend class ModuleInterfaceBuilder;
+  friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
@@ -231,12 +232,16 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
+  bool hasSwiftRangesPath() const;
+  bool hasCompiledSourcePath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
   bool hasModuleSourceInfoOutputPath() const;
   bool hasModuleInterfaceOutputPath() const;
+  bool hasPrivateModuleInterfaceOutputPath() const;
+  bool hasModuleSummaryOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

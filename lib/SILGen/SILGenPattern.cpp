@@ -81,7 +81,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
   case PatternKind::Is:
     os << "is ";
-    cast<IsPattern>(p)->getCastTypeLoc().getType()->print(os);
+    cast<IsPattern>(p)->getCastType()->print(os);
     break;
   case PatternKind::EnumElement: {
     auto eep = cast<EnumElementPattern>(p);
@@ -99,7 +99,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("not semantic");
   }
 }
@@ -129,7 +129,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
   }  
   llvm_unreachable("bad pattern");
@@ -168,14 +168,14 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
-    n++;
+    ++n;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
     return n;
   }
   case PatternKind::EnumElement: {
     auto en = cast<EnumElementPattern>(p);
-    n++;
+    ++n;
     if (en->hasSubPattern())
       n = getNumSpecializationsRecursive(en->getSubPattern(), n);
     return n;
@@ -190,7 +190,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
   }  
   llvm_unreachable("bad pattern");
@@ -231,7 +231,7 @@ static bool isWildcardPattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
 
@@ -286,15 +286,14 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     auto pIs = cast<IsPattern>(p);
     // 'is' patterns are only similar to matches to the same type.
     if (auto firstIs = dyn_cast<IsPattern>(first)) {
-      if (firstIs->getCastTypeLoc().getType()
-            ->isEqual(pIs->getCastTypeLoc().getType()))
+      if (firstIs->getCastType()->isEqual(pIs->getCastType()))
         return p;
     }
     return nullptr;
   }
     
   case PatternKind::Paren:
-  case PatternKind::Var:
+  case PatternKind::Binding:
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
@@ -311,7 +310,7 @@ namespace {
 /// A row which we intend to specialize.
 struct RowToSpecialize {
   /// The pattern from this row which we are specializing upon.
-  Pattern *Pattern;
+  swift::Pattern *Pattern;
 
   /// The index of the target row.
   unsigned RowIndex;
@@ -441,7 +440,7 @@ public:
 
   JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
 
-  void emitSharedCaseBlocks();
+  void emitSharedCaseBlocks(llvm::function_ref<void(CaseStmt *)> bodyEmitter);
 
   void emitCaseBody(CaseStmt *caseBlock);
 
@@ -565,7 +564,7 @@ public:
     // AlwaysRefutable before decrementing because we only ever test
     // this value against zero.
     if (isDirectlyRefutablePattern(Columns[column]))
-      NumRemainingSpecializations--;
+      --NumRemainingSpecializations;
 
     if (newColumns.size() == 1) {
       Columns[column] = newColumns[0];
@@ -1039,20 +1038,35 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         SGF.eraseBasicBlock(contBB);
         return;
       }
-      
+
       // Otherwise, if there is no fallthrough, then the next row is
-      // unreachable: emit a dead code diagnostic.
+      // unreachable: emit a dead code diagnostic if:
+      // 1) It's for a 'default' case (since Space Engine already handles
+      //    unreachable enum case patterns) or it's for a enum case which
+      //    has expression patterns since redundancy checking for such
+      //    patterns isn't sufficiently done by the Space Engine.
+      // 2) It's for a case statement in a do-catch.
       if (!clauses[firstRow].hasFallthroughTo()) {
         SourceLoc Loc;
         bool isDefault = false;
+        bool isParentDoCatch = false;
+        bool caseHasExprPattern = false;
         if (auto *S = clauses[firstRow].getClientData<Stmt>()) {
           Loc = S->getStartLoc();
-          if (auto *CS = dyn_cast<CaseStmt>(S))
+          if (auto *CS = dyn_cast<CaseStmt>(S)) {
+            caseHasExprPattern = llvm::any_of(
+                CS->getCaseLabelItems(), [&](const CaseLabelItem item) {
+                  return item.getPattern()->getKind() == PatternKind::Expr;
+                });
+            isParentDoCatch = CS->getParentKind() == CaseParentKind::DoCatch;
             isDefault = CS->isDefault();
+          }
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
         }
-        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        if (isParentDoCatch || isDefault || caseHasExprPattern) {
+          SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        }
       }
     }
   }
@@ -1084,7 +1098,7 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   assert(!hasGuard || !clauses[row].isIrrefutable());
 
   auto stmt = clauses[row].getClientData<Stmt>();
-  assert(isa<CaseStmt>(stmt) || isa<CatchStmt>(stmt));
+  assert(isa<CaseStmt>(stmt));
 
   auto *caseStmt = dyn_cast<CaseStmt>(stmt);
   bool hasMultipleItems =
@@ -1193,6 +1207,17 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
+
+  // Do not emit debug descriptions at this stage.
+  //
+  // If there are multiple let bindings, the value is forwarded to the case
+  // block via a phi. Emitting duplicate debug values for the incoming values
+  // leads to bogus debug info -- we must emit the debug value only on the phi.
+  //
+  // If there's only one let binding, we still want to wait until we can nest
+  // the scope for the case body under the scope for the pattern match.
+  init->setEmitDebugValueOnInit(false);
+
   auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
     mv.forwardInto(SGF, pattern, init.get());
@@ -1338,7 +1363,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("non-semantic pattern kind!");
   
   case PatternKind::Tuple:
@@ -1581,7 +1606,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {
-  auto type = cast<IsPattern>(row.Pattern)->getCastTypeLoc().getType();
+  auto type = cast<IsPattern>(row.Pattern)->getCastType();
   return type->getCanonicalType();
 }
 
@@ -1878,7 +1903,8 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     bool hasNonVoidAssocValue = false;
     bool hasAssocValue = elt->hasAssociatedValues();
     if (hasAssocValue) {
-      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
+      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
+                                               SGF.getTypeExpansionContext());
       hasNonVoidAssocValue = !eltTy.getASTType()->isVoid();
     }
 
@@ -1920,7 +1946,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
 
       SILValue eltValue;
       if (isPlusZero) {
-        origCMV = {SGF.B.createGuaranteedPhiArgument(eltTy),
+        origCMV = {SGF.B.createGuaranteedTransformingTerminatorArgument(eltTy),
                    CastConsumptionKind::BorrowAlways};
       } else {
         origCMV = {SGF.B.createOwnedPhiArgument(eltTy),
@@ -1970,7 +1996,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
   if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
     if (isPlusZero) {
-      SGF.B.createGuaranteedPhiArgument(src.getType());
+      SGF.B.createGuaranteedTransformingTerminatorArgument(src.getType());
     } else {
       SGF.B.createOwnedPhiArgument(src.getType());
     }
@@ -2060,7 +2086,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
     SILType eltTy;
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
-      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
+      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
+                                               SGF.getTypeExpansionContext());
       hasElt = !eltTy.getASTType()->isVoid();
     }
 
@@ -2319,7 +2346,7 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
             RegularLocation::getAutoGeneratedLocation(caseBlock->getEndLoc());
     if (auto *braces = dyn_cast<BraceStmt>(caseBlock->getBody()))
       if (braces->getNumElements() == 1 &&
-          dyn_cast_or_null<DoStmt>(braces->getElement(0).dyn_cast<Stmt *>()))
+          dyn_cast_or_null<DoStmt>(braces->getFirstElement().dyn_cast<Stmt *>()))
         cleanupLoc = CleanupLocation(caseBlock);
     SGF.emitBreakOutOf(cleanupLoc, PatternMatchStmt);
   }
@@ -2390,7 +2417,8 @@ emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
 }
 
 /// Emit all the shared case statements.
-void PatternMatchEmission::emitSharedCaseBlocks() {
+void PatternMatchEmission::emitSharedCaseBlocks(
+    llvm::function_ref<void(CaseStmt *)> bodyEmitter) {
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
     SILBasicBlock *caseBB = entry.second.first;
@@ -2438,7 +2466,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // the order of variables that are the incoming BB arguments. Setup the
     // VarLocs to point to the incoming args and setup initialization so any
     // args needing Cleanup will get that as well.
-    Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
+    LexicalScope scope(SGF, CleanupLocation(caseBlock));
     unsigned argIndex = 0;
     for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
@@ -2469,6 +2497,11 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 
+      // Emit a debug description of the incoming arg, nested within the scope
+      // for the pattern match.
+      SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
+
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
         SGF.VarLocs[vd].value = mv.getValue();
@@ -2486,7 +2519,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
 
     // Now that we have setup all of the VarLocs correctly, emit the shared case
     // body.
-    emitCaseBody(caseBlock);
+    bodyEmitter(caseBlock);
   }
 }
 
@@ -2605,6 +2638,10 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // If we don't have a fallthrough or a multi-pattern 'case', we can emit the
   // body inline. Emit the statement here and bail early.
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
+    // Debug values for case body variables must be nested within a scope for
+    // the case block to avoid name conflicts.
+    DebugScope scope(SGF, CleanupLocation(caseBlock));
+
     // If we have case body vars, set them up to point at the matching var
     // decls.
     if (caseBlock->hasCaseBodyVariables()) {
@@ -2625,6 +2662,11 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           // Ok, we found a match. Update the VarLocs for the case block.
           auto v = SGF.VarLocs[vd];
           SGF.VarLocs[expected] = v;
+
+          // Emit a debug description for the variable, nested within a scope
+          // for the pattern match.
+          SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+          SGF.B.emitDebugDescription(vd, v.value, dbgVar);
         }
       }
     }
@@ -2744,7 +2786,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
-  Scope switchScope(Cleanups, CleanupLocation(S));
+  LexicalScope switchScope(*this, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.
@@ -2845,7 +2887,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   switchScope.pop();
 
   // Then emit the case blocks shared by multiple pattern cases.
-  emission.emitSharedCaseBlocks();
+  emission.emitSharedCaseBlocks(
+      [&](CaseStmt *caseStmt) { emission.emitCaseBody(caseStmt); });
 
   // Bookkeeping.
   SwitchStack.pop_back();
@@ -2917,38 +2960,145 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   Cleanups.emitBranchAndCleanups(sharedDest, S, args);
 }
 
-
-/// Emit a sequence of catch clauses.
 void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
-                                       ArrayRef<CatchStmt*> clauses,
+                                       ArrayRef<CaseStmt *> clauses,
                                        JumpDest catchFallthroughDest) {
-  auto completionHandler = [&](PatternMatchEmission &emission,
-                               ArgArray argArray,
-                               ClauseRow &row) {
-    auto clause = row.getClientData<CatchStmt>();
-    emitProfilerIncrement(clause->getBody());
-    emitStmt(clause->getBody());
 
-    // If we fell out of the catch clause, branch to the fallthrough dest.
-    if (B.hasValidInsertionPoint()) {
-      Cleanups.emitBranchAndCleanups(catchFallthroughDest, clause->getBody());
+  auto completionHandler = [&](PatternMatchEmission &emission,
+                               ArgArray argArray, ClauseRow &row) {
+    auto clause = row.getClientData<CaseStmt>();
+    emitProfilerIncrement(clause->getBody());
+
+    // Certain catch clauses can be entered along multiple paths because they
+    // have multiple labels. When we need multiple entrance path, we factor the
+    // paths with a shared block.
+    //
+    // If we don't have a multi-pattern 'catch', we can emit the
+    // body inline. Emit the statement here and bail early.
+    if (clause->getCaseLabelItems().size() == 1) {
+      // If we have case body vars, set them up to point at the matching var
+      // decls.
+      if (clause->hasCaseBodyVariables()) {
+        // Since we know that we only have one case label item, grab its pattern
+        // vars and use that to update expected with the right SILValue.
+        //
+        // TODO: Do we need a copy here?
+        SmallVector<VarDecl *, 4> patternVars;
+        row.getCasePattern()->collectVariables(patternVars);
+        for (auto *expected : clause->getCaseBodyVariables()) {
+          if (!expected->hasName())
+            continue;
+          for (auto *vd : patternVars) {
+            if (!vd->hasName() || vd->getName() != expected->getName()) {
+              continue;
+            }
+
+            // Ok, we found a match. Update the VarLocs for the case block.
+            auto v = VarLocs[vd];
+            VarLocs[expected] = v;
+          }
+        }
+      }
+
+      emitStmt(clause->getBody());
+
+      // If we fell out of the catch clause, branch to the fallthrough dest.
+      if (B.hasValidInsertionPoint()) {
+        Cleanups.emitBranchAndCleanups(catchFallthroughDest, clause->getBody());
+      }
+      return;
     }
+
+    // Ok, at this point we know that we have a multiple entrance block. Grab
+    // our shared destination in preperation for branching to it.
+    //
+    // NOTE: We do not emit anything yet, since we will emit the shared block
+    // later.
+    JumpDest sharedDest = emission.getSharedCaseBlockDest(clause);
+
+    // If we do not have any bound decls, we do not need to setup any
+    // variables. Just jump to the shared destination.
+    if (!clause->hasCaseBodyVariables()) {
+      // Don't emit anything yet, we emit it at the cleanup level of the switch
+      // statement.
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(clause);
+      Cleanups.emitBranchAndCleanups(sharedDest, clause);
+      return;
+    }
+
+    // Generate the arguments from this row's pattern in the case block's
+    // expected order, and keep those arguments from being cleaned up, as we're
+    // passing the +1 along to the shared case block dest. (The cleanups still
+    // happen, as they are threaded through here messily, but the explicit
+    // retains here counteract them, and then the retain/release pair gets
+    // optimized out.)
+    SmallVector<SILValue, 4> args;
+    SmallVector<VarDecl *, 4> patternVars;
+    row.getCasePattern()->collectVariables(patternVars);
+    for (auto *expected : clause->getCaseBodyVariables()) {
+      if (!expected->hasName())
+        continue;
+      for (auto *var : patternVars) {
+        if (!var->hasName() || var->getName() != expected->getName())
+          continue;
+
+        SILValue value = VarLocs[var].value;
+        SILType type = value->getType();
+
+        // If we have an address-only type, initialize the temporary
+        // allocation. We're not going to pass the address as a block
+        // argument.
+        if (type.isAddressOnly(F)) {
+          emission.emitAddressOnlyInitialization(expected, value);
+          break;
+        }
+
+        // If we have a loadable address, perform a load [copy].
+        if (type.isAddress()) {
+          value = B.emitLoadValueOperation(CurrentSILLoc, value,
+                                           LoadOwnershipQualifier::Copy);
+          args.push_back(value);
+          break;
+        }
+
+        value = B.emitCopyValueOperation(CurrentSILLoc, value);
+        args.push_back(value);
+        break;
+      }
+    }
+
+    // Now that we have initialized our arguments, branch to the shared dest.
+    Cleanups.emitBranchAndCleanups(sharedDest, clause, args);
   };
+
+  LLVM_DEBUG(llvm::dbgs() << "emitting catch dispatch\n"; S->dump(llvm::dbgs());
+             llvm::dbgs() << '\n');
 
   PatternMatchEmission emission(*this, S, completionHandler);
 
-  // Add a row for each clause.
-  std::vector<ClauseRow> clauseRows;
-  clauseRows.reserve(clauses.size());
-  for (CatchStmt *clause : clauses) {
-    clauseRows.emplace_back(clause,
-                            clause->getErrorPattern(),
-                            clause->getGuardExpr(),
-                            /*hasFallthroughTo*/false);
+  // Add a row for each label of each case.
+  SmallVector<ClauseRow, 8> clauseRows;
+  clauseRows.reserve(S->getCatches().size());
+  for (auto caseBlock : S->getCatches()) {
+    // If we have multiple case label itmes, create a shared case block to
+    // generate the shared block.
+    if (caseBlock->getCaseLabelItems().size() > 1) {
+      emission.initSharedCaseBlockDest(caseBlock, /*hasFallthrough*/ false);
+    }
+
+    for (auto &labelItem : caseBlock->getCaseLabelItems()) {
+      clauseRows.emplace_back(caseBlock,
+                              const_cast<Pattern *>(labelItem.getPattern()),
+                              const_cast<Expr *>(labelItem.getGuardExpr()),
+                              /*hasFallthrough*/ false);
+    }
   }
 
-  // Set up an initial clause matrix.
-  ClauseMatrix clauseMatrix(clauseRows);
+  // Emit alloc_stacks for address-only variables appearing in
+  // multiple-entry case blocks.
+  emission.emitAddressOnlyAllocations();
+
+  Scope stmtScope(Cleanups, CleanupLocation(S));
 
   assert(exn.getType().isObject() &&
          "Error is special and should always be an object");
@@ -2980,10 +3130,22 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     }
     emitThrow(S, exn);
   };
+  // Set up an initial clause matrix.
+  ClauseMatrix clauseMatrix(clauseRows);
 
   // Recursively specialize and emit the clause matrix.
   emission.emitDispatch(clauseMatrix, subject, failure);
   assert(!B.hasValidInsertionPoint());
+
+  stmtScope.pop();
+
+  // Then emit the case blocks shared by multiple pattern cases.
+  emission.emitSharedCaseBlocks([&](CaseStmt *caseStmt) {
+    emitStmt(caseStmt->getBody());
+
+    // If we fell out of the catch clause, branch to the fallthrough dest.
+    if (B.hasValidInsertionPoint()) {
+      Cleanups.emitBranchAndCleanups(catchFallthroughDest, caseStmt->getBody());
+    }
+  });
 }
-
-

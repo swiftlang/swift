@@ -67,9 +67,9 @@ while true {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      count[#Int#]; name=count
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Identical]:      count[#Int#]; name=count
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/Local:       Key[#Key#]; name=Key
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#CustomGenericCollection<Key>.Value#]; name=Value
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
 
   var count: Int { #^GENERIC_PARAM_AND_ASSOC_TYPE^# }
@@ -224,8 +224,8 @@ func foo_38149042(bar: Bar_38149042) {
 // RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -291,7 +291,7 @@ public final class IntStore {
   }
 }
 // RDAR_41232519: Begin completions
-// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#Int#}[#Int#]; name=+ Int
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#Int#}[#Int#]; name=+ Int
 // RDAR_41232519: End completions
 
 // rdar://problem/28188259
@@ -355,8 +355,8 @@ extension Foo {
 }
 #endif
 // RDAR_41234606: Begin completion
-// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Element; name=Element
-// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Iterator; name=Iterator
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal/IsSystem: .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal/IsSystem: .Iterator; name=Iterator
 // RDAR_41234606: End completions
 
 // rdar://problem/41071587
@@ -378,3 +378,14 @@ struct test_54215016 {
 // RDAR_54215016: Begin completions
   }
 }
+
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=CRASH_CALL_AS_FUNCTION -source-filename=%s | %FileCheck %s -check-prefix=CRASH_CALL_AS_FUNCTION
+protocol HasCallAsFunctionRequirement {
+  func callAsFunction()
+}
+struct StructWithCallAsFunction: HasCallAsFunctionRequirement {
+  let f = #^CRASH_CALL_AS_FUNCTION^#
+  func callAsFunction() {}
+}
+// CRASH_CALL_AS_FUNCTION: Begin completion
+// CRASH_CALL_AS_FUNCTION: End completions

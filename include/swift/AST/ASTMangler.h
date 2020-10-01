@@ -39,8 +39,8 @@ protected:
   bool OptimizeProtocolNames = true;
 
   /// If enabled, use Objective-C runtime names when mangling @objc Swift
-  /// protocols.
-  bool UseObjCProtocolNames = false;
+  /// protocols and classes.
+  bool UseObjCRuntimeNames = false;
 
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
@@ -80,7 +80,6 @@ public:
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
-    DirectMethodReferenceThunk,
   };
 
   ASTMangler(bool DWARFMangling = false)
@@ -98,14 +97,15 @@ public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
-  std::string mangleEntity(const ValueDecl *decl, bool isCurried,
+  std::string mangleEntity(const ValueDecl *decl,
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
-                                     bool isDeallocating, SymbolKind SKind);
+                                     bool isDeallocating,
+                                     SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
-                                      bool isAllocating, bool isCurried,
+                                      bool isAllocating,
                                       SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleIVarInitDestroyEntity(const ClassDecl *decl,
@@ -121,11 +121,11 @@ public:
 
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index,
-                                          SymbolKind SKind);
+                                          SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
-                                             SymbolKind SKind);
+                                             SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -146,14 +146,55 @@ public:
 
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
-  std::string mangleGlobalInit(const VarDecl *decl, int counter,
+  std::string mangleGlobalInit(const PatternBindingDecl *decl,
+                               unsigned entry,
                                bool isInitFunc);
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              Type SelfType,
                                              ModuleDecl *Module);
-  
+
+  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// - Mangled original function name.
+  /// - Derivative function kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
+                                         AutoDiffDerivativeFunctionKind kind,
+                                         AutoDiffConfig config);
+
+  /// Mangle the linear map (differential/pullback) for the given:
+  /// - Mangled original function name.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffLinearMapHelper(StringRef name,
+                                            AutoDiffLinearMapKind kind,
+                                            AutoDiffConfig config);
+
+  /// Mangle the AutoDiff generated declaration for the given:
+  /// - Generated declaration kind: linear map struct or branching trace enum.
+  /// - Mangled original function name.
+  /// - Basic block number.
+  /// - Linear map kind: differential or pullback.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffGeneratedDeclaration(AutoDiffGeneratedDeclarationKind declKind,
+                                     StringRef origFnName, unsigned bbId,
+                                     AutoDiffLinearMapKind linearMapKind,
+                                     AutoDiffConfig config);
+
+  /// Mangle a SIL differentiability witness key:
+  /// - Mangled original function name.
+  /// - Parameter indices.
+  /// - Result indices.
+  /// - Derivative generic signature (optional).
+  std::string
+  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
+
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,
@@ -172,6 +213,9 @@ public:
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
+
+  /// Create a mangled name to be used for _typeName constant propagation.
+  std::string mangleTypeForTypeName(Type type);
 
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
   
@@ -192,9 +236,14 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
-                                        StringRef USRPrefix);
+                                        StringRef USRPrefix,
+                                        bool IsStatic);
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
+
+  std::string mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl);
+
+  std::string mangleOpaqueTypeDecl(const ValueDecl *decl);
 
   enum SpecialContext {
     ObjCContext,
@@ -244,6 +293,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
@@ -253,9 +305,9 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName);
 
-  void appendModule(const ModuleDecl *module);
+  void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
@@ -340,6 +392,9 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
+  void appendAnyProtocolConformance(CanGenericSignature genericSig,
+                                    CanType conformingType,
+                                    ProtocolConformanceRef conformance);
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance);
   void appendDependentProtocolConformance(const ConformanceAccessPath &path);

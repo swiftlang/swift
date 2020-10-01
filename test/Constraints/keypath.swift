@@ -31,8 +31,8 @@ class Demo {
 }
 
 let some = Some(keyPath: \Demo.here)
-// expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((Any) -> Void)?>'}}
-// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((Any) -> Void)?') are expected to be equal}}
+// expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((V) -> Void)?>'}}
+// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((V) -> Void)?') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
 
@@ -40,11 +40,8 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-
-  // FIXME: A terrible error, but the same as the pre-existing key path
-  // error in the similar situation: 'let _ = \S.init'.
-  _ = ([S]()).map(\.init)
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
@@ -52,6 +49,13 @@ func testFunc() {
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
 
+struct SR_12432 {
+  static func takesKeyPath(_: KeyPath<SR_12432.S, String>) -> String { "" }
+
+  struct S {
+    let text: String = takesKeyPath(\.text) // okay
+  }
+}
 
 // SR-11234
 public extension Array {
@@ -59,6 +63,24 @@ public extension Array {
         let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
         return sortedA
     }
+
+  var i: Int { 0 }
+}
+
+func takesVariadicFnWithGenericRet<T>(_ fn: (S...) -> T) {}
+
+// rdar://problem/59445486
+func testVariadicKeypathAsFunc() {
+  // These are okay, the base type of the KeyPath is inferred to be [S].
+  let _: (S...) -> Int = \.i
+  let _: (S...) -> Int = \Array.i
+  takesVariadicFnWithGenericRet(\.i)
+  takesVariadicFnWithGenericRet(\Array.i)
+
+  // These are not okay, the KeyPath should have a base that matches the
+  // internal parameter type of the function, i.e [S].
+  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
 }
 
 // rdar://problem/54322807
@@ -101,4 +123,67 @@ func rdar56131416() {
   
   // This type should be selected correctly.
   Rdar56131416.takesCorrectType(result)
+}
+
+func test_mismatch_with_contextual_optional_result() {
+  struct A<T> {
+    init<U: Collection>(_ data: T, keyPath: KeyPath<T, U?>) {}
+  }
+
+  struct B {
+    var arr: [Int] = []
+  }
+
+  let _ = A(B(), keyPath: \.arr)
+  // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
+}
+
+// SR-11184
+class SR11184 {}
+
+func fSR11184(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
+
+func fSR11184_O(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String?) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
+
+class KeyPathBase {}
+class KeyPathBaseSubtype: KeyPathBase {}
+class AnotherBase {}
+class AnotherComposeBase {
+  var member: KeyPathBase?
+}
+
+func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype?, _ abase: AnotherComposeBase,
+                               _ kp: KeyPath<KeyPathBase, T>, _ kpa: KeyPath<AnotherBase, T>) {
+  let _ : T = base[keyPath: kp] // expected-error {{value of optional type 'KeyPathBase?' must be unwrapped to a value of type 'KeyPathBase'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{19-19=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{19-19=?}}
+  let _ : T = base[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBase?'}}
+
+  // Chained root mismatch
+  let _ : T = abase.member[keyPath: kp] // expected-error {{value of optional type 'KeyPathBase?' must be unwrapped to a value of type 'KeyPathBase'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{27-27=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{27-27=?}}
+  let _ : T = abase.member[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBase?'}}
+
+  let _ : T = subBase[keyPath: kp] // expected-error {{value of optional type 'KeyPathBaseSubtype?' must be unwrapped to a value of type 'KeyPathBaseSubtype'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{22-22=!}}
+  // expected-note@-2 {{use '?' to access key path subscript only for non-'nil' base values}} {{22-22=?}}
+  let _ : T = subBase[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBaseSubtype?'}}
+
+}
+
+// SR-13442
+func SR13442<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
+
+func testSR13442() {
+  _ = SR13442(\.!.count) // OK
+  _ = SR13442(\String?.!.count) // OK
 }

@@ -60,19 +60,16 @@ public:
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<NormalProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
-  struct DelayedFunction {
-    /// Insert the entity after the given function when it's emitted.
-    SILDeclRef insertAfter;
-    /// Code that generates the function.
-    std::function<void (SILFunction *)> emitter;
-  };
-
-  /// Mapping from SILDeclRefs to delayed SILFunction generators for
-  /// non-externally-visible symbols.
-  llvm::DenseMap<SILDeclRef, DelayedFunction> delayedFunctions;
+  /// Mapping from SILDeclRefs to where the given function will be inserted
+  /// when it's emitted. Used for non-externally visible symbols.
+  llvm::DenseMap<SILDeclRef, SILDeclRef> delayedFunctions;
 
   /// Queue of delayed SILFunctions that need to be forced.
-  std::deque<std::pair<SILDeclRef, DelayedFunction>> forcedFunctions;
+  std::deque<SILDeclRef> forcedFunctions;
+
+  /// Mapping global VarDecls to their onceToken and onceFunc, respectively.
+  llvm::DenseMap<VarDecl *, std::pair<SILGlobalVariable *,
+                                      SILFunction *>> delayedGlobals;
 
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
@@ -131,6 +128,8 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>> FileIDsByFilePath;
+
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
@@ -168,7 +167,65 @@ public:
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
   bool hasNonTrivialIVars(ClassDecl *cd);
-  
+
+  /// Given an original function and a user-specified custom derivative
+  /// function, get or create a derivative thunk with the expected derivative
+  /// function type computed from the original function.
+  ///
+  /// To achieve the expected derivative type, the thunk may perform
+  /// self-reordering, reabstraction, or both.
+  ///
+  /// Self-reordering is done for canonicalizing the types of derivative
+  /// functions for instance methods wrt `self`. We want users to define
+  /// derivatives with the following AST function types:
+  ///
+  /// JVP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns differential taking `Self.Tan` as first parameter.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns pullback returning `Self.Tan` as first result.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// However, the curried `Self` parameter in the AST JVP/VJP function types
+  /// becomes the *last* parameter in the flattened parameter list of their
+  /// lowered SIL function types.
+  ///
+  /// JVP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns differential taking `Self.Tan` as *first* parameter.
+  ///
+  ///     $(T, ..., Self) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns pullback returning `Self.Tan` as *first* result.
+  ///
+  ///     $(T, ..., Self) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// This leads to a parameter ordering inconsistency, and would require the
+  /// differentiation transform to handle "wrt `self` instance method
+  /// derivatives" specially. However, canonicalization during SILGen makes the
+  /// parameter ordering uniform for "instance method derivatives wrt self" and
+  /// simplifies the transform rules.
+  ///
+  /// If `self` must be reordered, reorder it so that it appears as:
+  /// - The last parameter in the returned differential.
+  /// - The last result in the returned pullback.
+  SILFunction *getOrCreateCustomDerivativeThunk(
+      SILFunction *customDerivativeFn, SILFunction *originalFn,
+      const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
+
+  /// Get or create a derivative function vtable entry thunk for the given
+  /// SILDeclRef and derivative function type.
+  SILFunction *
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
+
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a
   /// failing designated initializer.
@@ -208,15 +265,15 @@ public:
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
-  /// Generate code for a source file of the module.
-  void emitSourceFile(SourceFile *sf);
-  
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
-  
+
+  /// Emits the function definition for a given SILDeclRef.
+  void emitFunctionDefinition(SILDeclRef constant, SILFunction *f);
+
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
@@ -228,10 +285,6 @@ public:
   /// the SILFunction to the current SILModule under the name
   /// SILDeclRef(cd, Destructor).
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
-
-  /// Generates the enum constructor for the given
-  /// EnumElementDecl under the name SILDeclRef(decl).
-  void emitEnumConstructor(EnumElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);
@@ -245,9 +298,6 @@ public:
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
-
-  /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
@@ -255,11 +305,7 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  void preEmitFunction(SILDeclRef constant,
-                       llvm::PointerUnion<ValueDecl *,
-                                          Expr *> astNode,
-                       SILFunction *F,
-                       SILLocation L);
+  void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.
@@ -342,7 +388,22 @@ public:
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
+                              DeclContext *useDC,
                               bool forPropertyDescriptor);
+
+  /// Emit all differentiability witnesses for the given function, visiting its
+  /// `@differentiable` and `@derivative` attributes.
+  void emitDifferentiabilityWitnessesForFunction(SILDeclRef constant,
+                                                 SILFunction *F);
+
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp,
+                                    const DeclAttribute *diffAttr);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
@@ -393,8 +454,8 @@ public:
 
   /// Find the conformance of the given Swift type to the
   /// _BridgedStoredNSError protocol.
-  Optional<ProtocolConformanceRef>
-  getConformanceToBridgedStoredNSError(SILLocation loc, Type type);
+  ProtocolConformanceRef getConformanceToBridgedStoredNSError(SILLocation loc,
+                                                              Type type);
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();

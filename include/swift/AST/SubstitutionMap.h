@@ -20,6 +20,8 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeExpansionContext.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Optional.h"
@@ -50,11 +52,10 @@ enum class CombineSubstitutionMaps {
 /// any entity that can reference type parameters, e.g., types (via
 /// Type::subst()) and conformances (via ProtocolConformanceRef::subst()).
 ///
-/// SubstitutionMaps are constructed by calling the getSubstitutionMap() method
-/// on a GenericSignature or (equivalently) by calling one of the static
-/// \c SubstitutionMap::get() methods. However, most substitution maps are
+/// SubstitutionMaps are constructed by calling the an overload of the static
+/// method \c SubstitutionMap::get(). However, most substitution maps are
 /// computed using higher-level entry points such as
-/// TypeBase::getMemberSubstitutionMap().
+/// TypeBase::getContextSubstitutionMap().
 ///
 /// Substitution maps are ASTContext-allocated and are uniqued on construction,
 /// so they can be used as fields in AST nodes.
@@ -128,8 +129,8 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 
   /// Look up a conformance for the given type to the given protocol.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType type, ProtocolDecl *proto) const;
+  ProtocolConformanceRef lookupConformance(CanType type,
+                                           ProtocolDecl *proto) const;
 
   /// Whether the substitution map is empty.
   bool empty() const;
@@ -148,6 +149,10 @@ public:
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
   ArrayRef<Type> getReplacementTypes() const;
+
+  /// Retrieve the array of replacement types for the innermost generic
+  /// parameters.
+  ArrayRef<Type> getInnermostReplacementTypes() const;
 
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
@@ -175,7 +180,13 @@ public:
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances,
                         SubstOptions options=None) const;
-  
+
+  /// Apply type expansion lowering to all types in the substitution map. Opaque
+  /// archetypes will be lowered to their underlying types if the type expansion
+  /// context allows.
+  SubstitutionMap mapIntoTypeExpansionContext(
+      TypeExpansionContext context) const;
+
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,
@@ -234,7 +245,7 @@ public:
   void dump(llvm::raw_ostream &out, DumpStyle style = DumpStyle::Full,
             unsigned indent = 0) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Profile the substitution map, for use with LLVM's FoldingSet.
   void profile(llvm::FoldingSetNodeID &id) const;
@@ -275,6 +286,12 @@ private:
   Type lookupSubstitution(CanSubstitutableType type) const;
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SubstitutionMap &subs) {
+  subs.dump(OS);
+  return OS;
+}
+
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c SubstitutionMap.
 struct QuerySubstitutionMap {
@@ -290,11 +307,10 @@ class LookUpConformanceInSubstitutionMap {
 public:
   explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
     : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

@@ -7,7 +7,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:    sil hidden [ossa] @{{.*}}testCall{{.*}}
 // CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> ()>):
 // CHECK:      [[T0_COPY:%.*]] = copy_value [[T0]]
-// CHECK-NEXT: switch_enum [[T0_COPY]] : $Optional<@callee_guaranteed () -> ()>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[T0_COPY]] : $Optional<@callee_guaranteed () -> ()>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 //
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
@@ -29,9 +29,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }
-// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@guaranteed Optional<@callee_guaranteed () -> @out T>) -> ()
-// CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> @out T>):
-// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed () -> @out τ_0_0> } <T>, var, name "f"
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddrOnlyCallResult{{.*}} :
+// CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>):
+// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>> } <T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK: store [[T0_COPY]] to [init] [[PBF]]
@@ -75,7 +75,7 @@ func wrap<T>(_ x: T) -> T? { return x }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(_ x: T) -> T {
-  // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
+  // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
   // CHECK:   unreachable
   // CHECK: [[OK]]:
@@ -86,10 +86,10 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
 // CHECK-LABEL: sil hidden [ossa] @$s8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
 func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
-  // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
+  // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]([[TUPLE:%.*]] :
   // CHECK:   ({{%.*}}, [[STRING:%.*]]) = destructure_tuple [[TUPLE]]
-  // CHECK:   [[RESULT:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[STRING]]
+  // CHECK:   [[RESULT:%.*]] = enum $Optional<String>, #Optional.some!enumelt, [[STRING]]
   // CHECK-NOT:   destroy_value [[STRING]]
   // CHECK:   br {{bb[0-9]+}}([[RESULT]] :
 }
@@ -105,7 +105,7 @@ func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
 func use_unwrapped(_: Int) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -118,7 +118,7 @@ func explicit_unwrap(_ value: Int?) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -131,7 +131,7 @@ func explicit_iuo_unwrap(_ value: Int!) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
@@ -144,7 +144,7 @@ func implicit_iuo_unwrap(_ value: Int!) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "custom.swuft"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/custom.swuft"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 2000

@@ -1,0 +1,31 @@
+//===------ BackDeploymentLibs.def - Backward Deployment Libraries --------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// Enumerates the backward deployment libraries that need to be linked
+// into Swift targets. Clients of this file must define the macro
+//
+//   BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)
+//
+// where:
+//   Version is a maximum Swift version written like a tuple, e.g., (5, 1)
+//   Filter is one of executable or all.
+//   LibraryName is the name of the library, e.g., "swiftCompatibility51"
+//===----------------------------------------------------------------------===//
+
+#ifndef BACK_DEPLOYMENT_LIB
+#  error "Must define BACK_DEPLOYMENT_LIB(Version, Filter, Library)"
+#endif
+
+BACK_DEPLOYMENT_LIB((5, 0), all, "swiftCompatibility50")
+BACK_DEPLOYMENT_LIB((5, 1), all, "swiftCompatibility51")
+BACK_DEPLOYMENT_LIB((5, 0), executable, "swiftCompatibilityDynamicReplacements")
+                    
+#undef BACK_DEPLOYMENT_LIB

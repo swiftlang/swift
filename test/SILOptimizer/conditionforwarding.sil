@@ -92,7 +92,7 @@ bb1:
   %7 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 1
   cond_fail %7 : $Builtin.Int1
   %9 = struct $Int64 (%6 : $Builtin.Int64)
-  %10 = enum $Optional<Int64>, #Optional.some!enumelt.1, %9 : $Int64
+  %10 = enum $Optional<Int64>, #Optional.some!enumelt, %9 : $Int64
   br bb3(%10 : $Optional<Int64>)
 
 bb2:
@@ -104,11 +104,11 @@ bb3(%14 : $Optional<Int64>):
   debug_value %14 : $Optional<Int64>
   %15 = function_ref @callee : $@convention(thin) () -> ()
   %16 = apply %15() : $@convention(thin) () -> ()
-  switch_enum %14 : $Optional<Int64>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+  switch_enum %14 : $Optional<Int64>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 
 bb4(%18 : $Int64):
-  %19 = enum $Optional<Int64>, #Optional.some!enumelt.1, %18 : $Int64
+  %19 = enum $Optional<Int64>, #Optional.some!enumelt, %18 : $Int64
   br bb6(%19 : $Optional<Int64>)
 
 bb5:

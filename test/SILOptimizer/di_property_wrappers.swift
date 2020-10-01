@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -219,8 +220,8 @@ func testRefStruct() {
     // CHECK-NEXT:   + payload alloc 42
     // CHECK-NEXT:   .. init value = 42
     // CHECK-NEXT:   + payload alloc 27
-    // CHECK-NEXT:   .. set value = 27
     // CHECK-NEXT:   - payload free 42
+    // CHECK-NEXT:   .. set value = 27
     let t1 = RefStruct()
     // CHECK-NEXT: value = 27
     print(t1.wrapped)
@@ -271,8 +272,8 @@ func testGenericClass() {
     // CHECK-NEXT:   + payload alloc 42
     // CHECK-NEXT:   .. init value = 42
     // CHECK-NEXT:   + payload alloc 27
-    // CHECK-NEXT:   .. set value = 27
     // CHECK-NEXT:   - payload free 42
+    // CHECK-NEXT:   .. set value = 27
     let t1 = GenericClass<Payload>()
     // CHECK-NEXT: value = 27
     print(t1.wrapped)
@@ -474,6 +475,94 @@ func testWrapperInitWithDefaultArg() {
   // CHECK-NEXT: Init
 }
 
+// rdar://problem/57350503 - DI failure due to an unnecessary cycle breaker
+public class Test57350503 {
+  @Synchronized
+  public private(set) var anchor: Int
+
+  public init(anchor: Int) {
+    self.anchor = anchor
+    printMe()
+  }
+
+  private func printMe() { }
+}
+
+@propertyWrapper
+public final class Synchronized<Value> {
+  private var value: Value
+
+  public var wrappedValue: Value {
+    get { value }
+    set { value = newValue }
+  }
+
+  public init(wrappedValue: Value) {
+    value = wrappedValue
+  }
+}
+
+
+struct SR_12341 {
+  @Wrapper var wrapped: Int = 10
+  var str: String
+
+  init() {
+     wrapped = 42
+     str = ""
+     wrapped = 27
+  }
+
+  init(condition: Bool) {
+    wrapped = 42
+    wrapped = 27
+    str = ""
+  }
+}
+
+func testSR_12341() {
+  // CHECK: ## SR_12341
+  print("\n## SR_12341")
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. set 27
+  _ = SR_12341()
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. init 27
+  _ = SR_12341(condition: true)
+}
+
+@propertyWrapper
+struct NonMutatingSetterWrapper<Value> {
+    var value: Value
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+    var wrappedValue: Value {
+        get { value }
+        nonmutating set {
+            print("  .. nonmutatingSet \(newValue)")
+        }
+    }
+}
+
+struct NonMutatingWrapperTestStruct {
+    @NonMutatingSetterWrapper var SomeProp: Int
+    init(val: Int) {
+        SomeProp = val
+    }
+}
+
+func testNonMutatingSetterStruct() {
+  // CHECK: ## NonMutatingSetterWrapper
+  print("\n## NonMutatingSetterWrapper")
+  let A = NonMutatingWrapperTestStruct(val: 11)
+  // CHECK-NEXT:  .. nonmutatingSet 11
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -483,3 +572,5 @@ testOptIntStruct()
 testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
+testSR_12341()
+testNonMutatingSetterStruct()

@@ -20,6 +20,9 @@
 
 #include "Visibility.h"
 
+#if defined(__OpenBSD__)
+#include <stdio.h>
+#endif
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <errno.h>
 #include <io.h>
@@ -49,7 +52,7 @@ static inline int _swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
 #endif
 
 // Environment
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   extern char **environ;
   return environ;
@@ -109,6 +112,20 @@ int static inline _swift_stdlib_open(const char *path, int oflag, mode_t mode) {
 int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
                                        mode_t mode) {
   return openat(fd, path, oflag, mode);
+}
+#endif
+
+#if defined(__OpenBSD__)
+static inline FILE *_swift_stdlib_stdin(void) {
+  return stdin;
+}
+
+static inline FILE *_swift_stdlib_stdout(void) {
+  return stdout;
+}
+
+static inline FILE *_swift_stdlib_stderr(void) {
+  return stderr;
 }
 #endif
 

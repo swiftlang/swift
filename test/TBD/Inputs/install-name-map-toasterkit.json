@@ -1,0 +1,12 @@
+[
+  {
+    "module": "ToasterKit",
+    "install_name": "/System/Previous/macOS/ToasterKit.dylib",
+    "platforms": ["macOS"]
+  },
+  {
+    "module": "ToasterKit",
+    "install_name": "/System/Previous/iOS/ToasterKit.dylib",
+    "platforms": ["iOS", "iOS_sim"]
+  }
+]

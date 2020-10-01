@@ -26,8 +26,8 @@ bb0(%0 : $A, %1 : @owned $X):
   %5 = mark_uninitialized [delegatingself] %1 : $X
   store %5 to [init] %2a : $*X
   %7 = load [copy] %2a : $*X
-  // CHECK: objc_method %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
-  %9 = objc_method %7 : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
+  // CHECK: objc_method %{{[0-9]+}} : $X, #X.init!initializer.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
+  %9 = objc_method %7 : $X, #X.init!initializer.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
   %10 = load [trivial] %3a : $*A
   %11 = load [trivial] %3a : $*A
   %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X
@@ -53,7 +53,7 @@ class B {
 
 sil [ossa] @test_overloaded_subscript : $@convention(thin) (@guaranteed B, B.Index) -> () {
 bb0(%0 : @guaranteed $B, %1 : $B.Index):
-  %reader = class_method %0 : $B, #B.subscript!read.1 : (B) -> (B.Index) -> (), $@convention(method) @yield_once (B.Index, @guaranteed B) -> @yields @guaranteed B.Element
+  %reader = class_method %0 : $B, #B.subscript!read : (B) -> (B.Index) -> (), $@convention(method) @yield_once (B.Index, @guaranteed B) -> @yields @guaranteed B.Element
   (%element, %token) = begin_apply %reader(%1, %0) : $@convention(method) @yield_once (B.Index, @guaranteed B) -> @yields @guaranteed B.Element
   end_apply %token
 

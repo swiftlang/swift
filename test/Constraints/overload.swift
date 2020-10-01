@@ -82,17 +82,17 @@ struct X2d {
 // Invalid declarations
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
-func f3(_ x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
+func f3(_ x: Intthingy) -> Int { } // expected-error{{cannot find type 'Intthingy' in scope}}
 
 func f3(_ x: Float) -> Float { }
 f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
-func f4(_ i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
-func f4(_ j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
+func f4(_ i: Wonka) { } // expected-error{{cannot find type 'Wonka' in scope}}
+func f4(_ j: Wibble) { } // expected-error{{cannot find type 'Wibble' in scope}}
 f4(5)
 
 func f1() {
-  var c : Class // expected-error{{use of undeclared type 'Class'}}
+  var c : Class // expected-error{{cannot find type 'Class' in scope}}
   markUsed(c.x) // make sure error does not cascade here
 }
 
@@ -127,16 +127,18 @@ func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(_ a : Int) -> Int {}
-func overloaded_identity(_ b : Float) -> Float {}
+func overloaded_identity(_ a : Int) -> Int {} // expected-note {{'overloaded_identity' produces 'Int', not the expected contextual result type '()'}} expected-note {{'overloaded_identity' declared her}}
+func overloaded_identity(_ b : Float) -> Float {} // expected-note {{'overloaded_identity' produces 'Float', not the expected contextual result type '()'}}
 
 func test_contextual_result_1() {
-  return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Float), (Int)}}
+  return overloaded_identity()  // expected-error {{missing argument for parameter #1 in call}}
+  // expected-error@-1 {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
 }
 
 func test_contextual_result_2() {
-  return overloaded_identity(1)  // expected-error {{unexpected non-void return value in void function}}
+  return overloaded_identity(1)
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // rdar://problem/24128153
@@ -236,4 +238,11 @@ func autoclosure1<T>(_: [T], _: X) { }
 
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
+}
+
+// rdar://problem/64368545 - failed to produce diagnostic (hole propagated to func result without recording a fix)
+func test_no_hole_propagation() {
+  func test(withArguments arguments: [String]) -> String {
+    return arguments.reduce(0, +) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  }
 }

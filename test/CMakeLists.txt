@@ -43,10 +43,23 @@ function(get_test_dependencies SDK result_var_name)
 
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
-      swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
-      sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
-      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
-      swift-api-digester swift-refactor swift-demangle-yamldump)
+      lldb-moduleimport-test
+      sil-func-extractor
+      sil-llvm-gen
+      sil-nm
+      sil-opt
+      sil-passpipeline-dumper
+      swift-frontend
+      swift-api-digester
+      swift-demangle
+      swift-demangle-yamldump
+      swift-dependency-tool
+      swift-ide-test
+      swift-llvm-opt
+      swift-refactor
+      swift-reflection-dump
+      swift-remoteast-test
+      swift-syntax-test)
 
     if(SWIFT_BUILD_SYNTAXPARSERLIB)
       list(APPEND deps_binaries swift-syntax-parser-test)
@@ -57,10 +70,29 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   if(NOT SWIFT_BUILT_STANDALONE)
-    list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
-         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
-         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings llvm-readelf dsymutil)
+    list(APPEND deps_binaries
+      arcmt-test
+      c-arcmt-test
+      c-index-test
+      clang
+      count
+      dsymutil
+      FileCheck
+      llc
+      llvm-ar
+      llvm-as
+      llvm-bcanalyzer
+      llvm-cov
+      llvm-dis
+      llvm-dwarfdump
+      llvm-link
+      llvm-nm
+      llvm-objdump
+      llvm-profdata
+      llvm-readelf
+      llvm-readobj
+      llvm-strings
+      not)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -70,9 +102,11 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
+     ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU"))
@@ -81,15 +115,10 @@ function(get_test_dependencies SDK result_var_name)
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
   endif()
 
-  if(XCODE)
-    # Xcode's build paths have a configuration variable in them,
-    # so CMake can't match them at compile time. Just use target names.
-    list(APPEND deps ${deps_binaries})
-  else()
-    foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}")
-    endforeach()
-  endif()
+  # Just use target names for dependency generation. This works for both Xcode
+  # and non-Xcode build systems. In the case of Xcode, its build paths have a
+  # configuration variable in them, so CMake can't match them at compile time.
+  list(APPEND deps ${deps_binaries})
 
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()
@@ -100,26 +129,26 @@ set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 # instead of by the path, which is good for CI. In this mode lit also updates
 # the mtime on the failed tests, which makes them run first on the
 # consecutive execution, which makes local builds fail faster.
-set(SWIFT_TEST_EXTRA_ARGS "--incremental")
+set(SWIFT_LIT_ARGS "--incremental" CACHE STRING "Arguments to pass to lit")
 
 if(NOT SWIFT_INCLUDE_TOOLS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_TEST_EXTRA_ARGS
+    list(APPEND SWIFT_LIT_ARGS
          "--param" "test_resource_dir=${SWIFTLIB_DIR}")
   endif()
 endif()
 
 option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
 if (SWIFT_TEST_USE_LEAKS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS "--param" "leaks-all")
+  list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
@@ -134,6 +163,8 @@ normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -162,10 +193,28 @@ endif()
 
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+    # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
+    # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
+    # have have only the "default" flavor for all SDKs and architectures except
+    # OSX when macCatalyst support is enabled.
+    set(build_flavors "default")
+    if(SWIFT_ENABLE_MACCATALYST AND "${SDK}" STREQUAL "OSX")
+      list(APPEND build_flavors "ios-like" )
+    endif()
+
+    foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
+    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
+    set(DEFAULT_OSX_VARIANT_SUFFIX "")
+
+    if(BUILD_FLAVOR STREQUAL "ios-like")
+      set(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}")
+      # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-maccatalyst-${ARCH}")
+      set(VARIANT_TRIPLE "${ARCH}-apple-ios13.0-macabi")
+    endif()
 
     # A directory where to put the xUnit-style XML test results.
     set(SWIFT_TEST_RESULTS_DIR
@@ -179,7 +228,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(validation_test_bin_dir
         "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-    if(LibXml2_FOUND)
+    if(LLVM_ENABLE_LIBXML2)
       set(SWIFT_HAVE_LIBXML2 TRUE)
     else()
       set(SWIFT_HAVE_LIBXML2 FALSE)
@@ -203,36 +252,43 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    # NOTE create a stub BlocksRuntime library that can be used for the
-    # reflection tests
-    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
-      "void
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      # NOTE create a stub BlocksRuntime library that can be used for the
+      # reflection tests
+      file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
+        "void
 #if defined(_WIN32)
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-    _add_swift_library_single(
-      BlocksRuntimeStub${VARIANT_SUFFIX}
-      BlocksRuntimeStub
-      SHARED
-      DONT_EMBED_BITCODE
-      NOSWIFTRT
-      ARCHITECTURE ${ARCH}
-      SDK ${SDK}
-      INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/Inputs/BlocksRuntime.c)
-    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
-      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
-      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
-      OUTPUT_NAME BlocksRuntime)
-    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+      _add_swift_target_library_single(
+        BlocksRuntimeStub${VARIANT_SUFFIX}
+        BlocksRuntimeStub
+        SHARED
+        ARCHITECTURE ${ARCH}
+        SDK ${SDK}
+        INSTALL_IN_COMPONENT dev
+        ${test_bin_dir}/Inputs/BlocksRuntime.c)
+      set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+        LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+        RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+        OUTPUT_NAME BlocksRuntime)
+      list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
           "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-      list(APPEND test_dependencies
-          "swift-reflection-test${VARIANT_SUFFIX}_signed")
+
+      if(BUILD_FLAVOR STREQUAL "ios-like")
+        # When testing the iOS-like build flavor, use the the normal macOS
+        # swift-reflection-test-tool. That tool runs out of process so it
+        # doesn't need to be build for macCatalyst.
+        list(APPEND test_dependencies
+            "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
+      else()
+        list(APPEND test_dependencies
+            "swift-reflection-test${VARIANT_SUFFIX}_signed")
+      endif()
     endif()
 
     if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -265,9 +321,9 @@ _Block_release(void) { }\n")
               # Reboot the device and remove everything in its tmp
               # directory. Build products and test executables are pushed
               # to that directory when running the test suite.
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
           COMMAND
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
               --destination-arch "${ARCH}"
@@ -286,7 +342,7 @@ _Block_release(void) { }\n")
         COMMENT "Uploading stdlib")
 
     foreach(test_mode ${TEST_MODES})
-      set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
+      set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
       separate_arguments(LIT_ARGS)
 
       if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
@@ -295,7 +351,7 @@ _Block_release(void) { }\n")
       endif()
 
       execute_process(COMMAND
-          "${PYTHON_EXECUTABLE}" "-c" "import psutil"
+          $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
           TIMEOUT 1 # second
           ERROR_QUIET)
@@ -304,6 +360,14 @@ _Block_release(void) { }\n")
       endif()
 
       list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+        list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+        list(APPEND LIT_ARGS "--param" "concurrency")
+      endif()
 
       foreach(test_subset ${TEST_SUBSETS})
         set(directories)
@@ -351,7 +415,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -370,7 +434,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -385,6 +449,7 @@ _Block_release(void) { }\n")
             PROPERTY FOLDER "Tests/check-swift")
       endforeach()
     endforeach()
+  endforeach()
   endforeach()
 endforeach()
 

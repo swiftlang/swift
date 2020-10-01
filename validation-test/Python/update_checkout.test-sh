@@ -1,5 +1,0 @@
-# RUN: %empty-directory(%t)
-# RUN: %swift_src_root/utils/update_checkout/test_update_checkout.sh %t
-
-# For now, only run this on macosx.
-# REQUIRES: OS=macosx

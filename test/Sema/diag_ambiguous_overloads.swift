@@ -12,24 +12,24 @@ func fe(_: Int, _: Int) {}
 fe(E.baz) // expected-error {{type 'E' has no member 'baz'; did you mean 'bar'?}}
 fe(.baz) // expected-error {{reference to member 'baz' cannot be resolved without a contextual type}}
 
-// FIXME: maybe complain about .nope also?
-fe(.nope, .nyet) // expected-error {{reference to member 'nyet' cannot be resolved without a contextual type}}
+fe(.nope, .nyet) // expected-error {{type 'Int' has no member 'nope'}}
+// expected-error@-1 {{reference to member 'nyet' cannot be resolved without a contextual type}}
 
-func fg<T>(_ f: (T) -> T) -> Void {} // expected-note {{in call to function 'fg'}}
-fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}
+func fg<T>(_ f: (T) -> T) -> Void {}
+fg({x in x}) // expected-error {{unable to infer type of a closure parameter 'x' in the current context}}
 
 
 struct S {
-  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {} // expected-note {{in call to function 'f'}}
+  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {}
   func f(_ d: (Double) -> Double) -> Void {}
   func test() -> Void {
-    f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
+    f({x in x}, 2) // expected-error {{unable to infer type of a closure parameter 'x' in the current context}}
   }
   
-  func g<T>(_ a: T, _ b: Int) -> Void {} // expected-note {{in call to function 'g'}}
+  func g<T>(_ a: T, _ b: Int) -> Void {}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{generic parameter 'T' could not be inferred}}
+    g(.notAThing, 7) // expected-error {{cannot infer contextual base in reference to member 'notAThing'}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}
@@ -40,6 +40,14 @@ struct S {
   }
 }
 
+struct School {
+  var name: String
+}
+func testDiagnoseForAmbiguityCrash(schools: [School]) {
+  schools.map({ $0.name }).sorted(by: { $0.nothing < $1.notAThing })
+  // expected-error@-1 {{value of type 'String' has no member 'nothing'}}
+  // expected-error@-2 {{value of type 'String' has no member 'notAThing'}}
+}
 
 class DefaultValue {
   static func foo(_ a: Int) {}
@@ -118,3 +126,37 @@ func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> 
   })
 }
 
+// SR-12689
+func SR12689(_ u: UnsafeBufferPointer<UInt16>) {}
+
+let array : [UInt16] = [1, 2]
+
+array.withUnsafeBufferPointer {
+  SR12689(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{cannot convert value of type 'UnsafePointer<UInt16>' to expected argument type 'UnsafeBufferPointer<UInt16>'}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-note@-2 {{candidate expects value of type 'UnsafeRawPointer' for parameter #1}}
+  // expected-note@-3 {{candidate expects value of type 'UnsafeMutableRawPointer' for parameter #1}}
+  // expected-note@-4 {{candidate expects value of type 'OpaquePointer' for parameter #1}}
+  // expected-note@-5 {{candidate expects value of type 'Builtin.RawPointer' for parameter #1}}
+
+  UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-note@-2 {{found candidate with type '(UnsafeRawPointer) -> UnsafeRawPointer'}}
+  // expected-note@-3 {{found candidate with type '(Builtin.RawPointer) -> UnsafeRawPointer'}}
+  // expected-note@-4 {{found candidate with type '(OpaquePointer) -> UnsafeRawPointer'}}
+  // expected-note@-5 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
+}
+
+func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1}}
+func SR12689_1(_ u: String) -> Double { 0 } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1}}
+func SR12689_2(_ u: Int) {}
+
+SR12689_2(SR12689_1(1 as Double)) // expected-error {{no exact matches in call to global function 'SR12689_1'}}
+SR12689_1(1 as Double) as Int // expected-error {{no exact matches in call to global function 'SR12689_1'}}
+
+// Ambiguos OverloadRefExpr
+func SR12689_O(_ p: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
+func SR12689_O(_ p: Double) {} // expected-note {{found candidate with type '(Double) -> ()'}}
+func SR12689_3(_ param: (String)-> Void) {}
+
+SR12689_3(SR12689_O) // expected-error {{no 'SR12689_O' candidates produce the expected type '(String) -> Void' for parameter #0}}

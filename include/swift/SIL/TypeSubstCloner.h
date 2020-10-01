@@ -82,15 +82,14 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             // substitutions may be different from the original ones, e.g.
             // there can be less substitutions.
             RecursiveSubs = SubstitutionMap::get(
-              AI.getFunction()
-                ->getLoweredFunctionType()
-                ->getInvocationGenericSignature(),
+              LoweredFnTy->getSubstGenericSignature(),
               Subs);
 
             // Use the new set of substitutions to compute the new
             // substituted callee type.
             RecursiveSubstCalleeSILType = LoweredFnTy->substGenericArgs(
-                AI.getModule(), RecursiveSubs);
+                AI.getModule(), RecursiveSubs,
+                Builder.getTypeExpansionContext());
           }
 
           // The specialized recursive function may have different calling
@@ -109,7 +108,8 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       assert(Subs.empty() ||
              SubstCalleeSILType ==
-                 Callee->getType().substGenericArgs(AI.getModule(), Subs));
+                 Callee->getType().substGenericArgs(
+                     AI.getModule(), Subs, Builder.getTypeExpansionContext()));
     }
 
     ArrayRef<SILValue> getArguments() const {
@@ -168,17 +168,40 @@ protected:
     SILType &Sty = TypeCache[Ty];
     if (!Sty) {
       Sty = Ty.subst(Original.getModule(), SubsMap);
+      if (!Sty.getASTType()->hasOpaqueArchetype() ||
+          !getBuilder()
+               .getTypeExpansionContext()
+               .shouldLookThroughOpaqueTypeArchetypes())
+        return Sty;
+      // Remap types containing opaque result types in the current context.
+      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
+          Sty.getCategory());
     }
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    if (!substTy->hasOpaqueArchetype() ||
+        !getBuilder().getTypeExpansionContext()
+            .shouldLookThroughOpaqueTypeArchetypes())
+      return substTy;
+    // Remap types containing opaque result types in the current context.
+    return getBuilder().getModule().Types.getLoweredRValueType(
+        TypeExpansionContext(getBuilder().getFunction()), substTy);
   }
 
-  ProtocolConformanceRef remapConformance(Type type,
+  ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type, SubsMap);
+    auto conformance = conf.subst(ty, SubsMap);
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto context = getBuilder().getTypeExpansionContext();
+    if (substTy->hasOpaqueArchetype() &&
+        context.shouldLookThroughOpaqueTypeArchetypes()) {
+      conformance =
+          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
+    }
+    return conformance;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
@@ -232,8 +255,8 @@ protected:
     SILLocation loc = getOpLocation(inst->getLoc());
     SILValue src = getOpValue(inst->getSrc());
     SILValue dest = getOpValue(inst->getDest());
-    CanType sourceType = getOpASTType(inst->getSourceType());
-    CanType targetType = getOpASTType(inst->getTargetType());
+    CanType sourceType = getOpASTType(inst->getSourceFormalType());
+    CanType targetType = getOpASTType(inst->getTargetFormalType());
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
@@ -288,6 +311,65 @@ protected:
       return;
     }
     super::visitDestroyValueInst(Destroy);
+  }
+
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    // If the extractee is the original function, do regular cloning.
+    if (dfei->getExtractee() ==
+        NormalDifferentiableFunctionTypeComponent::Original) {
+      super::visitDifferentiableFunctionExtractInst(dfei);
+      return;
+    }
+    // If the extractee is a derivative function, check whether the *remapped
+    // derivative function type* (bc) is equal to the *derivative remapped
+    // function type* (ad).
+    //
+    // ┌────────────────┐        remap       ┌─────────────────────────┐
+    // │ orig.  fn type │  ───────(a)──────► │ remapped orig.  fn type │
+    // └────────────────┘                    └─────────────────────────┘
+    //         │                                                │
+    //    (b, SILGen)   getAutoDiffDerivativeFunctionType   (d, here)
+    //         │                                                │
+    //         ▼                                                ▼
+    // ┌────────────────┐        remap       ┌─────────────────────────┐
+    // │ deriv. fn type │  ───────(c)──────► │ remapped deriv. fn type │
+    // └────────────────┘                    └─────────────────────────┘
+    //
+    // (ad) does not always commute with (bc):
+    // - (ad) is the result of remapping, then computing the derivative type.
+    //   This is the default cloning behavior, but may break invariants in the
+    //   initial SIL generated by SILGen.
+    // - (bc) is the result of computing the derivative type (SILGen), then
+    //   remapping. This is the expected type, preserving invariants from
+    //   earlier transforms.
+    //
+    // If (ad) is not equal to (bc), use (bc) as the explicit type.
+    SILType remappedOrigType = getOpType(dfei->getOperand()->getType());
+    auto remappedOrigFnType = remappedOrigType.castTo<SILFunctionType>();
+    auto derivativeRemappedFnType =
+        remappedOrigFnType
+            ->getAutoDiffDerivativeFunctionType(
+                remappedOrigFnType->getDifferentiabilityParameterIndices(),
+                remappedOrigFnType->getDifferentiabilityResultIndices(),
+                dfei->getDerivativeFunctionKind(),
+                getBuilder().getModule().Types,
+                LookUpConformanceInModule(SwiftMod))
+            ->getWithoutDifferentiability();
+    SILType remappedDerivativeFnType = getOpType(dfei->getType());
+    // If remapped derivative type and derivative remapped type are equal, do
+    // regular cloning.
+    if (SILType::getPrimitiveObjectType(derivativeRemappedFnType) ==
+        remappedDerivativeFnType) {
+      super::visitDifferentiableFunctionExtractInst(dfei);
+      return;
+    }
+    // Otherwise, explicitly use the remapped derivative type.
+    recordClonedInstruction(
+        dfei,
+        getBuilder().createDifferentiableFunctionExtract(
+            getOpLocation(dfei->getLoc()), dfei->getExtractee(),
+            getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
 
   /// One abstract function in the debug info can only have one set of variables

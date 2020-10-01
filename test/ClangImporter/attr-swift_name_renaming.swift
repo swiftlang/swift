@@ -20,7 +20,7 @@ func test() {
 
   // Typedef-of-anonymous-type-name renaming
   var p = Point()
-  var p2 = PointType() // FIXME: should provide Fix-It expected-error{{use of unresolved identifier 'PointType'}} {{none}}
+  var p2 = PointType() // FIXME: should provide Fix-It expected-error{{cannot find 'PointType' in scope}} {{none}}
 
   // Field name remapping
   p.x = 7

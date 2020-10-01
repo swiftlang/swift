@@ -17,7 +17,7 @@ extension P1 {
 sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
   debug_value_addr %0 : $*Self, let, name "self" // id: %1
-  %2 = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> () // user: %3
+  %2 = witness_method $Self, #P1.reqP1a : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> () // user: %3
   %3 = apply %2<Self>(%0) : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Self                        // id: %4
   %5 = tuple ()                                   // user: %6

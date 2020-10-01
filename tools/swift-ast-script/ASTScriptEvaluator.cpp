@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Frontend/Frontend.h"
 
 using namespace swift;
@@ -59,7 +60,7 @@ public:
       auto paramResultType = paramFnType->getResult();
       if (!paramResultType->isTypeParameter()) continue;
       auto sig = fn->getGenericSignature();
-      if (!sig->conformsToProtocol(paramResultType, ViewProtocol)) continue;
+      if (!sig->requiresProtocol(paramResultType, ViewProtocol)) continue;
 
       // The parameter must not be a @ViewBuilder parameter.
       if (param->getFunctionBuilderType()) continue;
@@ -82,7 +83,7 @@ public:
       out << ".(accessor)";
     } else {
       printDeclContext(out, decl->getDeclContext());
-      out << decl->getFullName();
+      out << decl->getName();
     }
   }
 
@@ -114,7 +115,11 @@ bool ASTScript::execute() const {
     return true;
   }
 
-  UnqualifiedLookup viewLookup(ctx.getIdentifier("View"), swiftUI);
+  auto descriptor =
+      UnqualifiedLookupDescriptor(DeclNameRef(ctx.getIdentifier("View")),
+                                  swiftUI);
+  auto viewLookup = evaluateOrDefault(ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
   auto viewProtocol =
     dyn_cast_or_null<ProtocolDecl>(viewLookup.getSingleTypeResult());
   if (!viewProtocol) {

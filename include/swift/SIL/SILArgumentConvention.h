@@ -129,8 +129,8 @@ struct SILArgumentConvention {
     llvm_unreachable("covered switch isn't covered?!");
   }
 
-  /// Returns true if \p Value is a not-aliasing indirect parameter.
-  bool isNotAliasedIndirectParameter() {
+  /// Returns true if \p Value is a non-aliasing indirect parameter.
+  bool isExclusiveIndirectParameter() {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:

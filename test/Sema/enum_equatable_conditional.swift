@@ -2,11 +2,11 @@
 
 struct NotEquatable { }
 
-enum WithArrayOfNotEquatables : Equatable { // expected-error{{type 'WithArrayOfNotEquatables' does not conform to protocol 'Equatable'}} expected-note {{do you want to add protocol stubs?}}
+enum WithArrayOfNotEquatables : Equatable { // expected-error{{type 'WithArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
   case only([NotEquatable]) // expected-note{{associated value type '[NotEquatable]' does not conform to protocol 'Equatable', preventing synthesized conformance of 'WithArrayOfNotEquatables' to 'Equatable'}}
 }
 
-enum WithArrayOfNotEquatables2<T> : Equatable { // expected-error{{type 'WithArrayOfNotEquatables2<T>' does not conform to protocol 'Equatable'}} expected-note {{do you want to add protocol stubs?}}
+enum WithArrayOfNotEquatables2<T> : Equatable { // expected-error{{type 'WithArrayOfNotEquatables2<T>' does not conform to protocol 'Equatable'}}
   case only([T]) // expected-note{{associated value type '[T]' does not conform to protocol 'Equatable', preventing synthesized conformance of 'WithArrayOfNotEquatables2<T>' to 'Equatable'}}
 }
 

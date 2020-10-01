@@ -46,7 +46,7 @@ size_t swift::markup::measureIndentation(StringRef Text) {
   size_t Col = 0;
   for (size_t i = 0, e = Text.size(); i != e; ++i) {
     if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {
-      Col++;
+      ++Col;
       continue;
     }
 
@@ -78,7 +78,7 @@ static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
 
   if (S.startswith(" * "))
     return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\n\r"))
+  if (S.startswith(" *\n") || S.startswith(" *\r\n"))
     return NumLeadingSpaces + 2;
   return 0;
 }
@@ -97,7 +97,7 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
       auto CleanedStartLoc =
           C.Range.getStart().getAdvancedLocOrInvalid(CommentMarkerBytes);
       auto CleanedEndLoc =
-          C.Range.getStart().getAdvancedLocOrInvalid(Cleaned.size());
+          CleanedStartLoc.getAdvancedLocOrInvalid(Cleaned.size());
       Builder.addLine(Cleaned, { CleanedStartLoc, CleanedEndLoc });
     } else {
       // Skip comment markers at the beginning and at the end.
@@ -115,8 +115,6 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
       // Determine if we have leading decorations in this block comment.
       bool HasASCIIArt = false;
       if (swift::startsWithNewline(Cleaned)) {
-        Builder.addLine(Cleaned.substr(0, 0), { C.Range.getStart(),
-                                                C.Range.getStart() });
         unsigned NewlineBytes = swift::measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
         CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(NewlineBytes);
@@ -141,13 +139,13 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
         StringRef Line = Cleaned.substr(0, Pos);
         auto CleanedEndLoc = CleanedStartLoc.getAdvancedLocOrInvalid(Pos);
 
+        Builder.addLine(Line, { CleanedStartLoc, CleanedEndLoc });
+
         Cleaned = Cleaned.drop_front(Pos);
         unsigned NewlineBytes = swift::measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
         Pos += NewlineBytes;
         CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(Pos);
-
-        Builder.addLine(Line, { CleanedStartLoc, CleanedEndLoc });
       }
     }
   }

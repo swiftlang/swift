@@ -282,6 +282,10 @@ module SwiftGlibc [system] {
     module sys {
       export *
 
+      module cdefs {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/cdefs.h"
+        export *
+      }
       module file {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/file.h"
         export *

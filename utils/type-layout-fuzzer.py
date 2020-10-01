@@ -35,7 +35,7 @@ if objcInterop:
 def randomTypeList(depth):
     count = random.randint(0, maxMembers)
     result = "("
-    for i in xrange(count):
+    for i in range(count):
         if i > 0:
             result += ", "
         result += randomTypeReference(depth + 1)
@@ -81,7 +81,7 @@ def randomTypeReference(depth):
 
 def defineRandomFields(depth, basename):
     numMembers = random.randint(0, maxMembers)
-    for i in xrange(numMembers):
+    for i in range(numMembers):
         print("  var " + basename + str(i) + ": " +
               randomTypeReference(depth + 1))
 
@@ -141,7 +141,7 @@ def defineRandomNominalType(name, depth=0):
         print("enum " + name + " {")
 
         numCases = random.randint(0, maxMembers)
-        for i in xrange(numCases):
+        for i in range(numCases):
             print("  case x" + str(i) + randomTypeList(depth + 1))
 
         print("}")

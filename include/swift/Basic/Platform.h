@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 
 namespace llvm {
   class Triple;
@@ -43,8 +44,16 @@ namespace swift {
   /// Returns true if the given triple represents watchOS running in a simulator.
   bool tripleIsWatchSimulator(const llvm::Triple &triple);
 
-  /// Return true if the given triple represents any simulator.
-  bool tripleIsAnySimulator(const llvm::Triple &triple);
+  /// Returns true if the given triple represents a macCatalyst environment.
+  bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
+
+  /// Determine whether the triple infers the "simulator" environment.
+  bool tripleInfersSimulatorEnvironment(const llvm::Triple &triple);
+
+  /// Returns true if the given -target triple and -target-variant triple
+  /// can be zippered.
+  bool triplesAreValidForZippering(const llvm::Triple &target,
+                                   const llvm::Triple &targetVariant);
 
   /// Returns true if the given triple represents an OS that ships with
   /// ABI-stable swift libraries (eg. in /usr/lib/swift).
@@ -62,11 +71,6 @@ namespace swift {
 
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
-
-  /// Maps an arbitrary platform to its non-simulator equivalent.
-  ///
-  /// If \p platform is not a simulator platform, it will be returned as is.
-  DarwinPlatformKind getNonSimulatorPlatform(DarwinPlatformKind platform);
 
   /// Returns the architecture component of the path for a given target triple.
   ///
@@ -91,11 +95,24 @@ namespace swift {
   /// llvm::Triple::normalize() would not affect it.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
   
-  
+  /// Computes the target triple without version information.
+  llvm::Triple getUnversionedTriple(const llvm::Triple &triple);
+
   /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
   /// LLVM target triple.
   Optional<llvm::VersionTuple>
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
+
+  /// Retrieve the target SDK version for the given SDKInfo and target triple.
+  llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                                         const llvm::Triple &triple);
+
+  /// Get SDK build version.
+  std::string getSDKBuildVersion(StringRef SDKPath);
+  std::string getSDKBuildVersionFromPlist(StringRef Path);
+
+  /// Get SDK name.
+  std::string getSDKName(StringRef SDKPath);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

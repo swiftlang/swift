@@ -18,4 +18,4 @@ _ = Foo.init(2)
 // CHECK1: Rename
 // CHECK2-NOT: Rename
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu

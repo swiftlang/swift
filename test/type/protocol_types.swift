@@ -3,7 +3,7 @@
 protocol HasSelfRequirements {
   func foo(_ x: Self)
 
-  func returnsOwnProtocol() -> HasSelfRequirements // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}} {{educational-notes=associated-type-requirements}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.
@@ -52,7 +52,7 @@ struct NestedCompoAliasTypeWhereRequirement<T> where T: CompoAssocType.Compo {}
 
 struct Struct1<T> { }
 struct Struct2<T : Pub & Bar> { }
-struct Struct3<T : Pub & Bar & P3> { } // expected-error {{use of undeclared type 'P3'}}
+struct Struct3<T : Pub & Bar & P3> { } // expected-error {{cannot find type 'P3' in scope}}
 struct Struct4<T> where T : Pub & Bar {}
 
 struct Struct5<T : protocol<Pub, Bar>> { } // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
@@ -68,7 +68,7 @@ protocol HasAssoc {
 }
 
 func testHasAssoc(_ x: Any) {
-  if let p = x as? HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}}
+  if let p = x as? HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}} {{educational-notes=associated-type-requirements}}
     p.foo() // don't crash here.
   }
 }

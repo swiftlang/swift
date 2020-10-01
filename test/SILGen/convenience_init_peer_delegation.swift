@@ -6,7 +6,7 @@ class X {
 
   // Convenience inits must dynamically dispatch designated inits...
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC0A0ACyt_tcfC
-  // CHECK:         class_method {{%.*}}, #X.init!allocator.1
+  // CHECK:         class_method {{%.*}}, #X.init!allocator
   convenience init(convenience: ()) {
     self.init()
   }
@@ -29,7 +29,7 @@ class X {
 
   // Convenience inits must dynamically dispatch required peer convenience inits
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
-  // CHECK:         class_method {{%.*}}, #X.init!allocator.1
+  // CHECK:         class_method {{%.*}}, #X.init!allocator
   required convenience init(requiredDoubleConvenience: ()) {
     self.init(requiredDoubleConvenience: ())
   }
@@ -69,11 +69,11 @@ func invocations(xt: X.Type) {
   // CHECK: function_ref @$s32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
   _ = X(requiredDoubleConvenience: ())
 
-  // CHECK: class_method {{%.*}}, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator
   _ = xt.init(required: ())
-  // CHECK: class_method {{%.*}}, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator
   _ = xt.init(requiredConvenience: ())
-  // CHECK: class_method {{%.*}}, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator
   _ = xt.init(requiredDoubleConvenience: ())
 }
 
@@ -85,7 +85,7 @@ class ObjCBase {
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc :
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfC'
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc
-  // CHECK: class_method {{%.+}} : $@thick ObjCBase.Type, #ObjCBase.init!allocator.1
+  // CHECK: class_method {{%.+}} : $@thick ObjCBase.Type, #ObjCBase.init!allocator
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc'
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfcTo
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc :
@@ -95,7 +95,7 @@ class ObjCBase {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE1CACyt_tcfC
-  // CHECK: class_method %0 : $@thick ObjCBase.Type, #ObjCBase.init!allocator.1
+  // CHECK: class_method %0 : $@thick ObjCBase.Type, #ObjCBase.init!allocator
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE1CACyt_tcfC'
   convenience init(swiftToObjC: ()) {
     self.init(objc: ())
@@ -105,7 +105,7 @@ class ObjCBase {
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc :
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfC'
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc
-  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.1.foreign
+  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.foreign
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc'
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfcTo
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc :
@@ -138,7 +138,7 @@ class ObjCBase {
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc :
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfC'
   // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc
-  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.1.foreign
+  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.foreign
   // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc'
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfcTo
   // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc :

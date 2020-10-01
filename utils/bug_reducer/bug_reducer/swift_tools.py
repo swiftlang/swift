@@ -236,7 +236,7 @@ class SILNMInvoker(SILToolInvoker):
         cmdline = self.base_args(emit_sib=False)
         cmdline.append(input_file)
         output = subprocess.check_output(cmdline)
-        for l in output.split("\n")[:-1]:
-            t = tuple(l.split(" "))
+        for line in output.split("\n")[:-1]:
+            t = tuple(line.split(" "))
             assert(len(t) == 2)
             yield t

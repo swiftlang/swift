@@ -11,6 +11,13 @@
 import os
 import platform
 
+from . import shell
+
+try:
+    from build_swift.build_swift.wrappers import xcrun
+except ImportError:
+    from build_swift.wrappers import xcrun
+
 
 class Platform(object):
     """
@@ -70,7 +77,7 @@ class DarwinPlatform(Platform):
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""
-        return self.name != "macosx"
+        return self.name != "macosx" and self.name != "maccatalyst"
 
     @property
     def supports_benchmark(self):
@@ -85,6 +92,39 @@ class DarwinPlatform(Platform):
         for tests.
         """
         return self.is_embedded and not self.is_simulator
+
+    def sdk_supports_architecture(self, arch, toolchain):
+        """
+        Convenience function for checking whether the SDK supports the
+        target architecture.
+        """
+
+        # The names match up with the xcrun SDK names.
+        xcrun_sdk_name = self.name
+
+        # 32-bit iOS and iOS simulator are supported, but are not covered
+        # by the SDK settings. Handle this special case here.
+        if (xcrun_sdk_name == 'iphoneos' and
+           (arch == 'armv7' or arch == 'armv7s')):
+            return True
+
+        if (xcrun_sdk_name == 'iphonesimulator' and arch == 'i386'):
+            return True
+
+        sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
+        if not sdk_path:
+            raise RuntimeError('Cannot find SDK path for %s' % xcrun_sdk_name)
+
+        # Find the SDKSettings.plist for this sdK
+        plistCommand = [
+            '/usr/libexec/PlistBuddy',
+            '-c',
+            'Print :SupportedTargets:%s:Archs' % (self.name),
+            '%s/SDKSettings.plist' % (sdk_path)
+        ]
+
+        sdk_archs = shell.capture(plistCommand, dry_run=False, echo=True)
+        return arch in sdk_archs
 
 
 class AndroidPlatform(Platform):
@@ -114,12 +154,12 @@ class Target(object):
 
 
 class StdlibDeploymentTarget(object):
-    OSX = DarwinPlatform("macosx", archs=["x86_64"],
+    OSX = DarwinPlatform("macosx", archs=["x86_64", "arm64", "arm64e"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
+    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64", "arm64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
 
@@ -128,15 +168,22 @@ class StdlibDeploymentTarget(object):
 
     AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
                              sdk_name="TVOS")
-    AppleTVSimulator = DarwinPlatform("appletvsimulator", archs=["x86_64"],
+    AppleTVSimulator = DarwinPlatform("appletvsimulator", archs=["x86_64", "arm64"],
                                       sdk_name="TVOS_SIMULATOR",
                                       is_simulator=True)
 
     AppleWatch = DarwinPlatform("watchos", archs=["armv7k"],
                                 sdk_name="WATCHOS")
-    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386"],
+
+    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386", "arm64"],
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
+
+    # A platform that's not tied to any particular OS, and it meant to be used
+    # to build the stdlib as standalone and/or statically linked.
+    Freestanding = Platform("freestanding",
+                            archs=["i386", "x86_64", "armv7", "armv7s", "armv7k",
+                                   "arm64", "arm64e"])
 
     Linux = Platform("linux", archs=[
         "x86_64",
@@ -149,6 +196,8 @@ class StdlibDeploymentTarget(object):
         "s390x"])
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
+
+    OpenBSD = Platform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
@@ -164,8 +213,10 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
+        Freestanding,
         Linux,
         FreeBSD,
+        OpenBSD,
         Cygwin,
         Android,
         Windows,
@@ -186,6 +237,14 @@ class StdlibDeploymentTarget(object):
         machine = platform.machine()
 
         if system == 'Linux':
+            if 'ANDROID_DATA' in os.environ:
+                if machine.startswith('armv7'):
+                    return StdlibDeploymentTarget.Android.armv7
+                elif machine == 'aarch64':
+                    return StdlibDeploymentTarget.Android.aarch64
+                raise NotImplementedError('Android System with architecture '
+                                          '"%s" is not supported' % machine)
+
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
             elif machine == 'i686':
@@ -208,10 +267,18 @@ class StdlibDeploymentTarget(object):
         elif system == 'Darwin':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.OSX.x86_64
+            elif machine == 'arm64':
+                return StdlibDeploymentTarget.OSX.arm64
+            elif machine == 'arm64e':
+                return StdlibDeploymentTarget.OSX.arm64e
 
         elif system == 'FreeBSD':
             if machine == 'amd64':
                 return StdlibDeploymentTarget.FreeBSD.x86_64
+
+        elif system == 'OpenBSD':
+            if machine == 'amd64':
+                return StdlibDeploymentTarget.OpenBSD.amd64
 
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':
@@ -235,6 +302,11 @@ class StdlibDeploymentTarget(object):
     @classmethod
     def get_targets_by_name(cls, names):
         return [cls.get_target_for_name(name) for name in names]
+
+    @classmethod
+    def get_target_names(cls):
+        return sorted([name for (name, target) in
+                       cls._targets_by_name.items()])
 
 
 def install_prefix():
@@ -271,5 +343,7 @@ def toolchain_path(install_destdir, install_prefix):
     built_toolchain_path = install_destdir
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
-        built_toolchain_path += darwin_toolchain_prefix(install_prefix)
+        built_toolchain_path += darwin_toolchain_prefix(install_prefix) + "/usr"
+    else:
+        built_toolchain_path += install_prefix
     return built_toolchain_path

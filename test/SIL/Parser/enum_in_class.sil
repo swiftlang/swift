@@ -17,6 +17,6 @@ class Task {
 sil [transparent] [ossa] @test_declref_enum : $@convention(thin) (UInt8, @thin Task.State.Type) -> Task.State {
 bb0(%0 : $UInt8, %1 : $@thin Task.State.Type):
 // CHECK: enum $Task.State, #Task.State.Bits!enumelt
-  %2 = enum $Task.State, #Task.State.Bits!enumelt.1, %0 : $UInt8
+  %2 = enum $Task.State, #Task.State.Bits!enumelt, %0 : $UInt8
   return %2 : $Task.State
 }

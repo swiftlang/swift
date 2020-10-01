@@ -42,7 +42,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
+    case CodeCompletionString::Chunk::ChunkKind::Keyword:
+    case CodeCompletionString::Chunk::ChunkKind::Attribute:
     case CodeCompletionString::Chunk::ChunkKind::Text:
+    case CodeCompletionString::Chunk::ChunkKind::BaseName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
@@ -59,6 +62,8 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdSystem:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdUser:
       if (!C.isAnnotation())
         Str += C.getText();
       break;
@@ -72,11 +77,17 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterTypeBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
       return Str;
 
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+      Str += " {";
+      Str += C.getText();
+      break;
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
       Str += " {";
       break;
@@ -98,7 +109,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       OS << C.getText();
       continue;
     }
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) {
+    if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
+        C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
       if (Result->getKind() == CodeCompletionResult::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
@@ -140,7 +152,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       } else {
         OS << ": ";
       }
-      OS << C.getText();
+      if (C.hasText())
+        OS << C.getText();
     }
   }
 }
@@ -204,22 +217,34 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
-  // Parse, typecheck and temporarily insert the incomplete code into the AST.
-  const unsigned OriginalDeclCount = SF.Decls.size();
+  // Import the last module.
+  auto *lastModule = SF.getParentModule();
 
-  PersistentParserState PersistentState;
-  bool Done;
-  do {
-    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
-  } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
-                      OriginalDeclCount);
+  ImplicitImportInfo implicitImports;
+  implicitImports.AdditionalModules.emplace_back(lastModule,
+                                                 /*exported*/ false);
 
-  performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
+  // Carry over the private imports from the last module.
+  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  lastModule->getImportedModules(imports,
+                                 ModuleDecl::ImportFilterKind::Default);
+  for (auto &import : imports) {
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
+                                                   /*exported*/ false);
+  }
 
-  // Now we are done with code completion.  Remove the declarations we
-  // temporarily inserted.
-  SF.Decls.resize(OriginalDeclCount);
+  // Create a new module and file for the code completion buffer, similar to how
+  // we handle new lines of REPL input.
+  auto *newModule = ModuleDecl::create(
+      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
+  auto &newSF =
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
+  newModule->addFile(newSF);
+
+  performImportResolution(newSF);
+  bindExtensions(*newModule);
+
+  performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
@@ -234,8 +259,6 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   CompletionStrings.clear();
   CookedResults.clear();
 
-  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
-
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,
                    CompletionCallbacksFactory.get());
@@ -249,7 +272,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   if (!Tokens.empty()) {
     Token &LastToken = Tokens.back();
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
-      Prefix = LastToken.getText();
+      Prefix = LastToken.getText().str();
 
       unsigned Offset = Ctx.SourceMgr.getLocOffsetInBuffer(LastToken.getLoc(),
                                                            BufferID);
@@ -276,7 +299,7 @@ StringRef REPLCompletions::getRoot() const {
     return Root.getValue();
   }
 
-  std::string RootStr = CookedResults[0].InsertableString;
+  std::string RootStr = CookedResults[0].InsertableString.str();
   for (auto R : CookedResults) {
     if (R.NumBytesToErase != 0) {
       RootStr.resize(0);
@@ -303,7 +326,7 @@ REPLCompletions::CookedResult REPLCompletions::getNextStem() {
   if (CookedResults.empty())
     return {};
 
-  CurrentCompletionIdx++;
+  ++CurrentCompletionIdx;
   if (CurrentCompletionIdx >= CookedResults.size())
     CurrentCompletionIdx = 0;
 

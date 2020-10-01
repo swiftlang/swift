@@ -117,10 +117,33 @@ public:
     schema.add(ExplosionSchema::Element::forScalar(ty));
   }
 
+  void storeAsBytes(IRGenFunction &IGF, Explosion &src, Address addr) const {
+    auto &IGM = IGF.IGM;
+
+    // Store in multiples of bytes to avoid undefined bits.
+    auto storageTy = addr.getAddress()->getType()->getPointerElementType();
+    if (storageTy->isIntegerTy() && (storageTy->getIntegerBitWidth() % 8)) {
+      auto &Builder = IGF.Builder;
+      auto nextByteSize = (storageTy->getIntegerBitWidth() + 7) & ~7UL;
+      auto nextByteSizedIntTy =
+          llvm::IntegerType::get(IGM.getLLVMContext(), nextByteSize);
+      auto newAddr =
+          Address(Builder.CreatePointerCast(addr.getAddress(),
+                                            nextByteSizedIntTy->getPointerTo()),
+                  addr.getAlignment());
+      auto newValue = Builder.CreateZExt(src.claimNext(), nextByteSizedIntTy);
+      Builder.CreateStore(newValue, newAddr);
+      return;
+    }
+
+    IGF.Builder.CreateStore(src.claimNext(), addr);
+  }
+
   void initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                   bool isOutlined) const override {
     addr = asDerived().projectScalar(IGF, addr);
-    IGF.Builder.CreateStore(src.claimNext(), addr);
+
+    storeAsBytes(IGF, src, addr);
   }
 
   void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -149,8 +172,7 @@ public:
     }
 
     // Store.
-    llvm::Value *newValue = src.claimNext();
-    IGF.Builder.CreateStore(newValue, dest);
+    storeAsBytes(IGF, src, dest);
 
     // Release the old value if we need to.
     if (!Derived::IsScalarPOD) {
@@ -207,6 +229,31 @@ public:
         IGM, lowering, asDerived().getScalarType(), offset,
         Size(IGM.DataLayout.getTypeStoreSize(asDerived().getScalarType())));
   }
+
+};
+
+/// SingleScalarTypeInfoWithTypeLayout - A further specialization of
+/// SingleScalarTypeInfo for types which knows how-to construct a type layout
+/// from its derived type which must be a TypeInfo.
+template <class Derived, class Base>
+class SingleScalarTypeInfoWithTypeLayout
+    : public SingleScalarTypeInfo<Derived, Base> {
+protected:
+  template <class... T>
+  SingleScalarTypeInfoWithTypeLayout(T &&... args)
+      : SingleScalarTypeInfo<Derived, Base>(::std::forward<T>(args)...) {}
+
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
+public:
+  friend class SingleScalarTypeInfo<Derived, Base>;
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T);
+  }
 };
 
 /// PODSingleScalarTypeInfo - A further specialization of
@@ -223,6 +270,10 @@ protected:
                                           IsPOD, IsFixedSize,
                                           ::std::forward<T>(args)...) {}
 
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
 private:
   friend class SingleScalarTypeInfo<Derived, Base>;
   static const bool IsScalarPOD = true;
@@ -235,6 +286,12 @@ private:
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T);
+  }
+
 };
 
 }

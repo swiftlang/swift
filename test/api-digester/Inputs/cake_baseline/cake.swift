@@ -40,6 +40,9 @@ public struct C6 {}
 @frozen
 public enum IceKind {}
 
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public enum FutureKind {}
+
 public protocol P1 {}
 
 public protocol P2 {}
@@ -105,7 +108,26 @@ public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
 
 public class SuperClassRemoval: C3 {}
 
-public class ClassToStruct {}
+public class ClassToStruct {
+  public init() {}
+}
+
+open class ClassWithMissingDesignatedInits {
+  internal init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+open class ClassWithoutMissingDesignatedInits {
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+public class SubclassWithMissingDesignatedInits: ClassWithMissingDesignatedInits {
+}
+
+public class SubclassWithoutMissingDesignatedInits: ClassWithoutMissingDesignatedInits {
+}
+
 public protocol ProtocolToEnum {}
 
 public class SuperClassChange: C7 {}

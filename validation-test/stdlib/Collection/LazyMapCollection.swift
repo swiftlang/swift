@@ -8,6 +8,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 

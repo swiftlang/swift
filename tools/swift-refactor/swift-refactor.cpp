@@ -71,7 +71,11 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "trailingclosure", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
-           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer")));
+           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
+           clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
+           clEnumValN(RefactoringKind::ConvertToComputedProperty,
+                   "convert-to-computed-property", "Convert from field initialization to computed property"),
+           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
 
 
 static llvm::cl::opt<std::string>
@@ -264,7 +268,7 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
-      CI.performParseOnly(/*EvaluateConditionals*/true);
+      // No type-checking required.
       break;
     default:
       CI.performSema();
@@ -283,7 +287,7 @@ int main(int argc, char *argv[]) {
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
   unsigned BufferID = SF->getBufferID().getValue();
-  std::string Buffer = SM.getRangeForBuffer(BufferID).str();
+  std::string Buffer = SM.getRangeForBuffer(BufferID).str().str();
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
   if (Start.empty()) {

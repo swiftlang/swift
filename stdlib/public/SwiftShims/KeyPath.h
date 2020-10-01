@@ -109,11 +109,26 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedI
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFunctionCall
   = 0x00000001U;
 
+#ifndef __cplusplus
 extern const void *_Nonnull (swift_keyPathGenericWitnessTable[]);
 
 static inline const void *_Nonnull __swift_keyPathGenericWitnessTable_addr(void) {
   return swift_keyPathGenericWitnessTable;
 }
+#endif
+
+// Discriminators for pointer authentication in key path patterns and objects
+
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentDestroy = 0x7072;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentCopy = 0x6f66;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentEquals = 0x756e;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentHash = 0x6374;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_Getter = 0x6f72;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_NonmutatingSetter = 0x6f70;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_MutatingSetter = 0x7469;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentLayout = 0x6373;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentInit = 0x6275;
+static const __swift_uint16_t _SwiftKeyPath_ptrauth_MetadataAccessor = 0x7474;
 
 #ifdef __cplusplus
 } // extern "C"

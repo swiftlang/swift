@@ -60,9 +60,8 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
 
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
-  auto numElements = BS->getNumElements();
-  if (numElements > 0) {
-    auto element = BS->getElement(numElements - 1);
+  if (!BS->empty()) {
+    auto element = BS->getLastElement();
     if (auto expr = element.dyn_cast<Expr *>()) {
       if (expr->getType()->isEqual(ResTy)) {
         Context.Diags.diagnose(
@@ -74,8 +73,9 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
       }
     }
   }
-  auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
-                                        : diag::missing_return;
+  auto diagID = F->isNoReturnFunction(F->getTypeExpansionContext())
+                    ? diag::missing_never_call
+                    : diag::missing_return;
   diagnose(Context,
            L.getEndSourceLoc(),
            diagID, ResTy,

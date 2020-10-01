@@ -31,7 +31,6 @@ using SILTypeCategoryField = BCFixed<2>;
 
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
-  SIL_UTF16,
   SIL_OBJC_SELECTOR,
   SIL_BYTES
 };
@@ -56,22 +55,6 @@ enum SILVTableEntryKindEncoding : uint8_t {
 };
 using SILVTableEntryKindField = BCFixed<2>;
 
-enum CheckedCastKindEncoding : uint8_t {
-  SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DOWNCAST,
-  SIL_CHECKED_CAST_IDENTICAL,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE,
-  SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL,
-};
-
 enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
@@ -95,15 +78,6 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   DeclRef,
 };
 
-// Constants for packing an encoded CheckedCastKind and
-// CastConsumptionKind together.
-enum {
-  // Must be large enough to store all the CheckedCastKindEncodings
-  SIL_CAST_CONSUMPTION_BIT_OFFSET = 4,
-  SIL_CHECKED_CAST_MASK =
-    (1 << SIL_CAST_CONSUMPTION_BIT_OFFSET) - 1
-};
-
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID
@@ -122,6 +96,8 @@ namespace sil_index_block {
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
+    SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+    SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -157,7 +133,6 @@ namespace sil_block {
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
     SIL_GLOBALVAR,
-    SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
     SIL_WITNESS_METHOD_ENTRY,
@@ -167,11 +142,16 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    SIL_INST_LINEAR_FUNCTION,
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -201,6 +181,7 @@ namespace sil_block {
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
     SILVTableEntryKindField,  // Kind
+    BCFixed<1>, // NonOverridden
     BCArray<ValueIDField> // SILDeclRef
   >;
   
@@ -276,15 +257,31 @@ namespace sil_block {
     DeclIDField
   >;
 
+  using DifferentiabilityWitnessLayout = BCRecordLayout<
+    SIL_DIFFERENTIABILITY_WITNESS,
+    DeclIDField,             // Original function name
+    SILLinkageField,         // Linkage
+    BCFixed<1>,              // Is declaration?
+    BCFixed<1>,              // Is serialized?
+    GenericSignatureIDField, // Derivative function generic signature
+    DeclIDField,             // JVP function name
+    DeclIDField,             // VJP function name
+    BCVBR<8>,                // Number of parameter indices
+    BCVBR<8>,                // Number of result indices
+    BCArray<ValueIDField>    // Parameter and result indices
+  >;
+
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
-                     BCFixed<1>,  // global_init
+                     BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
+                     BCFixed<2>,  // classSubclassScope
+                     BCFixed<1>,  // hasCReferences
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
@@ -350,18 +347,6 @@ namespace sil_block {
     TypeIDField,          // formal concrete type
     BCVBR<5>              // # of protocol conformances
     // Trailed by protocol conformance info (if any)
-  >;
-
-  // SIL Cast instructions with a cast kind, one type and one typed valueref.
-  using SILInstCastLayout = BCRecordLayout<
-    SIL_INST_CAST,
-    SILInstOpCodeField,
-    BCFixed<4>,          // Cast kind
-    TypeIDField,
-    SILTypeCategoryField,
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField
   >;
 
   // SIL instructions with one type and a list of values.
@@ -467,6 +452,39 @@ namespace sil_block {
     ValueIDField,          // existential
     BCArray<ValueIDField>  // SILDeclRef
     // may be trailed by an inline protocol conformance
+  >;
+
+  using SILInstDifferentiableFunctionLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    BCVBR<8>,             // number of function parameters
+    BCVBR<8>,   // number of function results
+    BCVBR<8>,   // number of differentiability parameters
+    BCFixed<1>,           // has derivative functions?
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstLinearFunctionLayout = BCRecordLayout<
+    SIL_INST_LINEAR_FUNCTION,
+    BCVBR<8>,             // number of function parameters
+    BCFixed<1>,           // has transpose function?
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstDifferentiableFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<2>, // extractee
+    BCFixed<1>  // has explicit extractee type?
+  >;
+
+  using SILInstLinearFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<1> // extractee
   >;
 }
 

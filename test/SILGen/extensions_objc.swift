@@ -16,10 +16,10 @@ extension Foo {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo):
 func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.
-  // CHECK: objc_method [[ARG]] : $Foo, #Foo.kay!1.foreign
+  // CHECK: objc_method [[ARG]] : $Foo, #Foo.kay!foreign
   x.kay()
 
-  // CHECK: objc_method [[ARG]] : $Foo, #Foo.cox!getter.1.foreign
+  // CHECK: objc_method [[ARG]] : $Foo, #Foo.cox!getter.foreign
   _ = x.cox
 
 }
@@ -28,9 +28,9 @@ func extensionMethodCurrying(_ x: Foo) {
   _ = x.kay
 }
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s15extensions_objc3FooC3kayyyFTc
-// CHECK:         function_ref @$s15extensions_objc3FooC3kayyyFTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s15extensions_objc3FooC3kayyyFTD
-// CHECK:         bb0([[SELF:%.*]] : @guaranteed $Foo):
-// CHECK:           [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:           objc_method [[SELF_COPY]] : $Foo, #Foo.kay!1.foreign
+// CHECK-LABEL: sil private [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_ : $@convention(thin) (@guaranteed Foo) -> @owned @callee_guaranteed () -> () {
+// CHECK: function_ref @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> ()
+
+// CHECK-LABEL: sil private [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> () {
+// CHECK: objc_method %0 : $Foo, #Foo.kay!foreign : (Foo) -> () -> (), $@convention(objc_method) (Foo) -> ()
+

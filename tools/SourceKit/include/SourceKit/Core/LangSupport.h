@@ -37,6 +37,7 @@ class SourceFileSyntax;
 } // namespace swift
 
 namespace SourceKit {
+class GlobalConfig;
 
 struct EntityInfo {
   UIdent Kind;
@@ -50,6 +51,7 @@ struct EntityInfo {
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
+  Optional<UIdent> EffectiveAccess;
 
   EntityInfo() = default;
 };
@@ -89,8 +91,10 @@ struct CodeCompletionInfo {
   StringRef DocBrief;
   StringRef AssocUSRs;
   UIdent SemanticContext;
+  UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
+  bool IsSystem;
   unsigned NumBytesToErase;
 
   struct IndexRange {
@@ -144,6 +148,8 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
+  virtual void setReusingASTContext(bool) = 0;
+  virtual void setAnnotatedTypename(bool) = 0;
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -202,6 +208,7 @@ struct DiagnosticEntryInfoBase {
   std::string Filename;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
+  SmallVector<std::string, 1> EducationalNotePaths;
 };
 
 struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
@@ -483,6 +490,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
+  std::vector<std::string> RequiredBystanders;
   unsigned Offset = 0;
   unsigned Length = 0;
   bool IsUnavailable = false;
@@ -611,6 +619,7 @@ public:
 
   virtual void handleResult(const TypeContextInfoItem &Result) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
 };
 
 struct ConformingMethodListResult {
@@ -635,6 +644,7 @@ public:
   virtual ~ConformingMethodListConsumer() {}
 
   virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
 };
 
@@ -647,12 +657,15 @@ public:
 
   virtual ~LangSupport() { }
 
+  virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
+
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
 
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               OptionsDictionary *options,
                CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
                Optional<VFSOptions> vfsOptions) = 0;
 
@@ -800,14 +813,18 @@ public:
 
   virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
                                         unsigned Offset,
+                                        OptionsDictionary *options,
                                         ArrayRef<const char *> Args,
-                                        TypeContextInfoConsumer &Consumer) = 0;
+                                        TypeContextInfoConsumer &Consumer,
+                                        Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
                                        unsigned Offset,
+                                       OptionsDictionary *options,
                                        ArrayRef<const char *> Args,
                                        ArrayRef<const char *> ExpectedTypes,
-                                       ConformingMethodListConsumer &Consumer) = 0;
+                                       ConformingMethodListConsumer &Consumer,
+                                       Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };

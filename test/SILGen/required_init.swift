@@ -5,7 +5,7 @@ func subclassFloatLiteral() -> Bar {
   return x
 }
 // CHECK-LABEL: sil hidden [ossa] @$s13required_init20subclassFloatLiteralAA3BarCyF
-// CHECK:         class_method {{%.*}} : $@thick Foo.Type, #Foo.init!allocator.1
+// CHECK:         class_method {{%.*}} : $@thick Foo.Type, #Foo.init!allocator
 
 class Foo: ExpressibleByFloatLiteral {
   required init(floatLiteral: Float) { }
@@ -18,7 +18,7 @@ class Bar: Foo {
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK:         #Foo.init!allocator.1: {{.*}} : @$s13required_init3FooC{{[_0-9a-zA-Z]*}}fC
+// CHECK:         #Foo.init!allocator: {{.*}} : @$s13required_init3FooC{{[_0-9a-zA-Z]*}}fC
 
 // CHECK-LABEL: sil_vtable Bar {
-// CHECK:         #Foo.init!allocator.1: {{.*}} : @$s13required_init3BarC{{[_0-9a-zA-Z]*}}fC
+// CHECK:         #Foo.init!allocator: {{.*}} : @$s13required_init3BarC{{[_0-9a-zA-Z]*}}fC

@@ -49,11 +49,11 @@ func objcKeypaths() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
-  // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
+  // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.foreign
   _ = \ObjCFoo.objcProp
-  // CHECK: keypath $KeyPath<Foo, String>, (objc "dyn"; {{.*}} id #Foo.dyn!getter.1.foreign
+  // CHECK: keypath $KeyPath<Foo, String>, (objc "dyn"; {{.*}} id #Foo.dyn!getter.foreign
   _ = \Foo.dyn
-  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"; {{.*}} id #Foo.int!getter.1 :
+  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"; {{.*}} id #Foo.int!getter :
   _ = \Foo.int
 }
 
@@ -70,9 +70,9 @@ func nonobjcExtensionOfObjCClass() {
   // Should be treated as a statically-dispatch property
   // CHECK: keypath $KeyPath<NSObject, X>, ({{.*}} id @
   _ = \NSObject.x
-  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.objc!getter.1.foreign
+  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.objc!getter.foreign
   _ = \NSObject.objc
-  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.dynamic!getter.1.foreign
+  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.dynamic!getter.foreign
   _ = \NSObject.dynamic
 
 }
@@ -83,9 +83,9 @@ func nonobjcExtensionOfObjCClass() {
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}ProtocolRequirement
 func objcProtocolRequirement<T: ObjCProto>(_: T) {
-  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.foreign
   _ = \T.objcRequirement
-  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.foreign
   _ = \ObjCProto.objcRequirement
 }
 
@@ -112,4 +112,48 @@ class OverrideFrameworkObjCProperty: A {
 
 func overrideFrameworkObjCProperty() {
   let _ = \OverrideFrameworkObjCProperty.counter
+}
+
+@dynamicMemberLookup
+class DynamicClass<Root> {
+    init() {}
+    subscript<T>(dynamicMember member: KeyPath<Root, T>) -> DynamicClass<T> {
+        fatalError()
+    }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}dynamicMemberLookupSimple
+func dynamicMemberLookupSimple(foo: DynamicClass<Foo>, nonobjc: DynamicClass<NonObjC>) {
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
+  _ = foo.bar
+  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"
+  _ = foo.int
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
+  // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo"
+  _ = foo.bar.foo
+  // CHECK: keypath $KeyPath<Foo, NonObjC>, (root
+  _ = foo.nonobjc
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "thisIsADifferentName"
+  _ = foo.differentName
+  // CHECK: keypath $KeyPath<NonObjC, Int>, (root
+  _ = nonobjc.x
+  // CHECK: keypath $KeyPath<NonObjC, NSObject>, (root
+   _ = nonobjc.y
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}dynamicMemberLookupNestedKeypaths
+func dynamicMemberLookupNestedKeypaths(foo: DynamicClass<Foo>) {
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar" 
+  // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo" 
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar" 
+  _ = foo.bar.foo.bar
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}dynamicMemberLookupMixedKeypaths
+func dynamicMemberLookupMixedKeypaths(foo: DynamicClass<Foo>) {
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
+  // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo"
+  // CHECK: keypath $KeyPath<Foo, NonObjC>, (root
+  // CHECK: keypath $KeyPath<NonObjC, NSObject>, (root
+  _ = foo.bar.foo.nonobjc.y 
 }

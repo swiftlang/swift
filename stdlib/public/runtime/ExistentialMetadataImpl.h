@@ -25,13 +25,11 @@ namespace swift {
 namespace metadataimpl {
 
 /// A common base class for opaque-existential and class-existential boxes.
-template<typename Impl>
-struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
-};
+template <typename Impl> struct SWIFT_LIBRARY_VISIBILITY ExistentialBoxBase {};
 
 /// A common base class for fixed and non-fixed opaque-existential box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
+struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
     : ExistentialBoxBase<OpaqueExistentialBoxBase> {
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
@@ -290,7 +288,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
 /// witness tables.  Note that the WitnessTables field is accessed via
 /// spooky action from Header.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY FixedOpaqueExistentialContainer {
+struct SWIFT_LIBRARY_VISIBILITY FixedOpaqueExistentialContainer {
   OpaqueExistentialContainer Header;
   const void *WitnessTables[NumWitnessTables];
 };
@@ -304,7 +302,7 @@ struct FixedOpaqueExistentialContainer<0> {
 /// A box implementation class for an opaque existential type with
 /// a fixed number of witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBox
     : OpaqueExistentialBoxBase {
   struct Container : FixedOpaqueExistentialContainer<NumWitnessTables> {
     const Metadata *getType() const {
@@ -346,7 +344,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
 
 /// A non-fixed box implementation class for an opaque existential
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     : OpaqueExistentialBoxBase {
   struct Container {
     OpaqueExistentialContainer Header;
@@ -400,7 +398,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
 
 /// A common base class for fixed and non-fixed class-existential box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
+struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
     : ExistentialBoxBase<ClassExistentialBoxBase> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
@@ -462,14 +460,12 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     return swift_getHeapObjectExtraInhabitantIndex(
                                   (HeapObject* const *) src->getValueSlot()) + 1;
   }
-  
 };
 
 /// A box implementation class for an existential container with
 /// a class constraint and a fixed number of protocol witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
-    : ClassExistentialBoxBase {
+struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
     ClassExistentialContainer Header;
     const void *TypeInfo[NumWitnessTables];
@@ -495,7 +491,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
 
 /// A non-fixed box implementation class for a class existential
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     : ClassExistentialBoxBase {
   struct Container {
     ClassExistentialContainer Header;
@@ -532,7 +528,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
 
 /// A common base class for fixed and non-fixed existential metatype box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
+struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
     : ExistentialBoxBase<ExistentialMetatypeBoxBase> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
@@ -591,7 +587,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
 /// A box implementation class for an existential metatype container
 /// with a fixed number of protocol witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
+struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBox
     : ExistentialMetatypeBoxBase {
   struct Container {
     ExistentialMetatypeContainer Header;
@@ -618,7 +614,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
 
 /// A non-fixed box implementation class for an existential metatype
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     : ExistentialMetatypeBoxBase {
   struct Container {
     ExistentialMetatypeContainer Header;

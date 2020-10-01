@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -285,12 +285,17 @@ public protocol RangeReplaceableCollection: Collection
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
   ///
+  /// The collection must not be empty.
+  ///
   /// - Returns: A non-nil value if the operation was performed.
   mutating func _customRemoveLast() -> Element?
 
   /// Customization point for `removeLast(_:)`.  Implement this function if you
   /// want to replace the default implementation.
   ///
+  /// - Parameter n: The number of elements to remove from the collection.
+  ///   `n` must be greater than or equal to zero and must not exceed the
+  ///   number of elements in the collection.
   /// - Returns: `true` if the operation was performed.
   mutating func _customRemoveLast(_ n: Int) -> Bool
 
@@ -449,8 +454,7 @@ extension RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    let approximateCapacity = self.count +
-      numericCast(newElements.underestimatedCount)
+    let approximateCapacity = self.count + newElements.underestimatedCount
     self.reserveCapacity(approximateCapacity)
     for element in newElements {
       append(element)
@@ -591,9 +595,10 @@ extension RangeReplaceableCollection {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it has")
-    let end = index(startIndex, offsetBy: k)
+    guard let end = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it has")
+    }
     removeSubrange(startIndex..<end)
   }
 
@@ -699,9 +704,11 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
+    guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[idx..<endIndex]
   }
 }
 
@@ -800,7 +807,12 @@ extension RangeReplaceableCollection
 
   @inlinable
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    guard let end = index(endIndex, offsetBy: -n, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[startIndex..<end]
     return true
   }
 }
@@ -864,13 +876,17 @@ extension RangeReplaceableCollection where Self: BidirectionalCollection {
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: -k)..<end)
+    guard let start = index(end, offsetBy: -k, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+
+    removeSubrange(start..<end)
   }
 }
 
@@ -934,13 +950,16 @@ where Self: BidirectionalCollection, SubSequence == Self {
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: -k)..<end)
+    guard let start = index(end, offsetBy: -k, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    removeSubrange(start..<end)
   }
 }
 
@@ -952,7 +971,7 @@ extension RangeReplaceableCollection {
   /// concatenate the elements of an integer array and a `Range<Int>` instance.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  ///     let moreNumbers = numbers + 5...10
+  ///     let moreNumbers = numbers + (5...10)
   ///     print(moreNumbers)
   ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
   ///
@@ -981,7 +1000,7 @@ extension RangeReplaceableCollection {
   /// concatenate the elements of a `Range<Int>` instance and an integer array.
   ///
   ///     let numbers = [7, 8, 9, 10]
-  ///     let moreNumbers = 1...6 + numbers
+  ///     let moreNumbers = (1...6) + numbers
   ///     print(moreNumbers)
   ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
   ///
@@ -998,7 +1017,7 @@ extension RangeReplaceableCollection {
   >(lhs: Other, rhs: Self) -> Self
   where Element == Other.Element {
     var result = Self()
-    result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
+    result.reserveCapacity(rhs.count + lhs.underestimatedCount)
     result.append(contentsOf: lhs)
     result.append(contentsOf: rhs)
     return result
@@ -1083,7 +1102,11 @@ extension RangeReplaceableCollection {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
-    return try Self(self.lazy.filter(isIncluded))
+    var result = Self()
+    for element in self where try isIncluded(element) {
+      result.append(element)
+    }
+    return result
   }
 }
 
@@ -1135,8 +1158,97 @@ extension RangeReplaceableCollection {
   public mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
-    // self = try filter { try !predicate($0) }
-    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
+    self = try filter { try !shouldBeRemoved($0) }
+  }
+}
+
+extension RangeReplaceableCollection {
+  /// Removes the elements at the given indices.
+  ///
+  /// For example, this code sample finds the indices of all the vowel
+  /// characters in the string, and then removes those characters.
+  ///
+  ///     var str = "The rain in Spain stays mainly in the plain."
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
+  ///
+  ///     str.removeSubranges(vowelIndices)
+  ///     // str == "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter subranges: The indices of the elements to remove.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
+    guard !subranges.isEmpty else {
+      return
+    }
+    
+    let inversion = subranges._inverted(within: self)
+    var result = Self()
+    for range in inversion.ranges {
+      result.append(contentsOf: self[range])
+    }
+    self = result
+  }
+}
+
+extension MutableCollection where Self: RangeReplaceableCollection {
+  /// Removes the elements at the given indices.
+  ///
+  /// For example, this code sample finds the indices of all the negative
+  /// numbers in the array, and then removes those values.
+  ///
+  ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
+  ///     let negativeIndices = numbers.subranges(where: { $0 < 0 })
+  ///
+  ///     numbers.removeSubranges(negativeIndices)
+  ///     // numbers == [5, 7, 11, 2, 6]
+  ///
+  /// - Parameter subranges: The indices of the elements to remove.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
+    guard let firstRange = subranges.ranges.first else {
+      return
+    }
+    
+    var endOfElementsToKeep = firstRange.lowerBound
+    var firstUnprocessed = firstRange.upperBound
+    
+    // This performs a half-stable partition based on the ranges in
+    // `indices`. At all times, the collection is divided into three
+    // regions:
+    //
+    // - `self[..<endOfElementsToKeep]` contains only elements that will
+    //   remain in the collection after this method call.
+    // - `self[endOfElementsToKeep..<firstUnprocessed]` contains only
+    //   elements that will be removed.
+    // - `self[firstUnprocessed...]` contains a mix of elements to remain
+    //   and elements to be removed.
+    //
+    // Each iteration of this loop moves the elements that are _between_
+    // two ranges to remove from the third region to the first region.
+    for range in subranges.ranges.dropFirst() {
+      let nextLow = range.lowerBound
+      while firstUnprocessed != nextLow {
+        swapAt(endOfElementsToKeep, firstUnprocessed)
+        formIndex(after: &endOfElementsToKeep)
+        formIndex(after: &firstUnprocessed)
+      }
+      
+      firstUnprocessed = range.upperBound
+    }
+    
+    // After dealing with all the ranges in `subranges`, move the elements
+    // that are still in the third region down to the first.
+    while firstUnprocessed != endIndex {
+      swapAt(endOfElementsToKeep, firstUnprocessed)
+      formIndex(after: &endOfElementsToKeep)
+      formIndex(after: &firstUnprocessed)
+    }
+    
+    removeSubrange(endOfElementsToKeep..<endIndex)
   }
 }

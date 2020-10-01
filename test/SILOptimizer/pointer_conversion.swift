@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
-// REQUIRES: optimized_stdlib
+// REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")
@@ -39,7 +39,7 @@ public func testArrayToOptional() {
   takesOptConstRawPointer(array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $__ContiguousArrayStorageBase
-  // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
+  // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
@@ -71,7 +71,7 @@ public func testMutableArrayToOptional() {
   takesOptMutableRawPointer(&array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
-  // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
+  // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
@@ -86,23 +86,14 @@ public func testMutableArrayToOptional() {
 public func arrayLiteralPromotion() {
   takesConstRawPointer([-41,-42,-43,-44])
   
-  // Stack allocate the array.
-  // TODO: When stdlib checks are enabled, this becomes heap allocated... :-(
-  // CHECK: alloc_ref {{.*}}[tail_elems $Int * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<Int>
-  
-  // Store the elements.
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -41
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -42
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -43
-  // CHECK: [[ELT:%.+]] = integer_literal $Builtin.Int{{.*}}, -44
-  
-  // Call the function.
-  // CHECK: [[PTR:%.+]] = mark_dependence
-
+  // Outline the array literal.
+  // CHECK: [[ARR:%.+]] = global_value
+  // CHECK: [[CAST:%.+]] = upcast [[ARR]]
+  // CHECK: [[TADDR:%.+]] = ref_tail_addr [[CAST]]
+  // CHECK: [[RAWPTR:%.+]] = address_to_pointer [[TADDR]]
+  // CHECK: [[UNSAFEPTR:%.+]] = struct $UnsafeRawPointer ([[RAWPTR]]
+  // CHECK: [[PTR:%.+]] = mark_dependence [[UNSAFEPTR]]
   // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
   // CHECK: apply [[FN]]([[PTR]])
-  
-  // Release the heap value.
-  // CHECK: strong_release
 }
 

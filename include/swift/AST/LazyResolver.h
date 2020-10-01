@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the LazyResolver abstract interface.
+// This file defines the abstract interfaces for lazily resolving declarations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,7 +18,6 @@
 #define SWIFT_AST_LAZYRESOLVER_H
 
 #include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -36,29 +35,6 @@ class ProtocolDecl;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
-
-/// Abstract interface used to lazily resolve aspects of the AST, such as the
-/// types of declarations or protocol conformance structures.
-class LazyResolver {
-public:
-  virtual ~LazyResolver();
-
-  /// Resolve the type witnesses for the given associated type within the given
-  /// protocol conformance.
-  virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *assocType) = 0;
-
-  /// Resolve the witness for the given non-type requirement within
-  /// the given protocol conformance.
-  virtual void resolveWitness(const NormalProtocolConformance *conformance,
-                              ValueDecl *requirement) = 0;
-
-  /// Resolve any implicitly-declared constructors within the given nominal.
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
-
-  /// Resolve an implicitly-generated member with the given name.
-  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
-};
 
 class LazyMemberLoader;
 
@@ -104,10 +80,7 @@ public:
 
   /// Populates a vector with all members of \p IDC that have DeclName
   /// matching \p N.
-  ///
-  /// Returns None if an error occurred \em or named member-lookup
-  /// was otherwise unsupported in this implementation or Decl.
-  virtual Optional<TinyPtrVector<ValueDecl *>>
+  virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 
@@ -126,6 +99,21 @@ public:
   virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements) = 0;
+
+  /// Returns the replaced decl for a given @_dynamicReplacement(for:) attribute.
+  virtual ValueDecl *
+  loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
+                                      uint64_t contextData) = 0;
+
+  /// Returns the referenced original declaration for a `@derivative(of:)`
+  /// attribute.
+  virtual AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) = 0;
+
+  /// Returns the type for a given @_typeEraser() attribute.
+  virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
+                                  uint64_t contextData) = 0;
 };
 
 /// A class that can lazily load conformances from a serialized format.

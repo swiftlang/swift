@@ -64,10 +64,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_5 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_6 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_7 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_9 | %FileCheck %s -check-prefix=IN_FOR_EACH_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_10 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_12 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | %FileCheck %s -check-prefix=DEPRECATED_1
@@ -75,13 +75,30 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_1 | %FileCheck %s -check-prefix=IN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_2 | %FileCheck %s -check-prefix=IN_TUPLE_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_3 | %FileCheck %s -check-prefix=OWN_INIT_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_4 | %FileCheck %s -check-prefix=OWN_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_6 | %FileCheck %s -check-prefix=OWN_INIT_6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_7 | %FileCheck %s -check-prefix=OWN_INIT_7
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_1 | %FileCheck %s -check-prefix=OWN_ACCESSOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_2 | %FileCheck %s -check-prefix=OWN_ACCESSOR_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_3 | %FileCheck %s -check-prefix=OWN_ACCESSOR_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_4 | %FileCheck %s -check-prefix=OWN_ACCESSOR_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_5 | %FileCheck %s -check-prefix=OWN_ACCESSOR_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_6 | %FileCheck %s -check-prefix=OWN_ACCESSOR_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_7 | %FileCheck %s -check-prefix=OWN_ACCESSOR_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_8 | %FileCheck %s -check-prefix=OWN_ACCESSOR_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_9 | %FileCheck %s -check-prefix=OWN_ACCESSOR_9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_10 | %FileCheck %s -check-prefix=OWN_ACCESSOR_10
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_11 | %FileCheck %s -check-prefix=OWN_ACCESSOR_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_12 | %FileCheck %s -check-prefix=OWN_ACCESSOR_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_13 | %FileCheck %s -check-prefix=OWN_ACCESSOR_13
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_14 | %FileCheck %s -check-prefix=OWN_ACCESSOR_13
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_15 | %FileCheck %s -check-prefix=OWN_ACCESSOR_13
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_16 | %FileCheck %s -check-prefix=OWN_ACCESSOR_13
 
 //
 // Test code completion at the beginning of expr-postfix.
@@ -117,17 +134,17 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Enum]/CurrModule:       FooEnum[#FooEnum#]{{; name=.+$}}
 // COMMON-DAG: Decl[Class]/CurrModule:      FooClass[#FooClass#]{{; name=.+$}}
 // COMMON-DAG: Decl[Protocol]/CurrModule:   FooProtocol[#FooProtocol#]{{; name=.+$}}
-// COMMON-DAG: Decl[TypeAlias]/CurrModule:  FooTypealias[#Int#]{{; name=.+$}}
+// COMMON-DAG: Decl[TypeAlias]/CurrModule{{(/TypeRelation\[Identical\])?}}:  FooTypealias[#Int#]{{; name=.+$}}
 // COMMON-DAG: Decl[GlobalVar]/CurrModule:  fooObject[#FooStruct#]{{; name=.+$}}
 // COMMON-DAG: Keyword[try]/None: try{{; name=.+$}}
 // COMMON-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
 // COMMON-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
 // COMMON-DAG: Literal[Nil]/None: nil{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int8[#Int8#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int16[#Int16#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int32[#Int32#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int64[#Int64#]{{; name=.+$}}
-// COMMON-DAG: Decl[Struct]/OtherModule[Swift]:      Bool[#Bool#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int8[#Int8#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int16[#Int16#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int32[#Int32#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int64[#Int64#]{{; name=.+$}}
+// COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Bool[#Bool#]{{; name=.+$}}
 // COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
 // COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
 // COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
@@ -587,4 +604,66 @@ func ownInitTestingShadow(ownInit7: Int) {
   var ownInit7: Int = #^OWN_INIT_7^#
   // OWN_INIT_7: Begin completions
   // OWN_INIT_7: Decl[LocalVar]/Local/TypeRelation[Identical]: ownInit7[#Int#];
+}
+
+var inAccessor1: Int {
+  get { #^OWN_ACCESSOR_1^# }
+// OWN_ACCESSOR_1: Begin completions
+// OWN_ACCESSOR_1: Decl[GlobalVar]/CurrModule/NotRecommended/TypeRelation[Identical]: inAccessor1[#Int#];
+  set { #^OWN_ACCESSOR_2^# }
+// OWN_ACCESSOR_2: Begin completions
+// OWN_ACCESSOR_2: Decl[GlobalVar]/CurrModule: inAccessor1[#Int#];
+}
+var inAccessor2: Int = 1 {
+  didSet { #^OWN_ACCESSOR_3^# }
+// OWN_ACCESSOR_3: Begin completions
+// OWN_ACCESSOR_3: Decl[GlobalVar]/CurrModule: inAccessor2[#Int#];
+  willSet { #^OWN_ACCESSOR_4^# }
+}
+class InAccessorTest {
+  var inAccessor3: Int {
+    get { #^OWN_ACCESSOR_5^# }
+// OWN_ACCESSOR_5: Begin completions
+// OWN_ACCESSOR_5: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Identical]: inAccessor3[#Int#];
+    set { #^OWN_ACCESSOR_6^# }
+// OWN_ACCESSOR_6: Begin completions
+// OWN_ACCESSOR_6: Decl[InstanceVar]/CurrNominal: inAccessor3[#Int#];
+  }
+  var inAccessor4: Int = 1 {
+    didSet { #^OWN_ACCESSOR_7^# }
+// OWN_ACCESSOR_7: Begin completions
+// OWN_ACCESSOR_7: Decl[InstanceVar]/CurrNominal: inAccessor4[#Int#];
+    willSet { #^OWN_ACCESSOR_8^# }
+  }
+}
+func inAccessorTest() {
+  var inAccessor5: Int {
+    get { #^OWN_ACCESSOR_9^# }
+// OWN_ACCESSOR_9: Begin completions
+// OWN_ACCESSOR_9: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Identical]: inAccessor5[#Int#];
+    set { #^OWN_ACCESSOR_10^# }
+// OWN_ACCESSOR_10: Begin completions
+// OWN_ACCESSOR_10: Decl[LocalVar]/Local: inAccessor5[#Int#];
+  }
+  var inAccessor6: Int = 1 {
+    didSet { #^OWN_ACCESSOR_11^# }
+// OWN_ACCESSOR_11: Begin completions
+// OWN_ACCESSOR_11: Decl[LocalVar]/Local: inAccessor6[#Int#];
+    willSet { #^OWN_ACCESSOR_12^# }
+  }
+}
+class InAccessorTestQualified {
+  var inAccessorProp: Int {
+    get {
+      let _ = self.#^OWN_ACCESSOR_13^#
+// OWN_ACCESSOR_13: Begin completions
+// OWN_ACCESSOR_13-DAG: Decl[InstanceVar]/CurrNominal:      inAccessorProp[#Int#];
+// OWN_ACCESSOR_13: End completions
+      let _ = \InAccessorTestQualified.#^OWN_ACCESSOR_14^#
+    }
+    set {
+      let _ = self.#^OWN_ACCESSOR_15^#
+      let _ = \InAccessorTestQualified.#^OWN_ACCESSOR_16^#
+    }
+  }
 }

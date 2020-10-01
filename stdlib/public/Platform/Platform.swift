@@ -142,6 +142,10 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
     return vsnprintf(ptr, len, format, va_args)
   }
 }
+#elseif os(OpenBSD)
+public var stdin: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdin() }
+public var stdout: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdout() }
+public var stderr: UnsafeMutablePointer<FILE> { return _swift_stdlib_stderr() }
 #elseif os(Windows)
 public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
 public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
@@ -332,6 +336,11 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
+#elseif os(OpenBSD)
+public var SIG_DFL: sig_t? { return nil }
+public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
+public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
+public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
 public typealias sighandler_t = __sighandler_t
 
@@ -366,6 +375,8 @@ public var SIG_IGN: _crt_signal_t {
 public var SIG_ERR: _crt_signal_t {
   return unsafeBitCast(-1, to: _crt_signal_t.self)
 }
+#elseif os(WASI)
+// No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif
@@ -375,14 +386,21 @@ internal var _ignore = _UnsupportedPlatformError()
 //===----------------------------------------------------------------------===//
 
 #if !os(Windows) 
+
+#if os(OpenBSD)
+public typealias Semaphore = UnsafeMutablePointer<sem_t?>
+#else
+public typealias Semaphore = UnsafeMutablePointer<sem_t>
+#endif
+
 /// The value returned by `sem_open()` in the case of failure.
-public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
+public var SEM_FAILED: Semaphore? {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
-  return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  return Semaphore(bitPattern: -1)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   // The value is ABI.  Value verified to be correct on Glibc.
-  return UnsafeMutablePointer<sem_t>(bitPattern: 0)
+  return Semaphore(bitPattern: 0)
 #else
   _UnsupportedPlatformError()
 #endif
@@ -391,7 +409,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 public func sem_open(
   _ name: UnsafePointer<CChar>,
   _ oflag: Int32
-) -> UnsafeMutablePointer<sem_t>? {
+) -> Semaphore? {
   return _stdlib_sem_open2(name, oflag)
 }
 
@@ -400,9 +418,10 @@ public func sem_open(
   _ oflag: Int32,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t>? {
+) -> Semaphore? {
   return _stdlib_sem_open4(name, oflag, mode, value)
 }
+
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -410,7 +429,7 @@ public func sem_open(
 //===----------------------------------------------------------------------===//
 
 // Some platforms don't have `extern char** environ` imported from C.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(OpenBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_stdlib_getEnviron()
 }

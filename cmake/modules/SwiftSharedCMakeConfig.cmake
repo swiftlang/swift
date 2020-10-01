@@ -58,7 +58,7 @@ macro(swift_common_standalone_build_config_llvm product)
     fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
   endif()
 
-  if(NOT CMAKE_CROSSCOMPILING)
+  if(NOT CMAKE_CROSSCOMPILING AND NOT SWIFT_CROSS_COMPILING)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
@@ -193,7 +193,7 @@ macro(swift_common_standalone_build_config_cmark product)
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  include(${PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake)
   add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 

@@ -19,14 +19,10 @@ func isOn(_ b: Binary) -> Bool {
 // CHECK-LABEL: sil hidden [ossa] @$s16switch_debuginfo5test11iySi_tF
 func test1(i: Int) {
   switch i {
-           // CHECK-NOT: [[LOC]]:[[@LINE+1]]
-  case 0:  // CHECK: debug_value {{.*}} : $Int, let, name "$match", [[LOC]]:[[@LINE]]
-           // CHECK-NOT: [[LOC]]:[[@LINE-1]]
+  case 0:  // CHECK-NOT: [[LOC]]:[[@LINE]]
     nop1()
-
-           // CHECK-NOT: [[LOC]]:[[@LINE+1]]
-  case 1:  // CHECK: debug_value {{.*}} : $Int, let, name "$match", [[LOC]]:[[@LINE]]
-           // CHECK-NOT: [[LOC]]:[[@LINE-1]]
+           
+  case 1:  // CHECK-NOT: [[LOC]]:[[@LINE]]
     nop1()
 
   default: // CHECK-NOT: [[LOC]]:[[@LINE]]

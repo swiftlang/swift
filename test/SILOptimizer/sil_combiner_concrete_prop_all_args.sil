@@ -123,7 +123,7 @@ bb0(%0 : $SomeClass):
 
 sil private [transparent] [thunk] @$s21existential_transform9SomeClassCAA0C8ProtocolA2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeProtocol) (@guaranteed SomeClass) -> Int32 {
 bb0(%0 : $SomeClass):
-  %1 = class_method %0 : $SomeClass, #SomeClass.foo!1 : (SomeClass) -> () -> Int32, $@convention(method) (@guaranteed SomeClass) -> Int32 
+  %1 = class_method %0 : $SomeClass, #SomeClass.foo : (SomeClass) -> () -> Int32, $@convention(method) (@guaranteed SomeClass) -> Int32 
   %2 = apply %1(%0) : $@convention(method) (@guaranteed SomeClass) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform9SomeClassCAA0C8ProtocolA2aDP3foos5Int32VyFTW'
@@ -170,7 +170,7 @@ bb0(%0 : $SomeNoClass):
 sil private [transparent] [thunk] @$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeNoClassProtocol) (@in_guaranteed SomeNoClass) -> Int32 {
 bb0(%0 : $*SomeNoClass):
   %1 = load %0 : $*SomeNoClass                    
-  %2 = class_method %1 : $SomeNoClass, #SomeNoClass.foo!1 : (SomeNoClass) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClass) -> Int32 
+  %2 = class_method %1 : $SomeNoClass, #SomeNoClass.foo : (SomeNoClass) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClass) -> Int32 
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeNoClass) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW'
@@ -225,14 +225,14 @@ bb0(%0 : $SomeClassComp):
 
 sil private [transparent] [thunk] @$s21existential_transform13SomeClassCompCAA0cd8ProtocolE0A2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeClassProtocolComp) (@guaranteed SomeClassComp) -> Int32 {
 bb0(%0 : $SomeClassComp):
-  %1 = class_method %0 : $SomeClassComp, #SomeClassComp.foo!1 : (SomeClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeClassComp) -> Int32 
+  %1 = class_method %0 : $SomeClassComp, #SomeClassComp.foo : (SomeClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeClassComp) -> Int32 
   %2 = apply %1(%0) : $@convention(method) (@guaranteed SomeClassComp) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform13SomeClassCompCAA0cd8ProtocolE0A2aDP3foos5Int32VyFTW'
 
 sil private [transparent] [thunk] @$s21existential_transform13SomeClassCompCAA0c5Otherd8ProtocolE0A2aDP3bars5Int32VyFTW : $@convention(witness_method: SomeClassProtocolComp) (@guaranteed SomeClassComp) -> Int32 {
 bb0(%0 : $SomeClassComp):
-  %1 = class_method %0 : $SomeClassComp, #SomeClassComp.bar!1 : (SomeClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeClassComp) -> Int32 
+  %1 = class_method %0 : $SomeClassComp, #SomeClassComp.bar : (SomeClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeClassComp) -> Int32 
   %2 = apply %1(%0) : $@convention(method) (@guaranteed SomeClassComp) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform13SomeClassCompCAA0c5Otherd8ProtocolE0A2aDP3bars5Int32VyFTW'
@@ -286,7 +286,7 @@ bb0(%0 : $SomeNoClassComp):
 sil private [transparent] [thunk] @$s21existential_transform15SomeNoClassCompCAA0cde8ProtocolF0A2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeNoClassProtocolComp) (@in_guaranteed SomeNoClassComp) -> Int32 {
 bb0(%0 : $*SomeNoClassComp):
   %1 = load %0 : $*SomeNoClassComp                
-  %2 = class_method %1 : $SomeNoClassComp, #SomeNoClassComp.foo!1 : (SomeNoClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
+  %2 = class_method %1 : $SomeNoClassComp, #SomeNoClassComp.foo : (SomeNoClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform15SomeNoClassCompCAA0cde8ProtocolF0A2aDP3foos5Int32VyFTW'
@@ -294,7 +294,7 @@ bb0(%0 : $*SomeNoClassComp):
 sil private [transparent] [thunk] @$s21existential_transform15SomeNoClassCompCAA0c5Otherde8ProtocolF0A2aDP3bars5Int32VyFTW : $@convention(witness_method: SomeNoClassProtocolComp) (@in_guaranteed SomeNoClassComp) -> Int32 {
 bb0(%0 : $*SomeNoClassComp):
   %1 = load %0 : $*SomeNoClassComp                
-  %2 = class_method %1 : $SomeNoClassComp, #SomeNoClassComp.bar!1 : (SomeNoClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
+  %2 = class_method %1 : $SomeNoClassComp, #SomeNoClassComp.bar : (SomeNoClassComp) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeNoClassComp) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform15SomeNoClassCompCAA0c5Otherde8ProtocolF0A2aDP3bars5Int32VyFTW'
@@ -342,7 +342,7 @@ bb0(%0 : $K):
 
 sil private [transparent] [thunk] @$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW : $@convention(witness_method: P) (@guaranteed K) -> Int32 {
 bb0(%0 : $K):
-  %1 = class_method %0 : $K, #K.foo!1 : (K) -> () -> Int32, $@convention(method) (@guaranteed K) -> Int32 
+  %1 = class_method %0 : $K, #K.foo : (K) -> () -> Int32, $@convention(method) (@guaranteed K) -> Int32 
   %2 = apply %1(%0) : $@convention(method) (@guaranteed K) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW'
@@ -351,7 +351,7 @@ bb0(%0 : $K):
 // CHECK: bb0(%0 : $P):
 // CHECK:   debug_value %0 : $P, let, name "a", argno 1     
 // CHECK:   %2 = open_existential_ref %0 : $P to $@opened("{{.*}}") P 
-// CHECK:   %3 = witness_method $@opened("{{.*}}") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+// CHECK:   %3 = witness_method $@opened("{{.*}}") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("{{.*}}") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
 // CHECK:   %4 = apply %3<@opened("{{.*}}") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
 // CHECK:   return %4 : $Int32                              
 // CHECK-LABEL: } // end sil function '$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF'
@@ -359,7 +359,7 @@ sil hidden [noinline] @$s21existential_transform18do_not_optimize_cp1as5Int32VAA
 bb0(%0 : $P):
   debug_value %0 : $P, let, name "a", argno 1     
   %2 = open_existential_ref %0 : $P to $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P 
-  %3 = witness_method $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
+  %3 = witness_method $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
   %4 = apply %3<@opened("CC9697D8-AC7C-11E8-B742-D0817AD4059B") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32 
   return %4 : $Int32                              
 } // end sil function '$s21existential_transform18do_not_optimize_cp1as5Int32VAA1P_p_tF'
@@ -373,7 +373,7 @@ bb0(%0 : $KK):
 
 sil private [transparent] [thunk] @$s21existential_transform2KKCAA2PPA2aDP3foos5Int32VyFTW : $@convention(witness_method: PP) (@guaranteed KK) -> Int32 {
 bb0(%0 : $KK):
-  %1 = class_method %0 : $KK, #KK.foo!1 : (KK) -> () -> Int32, $@convention(method) (@guaranteed KK) -> Int32 
+  %1 = class_method %0 : $KK, #KK.foo : (KK) -> () -> Int32, $@convention(method) (@guaranteed KK) -> Int32 
   %2 = apply %1(%0) : $@convention(method) (@guaranteed KK) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform2KKCAA2PPA2aDP3foos5Int32VyFTW'
@@ -384,7 +384,7 @@ bb0(%0 : $*PP):
   debug_value_addr %0 : $*PP, var, name "a", argno 1 
   %2 = load %0 : $*PP                             
   %3 = open_existential_ref %2 : $PP to $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP 
-  %4 = witness_method $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP, #PP.foo!1 : <Self where Self : PP> (Self) -> () -> Int32, %3 : $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
+  %4 = witness_method $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP, #PP.foo : <Self where Self : PP> (Self) -> () -> Int32, %3 : $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
   strong_retain %2 : $PP                          
   %6 = apply %4<@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP>(%3) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 
   strong_release %2 : $PP                         
@@ -432,7 +432,7 @@ bb0(%0 : $KKK):
 sil private [transparent] [thunk] @$s21existential_transform3KKKCAA3PPPA2aDP3foos5Int32VyFTW : $@convention(witness_method: PPP) (@in_guaranteed KKK) -> Int32 {
 bb0(%0 : $*KKK):
   %1 = load %0 : $*KKK                            
-  %2 = class_method %1 : $KKK, #KKK.foo!1 : (KKK) -> () -> Int32, $@convention(method) (@guaranteed KKK) -> Int32 
+  %2 = class_method %1 : $KKK, #KKK.foo : (KKK) -> () -> Int32, $@convention(method) (@guaranteed KKK) -> Int32 
   %3 = apply %2(%1) : $@convention(method) (@guaranteed KKK) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform3KKKCAA3PPPA2aDP3foos5Int32VyFTW'
@@ -529,7 +529,7 @@ bb0:
 // CHECK-LABEL: } // end sil function '$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n4main0G5ClassC_Tg5'
 sil shared [noinline] @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $τ_0_0):
-  %1 = witness_method $τ_0_0, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> Int32 : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
+  %1 = witness_method $τ_0_0, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int32 : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
   %2 = apply %1<τ_0_0>(%0) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n'
@@ -543,7 +543,7 @@ bb0(%0 : $τ_0_0):
 // CHECK-LABEL: } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n4main0ghI0C_Tg5'
 sil shared [noinline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
-  %1 = witness_method $τ_0_0, #SomeNoClassProtocol.foo!1 : <Self where Self : SomeNoClassProtocol> (Self) -> () -> Int32 : $@convention(witness_method: SomeNoClassProtocol) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
+  %1 = witness_method $τ_0_0, #SomeNoClassProtocol.foo : <Self where Self : SomeNoClassProtocol> (Self) -> () -> Int32 : $@convention(witness_method: SomeNoClassProtocol) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   %2 = apply %1<τ_0_0>(%0) : $@convention(witness_method: SomeNoClassProtocol) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n'
@@ -562,9 +562,9 @@ bb0(%0 : $*τ_0_0):
 // CHECK: } // end sil function '$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n4main0hiK0C_Tg5'
 sil shared [noinline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $τ_0_0):
-  %1 = witness_method $τ_0_0, #SomeClassProtocolComp.foo!1 : <Self where Self : SomeClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeClassProtocolComp) <τ_0_0 where τ_0_0 : SomeClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
+  %1 = witness_method $τ_0_0, #SomeClassProtocolComp.foo : <Self where Self : SomeClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeClassProtocolComp) <τ_0_0 where τ_0_0 : SomeClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   %2 = apply %1<τ_0_0>(%0) : $@convention(witness_method: SomeClassProtocolComp) <τ_0_0 where τ_0_0 : SomeClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
-  %3 = witness_method $τ_0_0, #SomeOtherClassProtocolComp.bar!1 : <Self where Self : SomeOtherClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeOtherClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
+  %3 = witness_method $τ_0_0, #SomeOtherClassProtocolComp.bar : <Self where Self : SomeOtherClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeOtherClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%0) : $@convention(witness_method: SomeOtherClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   %5 = struct_extract %2 : $Int32, #Int32._value  
   %6 = struct_extract %4 : $Int32, #Int32._value  
@@ -591,9 +591,9 @@ bb0(%0 : $τ_0_0):
 // CHECK-LABEL: } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5'
 sil shared [noinline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
-  %1 = witness_method $τ_0_0, #SomeNoClassProtocolComp.foo!1 : <Self where Self : SomeNoClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
+  %1 = witness_method $τ_0_0, #SomeNoClassProtocolComp.foo : <Self where Self : SomeNoClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   %2 = apply %1<τ_0_0>(%0) : $@convention(witness_method: SomeNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
-  %3 = witness_method $τ_0_0, #SomeOtherNoClassProtocolComp.bar!1 : <Self where Self : SomeOtherNoClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeOtherNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
+  %3 = witness_method $τ_0_0, #SomeOtherNoClassProtocolComp.bar : <Self where Self : SomeOtherNoClassProtocolComp> (Self) -> () -> Int32 : $@convention(witness_method: SomeOtherNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%0) : $@convention(witness_method: SomeOtherNoClassProtocolComp) <τ_0_0 where τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   %5 = struct_extract %2 : $Int32, #Int32._value  
   %6 = struct_extract %4 : $Int32, #Int32._value  
@@ -614,7 +614,7 @@ sil shared [noinline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        
   copy_addr [take] %0 to [initialization] %1 : $*τ_0_0 
-  %3 = witness_method $τ_0_0, #PPP.foo!1 : <Self where Self : PPP> (Self) -> () -> Int32 : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> Int32 
+  %3 = witness_method $τ_0_0, #PPP.foo : <Self where Self : PPP> (Self) -> () -> Int32 : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%1) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> Int32 
   dealloc_stack %1 : $*τ_0_0                     
   return %4 : $Int32                              
@@ -628,78 +628,78 @@ sil shared [noinline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        
   copy_addr [take] %0 to [initialization] %1 : $*τ_0_0 
-  %3 = witness_method $τ_0_0, #PPPP.foo!1 : <Self where Self : PPPP> (Self) -> () -> Int32 : $@convention(witness_method: PPPP) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed τ_0_0) -> Int32 
+  %3 = witness_method $τ_0_0, #PPPP.foo : <Self where Self : PPPP> (Self) -> () -> Int32 : $@convention(witness_method: PPPP) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%1) : $@convention(witness_method: PPPP) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed τ_0_0) -> Int32 
   dealloc_stack %1 : $*τ_0_0                     
   return %4 : $Int32                              
 } // end sil function '$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n'
 
 sil_vtable SomeClass {
-  #SomeClass.foo!1: (SomeClass) -> () -> Int32 : @$s21existential_transform9SomeClassC3foos5Int32VyF	// SomeClass.foo()
+  #SomeClass.foo: (SomeClass) -> () -> Int32 : @$s21existential_transform9SomeClassC3foos5Int32VyF	// SomeClass.foo()
 }
 
 sil_vtable SomeNoClass {
-  #SomeNoClass.foo!1: (SomeNoClass) -> () -> Int32 : @$s21existential_transform11SomeNoClassC3foos5Int32VyF	// SomeNoClass.foo()
+  #SomeNoClass.foo: (SomeNoClass) -> () -> Int32 : @$s21existential_transform11SomeNoClassC3foos5Int32VyF	// SomeNoClass.foo()
 }
 
 sil_vtable SomeClassComp {
-  #SomeClassComp.foo!1: (SomeClassComp) -> () -> Int32 : @$s21existential_transform13SomeClassCompC3foos5Int32VyF	// SomeClassComp.foo()
-  #SomeClassComp.bar!1: (SomeClassComp) -> () -> Int32 : @$s21existential_transform13SomeClassCompC3bars5Int32VyF	// SomeClassComp.bar()
+  #SomeClassComp.foo: (SomeClassComp) -> () -> Int32 : @$s21existential_transform13SomeClassCompC3foos5Int32VyF	// SomeClassComp.foo()
+  #SomeClassComp.bar: (SomeClassComp) -> () -> Int32 : @$s21existential_transform13SomeClassCompC3bars5Int32VyF	// SomeClassComp.bar()
 }
 
 sil_vtable SomeNoClassComp {
-  #SomeNoClassComp.foo!1: (SomeNoClassComp) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompC3foos5Int32VyF	// SomeNoClassComp.foo()
-  #SomeNoClassComp.bar!1: (SomeNoClassComp) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompC3bars5Int32VyF	// SomeNoClassComp.bar()
+  #SomeNoClassComp.foo: (SomeNoClassComp) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompC3foos5Int32VyF	// SomeNoClassComp.foo()
+  #SomeNoClassComp.bar: (SomeNoClassComp) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompC3bars5Int32VyF	// SomeNoClassComp.bar()
 }
 
 sil_vtable K {
-  #K.foo!1: (K) -> () -> Int32 : @$s21existential_transform1KC3foos5Int32VyF	// K.foo()
+  #K.foo: (K) -> () -> Int32 : @$s21existential_transform1KC3foos5Int32VyF	// K.foo()
 }
 
 sil_vtable KK {
-  #KK.foo!1: (KK) -> () -> Int32 : @$s21existential_transform2KKC3foos5Int32VyF	// KK.foo()
+  #KK.foo: (KK) -> () -> Int32 : @$s21existential_transform2KKC3foos5Int32VyF	// KK.foo()
 }
 
 sil_vtable KKK {
-  #KKK.foo!1: (KKK) -> () -> Int32 : @$s21existential_transform3KKKC3foos5Int32VyF	// KKK.foo()
+  #KKK.foo: (KKK) -> () -> Int32 : @$s21existential_transform3KKKC3foos5Int32VyF	// KKK.foo()
 }
 
 sil_witness_table hidden SomeClass: SomeProtocol module existential_transform {
-  method #SomeProtocol.foo!1: <Self where Self : SomeProtocol> (Self) -> () -> Int32 : @$s21existential_transform9SomeClassCAA0C8ProtocolA2aDP3foos5Int32VyFTW	// protocol witness for SomeProtocol.foo() in conformance SomeClass
+  method #SomeProtocol.foo: <Self where Self : SomeProtocol> (Self) -> () -> Int32 : @$s21existential_transform9SomeClassCAA0C8ProtocolA2aDP3foos5Int32VyFTW	// protocol witness for SomeProtocol.foo() in conformance SomeClass
 }
 
 sil_witness_table hidden SomeNoClass: SomeNoClassProtocol module existential_transform {
-  method #SomeNoClassProtocol.foo!1: <Self where Self : SomeNoClassProtocol> (Self) -> () -> Int32 : @$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW	// protocol witness for SomeNoClassProtocol.foo() in conformance SomeNoClass
+  method #SomeNoClassProtocol.foo: <Self where Self : SomeNoClassProtocol> (Self) -> () -> Int32 : @$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW	// protocol witness for SomeNoClassProtocol.foo() in conformance SomeNoClass
 }
 
 sil_witness_table hidden SomeClassComp: SomeClassProtocolComp module existential_transform {
-  method #SomeClassProtocolComp.foo!1: <Self where Self : SomeClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform13SomeClassCompCAA0cd8ProtocolE0A2aDP3foos5Int32VyFTW	// protocol witness for SomeClassProtocolComp.foo() in conformance SomeClassComp
+  method #SomeClassProtocolComp.foo: <Self where Self : SomeClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform13SomeClassCompCAA0cd8ProtocolE0A2aDP3foos5Int32VyFTW	// protocol witness for SomeClassProtocolComp.foo() in conformance SomeClassComp
 }
 
 sil_witness_table hidden SomeClassComp: SomeOtherClassProtocolComp module existential_transform {
-  method #SomeOtherClassProtocolComp.bar!1: <Self where Self : SomeOtherClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform13SomeClassCompCAA0c5Otherd8ProtocolE0A2aDP3bars5Int32VyFTW	// protocol witness for SomeOtherClassProtocolComp.bar() in conformance SomeClassComp
+  method #SomeOtherClassProtocolComp.bar: <Self where Self : SomeOtherClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform13SomeClassCompCAA0c5Otherd8ProtocolE0A2aDP3bars5Int32VyFTW	// protocol witness for SomeOtherClassProtocolComp.bar() in conformance SomeClassComp
 }
 
 sil_witness_table hidden SomeNoClassComp: SomeNoClassProtocolComp module existential_transform {
-  method #SomeNoClassProtocolComp.foo!1: <Self where Self : SomeNoClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompCAA0cde8ProtocolF0A2aDP3foos5Int32VyFTW	// protocol witness for SomeNoClassProtocolComp.foo() in conformance SomeNoClassComp
+  method #SomeNoClassProtocolComp.foo: <Self where Self : SomeNoClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompCAA0cde8ProtocolF0A2aDP3foos5Int32VyFTW	// protocol witness for SomeNoClassProtocolComp.foo() in conformance SomeNoClassComp
 }
 
 sil_witness_table hidden SomeNoClassComp: SomeOtherNoClassProtocolComp module existential_transform {
-  method #SomeOtherNoClassProtocolComp.bar!1: <Self where Self : SomeOtherNoClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompCAA0c5Otherde8ProtocolF0A2aDP3bars5Int32VyFTW	// protocol witness for SomeOtherNoClassProtocolComp.bar() in conformance SomeNoClassComp
+  method #SomeOtherNoClassProtocolComp.bar: <Self where Self : SomeOtherNoClassProtocolComp> (Self) -> () -> Int32 : @$s21existential_transform15SomeNoClassCompCAA0c5Otherde8ProtocolF0A2aDP3bars5Int32VyFTW	// protocol witness for SomeOtherNoClassProtocolComp.bar() in conformance SomeNoClassComp
 }
 
 sil_witness_table hidden K: P module existential_transform {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() in conformance K
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : @$s21existential_transform1KCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() in conformance K
 }
 
 sil_witness_table hidden KK: PP module existential_transform {
-  method #PP.foo!1: <Self where Self : PP> (Self) -> () -> Int32 : @$s21existential_transform2KKCAA2PPA2aDP3foos5Int32VyFTW	// protocol witness for PP.foo() in conformance KK
+  method #PP.foo: <Self where Self : PP> (Self) -> () -> Int32 : @$s21existential_transform2KKCAA2PPA2aDP3foos5Int32VyFTW	// protocol witness for PP.foo() in conformance KK
 }
 
 sil_witness_table hidden KKK: PPP module existential_transform {
-  method #PPP.foo!1: <Self where Self : PPP> (Self) -> () -> Int32 : @$s21existential_transform3KKKCAA3PPPA2aDP3foos5Int32VyFTW	// protocol witness for PPP.foo() in conformance KKK
+  method #PPP.foo: <Self where Self : PPP> (Self) -> () -> Int32 : @$s21existential_transform3KKKCAA3PPPA2aDP3foos5Int32VyFTW	// protocol witness for PPP.foo() in conformance KKK
 }
 
 sil_witness_table hidden SSSS: PPPP module existential_transform {
-  method #PPPP.foo!1: <Self where Self : PPPP> (Self) -> () -> Int32 : @$s21existential_transform4SSSSVAA4PPPPA2aDP3foos5Int32VyFTW	// protocol witness for PPPP.foo() in conformance SSSS
+  method #PPPP.foo: <Self where Self : PPPP> (Self) -> () -> Int32 : @$s21existential_transform4SSSSVAA4PPPPA2aDP3foos5Int32VyFTW	// protocol witness for PPPP.foo() in conformance SSSS
 }

@@ -70,6 +70,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
     assert(!builder.empty() == requiresHeapHeader(layoutKind));
     MinimumAlign = Alignment(1);
     MinimumSize = Size(0);
+    headerSize = builder.getHeaderSize();
     SpareBits.clear();
     IsFixedLayout = true;
     IsKnownPOD = IsPOD;
@@ -79,6 +80,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
+    headerSize = builder.getHeaderSize();
     SpareBits = builder.getSpareBits();
     IsFixedLayout = builder.isFixedLayout();
     IsKnownPOD = builder.isPOD();
@@ -186,6 +188,7 @@ void StructLayoutBuilder::addHeapHeader() {
   CurSize = IGM.RefCountedStructSize;
   CurAlignment = IGM.getPointerAlignment();
   StructFields.push_back(IGM.RefCountedStructTy);
+  headerSize = CurSize;
 }
 
 void StructLayoutBuilder::addNSObjectHeader() {
@@ -193,6 +196,7 @@ void StructLayoutBuilder::addNSObjectHeader() {
   CurSize = IGM.getPointerSize();
   CurAlignment = IGM.getPointerAlignment();
   StructFields.push_back(IGM.ObjCClassPtrTy);
+  headerSize = CurSize;
 }
 
 bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
@@ -219,7 +223,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
     // If the element type is empty, it adds nothing.
-    NextNonFixedOffsetIndex++;
+    ++NextNonFixedOffsetIndex;
     return false;
   }
   // TODO: consider using different layout rules.
@@ -234,7 +238,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   } else {
     addNonFixedSizeElement(elt);
   }
-  NextNonFixedOffsetIndex++;
+  ++NextNonFixedOffsetIndex;
   return true;
 }
 
@@ -308,7 +312,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  auto byteOffset = isFixedLayout() ? CurSize : Size(0);
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), byteOffset);
 }
 
 /// Add an element at the fixed offset of the current end of the

@@ -19,7 +19,7 @@ struct Concrete<AType2: ProtoA>: ProtoB {
         fatalError()
     }
 
-    func protoFunc() -> Alias { // expected-error{{unsupported recursion for reference to type alias 'Alias' of type 'Concrete<AType2>'}}
+    func protoFunc() -> Alias {
         fatalError()
     }
 }

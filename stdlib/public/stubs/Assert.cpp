@@ -12,6 +12,7 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
 #include "../SwiftShims/AssertionReporting.h"
 #include <cstdarg>
 #include <cstdint>
@@ -39,7 +40,7 @@ static void logPrefixAndMessageToDebugger(
   free(debuggerMessage);
 }
 
-void swift::_swift_stdlib_reportFatalErrorInFile(
+void _swift_stdlib_reportFatalErrorInFile(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
     const unsigned char *file, int fileLength,
@@ -61,7 +62,7 @@ void swift::_swift_stdlib_reportFatalErrorInFile(
   logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
 }
 
-void swift::_swift_stdlib_reportFatalError(
+void _swift_stdlib_reportFatalError(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
     uint32_t flags
@@ -78,7 +79,7 @@ void swift::_swift_stdlib_reportFatalError(
   logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
 }
 
-void swift::_swift_stdlib_reportUnimplementedInitializerInFile(
+void _swift_stdlib_reportUnimplementedInitializerInFile(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,
     const unsigned char *file, int fileLength,
@@ -99,7 +100,7 @@ void swift::_swift_stdlib_reportUnimplementedInitializerInFile(
   free(log);
 }
 
-void swift::_swift_stdlib_reportUnimplementedInitializer(
+void _swift_stdlib_reportUnimplementedInitializer(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,
     uint32_t flags

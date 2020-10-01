@@ -3,6 +3,7 @@
 
 // This unusual use of 'sh' allows the path of the profraw file to be
 // substituted by %target-run.
+// RUN: %target-codesign %t/main
 // RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -110,7 +111,7 @@ public func bar(_ x: Int64) -> Int64 {
 // SIL-LABEL: sil @$s18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
 // SIL-OPT-LABEL: sil @$s18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
 public func foo(_ x: Int64) {
-  // SIL: switch_enum {{.*}} : $Optional<Int64>, case #Optional.some!enumelt.1: {{.*}} !case_count(100), case #Optional.none!enumelt: {{.*}} !case_count(1)
+  // SIL: switch_enum {{.*}} : $Optional<Int64>, case #Optional.some!enumelt: {{.*}} !case_count(100), case #Optional.none!enumelt: {{.*}} !case_count(1)
   // SIL: cond_br {{.*}}, {{.*}}, {{.*}} !true_count(50)
   // SIL: cond_br {{.*}}, {{.*}}, {{.*}} !true_count(1)
   // SIL-OPT: integer_literal $Builtin.Int64, 93

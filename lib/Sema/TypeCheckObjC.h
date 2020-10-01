@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_OBJC_H
 #define SWIFT_SEMA_TYPE_CHECK_OBJC_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
 
@@ -25,7 +26,6 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class SubscriptDecl;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
 class InFlightDiagnostic;
@@ -124,6 +124,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 /// and figure out its foreign error convention (if any).
 bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                            ObjCReason Reason,
+                           Optional<ForeignAsyncConvention> &asyncConvention,
                            Optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.
@@ -134,11 +135,6 @@ bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 
 /// Check whether the given declaration can be represented in Objective-C.
 bool canBeRepresentedInObjC(const ValueDecl *decl);
-
-/// Check that specific, known bridging functions are fully type-checked.
-///
-/// NOTE: This is only here to support the --enable-source-import hack.
-void checkBridgedFunctions(ASTContext &ctx);
 
 /// Attach Fix-Its to the given diagnostic that updates the name of the
 /// given declaration to the desired target name.

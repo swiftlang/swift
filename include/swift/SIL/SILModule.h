@@ -28,6 +28,7 @@
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
+#include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
@@ -39,7 +40,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ilist.h"
@@ -66,6 +66,7 @@ class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
+class SILRemarkStreamer;
 
 namespace Lowering {
 class SILGenModule;
@@ -109,10 +110,12 @@ class SILModule {
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
-  using VTableListType = llvm::ilist<SILVTable>;
+  using VTableListType = llvm::ArrayRef<SILVTable*>;
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DifferentiabilityWitnessListType =
+      llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
 
@@ -131,6 +134,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
   friend SILLayout;
@@ -166,15 +170,12 @@ private:
   /// Functions, which are dead (and not in the functions list anymore),
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
-  
-  /// Stores the names of zombie functions.
-  llvm::BumpPtrAllocator zombieFunctionNames;
-  
+
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
   /// The list of SILVTables in the module.
-  VTableListType vtables;
+  std::vector<SILVTable*> vtables;
 
   /// This is a cache of vtable entries for quick look-up
   llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILVTable::Entry>
@@ -194,6 +195,26 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
+  /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
+  llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
+
+  /// Lookup table for SILDifferentiabilityWitnesses, keyed by original
+  /// function name.
+  llvm::StringMap<llvm::SmallVector<SILDifferentiabilityWitness *, 1>>
+      DifferentiabilityWitnessesByFunction;
+
+  /// The list of SILDifferentiabilityWitnesses in the module.
+  DifferentiabilityWitnessListType differentiabilityWitnesses;
+
+  /// Declarations which are externally visible.
+  ///
+  /// These are method declarations which are referenced from inlinable
+  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// any attributes or linkage which mark them as externally visible by
+  /// default.
+  /// Currently this table is not serialized.
+  llvm::SetVector<ValueDecl *> externallyVisible;
+
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
@@ -202,17 +223,12 @@ private:
 
   // The map of SILCoverageMaps in the module.
   CoverageMapCollectionType coverageMaps;
-  
+
   // The list of SILProperties in the module.
   PropertyListType properties;
 
-  /// This is the underlying raw stream of OptRecordStream.
-  ///
-  /// It is also owned by SILModule in order to keep their lifetime in sync.
-  std::unique_ptr<llvm::raw_ostream> OptRecordRawStream;
-
-  /// If non-null, the YAML file where remarks should be recorded.
-  std::unique_ptr<llvm::yaml::Output> OptRecordStream;
+  /// The remark streamer used to serialize SIL remarks to a file.
+  std::unique_ptr<swift::SILRemarkStreamer> silRemarkStreamer;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -240,16 +256,21 @@ private:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
-  /// True if this SILModule really contains the whole module, i.e.
-  /// optimizations can assume that they see the whole module.
-  bool wholeModule;
-
   /// The options passed into this SILModule.
-  SILOptions &Options;
+  const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
+
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in non transparent functions.
+  /// This gets set in NonTransparent OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in transparent functions.
+  /// This gets set in OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForAllFuncOME;
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
@@ -258,11 +279,8 @@ private:
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
-  // Intentionally marked private so that we need to use 'constructSIL()'
-  // to construct a SILModule.
-  SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule);
+  SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+            Lowering::TypeConverter &TC, const SILOptions &Options);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -290,6 +308,19 @@ public:
   void removeDeserializationNotificationHandler(
       DeserializationNotificationHandler *handler) {
     deserializationNotificationHandlers.erase(handler);
+  }
+
+  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  }
+  bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    return regDeserializationNotificationHandlerForAllFuncOME;
+  }
+  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
+  }
+  void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
   /// Add a delete notification handler \p Handler to the module context.
@@ -328,28 +359,19 @@ public:
   /// Specialization can cause a function that was erased before by dead function
   /// elimination to become alive again. If this happens we need to remove it
   /// from the list of zombies.
-  void removeFromZombieList(StringRef Name);
+  SILFunction *removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
 
-  /// Construct a SIL module from an AST module.
+  /// Create and return an empty SIL module suitable for generating or parsing
+  /// SIL into.
   ///
-  /// The module will be constructed in the Raw stage. The provided AST module
-  /// should contain source files.
-  ///
-  /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file.
+  /// \param context The associated decl context. This should be a FileUnit in
+  /// single-file mode, and a ModuleDecl in whole-module mode.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
-               SILOptions &Options, FileUnit *sf = nullptr);
-
-  /// Create and return an empty SIL module that we can
-  /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    SILOptions &Options,
-                    bool WholeModule = false);
+  createEmptyModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                    Lowering::TypeConverter &TC, const SILOptions &Options);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
@@ -357,15 +379,15 @@ public:
   ASTContext &getASTContext() const;
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
-  /// Get the Swift DeclContext associated with this SIL module.
+  /// Get the Swift DeclContext associated with this SIL module. This is never
+  /// null.
   ///
   /// All AST declarations within this context are assumed to have been fully
   /// processed as part of generating this module. This allows certain passes
   /// to make additional assumptions about these declarations.
   ///
   /// If this is the same as TheSwiftModule, the entire module is being
-  /// compiled as a single unit. If this is null, no context-based assumptions
-  /// can be made.
+  /// compiled as a single unit.
   const DeclContext *getAssociatedContext() const {
     return AssociatedDeclContext;
   }
@@ -373,7 +395,7 @@ public:
   /// Returns true if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool isWholeModule() const {
-    return wholeModule;
+    return isa<ModuleDecl>(AssociatedDeclContext);
   }
 
   bool isStdlibModule() const;
@@ -381,7 +403,7 @@ public:
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 
-  SILOptions &getOptions() const { return Options; }
+  const SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
@@ -401,20 +423,15 @@ public:
   const_iterator zombies_begin() const { return zombieFunctions.begin(); }
   const_iterator zombies_end() const { return zombieFunctions.end(); }
 
+  llvm::ArrayRef<SILVTable*> getVTables() const {
+    return llvm::ArrayRef<SILVTable*>(vtables);
+  }
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
-  VTableListType &getVTableList() { return vtables; }
-  const VTableListType &getVTableList() const { return vtables; }
-  vtable_iterator vtable_begin() { return vtables.begin(); }
-  vtable_iterator vtable_end() { return vtables.end(); }
-  vtable_const_iterator vtable_begin() const { return vtables.begin(); }
-  vtable_const_iterator vtable_end() const { return vtables.end(); }
-  iterator_range<vtable_iterator> getVTables() {
-    return {vtables.begin(), vtables.end()};
-  }
-  iterator_range<vtable_const_iterator> getVTables() const {
-    return {vtables.begin(), vtables.end()};
-  }
+  vtable_iterator vtable_begin() { return getVTables().begin(); }
+  vtable_iterator vtable_end() { return getVTables().end(); }
+  vtable_const_iterator vtable_begin() const { return getVTables().begin(); }
+  vtable_const_iterator vtable_end() const { return getVTables().end(); }
 
   using witness_table_iterator = WitnessTableListType::iterator;
   using witness_table_const_iterator = WitnessTableListType::const_iterator;
@@ -446,6 +463,32 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
+  using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
+  DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }
+  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
+  differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
+  iterator_range<differentiability_witness_iterator>
+  getDifferentiabilityWitnesses() {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+  iterator_range<differentiability_witness_const_iterator>
+  getDifferentiabilityWitnesses() const {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+
+  void addExternallyVisibleDecl(ValueDecl *decl) {
+    externallyVisible.insert(decl);
+  }
+  bool isExternallyVisibleDecl(ValueDecl *decl) {
+    return externallyVisible.count(decl) != 0;
+  }
+
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;
   GlobalListType &getSILGlobalList() { return silGlobals; }
@@ -472,9 +515,11 @@ public:
     return coverageMaps;
   }
 
-  llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
-  void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
-                          std::unique_ptr<llvm::raw_ostream> &&RawStream);
+  swift::SILRemarkStreamer *getSILRemarkStreamer() {
+    return silRemarkStreamer.get();
+  }
+
+  void installSILRemarkStreamer();
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of
@@ -486,7 +531,7 @@ public:
 
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
-  
+
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
@@ -510,6 +555,13 @@ public:
   /// succeeded, false otherwise.
   bool loadFunction(SILFunction *F);
 
+  /// Update the linkage of the SILFunction with the linkage of the serialized
+  /// function.
+  ///
+  /// The serialized SILLinkage can differ from the linkage derived from the
+  /// AST, e.g. cross-module-optimization can change the SIL linkages.
+  void updateFunctionLinkage(SILFunction *F);
+
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.
   ///
@@ -527,10 +579,6 @@ public:
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
-
-  /// Link all definitions in all segments that are logically part of
-  /// the same AST module.
-  void linkAllFromCurrentModule();
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
@@ -562,11 +610,26 @@ public:
                                       bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C);
+  SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
+
+  /// Look up the differentiability witness with the given name.
+  SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
+
+  /// Look up the differentiability witness corresponding to the given key.
+  SILDifferentiabilityWitness *
+  lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+
+  /// Look up the differentiability witness corresponding to the given function.
+  llvm::ArrayRef<SILDifferentiabilityWitness *>
+  lookUpDifferentiabilityWitnessesForFunction(StringRef name);
+
+  /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
+  /// deserialization succeeded, false otherwise.
+  bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
@@ -595,19 +658,36 @@ public:
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
-                           ResilienceExpansion forExpansion);
+                           TypeExpansionContext forExpansion);
 
   /// Can type metadata for the given formal type be fetched in
   /// the given module?
   bool isTypeMetadataAccessible(CanType type);
 
+  /// Can type metadata necessary for value operations for the given sil type be
+  /// fetched in the given module?
+  bool isTypeMetadataForLayoutAccessible(SILType type);
+
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
 
+  /// Check if there are any leaking instructions.
+  ///
+  /// Aborts with an error if more instructions are allocated than contained in
+  /// the module.
+  void checkForLeaks() const;
+
+  /// Check if there are any leaking instructions after the SILModule is
+  /// destructed.
+  ///
+  /// The SILModule destructor already calls checkForLeaks(). This function is
+  /// useful to check if the destructor itself destroys all data structures.
+  static void checkForLeaksAfterDestruction();
+
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
-  
+
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file
@@ -617,17 +697,16 @@ public:
 
   /// Pretty-print the module to the designated stream.
   ///
-  /// \param Verbose Dump SIL location information in verbose mode.
   /// \param M If present, the types and declarations from this module will be
   ///        printed. The module would usually contain the types and Decls that
   ///        the SIL module depends on.
-  /// \param ShouldSort If set to true sorts functions, vtables, sil global
-  ///        variables, and witness tables by name to ease diffing.
+  /// \param Opts The SIL options, used to determine printing verbosity and
+  ///        and sorting.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream &OS, bool Verbose = false,
-             ModuleDecl *M = nullptr, bool ShouldSort = false,
+  void print(raw_ostream &OS, ModuleDecl *M = nullptr,
+             const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
-    SILPrintContext PrintCtx(OS, Verbose, ShouldSort);
+    SILPrintContext PrintCtx(OS, Opts);
     print(PrintCtx, M, PrintASTDecls);
   }
 
@@ -696,6 +775,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);
   return OS;
 }
+
+/// Print a simple description of a SILModule for the request evaluator.
+void simple_display(llvm::raw_ostream &out, const SILModule *M);
+
+/// Retrieve a SourceLoc for a SILModule that the request evaluator can use for
+/// diagnostics.
+SourceLoc extractNearestSourceLoc(const SILModule *SM);
 
 namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the

@@ -67,6 +67,7 @@ struct SomeStruct {
   init(width: Int) {
     self.init()
     self.width = width // expected-error {{cannot assign value of type 'Int' to type 'Measurement'}}
+    // expected-error@-1 {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
     self.height = Measurement(val: 20) // expected-error {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
@@ -74,6 +75,7 @@ struct SomeStruct {
   init(height: Int) {
     self.width = Measurement(val: 10) // expected-error {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
     self.height = height // expected-error {{cannot assign value of type 'Int' to type 'Measurement'}}
+    // expected-error@-1 {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
     self.init()
   }
 }

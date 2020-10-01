@@ -14,7 +14,6 @@
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 
 #include <string>
 
@@ -77,11 +76,27 @@ struct SupplementaryOutputPaths {
   /// visibility" within a module, that becomes very important for any sort of
   /// incremental build. These files are consumed by the Swift driver to decide
   /// whether a source file needs to be recompiled during a build. See
-  /// docs/DependencyAnalysis.rst for more information.
+  /// docs/DependencyAnalysis.md for more information.
   ///
   /// \sa swift::emitReferenceDependencies
   /// \sa DependencyGraph
   std::string ReferenceDependenciesFilePath;
+
+  /// The path to which we should output a Swift "unparsed ranges" file.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// "Unparsed ranges" track source ranges in non-primary files whose parsing
+  /// was skipped
+  /// (a.k.a. "delayed).\
+  /// These files are consumed by the Swift driver (or will be someday) to
+  /// decide whether a source file needs to be recompiled during a build.
+  ///
+  /// \sa swift::emitSwiftRanges
+  std::string SwiftRangesFilePath;
+
+  /// The path to which we should save the source code of a primary source file
+  /// to be compiled. Used to diff sources of primary inputs.
+  std::string CompiledSourceFilePath;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
@@ -133,6 +148,26 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitSwiftInterface
   std::string ModuleInterfaceOutputPath;
 
+  /// The path to which we should emit a private module interface.
+  ///
+  /// The private module interface contains all SPI decls and attributes.
+  ///
+  /// \sa ModuleInterfaceOutputPath
+  std::string PrivateModuleInterfaceOutputPath;
+
+  /// The path to a .c file where we should declare $ld$add symbols for those
+  /// symbols moved to the current module.
+  /// When symbols are moved to this module, this module declares them as HIDE
+  /// for the OS versions prior to when the move happened. On the other hand, the
+  /// original module should ADD them for these OS versions. An executable
+  /// can choose the right library to link against depending on the deployment target.
+  /// This is a walk-around that linker directives cannot specify other install
+  /// name per symbol, we should eventually remove this.
+  std::string LdAddCFilePath;
+
+  /// The path to which we should emit module summary file.
+  std::string ModuleSummaryOutputPath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
@@ -142,7 +177,7 @@ struct SupplementaryOutputPaths {
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
-           ModuleSourceInfoOutputPath.empty();
+           ModuleSourceInfoOutputPath.empty() && LdAddCFilePath.empty();
   }
 };
 } // namespace swift

@@ -14,12 +14,13 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
-#include "swift/Basic/type_traits.h"
+#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/ImmutablePointerSet.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/type_traits.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -134,6 +135,8 @@ public:
   void updateKnownSafe(bool NewValue) {
     KnownSafe |= NewValue;
   }
+
+  void clearKnownSafe() { KnownSafe = false; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -175,6 +178,9 @@ public:
   BottomUpRefCountState(BottomUpRefCountState &&) = default;
   BottomUpRefCountState &operator=(BottomUpRefCountState &&) = default;
 
+  /// Getter for LatticeState
+  LatticeState getLatticeState() const {return LatState;}
+
   /// Return true if the release can be moved to the retain.
   bool isCodeMotionSafe() const {
     return LatState != LatticeState::MightBeDecremented;
@@ -185,31 +191,27 @@ public:
   bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
                            RCIdentityFunctionInfo *RCFI);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPt is the point furthest up the CFG where we can move the currently
-  /// tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
-                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
+  /// Remove "KnownSafe" on the BottomUpRefCountState, if we find a retain
+  /// instruction with another RCIdentity can pair with the previously visited
+  /// retain instruction.
+  void checkAndResetKnownSafety(
+      SILInstruction *I, SILValue VisitedRC,
+      std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+      RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPts are the points furthest up the CFG where we can move the
-  /// currently tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   //
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
+  /// This function is conservative enough that the flow sensitive nature of
+  /// loop summarized instructions does not matter.
   void updateForDifferentLoopInst(
       SILInstruction *I,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-      AliasAnalysis *AA);
-
-  // Determine the conservative effect of the given list of predecessor
-  // terminators upon this reference count.
-  void updateForPredTerminators(
-      ArrayRef<SILInstruction *> PredTerms,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
@@ -222,6 +224,8 @@ public:
 
   /// Uninitialize the current state.
   void clear();
+
+  void dump();
 
 private:
   /// Return true if we *might* remove this instruction.
@@ -251,19 +255,14 @@ private:
   bool valueCanBeUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
-  /// the location where if \p PotentialUser is a user of this ref count, we
-  /// would insert a release.
-  bool handleUser(SILValue RCIdentity,
-                  ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                  AliasAnalysis *AA);
+  /// lattice state. Return true if we do so and false otherwise.
+  bool handleUser();
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool
   handlePotentialUser(SILInstruction *PotentialUser,
-                      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                       AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -271,25 +270,19 @@ private:
   bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
-  /// the location where if \p PotentialUser is a user of this ref count, we
-  /// would insert a release.
-  bool
-  handleGuaranteedUser(SILValue RCIdentity,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                       AliasAnalysis *AA);
+  /// lattice state. Return true if we do so and false otherwise.
+  bool handleGuaranteedUser();
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
       SILInstruction *User,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
+  bool handleRefCountInstMatch();
 };
 
 //===----------------------------------------------------------------------===//
@@ -324,6 +317,9 @@ public:
   TopDownRefCountState(TopDownRefCountState &&) = default;
   TopDownRefCountState &operator=(TopDownRefCountState &&) = default;
 
+  /// Getter for LatticeState
+  LatticeState getLatticeState() const {return LatState;}
+
   /// Return true if the retain can be moved to the release.
   bool isCodeMotionSafe() const {
     return LatState != LatticeState::MightBeUsed;
@@ -345,24 +341,27 @@ public:
   /// Uninitialize the current state.
   void clear();
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPt is the point furthest up the CFG where we can move the currently
-  /// tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   void
   updateForSameLoopInst(SILInstruction *I,
-                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
+  /// Remove "KnownSafe" on the TopDownRefCountState, if we find a retain
+  /// instruction with another RCIdentity can pair with the previously visited
+  /// retain instruction.
+  void checkAndResetKnownSafety(
+      SILInstruction *I, SILValue VisitedRC,
+      std::function<bool(SILInstruction *)> checkIfRefCountInstIsMatched,
+      RCIdentityFunctionInfo *RCIA, AliasAnalysis *AA);
 
-  /// Update this reference count's state given the instruction \p I. \p
-  /// InsertPts are the points furthest up the CFG where we can move the
-  /// currently tracked reference count.
+  /// Update this reference count's state given the instruction \p I.
   ///
   /// The main difference in between this routine and update for same loop inst
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
+  /// This function is conservative enough that the flow sensitive nature of
+  /// loop summarized instructions does not matter.
   void updateForDifferentLoopInst(
       SILInstruction *I,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Returns true if the passed in ref count inst matches the ref count inst
@@ -372,6 +371,8 @@ public:
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
   bool merge(const TopDownRefCountState &Other);
+
+  void dump();
 
 private:
   /// Can we guarantee that the given reference counted value has been modified?
@@ -383,15 +384,13 @@ private:
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+  bool handleDecrement();
 
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialDecrement(
       SILInstruction *PotentialDecrement,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -400,8 +399,7 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser,
-                  SILValue RCIdentity, AliasAnalysis *AA);
+  bool handleUser();
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
@@ -414,23 +412,18 @@ private:
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool
-  handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                       SILValue RCIdentity,
-                       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
-                       AliasAnalysis *AA);
+  bool handleGuaranteedUser();
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
       SILInstruction *PotentialGuaranteedUser,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
+  bool handleRefCountInstMatch();
 };
 
 // These static asserts are here for performance reasons.

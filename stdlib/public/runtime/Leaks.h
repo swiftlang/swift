@@ -23,21 +23,25 @@
 
 #include "../SwiftShims/Visibility.h"
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 
 namespace swift {
 struct HeapObject;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_leaks_startTrackingObjects(const char *);
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-int _swift_leaks_stopTrackingObjects(const char *);
-SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_leaks_startTrackingObject(swift::HeapObject *);
-SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_leaks_stopTrackingObject(swift::HeapObject *);
+SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
+_swift_leaks_startTrackingObjects(const char *);
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED int
+_swift_leaks_stopTrackingObjects(const char *);
+
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
+_swift_leaks_startTrackingObject(swift::HeapObject *);
+
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
+_swift_leaks_stopTrackingObject(swift::HeapObject *);
 
 #define SWIFT_LEAKS_START_TRACKING_OBJECT(obj)                                 \
   _swift_leaks_startTrackingObject(obj)

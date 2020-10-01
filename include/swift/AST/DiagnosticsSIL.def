@@ -17,30 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef REMARK
-#  define REMARK(ID,Options,Text,Signature) \
-  DIAG(REMARK,ID,Options,Text,Signature)
-#endif
-
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 // SILGen issues.
 ERROR(bridging_module_missing,none,
@@ -116,7 +94,7 @@ ERROR(unsupported_c_function_pointer_conversion,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type|<<error>}1",
+      "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
 
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
@@ -130,7 +108,7 @@ ERROR(capture_before_declaration_defer,none,
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
-#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure}0"
+#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure|autoclosure}0"
 
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
@@ -154,6 +132,10 @@ ERROR(escaping_noescape_var_capture,none,
       " captures non-escaping value", (unsigned))
 
 NOTE(value_captured_here,none,"captured here", ())
+
+NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (Identifier))
+
+NOTE(copy_self_captured_by_autoclosure,none, "pass a copy of 'self'", ())
 
 #undef SELECT_ESCAPING_CLOSURE_KIND
 
@@ -222,8 +204,6 @@ ERROR(self_inside_catch_superselfinit,none,
       "'self' used inside 'catch' block reachable from "
       "%select{super|self}0.init call",
       (unsigned))
-ERROR(return_from_init_without_initing_self,none,
-      "return from initializer before 'self.init' call or assignment to 'self'", ())
 ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
@@ -324,9 +304,6 @@ ERROR(integer_conversion_overflow_builtin_types,none,
 WARNING(integer_conversion_overflow_warn,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
-ERROR(integer_conversion_sign_error,none,
-      "negative integer cannot be converted to unsigned type %0",
-      (Type))
 ERROR(negative_integer_literal_overflow_unsigned,none,
       "negative integer '%1' overflows when stored into unsigned type %0",
       (Type, StringRef))
@@ -408,15 +385,26 @@ NOTE(constexpr_unsupported_instruction_found_here,none, "operation"
 
 NOTE(constexpr_found_callee_with_no_body, none,
     "encountered call to '%0' whose body is not available. "
-    "Imported functions must be marked '@inlinable' to constant evaluate.",
+    "Imported functions must be marked '@inlinable' to constant evaluate",
     (StringRef))
 NOTE(constexpr_callee_with_no_body, none,
     "%select{|calls a }0function whose body is not available", (bool))
+
+NOTE(constexpr_found_call_with_unknown_arg, none,
+    "encountered call to '%0' where the %1 argument is not a constant",
+    (StringRef, StringRef))
+NOTE(constexpr_call_with_unknown_arg, none,
+    "%select{|makes a }0function call with non-constant arguments", (bool))
 
 NOTE(constexpr_untracked_sil_value_use_found, none,
     "encountered use of a variable not tracked by the evaluator", ())
 NOTE(constexpr_untracked_sil_value_used_here, none,
     "untracked variable used %select{here|by this call}0", (bool))
+
+NOTE(constexpr_unevaluable_cast_found, none,
+    "encountered an unevaluable cast", ())
+NOTE(constexpr_unevaluable_cast_used_here, none,
+    "unevaluable cast encountered %select{here|by this call}0", (bool))
 
 NOTE(constexpr_unresolvable_witness_call, none,
     "encountered unresolvable witness method call: '%0'", (StringRef))
@@ -439,17 +427,116 @@ ERROR(not_constant_evaluable, none, "not constant evaluable", ())
 ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
       "function '%0' must be annotated '@_optimize(none)'", (StringRef))
 
+// Differentiation transform diagnostics
+ERROR(autodiff_internal_swift_not_imported,none,
+      "Automatic differentiation internal error: the Swift module is not "
+      "imported", ())
+ERROR(autodiff_differentiation_module_not_imported,none,
+      "Automatic differentiation requires the '_Differentiation' module to be "
+      "imported", ())
+ERROR(autodiff_conversion_to_linear_function_not_supported,none,
+      "conversion to '@differentiable(linear)' function type is not yet "
+      "supported", ())
+ERROR(autodiff_function_not_differentiable_error,none,
+      "function is not differentiable", ())
+ERROR(autodiff_expression_not_differentiable_error,none,
+      "expression is not differentiable", ())
+NOTE(autodiff_expression_not_differentiable_note,none,
+     "expression is not differentiable", ())
+NOTE(autodiff_when_differentiating_function_call,none,
+     "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
+NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
+     "differentiability required by the corresponding protocol requirement "
+     "here", ())
+NOTE(autodiff_jvp_control_flow_not_supported,none,
+     "forward-mode differentiation does not yet support control flow", ())
+NOTE(autodiff_control_flow_not_supported,none,
+     "cannot differentiate unsupported control flow", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
+NOTE(autodiff_external_nondifferentiable_function,none,
+     "cannot differentiate functions that have not been marked "
+     "'@differentiable' and that are defined in other files", ())
+NOTE(autodiff_opaque_function_not_differentiable,none,
+     "opaque non-'@differentiable' function is not differentiable", ())
+NOTE(autodiff_private_derivative_from_fragile,none,
+     "differentiated functions in "
+     "%select{'@inlinable' functions|default arguments}0 must be marked "
+     "'@differentiable' or have a public '@derivative'"
+     "%select{|; this is not possible with a closure, make a top-level "
+     "function instead}1", (unsigned, bool))
+NOTE(autodiff_function_noderivative_parameter_not_differentiable,none,
+     "cannot differentiate with respect to a '@noDerivative' parameter", ())
+NOTE(autodiff_function_assoc_func_unmet_requirements,none,
+     "function call is not differentiable because generic requirements are not "
+     "met: '%0'", (/*requirements*/ StringRef))
+NOTE(autodiff_nondifferentiable_argument,none,
+     "cannot differentiate through a non-differentiable argument; do you want "
+     "to use 'withoutDerivative(at:)'?", ())
+NOTE(autodiff_nondifferentiable_result,none,
+     "cannot differentiate through a non-differentiable result; do you want to "
+     "use 'withoutDerivative(at:)'?", ())
+NOTE(autodiff_protocol_member_not_differentiable,none,
+     "member is not differentiable because the corresponding protocol "
+     "requirement is not '@differentiable'", ())
+NOTE(autodiff_class_member_not_differentiable,none,
+     "member is not differentiable because the corresponding class member "
+     "is not '@differentiable'", ())
+NOTE(autodiff_member_subset_indices_not_differentiable,none,
+     "member is differentiable only with respect to a smaller subset of "
+     "arguments", ())
+// TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
+// functions.
+NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
+     "cannot convert a direct method reference to a '@differentiable' "
+     "function; use an explicit closure instead", ())
+NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
+     "cannot differentiate through multiple results", ())
+NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
+     "cannot differentiate through 'inout' arguments", ())
+NOTE(autodiff_enums_unsupported,none,
+     "differentiating enum values is not yet supported", ())
+NOTE(autodiff_stored_property_parent_not_differentiable,none,
+     "cannot differentiate access to property '%0.%1' because '%0' does not "
+     "conform to 'Differentiable'", (StringRef, StringRef))
+NOTE(autodiff_stored_property_not_differentiable,none,
+     "cannot differentiate access to property '%0.%1' because property type %2 "
+     "does not conform to 'Differentiable'", (StringRef, StringRef, Type))
+NOTE(autodiff_stored_property_tangent_not_struct,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector' is not a struct", (StringRef, StringRef))
+NOTE(autodiff_stored_property_no_corresponding_tangent,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector' does not have a stored property named '%1'",
+     (StringRef, StringRef))
+NOTE(autodiff_tangent_property_wrong_type,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector.%1' does not have expected type %2",
+     (StringRef, StringRef, /*originalPropertyTanType*/ Type))
+NOTE(autodiff_tangent_property_not_stored,none,
+     "cannot differentiate access to property '%0.%1' because "
+     "'%0.TangentVector.%1' is not a stored property", (StringRef, StringRef))
+NOTE(autodiff_coroutines_not_supported,none,
+     "differentiation of coroutine calls is not yet supported", ())
+NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
+     "cannot differentiate writes to global variables", ())
+NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
+     "cannot differentiate writes to mutable captures", ())
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
-      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
-      "`withUnsafePointer` or `withUnsafeBytes`", ())
+      "use 'withUnsafePointer' or 'withUnsafeBytes' unless you're implementing "
+      "'withUnsafePointer' or 'withUnsafeBytes'", ())
 ERROR(non_borrowed_indirect_addressof,none,
       "addressof only works with borrowable in-memory rvalues; "
-      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
-      "`withUnsafePointer` or `withUnsafeBytes`", ())
+      "use 'withUnsafePointer' or 'withUnsafeBytes' unless you're implementing "
+      "'withUnsafePointer' or 'withUnsafeBytes'", ())
 
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
+NOTE(opt_remark_note, none, "%0", (StringRef))
 
 // Float-point to integer conversions
 ERROR(float_to_int_overflow, none,
@@ -509,27 +596,37 @@ NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
 
 // OS log optimization diagnostics.
 
-ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
-  " the os log call", (Identifier))
+ERROR(oslog_constant_eval_trap, none, "%0", (StringRef))
 
-ERROR(oslog_dynamic_message, none, "os log methods must be passed a string "
-      "interpolation literal. 'OSLogMessage' must not be constructed explicitly",
-      ())
+ERROR(oslog_too_many_instructions, none, "interpolated expression and arguments "
+      "are too complex", ())
 
-ERROR(oslog_const_evaluation_error, none, "constant evaluating 'OSLogMessage'"
-  "implementation failed.", ())
+ERROR(oslog_invalid_log_message, none, "invalid log message; extending "
+      "types defined in the os module is not supported", ())
 
-ERROR(oslog_non_constant_message, none, "'OSLogMessage' struct is "
-      "unoptimizable: 'init' is not constant evaluable", ())
+NOTE(oslog_const_evaluable_fun_error, none, "'%0' failed evaluation", (StringRef))
 
-ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
-      "unoptimizable: 'init' is not constant evaluable", ())
+ERROR(oslog_non_constant_message, none, "'OSLogMessage' instance passed to the "
+      "log call is not a constant", ())
+
+ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' instance "
+      "passed to 'OSLogMessage.init' is not a constant", ())
 
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
-      "constant: formatting and privacy options must be literals", (StringRef))
+      "constant", (StringRef))
+
+ERROR(oslog_message_alive_after_opts, none, "string interpolation cannot "
+      "be used in this context; if you are calling an os_log function, "
+      "try a different overload", ())
+
+ERROR(oslog_message_explicitly_created, none, "'OSLogMessage' must be "
+      " created from a string interpolation or string literal", ())
+
+WARNING(oslog_call_in_unreachable_code, none, "os log call will never be "
+        "executed and may have undiagnosed errors", ())
 
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
-      "builtin must used only on string literals", ())
+      "builtin must be used only on string literals", ())
 
 ERROR(polymorphic_builtin_passed_non_trivial_non_builtin_type, none, "Argument "
       "of type %0 can not be passed as an argument to a Polymorphic "
@@ -541,12 +638,10 @@ ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
       "overload implied by passing argument of type %2",
       (Identifier, StringRef, Type))
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef REMARK
-# undef NOTE
-# undef WARNING
-# undef ERROR
-#endif
+ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
+      "Can not promote value from heap to stack due to value escaping", ())
+NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
+     "value escapes here", ())
+
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

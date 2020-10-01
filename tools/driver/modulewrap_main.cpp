@@ -27,7 +27,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
@@ -44,6 +44,7 @@ private:
   std::string OutputFilename = "-";
   llvm::Triple TargetTriple;
   std::vector<std::string> InputFilenames;
+  bool UseSharedResourceFolder = true;
 
 public:
   bool hasSingleInput() const { return InputFilenames.size() == 1; }
@@ -59,6 +60,8 @@ public:
 
   const std::vector<std::string> &getInputFilenames() { return InputFilenames; }
   llvm::Triple &getTargetTriple() { return TargetTriple; }
+
+  bool useSharedResourceFolder() { return UseSharedResourceFolder; }
 
   int parseArgs(llvm::ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
     using namespace options;
@@ -90,7 +93,8 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Module Wrapper", options::ModuleWrapOption, 0,
                        /*ShowAllAliases*/false);
@@ -108,6 +112,13 @@ public:
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
       OutputFilename = A->getValue();
+    }
+
+    if (ParsedArgs.hasFlag(OPT_static_executable, OPT_no_static_executable,
+                           false) ||
+        ParsedArgs.hasFlag(OPT_static_stdlib, OPT_no_static_stdlib, false) ||
+        ParsedArgs.hasArg(OPT_static)) {
+      UseSharedResourceFolder = false;
     }
 
     return 0;
@@ -156,26 +167,24 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   // Wrap the bitstream in a module object file. To use the ClangImporter to
   // create the module loader, we need to properly set the runtime library path.
   SearchPathOptions SearchPathOpts;
-  // FIXME: This logic has been duplicated from
-  //        CompilerInvocation::setMainExecutablePath. ModuleWrapInvocation
-  //        should share its implementation.
-  SmallString<128> RuntimeResourcePath(MainExecutablePath);
-  llvm::sys::path::remove_filename(RuntimeResourcePath); // Remove /swift
-  llvm::sys::path::remove_filename(RuntimeResourcePath); // Remove /bin
-  llvm::sys::path::append(RuntimeResourcePath, "lib", "swift");
-  SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
+  SmallString<128> RuntimeResourcePath;
+  CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+      MainExecutablePath, Invocation.useSharedResourceFolder(),
+      RuntimeResourcePath);
+  SearchPathOpts.RuntimeResourcePath = std::string(RuntimeResourcePath.str());
 
   SourceManager SrcMgr;
+  TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
+  ClangImporterOptions ClangImporterOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
+  ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
+                                        ClangImporterOpts, SrcMgr,
                                         Instance.getDiags());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
-  ClangImporterOptions ClangImporterOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
-                         true);
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;
   std::unique_ptr<Lowering::TypeConverter> TC(new Lowering::TypeConverter(*M));

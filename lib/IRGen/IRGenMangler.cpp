@@ -83,7 +83,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
-  UseObjCProtocolNames = true;
+  UseObjCRuntimeNames = true;
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
@@ -91,7 +91,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     CanSymbolicReferenceLocally(CanSymbolicReference);
 
   AllowSymbolicReferences = true;
-  CanSymbolicReference = [&IGM](SymbolicReferent s) -> bool {
+  CanSymbolicReference = [](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
@@ -119,21 +119,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
         }
       }
 
-      // TODO: ObjectMemoryReader for PE platforms still does not
-      // implement symbol relocations. For now, on non-Mach-O platforms,
-      // only symbolic reference things in the same module.
-      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO
-          && IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF) {
-        auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
-        if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
-            (!IGM.CurSourceFile ||
-             IGM.CurSourceFile != type->getParentSourceFile())) {
-          return false;
-        }
-      }
-      
       return true;
-    } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
+    } else if (s.is<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.
       return true;
     } else {
@@ -156,6 +143,8 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   });
 }
 
+
+
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
   beginMangling();
@@ -167,6 +156,21 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     appendProtocolName(protocol);
     appendOperator("MS");
   }
+  return finalize();
+}
+
+std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  if (isa<NormalProtocolConformance>(conformance)) {
+    appendProtocolConformance(conformance);
+    appendOperator("Mc");
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+    appendProtocolName(protocol);
+    appendOperator("MS");
+  }
+  appendOperator("MK");
   return finalize();
 }
 
@@ -267,7 +271,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       = '_';
     Buffer << ' ';
     if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
-      appendContext(ty);
+      appendContext(ty, ty->getAlternateModuleName());
     else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
       appendOpaqueDeclName(opaque);
     else
@@ -321,15 +325,7 @@ std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
   if (genericSig)
     appendGenericSignature(genericSig);
 
-  if (type)
-    appendType(type);
-
-  if (conformance.isConcrete())
-    appendConcreteProtocolConformance(conformance.getConcrete());
-  else if (conformance.isAbstract())
-    appendProtocolName(conformance.getAbstract());
-  else
-    assert(conformance.isInvalid() && "Unknown protocol conformance");
+  appendAnyProtocolConformance(genericSig, type, conformance);
   return finalize();
 }
 

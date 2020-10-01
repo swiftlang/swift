@@ -17,88 +17,48 @@
 #ifndef SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 #define SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 
-#include "swift/AST/LazyResolver.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
-#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/Scope.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-  class AbstractFunctionDecl;
+
+class SourceFile;
+class DeclContext;
+class IterableDeclContext;
+
+enum class CodeCompletionDelayedDeclKind {
+  TopLevelCodeDecl,
+  Decl,
+  FunctionBody,
+};
+
+class CodeCompletionDelayedDeclState {
+public:
+  CodeCompletionDelayedDeclKind Kind;
+  unsigned Flags;
+  DeclContext *ParentContext;
+  SavedScope Scope;
+  unsigned StartOffset;
+  unsigned EndOffset;
+  unsigned PrevOffset;
+
+  SavedScope takeScope() { return std::move(Scope); }
+
+  CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
+                                 unsigned Flags, DeclContext *ParentContext,
+                                 SavedScope &&Scope, unsigned StartOffset,
+                                 unsigned EndOffset, unsigned PrevOffset)
+      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
+        Scope(std::move(Scope)), StartOffset(StartOffset), EndOffset(EndOffset),
+        PrevOffset(PrevOffset) {}
+};
 
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
-public:
-  struct ParserPos {
-    SourceLoc Loc;
-    SourceLoc PrevLoc;
+  swift::ScopeInfo ScopeInfo;
 
-    bool isValid() const { return Loc.isValid(); }
-  };
-
-  class FunctionBodyState {
-    ParserPos BodyPos;
-    SavedScope Scope;
-    friend class Parser;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    FunctionBodyState(SourceRange BodyRange, SourceLoc PreviousLoc,
-                      SavedScope &&Scope)
-      : BodyPos{BodyRange.Start, PreviousLoc}, Scope(std::move(Scope))
-    {}
-  };
-
-  enum class DelayedDeclKind {
-    TopLevelCodeDecl,
-    Decl,
-  };
-
-  class DelayedDeclState {
-    friend class PersistentParserState;
-    friend class Parser;
-    DelayedDeclKind Kind;
-    unsigned Flags;
-    DeclContext *ParentContext;
-    ParserPos BodyPos;
-    SourceLoc BodyEnd;
-    SavedScope Scope;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    DelayedDeclState(DelayedDeclKind Kind, unsigned Flags,
-                     DeclContext *ParentContext, SourceRange BodyRange,
-                     SourceLoc PreviousLoc, SavedScope &&Scope)
-      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
-        BodyPos{BodyRange.Start, PreviousLoc},
-        BodyEnd(BodyRange.End), Scope(std::move(Scope))
-    {}
-  };
-
-  bool InPoundLineEnvironment = false;
-  // FIXME: When condition evaluation moves to a later phase, remove this bit
-  // and adjust the client call 'performParseOnly'.
-  bool PerformConditionEvaluation = true;
-private:
-  ScopeInfo ScopeInfo;
-  using DelayedFunctionBodiesTy =
-      llvm::DenseMap<AbstractFunctionDecl *,
-                     std::unique_ptr<FunctionBodyState>>;
-  DelayedFunctionBodiesTy DelayedFunctionBodies;
-
-  /// Parser sets this if it stopped parsing before the buffer ended.
-  ParserPosition MarkedPos;
-
-  std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
-
-  std::vector<IterableDeclContext *> DelayedDeclLists;
+  std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
@@ -109,48 +69,35 @@ public:
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
-  void delayDecl(DelayedDeclKind Kind, unsigned Flags,
-                 DeclContext *ParentContext,
-                 SourceRange BodyRange, SourceLoc PreviousLoc);
+  void setCodeCompletionDelayedDeclState(SourceManager &SM, unsigned BufferID,
+                                         CodeCompletionDelayedDeclKind Kind,
+                                         unsigned Flags,
+                                         DeclContext *ParentContext,
+                                         SourceRange BodyRange,
+                                         SourceLoc PreviousLoc);
+  void restoreCodeCompletionDelayedDeclState(
+      const CodeCompletionDelayedDeclState &other);
 
-  void delayDeclList(IterableDeclContext *D);
-
-  void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
-                     SourceLoc PreviousLoc);
-
-  bool hasDelayedDecl() {
-    return CodeCompletionDelayedDeclState.get() != nullptr;
-  }
-  DelayedDeclKind getDelayedDeclKind() {
-    return CodeCompletionDelayedDeclState->Kind;
-  }
-  SourceLoc getDelayedDeclLoc() {
-    return CodeCompletionDelayedDeclState->BodyPos.Loc;
-  }
-  DeclContext *getDelayedDeclContext() {
-    return CodeCompletionDelayedDeclState->ParentContext;
-  }
-  std::unique_ptr<DelayedDeclState> takeDelayedDeclState() {
-    return std::move(CodeCompletionDelayedDeclState);
+  bool hasCodeCompletionDelayedDeclState() const {
+    return CodeCompletionDelayedDeclStat.get() != nullptr;
   }
 
-  void parseAllDelayedDeclLists();
+  CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
+    return *CodeCompletionDelayedDeclStat.get();
+  }
+  const CodeCompletionDelayedDeclState &
+  getCodeCompletionDelayedDeclState() const {
+    return *CodeCompletionDelayedDeclStat.get();
+  }
+
+  std::unique_ptr<CodeCompletionDelayedDeclState>
+  takeCodeCompletionDelayedDeclState() {
+    assert(hasCodeCompletionDelayedDeclState());
+    return std::move(CodeCompletionDelayedDeclStat);
+  }
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;
-  }
-
-  void markParserPosition(ParserPosition Pos,
-                          bool InPoundLineEnvironment) {
-    MarkedPos = Pos;
-    this->InPoundLineEnvironment = InPoundLineEnvironment;
-  }
-
-  /// Returns the marked parser position and resets it.
-  ParserPosition takeParserPosition() {
-    ParserPosition Pos = MarkedPos;
-    MarkedPos = ParserPosition();
-    return Pos;
   }
 };
 

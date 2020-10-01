@@ -16,6 +16,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
@@ -25,72 +26,52 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static void
+translateConformingMethodListOptions(OptionsDictionary &from,
+                                     ConformingMethodList::Options &to) {
+  // ConformingMethodList doesn't receive any options at this point.
+}
+
 static bool swiftConformingMethodListImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ArrayRef<const char *> Args,
     ArrayRef<const char *> ExpectedTypeNames,
-    ide::ConformingMethodListConsumer &Consumer, std::string &Error) {
-  auto bufferIdentifier =
-      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
+    ide::ConformingMethodListConsumer &Consumer,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  return Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      [&](CompilerInstance &CI, bool reusingASTContext) {
+        // Create a factory for code completion callbacks that will feed the
+        // Consumer.
+        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+            ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
+                                                          Consumer));
 
-  auto origOffset = Offset;
-  auto newBuffer = SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
-
-  CompilerInstance CI;
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
-  EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
-  if (TracedOp.enabled()) {
-    CI.addDiagnosticConsumer(&TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
-    TracedOp.setDiagnosticProvider(
-        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(
-        SwiftArgs,
-        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
-         std::make_pair("Offset", std::to_string(Offset))});
-  }
-
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
-                                                    Consumer));
-
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
-
-  return true;
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
+      });
 }
 
 void SwiftLangSupport::getConformingMethodList(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypeNames,
-    SourceKit::ConformingMethodListConsumer &SKConsumer) {
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypeNames,
+    SourceKit::ConformingMethodListConsumer &SKConsumer,
+    Optional<VFSOptions> vfsOptions) {
+  std::string error;
+
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return SKConsumer.failed(error);
+
+  ConformingMethodList::Options options;
+  if (optionsDict) {
+    translateConformingMethodListOptions(*optionsDict, options);
+  }
 
   class Consumer : public ide::ConformingMethodListConsumer {
     SourceKit::ConformingMethodListConsumer &SKConsumer;
@@ -100,7 +81,7 @@ void SwiftLangSupport::getConformingMethodList(
         : SKConsumer(SKConsumer) {}
 
     /// Convert an IDE result to a SK result and send it to \c SKConsumer .
-    void handleResult(const ide::ConformingMethodListResult &Result) {
+    void handleResult(const ide::ConformingMethodListResult &Result) override {
       SmallString<512> SS;
       llvm::raw_svector_ostream OS(SS);
 
@@ -140,7 +121,7 @@ void SwiftLangSupport::getConformingMethodList(
 
         // Name.
         memberElem.DeclNameBegin = SS.size();
-        member->getFullName().print(OS);
+        member->getName().print(OS);
         memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Type name.
@@ -204,11 +185,15 @@ void SwiftLangSupport::getConformingMethodList(
 
       SKConsumer.handleResult(SKResult);
     }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
+    }
   } Consumer(SKConsumer);
 
-  std::string Error;
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
-                                     ExpectedTypeNames, Consumer, Error)) {
-    SKConsumer.failed(Error);
+                                     ExpectedTypeNames, Consumer, fileSystem,
+                                     error)) {
+    SKConsumer.failed(error);
   }
 }

@@ -62,15 +62,15 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+bool SourceLoader::canImportModule(ImportPath::Element ID) {
   // Search the memory buffers to see if we can find this file on disk.
-  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
-                                            ID.second);
+  FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
+                                            ID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
-                         ID.first, err.message());
+      Ctx.Diags.diagnose(ID.Loc, diag::sema_opening_import,
+                         ID.Item, err.message());
     }
 
     return false;
@@ -79,21 +79,20 @@ bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ArrayRef<std::pair<Identifier,
-                                     SourceLoc>> path) {
+                                     ImportPath::Module path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
 
   auto moduleID = path[0];
 
-  FileOrError inputFileOrError = findModule(Ctx, moduleID.first.str(),
-                                            moduleID.second);
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.Item.str(),
+                                            moduleID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first, err.message());
+      Ctx.Diags.diagnose(moduleID.Loc, diag::sema_opening_import,
+                         moduleID.Item, err.message());
     }
 
     return nullptr;
@@ -105,10 +104,6 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
                                      /*isSystem=*/false);
 
-  // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
-                                          false);
-
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
@@ -116,28 +111,22 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
+                                                : ImplicitStdlibKind::None;
+
+  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.first] = importMod;
+  Ctx.addLoadedModule(importMod);
 
-  auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
-  if (!Ctx.getStdlibModule())
-    implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
-
-  auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID, implicitImportKind,
-                                          Ctx.LangOpts.CollectParsedToken,
-                                          Ctx.LangOpts.BuildSyntaxTree);
+  auto *importFile =
+      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
   importMod->addFile(*importFile);
-
-  bool done;
-  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, nullptr);
-  assert(done && "Parser returned early?");
-  (void)done;
-
-  performNameBinding(*importFile);
+  performImportResolution(*importFile);
   importMod->setHasResolvedImports();
+  bindExtensions(*importMod);
   return importMod;
 }
 

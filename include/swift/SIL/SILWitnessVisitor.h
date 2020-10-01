@@ -122,14 +122,19 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(accessor))
+      if (SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+        addAutoDiffDerivativeMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
+      }
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    if (SILDeclRef::requiresNewWitnessTableEntry(cd))
+    if (SILDeclRef::requiresNewWitnessTableEntry(cd)) {
       asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+      addAutoDiffDerivativeMethodsIfRequired(cd, SILDeclRef::Kind::Allocator);
+    }
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -138,8 +143,10 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func))
+    if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    }
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -165,6 +172,26 @@ public:
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
     // We don't care about diagnostics at this stage.
+  }
+
+private:
+  void addAutoDiffDerivativeMethodsIfRequired(AbstractFunctionDecl *AFD,
+                                              SILDeclRef::Kind kind) {
+    SILDeclRef declRef(AFD, kind);
+    for (auto *diffAttr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
+    }
   }
 };
 

@@ -1534,7 +1534,7 @@ class infer_instanceVar2<
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
-// CHECK-LABEL: @objc class infer_instanceVar3 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_instanceVar3 : Class_ObjC1 {
 
   var v1: Int = 0
 // CHECK-LABEL: @objc @_hasInitialValue var v1: Int
@@ -1599,13 +1599,13 @@ protocol infer_throughConformanceProto1 {
 }
 
 class infer_class1 : PlainClass {}
-// CHECK-LABEL: {{^}}class infer_class1 : PlainClass {
+// CHECK-LABEL: {{^}}@_inheritsConvenienceInitializers class infer_class1 : PlainClass {
 
 class infer_class2 : Class_ObjC1 {}
-// CHECK-LABEL: @objc class infer_class2 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class2 : Class_ObjC1 {
 
 class infer_class3 : infer_class2 {}
-// CHECK-LABEL: @objc class infer_class3 : infer_class2 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class3 : infer_class2 {
 
 class infer_class4 : Protocol_Class1 {}
 // CHECK-LABEL: {{^}}class infer_class4 : Protocol_Class1 {
@@ -1653,9 +1653,9 @@ protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 
 class C {
   // Don't crash.
-  @objc func foo(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
-  @IBAction func myAction(sender: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
-  @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}}
+  @objc func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @IBAction func myAction(sender: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}}
 }
 
 //===---
@@ -2374,4 +2374,10 @@ class SR_9035_C {}
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
   func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
+}
+
+// SR-12801: Make sure we reject an @objc generic subscript.
+class SR12801 {
+  @objc subscript<T>(foo : [T]) -> Int { return 0 }
+  // expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }

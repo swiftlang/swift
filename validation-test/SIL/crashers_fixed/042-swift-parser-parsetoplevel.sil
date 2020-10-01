@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+class a 4{sil_vtable a

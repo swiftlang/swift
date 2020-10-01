@@ -49,6 +49,8 @@ struct OpenedArchetypeInfo {
     assert(!OpenedArchetype || (OpenedArchetypeValue && ExistentialValue));
     return OpenedArchetype;
   }
+  
+  void dump() const;
 };
 
 /// Record conformance and concrete type info derived from an init_existential
@@ -98,11 +100,12 @@ struct ConcreteExistentialInfo {
   // Do a conformance lookup on ConcreteType with the given requirement, P. If P
   // is satisfiable based on the existential's conformance, return the new
   // conformance on P. Otherwise return None.
-  Optional<ProtocolConformanceRef>
-  lookupExistentialConformance(ProtocolDecl *P) const {
+  ProtocolConformanceRef lookupExistentialConformance(ProtocolDecl *P) const {
     CanType selfTy = P->getSelfInterfaceType()->getCanonicalType();
     return ExistentialSubs.lookupConformance(selfTy, P);
   }
+  
+  void dump() const;
 
 private:
   void initializeSubstitutionMap(
@@ -132,6 +135,8 @@ struct ConcreteOpenedExistentialInfo {
     assert(CEI->isValid());
     return true;
   }
+  
+  void dump() const;
 };
 
 } // end namespace swift

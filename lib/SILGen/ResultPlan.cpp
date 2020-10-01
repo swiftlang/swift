@@ -71,7 +71,7 @@ public:
   void dump(SILGenFunction &SGF) const override {
     llvm::errs() << "IndirectOpenedSelfCleanup\n";
     if (box)
-      box->dump();
+      box->print(llvm::errs());
   }
 };
 
@@ -105,8 +105,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
     MakeAbstractConformanceForGenericType());
 
   return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
-                         mappedSig->getCanonicalSignature(),
-                         mappedSubs);
+                         mappedSig.getCanonicalSignature(), mappedSubs);
 }
 
 /// A result plan for an indirectly-returned opened existential value.
@@ -149,11 +148,11 @@ public:
     SubstitutionMap layoutSubs;
     std::tie(layoutTy, layoutSig, layoutSubs)
       = mapTypeOutOfOpenedExistentialContext(resultTy);
-    
-    auto boxLayout = SILLayout::get(SGF.getASTContext(),
-      layoutSig->getCanonicalSignature(),
-      SILField(layoutTy->getCanonicalType(layoutSig), true));
-    
+
+    auto boxLayout =
+        SILLayout::get(SGF.getASTContext(), layoutSig.getCanonicalSignature(),
+                       SILField(layoutTy->getCanonicalType(layoutSig), true));
+
     resultBox = SGF.B.createAllocBox(loc,
       SILBoxType::get(SGF.getASTContext(),
                       boxLayout,
@@ -250,7 +249,8 @@ public:
                                          origType.getType(), substType,
                                          loweredResultTy);
         } else {
-          return Conversion::getOrigToSubst(origType, substType);
+          return Conversion::getOrigToSubst(origType, substType,
+                                            loweredResultTy);
         }
       }();
 
@@ -473,7 +473,8 @@ public:
         substFnType->getParameters()[errorParamIndex];
     // We assume that there's no interesting reabstraction here beyond a layer
     // of optional.
-    errorPtrType = errorParameter.getArgumentType(SGF.SGM.M, substFnType);
+    errorPtrType = errorParameter.getArgumentType(
+        SGF.SGM.M, substFnType, SGF.getTypeExpansionContext());
     unwrappedPtrType = errorPtrType;
     Type unwrapped = errorPtrType->getOptionalObjectType();
     isOptional = (bool) unwrapped;
@@ -572,8 +573,10 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   case ForeignErrorConvention::NilResult: {
     assert(allResults.size() == 1);
     auto substFnTy = calleeTypeInfo.substFnType;
-    CanType objectType = allResults[0].getReturnValueType(SGF.SGM.M, substFnTy)
-                                      .getOptionalObjectType();
+    CanType objectType = allResults[0]
+                             .getReturnValueType(SGF.SGM.M, substFnTy,
+                                                 SGF.getTypeExpansionContext())
+                             .getOptionalObjectType();
     SILResultInfo optResult = allResults[0].getWithInterfaceType(objectType);
     allResults.clear();
     allResults.push_back(optResult);
@@ -608,8 +611,9 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   if (init && init->canPerformInPlaceInitialization() &&
       SGF.silConv.isSILIndirect(result) &&
       !SGF.getLoweredType(substType).getAddressType().hasAbstractionDifference(
-            calleeTypeInfo.getOverrideRep(),
-            result.getSILStorageType(SGF.SGM.M, calleeTy))) {
+          calleeTypeInfo.getOverrideRep(),
+          result.getSILStorageType(SGF.SGM.M, calleeTy,
+                                   SGF.getTypeExpansionContext()))) {
     return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
   }
 
@@ -624,8 +628,11 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // then we need to evaluate the arguments first in order to have access to
   // the opened Self type. A special result plan defers allocating the stack
   // slot to the point the call is emitted.
-  if (result.getReturnValueType(SGF.SGM.M, calleeTy)->hasOpenedExistential()
-      && SGF.silConv.isSILIndirect(result)) {
+  if (result
+          .getReturnValueType(SGF.SGM.M, calleeTy,
+                              SGF.getTypeExpansionContext())
+          ->hasOpenedExistential() &&
+      SGF.silConv.isSILIndirect(result)) {
     return ResultPlanPtr(
       new IndirectOpenedSelfResultPlan(SGF, origType, substType));
   }
@@ -633,8 +640,8 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Create a temporary if the result is indirect.
   std::unique_ptr<TemporaryInitialization> temporary;
   if (SGF.silConv.isSILIndirect(result)) {
-    auto &resultTL = SGF.getTypeLowering(
-                               result.getReturnValueType(SGF.SGM.M, calleeTy));
+    auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
+        SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));
     temporary = SGF.emitTemporary(loc, resultTL);
   }
 

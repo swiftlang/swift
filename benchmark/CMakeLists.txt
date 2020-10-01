@@ -51,6 +51,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChaCha
     single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
@@ -61,6 +62,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
+    single-source/DevirtualizeProtocolComposition
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
@@ -89,12 +91,14 @@ set(SWIFT_BENCH_MODULES
     single-source/Fibonacci
     single-source/FindStringNaive
     single-source/FlattenList
+    single-source/FloatingPointConversion
     single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/Histogram
-    single-source/InsertCharacter  
+    single-source/HTTP2StateMachine
+    single-source/InsertCharacter
     single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
@@ -105,6 +109,7 @@ set(SWIFT_BENCH_MODULES
     single-source/LuhnAlgoLazy
     single-source/MapReduce
     single-source/Memset
+    single-source/Mirror
     single-source/MonteCarloE
     single-source/MonteCarloPi
     single-source/NSDictionaryCastToSwift
@@ -132,6 +137,7 @@ set(SWIFT_BENCH_MODULES
     single-source/PrefixWhile
     single-source/Prims
     single-source/PrimsNonStrongRef
+    single-source/ProtocolConformance
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
     single-source/Queue
@@ -139,6 +145,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/Radix2CooleyTukey
     single-source/RandomShuffle
+    single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
@@ -224,6 +231,9 @@ endif()
 set(SWIFT_BENCHMARK_EXTRA_FLAGS "" CACHE STRING
     "Extra options to pass to swiftc when building the benchmarks")
 
+set(SWIFT_BENCHMARK_UNOPTIMIZED_DRIVER NO CACHE BOOL
+    "Build the benchmark driver utilites without optimization (default: no)")
+
 if (SWIFT_BENCHMARK_BUILT_STANDALONE)
   # This option's value must match the value of the same option used when
   # building the swift runtime.
@@ -246,6 +256,10 @@ option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
 
 set(SWIFT_BENCHMARK_OPT_VIEWER "" CACHE FILEPATH
   "Path to opt-viewer")
+
+option(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO
+  "Produce debug info for benchmarks"
+  TRUE)
 
 if(SWIFT_BENCHMARK_OPT_VIEWER)
   # If the path to the opt-viewer was specified manually and we have no access

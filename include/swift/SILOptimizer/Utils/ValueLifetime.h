@@ -28,18 +28,39 @@ namespace swift {
 /// of the analysis and can be a super set of the uses of the SILValue
 /// e.g. it can be the set of transitive uses of the SILValue.
 class ValueLifetimeAnalysis {
+  /// The instruction or argument that define the value.
+  PointerUnion<SILInstruction *, SILArgument *> defValue;
+
+  /// The set of blocks where the value is live.
+  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
+
+  /// The set of instructions where the value is used, or the users-list
+  /// provided with the constructor.
+  llvm::SmallPtrSet<SILInstruction *, 16> userSet;
+
+  /// Indicates whether the basic block containing def has users of def that
+  /// precede def. This field is initialized by propagateLiveness.
+  bool hasUsersBeforeDef;
+
+  /// Critical edges that couldn't be split to compute the frontier. This could
+  /// be non-empty when the analysis is invoked with DontModifyCFG mode.
+  llvm::SmallVector<std::pair<TermInst *, unsigned>, 16> criticalEdges;
+
 public:
 
   /// The lifetime frontier for the value. It is the list of instructions
   /// following the last uses of the value. All the frontier instructions
   /// end the value's lifetime.
-  typedef llvm::SmallVector<SILInstruction *, 4> Frontier;
+  using Frontier = SmallVector<SILInstruction *, 4>;
 
-  /// Constructor for the value \p Def with a specific set of users of Def's
-  /// users.
-  ValueLifetimeAnalysis(SILInstruction *def,
-                        ArrayRef<SILInstruction *> userList)
-      : defValue(def), userSet(userList.begin(), userList.end()) {
+  /// Constructor for the value \p def with a specific range of users.
+  ///
+  /// We templatize over the RangeTy so that we can initialize
+  /// ValueLifetimeAnalysis with misc iterators including transform
+  /// iterators.
+  template <typename RangeTy>
+  ValueLifetimeAnalysis(decltype(defValue) def, const RangeTy &userRange)
+      : defValue(def), userSet(userRange.begin(), userRange.end()) {
     propagateLiveness();
   }
 
@@ -79,6 +100,9 @@ public:
   /// instructions of the frontier that are not in the critical edges. Note that
   /// the method getCriticalEdges can be used to retrieve the critical edges.
   ///
+  /// An edge is also considered as "critical" if it has a single precedessor
+  /// but the predecessor's terminal instruction is a user of the value.
+  ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &frontier, Mode mode,
@@ -96,7 +120,7 @@ public:
   /// Returns true if the value is alive at the begin of block \p bb.
   bool isAliveAtBeginOfBlock(SILBasicBlock *bb) {
     return liveBlocks.count(bb) &&
-           (bb != defValue->getParent() || hasUsersBeforeDef);
+           (hasUsersBeforeDef || bb != getDefValueParentBlock());
   }
 
   /// Checks if there is a dealloc_ref inside the value's live range.
@@ -106,24 +130,19 @@ public:
   void dump() const;
 
 private:
+  SILFunction *getFunction() const {
+    if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
+      return inst->getFunction();
+    }
+    return defValue.get<SILArgument *>()->getFunction();
+  }
 
-  /// The value.
-  SILInstruction *defValue;
-
-  /// The set of blocks where the value is live.
-  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
-
-  /// The set of instructions where the value is used, or the users-list
-  /// provided with the constructor.
-  llvm::SmallPtrSet<SILInstruction *, 16> userSet;
-
-  /// Indicates whether the basic block containing def has users of def that
-  /// precede def. This field is initialized by propagateLiveness.
-  bool hasUsersBeforeDef;
-
-  /// Critical edges that couldn't be split to compute the frontier. This could
-  /// be non-empty when the analysis is invoked with DontModifyCFG mode.
-  llvm::SmallVector<std::pair<TermInst *, unsigned>, 16> criticalEdges;
+  SILBasicBlock *getDefValueParentBlock() const {
+    if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
+      return inst->getParent();
+    }
+    return defValue.get<SILArgument *>()->getParent();
+  }
 
   /// Propagates the liveness information up the control flow graph.
   void propagateLiveness();
@@ -132,6 +151,15 @@ private:
   SILInstruction *findLastUserInBlock(SILBasicBlock *bb);
 };
 
+/// Destroys \p valueOrStackLoc at \p frontier.
+///
+/// If  \p valueOrStackLoc is an alloc_stack, inserts destroy_addr and
+/// dealloc_stack at each instruction of the \p frontier.
+/// Otherwise \p valueOrStackLoc must be a value type and in this case, inserts
+/// destroy_value at each instruction of the \p frontier.
+void endLifetimeAtFrontier(SILValue valueOrStackLoc,
+                           const ValueLifetimeAnalysis::Frontier &frontier,
+                           SILBuilderContext &builderCtxt);
 
 } // end namespace swift
 

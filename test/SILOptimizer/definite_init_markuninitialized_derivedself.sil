@@ -63,8 +63,8 @@ sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 sil [ossa] @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
-  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  %1a = mark_uninitialized [derivedself] %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %3 = project_box %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   store %0 to [init] %3 : $*DerivedClassWithIVars
 
   // Get an int
@@ -87,7 +87,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 
   // Finally perform the epilog.
   %18 = load [copy] %3 : $*DerivedClassWithIVars
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  destroy_value %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }
 
@@ -112,8 +112,8 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 sil [ossa] @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
-  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  %1a = mark_uninitialized [derivedself] %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %3 = project_box %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   store %0 to [init] %3 : $*DerivedClassWithIVars
 
   %11 = load [take] %3 : $*DerivedClassWithIVars
@@ -124,7 +124,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
   store %16 to [init] %3 : $*DerivedClassWithIVars
 
   %18 = load [copy] %3 : $*DerivedClassWithIVars
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  destroy_value %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }
 
@@ -195,7 +195,9 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // Now we destroy the stored value.
 // CHECK: [[SELF:%[0-9]+]] = load_borrow [[SELFBOX]]
 // CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[SELF]]
-// CHECK: destroy_addr [[SELF_FIELD]]
+// CHECK: [[SELF_FIELD_ACCESS:%.*]] = begin_access [deinit] [static] [[SELF_FIELD]]
+// CHECK: destroy_addr [[SELF_FIELD_ACCESS]]
+// CHECK: end_access [[SELF_FIELD_ACCESS]]
 // CHECK: end_borrow [[SELF]]
 //
 // And then perform dealloc_partial_ref.
@@ -246,8 +248,8 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 sil [ossa] @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars, %i : $Int):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
-  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  %1a = mark_uninitialized [derivedself] %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %3 = project_box %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   store %0 to [init] %3 : $*DerivedClassWithIVars
 
   // Initialize properties in derived class.
@@ -274,6 +276,6 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : $Int):
   %16 = unchecked_ref_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   store %16 to [init] %3 : $*DerivedClassWithIVars
   %18 = load [copy] %3 : $*DerivedClassWithIVars
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  destroy_value %1a : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   return %18 : $DerivedClassWithIVars
 }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+@_spi(Foundation) import Swift
 
 //===----------------------------------------------------------------------===//
 // New Strings
@@ -32,7 +33,7 @@ extension String : _ObjectiveCBridgeable {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(

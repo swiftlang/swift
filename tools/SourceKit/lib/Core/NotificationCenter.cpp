@@ -34,8 +34,8 @@ void NotificationCenter::postDocumentUpdateNotification(
   {
     llvm::sys::ScopedLock L(Mtx);
     recvs = DocUpdReceivers;
-  }  
-  std::string docName = DocumentName;
+  }
+  std::string docName = DocumentName.str();
   auto sendNote = [recvs, docName]{
     for (auto &Fn : recvs)
       Fn(docName);

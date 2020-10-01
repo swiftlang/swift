@@ -35,18 +35,18 @@ public struct HasStoredProperties {
   public var simpleStoredMutable: Int
 
   // CHECK: @_hasStorage public var storedWithObservers: Swift.Bool {
-  // RESILIENT: {{^}}  public var storedWithObservers: Swift.Bool {
-  // COMMON-NEXT: get
-  // COMMON-NEXT: set
-  // COMMON-NEXT: }
+  // RESILIENT:   {{^}}  public var storedWithObservers: Swift.Bool {
+  // COMMON-NEXT: {{^}}    get
+  // COMMON-NEXT: {{^}}    set
+  // COMMON-NEXT: {{^}}  }
   public var storedWithObservers: Bool {
     willSet {}
   }
 
   // CHECK: @_hasStorage public var storedPrivateSet: Swift.Int {
-  // RESILIENT: {{^}}  public var storedPrivateSet: Swift.Int {
-  // COMMON-NEXT: get
-  // COMMON-NEXT: }
+  // RESILIENT:   {{^}}  public var storedPrivateSet: Swift.Int {
+  // COMMON-NEXT: {{^}}    get
+  // COMMON-NEXT: {{^}}  }
   public private(set) var storedPrivateSet: Int
 
   // CHECK: private var privateVar: Swift.Bool
@@ -54,10 +54,10 @@ public struct HasStoredProperties {
   private var privateVar: Bool
 
   // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: Swift.Int {
-  // RESILIENT: {{^}}  public var storedWithObserversInitialValue: Swift.Int {
-  // COMMON-NEXT: get
-  // COMMON-NEXT: set
-  // COMMON-NEXT: }
+  // RESILIENT:   {{^}}  public var storedWithObserversInitialValue: Swift.Int {
+  // COMMON-NEXT: {{^}}    get
+  // COMMON-NEXT: {{^}}    set
+  // COMMON-NEXT: {{^}}  }
   public var storedWithObserversInitialValue: Int = 0 {
     didSet {}
   }
@@ -83,6 +83,9 @@ public struct BagOfVariables {
   // COMMON: public let a: Swift.Int = 0
   public let a: Int = 0
 
+  // COMMON: public let (x, y): (Swift.Int, Swift.Int) = (0, 0)
+  public let (x, y) = (0, 0)
+
   // COMMON: public var b: Swift.Bool = false
   public var b: Bool = false
 
@@ -101,10 +104,10 @@ public struct HasStoredPropertiesFixedLayout {
   // COMMON: public var simpleStoredMutable: StoredProperties.BagOfVariables
   public var simpleStoredMutable: BagOfVariables
 
-  // COMMON: @_hasStorage public var storedWithObservers: StoredProperties.BagOfVariables {
-  // COMMON-NEXT: get
-  // COMMON-NEXT: set
-  // COMMON-NEXT: }
+  // COMMON:      {{^}} @_hasStorage public var storedWithObservers: StoredProperties.BagOfVariables {
+  // COMMON-NEXT: {{^}}    get
+  // COMMON-NEXT: {{^}}    set
+  // COMMON-NEXT: {{^}} }
   public var storedWithObservers: BagOfVariables {
     didSet {}
   }

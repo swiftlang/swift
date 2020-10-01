@@ -453,8 +453,21 @@ private:
         continue;
       }
 
-      AvailabilityContext NewConstraint = contextForSpec(Spec);
-      Query->setAvailableRange(NewConstraint.getOSVersion());
+      AvailabilityContext NewConstraint = contextForSpec(Spec, false);
+      Query->setAvailableRange(contextForSpec(Spec, true).getOSVersion());
+
+      // When compiling zippered for macCatalyst, we need to collect both
+      // a macOS version (the target version) and an iOS/macCatalyst version
+      // (the target-variant). These versions will both be passed to a runtime
+      // entrypoint that will check either the macOS version or the iOS
+      // version depending on the kind of process this code is loaded into.
+      if (Context.LangOpts.TargetVariant) {
+        AvailabilitySpec *VariantSpec =
+            bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
+        VersionRange VariantRange =
+            contextForSpec(VariantSpec, true).getOSVersion();
+        Query->setVariantAvailableRange(VariantRange);
+      }
 
       if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
         // The wildcard spec '*' represents the minimum deployment target, so
@@ -480,9 +493,18 @@ private:
         // required compatibility version is different than the deployment
         // target).
         if (CurrentTRC->getReason() != TypeRefinementContext::Reason::Root) {
+          PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
+          auto *PlatformSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+          // If possible, try to report the diagnostic in terms for the
+          // platform the user uttered in the '#available()'. For a platform
+          // that inherits availability from another platform it may be
+          // different from the platform specified in the target triple.
+          if (PlatformSpec)
+            BestPlatform = PlatformSpec->getPlatform();
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
-                         platformString(targetPlatform(Context.LangOpts)));
+                         platformString(BestPlatform));
           Diags.diagnose(CurrentTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
@@ -503,7 +525,7 @@ private:
           Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
-      NestedCount++;
+      ++NestedCount;
     }
 
 
@@ -535,8 +557,11 @@ private:
 
   /// Return the best active spec for the target platform or nullptr if no
   /// such spec exists.
-  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available) {
+  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
+                                           bool forTargetVariant = false) {
     OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
+    PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
+
     for (auto *Spec : available->getQueries()) {
       if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
         FoundOtherSpec = OtherSpec;
@@ -551,10 +576,18 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts)) {
-        return VersionSpec;
+      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
+                           forTargetVariant)) {
+        if (!BestSpec ||
+            inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
+                                             BestSpec->getPlatform())) {
+          BestSpec = VersionSpec;
+        }
       }
     }
+
+    if (BestSpec)
+      return BestSpec;
 
     // If we have reached this point, we found no spec for our target, so
     // we return the other spec ('*'), if we found it, or nullptr, if not.
@@ -562,13 +595,19 @@ private:
   }
 
   /// Return the availability context for the given spec.
-  AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
+  AvailabilityContext contextForSpec(AvailabilitySpec *Spec,
+                                    bool GetRuntimeContext) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       return AvailabilityContext::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
+
+    llvm::VersionTuple Version = (GetRuntimeContext ?
+                                    VersionSpec->getRuntimeVersion() :
+                                    VersionSpec->getVersion());
+
+    return AvailabilityContext(VersionRange::allGTE(Version));
   }
 
   Expr *walkToExprPost(Expr *E) override {
@@ -582,14 +621,8 @@ private:
   
 } // end anonymous namespace
 
-void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                      unsigned StartElem) {
+void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
-
-  // If we are not starting at the beginning of the source file, we had better
-  // already have a root type refinement context.
-  assert(StartElem == 0 || RootTRC);
-
   ASTContext &Context = SF.getASTContext();
 
   if (!RootTRC) {
@@ -604,7 +637,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, Context);
-  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+  for (auto D : SF.getTopLevelDecls()) {
     Builder.build(D);
   }
 }
@@ -613,7 +646,7 @@ TypeRefinementContext *
 TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   TypeRefinementContext *TRC = SF->getTypeRefinementContext();
   if (!TRC) {
-    buildTypeRefinementContextHierarchy(*SF, 0);
+    buildTypeRefinementContextHierarchy(*SF);
     TRC = SF->getTypeRefinementContext();
   }
 
@@ -728,7 +761,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
-  diagnosePotentialUnavailability(D, D->getFullName(), ReferenceRange,
+  diagnosePotentialUnavailability(D, D->getName(), ReferenceRange,
                                   ReferenceDC, Reason);
 }
 
@@ -904,8 +937,9 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   if (!SF)
     return nullptr;
 
-  auto BestTopLevelDecl = llvm::find_if(SF->Decls, ContainsReferenceRange);
-  if (BestTopLevelDecl != SF->Decls.end())
+  auto BestTopLevelDecl = llvm::find_if(SF->getTopLevelDecls(),
+                                        ContainsReferenceRange);
+  if (BestTopLevelDecl != SF->getTopLevelDecls().end())
     return *BestTopLevelDecl;
 
   return nullptr;
@@ -1101,7 +1135,8 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
       [](ASTNode Node, ASTWalker::ParentTy Parent) {
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
-          if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
+          if (!ParentClosure ||
+              ParentClosure->isSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
@@ -1218,8 +1253,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     auto Platform = targetPlatform(Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
-    if ((Platform == PlatformKind::OSX ||
-         Platform == PlatformKind::OSXApplicationExtension) &&
+    if ((Platform == PlatformKind::macOS ||
+         Platform == PlatformKind::macOSApplicationExtension) &&
         !(RunningVers.getMinor().hasValue() &&
           RequiredVers.getMinor().hasValue() &&
           RunningVers.getMinor().getValue() ==
@@ -1398,7 +1433,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   assert(Accessor->isGetterOrSetter());
 
   const AbstractStorageDecl *ASD = Accessor->getStorage();
-  DeclName Name = ASD->getFullName();
+  DeclName Name = ASD->getName();
 
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
                         : diag::availability_accessor_only_version_newer;
@@ -1785,8 +1820,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   auto I = argumentLabelIDs.begin();
 
   auto updateLabelsForArg = [&](Expr *expr) -> bool {
-    if (isa<DefaultArgumentExpr>(expr) ||
-        isa<CallerDefaultArgumentExpr>(expr)) {
+    if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
       if (I == argumentLabelIDs.end())
         return true;
@@ -1808,7 +1842,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           ++I;
 
           // Two or more arguments: Insert empty labels after the first one.
-          variadicArgsNum--;
+          --variadicArgsNum;
           I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }
@@ -1916,12 +1950,12 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
   static const unsigned NOT_ACCESSOR_INDEX = 2;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getFullName();
+    DeclName Name = accessor->getStorage()->getName();
     assert(accessor->isGetterOrSetter());
     return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
   }
 
-  return {NOT_ACCESSOR_INDEX, D->getFullName()};
+  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
@@ -2033,6 +2067,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 
   diagnoseExplicitUnavailability(base, override->getLoc(),
                                  override->getDeclContext(),
+                                 /*Flags*/None,
                                  [&](InFlightDiagnostic &diag) {
     ParsedDeclName parsedName = parseDeclName(attr->Rename);
     if (!parsedName || parsedName.isPropertyAccessor() ||
@@ -2052,7 +2087,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
     }
 
     DeclName newName = parsedName.formDeclName(ctx);
-    size_t numArgs = override->getFullName().getArgumentNames().size();
+    size_t numArgs = override->getName().getArgumentNames().size();
     if (!newName || newName.getArgumentNames().size() != numArgs)
       return;
 
@@ -2063,10 +2098,11 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
-                                                 SourceRange R,
-                                                 const DeclContext *DC,
-                                                 const ApplyExpr *call) {
-  return diagnoseExplicitUnavailability(D, R, DC,
+                                           SourceRange R,
+                                           const DeclContext *DC,
+                                           const ApplyExpr *call,
+                                           DeclAvailabilityFlags Flags) {
+  return diagnoseExplicitUnavailability(D, R, DC, Flags,
                                         [=](InFlightDiagnostic &diag) {
     fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
@@ -2138,6 +2174,7 @@ bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
@@ -2195,6 +2232,14 @@ bool swift::diagnoseExplicitUnavailability(
     break;
   }
 
+  // TODO: Consider removing this.
+  // ObjC keypaths components weren't checked previously, so errors are demoted
+  // to warnings to avoid source breakage. In some cases unavailable or
+  // obsolete decls still map to valid ObjC runtime names, so behave correctly
+  // at runtime, even though their use would produce an error outside of a
+  // #keyPath expression.
+  bool warnInObjCKeyPath = Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath);
+
   if (!Attr->Rename.empty()) {
     SmallString<32> newNameBuf;
     Optional<ReplacementDeclKind> replaceKind =
@@ -2204,7 +2249,9 @@ bool swift::diagnoseExplicitUnavailability(
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       auto diag =
-          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+          diags.diagnose(Loc, warnInObjCKeyPath
+                         ? diag::availability_decl_unavailable_rename_warn
+                         : diag::availability_decl_unavailable_rename,
                          RawAccessorKind, Name, replaceKind.hasValue(),
                          rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
@@ -2219,7 +2266,9 @@ bool swift::diagnoseExplicitUnavailability(
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diags
-        .diagnose(Loc, diag::availability_decl_unavailable, RawAccessorKind,
+        .diagnose(Loc, warnInObjCKeyPath
+                  ? diag::availability_decl_unavailable_warn
+                  : diag::availability_decl_unavailable, RawAccessorKind,
                   Name, platform.empty(), platform, EncodedMessage.Message)
         .highlight(R);
   }
@@ -2291,9 +2340,7 @@ class AvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  ResilienceExpansion Expansion;
-  Optional<TypeChecker::FragileFunctionKind> FragileKind;
-  bool TreatUsableFromInlineAsPublic = false;
+  FragileFunctionKind FragileKind;
 
   /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
   /// implicit.
@@ -2310,10 +2357,7 @@ class AvailabilityWalker : public ASTWalker {
 
 public:
   AvailabilityWalker(DeclContext *DC) : Context(DC->getASTContext()), DC(DC) {
-    Expansion = DC->getResilienceExpansion();
-    if (Expansion == ResilienceExpansion::Minimal)
-      std::tie(FragileKind, TreatUsableFromInlineAsPublic)
-        = TypeChecker::getFragileFunctionKind(DC);
+    FragileKind = DC->getFragileFunctionKind();
   }
 
   // FIXME: Remove this
@@ -2321,9 +2365,11 @@ public:
     return true;
   }
 
-  bool shouldWalkIntoNonSingleExpressionClosure() override {
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
+
+  bool shouldWalkIntoTapExpression() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
@@ -2470,6 +2516,10 @@ private:
   /// Walk a keypath expression, checking all of its components for
   /// availability.
   void maybeDiagKeyPath(KeyPathExpr *KP) {
+    auto flags = DeclAvailabilityFlags();
+    if (KP->isObjC())
+      flags = DeclAvailabilityFlag::ForObjCKeyPath;
+
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
@@ -2477,7 +2527,7 @@ private:
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
-        diagAvailability(decl, range, nullptr);
+        diagAvailability(decl, range, nullptr, flags);
         break;
       }
 
@@ -2491,6 +2541,7 @@ private:
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::DictionaryKey:
         break;
       }
     }
@@ -2591,13 +2642,12 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (FragileKind)
+  if (FragileKind.kind != FragileFunctionKind::None)
     if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
-                                                TreatUsableFromInlineAsPublic))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
         return true;
 
-  if (diagnoseExplicitUnavailability(D, R, DC, call))
+  if (diagnoseExplicitUnavailability(D, R, DC, call, Flags))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -2644,11 +2694,8 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
     Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return
-    TypeChecker::conformsToProtocol(ty, integerType, DC,
-                                    ConformanceCheckFlags::InExpression) ||
-    TypeChecker::conformsToProtocol(ty, floatingType, DC,
-                                    ConformanceCheckFlags::InExpression);
+  return TypeChecker::conformsToProtocol(ty, integerType, DC) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC);
 }
 
 
@@ -2807,42 +2854,87 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
-void swift::checkExplicitAvailability(Decl *decl) {
-  // Check only if the command line option was set.
-  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
-    return;
-
-  // Skip nominal type members as the type should be annotated.
-  auto declContext = decl->getDeclContext();
-  if (isa<NominalTypeDecl>(declContext))
-    return;
-
-  ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
-  if (valueDecl == nullptr) {
-    // decl should be either a ValueDecl or an ExtensionDecl
-    auto extension = cast<ExtensionDecl>(decl);
-    valueDecl = extension->getExtendedNominal();
-    if (!valueDecl)
-      return;
+/// Should we warn that \p decl needs an explicit availability annotation
+/// in -require-explicit-availability mode?
+static bool declNeedsExplicitAvailability(const Decl *decl) {
+  // Skip non-public decls.
+  if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
+    AccessScope scope =
+      valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                      /*treatUsableFromInlineAsPublic*/true);
+    if (!scope.isPublic())
+      return false;
   }
 
-  // Skip decls that are not public and not usable from inline.
-  AccessScope scope =
-    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                  /*treatUsableFromInlineAsPublic*/true);
-  if (!scope.isPublic() ||
-      decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return;
+  // Skip functions emitted into clients or SPI.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      decl->isSPI())
+    return false;
 
   // Warn on decls without an introduction version.
   auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-      !decl->getAttrs().isUnavailable(ctx)) {
+  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+         !decl->getAttrs().isUnavailable(ctx);
+}
 
+void swift::checkExplicitAvailability(Decl *decl) {
+  // Skip if the command line option was not set and
+  // accessors as we check the pattern binding decl instead.
+  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability ||
+      isa<AccessorDecl>(decl))
+    return;
+
+  // Only look at decls at module level or in extensions.
+  // This could be changed to force having attributes on all decls.
+  if (!decl->getDeclContext()->isModuleScopeContext() &&
+      !isa<ExtensionDecl>(decl->getDeclContext())) return;
+
+  if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+    // decl should be either a ValueDecl or an ExtensionDecl.
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
+      return;
+
+    // Skip extensions without public members or conformances.
+    auto members = extension->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (declNeedsExplicitAvailability(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = extension->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [](const ProtocolDecl *PD) -> bool {
+      AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+      return scope.isPublic();
+    });
+
+    if (!hasMembers && !hasProtocols) return;
+
+  } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    // Check the first var instead.
+    if (pbd->getNumPatternEntries() == 0)
+      return;
+
+    llvm::SmallVector<VarDecl *, 2> vars;
+    pbd->getPattern(0)->collectVariables(vars);
+    if (vars.empty())
+      return;
+
+    decl = vars.front();
+  }
+
+  if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
-    auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
+    auto suggestPlatform =
+      decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
       auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
@@ -2855,6 +2947,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
+         auto &ctx = decl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"

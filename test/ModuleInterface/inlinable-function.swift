@@ -30,7 +30,7 @@ public struct Foo: Hashable {
 
   // CHECK: public var hasDidSet: Swift.Int {
   public var hasDidSet: Int {
-    // CHECK-NEXT: @_transparent get{{$}}
+    // CHECK-NEXT: get{{$}}
     // CHECK-NEXT: set{{(\(value\))?}}{{$}}
     // CHECK-NOT: didSet
     didSet {

@@ -15,6 +15,9 @@
 
 #include "llvm/Support/ErrorHandling.h"
 
+// FIXME: Remove after fixmeWitnessHasLinkageThatNeedsToBePublic is removed.
+#include "swift/SIL/SILDeclRef.h"
+
 namespace swift {
 
 class ValueDecl;
@@ -274,9 +277,11 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
 // then SILGen gives the member private linkage, ignoring the more
 // visible access level it was given in the AST.
 inline bool
-fixmeWitnessHasLinkageThatNeedsToBePublic(SILLinkage witnessLinkage) {
-  return !hasPublicVisibility(witnessLinkage) &&
-         !hasSharedVisibility(witnessLinkage);
+fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness) {
+  auto witnessLinkage = witness.getLinkage(ForDefinition);
+  return !hasPublicVisibility(witnessLinkage)
+         && (!hasSharedVisibility(witnessLinkage)
+             || !witness.isSerialized());
 }
 
 } // end swift namespace

@@ -26,15 +26,12 @@
 namespace swift {
 
 class SILArgument;
-class SILPhiArgument;
-class SILFunctionArgument;
 
-using PhiArgumentArrayRef =
-    TransformRange<ArrayRef<SILArgument *>, SILPhiArgument *(*)(SILArgument *)>;
-
-using FunctionArgumentArrayRef =
-    TransformRange<ArrayRef<SILArgument *>,
-                   SILFunctionArgument *(*)(SILArgument *)>;
+#define ARGUMENT(NAME, PARENT)                                                 \
+  class NAME;                                                                  \
+  using NAME##ArrayRef =                                                       \
+      TransformRange<ArrayRef<SILArgument *>, NAME *(*)(SILArgument *)>;
+#include "swift/SIL/SILNodes.def"
 
 } // namespace swift
 

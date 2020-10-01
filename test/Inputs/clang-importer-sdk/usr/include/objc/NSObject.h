@@ -27,6 +27,10 @@
 @property (readonly) NSInteger hash;
 @end
 
+@interface NSObject (Coding)
+- (Class)classForCoder;
+@end
+
 @interface A : NSObject
 - (int)method:(int)arg withDouble:(double)d;
 + (int)classMethod;

@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -69,6 +70,10 @@ class MandatoryCombiner final
   /// Whether any changes have been made.
   bool madeChange;
 
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
   /// The number of times that the worklist has been processed.
   unsigned iteration;
 
@@ -77,15 +82,17 @@ class MandatoryCombiner final
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
 
 public:
-  MandatoryCombiner(
-      SmallVectorImpl<SILInstruction *> &createdInstructions)
+  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
       : worklist("MC"), madeChange(false), iteration(0),
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
               instructionsPendingDeletion.push_back(instruction);
             },
-            [&](SILInstruction *instruction) { worklist.add(instruction); }),
+            [&](SILInstruction *instruction) { worklist.add(instruction); },
+            [this](SILValue oldValue, SILValue newValue) {
+              worklist.replaceValueUsesWith(oldValue, newValue);
+            }),
         createdInstructions(createdInstructions){};
 
   void addReachableCodeToWorklist(SILFunction &function);
@@ -110,6 +117,10 @@ public:
     while (doOneIteration(function, iteration)) {
       changed = true;
       ++iteration;
+    }
+
+    if (invalidatedStackNesting) {
+      StackNesting().correctStackNesting(&function);
     }
 
     return changed;
@@ -188,10 +199,12 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
                                                  instructionDescription
 #endif
       );
+      madeChange = true;
     }
 
     for (SILInstruction *instruction : instructionsPendingDeletion) {
       worklist.eraseInstFromFunction(*instruction);
+      madeChange = true;
     }
     instructionsPendingDeletion.clear();
 
@@ -203,6 +216,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
       LLVM_DEBUG(llvm::dbgs() << "MC: add " << *instruction
                               << " from tracking list to worklist\n");
       worklist.add(instruction);
+      madeChange = true;
     }
     createdInstructions.clear();
   }
@@ -216,6 +230,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
 //===----------------------------------------------------------------------===//
 
 SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
+
   // Apply this pass only to partial applies all of whose arguments are
   // trivial.
   auto calledValue = instruction->getCallee();
@@ -266,7 +281,9 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
                                              /*instructionDescription=*/""
 #endif
   );
-  tryDeleteDeadClosure(partialApply, instModCallbacks);
+  if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
+    invalidatedStackNesting = true;
+  }
   return nullptr;
 }
 

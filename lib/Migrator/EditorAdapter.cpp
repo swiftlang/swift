@@ -33,7 +33,7 @@ EditorAdapter::cacheReplacement(CharSourceRange Range, StringRef Text) const {
     return false;
   unsigned SwiftBufferID, Offset;
   std::tie(SwiftBufferID, Offset) = getLocInfo(Range.getStart());
-  Replacement R { Offset, Range.getByteLength(), Text };
+  Replacement R{Offset, Range.getByteLength(), Text.str()};
   if (Replacements.count(R)) {
     return true;
   } else {

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -86,7 +87,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
   if (!i)
     return;
   op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
-  recursivelyDeleteTriviallyDeadInstructions(i);
+  eliminateDeadInstruction(i);
 }
 
 // Our implementation assumes that our caller is attempting to remove a dead
@@ -375,7 +376,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     auto failureBB =
         oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
     builder.createCheckedCastBranch(
-        cbi->getLoc(), cbi->isExact(), cbi->getOperand(), cbi->getCastType(),
+        cbi->getLoc(), cbi->isExact(), cbi->getOperand(),
+        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
         successBB, failureBB, cbi->getTrueBBCount(), cbi->getFalseBBCount());
     cbi->eraseFromParent();
     return;
@@ -389,9 +391,10 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
         oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
     auto failureBB =
         oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    builder.createCheckedCastValueBranch(cbi->getLoc(), cbi->getOperand(),
-                                         cbi->getCastType(), successBB,
-                                         failureBB);
+    builder.createCheckedCastValueBranch(
+        cbi->getLoc(), cbi->getOperand(), cbi->getSourceFormalType(),
+        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
+        successBB, failureBB);
     cbi->eraseFromParent();
     return;
   }
@@ -407,19 +410,50 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     auto trueCount = cbi->getTrueBBCount();
     auto falseCount = cbi->getFalseBBCount();
     builder.createCheckedCastAddrBranch(
-        cbi->getLoc(), cbi->getConsumptionKind(), cbi->getSrc(),
-        cbi->getSourceType(), cbi->getDest(), cbi->getTargetType(), successBB,
-        failureBB, trueCount, falseCount);
+        cbi->getLoc(), cbi->getConsumptionKind(),
+        cbi->getSrc(), cbi->getSourceFormalType(),
+        cbi->getDest(), cbi->getTargetFormalType(),
+        successBB, failureBB, trueCount, falseCount);
     cbi->eraseFromParent();
+    return;
+  }
+
+  case TermKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(t);
+    SILBasicBlock *normalBB =
+        (oldDest == tai->getNormalBB() ? newDest : tai->getNormalBB());
+    SILBasicBlock *errorBB =
+        (oldDest == tai->getErrorBB() ? newDest : tai->getErrorBB());
+    SmallVector<SILValue, 8> args;
+    for (SILValue arg : tai->getArguments()) {
+      args.push_back(arg);
+    }
+    builder.createTryApply( tai->getLoc(), tai->getCallee(),
+                tai->getSubstitutionMap(), args, normalBB, errorBB,
+                tai->getSpecializationInfo());
+    tai->eraseFromParent();
+    return;
+  }
+  
+  case TermKind::YieldInst: {
+    auto *yi = cast<YieldInst>(t);
+    SILBasicBlock *resumeBB =
+        (oldDest == yi->getResumeBB() ? newDest : yi->getResumeBB());
+    SILBasicBlock *unwindBB =
+        (oldDest == yi->getUnwindBB() ? newDest : yi->getUnwindBB());
+    SmallVector<SILValue, 8> args;
+    for (SILValue arg : yi->getYieldedValues()) {
+      args.push_back(arg);
+    }
+    builder.createYield(yi->getLoc(), args,resumeBB, unwindBB);
+    yi->eraseFromParent();
     return;
   }
 
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
-  case TermKind::TryApplyInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
-  case TermKind::YieldInst:
     llvm_unreachable(
         "Branch target cannot be replaced for this terminator instruction!");
   }
@@ -515,6 +549,20 @@ bool swift::splitCriticalEdgesFrom(SILBasicBlock *fromBB,
         splitCriticalEdge(fromBB->getTerminator(), idx, domInfo, loopInfo);
     changed |= (newBB != nullptr);
   }
+  return changed;
+}
+
+bool swift::splitCriticalEdgesTo(SILBasicBlock *toBB, DominanceInfo *domInfo,
+                                 SILLoopInfo *loopInfo) {
+  bool changed = false;
+  unsigned numPreds = std::distance(toBB->pred_begin(), toBB->pred_end());
+
+  for (unsigned idx = 0; idx != numPreds; ++idx) {
+    SILBasicBlock *fromBB = *std::next(toBB->pred_begin(), idx);
+    auto *newBB = splitIfCriticalEdge(fromBB, toBB);
+    changed |= (newBB != nullptr);
+  }
+
   return changed;
 }
 
@@ -618,89 +666,6 @@ SILBasicBlock *swift::splitIfCriticalEdge(SILBasicBlock *from,
       return splitCriticalEdge(t, i, domInfo, loopInfo);
   }
   llvm_unreachable("Destination block not found");
-}
-
-void swift::completeJointPostDominanceSet(
-    ArrayRef<SILBasicBlock *> userBlocks, ArrayRef<SILBasicBlock *> defBlocks,
-    llvm::SmallVectorImpl<SILBasicBlock *> &result) {
-  assert(!userBlocks.empty() && "Must have at least 1 user block");
-  assert(!defBlocks.empty() && "Must have at least 1 def block");
-
-  // If we have only one def block and one user block and they are the same
-  // block, then just return.
-  if (defBlocks.size() == 1 && userBlocks.size() == 1
-      && userBlocks[0] == defBlocks[0]) {
-    return;
-  }
-
-  // Some notes on the algorithm:
-  //
-  // 1. Our VisitedBlocks set just states that a value has been added to the
-  // worklist and should not be added to the worklist.
-  // 2. Our targets of the CFG block are DefBlockSet.
-  // 3. We find the missing post-domination blocks by finding successors of
-  // blocks on our walk that we have not visited by the end of the walk. For
-  // joint post-dominance to be true, no such successors should exist.
-
-  // Our set of target blocks where we stop walking.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> defBlockSet(defBlocks.begin(),
-                                                    defBlocks.end());
-
-  // The set of successor blocks of blocks that we visit. Any blocks still in
-  // this set at the end of the walk act as a post-dominating closure around our
-  // userBlock set.
-  llvm::SmallSetVector<SILBasicBlock *, 16> mustVisitSuccessorBlocks;
-
-  // Add our user and def blocks to the visitedBlock set. We never want to find
-  // these in our worklist.
-  llvm::SmallPtrSet<SILBasicBlock *, 32> visitedBlocks(userBlocks.begin(),
-                                                       userBlocks.end());
-
-  // Finally setup our worklist by adding our user block predecessors. We only
-  // add the predecessors to the worklist once.
-  llvm::SmallVector<SILBasicBlock *, 32> worklist;
-  for (auto *block : userBlocks) {
-    llvm::copy_if(block->getPredecessorBlocks(), std::back_inserter(worklist),
-                  [&](SILBasicBlock *predBlock) -> bool {
-                    return visitedBlocks.insert(predBlock).second;
-                  });
-  }
-
-  // Then until we reach a fix point.
-  while (!worklist.empty()) {
-    // Grab the next block from the worklist.
-    auto *block = worklist.pop_back_val();
-    assert(visitedBlocks.count(block)
-           && "All blocks from worklist should be "
-              "in the visited blocks set.");
-
-    // Since we are visiting this block now, we know that this block can not be
-    // apart of a the post-dominance closure of our UseBlocks.
-    mustVisitSuccessorBlocks.remove(block);
-
-    // Then add each successor block of block that has not been visited yet to
-    // the mustVisitSuccessorBlocks set.
-    for (auto *succBlock : block->getSuccessorBlocks()) {
-      if (!visitedBlocks.count(succBlock)) {
-        mustVisitSuccessorBlocks.insert(succBlock);
-      }
-    }
-
-    // If this is a def block, then do not add its predecessors to the
-    // worklist.
-    if (defBlockSet.count(block))
-      continue;
-
-    // Otherwise add all unvisited predecessors to the worklist.
-    llvm::copy_if(block->getPredecessorBlocks(), std::back_inserter(worklist),
-                  [&](SILBasicBlock *block) -> bool {
-                    return visitedBlocks.insert(block).second;
-                  });
-  }
-
-  // Now that we are done, add all remaining must visit blocks to our result
-  // list. These are the remaining parts of our joint post-dominance closure.
-  llvm::copy(mustVisitSuccessorBlocks, std::back_inserter(result));
 }
 
 bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(

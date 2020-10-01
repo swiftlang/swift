@@ -212,6 +212,7 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   // Instance member of existential metatype -- not allowed
   _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
   _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
+  // expected-error@-1 {{partial application of 'mutating' method is not allowed}}
 
   // Static member of metatype -- not allowed
   _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}

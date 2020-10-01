@@ -18,9 +18,12 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) &&                                 \
+    !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
 
 #include "ImageInspection.h"
+#include "ImageInspectionCommon.h"
+#include "swift/Runtime/Config.h"
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <objc/runtime.h>
@@ -30,21 +33,17 @@
 using namespace swift;
 
 namespace {
-/// The Mach-O section name for the section containing protocol descriptor
-/// references. This lives within SEG_TEXT.
-constexpr const char ProtocolsSection[] = "__swift5_protos";
-/// The Mach-O section name for the section containing protocol conformances.
-/// This lives within SEG_TEXT.
-constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
-/// The Mach-O section name for the section containing type references.
-/// This lives within SEG_TEXT.
-constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
-/// The Mach-O section name for the section containing dynamic replacements.
-/// This lives within SEG_TEXT.
-constexpr const char DynamicReplacementSection[] = "__swift5_replace";
-constexpr const char DynamicReplacementSomeSection[] = "__swift5_replac2";
 
-constexpr const char TextSegment[] = SEG_TEXT;
+constexpr const char ProtocolsSection[] = MachOProtocolsSection;
+constexpr const char ProtocolConformancesSection[] =
+    MachOProtocolConformancesSection;
+constexpr const char TypeMetadataRecordSection[] =
+    MachOTypeMetadataRecordSection;
+constexpr const char DynamicReplacementSection[] =
+    MachODynamicReplacementSection;
+constexpr const char DynamicReplacementSomeSection[] =
+    MachODynamicReplacementSomeSection;
+constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -121,13 +120,9 @@ void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
 
 } // end anonymous namespace
 
-#if OBJC_ADDLOADIMAGEFUNC_DEFINED
+#if OBJC_ADDLOADIMAGEFUNC_DEFINED && SWIFT_OBJC_INTEROP
 #define REGISTER_FUNC(...)                                               \
-  if (__builtin_available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)) { \
-    objc_addLoadImageFunc(__VA_ARGS__);                                  \
-  } else {                                                               \
-    _dyld_register_func_for_add_image(__VA_ARGS__);                      \
-  }
+    _dyld_register_func_for_add_image(__VA_ARGS__);
 #else
 #define REGISTER_FUNC(...) _dyld_register_func_for_add_image(__VA_ARGS__)
 #endif
@@ -168,6 +163,8 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   return 1;
 }
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
   unsigned long size;
   auto *executableHeader = static_cast<mach_header_platform *>(_NSGetMachExecuteHeader());
@@ -177,4 +174,7 @@ void *swift::lookupSection(const char *segment, const char *section, size_t *out
   return static_cast<void *>(data);
 }
 
-#endif // defined(__APPLE__) && defined(__MACH__)
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
+#endif // defined(__APPLE__) && defined(__MACH__) &&
+       // !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)

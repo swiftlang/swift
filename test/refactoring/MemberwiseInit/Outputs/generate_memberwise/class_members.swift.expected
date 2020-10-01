@@ -1,11 +1,13 @@
 class Person {
-internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175) {
+internal init(firstName: String? = nil, lastName: String? = nil, age: Int? = nil, planet: String = "Earth", solarSystem: String = "Milky Way", avgHeight: Int = 175, location: @escaping () -> Place = { fatalError() }, secondLocation: (() -> Place)? = nil) {
 self.firstName = firstName
 self.lastName = lastName
 self.age = age
 self.planet = planet
 self.solarSystem = solarSystem
 self.avgHeight = avgHeight
+self.location = location
+self.secondLocation = secondLocation
 }
 
   var firstName: String!
@@ -15,9 +17,12 @@ self.avgHeight = avgHeight
   var avgHeight = 175
   let line = #line, file = #file, handle = #dsohandle
   lazy var idea: Idea = { fatalError() }()
+  var location: () -> Place = { fatalError() }
+  var secondLocation: (() -> Place)!
 }
 
 struct Place {
+  typealias Callback = () -> ()
   let person: Person
   let street: String
   let apartment: Optional<String>
@@ -25,6 +30,7 @@ struct Place {
   let state: String
   let postalCode: Int
   let plusFour: Int?
+  let callback: Callback
 }
 
 protocol Thing {

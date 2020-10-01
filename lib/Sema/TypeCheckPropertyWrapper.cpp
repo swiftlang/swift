@@ -28,13 +28,20 @@ using namespace swift;
 
 /// The kind of property initializer to look for
 enum class PropertyWrapperInitKind {
-  /// An initial-value initializer (i.e. `init(initialValue:)`)
+  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
+  /// deprecated.
   InitialValue,
   /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
   WrappedValue,
   /// An default-value initializer (i.e. `init()` or `init(defaultArgs...)`)
   Default
 };
+
+static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
+                                          NominalTypeDecl *parent) {
+  return decl->getFormalAccess() <
+         std::min(parent->getFormalAccess(), AccessLevel::Public);
+}
 
 /// Find the named property in a property wrapper to which access will
 /// be delegated.
@@ -43,7 +50,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    nominal->lookupQualified(nominal, name, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, DeclNameRef(name), NL_QualifiedDefault,
+                             decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
       if (!foundVar || foundVar->isStatic() ||
@@ -71,17 +79,17 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
       var->diagnose(diag::kind_declname_declared_here,
-                    var->getDescriptiveKind(), var->getFullName());
+                    var->getDescriptiveKind(), var->getName());
     }
     return nullptr;
   }
 
   // The property must be as accessible as the nominal type.
   VarDecl *var = vars.front();
-  if (var->getFormalAccess() < nominal->getFormalAccess()) {
+  if (isDeclNotAsAccessibleAsParent(var, nominal)) {
     var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                   var->getFormalAccess(), var->getDescriptiveKind(),
-                  var->getFullName(), nominal->getDeclaredType(),
+                  var->getName(), nominal->getDeclaredType(),
                   nominal->getFormalAccess());
     return nullptr;
   }
@@ -93,7 +101,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 /// type.
 static ConstructorDecl *
 findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
-                        VarDecl *valueVar, PropertyWrapperInitKind initKind) {
+                        VarDecl *valueVar, PropertyWrapperInitKind initKind,
+                        const SmallVectorImpl<ValueDecl *> &decls) {
   enum class NonViableReason {
     Failable,
     ParameterTypeMismatch,
@@ -103,7 +112,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<std::tuple<ConstructorDecl *, NonViableReason, Type>, 2>
       nonviable;
   SmallVector<ConstructorDecl *, 2> viableInitializers;
-  SmallVector<ValueDecl *, 2> decls;
 
   Identifier argumentLabel;
   switch (initKind) {
@@ -117,8 +125,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
-  nominal->lookupQualified(nominal, DeclBaseName::createConstructor(),
-                           NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
     if (!init || init->getDeclContext() != nominal || init->isGeneric())
@@ -148,6 +154,14 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     if (hasExtraneousParam)
       continue;
 
+    if (initKind != PropertyWrapperInitKind::Default) {
+      if (!argumentParam)
+        continue;
+
+      if (argumentParam->isInOut() || argumentParam->isVariadic())
+        continue;
+    }
+
     // Failable initializers cannot be used.
     if (init->isFailable()) {
       nonviable.push_back(
@@ -156,7 +170,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     }
 
     // Check accessibility.
-    if (init->getFormalAccess() < nominal->getFormalAccess()) {
+    if (isDeclNotAsAccessibleAsParent(init, nominal)) {
       nonviable.push_back(
           std::make_tuple(init, NonViableReason::Inaccessible, Type()));
       continue;
@@ -164,16 +178,10 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
     // Additional checks for initial-value and wrapped-value initializers
     if (initKind != PropertyWrapperInitKind::Default) {
-      if (!argumentParam)
-        continue;
-
-      if (!argumentParam->hasInterfaceType())
-        continue;
-
-      if (argumentParam->isInOut() || argumentParam->isVariadic())
-        continue;
-
       auto paramType = argumentParam->getInterfaceType();
+      if (paramType->is<ErrorType>())
+        continue;
+
       if (argumentParam->isAutoClosure()) {
         if (auto *fnType = paramType->getAs<FunctionType>())
           paramType = fnType->getResult();
@@ -200,21 +208,21 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       switch (reason) {
       case NonViableReason::Failable:
         init->diagnose(diag::property_wrapper_failable_init,
-                       init->getFullName());
+                       init->getName());
         break;
 
       case NonViableReason::Inaccessible:
         init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                        init->getFormalAccess(), init->getDescriptiveKind(),
-                       init->getFullName(), nominal->getDeclaredType(),
+                       init->getName(), nominal->getDeclaredType(),
                        nominal->getFormalAccess());
         break;
 
       case NonViableReason::ParameterTypeMismatch:
         init->diagnose(diag::property_wrapper_wrong_initial_value_init,
-                       init->getFullName(), paramType,
+                       init->getName(), paramType,
                        valueVar->getValueInterfaceType());
-        valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
+        valueVar->diagnose(diag::decl_declared_here, valueVar->getName());
         break;
       }
     }
@@ -264,7 +272,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     for (auto subscript : subscripts) {
       subscript->diagnose(diag::kind_declname_declared_here,
                           subscript->getDescriptiveKind(),
-                          subscript->getFullName());
+                          subscript->getName());
     }
     return nullptr;
 
@@ -272,11 +280,11 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
 
   auto subscript = subscripts.front();
   // the subscript must be as accessible as the nominal type.
-  if (subscript->getFormalAccess() < nominal->getFormalAccess()) {
+  if (isDeclNotAsAccessibleAsParent(subscript, nominal)) {
     subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                         subscript->getFormalAccess(),
                         subscript->getDescriptiveKind(),
-                        subscript->getFullName(), nominal->getDeclaredType(),
+                        subscript->getName(), nominal->getDeclaredType(),
                         nominal->getFormalAccess());
     return nullptr;
   }
@@ -284,7 +292,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   return subscript;
 }
 
-llvm::Expected<PropertyWrapperTypeInfo>
+PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
   // We must have the @propertyWrapper attribute to continue.
@@ -301,16 +309,20 @@ PropertyWrapperTypeInfoRequest::evaluate(
   if (!valueVar)
     return PropertyWrapperTypeInfo();
 
-  // FIXME: Remove this one
-  (void)valueVar->getInterfaceType();
-  
+  TypeChecker::addImplicitConstructors(nominal);
+
+  SmallVector<ValueDecl *, 2> decls;
+  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
+                           NL_QualifiedDefault, decls);
+
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  if (findSuitableWrapperInit(ctx, nominal, valueVar,
-                              PropertyWrapperInitKind::WrappedValue))
+  if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
+                              PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
-  else if (auto init = findSuitableWrapperInit(
-               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue)) {
+  } else if (auto init = findSuitableWrapperInit(
+               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue,
+               decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
 
     if (init->getLoc().isValid()) {
@@ -328,7 +340,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
   }
 
   if (findSuitableWrapperInit(ctx, nominal, /*valueVar=*/nullptr,
-                              PropertyWrapperInitKind::Default)) {
+                              PropertyWrapperInitKind::Default, decls)) {
     result.defaultInit = PropertyWrapperTypeInfo::HasDefaultValueInit;
   }
 
@@ -354,10 +366,27 @@ PropertyWrapperTypeInfoRequest::evaluate(
     }
   }
 
+  bool hasInvalidDynamicSelf = false;
+  if (result.projectedValueVar &&
+      result.projectedValueVar->getValueInterfaceType()->hasDynamicSelfType()) {
+    result.projectedValueVar->diagnose(
+        diag::property_wrapper_dynamic_self_type, /*projectedValue=*/true);
+    hasInvalidDynamicSelf = true;
+  }
+
+  if (result.valueVar->getValueInterfaceType()->hasDynamicSelfType()) {
+    result.valueVar->diagnose(
+        diag::property_wrapper_dynamic_self_type, /*projectedValue=*/false);
+    hasInvalidDynamicSelf = true;
+  }
+
+  if (hasInvalidDynamicSelf)
+    return PropertyWrapperTypeInfo();
+
   return result;
 }
 
-llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
+llvm::TinyPtrVector<CustomAttr *>
 AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
                                           VarDecl *var) const {
   ASTContext &ctx = var->getASTContext();
@@ -430,7 +459,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 2 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
-                    var->getFullName(), whichKind);
+                    var->getName(), whichKind);
       continue;
     }
 
@@ -447,17 +476,17 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       else
         whichKind = 2;
       var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getFullName(), whichKind)
+                    var->getName(), whichKind)
         .highlight(attr->getRange());
 
       continue;
     }
 
     // Properties with wrappers must not override another property.
-    if (auto classDecl = dyn_cast<ClassDecl>(dc)) {
-      if (auto overrideAttr = var->getAttrs().getAttribute<OverrideAttr>()) {
+    if (isa<ClassDecl>(dc)) {
+      if (var->getAttrs().hasAttribute<OverrideAttr>()) {
         var->diagnose(diag::property_with_wrapper_overrides,
-                      var->getFullName())
+                      var->getName())
           .highlight(attr->getRange());
         continue;
       }
@@ -472,139 +501,71 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-llvm::Expected<Type>
-AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
-                                             VarDecl *var,
-                                             unsigned index) const {
+Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
+                                                  VarDecl *var,
+                                                  unsigned index) const {
   // Find the custom attributes for the attached property wrapper.
-  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>> customAttrVal =
-      evaluator(AttachedPropertyWrappersRequest{var});
-  if (!customAttrVal)
-    return customAttrVal.takeError();
+  llvm::TinyPtrVector<CustomAttr *> customAttrVal =
+      evaluateOrDefault(evaluator, AttachedPropertyWrappersRequest{var}, {});
 
   // If there isn't an attached property wrapper at this index, we're done.
-  if (index >= customAttrVal->size())
+  if (index >= customAttrVal.size())
     return Type();
                                                
-  auto customAttr = (*customAttrVal)[index];
+  auto customAttr = customAttrVal[index];
   if (!customAttr)
     return Type();
 
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
-    return nullptr;
-
-  auto resolution =
-      TypeResolution::forContextual(var->getDeclContext());
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (TypeChecker::validateType(tc.Context, customAttr->getTypeLoc(),
-                                resolution, options))
-    return ErrorType::get(ctx);
-
-  return customAttr->getTypeLoc().getType();
+  auto ty = evaluateOrDefault(
+      evaluator,
+      CustomAttrTypeRequest{customAttr, var->getDeclContext(),
+                            CustomAttrTypeKind::PropertyDelegate},
+      Type());
+  if (!ty || ty->hasError()) {
+    return ErrorType::get(var->getASTContext());
+  }
+  return ty;
 }
 
-llvm::Expected<Type>
+Type
 PropertyWrapperBackingPropertyTypeRequest::evaluate(
-                                    Evaluator &evaluator, VarDecl *var) const {
-  llvm::Expected<Type> rawTypeResult =
-    evaluator(AttachedPropertyWrapperTypeRequest{var, 0});
-  if (!rawTypeResult)
-    return rawTypeResult;
+    Evaluator &evaluator, VarDecl *var) const {
+  Type rawType =
+      evaluateOrDefault(evaluator,
+                        AttachedPropertyWrapperTypeRequest{var, 0}, Type());
 
-  Type rawType = *rawTypeResult;
   if (!rawType || rawType->hasError())
     return Type();
-
-  if (!rawType->hasUnboundGenericType())
-    return rawType->mapTypeOutOfContext();
 
   auto binding = var->getParentPatternBinding();
   if (!binding)
     return Type();
 
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
-    return Type();
-
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
-      tc.typeCheckPatternBinding(binding, index);
+      TypeChecker::typeCheckPatternBinding(binding, index);
+  } else {
+    using namespace constraints;
+    auto dc = var->getInnermostDeclContext();
+    ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
+    auto target = SolutionApplicationTarget::forUninitializedWrappedVar(var);
+    auto solutions = cs.solve(target, FreeTypeVariableBinding::Disallow);
 
-    Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
-    assert(type || ctx.Diags.hadAnyError());
-    return type;
-  }
-
-  // Compute the type of the property to plug in to the wrapper type.
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)var->getInterfaceType();
-  Type propertyType = var->getType();
-  if (!propertyType || propertyType->hasError())
-    return Type();
-
-  using namespace constraints;
-  auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(tc, dc, None);
-  auto emptyLocator = cs.getConstraintLocator(nullptr);
-  
-  auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  Type valueMemberType;
-  Type outermostOpenedWrapperType;
-  for (unsigned i : indices(wrapperAttrs)) {
-    Type rawWrapperType = var->getAttachedPropertyWrapperType(i);
-    if (!rawWrapperType)
+    if (!solutions || !cs.applySolution(solutions->front(), target)) {
+      var->setInvalid();
       return Type();
-    
-    // Open the type.
-    Type openedWrapperType =
-      cs.openUnboundGenericType(rawWrapperType, emptyLocator);
-    if (!outermostOpenedWrapperType)
-      outermostOpenedWrapperType = openedWrapperType;
-    
-    // If we already have a value member type, it must be equivalent to
-    // this opened wrapper type.
-    if (valueMemberType) {
-      cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                       openedWrapperType, emptyLocator);
     }
-    
-    // Retrieve the type of the wrapped value.
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-    if (!wrapperInfo)
-      return Type();
-
-    valueMemberType = openedWrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
-  }
-  
-  // The resulting value member type must be equivalent to the property
-  // type.
-  cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                   propertyType, emptyLocator);
-
-  SmallVector<Solution, 4> solutions;
-  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
-    var->diagnose(diag::property_wrapper_incompatible_property,
-                  propertyType, rawType);
-    if (auto nominalWrapper = rawType->getAnyNominal()) {
-      nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                               nominalWrapper->getFullName());
-    }
-    return Type();
   }
 
-  Type wrapperType = solutions.front().simplifyType(outermostOpenedWrapperType);
-  return wrapperType->mapTypeOutOfContext();
+  ASTContext &ctx = var->getASTContext();
+  Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
+  assert(type || ctx.Diags.hadAnyError());
+  return type;
 }
 
 Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
@@ -633,25 +594,31 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
-Expr *swift::buildPropertyWrapperInitialValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value,
-    bool ignoreAttributeArgs) {
+Expr *swift::buildPropertyWrapperWrappedValueCall(
+    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
+  ApplyExpr *innermostInit = nullptr;
+
   for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
       backingStorageType ? computeWrappedValueType(var, backingStorageType, i)
                          : var->getAttachedPropertyWrapperType(i);
     if (!wrapperType)
       return nullptr;
-    
-    auto typeExpr = TypeExpr::createImplicitHack(
-        wrapperAttrs[i]->getTypeLoc().getLoc(),
-        wrapperType, ctx);
 
-    SourceLoc startLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().Start;
+    auto reprRange = SourceRange();
+    if (auto *repr = wrapperAttrs[i]->getTypeRepr()) {
+      reprRange = repr->getSourceRange();
+    }
+
+    auto typeExpr =
+        TypeExpr::createImplicitHack(reprRange.Start, wrapperType, ctx);
+
+    SourceLoc startLoc = reprRange.Start;
 
     // If there were no arguments provided for the attribute at this level,
     // call `init(wrappedValue:)` directly.
@@ -671,12 +638,16 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
 
       auto endLoc = initializer->getEndLoc();
       if (endLoc.isInvalid() && startLoc.isValid())
-        endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
+        endLoc = reprRange.End;
 
-      initializer = CallExpr::create(
-         ctx, typeExpr, startLoc, {initializer}, {argName},
-         {initializer->getStartLoc()}, endLoc,
-         nullptr, /*implicit=*/true);
+      auto *init =
+          CallExpr::create(ctx, typeExpr, startLoc, {initializer}, {argName},
+                           {initializer->getStartLoc()}, endLoc,
+                           /*trailingClosures=*/{}, /*implicit=*/true);
+      initializer = init;
+
+      if (!innermostInit)
+        innermostInit = init;
       continue;
     }
 
@@ -703,12 +674,19 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
     
     auto endLoc = attr->getArg()->getEndLoc();
     if (endLoc.isInvalid() && startLoc.isValid())
-      endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
+      endLoc = reprRange.End;
 
-    initializer = CallExpr::create(
-        ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
-        endLoc, nullptr, /*implicit=*/true);
+    auto *init = CallExpr::create(ctx, typeExpr, startLoc, elements,
+                                   elementNames, elementLocs, endLoc,
+                                   /*trailingClosures=*/{}, /*implicit=*/true);
+    initializer = init;
+
+    if (!innermostInit)
+      innermostInit = init;
   }
-  
+
+  // Invoke the callback, passing in the innermost init(wrappedValue:) call
+  innermostInitCallback(innermostInit);
+
   return initializer;
 }

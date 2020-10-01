@@ -17,6 +17,30 @@
 
 using namespace swift;
 
+/// Invoke \p visitor for each reachable block in \p f in worklist order (at
+/// least one predecessor has been visited).
+bool ReachableBlocks::visit(SILFunction *f,
+                            function_ref<bool(SILBasicBlock *)> visitor) {
+  assert(visited.empty() && "blocks already visited");
+
+  // Walk over the CFG, starting at the entry block, until all reachable blocks
+  // are visited.
+  SILBasicBlock *entryBB = f->getEntryBlock();
+  SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
+  visited.insert(entryBB);
+  while (!worklist.empty()) {
+    SILBasicBlock *bb = worklist.pop_back_val();
+    if (!visitor(bb))
+      return false;
+
+    for (auto &succ : bb->getSuccessors()) {
+      if (visited.insert(succ).second)
+        worklist.push_back(succ);
+    }
+  }
+  return true;
+}
+
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
@@ -42,25 +66,16 @@ void swift::removeDeadBlock(SILBasicBlock *bb) {
 }
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
-  // All reachable blocks, but does not include the entry block.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> visited;
+  ReachableBlocks reachable;
+  // Visit all the blocks without doing any extra work.
+  reachable.visit(&f, [](SILBasicBlock *) { return true; });
 
-  // Walk over the CFG, starting at the entry block, until all reachable blocks are visited.
-  llvm::SmallVector<SILBasicBlock *, 8> worklist(1, f.getEntryBlock());
-  while (!worklist.empty()) {
-    SILBasicBlock *bb = worklist.pop_back_val();
-    for (auto &Succ : bb->getSuccessors()) {
-      if (visited.insert(Succ).second)
-        worklist.push_back(Succ);
-    }
-  }
-
-  // Remove the blocks we never reached. Exclude the entry block from the iteration because it's
-  // not included in the Visited set.
+  // Remove the blocks we never reached. Assume the entry block is visited.
+  // Reachable's visited set contains dangling pointers during this loop.
   bool changed = false;
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
-    if (!visited.count(bb)) {
+    if (!reachable.isVisited(bb)) {
       removeDeadBlock(bb);
       changed = true;
     }
@@ -68,11 +83,19 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
   return changed;
 }
 
-/// Helper function to perform SSA updates in case of jump threading.
-void swift::updateSSAAfterCloning(BasicBlockCloner &cloner,
-                                  SILBasicBlock *srcBB, SILBasicBlock *destBB) {
+void BasicBlockCloner::updateSSAAfterCloning() {
+  // All instructions should have been checked by canCloneInstruction. But we
+  // still need to check the arguments.
+  for (auto arg : origBB->getArguments()) {
+    if ((needsSSAUpdate |= isUsedOutsideOfBlock(arg))) {
+      break;
+    }
+  }
+  if (!needsSSAUpdate)
+    return;
+
   SILSSAUpdater ssaUpdater;
-  for (auto availValPair : cloner.AvailVals) {
+  for (auto availValPair : availVals) {
     ValueBase *inst = availValPair.first;
     if (inst->use_empty())
       continue;
@@ -84,24 +107,24 @@ void swift::updateSSAAfterCloning(BasicBlockCloner &cloner,
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.Initialize(inst->getType());
-    ssaUpdater.AddAvailableValue(destBB, inst);
-    ssaUpdater.AddAvailableValue(srcBB, newResult);
+    ssaUpdater.initialize(inst->getType());
+    ssaUpdater.addAvailableValue(origBB, inst);
+    ssaUpdater.addAvailableValue(getNewBB(), newResult);
 
     if (useList.empty())
       continue;
 
     // Update all the uses.
     for (auto useWrapper : useList) {
-      Operand *use = useWrapper;
+      Operand *use = useWrapper; // unwrap
       SILInstruction *user = use->getUser();
       assert(user && "Missing user");
 
       // Ignore uses in the same basic block.
-      if (user->getParent() == destBB)
+      if (user->getParent() == origBB)
         continue;
 
-      ssaUpdater.RewriteUse(*use);
+      ssaUpdater.rewriteUse(*use);
     }
   }
 }
@@ -128,6 +151,27 @@ bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
   return changed;
 }
 
+void BasicBlockCloner::sinkAddressProjections() {
+  // Because the address projections chains will be disjoint (an instruction
+  // in one chain cannot use the result of an instruction in another chain),
+  // the order they are sunk does not matter.
+  InstructionDeleter deleter;
+  for (auto ii = origBB->begin(), ie = origBB->end(); ii != ie;) {
+    bool canSink = sinkProj.analyzeAddressProjections(&*ii);
+    (void)canSink;
+    assert(canSink && "canCloneInstruction should catch this.");
+
+    sinkProj.cloneProjections();
+    assert((sinkProj.getInBlockDefs().empty() || needsSSAUpdate)
+           && "canCloneInstruction should catch this.");
+
+    auto nextII = std::next(ii);
+    deleter.trackIfDead(&*ii);
+    ii = nextII;
+  }
+  deleter.cleanUpDeadInstructions();
+}
+
 // Populate 'projections' with the chain of address projections leading
 // to and including 'inst'.
 //
@@ -149,7 +193,7 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return true;
     }
     if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
-      if (addressProj->isTriviallyDuplicatable()) {
+      if (addressProj->isPure()) {
         projections.push_back(addressProj);
         return true;
       }
@@ -171,7 +215,8 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return false;
 
     for (SILValue operandVal : projections[idx]->getOperandValues())
-      pushOperandVal(operandVal);
+      if (!pushOperandVal(operandVal))
+        return false;
   }
   return true;
 }
@@ -183,19 +228,40 @@ bool SinkAddressProjections::cloneProjections() {
     return false;
 
   SILBasicBlock *bb = projections.front()->getParent();
-  SmallVector<Operand *, 4> usesToReplace;
   // Clone projections in last-to-first order.
   for (unsigned idx = 0; idx < projections.size(); ++idx) {
     auto *oldProj = projections[idx];
     assert(oldProj->getParent() == bb);
+    // Reset transient per-projection sets.
     usesToReplace.clear();
+    firstBlockUse.clear();
+    // Gather uses.
     for (Operand *use : oldProj->getUses()) {
-      if (use->getUser()->getParent() != bb)
+      auto *useBB = use->getUser()->getParent();
+      if (useBB != bb) {
+        firstBlockUse.try_emplace(useBB, use);
         usesToReplace.push_back(use);
+      }
     }
+    // Replace uses. Uses must be handled in the same order they were discovered
+    // above.
+    //
+    // Avoid cloning a projection multiple times per block. This avoids extra
+    // projections, but also prevents the removal of DebugValue. If a
+    // projection's only remaining is DebugValue, then it is deleted along with
+    // the DebugValue.
     for (Operand *use : usesToReplace) {
-      auto *newProj = oldProj->clone(use->getUser());
-      use->set(cast<SingleValueInstruction>(newProj));
+      auto *useBB = use->getUser()->getParent();
+      auto *firstUse = firstBlockUse.lookup(useBB);
+      SingleValueInstruction *newProj;
+      if (use == firstUse)
+        newProj = cast<SingleValueInstruction>(oldProj->clone(use->getUser()));
+      else {
+        newProj = cast<SingleValueInstruction>(firstUse->get());
+        assert(newProj->getParent() == useBB);
+        newProj->moveFront(useBB);
+      }
+      use->set(newProj);
     }
   }
   return true;
@@ -223,21 +289,26 @@ void StaticInitCloner::add(SILInstruction *initVal) {
 SingleValueInstruction *
 StaticInitCloner::clone(SingleValueInstruction *initVal) {
   assert(numOpsToClone.count(initVal) != 0 && "initVal was not added");
-  // Find the right order to clone: all operands of an instruction must be
-  // cloned before the instruction itself.
-  while (!readyToClone.empty()) {
-    SILInstruction *inst = readyToClone.pop_back_val();
+  
+  if (!isValueCloned(initVal)) {
+    // Find the right order to clone: all operands of an instruction must be
+    // cloned before the instruction itself.
+    while (!readyToClone.empty()) {
+      SILInstruction *inst = readyToClone.pop_back_val();
 
-    // Clone the instruction into the SILGlobalVariable
-    visit(inst);
+      // Clone the instruction into the SILGlobalVariable
+      visit(inst);
 
-    // Check if users of I can now be cloned.
-    for (SILValue result : inst->getResults()) {
-      for (Operand *use : result->getUses()) {
-        SILInstruction *user = use->getUser();
-        if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
-          readyToClone.push_back(user);
+      // Check if users of I can now be cloned.
+      for (SILValue result : inst->getResults()) {
+        for (Operand *use : result->getUses()) {
+          SILInstruction *user = use->getUser();
+          if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
+            readyToClone.push_back(user);
+        }
       }
+      if (inst == initVal)
+        break;
     }
   }
   return cast<SingleValueInstruction>(getMappedValue(initVal));

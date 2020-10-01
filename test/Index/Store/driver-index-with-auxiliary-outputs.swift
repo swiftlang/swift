@@ -4,7 +4,7 @@
 // make sure the frontend job doesn't try to emit the auxiliary outputs based
 // on the non-indexed files. (This is how Xcode currently constructs -index-file
 // invocations: take a normal build command and add extra arguments to it.)
-// RUN: %target-build-swift -index-file -index-file-path %S/Inputs/SwiftModuleA.swift %S/Inputs/SwiftModuleA.swift %s -index-store-path %t/idx -module-name driver_index -emit-objc-header-path %t/out.h -emit-module-interface-path %t/out.swiftinterface
+// RUN: %target-build-swift -index-file -index-file-path %S/Inputs/SwiftModuleA.swift %S/Inputs/SwiftModuleA.swift %s -index-store-path %t/idx -Xfrontend -index-ignore-stdlib -module-name driver_index -emit-objc-header-path %t/out.h -emit-module-interface-path %t/out.swiftinterface
 
 // RUN: test ! -f %t/out.h
 // RUN: test ! -f %t/out.swiftinterface

@@ -61,7 +61,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     rawValue = Builtin.reinterpretCast(native)
   }
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(wasm32))
   @inlinable
   @inline(__always)
   internal init(taggedPayload: UInt) {
@@ -73,6 +73,12 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inline(__always)
   internal mutating func isUniquelyReferencedNative() -> Bool {
     return _isUnique(&rawValue)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationNative() -> Bool {
+    return Bool(Builtin.beginCOWMutation(&rawValue))
   }
 
   @inlinable
@@ -129,6 +135,20 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
     _internalInvariant(isNative)
     return _isUnique_native(&rawValue)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationUnflaggedNative() -> Bool {
+    _internalInvariant(isNative)
+    return Bool(Builtin.beginCOWMutation_native(&rawValue))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+    _internalInvariant(isNative)
+    Builtin.endCOWMutation(&rawValue)
   }
 
   @inlinable

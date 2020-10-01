@@ -2,7 +2,7 @@
 
 // <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
 
-// CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties19StructWithLazyFieldV4onceSivg : $@convention(method) (@inout StructWithLazyField) -> Int
+// CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s15lazy_properties19StructWithLazyFieldV4onceSivg : $@convention(method) (@inout StructWithLazyField) -> Int
 
 // CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties19StructWithLazyFieldV4onceSivs : $@convention(method) (Int, @inout StructWithLazyField) -> ()
 
@@ -23,7 +23,7 @@ func test21057425() {
 
 // Anonymous closure parameters in lazy initializer crash SILGen
 
-// CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivg : $@convention(method) (@inout HasAnonymousParameters) -> Int
+// CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivg : $@convention(method) (@inout HasAnonymousParameters) -> Int
 
 // CHECK-LABEL: sil private [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivgS2iXEfU_ : $@convention(thin) (Int) -> Int
 
@@ -39,7 +39,7 @@ class LazyClass {
   lazy var x = 0
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties9LazyClassC1xSivg : $@convention(method) (@guaranteed LazyClass) -> Int
+// CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s15lazy_properties9LazyClassC1xSivg : $@convention(method) (@guaranteed LazyClass) -> Int
 // CHECK: ref_element_addr %0 : $LazyClass, #LazyClass.$__lazy_storage_$_x
 // CHECK: return
 

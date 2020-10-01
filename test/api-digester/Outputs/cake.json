@@ -201,7 +201,8 @@
       "declKind": "Class",
       "usr": "s:4cake2C0C",
       "moduleName": "cake",
-      "genericSig": "<T1, T2, T3>"
+      "genericSig": "<T1, T2, T3>",
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeAlias",
@@ -425,6 +426,8 @@
       "usr": "s:4cake2C1C",
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
+      "hasMissingDesignatedInitializers": true,
+      "inheritsConvenienceInitializers": true,
       "superclassNames": [
         "cake.C0<cake.S1, cake.S1, cake.S1>"
       ]
@@ -632,6 +635,7 @@
       "usr": "s:4cake6NumberO",
       "moduleName": "cake",
       "enumRawTypeName": "Int",
+      "isEnumExhaustive": true,
       "conformances": [
         {
           "kind": "Conformance",
@@ -1235,6 +1239,7 @@
       "declKind": "Class",
       "usr": "s:4cake15FutureContainerC",
       "moduleName": "cake",
+      "hasMissingDesignatedInitializers": true,
       "conformances": [
         {
           "kind": "Conformance",
@@ -1266,7 +1271,8 @@
         "Available",
         "Available",
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1278,7 +1284,8 @@
       "intro_swift": "5",
       "declAttributes": [
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1330,7 +1337,27 @@
       "objc_name": "NewObjCClass",
       "declAttributes": [
         "ObjC"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
+    },
+    {
+      "kind": "Function",
+      "name": "emitIntoClientFunc",
+      "printedName": "emitIntoClientFunc()",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        }
+      ],
+      "declKind": "Func",
+      "usr": "s:4cake18emitIntoClientFuncyyF",
+      "moduleName": "cake",
+      "declAttributes": [
+        "AlwaysEmitIntoClient"
+      ],
+      "funcSelfKind": "NonMutating"
     },
     {
       "kind": "TypeDecl",
@@ -1526,18 +1553,6 @@
         },
         {
           "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath",
-          "usr": "s:s10MirrorPathP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
-        },
-        {
-          "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable",
           "usr": "s:SE"
@@ -1550,6 +1565,24 @@
         },
         {
           "kind": "Conformance",
+          "name": "CustomReflectable",
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
+        },
+        {
+          "kind": "Conformance",
           "name": "Hashable",
           "printedName": "Hashable",
           "usr": "s:SH"
@@ -1559,12 +1592,6 @@
           "name": "Equatable",
           "printedName": "Equatable",
           "usr": "s:SQ"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CustomReflectable",
-          "printedName": "CustomReflectable",
-          "usr": "s:s17CustomReflectableP"
         },
         {
           "kind": "Conformance",

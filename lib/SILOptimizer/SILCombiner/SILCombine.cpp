@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -130,7 +131,9 @@ public:
   }
 
   void notifyHasNewUsers(SILValue value) override {
-    Worklist.addUsersToWorklist(value);
+    if (Worklist.size() < 10000) {
+      Worklist.addUsersToWorklist(value);
+    }
     changed = true;
   }
 
@@ -226,12 +229,26 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // Perform iterations until we do not make any changes.
   while (doOneIteration(F, Iteration)) {
     Changed = true;
-    Iteration++;
+    ++Iteration;
+  }
+
+  if (invalidatedStackNesting) {
+    StackNesting().correctStackNesting(&F);
   }
 
   // Cleanup the builder and return whether or not we made any changes.
   return Changed;
 }
+
+void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    while (!result->use_empty()) {
+      eraseInstIncludingUsers(result->use_begin()->getUser());
+    }
+  }
+  eraseInstFromFunction(*inst);
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points
@@ -245,10 +262,6 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    // FIXME: We should be able to handle ownership.
-    if (getFunction()->hasOwnership())
-      return;
-
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();

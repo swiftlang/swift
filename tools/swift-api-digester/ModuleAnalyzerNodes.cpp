@@ -37,7 +37,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 #define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
 #include "swift/IDE/DigesterEnums.def"
 
-  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
+  swift::ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
 
@@ -126,7 +126,11 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal) {}
+  EnumRawTypeName(Info.EnumRawTypeName),
+  IsExternal(Info.IsExternal),
+  IsEnumExhaustive(Info.IsEnumExhaustive),
+  HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
+  InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
@@ -405,20 +409,28 @@ StringRef SDKNodeDecl::getScreenInfo() const {
   auto &Ctx = getSDKContext();
   llvm::SmallString<64> SS;
   llvm::raw_svector_ostream OS(SS);
-  if (Ctx.getOpts().PrintModule)
-    OS << ModuleName;
-  if (!HeaderName.empty())
-    OS << "(" << HeaderName << ")";
+  if (Ctx.getOpts().CompilerStyle) {
+    // Compiler style we don't need source info
+    OS << (Ctx.checkingABI() ? "ABI breakage" : "API breakage");
+  } else {
+    // Print more source info.
+    if (Ctx.getOpts().PrintModule)
+      OS << ModuleName;
+    if (!HeaderName.empty())
+      OS << "(" << HeaderName << ")";
+  }
   if (!OS.str().empty())
     OS << ": ";
   bool IsExtension = false;
   if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
     IsExtension = TD->isExternal();
   }
-  if (IsExtension)
-    OS << "Extension";
-  else
-    OS << getDeclKind();
+
+  // There is no particular reasons why we don't use lower-cased keyword names
+  // in non-CompilerStyle mode. This is to be backward compatible so clients
+  // don't need to update existing known breakages.
+  OS << getDeclKindStr(IsExtension? DeclKind::Extension : getDeclKind(),
+                       getSDKContext().getOpts().CompilerStyle);
   OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
@@ -590,7 +602,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
 
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
-    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue().str());
   };
   static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
     auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
@@ -1069,7 +1081,7 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     llvm::SmallString<32> Result;
     Result.append(getSimpleName(VD));
     Result.append("(");
-    for (auto Arg : VD->getFullName().getArgumentNames()) {
+    for (auto Arg : VD->getName().getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
       Result.append(":");
     }
@@ -1148,7 +1160,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   if (auto *GC = D->getAsGenericContext()) {
     if (auto Sig = GC->getGenericSignature()) {
       if (Canonical)
-        Sig->getCanonicalSignature()->print(OS, Opts);
+        Sig.getCanonicalSignature()->print(OS, Opts);
       else
         Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());
@@ -1327,7 +1339,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       SugaredGenericSig(Ctx.checkingABI()?
                         printGenericSignature(Ctx, D, /*Canonical*/false):
                         StringRef()),
-      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
+      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::macOS)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
@@ -1403,6 +1415,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
         SuperclassNames.push_back(getPrintedName(Ctx, T->getCanonicalType()));
       }
     }
+    HasMissingDesignatedInitializers = CD->hasMissingDesignatedInitializers();
+    InheritsConvenienceInitializers = CD->inheritsSuperclassInitializers();
   }
 
   if (auto *FD = dyn_cast<FuncDecl>(VD)) {
@@ -1422,6 +1436,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
+    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr);
     if (auto RT = ED->getRawType()) {
       if (auto *D = RT->getNominalOrBoundGenericNominal()) {
         EnumRawTypeName = D->getName().str();
@@ -1511,7 +1526,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     Root->addChild(constructTypeNode(MTT->getInstanceType()));
   } else if (auto ATT = T->getAs<ArchetypeType>()) {
     for (auto Pro : ATT->getConformsTo()) {
-      Root->addChild(constructTypeNode(Pro->getDeclaredType()));
+      Root->addChild(constructTypeNode(Pro->getDeclaredInterfaceType()));
     }
   }
   return Root;
@@ -1566,6 +1581,7 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 bool swift::ide::api::
 SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   // Exclude all clang nodes if we're comparing Swift decls specifically.
+  // FIXME: isFromClang also excludes Swift decls with @objc. We should allow those.
   if (Opts.SwiftOnly && isFromClang(D)) {
     return true;
   }
@@ -1588,13 +1604,18 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
-      // whitelist them if we're checking ABI.
+      // allowlist them if we're checking ABI.
       if (getFixedBinaryOrder(VD).hasValue())
         return false;
       // Typealias should have no impact on ABI.
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+    // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
+    // These decls are considered effectively public because they are usable
+    // from inline, so we have to manually exclude them here.
+    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return true;
   } else {
     if (D->isPrivateStdlibDecl(false))
       return true;
@@ -1690,7 +1711,8 @@ SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   Info.IsImplicitlyUnwrappedOptional = VD->isImplicitlyUnwrappedOptional();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
-    for(auto *AC: VAD->getAllAccessors()) {
+    llvm::SmallVector<AccessorDecl*, 4> scratch;
+    for(auto *AC: VAD->getOpaqueAccessors(scratch)) {
       if (!Ctx.shouldIgnore(AC, VAD)) {
         Var->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
       }
@@ -1724,7 +1746,8 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
   for (auto *Node: createParameterNodes(SD->getIndices())) {
     Subs->addChild(Node);
   }
-  for(auto *AC: SD->getAllAccessors()) {
+  llvm::SmallVector<AccessorDecl*, 4> scratch;
+  for(auto *AC: SD->getOpaqueAccessors(scratch)) {
     if (!Ctx.shouldIgnore(AC, SD)) {
       Subs->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
     }
@@ -1975,6 +1998,11 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
   output(out, KeyKind::KK_isExternal, IsExternal);
+  output(out, KeyKind::KK_isEnumExhaustive, IsEnumExhaustive);
+  output(out, KeyKind::KK_hasMissingDesignatedInitializers,
+         HasMissingDesignatedInitializers);
+  output(out, KeyKind::KK_inheritsConvenienceInitializers,
+         InheritsConvenienceInitializers);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }

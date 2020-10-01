@@ -354,7 +354,7 @@ sil @trivial_destructor_on_stack : $@convention(thin) () -> () {
 // CHECK: alloc_ref
 sil @trivial_destructor_may_trap : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
-  %1 = unconditional_checked_cast %0 : $TrivialDestructor to $AnyObject
+  %1 = unconditional_checked_cast %0 : $TrivialDestructor to AnyObject
   strong_release %0 : $TrivialDestructor
   %4 = tuple()
   return %4 : $()
@@ -372,5 +372,25 @@ bb0:
   dealloc_stack %0 : $*FloatingPointRoundingRule
   %1 = tuple ()
   return %1 : $()
+}
+
+protocol P { }
+struct X : P { }
+
+// CHECK-LABEL: sil @remove_dead_optional_existential
+// CHECK:      bb0(%0 : $X):
+// CHECK-NEXT:   %1 = tuple ()
+// CHECK-NEXT:   return %1
+sil @remove_dead_optional_existential : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %3 = alloc_stack $Optional<P>
+  %4 = init_enum_data_addr %3 : $*Optional<P>, #Optional.some!enumelt
+  %5 = init_existential_addr %4 : $*P, $X
+  store %0 to %5 : $*X
+  inject_enum_addr %3 : $*Optional<P>, #Optional.some!enumelt
+  destroy_addr %3 : $*Optional<P>
+  dealloc_stack %3 : $*Optional<P>
+  %10 = tuple ()
+  return %10 : $()
 }
 

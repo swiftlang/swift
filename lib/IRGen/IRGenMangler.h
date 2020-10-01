@@ -15,6 +15,7 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -96,6 +97,11 @@ public:
     return mangleTypeSymbol(type, "Ma");
   }
 
+  std::string
+  mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(Type type) {
+    return mangleTypeSymbol(type, "Mb");
+  }
+
   std::string mangleTypeMetadataLazyCacheVariable(Type type) {
     return mangleTypeSymbol(type, "ML");
   }
@@ -112,12 +118,24 @@ public:
     return mangleTypeSymbol(type, "N");
   }
 
+  std::string mangleNoncanonicalTypeMetadata(Type type) {
+    return mangleTypeSymbol(type, "MN");
+  }
+
+  std::string mangleNoncanonicalSpecializedGenericTypeMetadataCache(Type type) {
+    return mangleTypeSymbol(type, "MJ");
+  }
+
   std::string mangleTypeMetadataPattern(const NominalTypeDecl *decl) {
     return mangleNominalTypeSymbol(decl, "MP");
   }
 
   std::string mangleClassMetaClass(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mm");
+  }
+
+  std::string mangleSpecializedGenericClassMetaClass(const CanType theType) {
+    return mangleTypeSymbol(theType, "MM");
   }
 
   std::string mangleObjCMetadataUpdateFunction(const ClassDecl *Decl) {
@@ -191,21 +209,21 @@ public:
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXM");
     return finalize();
   }
   
   std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXE");
     return finalize();
   }
   
   void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
     if (auto DC = Name.dyn_cast<DeclContext *>()) {
-      return appendContext(DC);
+      return appendContext(DC, StringRef());
     }
     if (auto VD = Name.dyn_cast<VarDecl *>()) {
       return appendEntity(VD);
@@ -225,12 +243,6 @@ public:
     beginMangling();
     appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
-    return finalize();
-  }
-
-  std::string mangleContext(const DeclContext *DC) {
-    beginMangling();
-    appendContext(DC);
     return finalize();
   }
 
@@ -311,8 +323,10 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                   const RootProtocolConformance *conformance);
-  
+                                    const RootProtocolConformance *conformance);
+  std::string mangleProtocolConformanceInstantiationCache(
+                                    const RootProtocolConformance *conformance);
+
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
     appendEntity(storage);
@@ -351,6 +365,25 @@ public:
   std::string mangleProtocolWitnessTableLazyCacheVariable(Type type,
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(type, C, "WL");
+  }
+
+  std::string
+  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedType association) {
+    beginMangling();
+    appendAnyGenericType(association.getSourceProtocol());
+    appendIdentifier(association.getAssociation()->getNameStr());
+    return finalize();
+  }
+
+  std::string mangleAssociatedTypeWitnessTableAccessFunctionDiscriminator(
+                                           const AssociatedConformance &conf) {
+    beginMangling();
+    appendAnyGenericType(conf.getSourceProtocol());
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(conf.getAssociation(),
+                             isFirstAssociatedTypeIdentifier);
+    appendAnyGenericType(conf.getAssociatedRequirement());
+    return finalize();
   }
 
   std::string mangleAssociatedTypeWitnessTableAccessFunction(

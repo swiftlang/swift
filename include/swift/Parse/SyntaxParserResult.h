@@ -44,11 +44,16 @@ public:
 
   bool isNull() const { return ASTResult.isNull(); }
   bool isNonNull() const { return ASTResult.isNonNull(); }
-  bool isParseError() const { return ASTResult.isParseError(); }
+  bool isParseError() const {
+    return ASTResult.isParseError();
+  }
+  bool isParseErrorOrHasCompletion() const {
+    return ASTResult.isParseErrorOrHasCompletion();
+  }
   bool hasCodeCompletion() const { return ASTResult.hasCodeCompletion(); }
 
   void setIsParseError() { return ASTResult.setIsParserError(); }
-  void setHasCodeCompletion() { return ASTResult.setHasCodeCompletion(); }
+  void setHasCodeCompletionAndIsError() { return ASTResult.setHasCodeCompletionAndIsError(); }
 
   const ParserResult<AST> &getASTResult() { return ASTResult; }
 
@@ -92,7 +97,7 @@ makeSyntaxCodeCompletionResult(AST *Result = nullptr) {
   SyntaxParserResult<Syntax, AST> SR;
   if (Result)
     SR = SyntaxParserResult<Syntax, AST>(None, Result);
-  SR.setHasCodeCompletion();
+  SR.setHasCodeCompletionAndIsError();
   return SR;
 }
 

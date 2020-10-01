@@ -34,7 +34,9 @@ PMOMemoryObjectInfo::PMOMemoryObjectInfo(AllocationInst *allocation)
   if (auto *abi = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
            "analyzing multi-field boxes not implemented");
-    MemorySILType = getSILBoxFieldType(abi->getBoxType(), module.Types, 0);
+    MemorySILType =
+        getSILBoxFieldType(TypeExpansionContext(*abi->getFunction()),
+                           abi->getBoxType(), module.Types, 0);
   } else {
     MemorySILType = cast<AllocStackInst>(MemoryInst)->getElementType();
   }

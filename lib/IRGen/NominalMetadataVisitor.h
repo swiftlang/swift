@@ -20,6 +20,7 @@
 
 #include "GenericRequirement.h"
 #include "GenProto.h"
+#include "GenMeta.h"
 #include "IRGenModule.h"
 #include "MetadataVisitor.h"
 
@@ -53,9 +54,9 @@ public:
     GenericTypeRequirements requirements(super::IGM, typeDecl);
     for (auto reqt : requirements.getRequirements()) {
       if (reqt.Protocol) {
-        asImpl().addGenericWitnessTable(args...);
+        asImpl().addGenericWitnessTable(reqt, args...);
       } else {
-        asImpl().addGenericArgument(args...);
+        asImpl().addGenericArgument(reqt, args...);
       }
     }
 

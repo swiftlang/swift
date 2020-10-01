@@ -75,7 +75,7 @@ static bool isUnitTest(const ValueDecl *D) {
     return false;
 
   // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
+  if (FD->getBaseIdentifier().str().startswith("test"))
     return true;
 
   return false;
@@ -143,7 +143,7 @@ SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
   info.SubKind = SymbolSubKind::None;
   info.Properties = SymbolPropertySet();
   if (auto *D = Mod.getAsSwiftModule()) {
-    if (!D->isClangModule()) {
+    if (!D->isNonSwiftModule()) {
       info.Lang = SymbolLanguage::Swift;
     } else {
       info.Lang = SymbolLanguage::C;

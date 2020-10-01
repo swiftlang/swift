@@ -13,7 +13,6 @@
 #if !defined(__ELF__) && !defined(__MACH__)
 
 #include "ImageInspection.h"
-#include "ImageInspectionCOFF.h"
 
 #if defined(__CYGWIN__)
 #include <dlfcn.h>
@@ -25,108 +24,6 @@
 #endif
 
 using namespace swift;
-
-namespace {
-static const swift::MetadataSections *registered = nullptr;
-
-void record(const swift::MetadataSections *sections) {
-  if (registered == nullptr) {
-    registered = sections;
-    sections->next = sections->prev = sections;
-  } else {
-    registered->prev->next = sections;
-    sections->next = registered;
-    sections->prev = registered->prev;
-    registered->prev = sections;
-  }
-}
-}
-
-void swift::initializeProtocolLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &protocols =
-      sections->swift5_protocols;
-    if (protocols.length)
-      addImageProtocolsBlockCallbackUnsafe(
-          reinterpret_cast<void *>(protocols.start), protocols.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
-void swift::initializeProtocolConformanceLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &conformances =
-        sections->swift5_protocol_conformances;
-    if (conformances.length)
-      addImageProtocolConformanceBlockCallbackUnsafe(
-          reinterpret_cast<void *>(conformances.start), conformances.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
-void swift::initializeTypeMetadataRecordLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &type_metadata =
-        sections->swift5_type_metadata;
-    if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallbackUnsafe(
-          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
-void swift::initializeDynamicReplacementLookup() {
-}
-
-SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr) {
-  const swift::MetadataSections *sections =
-      static_cast<const swift::MetadataSections *>(addr);
-
-  record(sections);
-
-  const auto &protocols_section = sections->swift5_protocols;
-  const void *protocols =
-      reinterpret_cast<void *>(protocols_section.start);
-  if (protocols_section.length)
-    addImageProtocolsBlockCallback(protocols, protocols_section.length);
-
-  const auto &protocol_conformances = sections->swift5_protocol_conformances;
-  const void *conformances =
-      reinterpret_cast<void *>(protocol_conformances.start);
-  if (protocol_conformances.length)
-    addImageProtocolConformanceBlockCallback(conformances,
-                                             protocol_conformances.length);
-
-  const auto &type_metadata = sections->swift5_type_metadata;
-  const void *metadata = reinterpret_cast<void *>(type_metadata.start);
-  if (type_metadata.length)
-    addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
-
-  const auto &dynamic_replacements = sections->swift5_repl;
-  const auto *replacements =
-      reinterpret_cast<void *>(dynamic_replacements.start);
-  if (dynamic_replacements.length) {
-    const auto &dynamic_replacements_some = sections->swift5_reps;
-    const auto *replacements_some =
-      reinterpret_cast<void *>(dynamic_replacements_some.start);
-    addImageDynamicReplacementBlockCallback(
-        replacements, dynamic_replacements.length, replacements_some,
-        dynamic_replacements_some.length);
-  }
-}
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #if defined(__CYGWIN__)
@@ -171,12 +68,6 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #else
   return 0;
 #endif // defined(__CYGWIN__) || defined(_WIN32)
-}
-
-// This is only used for backward deployment hooks, which we currently only support for
-// MachO. Add a stub here to make sure it still compiles.
-void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
-  return nullptr;
 }
 
 #endif // !defined(__ELF__) && !defined(__MACH__)

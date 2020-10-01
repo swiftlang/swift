@@ -34,3 +34,11 @@ break
            collatz(r)
     }
 }
+
+  #if true
+   func foo() -> Int {
+        0
+     }
+ #else
+   1
+     #endif

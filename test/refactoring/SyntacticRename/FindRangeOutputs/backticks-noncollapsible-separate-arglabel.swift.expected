@@ -1,0 +1,5 @@
+struct Foo {
+    /*test:def*/<keywordBase>subscript</keywordBase>(<arglabel index=0>`x`</arglabel> <noncollapsibleparam index=0>y</noncollapsibleparam>: Int) -> Int { fatalError() }
+}
+Foo()/*test:ref*/[<callarg index=0>`x`</callarg><callcolon index=0>: </callcolon>10]
+

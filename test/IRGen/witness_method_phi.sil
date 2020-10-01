@@ -9,8 +9,8 @@ entry:
   // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 1
   // CHECK: [[LOAD:%.*]] = load i8*, i8** [[T0_GEP]],
   // CHECK: [[T0:%.*]] = bitcast i8* [[LOAD]] to void (%swift.opaque*, %swift.type*, i8**)*
-  // CHECK: [[FUNC:%.*]] = bitcast void (%swift.opaque*, %swift.type*, i8**)* [[T0]] to i8*
-  %1 = witness_method $T, #P.foo!1 : $@convention(witness_method: P) <T: P> (@in T) -> ()
+  // CHECK: [[FUNC:%.*]] = bitcast void (%swift.opaque*, %swift.type*, i8**)* {{.*}} to i8*
+  %1 = witness_method $T, #P.foo : $@convention(witness_method: P) <T: P> (@in T) -> ()
   br bb1(%1 : $@convention(witness_method: P) <T: P> (@in T) -> ())
 
 // CHECK:         phi i8* [ [[FUNC]], %entry ]

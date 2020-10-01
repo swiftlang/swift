@@ -14,7 +14,7 @@
 import CoreFoundation
 #else
 @_exported import Foundation // Clang module
-import _SwiftCoreFoundationOverlayShims
+@_implementationOnly import _SwiftCoreFoundationOverlayShims
 #endif
 
 /// A `Measurement` is a model type that holds a `Double` value associated with a `Unit`.

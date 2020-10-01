@@ -118,12 +118,8 @@ public:
   /// Set target decl for attribute if the CC token is in attribute of the decl.
   virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
 
-  /// Complete the whole expression.  This is a fallback that should
-  /// produce results when more specific completion methods failed.
-  virtual void completeExpr() {};
-
   /// Complete expr-dot after we have consumed the dot.
-  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
+  virtual void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) {};
 
   /// Complete the beginning of a statement or expression.
   virtual void completeStmtOrExpr(CodeCompletionExpr *E) {};
@@ -194,13 +190,20 @@ public:
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) {};
+  completeImportDecl(ImportPath::Builder &Path) {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
 
   virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
+
+  virtual bool canPerformCompleteLabeledTrailingClosure() const {
+    return false;
+  }
+
+  virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
+                                              bool isAtStartOfLine) {};
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
@@ -221,7 +224,9 @@ public:
 
   virtual void completeAfterIfStmt(bool hasElse) {};
 
-  virtual void completeGenericParams(TypeLoc TL) {};
+  virtual void completeGenericRequirement() {};
+
+  virtual void completeStmtLabel(StmtKind ParentKind) {};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

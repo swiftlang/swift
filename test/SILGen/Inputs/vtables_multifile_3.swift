@@ -19,9 +19,9 @@ open class OtherDerived : MostDerived {
 // or Derived, which we cannot see from here.
 
 // CHECK-LABEL: sil_vtable [serialized] OtherDerived {
-// CHECK-NEXT:   #MoreDerived.privateMethod1!1: (MoreDerived) -> () -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod1yyF [override]      // OtherDerived.privateMethod1()
-// CHECK-NEXT:   #MoreDerived.privateMethod2!1: (MoreDerived) -> (AnyObject?) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod2yyyXlSgF [override]       // OtherDerived.privateMethod2(_:)
-// CHECK-NEXT:   #MoreDerived.privateMethod3!1: (MoreDerived) -> (Int?) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod3yySiSgF [override]      // OtherDerived.privateMethod3(_:)
-// CHECK-NEXT:   #MoreDerived.privateMethod4!1: (MoreDerived) -> (Int) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod4yySiF [override] // OtherDerived.privateMethod4(_:)
-// CHECK-NEXT:   #OtherDerived.deinit!deallocator.1: @$s19vtables_multifile_312OtherDerivedCfD // OtherDerived.__deallocating_deinit
+// CHECK-NEXT:   #MoreDerived.privateMethod1: (MoreDerived) -> () -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod1yyF [override]      // OtherDerived.privateMethod1()
+// CHECK-NEXT:   #MoreDerived.privateMethod2: (MoreDerived) -> (AnyObject?) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod2yyyXlSgF [override]       // OtherDerived.privateMethod2(_:)
+// CHECK-NEXT:   #MoreDerived.privateMethod3: (MoreDerived) -> (Int?) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod3yySiSgF [override]      // OtherDerived.privateMethod3(_:)
+// CHECK-NEXT:   #MoreDerived.privateMethod4: (MoreDerived) -> (Int) -> () : @$s19vtables_multifile_312OtherDerivedC14privateMethod4yySiF [override] // OtherDerived.privateMethod4(_:)
+// CHECK-NEXT:   #OtherDerived.deinit!deallocator: @$s19vtables_multifile_312OtherDerivedCfD // OtherDerived.__deallocating_deinit
 // CHECK-NEXT: }

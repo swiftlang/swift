@@ -98,3 +98,7 @@ public class ForwardNativeTypeIsNonObjCClass {
 public class SwiftForwardNativeTypeIsNonObjCClass {
     public init() {}
 }
+
+public class ForwardNativeTypeIsUnambiguouslyNonObjCClass {
+    public init() {}
+}

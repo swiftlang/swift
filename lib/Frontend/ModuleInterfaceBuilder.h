@@ -16,7 +16,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "llvm/Support/StringSaver.h"
 
 namespace llvm {
 namespace vfs {
@@ -32,25 +34,44 @@ class SearchPathOptions;
 class DependencyTracker;
 
 class ModuleInterfaceBuilder {
-  llvm::vfs::FileSystem &fs;
+  SourceManager &sourceMgr;
   DiagnosticEngine &diags;
+  InterfaceSubContextDelegate &subASTDelegate;
   const StringRef interfacePath;
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
-  const bool serializeDependencyHashes;
-  const bool trackSystemDependencies;
-  const bool remarkOnRebuildFromInterface;
+  const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
-  CompilerInvocation subInvocation;
   SmallVector<StringRef, 3> extraDependencies;
 
-  void configureSubInvocationInputsAndOutputs(StringRef OutPath);
+public:
+  /// Emit a diagnostic tied to this declaration.
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(
+      DiagnosticEngine &Diags,
+      SourceManager &SM,
+      StringRef InterfacePath,
+      SourceLoc Loc,
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) {
+    if (Loc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      Loc = SM.getLocFromExternalSource(InterfacePath, 1, 1);
+    }
+    return Diags.diagnose(Loc, ID, std::move(Args)...);
+  }
 
-  void configureSubInvocation(const SearchPathOptions &SearchPathOpts,
-                              const LangOptions &LangOpts,
-                              ClangModuleLoader *ClangLoader);
+private:
+  /// Emit a diagnostic tied to this declaration.
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) const {
+    return diagnose(diags, sourceMgr, interfacePath, diagnosticLoc,
+                    ID, std::move(Args)...);
+  }
 
   /// Populate the provided \p Deps with \c FileDependency entries for all
   /// dependencies \p SubInstance's DependencyTracker recorded while compiling
@@ -63,37 +84,25 @@ class ModuleInterfaceBuilder {
       SmallVectorImpl<SerializationOptions::FileDependency> &Deps,
       bool IsHashBased);
 
-  bool extractSwiftInterfaceVersionAndArgs(
-      version::Version &Vers, llvm::StringSaver &SubArgSaver,
-      SmallVectorImpl<const char *> &SubArgs);
-
+  bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
+                                std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                                ArrayRef<std::string> CandidateModules);
 public:
   ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
-                            const SearchPathOptions &searchPathOpts,
-                            const LangOptions &langOpts,
-                            ClangModuleLoader *clangImporter,
+                            InterfaceSubContextDelegate &subASTDelegate,
                             StringRef interfacePath,
                             StringRef moduleName,
                             StringRef moduleCachePath,
                             StringRef prebuiltCachePath,
-                            bool serializeDependencyHashes = false,
-                            bool trackSystemDependencies = false,
-                            bool remarkOnRebuildFromInterface = false,
+                            bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
-    : fs(*sourceMgr.getFileSystem()), diags(diags),
+    : sourceMgr(sourceMgr), diags(diags),
+      subASTDelegate(subASTDelegate),
       interfacePath(interfacePath), moduleName(moduleName),
       moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
-      serializeDependencyHashes(serializeDependencyHashes),
-      trackSystemDependencies(trackSystemDependencies),
-      remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
-    configureSubInvocation(searchPathOpts, langOpts, clangImporter);
-  }
-
-  const CompilerInvocation &getSubInvocation() const {
-    return subInvocation;
-  }
+      disableInterfaceFileLock(disableInterfaceFileLock),
+      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {}
 
   /// Ensures the requested file name is added as a dependency of the resulting
   /// module.
@@ -102,7 +111,9 @@ public:
   }
 
   bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
-                        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
+                        std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                        llvm::function_ref<void()> RemarkRebuild = nullptr,
+                        ArrayRef<std::string> CandidateModules = {});
 };
 
 } // end namespace swift

@@ -19,7 +19,7 @@ func checkThatAPINotesAreBeingUsed() {
 
 // OPT-LABEL: sil hidden @$s21objc_nonnull_lie_hack10makeObjectSo8NSObjectCSgyF
 // OPT:         [[OPT:%.*]] = unchecked_ref_cast
-// OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.some!enumelt.1:
+// OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.some!enumelt:
 func makeObject() -> NSObject? {
   let foo: NSObject? = NSObject()
   if foo == nil {
@@ -30,7 +30,7 @@ func makeObject() -> NSObject? {
 
 // OPT-LABEL: sil hidden @$s21objc_nonnull_lie_hack15callClassMethodSo10NonNilTestCSgyF
 // OPT: [[METATYPE:%[0-9]+]] = metatype $@thick NonNilTest.Type
-// OPT: [[METHOD:%[0-9]+]] = objc_method [[METATYPE]] : $@thick NonNilTest.Type, #NonNilTest.nonNilObject!1.foreign : (NonNilTest.Type) -> () -> NonNilTest, $@convention(objc_method) (@objc_metatype NonNilTest.Type) -> @autoreleased NonNilTest
+// OPT: [[METHOD:%[0-9]+]] = objc_method [[METATYPE]] : $@thick NonNilTest.Type, #NonNilTest.nonNilObject!foreign : (NonNilTest.Type) -> () -> NonNilTest, $@convention(objc_method) (@objc_metatype NonNilTest.Type) -> @autoreleased NonNilTest
 // OPT: [[OBJC_METATYPE:%[0-9]+]] = metatype $@objc_metatype NonNilTest.Type
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_METATYPE]]) : $@convention(objc_method) (@objc_metatype NonNilTest.Type) -> @autoreleased NonNilTest
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
@@ -44,7 +44,7 @@ func callClassMethod() -> NonNilTest? {
 }
 
 // OPT-LABEL: sil shared @$s21objc_nonnull_lie_hack18callInstanceMethodSo10NonNilTestCSgAD3obj_tFTf4g_n
-// OPT: [[METHOD:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObject!1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[METHOD:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObject!foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]]
 // OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>
@@ -58,7 +58,7 @@ func callInstanceMethod(obj: NonNilTest) -> NonNilTest? {
 }
 
 // OPT-LABEL: sil shared @$s21objc_nonnull_lie_hack12loadPropertySo10NonNilTestCSgAD3obj_tFTf4g_n
-// OPT: [[GETTER:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObjectProperty!getter.1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[GETTER:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.nonNilObjectProperty!getter.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>,
@@ -71,7 +71,7 @@ func loadProperty(obj: NonNilTest) -> NonNilTest? {
 }
 
 // OPT-LABEL: sil shared @$s21objc_nonnull_lie_hack19loadUnownedPropertySo10NonNilTestCSgAD3obj_tFTf4g_n
-// OPT: [[GETTER:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.unownedNonNilObjectProperty!getter.1.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
+// OPT: [[GETTER:%[0-9]+]] = objc_method [[OBJ:%[0-9]+]] : $NonNilTest, #NonNilTest.unownedNonNilObjectProperty!getter.foreign : (NonNilTest) -> () -> NonNilTest, $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (NonNilTest) -> @autoreleased NonNilTest
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $NonNilTest to $Optional<NonNilTest>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<NonNilTest>

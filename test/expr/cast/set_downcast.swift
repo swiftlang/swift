@@ -30,7 +30,7 @@ setD = setC as! Set<D>
 if let _ = setC as? Set<D> { }
 
 // Test set downcasts to unrelated types.
-_ = setC as! Set<U> // expected-warning{{cast from 'Set<C>' to unrelated type 'Set<U>' always fails}}
+_ = setC as! Set<U> // Ok
 
-// Test set conditional downcasts to unrelated types
-if let _ = setC as? Set<U> { } // expected-warning{{cast from 'Set<C>' to unrelated type 'Set<U>' always fails}}
+// Test set conditional downcasts to unrelated types.
+if let _ = setC as? Set<U> { } // Ok

@@ -43,7 +43,7 @@ dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type '[C :
 // expected-note@-2 {{arguments to generic parameter 'Value' ('C' and 'U') are expected to be equal}}
 
 // Test dictionary conditional downcasts to unrelated types
-if let _ = dictCC as? Dictionary<D, U> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<D, U>' always fails}}
-if let _ = dictCC as? Dictionary<U, D> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<U, D>' always fails}}
-if let _ = dictCC as? Dictionary<U, U> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<U, U>' always fails}}
+if let _ = dictCC as? Dictionary<D, U> { } // Ok
+if let _ = dictCC as? Dictionary<U, D> { } // Ok
+if let _ = dictCC as? Dictionary<U, U> { } // Ok
 

@@ -10,9 +10,9 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -592,40 +592,10 @@ Runtime.test("Struct layout with reference storage types") {
 }
 
 Runtime.test("SwiftError layout constants for LLDB") {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
-#elseif os(Linux)
-  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
-#elseif os(Android)
-  #if arch(arm)
-    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
-  #elseif arch(arm64)
-    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
-  #else
-    _UnimplementedError()
-  #endif
-#elseif os(Windows)
-  let hStdlibCore: HMODULE = GetModuleHandleA("swiftCore.dll")!
-#else
-  _UnimplementedError()
-#endif
+  let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
+  let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
 
-#if os(Windows)
-  let offsetof_SwiftError_typeMetadata: UnsafeRawPointer =
-      unsafeBitCast(GetProcAddress(hStdlibCore,
-                                   "_swift_lldb_offsetof_SwiftError_typeMetadata")!,
-                    to: UnsafeRawPointer.self)
-  let sizeof_SwiftError: UnsafeRawPointer =
-      unsafeBitCast(GetProcAddress(hStdlibCore,
-                                   "_swift_lldb_sizeof_SwiftError")!,
-                    to: UnsafeRawPointer.self)
-#else
-  let offsetof_SwiftError_typeMetadata =
-    dlsym(RTLD_DEFAULT, "_swift_lldb_offsetof_SwiftError_typeMetadata")!
-  let sizeof_SwiftError =
-    dlsym(RTLD_DEFAULT, "_swift_lldb_sizeof_SwiftError")!
-#endif
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 #if arch(i386) || arch(arm)
   expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(36, sizeof_SwiftError.load(as: UInt.self))
@@ -633,7 +603,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux) || os(Android) || os(Windows)
+#elseif os(Linux) || os(Android) || os(Windows) || os(OpenBSD)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else
@@ -792,7 +762,7 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.

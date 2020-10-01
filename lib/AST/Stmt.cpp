@@ -262,25 +262,25 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-void CatchStmt::setErrorPattern(Pattern *pattern) {
-  ErrorPattern = pattern;
-  ErrorPattern->markOwnedByStatement(this);
-}
-
-
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
-                                 ArrayRef<CatchStmt*> catches,
+                                 ArrayRef<CaseStmt *> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
+  void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
 
+bool CaseLabelItem::isSyntacticallyExhaustive() const {
+  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+}
+
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
   for (auto clause : getCatches()) {
-    if (clause->isSyntacticallyExhaustive())
-      return true;
+    for (auto &LabelItem : clause->getCaseLabelItems()) {
+      if (LabelItem.isSyntacticallyExhaustive())
+        return true;
+    }
   }
   return false;
 }
@@ -296,26 +296,23 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
-bool CatchStmt::isSyntacticallyExhaustive() const {
-  // It cannot have a guard expression and the pattern cannot be refutable.
-  return getGuardExpr() == nullptr &&
-         !getErrorPattern()->isRefutablePattern();
-}
-
-
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
-  return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
+  return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
+                                           RParenLoc);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
-      return PoundLoc;
+      if (LParenLoc.isInvalid())
+        return PoundLoc;
+      return LParenLoc;
     }
     return getQueries()[NumQueries - 1]->getSourceRange().End;
   }
@@ -395,31 +392,36 @@ SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
-    return { CasePattern->getStartLoc(), E->getEndLoc() };
-  return CasePattern->getSourceRange();
+    return { getPattern()->getStartLoc(), E->getEndLoc() };
+  return getPattern()->getSourceRange();
 }
 SourceLoc CaseLabelItem::getStartLoc() const {
-  return CasePattern->getStartLoc();
+  return getPattern()->getStartLoc();
 }
 SourceLoc CaseLabelItem::getEndLoc() const {
   if (auto *E = getGuardExpr())
     return E->getEndLoc();
-  return CasePattern->getEndLoc();
+  return getPattern()->getEndLoc();
 }
 
-CaseStmt::CaseStmt(SourceLoc caseLoc, ArrayRef<CaseLabelItem> caseLabelItems,
-                   SourceLoc unknownAttrLoc, SourceLoc colonLoc, Stmt *body,
+CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
+                   ArrayRef<CaseLabelItem> caseLabelItems,
+                   SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
+                   Stmt *body,
                    Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
                    Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
-    : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, caseLoc)),
-      UnknownAttrLoc(unknownAttrLoc), CaseLoc(caseLoc), ColonLoc(colonLoc),
+    : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
+      UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
+      ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
       BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
       CaseBodyVariables(caseBodyVariables) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
-
+  assert(
+      !(parentKind == CaseParentKind::DoCatch && fallthroughStmt.isNonNull()) &&
+      "Only switch cases can have a fallthrough.");
   if (hasFallthroughDest()) {
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
@@ -439,7 +441,8 @@ CaseStmt::CaseStmt(SourceLoc caseLoc, ArrayRef<CaseLabelItem> caseLabelItems,
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &ctx, SourceLoc caseLoc,
+CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+                           SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
                            Stmt *body,
@@ -450,8 +453,43 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, SourceLoc caseLoc,
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),
                    alignof(CaseStmt));
-  return ::new (mem) CaseStmt(caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
-                              body, caseVarDecls, implicit, fallthroughStmt);
+  return ::new (mem)
+      CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
+               body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+namespace {
+
+template<typename CaseIterator>
+CaseStmt *findNextCaseStmt(
+    CaseIterator first, CaseIterator last, const CaseStmt *caseStmt) {
+  for(auto caseIter = first; caseIter != last; ++caseIter) {
+    if (*caseIter == caseStmt) {
+      ++caseIter;
+      return caseIter == last ? nullptr : *caseIter;
+    }
+  }
+
+  return nullptr;
+}
+
+}
+
+CaseStmt *CaseStmt::findNextCaseStmt() const {
+  auto parent = getParentStmt();
+  if (!parent)
+    return nullptr;
+
+  if (auto switchParent = dyn_cast<SwitchStmt>(parent)) {
+    return ::findNextCaseStmt(
+        switchParent->getCases().begin(), switchParent->getCases().end(),
+        this);
+  }
+
+  auto doCatchParent = cast<DoCatchStmt>(parent);
+  return ::findNextCaseStmt(
+      doCatchParent->getCatches().begin(), doCatchParent->getCatches().end(),
+      this);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
@@ -475,6 +513,9 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());
+  for (auto *caseStmt : theSwitch->getCases())
+    caseStmt->setParentStmt(theSwitch);
+
   return theSwitch;
 }
 
@@ -483,14 +524,14 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 // dependency.
 
 struct StmtTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Stmt *S = static_cast<const Stmt *>(Entity);
     OS << Stmt::getKindName(S->getKind());
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const Stmt *S = static_cast<const Stmt *>(Entity);

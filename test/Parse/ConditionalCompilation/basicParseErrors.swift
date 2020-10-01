@@ -78,6 +78,7 @@ struct S {
 // expected-note@-2{{did you mean 'FreeBSD'?}} {{8-15=FreeBSD}}
 // expected-note@-3{{did you mean 'Android'?}} {{8-15=Android}}
 // expected-note@-4{{did you mean 'OSX'?}} {{8-15=OSX}}
+// expected-note@-5{{did you mean 'OpenBSD'?}} {{8-15=OpenBSD}}
 #endif
 
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
@@ -104,7 +105,7 @@ fn_j() // OK
 // expected-error @-1 {{invalid conditional compilation expression}}
 undefinedFunc() // ignored.
 #else
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #endif
 
 #if false
@@ -112,7 +113,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 // expected-error @-1 {{invalid conditional compilation expression}}
 undefinedFunc() // ignored.
 #else
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #endif
 
 /// Invalid platform condition arguments don't invalidate the whole condition.
@@ -137,7 +138,7 @@ fn_k()
 // expected-note@-6 {{did you mean 'i386'?}} {{26-29=i386}}
 func undefinedFunc() // ignored.
 #endif
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
 #if os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{5-7=targetEnvironment}}
 #endif
@@ -148,7 +149,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 #if _endian(arm64) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note {{did you mean 'arch'}} {{5-12=arch}}
 #endif
 
-#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'simulator'}} {{23-28=simulator}}
+#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'macabi'}} {{23-28=macabi}}
 #endif
 
 #if os(iOS) || os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{16-18=targetEnvironment}}

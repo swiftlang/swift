@@ -1,0 +1,13 @@
+// RUN: %target-sil-opt -non-stdlib-non-transparent-func-ownership-model-eliminator %s | %FileCheck %s
+// RUN: %target-sil-opt -non-stdlib-non-transparent-func-ownership-model-eliminator %s -module-name Swift | %FileCheck -check-prefix=STDLIB-CHECK %s
+
+// CHECK-NOT: [ossa]
+// STDLIB-CHECK: [ossa]
+
+sil_stage canonical
+
+sil [ossa] @my_ossa : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
