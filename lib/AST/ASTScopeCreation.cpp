@@ -218,7 +218,7 @@ public:
                          ASTScopeImpl *const organicInsertionPoint,
                          ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
-    for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
+    for (auto nd : nodesOrDeclsToAdd) {
       auto *const newIP =
           addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
       ip = newIP;
@@ -419,9 +419,6 @@ public:
   void addChildrenForKnownAttributes(ValueDecl *decl,
                                      ASTScopeImpl *parent);
 
-public:
-
-private:
   /// Remove VarDecls because we'll find them when we expand the
   /// PatternBindingDecls. Remove EnunCases
   /// because they overlap EnumElements and AST includes the elements in the
@@ -463,7 +460,6 @@ private:
     return -1 == signum;
   }
 
-public:
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
@@ -950,7 +946,9 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   // Assume that decls are only added at the end, in source order
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(insertionPoint, this, newNodes);
+      scopeCreator.addSiblingsToScopeTree(insertionPoint, this,
+                                          scopeCreator.sortBySourceRange(
+                                            scopeCreator.cull(newNodes)));
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
   //           "ASTScope tree missed some DeclContexts or made some up");
@@ -1068,7 +1066,10 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
   // TODO: remove the sort after fixing parser to create brace statement
   // elements in source order
   auto *insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(this, this, stmt->getElements());
+      scopeCreator.addSiblingsToScopeTree(this, this,
+                                          scopeCreator.sortBySourceRange(
+                                            scopeCreator.cull(
+                                              stmt->getElements())));
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
@@ -1414,6 +1415,7 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
+  nodes = scopeCreator.sortBySourceRange(scopeCreator.cull(nodes));
   scopeCreator.addSiblingsToScopeTree(this, this, nodes);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
