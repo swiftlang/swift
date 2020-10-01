@@ -19,7 +19,6 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -27,8 +26,6 @@ namespace swift {
 
 class SILFunction;
 class SILArgument;
-class SILPhiArgument;
-class SILFunctionArgument;
 class SILPrintContext;
 
 class SILBasicBlock :
@@ -57,7 +54,7 @@ private:
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
 
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *relativeToBB, bool after);
 
@@ -78,6 +75,9 @@ public:
 
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
+
+  /// Remove all instructions of a SILGlobalVariable's static initializer block.
+  void clearStaticInitializerBlock(SILModule &module);
 
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation
@@ -111,6 +111,10 @@ public:
   /// Transfer the instructions from Other to the end of this block.
   void spliceAtEnd(SILBasicBlock *Other) {
     InstList.splice(end(), Other->InstList);
+  }
+
+  void spliceAtBegin(SILBasicBlock *Other) {
+    InstList.splice(begin(), Other->InstList);
   }
 
   bool empty() const { return InstList.empty(); }
@@ -194,14 +198,10 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
 
-  /// Returns a transform array ref that performs llvm::cast<SILPhiArgument> on
+  /// Returns a transform array ref that performs llvm::cast<NAME>
   /// each argument and then returns the downcasted value.
-  PhiArgumentArrayRef getPhiArguments() const;
-
-  /// Returns a transform array ref that performs
-  /// llvm::cast<SILFunctionArgument> on each argument and then returns the
-  /// downcasted value.
-  FunctionArgumentArrayRef getFunctionArguments() const;
+#define ARGUMENT(NAME, PARENT) NAME##ArrayRef get##NAME##s() const;
+#include "swift/SIL/SILNodes.def"
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
@@ -209,13 +209,16 @@ public:
 
   void cloneArgumentList(SILBasicBlock *Other);
 
+  void moveArgumentList(SILBasicBlock *from);
+
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr);
+                                              const ValueDecl *D = nullptr,
+                                              bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,
@@ -232,11 +235,20 @@ public:
                                                const ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl
-  /// \p D.
-  SILPhiArgument *replacePhiArgument(unsigned i, SILType Ty,
-                                     ValueOwnershipKind Kind,
-                                     const ValueDecl *D = nullptr);
+  /// ValueDecl \p D.
+  ///
+  /// NOTE: This assumes that the current argument in position \p i has had its
+  /// uses eliminated. To replace/replace all uses with, use
+  /// replacePhiArgumentAndRAUW.
+  SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
+                                     ValueOwnershipKind kind,
+                                     const ValueDecl *decl = nullptr);
+
+  /// Replace phi argument \p i and RAUW all uses.
+  SILPhiArgument *
+  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
+                                      ValueOwnershipKind kind,
+                                      const ValueDecl *decl = nullptr);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
@@ -393,8 +405,8 @@ public:
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
-  /// Pretty-print the SILBasicBlock with the designated stream and context.
-  void print(llvm::raw_ostream &OS, SILPrintContext &Ctx) const;
+  /// Pretty-print the SILBasicBlock with the designated context.
+  void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 

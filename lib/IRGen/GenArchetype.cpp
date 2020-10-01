@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
@@ -27,6 +28,7 @@
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -60,8 +62,14 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   // Check for an existing cache entry.
   if (auto response = IGF.tryGetLocalTypeMetadata(archetype, request))
     return response;
+  
+  // If this is an opaque archetype, we'll need to instantiate using its
+  // descriptor.
+  if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+    return emitOpaqueTypeMetadataRef(IGF, opaque, request);
+  }
 
-  // If that's not present, this must be an associated type.
+  // If there's no local or opaque metadata, it must be a nested type.
   auto nested = cast<NestedArchetypeType>(archetype);
 
   CanArchetypeType parent(nested->getParent());
@@ -99,6 +107,11 @@ public:
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
     collector.collectTypeMetadataForLayout(T);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
   }
 };
 
@@ -172,7 +185,8 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  auto environment = archetype->getGenericEnvironment();
+  auto origRoot = archetype->getRoot();
+  auto environment = origRoot->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.
@@ -180,7 +194,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // concretely available; we really ought to be comparing the full paths
   // to this conformance from concrete sources.
 
-  auto signature = environment->getGenericSignature()->getCanonicalSignature();
+  auto signature = environment->getGenericSignature().getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
   auto astPath = signature->getConformanceAccessPath(archetypeDepType,
@@ -227,7 +241,14 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 
   auto rootWTable = IGF.tryGetLocalTypeData(rootArchetype,
               LocalTypeDataKind::forAbstractProtocolWitnessTable(rootProtocol));
-  assert(rootWTable && "root witness table not bound in local context!");
+  // Fetch an opaque type's witness table if it wasn't cached yet.
+  if (!rootWTable) {
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(rootArchetype)) {
+      rootWTable = emitOpaqueTypeWitnessTableRef(IGF, opaqueRoot,
+                                                 rootProtocol);
+    }
+    assert(rootWTable && "root witness table not bound in local context!");
+  }
 
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
                                        ProtocolConformanceRef(rootProtocol),
@@ -263,8 +284,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
 
   // If the archetype is class-constrained, use a class pointer
   // representation.
-  if (archetype->requiresClass() ||
-      (layout && layout->isRefCounted())) {
+  if (layout && layout->isRefCounted()) {
     auto refcount = archetype->getReferenceCounting();
 
     llvm::PointerType *reprTy;
@@ -374,7 +394,6 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                      Address addr,
                                                      SILType type) {
   auto archetype = type.castTo<ArchetypeType>();
-
   // Acquire the archetype's static metadata.
   llvm::Value *metadata =
     emitArchetypeTypeMetadataRef(IGF, archetype, MetadataState::Complete)
@@ -382,4 +401,152 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
                                 {addr.getAddress(), metadata,
                                  llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
+}
+
+static void
+withOpaqueTypeGenericArgs(IRGenFunction &IGF,
+                          CanOpaqueTypeArchetypeType archetype,
+                          llvm::function_ref<void (llvm::Value*)> body) {
+  // Collect the generic arguments of the opaque decl.
+  auto opaqueDecl = archetype->getDecl();
+  auto generics = opaqueDecl->getGenericSignatureOfContext();
+  llvm::Value *genericArgs;
+  Address alloca;
+  Size allocaSize(0);
+  if (!generics || generics->areAllParamsConcrete()) {
+    genericArgs = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+  } else {
+    SmallVector<llvm::Value *, 4> args;
+    SmallVector<llvm::Type *, 4> types;
+
+    enumerateGenericSignatureRequirements(
+        opaqueDecl->getGenericSignature().getCanonicalSignature(),
+        [&](GenericRequirement reqt) {
+          auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
+                        ->getCanonicalType(opaqueDecl->getGenericSignature());
+          if (reqt.Protocol) {
+            auto ref =
+                ProtocolConformanceRef(reqt.Protocol)
+                    .subst(reqt.TypeParameter, archetype->getSubstitutions());
+            args.push_back(emitWitnessTableRef(IGF, ty, ref));
+          } else {
+            args.push_back(IGF.emitAbstractTypeMetadataRef(ty));
+          }
+          types.push_back(args.back()->getType());
+        });
+    auto bufTy = llvm::StructType::get(IGF.IGM.getLLVMContext(), types);
+    alloca = IGF.createAlloca(bufTy, IGF.IGM.getPointerAlignment());
+    allocaSize = IGF.IGM.getPointerSize() * args.size();
+    IGF.Builder.CreateLifetimeStart(alloca, allocaSize);
+    for (auto i : indices(args)) {
+      IGF.Builder.CreateStore(args[i],
+          IGF.Builder.CreateStructGEP(alloca, i, i * IGF.IGM.getPointerSize()));
+    }
+    genericArgs = IGF.Builder.CreateBitCast(alloca.getAddress(),
+                                            IGF.IGM.Int8PtrTy);
+  }
+  
+  // Pass them down to the body.
+  body(genericArgs);
+
+  // End the alloca's lifetime, if we allocated one.
+  if (alloca.getAddress()) {
+    IGF.Builder.CreateLifetimeEnd(alloca, allocaSize);
+  }
+}
+
+bool shouldUseOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
+  auto *namingDecl = opaque->getNamingDecl();
+
+  // Don't emit accessors for abstract storage that is not dynamic or a dynamic
+  // replacement.
+  if (auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl)) {
+    return abstractStorage->hasAnyNativeDynamicAccessors() ||
+           abstractStorage->getDynamicallyReplacedDecl();
+  }
+
+  // Don't emit accessors for functions that are not dynamic or dynamic
+  // replacements.
+  return namingDecl->shouldUseNativeDynamicDispatch() ||
+         (bool)namingDecl->getDynamicallyReplacedDecl();
+}
+
+static llvm::Value *
+getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
+                                 OpaqueTypeDecl *opaqueDecl) {
+  auto &IGM = IGF.IGM;
+
+  // Support dynamically replacing the return type as part of dynamic function
+  // replacement.
+  if (!IGM.getOptions().shouldOptimize() &&
+      shouldUseOpaqueTypeDescriptorAccessor(opaqueDecl)) {
+    auto descriptorAccessor = IGM.getAddrOfOpaqueTypeDescriptorAccessFunction(
+        opaqueDecl, NotForDefinition, false);
+    auto desc = IGF.Builder.CreateCall(descriptorAccessor, {});
+    desc->setDoesNotThrow();
+    desc->setCallingConv(IGM.SwiftCC);
+    return desc;
+  }
+  return IGM.getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
+}
+
+MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
+                                          CanOpaqueTypeArchetypeType archetype,
+                                          DynamicMetadataRequest request) {
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
+  auto opaqueDecl = archetype->getDecl();
+
+  auto *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
+  auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+
+  llvm::CallInst *result = nullptr;
+  withOpaqueTypeGenericArgs(IGF, archetype,
+    [&](llvm::Value *genericArgs) {
+      result = IGF.Builder.CreateCall(accessorFn,
+                       {request.get(IGF), genericArgs, descriptor, indexValue});
+      result->setDoesNotThrow();
+      result->setCallingConv(IGF.IGM.SwiftCC);
+      result->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::ReadOnly);
+    });
+  assert(result);
+  
+  auto response = MetadataResponse::handle(IGF, request, result);
+  IGF.setScopedLocalTypeMetadata(archetype, response);
+  return response;
+}
+
+llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
+                                          CanOpaqueTypeArchetypeType archetype,
+                                          ProtocolDecl *protocol) {
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
+  auto opaqueDecl = archetype->getDecl();
+
+
+  llvm::Value *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
+
+  auto foundProtocol = std::find(archetype->getConformsTo().begin(),
+                                 archetype->getConformsTo().end(),
+                                 protocol);
+  assert(foundProtocol != archetype->getConformsTo().end());
+  
+  unsigned index = foundProtocol - archetype->getConformsTo().begin() + 1;
+  auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
+  
+  llvm::CallInst *result = nullptr;
+  withOpaqueTypeGenericArgs(IGF, archetype,
+    [&](llvm::Value *genericArgs) {
+      result = IGF.Builder.CreateCall(accessorFn,
+                                   {genericArgs, descriptor, indexValue});
+      result->setDoesNotThrow();
+      result->setCallingConv(IGF.IGM.SwiftCC);
+      result->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::ReadOnly);
+    });
+  assert(result);
+  
+  IGF.setScopedLocalTypeData(archetype,
+                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+                 result);
+  return result;
 }

@@ -50,6 +50,6 @@ sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -
 // CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"{{got.|__imp_}}$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
 // CHECK-SAME:   @"symbolic q_"
 // CHECK-SAME:   @"symbolic x"
-// CHECK-SAME:   @"keypath_get_witness_table
+// CHECK-SAME:   @"get_witness_table
 //            -- computed get-only property, identified by indirect pointer
 // CHECK-SAME:   <i32 0x0208_0002>

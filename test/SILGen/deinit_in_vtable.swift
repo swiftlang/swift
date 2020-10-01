@@ -31,9 +31,9 @@ public func testmain() {
 // function elimination
 
 // CHECK-LABEL: sil_vtable A
-// CHECK: A.deinit!deallocator.1: @[[A]]
+// CHECK: A.deinit!deallocator: @[[A]]
 
 // CHECK-LABEL: sil_vtable B
 // CHECK-NOT: A.deinit
-// CHECK: B.deinit!deallocator.1: @[[B]]
+// CHECK: B.deinit!deallocator: @[[B]]
 

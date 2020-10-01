@@ -17,6 +17,7 @@
 #ifndef SWIFT_BASIC_SOURCELOC_H
 #define SWIFT_BASIC_SOURCELOC_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
@@ -77,7 +78,15 @@ public:
     print(OS, SM, Tmp);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
+
+	friend size_t hash_value(SourceLoc loc) {
+		return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
+	}
+
+	friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
+		// Nothing meaningful to print.
+	}
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
@@ -120,7 +129,7 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 /// A half-open character-based source range.
@@ -211,7 +220,7 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
   
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 } // end namespace swift
@@ -257,10 +266,8 @@ template <> struct DenseMapInfo<swift::SourceRange> {
   }
 
   static unsigned getHashValue(const swift::SourceRange &Val) {
-    return hash_combine(DenseMapInfo<const void *>::getHashValue(
-                            Val.Start.getOpaquePointerValue()),
-                        DenseMapInfo<const void *>::getHashValue(
-                            Val.End.getOpaquePointerValue()));
+    return hash_combine(Val.Start.getOpaquePointerValue(),
+                        Val.End.getOpaquePointerValue());
   }
 
   static bool isEqual(const swift::SourceRange &LHS,

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 public struct TestOptions: OptionSet {
@@ -12,25 +12,30 @@ public struct TestOptions: OptionSet {
     static let fourth   = TestOptions(rawValue: 1 << 3)
 }
 
-// CHECK:      sil @{{.*}}returnTestOptions{{.*}}
+// CHECK-LABEL: sil_global hidden [let] @$s4test17globalTestOptionsAA0cD0Vvp : $TestOptions = {
+// CHECK:   [[CONST:%.*]] = integer_literal $Builtin.Int{{32|64}}, 15
+// CHECK:   [[INT:%.*]] = struct $Int (%0 : $Builtin.Int{{32|64}})
+// CHECK:   %initval = struct $TestOptions ([[INT]] : $Int)
+let globalTestOptions: TestOptions = [.first, .second, .third, .fourth]
+
+// CHECK-LABEL: sil @{{.*}}returnTestOptions{{.*}}
 // CHECK-NEXT: bb0:
+// CHECK-NEXT:   builtin
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   return
 public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
 }
 
-// CHECK:        alloc_global @{{.*}}globalTestOptions{{.*}}
-// CHECK-NEXT:   global_addr
-// CHECK-NEXT:   integer_literal {{.*}}, 15
+// CHECK-LABEL: sil @{{.*}}returnEmptyTestOptions{{.*}}
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   integer_literal {{.*}}, 0
+// CHECK-NEXT:   builtin "onFastPath"() : $()
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
-// CHECK-NEXT:   store
-// CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-let globalTestOptions: TestOptions = [.first, .second, .third, .fourth]
-
+public func returnEmptyTestOptions() -> TestOptions {
+    return []
+}

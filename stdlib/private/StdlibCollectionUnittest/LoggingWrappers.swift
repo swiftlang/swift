@@ -73,7 +73,7 @@ extension LoggingIterator: IteratorProtocol {
 // since Log is an associated type that cannot be refined in extensions
 // that add functionality.
 
-public class SequenceLog {
+public class SequenceLogBase {
   // Sequence
   public static var makeIterator = TypeIndexed(0)
   public static var underestimatedCount = TypeIndexed(0)
@@ -133,24 +133,26 @@ public class SequenceLog {
   public static var removeSubrange = TypeIndexed(0)
   public static var replaceSubrange = TypeIndexed(0)
   public static var reserveCapacity = TypeIndexed(0)
+}
 
-  public class func dispatchTester<S>(
+public class SequenceLog : SequenceLogBase {
+  public static func dispatchTester<S>(
     _ s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(wrapping: LoggingSequence(wrapping: s))
   }
 }
 
-public class CollectionLog : SequenceLog {
-  public override class func dispatchTester<C>(
+public class CollectionLog : SequenceLogBase {
+  public static func dispatchTester<C>(
     _ c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(wrapping: LoggingCollection(wrapping: c))
   }
 }
 
-public class BidirectionalCollectionLog : CollectionLog {
-  public override class func dispatchTester<C>(
+public class BidirectionalCollectionLog : SequenceLogBase {
+  public static func dispatchTester<C>(
     _ c: C
   ) -> LoggingBidirectionalCollection<LoggingBidirectionalCollection<C>> {
     return LoggingBidirectionalCollection(
@@ -158,8 +160,8 @@ public class BidirectionalCollectionLog : CollectionLog {
   }
 }
 
-public class MutableCollectionLog : CollectionLog {
-  public override class func dispatchTester<C>(
+public class MutableCollectionLog : SequenceLogBase {
+  public static func dispatchTester<C>(
     _ c: C
   ) -> LoggingMutableCollection<LoggingMutableCollection<C>> {
     return LoggingMutableCollection(
@@ -171,8 +173,8 @@ public class MutableCollectionLog : CollectionLog {
 /// of `RangeReplaceableCollection`.
 ///
 /// Each static variable is a mapping of Type -> Number of calls.
-public class RangeReplaceableCollectionLog : CollectionLog {
-  public override class func dispatchTester<C>(
+public class RangeReplaceableCollectionLog : SequenceLogBase {
+  public static func dispatchTester<C>(
     _ rrc: C
   ) -> LoggingRangeReplaceableCollection<LoggingRangeReplaceableCollection<C>> {
     return LoggingRangeReplaceableCollection(

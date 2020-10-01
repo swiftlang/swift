@@ -27,12 +27,11 @@ namespace swift {
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
-  class TypeChecker;
+  class Decl;
   class ValueDecl;
 
 /// Diagnose uses of unavailable declarations.
-void diagAvailability(TypeChecker &TC, const Expr *E,
-                      DeclContext *DC);
+void diagAvailability(const Expr *E, DeclContext *DC);
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
@@ -51,6 +50,10 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of declarations in versions before they were
   /// introduced. Used to work around availability-checker bugs.
   AllowPotentiallyUnavailable = 1 << 3,
+
+  /// If an error diagnostic would normally be emitted, demote the error to a
+  /// warning. Used for ObjC key path components.
+  ForObjCKeyPath = 1 << 4
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -58,7 +61,6 @@ using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
 bool diagnoseDeclAvailability(const ValueDecl *Decl,
-                              TypeChecker &TC,
                               DeclContext *DC,
                               SourceRange R,
                               DeclAvailabilityFlags Options);
@@ -72,7 +74,8 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                     SourceRange R,
                                     const DeclContext *DC,
-                                    const ApplyExpr *call);
+                                    const ApplyExpr *call,
+                                    DeclAvailabilityFlags Flags = None);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
@@ -80,7 +83,11 @@ bool diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
+/// Check if \p decl has a introduction version required by -require-explicit-availability
+void checkExplicitAvailability(Decl *decl);
 
 } // namespace swift
 

@@ -38,6 +38,9 @@ extern "C" {
 #endif
 
 SWIFT_REMOTE_MIRROR_LINKAGE
+#if !defined(_WIN32)
+__attribute__((__weak_import__))
+#endif
 extern unsigned long long swift_reflection_classIsSwiftMask;
 
 /// Get the metadata version supported by the Remote Mirror library.
@@ -69,20 +72,25 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
-/// Add reflection sections for a loaded Swift image.
+/// DEPRECATED. Add reflection sections for a loaded Swift image.
+///
+/// You probably want to use \c swift_reflection_addImage instead.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
-#if defined(__APPLE__) && defined(__MACH__)
+/// Add reflection sections from a loaded Swift image.
+SWIFT_REMOTE_MIRROR_LINKAGE
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef, swift_reflection_mapping_info_t Info);
+
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart);
-#endif
 
 /// Returns a boolean indicating if the isa mask was successfully
 /// read, in which case it is stored in the isaMask out parameter.
@@ -113,7 +121,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
 
-/// Returns whether the given address is within an image added to this
+/// Returns whether the given address is associated with an image added to this
 /// library. Images must be added using swift_reflection_addImage, not
 /// swift_reflection_addReflectionInfo, for this function to work
 /// properly. If addReflectionInfo is used, the return value will always
@@ -145,6 +153,21 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
+
+/// Returns the demangled name for a typeref, or NULL if the name couldn't be
+/// created.
+///
+/// The returned string is heap allocated and the caller must free() it when
+/// done.
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForProtocolDescriptor(
+  SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -224,6 +247,22 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         swift_addr_t *OutStartOfInstanceData);
 
+/// Projects the value of an enum.
+///
+/// Takes the address and typeref for an enum and determines the
+/// index of the currently-selected case within the enum.
+/// You can use this index with `swift_reflection_childOfTypeRef`
+/// to get detailed information about the specific case.
+///
+/// Returns true if the enum case could be successfully determined.
+/// In particular, note that this code may fail for valid in-memory data
+/// if the compiler is using a strategy we do not yet understand.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      int *CaseIndex);
+
 /// Dump a brief description of the typeref as a tree to stderr.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);
@@ -253,6 +292,85 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
 SWIFT_REMOTE_MIRROR_LINKAGE
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
+
+/// Iterate over the process's protocol conformance cache.
+///
+/// Calls the passed in Call function for each protocol conformance found in
+/// the conformance cache. The function is passed the type which conforms and
+/// the protocol it conforms to. The ContextPtr is passed through unchanged.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateConformanceCache(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_reflection_ptr_t Type,
+               swift_reflection_ptr_t Proto,
+               void *ContextPtr),
+  void *ContextPtr);
+
+/// Iterate over the process's metadata allocations.
+///
+/// Calls the passed in Call function for each metadata allocation. The function
+/// is passed a structure that describes the allocation. The ContextPtr is
+/// passed through unchanged.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateMetadataAllocations(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_metadata_allocation_t Allocation,
+               void *ContextPtr),
+  void *ContextPtr);
+
+/// Given a metadata allocation, return the metadata it points to. Returns NULL
+/// on failure. Despite the name, not all allocations point to metadata.
+/// Currently, this will return a metadata only for allocations with tag
+/// GenericMetadataCache. Support for additional tags may be added in the
+/// future. The caller must gracefully handle failure.
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
+  SwiftReflectionContextRef ContextRef,
+  swift_metadata_allocation_t Allocation);
+
+/// Return the name of a metadata allocation tag, or NULL if the tag is unknown.
+/// This pointer remains valid until the next swift_reflection call on the given
+/// context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *
+swift_reflection_metadataAllocationTagName(SwiftReflectionContextRef ContextRef,
+                                           swift_metadata_allocation_tag_t Tag);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode);
+
+/// Backtrace iterator callback passed to
+/// swift_reflection_iterateMetadataAllocationBacktraces
+typedef void (*swift_metadataAllocationBacktraceIterator)(
+    swift_reflection_ptr_t AllocationPtr, size_t Count,
+    const swift_reflection_ptr_t Ptrs[], void *ContextPtr);
+
+/// Iterate over all recorded metadata allocation backtraces in the process.
+///
+/// Calls the passed in Call function for each recorded backtrace. The function
+/// is passed the number of backtrace entries and an array of those entries, as
+/// pointers. The array is stored from deepest to shallowest, so main() will be
+/// somewhere near the end. This array is valid only for the duration of the
+/// call.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateMetadataAllocationBacktraces(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadataAllocationBacktraceIterator Call, void *ContextPtr);
 
 #ifdef __cplusplus
 } // extern "C"

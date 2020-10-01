@@ -92,8 +92,9 @@ public:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
-  void emitScalarReturn(SILType resultTy, Explosion &scalars,
-                        bool isSwiftCCReturn, bool isOutlined);
+  void emitScalarReturn(SILType returnResultType, SILType funcResultType,
+                        Explosion &scalars, bool isSwiftCCReturn,
+                        bool isOutlined);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -280,6 +281,7 @@ public:
   const SILDebugScope *getDebugScope() const { return DbgScope; }
   llvm::Value *coerceValue(llvm::Value *value, llvm::Type *toTy,
                            const llvm::DataLayout &);
+  Explosion coerceValueTo(SILType fromTy, Explosion &from, SILType toTy);
 
   /// Mark a load as invariant.
   void setInvariantLoad(llvm::LoadInst *load);
@@ -287,7 +289,7 @@ public:
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
-  void emitTrap(bool EmitUnreachable);
+  void emitTrap(StringRef failureMessage, bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -644,7 +646,8 @@ public:
   };
 
   llvm::Value *getLocalSelfMetadata();
-  void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
+  void setLocalSelfMetadata(CanType selfBaseTy, bool selfIsExact,
+                            llvm::Value *value, LocalSelfKind kind);
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
@@ -660,7 +663,9 @@ private:
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  
+  /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
+  CanType LocalSelfType;
+  bool LocalSelfIsExact = false;
   LocalSelfKind SelfKind;
 };
 

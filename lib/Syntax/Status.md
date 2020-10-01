@@ -31,7 +31,6 @@
   * ForcedValueExpr
   * SuperRefExpr
   * ImplicitMemberExpr
-  * InterpolatedStringLiteralExpr
   * KeyPathExpr
   * KeyPathDotExpr
   * InOutExpr

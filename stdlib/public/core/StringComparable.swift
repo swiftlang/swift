@@ -64,8 +64,8 @@ extension StringProtocol {
   }
 }
 
-extension String : Equatable {
-  @inlinable @inline(__always) // For the bitwise comparision
+extension String: Equatable {
+  @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
   @_semantics("string.equals")
   public static func == (lhs: String, rhs: String) -> Bool {
@@ -73,12 +73,34 @@ extension String : Equatable {
   }
 }
 
-extension String : Comparable {
-  @inlinable @inline(__always) // For the bitwise comparision
+extension String: Comparable {
+  @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
     return _stringCompare(lhs._guts, rhs._guts, expecting: .less)
   }
 }
 
-extension Substring : Equatable {}
+extension Substring: Equatable {}
+
+// TODO(SR-12457): Generalize `~=` over `StringProtocol`. Below are
+// concrete overloads to give us most of the benefit without potential harm
+// to expression type checking performance.
+extension String {
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @_effects(readonly)
+  public static func ~= (lhs: String, rhs: Substring) -> Bool {
+    return lhs == rhs
+  }
+}
+extension Substring {
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @_effects(readonly)
+  public static func ~= (lhs: Substring, rhs: String) -> Bool {
+    return lhs == rhs
+  }
+}
+
+

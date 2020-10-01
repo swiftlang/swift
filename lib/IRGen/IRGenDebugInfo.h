@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_DEBUGINFO_H
 #define SWIFT_IRGEN_DEBUGINFO_H
 
+#include <swift/SIL/SILInstruction.h>
 #include "DebugTypeInfo.h"
 #include "IRGenFunction.h"
 
@@ -48,7 +49,8 @@ public:
   static std::unique_ptr<IRGenDebugInfo>
   createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
                        IRGenModule &IGM, llvm::Module &M,
-                       StringRef MainOutputFilenameForDebugInfo);
+                       StringRef MainOutputFilenameForDebugInfo,
+                       StringRef PrivateDiscriminator);
   virtual ~IRGenDebugInfo();
 
   /// Finalize the llvm::DIBuilder owned by this object.
@@ -58,6 +60,12 @@ public:
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                      SILLocation Loc);
+
+  /// Replace the current debug location in \p Builder with the same location, but contained in an
+  /// inlined function which is named like \p failureMsg.
+  ///
+  /// This lets the debugger display the \p failureMsg as an inlined function frame.
+  void addFailureMessageToCurrentLoc(IRBuilder &Builder, StringRef failureMsg);
 
   void clearLoc(IRBuilder &Builder);
 
@@ -127,8 +135,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               ValueDecl *VarDecl, StringRef Name,
-                               unsigned ArgNo = 0,
+                               ValueDecl *VarDecl, SILDebugVariable VarInfo,
                                IndirectionKind Indirection = DirectValue,
                                ArtificialKind Artificial = RealValue);
 

@@ -827,7 +827,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)
@@ -1119,7 +1119,7 @@ enum UnavailableCaseOSSpecific {
   case a
   case b
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   @available(macOS, unavailable)
   @available(iOS, unavailable)
   @available(tvOS, unavailable)
@@ -1174,5 +1174,45 @@ extension Result where T == NoError {
     case .Ok(_):
       break // But it's okay to write one.
     }
+  }
+}
+
+enum SR10301<T,E> {
+  case value(T)
+  case error(E)
+}
+enum SR10301Error: Error {
+  case bad
+}
+
+func sr10301(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, SR10301Error.bad)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_is(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, is SR10301Error)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, let err as SR10301Error)):
+    _ = err
+    return
+  case .error((_, let err)):
+    _ = err
+    return
   }
 }

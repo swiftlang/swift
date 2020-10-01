@@ -1,0 +1,9 @@
+framework module Foo {
+  umbrella header "Foo.h"
+  export *
+  framework module FooSub {
+    umbrella header "FooSub.h"
+    export *
+  }
+}
+

@@ -19,6 +19,14 @@ guard let top = Optional.some("top") else {
 }
 print(top)
 
+protocol P1 {}
+struct Test {
+  var test: P1 {
+    struct SP1: P1 {}
+    return SP1()
+  }
+}
+
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -rename -source-filename %s -pos=2:15 -new-name new_S1 >> %t.result/S1.swift
 // RUN: diff -u %S/Outputs/basic/S1.swift.expected %t.result/S1.swift
@@ -46,6 +54,8 @@ print(top)
 // RUN: diff -u %S/Outputs/basic/local.swift.expected %t.result/local.swift
 // RUN: %refactor -rename -source-filename %s -pos=20:7 -new-name 'bottom' > %t.result/top_level.swift
 // RUN: diff -u %S/Outputs/basic/top_level.swift.expected %t.result/top_level.swift
+// RUN: %refactor -rename -source-filename %s -pos=26:12 -new-name new_SP1 > %t.result/SP1.swift
+// RUN: diff -u %S/Outputs/basic/SP1.swift.expected %t.result/SP1.swift
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=2:15 > %t.ranges/S1.swift
 // RUN: diff -u %S/Outputs/basic_ranges/S1.swift.expected %t.ranges/S1.swift
@@ -71,3 +81,5 @@ print(top)
 // RUN: diff -u %S/Outputs/basic_ranges/local.swift.expected %t.ranges/local.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=20:7 > %t.result/top_level.swift
 // RUN: diff -u %S/Outputs/basic_ranges/top_level.swift.expected %t.result/top_level.swift
+// RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=26:12 > %t.result/SP1.swift
+// RUN: diff -u %S/Outputs/basic_ranges/SP1.swift.expected %t.result/SP1.swift

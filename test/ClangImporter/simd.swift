@@ -22,6 +22,12 @@ let ll3_value: ll3 = makes_ll3()
 let ll8_value: ll8 = makes_ll8()
 let ull4_value: ull4 = makes_ull4()
 let ull16_value: ull16 = makes_ull16()
+let half2_value: half2 = makes_half2()
+let half3_value: half3 = makes_half3()
+let half4_value: half4 = makes_half4()
+let half8_value: half8 = makes_half8()
+let half16_value: half16 = makes_half16()
+let half32_value: half32 = makes_half32()
 let float2_value: float2 = makes_float2()
 let float3_value: float3 = makes_float3()
 let float4_value: float4 = makes_float4()
@@ -52,6 +58,12 @@ takes_ll3(ll3_value)
 takes_ll8(ll8_value)
 takes_ull4(ull4_value)
 takes_ull16(ull16_value)
+takes_half2(half2_value)
+takes_half3(half3_value)
+takes_half4(half4_value)
+takes_half8(half8_value)
+takes_half16(half16_value)
+takes_half32(half32_value)
 takes_float2(float2_value)
 takes_float3(float3_value)
 takes_float4(float4_value)
@@ -64,16 +76,16 @@ takes_double8(double8_value)
 
 // These shouldn't be imported, since there's no type to map them to.
 
-let char17_value = makes_char17()   // expected-error{{unresolved identifier 'makes_char17'}}
-let uchar21_value = makes_uchar21() // expected-error{{unresolved identifier 'makes_uchar21'}}
-let short5_value = makes_short5()   // expected-error{{unresolved identifier 'makes_short5'}}
-let ushort6_value = makes_ushort6() // expected-error{{unresolved identifier 'makes_ushort6'}}
-let int128_value = makes_int128()   // expected-error{{unresolved identifier 'makes_int128'}}
-let uint20_value = makes_uint20()   // expected-error{{unresolved identifier 'makes_uint20'}}
+let char17_value = makes_char17()   // expected-error{{cannot find 'makes_char17' in scope}}
+let uchar21_value = makes_uchar21() // expected-error{{cannot find 'makes_uchar21' in scope}}
+let short5_value = makes_short5()   // expected-error{{cannot find 'makes_short5' in scope}}
+let ushort6_value = makes_ushort6() // expected-error{{cannot find 'makes_ushort6' in scope}}
+let int128_value = makes_int128()   // expected-error{{cannot find 'makes_int128' in scope}}
+let uint20_value = makes_uint20()   // expected-error{{cannot find 'makes_uint20' in scope}}
 
-takes_char17(char17_value)   // expected-error{{unresolved identifier 'takes_char17'}}
-takes_uchar21(uchar21_value) // expected-error{{unresolved identifier 'takes_uchar21'}}
-takes_short5(short5_value)   // expected-error{{unresolved identifier 'takes_short5'}}
-takes_ushort6(ushort6_value) // expected-error{{unresolved identifier 'takes_ushort6'}}
-takes_int128(int128_value)   // expected-error{{unresolved identifier 'takes_int128'}}
-takes_uint20(uint20_value)   // expected-error{{unresolved identifier 'takes_uint20'}}
+takes_char17(char17_value)   // expected-error{{cannot find 'takes_char17' in scope}}
+takes_uchar21(uchar21_value) // expected-error{{cannot find 'takes_uchar21' in scope}}
+takes_short5(short5_value)   // expected-error{{cannot find 'takes_short5' in scope}}
+takes_ushort6(ushort6_value) // expected-error{{cannot find 'takes_ushort6' in scope}}
+takes_int128(int128_value)   // expected-error{{cannot find 'takes_int128' in scope}}
+takes_uint20(uint20_value)   // expected-error{{cannot find 'takes_uint20' in scope}}

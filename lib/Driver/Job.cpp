@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/STLExtras.h"
+#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
@@ -23,6 +24,11 @@
 
 using namespace swift;
 using namespace swift::driver;
+
+CommandOutput::CommandOutput(StringRef dummyBase, OutputFileMap &dummyOFM)
+    : Inputs({CommandInputPair(dummyBase, "")}), DerivedOutputMap(dummyOFM) {
+  setAdditionalOutputForType(file_types::TY_SwiftDeps, dummyBase);
+}
 
 StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
                                                   file_types::ID Type) const {
@@ -61,9 +67,9 @@ void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
   assert(Type != file_types::TY_Nothing);
   auto &M = DerivedOutputMap.getOrCreateOutputMapForInput(PrimaryInputFile);
   if (Overwrite) {
-    M[Type] = OutputFile;
+    M[Type] = OutputFile.str();
   } else {
-    auto res = M.insert(std::make_pair(Type, OutputFile));
+    auto res = M.insert(std::make_pair(Type, OutputFile.str()));
     if (res.second) {
       // New entry, no need to compare.
     } else {
@@ -235,6 +241,10 @@ CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
   return V;
 }
 
+bool CommandOutput::hasAdditionalOutputForType(file_types::ID type) const {
+  return AdditionalOutputTypes.count(type);
+}
+
 StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {
   if (PrimaryOutputType == Type)
     return getPrimaryOutputFilename();
@@ -317,7 +327,7 @@ CommandOutput::dump() const {
 
 void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
   SmallVector<StringRef, 4> inputs;
-  for (const CommandInputPair IP : Inputs) {
+  for (const CommandInputPair &IP : Inputs) {
     assert(IP.Base == IP.Primary && !IP.Base.empty() &&
            "output file maps won't work if these differ");
     inputs.push_back(IP.Primary);
@@ -363,7 +373,7 @@ void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
   if (hasResponseFile()) {
-    printArguments(os, {ResponseFileArg});
+    printArguments(os, {ResponseFile->argString});
     os << " # ";
   }
   printArguments(os, Arguments);
@@ -398,29 +408,27 @@ void Job::printSummary(raw_ostream &os) const {
   }
 
   os << "{" << getSource().getClassName() << ": ";
-  interleave(Outputs,
-             [&](const std::string &Arg) {
-               os << llvm::sys::path::filename(Arg);
-             },
-             [&] { os << ' '; });
+  interleave(
+      Outputs, [&](StringRef Arg) { os << llvm::sys::path::filename(Arg); },
+      [&] { os << ' '; });
   if (actual_out > limit) {
     os << " ... " << (actual_out-limit) << " more";
   }
   os << " <= ";
-  interleave(Inputs,
-             [&](const std::string &Arg) {
-               os << llvm::sys::path::filename(Arg);
-             },
-             [&] { os << ' '; });
+  interleave(
+      Inputs, [&](StringRef Arg) { os << llvm::sys::path::filename(Arg); },
+      [&] { os << ' '; });
   if (actual_in > limit) {
     os << " ... " << (actual_in-limit) << " more";
   }
   os << "}";
 }
 
+
 bool Job::writeArgsToResponseFile() const {
+  assert(hasResponseFile());
   std::error_code EC;
-  llvm::raw_fd_ostream OS(ResponseFilePath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(ResponseFile->path, EC, llvm::sys::fs::F_None);
   if (EC) {
     return true;
   }
@@ -432,15 +440,26 @@ bool Job::writeArgsToResponseFile() const {
   return false;
 }
 
+StringRef Job::getFirstSwiftPrimaryInput() const {
+  const JobAction &source = getSource();
+  if (!isa<CompileJobAction>(source))
+    return StringRef();
+  const auto *firstInput = source.getInputs().front();
+  if (auto *inputInput = dyn_cast<InputAction>(firstInput))
+    return inputInput->getInputArg().getValue();
+  return StringRef();
+}
+
 BatchJob::BatchJob(const JobAction &Source,
                    SmallVectorImpl<const Job *> &&Inputs,
                    std::unique_ptr<CommandOutput> Output,
                    const char *Executable, llvm::opt::ArgStringList Arguments,
                    EnvironmentVector ExtraEnvironment,
                    std::vector<FilelistInfo> Infos,
-                   ArrayRef<const Job *> Combined, int64_t &NextQuasiPID)
+                   ArrayRef<const Job *> Combined, int64_t &NextQuasiPID,
+                   Optional<ResponseFileInfo> ResponseFile)
     : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
-          ExtraEnvironment, Infos),
+          ExtraEnvironment, Infos, ResponseFile),
       CombinedJobs(Combined.begin(), Combined.end()),
       QuasiPIDBase(NextQuasiPID) {
 

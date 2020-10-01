@@ -86,7 +86,7 @@ public:
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);
-    void setCustomBuffer(SourceKit::UIdent Key, CustomBufferKind Kind,
+    void setCustomBuffer(SourceKit::UIdent Key,
                          std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 
   private:
@@ -160,9 +160,9 @@ void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver);
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
-sourcekitd_response_t createErrorRequestInvalid(const char *Description);
-sourcekitd_response_t createErrorRequestFailed(const char *Description);
-sourcekitd_response_t createErrorRequestInterrupted(const char *Description);
+sourcekitd_response_t createErrorRequestInvalid(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestFailed(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestInterrupted(llvm::StringRef Descr);
 sourcekitd_response_t createErrorRequestCancelled();
 
 /// Send notification object.
@@ -174,6 +174,7 @@ sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
+std::string getDiagnosticDocumentationPath();
 
 void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 

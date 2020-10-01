@@ -193,10 +193,10 @@ void DocStructureArrayBuilder::beginSubStructure(
       BodyLength,
       DocOffset,
       DocLength,
-      DisplayName,
-      TypeName,
-      RuntimeName,
-      SelectorName,
+      DisplayName.str(),
+      TypeName.str(),
+      RuntimeName.str(),
+      SelectorName.str(),
       impl.addInheritedTypes(InheritedTypes),
       impl.addAttrs(Attrs),
       {}, // elements
@@ -244,6 +244,8 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
   size_t structureArrayBufferSize = impl.structureArrayBuffer.size();
   size_t structureBufferSize = impl.structureBuilder.sizeInBytes();
 
+  size_t kindSize = sizeof(uint64_t);
+
   // Header:
   // * offset of each section start (5)
   // * offset of top structure array (relative to structure array section) (1)
@@ -251,9 +253,12 @@ std::unique_ptr<llvm::MemoryBuffer> DocStructureArrayBuilder::createBuffer() {
 
   auto result = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
       inheritedTypesBufferSize + attrsBufferSize + elementsBufferSize +
-      structureArrayBufferSize + structureBufferSize + headerSize);
+      structureArrayBufferSize + structureBufferSize + headerSize + kindSize);
 
-  char *start = result->getBufferStart();
+  *reinterpret_cast<uint64_t *>(result->getBufferStart()) =
+      (uint64_t)CustomBufferKind::DocStructureArray;
+
+  char *start = result->getBufferStart() + kindSize;
   char *headerPtr = start;
   char *ptr = start + headerSize;
 

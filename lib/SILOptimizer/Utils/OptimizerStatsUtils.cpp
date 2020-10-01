@@ -141,7 +141,7 @@ public:
       unsigned index = getIndexForKind(kind);
       if (!ShouldComputeInstCounts[index]) {
         ShouldComputeInstCounts[index] = true;
-        NumInstCounts++;
+        ++NumInstCounts;
       }
     }
   }
@@ -514,7 +514,7 @@ public:
   /// Get the collected statistics for a function.
   FunctionStat &getFunctionStat(const SILFunction *F) {
     if (!Cache)
-      Cache = llvm::make_unique<AccumulatedOptimizerStats>();
+      Cache = std::make_unique<AccumulatedOptimizerStats>();
 
     return Cache->getFunctionStat(F);
   }
@@ -522,7 +522,7 @@ public:
   /// Get the collected statistics for a module.
   ModuleStat &getModuleStat() {
     if (!Cache)
-      Cache = llvm::make_unique<AccumulatedOptimizerStats>();
+      Cache = std::make_unique<AccumulatedOptimizerStats>();
 
     return Cache->getModuleStat();
   }
@@ -557,7 +557,7 @@ llvm::raw_ostream &stats_os() {
     if (!SILStatsOutputFile.empty()) {
       // Try to open the file.
       std::error_code EC;
-      auto fd_stream = llvm::make_unique<llvm::raw_fd_ostream>(
+      auto fd_stream = std::make_unique<llvm::raw_fd_ostream>(
           SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::F_Text);
       if (!fd_stream->has_error() && !EC) {
         stats_output_stream = {fd_stream.release(),
@@ -648,7 +648,7 @@ bool isMatchingFunction(SILFunction *F, bool shouldHaveNamePattern = false) {
     return FuncName.contains(StatsOnlyFunctionsNamePattern);
   }
 
-  return shouldHaveNamePattern ? true : false;
+  return shouldHaveNamePattern;
 }
 
 /// Compute the delta between the old and new values.

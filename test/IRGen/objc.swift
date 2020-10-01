@@ -22,12 +22,12 @@ import gizmo
 // CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
-// CHECK: @"$sSo4RectVMn" = linkonce_odr hidden constant
-// CHECK: @"$sSo4RectVN" = linkonce_odr hidden constant
-
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
 // CHECK: @"\01L_selector_data(eviscerate)"
+
+// CHECK: @"$sSo4RectVMn" = linkonce_odr hidden constant
+// CHECK: @"$sSo4RectVMf" = linkonce_odr hidden constant
 
 struct id {
   var data : AnyObject
@@ -39,16 +39,14 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 }
 
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @llvm.objc.release
+// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
@@ -72,7 +70,7 @@ class Octogenarian : Contrarian {
 @_silgen_name("unknown")
 func unknown(_ x: id) -> id
 
-// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
+// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object* %0)
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRetain
 // CHECK:      call {{.*}} @swift_unknownObjectRetain
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRelease
@@ -87,7 +85,7 @@ func test0(_ arg: id) -> id {
 }
 
 func test1(_ cell: Blammo) {}
-// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]* %0) {{.*}} {
 // CHECK-NEXT:    entry
 // CHECK-NEXT:    alloca
 // CHECK-NEXT:    bitcast
@@ -130,7 +128,7 @@ func test10(_ g: Gizmo, r: Rect) {
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
 // CHECK-LABEL: define hidden swiftcc void @"$s4objc6test11yySo4RectVF"
-// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$sSo4RectVN"
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$sSo4RectVMf"
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {
@@ -147,7 +145,7 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA,__objc_imageinfo,regular,no_dead_strip"}
-//   83887872 == (5 << 24) | (0 << 16) | (7 << 8). 
-//     5 and 0 is the current major.minor version. 7 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 83887872}
+//   84084480 == (5 << 24) | (3 << 16) | (7 << 8). 
+//     5 and 3 is the current major.minor version. 7 is the Swift ABI version.
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 84084480}
 // CHECK:  i32 1, !"Swift Version", i32 7}

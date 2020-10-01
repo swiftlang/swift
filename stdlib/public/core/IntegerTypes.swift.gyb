@@ -14,10 +14,10 @@
 # Utility code for later in this template
 #
 
+from __future__ import division
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 
-from string import maketrans, capitalize
 from itertools import chain
 
 # Number of bits in the Builtin.Word type
@@ -30,12 +30,12 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = {
-  'Numeric' : [
+  'Numeric': [
     struct(operator='+', name='adding',      firstArg='_',  llvmName='add', kind='+'),
     struct(operator='-', name='subtracting', firstArg='_',  llvmName='sub', kind='-'),
     struct(operator='*', name='multiplied',  firstArg='by', llvmName='mul', kind='*'),
   ],
-  'BinaryInteger' : [
+  'BinaryInteger': [
     struct(operator='/', name='divided',     firstArg='by', llvmName='div', kind='/'),
     struct(operator='%', name='remainder',   firstArg='dividingBy', llvmName='rem', kind='/'),
   ],
@@ -1085,7 +1085,7 @@ def unsafeOperationComment(operator):
 /// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
 /// type.
 %   end
-@_fixed_layout
+@frozen
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
@@ -1115,7 +1115,7 @@ public struct ${Self}
   }
 
 %   if Self in ['Int32', 'Int64']:
-%     Floating = {32 : 'Float', 64 : 'Double'}[bits]
+%     Floating = {32: 'Float', 64: 'Double'}[bits]
   @available(*, unavailable,
     message: "Please use ${Self}(bitPattern: ${OtherSelf}) in combination with ${Floating}.bitPattern property.")
   public init(bitPattern x: ${Floating}) {
@@ -1124,11 +1124,11 @@ public struct ${Self}
 %   end
 
 %   for (FloatType, FloatBits) in [
-%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
+%     ('Float16', 16), ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
 
 %     if FloatType == 'Float80':
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Creates an integer from the given floating-point value, rounding toward
@@ -1151,14 +1151,21 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
+%     if FloatType == 'Float16':
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+%     end
   @_transparent
   public init(_ source: ${FloatType}) {
     _precondition(source.isFinite,
       "${FloatType} value cannot be converted to ${Self} because it is either infinite or NaN")
+%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     _precondition(source > ${str(lower)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(source < ${str(upper)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+%     end
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
@@ -1176,12 +1183,21 @@ public struct ${Self}
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
+%     if FloatType == 'Float16':
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+%     end
   @_transparent
   public init?(exactly source: ${FloatType}) {
     // The value passed as `source` must not be infinite, NaN, or exceed the
     // bounds of the integer type; the result of `fptosi` or `fptoui` is
     // undefined if it overflows.
+%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+%     else:
+    guard source.isFinite else {
+%     end
       return nil
     }
     guard source == source.rounded(.towardZero) else {
@@ -1234,7 +1250,8 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
         lhs._value, rhs._value, true._value)
 %   end
-    Builtin.condfail(overflow)
+    Builtin.condfail_message(overflow,
+      StaticString("arithmetic overflow").unsafeRawPointer)
     lhs = ${Self}(result)
   }
 %       end
@@ -1333,7 +1350,7 @@ ${assignmentOperatorComment(x.operator, True)}
   /// The bit width of ${Article.lower()} `${Self}` instance is ${bits}.
 %   end
   @_transparent
-  public static var bitWidth : Int { return ${bits} }
+  public static var bitWidth: Int { return ${bits} }
 
   /// The number of leading zeros in this value's binary representation.
   ///
@@ -1383,8 +1400,8 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   /// A type that represents the words of this integer.
-  @_fixed_layout
-  public struct Words : RandomAccessCollection {
+  @frozen
+  public struct Words: RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
@@ -1485,6 +1502,7 @@ ${assignmentOperatorComment(x.operator, True)}
 % end
 
 %   dbits = bits*2
+%   if bits <= word_bits:
   /// Returns a tuple containing the high and low parts of the result of
   /// multiplying this value by the given value.
   ///
@@ -1517,11 +1535,6 @@ ${assignmentOperatorComment(x.operator, True)}
   public func multipliedFullWidth(by other: ${Self})
     -> (high: ${Self}, low: ${Self}.Magnitude) {
     // FIXME(integers): tests
-%   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-    // FIXME(integers): implement
-    fatalError("Operation is not supported")
-%   else:
     let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
     let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
@@ -1531,8 +1544,8 @@ ${assignmentOperatorComment(x.operator, True)}
     let shifted = Builtin.ashr_Int${dbits}(res, shift)
     let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
     return (high: high, low: low)
-%   end
   }
+%   end
 
   /// Returns a tuple containing the quotient and remainder of dividing the
   /// given value by this value.
@@ -1630,7 +1643,7 @@ ${assignmentOperatorComment(x.operator, True)}
 }
 %# end of concrete type: ${Self}
 
-extension ${Self} : Hashable {
+extension ${Self}: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -1651,12 +1664,12 @@ extension ${Self} : Hashable {
     return Hasher._hash(
       seed: seed,
       bytes: UInt64(truncatingIfNeeded: ${U}${Self}(_value)),
-      count: ${bits / 8})
+      count: ${bits // 8})
     % end
   }
 }
 
-extension ${Self} : _HasCustomAnyHashableRepresentation {
+extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _IntegerAnyHashableBox(self))

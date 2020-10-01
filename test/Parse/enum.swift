@@ -5,6 +5,9 @@
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
+// Windows does not support FP80
+// XFAIL: OS=windows-msvc
+
 enum Empty {}
 
 enum Boolish {
@@ -98,8 +101,8 @@ enum ImproperlyHasIVars {
 
 // We used to crash on this.  rdar://14678675
 enum rdar14678675 {
-  case U1,
-  case U2 // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U1, // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U2 
   case U3
 }
 
@@ -122,10 +125,10 @@ enum Recovery5 {
   // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
 }
 enum Recovery6 {
-  case Snout, _; // expected-error {{expected identifier after comma in enum 'case' declaration}}
-  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
-  case Tusk, // expected-error {{expected pattern}}
-} // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}} expected-note {{'_' previously declared here}}
+  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}} expected-error {{invalid redeclaration of '_'}}
+  case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
+} 
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}}
 // expected-error@-1{{'RawTypeEmpty' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
@@ -470,7 +473,7 @@ enum SE0036 {
 
   func staticReferenceInInstanceMethod() {
     _ = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
-    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
+    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-13=SE0036}}
     _ = SE0036.A
   }
 
@@ -485,7 +488,7 @@ enum SE0036 {
   func staticReferenceInSwitchInInstanceMethod() {
     switch self {
     case A: break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
-    case B(_): break // expected-error {{enum case 'B' cannot be used as an instance member}} {{10-10=.}}
+    case B(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
     case C(let x): _ = x; break // expected-error {{enum case 'C' cannot be used as an instance member}} {{10-10=.}}
     }
   }
@@ -529,7 +532,7 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}} expected-error {{missing argument label 'x:' in call}}
+    case A(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
     }
 
     switch self {
@@ -546,6 +549,55 @@ enum switch {} // expected-error {{keyword 'switch' cannot be used as an identif
 
 enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
-  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
-  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
+  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
+}
+
+// SR-11261
+enum SR11261 {
+  case identifier
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
+  case identifier2
+}
+
+enum SR11261_var {
+  case identifier
+  case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
+  case identifier2
+}
+
+enum SR11261_underscore {
+  case identifier
+  case _ // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
+  case identifier2
+}
+
+enum SR11261_Comma {
+  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
+}
+
+enum SR11261_Newline {
+  case identifier1
+  case identifier2
+  case 
+  case identifier // expected-error {{keyword 'case' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
+}
+
+enum SR11261_Newline2 {
+  case 
+  func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
+}
+
+enum SR11261_PatternMatching {
+  case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
+}
+
+enum CasesWithMissingElement: Int {
+  // expected-error@-1 {{'CasesWithMissingElement' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+
+  case a = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
+
+  case b = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
 }

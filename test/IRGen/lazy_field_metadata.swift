@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir -wmo -O %s | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-ir -wmo -O %s > %t/out.txt
+// RUN: %FileCheck %s < %t/out.txt
+// RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out.txt
 
 // Both should be emitted:
 
@@ -13,6 +16,21 @@ struct GenericWithGenericField<T> {
   var field = GenericWithConcreteField<T>()
 }
 
-public func forceMetadata() -> Any.Type {
-  return GenericWithGenericField<Int>.self
+@_optimize(none)
+public func takeMetadata<T>(_: T.Type) {}
+
+public func forceMetadata() {
+  takeMetadata(GenericWithGenericField<Int>.self)
 }
+
+// These two types are completely unused.
+struct TypeOfProperty {
+  var x: Int
+}
+
+struct HasPropertyType {
+  var p: TypeOfProperty
+}
+
+// NEGATIVE-NOT: @"$s19lazy_field_metadata14TypeOfPropertyVMn"
+// NEGATIVE-NOT: @"$s19lazy_field_metadata15HasPropertyTypeVMn"

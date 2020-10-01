@@ -3,6 +3,7 @@
 
 // This unusual use of 'sh' allows the path of the profraw file to be
 // substituted by %target-run.
+// RUN: %target-codesign %t/main
 // RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -133,9 +134,9 @@ extension Struct1 {
 var g2: Int = 0
 
 class Class3 {
-  var m1 = g2 == 0
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
 }
 
 // rdar://34244637: Wrong coverage for do/catch sequence

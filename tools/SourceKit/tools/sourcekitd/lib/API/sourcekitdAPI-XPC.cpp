@@ -69,24 +69,25 @@ public:
     return getPtr()+1;
   }
 
-  static CustomXPCData createErrorRequestInvalid(const char *Description) {
+  static CustomXPCData createErrorRequestInvalid(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestInvalid, Description);
   }
-  static CustomXPCData createErrorRequestFailed(const char *Description) {
+  static CustomXPCData createErrorRequestFailed(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestFailed, Description);
   }
-  static CustomXPCData createErrorRequestInterrupted(const char *Description) {
+  static CustomXPCData createErrorRequestInterrupted(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestInterrupted, Description);
   }
-  static CustomXPCData createErrorRequestCancelled(const char *Description) {
+  static CustomXPCData createErrorRequestCancelled(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestCancelled, Description);
   }
 
 private:
-  static CustomXPCData createKindAndString(Kind K, const char *Str) {
+  static CustomXPCData createKindAndString(Kind K, StringRef Str) {
     llvm::SmallVector<char, 128> Buf;
     Buf.push_back((char)K);
-    Buf.append(Str, Str+strlen(Str)+1);
+    Buf.append(Str.begin(), Str.end());
+    Buf.push_back('\0');
     return CustomXPCData(xpc_data_create(Buf.begin(), Buf.size()));
   }
 
@@ -257,19 +258,9 @@ ResponseBuilder::Dictionary::setDictionary(UIdent Key) {
 }
 
 void ResponseBuilder::Dictionary::setCustomBuffer(
-      SourceKit::UIdent Key,
-      CustomBufferKind Kind, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
-
-  std::unique_ptr<llvm::WritableMemoryBuffer> CustomBuf;
-  CustomBuf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      sizeof(uint64_t) + MemBuf->getBufferSize());
-  char *BufPtr = CustomBuf->getBufferStart();
-  *reinterpret_cast<uint64_t*>(BufPtr) = (uint64_t)Kind;
-  BufPtr += sizeof(uint64_t);
-  memcpy(BufPtr, MemBuf->getBufferStart(), MemBuf->getBufferSize());
-
-  xpc_object_t xdata = xpc_data_create(CustomBuf->getBufferStart(),
-                                       CustomBuf->getBufferSize());
+    SourceKit::UIdent Key, std::unique_ptr<llvm::MemoryBuffer> Buf) {
+  xpc_object_t xdata = xpc_data_create(Buf->getBufferStart(),
+                                       Buf->getBufferSize());
   xpc_dictionary_set_value(Impl, Key.c_str(), xdata);
   xpc_release(xdata);
 }
@@ -375,20 +366,20 @@ Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
 }
 
 sourcekitd_response_t
-sourcekitd::createErrorRequestInvalid(const char *Description) {
+sourcekitd::createErrorRequestInvalid(StringRef Description) {
   return CustomXPCData::createErrorRequestInvalid(Description).getXObj();
 }
 sourcekitd_response_t
-sourcekitd::createErrorRequestFailed(const char *Description) {
+sourcekitd::createErrorRequestFailed(StringRef Description) {
   return CustomXPCData::createErrorRequestFailed(Description).getXObj();
 }
 sourcekitd_response_t
-sourcekitd::createErrorRequestInterrupted(const char *Description) {
+sourcekitd::createErrorRequestInterrupted(StringRef Description) {
   return CustomXPCData::createErrorRequestInterrupted(Description).getXObj();
 }
 sourcekitd_response_t
 sourcekitd::createErrorRequestCancelled() {
-  return CustomXPCData::createErrorRequestCancelled("").getXObj();
+  return CustomXPCData::createErrorRequestCancelled(StringRef("")).getXObj();
 }
 
 //===----------------------------------------------------------------------===//

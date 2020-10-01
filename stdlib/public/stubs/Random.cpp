@@ -42,10 +42,14 @@
 #include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/Random.h"
 
+#include <algorithm> // required for std::min
+
+using namespace swift;
+
 #if defined(__APPLE__)
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   arc4random_buf(buf, nbytes);
 }
 
@@ -53,7 +57,11 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #warning TODO: Test swift_stdlib_random on Windows
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+  if (nbytes > ULONG_MAX) {
+    fatalError(0, "Fatal error: %zd exceeds ULONG_MAX\n", nbytes);
+  }
+
   NTSTATUS status = BCryptGenRandom(nullptr,
                                     static_cast<PUCHAR>(buf),
                                     static_cast<ULONG>(nbytes),
@@ -66,14 +74,14 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #else
 
 #undef  WHILE_EINTR
-#define WHILE_EINTR(expression) ({                                             \
+#define WHILE_EINTR(expression) ([&] () -> decltype(expression) {              \
   decltype(expression) result = -1;                                            \
   do { result = (expression); } while (result == -1 && errno == EINTR);        \
-  result;                                                                      \
-})
+  return result;                                                               \
+}())
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
 
@@ -84,7 +92,7 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
     if (getrandom_available) {
       actual_nbytes = WHILE_EINTR(syscall(__NR_getrandom, buf, nbytes, 0));
     }
-#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__))
+#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__) || defined(__wasi__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
     
     if (0 == getentropy(buf, getentropy_nbytes)) {

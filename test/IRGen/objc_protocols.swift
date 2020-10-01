@@ -25,14 +25,14 @@ class Foo : NSRuncing, NSFunging, Ansible {
   @objc func foo() {}
   func anse() {}
 }
-// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@[0-9]+]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3FooC5runceyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3FooC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3FooC3fooyyFTo" to i8*)
 // CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 class Bar {
   func bar() {}
@@ -50,14 +50,14 @@ extension Bar : NSRuncing, NSFunging {
 }
 
 // -- ...but the ObjC protocol conformances on its extension add some
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3BarC5runceyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3BarC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3BarC3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -66,12 +66,12 @@ extension Bas : NSRuncing {
   func foo() {}
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = private constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = internal constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 1,
-// CHECK;   [1 x { i8*, i8*, i8* }] [
+// CHECK:   [1 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas0C0C0a1_B0E3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // -- Swift protocol refinement of ObjC protocols.
 protocol Frungible : NSRuncing, NSFunging {
@@ -86,14 +86,14 @@ class Zim : Frungible {
   func frunge() {}
 }
 
-// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3ZimC5runceyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3ZimC5fungeyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s14objc_protocols3ZimC3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Frungible {
@@ -106,13 +106,13 @@ extension Zang : Frungible {
   func frunge() {}
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = private constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = internal constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @"$s18objc_protocols_Bas4ZangC0a1_B0E3fooyyFTo" to i8*) }
 // CHECK:   ]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: }, section "__DATA, {{.*}}", align 8
 
 @objc protocol BaseProtocol { }
 protocol InheritingProtocol : BaseProtocol { }
@@ -120,7 +120,7 @@ protocol InheritingProtocol : BaseProtocol { }
 // CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
 class ImplementingClass : InheritingProtocol { }
 
-// CHECK: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = private constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+// CHECK: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = internal constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
 
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @"$s14objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F"
@@ -130,7 +130,7 @@ func mixed_heritage_erasure(_ x: Zim) -> Frungible {
   // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object* %0, %swift.type* %T) {{.*}} {
 func objc_generic<T : NSRuncing>(_ x: T) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -138,13 +138,13 @@ func objc_generic<T : NSRuncing>(_ x: T) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols05call_A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols05call_A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object* %0, %swift.type* %T) {{.*}} {
 // CHECK:         call swiftcc void @"$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F"(%objc_object* %0, %swift.type* %T)
 func call_objc_generic<T : NSRuncing>(_ x: T) {
   objc_generic(x)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F"(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F"(%objc_object* %0) {{.*}} {
 func objc_protocol(_ x: NSRuncing) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -152,14 +152,14 @@ func objc_protocol(_ x: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK: define hidden swiftcc %objc_object* @"$s14objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F"(%TSo7NSSpoonC*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @"$s14objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F"(%TSo7NSSpoonC* %0) {{.*}} {
 func objc_erasure(_ x: NSSpoon) -> NSRuncing {
   return x
   // CHECK: [[RES:%.*]] = bitcast %TSo7NSSpoonC* {{%.*}} to %objc_object*
   // CHECK: ret %objc_object* [[RES]]
 }
 
-// CHECK: define hidden swiftcc void @"$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F"(%objc_object*)
+// CHECK: define hidden swiftcc void @"$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F"(%objc_object* %0)
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -170,7 +170,7 @@ func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[FUNGE]])
 }
 
-// CHECK: define hidden swiftcc void @"$s14objc_protocols0A27_swift_protocol_composition{{[_0-9a-zA-Z]*}}F"(%objc_object*, i8**)
+// CHECK: define hidden swiftcc void @"$s14objc_protocols0A27_swift_protocol_composition{{[_0-9a-zA-Z]*}}F"(%objc_object* %0, i8** %1)
 func objc_swift_protocol_composition
 (_ x: NSRuncing & Ansible & NSFunging) {
   x.runce()

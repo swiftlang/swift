@@ -6,7 +6,8 @@ add_swift_host_library(swiftLLVMPasses STATIC
   LLVMInlineTree.cpp
   LLVMMergeFunctions.cpp
 
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
   analysis
   )
-
+target_link_libraries(swiftLLVMPasses PRIVATE
+  swiftDemangling)

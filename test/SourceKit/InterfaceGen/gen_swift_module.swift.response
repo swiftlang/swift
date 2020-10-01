@@ -69,7 +69,8 @@ public func pub_function()
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 7,
-    key.length: 17
+    key.length: 17,
+    key.is_system: 1
   }
 ]
 [
@@ -79,7 +80,6 @@ public func pub_function()
     key.name: "MyClass",
     key.offset: 33,
     key.length: 47,
-    key.runtime_name: "_TtC4main7MyClass",
     key.nameoffset: 39,
     key.namelength: 7,
     key.bodyoffset: 48,

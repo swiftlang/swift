@@ -21,37 +21,36 @@ sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
 import perf_test_driver  # noqa (E402 module level import not at top of file)
 
 # Regexes for the XFAIL_LIST. Matches against '([Onone|O|Osize],TestName)'
-XFAIL_LIST = [
-]
+XFAIL_LIST = []
 
 
 class GuardMallocResult(perf_test_driver.Result):
-
     def __init__(self, name, status):
         perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
 
 
 class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
-
     def __init__(self, binary, xfail_list):
         perf_test_driver.BenchmarkDriver.__init__(
-            self, binary, xfail_list,
-            enable_parallel=True)
+            self, binary, xfail_list, enable_parallel=True
+        )
         self.new_env = os.environ.copy()
-        self.new_env['DYLD_INSERT_LIBRARIES'] = '/usr/lib/libgmalloc.dylib'
+        self.new_env["DYLD_INSERT_LIBRARIES"] = "/usr/lib/libgmalloc.dylib"
 
     def prepare_input(self, name):
-        return {'env': self.new_env}
+        return {"env": self.new_env}
 
     def process_input(self, data):
-        test_name = '({},{})'.format(data['opt'], data['test_name'])
+        test_name = "({},{})".format(data["opt"], data["test_name"])
         print("Running {}...".format(test_name))
         sys.stdout.flush()
 
         p = subprocess.Popen(
-            [data['path'], data['test_name'], '--num-iters=2'],
-            env=data['env'], stderr=open('/dev/null', 'w'),
-            stdout=open('/dev/null', 'w'))
+            [data["path"], data["test_name"], "--num-iters=2"],
+            env=data["env"],
+            stderr=open("/dev/null", "w"),
+            stdout=open("/dev/null", "w"),
+        )
         status = p.wait()
 
         return GuardMallocResult(test_name, status)

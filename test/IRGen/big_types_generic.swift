@@ -52,9 +52,9 @@ func generic2<T>(_ t: T) -> ((Big<T>, Big<T>), () -> Big<T>) {
 }
 
 // CHECK-LABEL: sil hidden @$s17big_types_generic8useStuffyyF : $@convention(thin) () -> ()
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt.1
-// CHECK: switch_enum %{{.*}} : $Optional<((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)>, case #Optional.some!enumelt.1
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<((Big<Int32>, Big<Int32>), @callee_guaranteed () -> @out Big<Int32>)>, case #Optional.some!enumelt
+// CHECK: switch_enum %{{.*}} : $Optional<((Big<Int>, Big<Int>), @callee_guaranteed () -> @out Big<Int>)>, case #Optional.some!enumelt
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s17big_types_generic8useStuffyyF'
 func useStuff() {

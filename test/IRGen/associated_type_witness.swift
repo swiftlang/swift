@@ -17,7 +17,7 @@ protocol Assocked {
 struct Universal : P, Q {}
 
 
-// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}V" = linkonce_odr hidden constant
+// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}InnermostV" = linkonce_odr hidden constant
 // CHECK-SAME: @"$s23associated_type_witness12OuterPrivate{{.*}}5InnerE0V9InnermostVMn"
 private struct OuterPrivate {
   struct InnerPrivate: HasSimpleAssoc {
@@ -41,7 +41,7 @@ protocol HasThreeAssocTypes {
 // GLOBAL-SAME:    @"$s23associated_type_witness13WithUniversalVAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1P",
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1Q"
-// GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ [36 x i8], i8 }>* @"symbolic 23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal
@@ -52,7 +52,7 @@ struct WithUniversal : Assocked {
 // GLOBAL-SAME:    @"$s23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1Q"
-// GLOBAL-SAME:    @"symbolic 23associated_type_witness9UniversalV"
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct GenericWithUniversal<T> : Assocked {
   typealias Assoc = Universal
@@ -90,15 +90,25 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1Q"
-// GLOBAL-SAME:    @"symbolic 23associated_type_witness4PairVyxq_G"
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness4PairV{{.*}}"
 // GLOBAL-SAME:  ]
+
+//   Protocol conformance descriptor for Computed : Assocked.
+// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
+// GLOBAL-SAME:    i16 4,
+// GLOBAL-SAME:    i16 1,
+
+//    No instantiator function
+// GLOBAL-SAME:    i32 0,
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint
+// GLOBAL-SAME:  }
 
 struct Computed<T, U> : Assocked {
   typealias Assoc = Pair<T, U>
 }
 
 //   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
-// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8**, %swift.type* %"GenericComputed<T>", i8**)
+// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8** %0, %swift.type* %"GenericComputed<T>", i8** %1)
 // CHECK:         [[T0:%.*]] = call i8** @swift_getWitnessTable({{.*}}@"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAMc"
 // CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
 // CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 1
@@ -117,6 +127,14 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 // GLOBAL-SAME: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc"
 // GLOBAL-SAME: i8* null
 
+//   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
+// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
+// GLOBAL-SAME:    i16 2,
+// GLOBAL-SAME:    i16 1,
+
+//   Relative reference to instantiator function
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),
+
 //   Relative reference to private data
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
   typealias Assoc = PBox<T>
@@ -133,20 +151,35 @@ struct UsesVoid : HasSimpleAssoc {
   typealias Assoc = ()
 }
 
-//   Protocol conformance descriptor for Computed : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
-// GLOBAL-SAME:    i16 4,
-// GLOBAL-SAME:    i16 1,
+// SR-11642: Failure to canonicalize type in associated type witness.
+struct Validator<T> {
+  let validatorFailureType: Any.Type
+}
 
-//    No instantiator function
-// GLOBAL-SAME:    i32 0,
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint
-// GLOBAL-SAME:  }
 
-//   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
-// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
-// GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 1,
+protocol ValidatorType {
+  associatedtype Data
+  associatedtype Failure
+  func validator() -> Validator<Data>
+}
 
-//   Relative reference to instantiator function
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),
+
+extension ValidatorType {
+  func validator() -> Validator<Data> {
+    .init(validatorFailureType: Failure.self)
+  }
+}
+
+
+// MARK: Failing example
+extension Validator where T == String {
+  struct V: ValidatorType {
+    typealias Data = T // or String
+
+    struct Failure {}
+  }
+}
+
+// GLOBAL-LABEL: @"symbolic _____ySS__G 23associated_type_witness9ValidatorVAASSRszlE1VV7FailureV"
+
+

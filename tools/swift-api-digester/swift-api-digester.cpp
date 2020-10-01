@@ -26,6 +26,9 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/Basic/Platform.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
@@ -40,89 +43,133 @@ namespace  {
   enum class ActionType {
     None,
     DumpSDK,
-    DumpSwiftModules,
-    CompareSDKs,
+    MigratorGen,
     DiagnoseSDKs,
     // The following two are for testing purposes
     DeserializeDiffItems,
     DeserializeSDK,
     GenerateNameCorrectionTemplate,
     FindUsr,
+    GenerateEmptyBaseline,
   };
 } // end anonymous namespace
 
 namespace options {
 
+static llvm::cl::OptionCategory Category("swift-api-digester Options");
+
 static llvm::cl::opt<bool>
-IncludeAllModules("include-all", llvm::cl::desc("Include all modules from the SDK"));
+IncludeAllModules("include-all",
+                  llvm::cl::desc("Include all modules from the SDK"),
+                  llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"));
+ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 ModuleList("module-list-file",
-           llvm::cl::desc("File containing a new-line separated list of modules"));
+           llvm::cl::desc("File containing a new-line separated list of modules"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-ProtReqWhiteList("protocol-requirement-white-list",
-           llvm::cl::desc("File containing a new-line separated list of protocol names"));
+ProtReqAllowList("protocol-requirement-allow-list",
+           llvm::cl::desc("File containing a new-line separated list of protocol names"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-OutputFile("o", llvm::cl::desc("Output file"));
+OutputFile("o", llvm::cl::desc("Output file"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"));
+OutputDir("output-dir", llvm::cl::desc("Directory path to where we dump the generated Json files"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-Triple("target", llvm::cl::desc("target triple"));
+SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
+BaselineSDK("bsdk", llvm::cl::desc("path to the baseline SDK to import frameworks"),
+    llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"),
+       llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
+                llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
-            llvm::cl::desc("The directory that holds the compiler resource files"));
+            llvm::cl::desc("The directory that holds the compiler resource files"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
+FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"),
+               llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
+BaselineFrameworkPaths("BF", llvm::cl::desc("add a directory to the baseline framework search path"),
+                       llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+BaselineModuleInputPaths("BI", llvm::cl::desc("add a module for baseline input"),
+                         llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+ModuleInputPaths("I", llvm::cl::desc("add a module for input"),
+                 llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 CCSystemFrameworkPaths("iframework",
-  llvm::cl::desc("add a directory to the clang importer system framework search path"));
+  llvm::cl::desc("add a directory to the clang importer system framework search path"),
+  llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
-                        llvm::cl::desc("Abort if a module failed to load"));
+                        llvm::cl::desc("Abort if a module failed to load"),
+                        llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-Verbose("v", llvm::cl::desc("Verbose"));
+Verbose("v", llvm::cl::desc("Verbose"),
+        llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false));
+DebugMapping("debug-mapping", llvm::cl::desc("Dumping information for debug purposes"),
+             llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 SwiftOnly("swift-only",
           llvm::cl::desc("Only include APIs defined from Swift source"),
-          llvm::cl::init(false));
+          llvm::cl::init(false),
+          llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"));
+DisableOSChecks("disable-os-checks",
+                llvm::cl::desc("Skip OS related diagnostics"),
+                llvm::cl::init(false),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
+      llvm::cl::cat(Category),
       llvm::cl::values(
           clEnumValN(ActionType::DumpSDK,
                      "dump-sdk",
                      "Dump SDK content to JSON file"),
-          clEnumValN(ActionType::DumpSwiftModules,
-                     "dump-swift",
-                     "dump swift modules in SDK"),
-          clEnumValN(ActionType::CompareSDKs,
-                     "compare-sdk",
-                     "Compare SDK content in JSON file"),
+          clEnumValN(ActionType::MigratorGen,
+                     "generate-migration-script",
+                     "Compare SDK content in JSON file and generate migration script"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
                      "Diagnose SDK content in JSON file"),
@@ -137,36 +184,92 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Find USR for decls by given condition"),
           clEnumValN(ActionType::GenerateNameCorrectionTemplate,
                      "generate-name-correction",
-                     "Generate name correction template")));
+                     "Generate name correction template"),
+          clEnumValN(ActionType::GenerateEmptyBaseline,
+                     "generate-empty-baseline",
+                     "Generate an empty baseline")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
-            llvm::cl::desc("The SDK contents under comparison"));
+            llvm::cl::desc("The SDK contents under comparison"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 ApisPrintUsrs("api-usrs",
               llvm::cl::desc("The name of APIs to print their usrs, "
-                             "e.g. Type::Function"));
+                             "e.g. Type::Function"),
+              llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 IgnoreRemovedDeclUSRs("ignored-usrs",
                       llvm::cl::desc("the file containing USRs of removed decls "
-                                     "that the digester should ignore"));
+                                     "that the digester should ignore"),
+                      llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 SwiftVersion("swift-version",
-             llvm::cl::desc("The Swift compiler version to invoke"));
+             llvm::cl::desc("The Swift compiler version to invoke"),
+             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-OutputInJson("json", llvm::cl::desc("Print output in JSON format."));
+OutputInJson("json", llvm::cl::desc("Print output in JSON format."),
+             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 AvoidLocation("avoid-location",
-              llvm::cl::desc("Avoid serializing the file paths of SDK nodes."));
+              llvm::cl::desc("Avoid serializing the file paths of SDK nodes."),
+              llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AvoidToolArgs("avoid-tool-args",
+              llvm::cl::desc("Avoid serializing the arguments for invoking the tool."),
+              llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 LocationFilter("location",
-              llvm::cl::desc("Filter nodes with the given location."));
+              llvm::cl::desc("Filter nodes with the given location."),
+              llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+CompilerStyleDiags("compiler-style-diags",
+                   llvm::cl::desc("Print compiler style diagnostics to stderr."),
+                   llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+Migrator("migrator",
+         llvm::cl::desc("Dump Json suitable for generating migration script"),
+         llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
+                          llvm::cl::desc("Prefer loading these modules via interface"),
+                          llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BaselineFilePath("baseline-path",
+                 llvm::cl::desc("The path to the Json file that we should use as the baseline"),
+                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BaselineDirPath("baseline-dir",
+                 llvm::cl::desc("The path to a directory containing baseline files: macos.json, iphoneos.json, appletvos.json, watchos.json, and iosmac.json"),
+                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+UseEmptyBaseline("empty-baseline",
+                llvm::cl::desc("Use empty baseline for diagnostics"),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+SerializedDiagPath("serialize-diagnostics-path",
+                   llvm::cl::desc("Serialize diagnostics to a path"),
+                   llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BreakageAllowlistPath("breakage-allowlist-path",
+                      llvm::cl::desc("An allowlist of breakages to not complain about"),
+                      llvm::cl::cat(Category));
+
 } // namespace options
 
 namespace {
@@ -198,6 +301,22 @@ bool contains(ArrayRef<T> container, T instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
+static
+void singleMatch(SDKNode* Left, SDKNode *Right, MatchedNodeListener &Listener) {
+
+  // Both null, be forgiving.
+  if (!Left && !Right)
+    return;
+  // If both are valid and identical to each other, we don't need to match them.
+  if (Left && Right && *Left == *Right)
+    return;
+  if (!Left || !Right)
+    Listener.foundMatch(Left, Right,
+                        Left ? NodeMatchReason::Removed : NodeMatchReason::Added);
+  else
+    Listener.foundMatch(Left, Right, NodeMatchReason::Sequential);
+}
+
 // Given two NodeVector, this matches SDKNode by the order of their appearance
 // in the respective NodeVector. We use this in the order-sensitive cases, such
 // as parameters in a function decl.
@@ -215,16 +334,11 @@ public:
     for (unsigned long i = 0; i < std::max(Left.size(), Right.size()); i ++) {
       auto L = i < Left.size() ? Left[i] : nullptr;
       auto R = i < Right.size() ? Right[i] : nullptr;
-      if (L && R && *L == *R)
-        continue;
-      if (!L || !R)
-        Listener.foundMatch(L, R,
-          L ? NodeMatchReason::Removed : NodeMatchReason::Added);
-      else
-        Listener.foundMatch(L, R, NodeMatchReason::Sequential);
+      singleMatch(L, R, Listener);
     }
   }
 };
+
 struct NodeMatch {
   NodePtr Left;
   NodePtr Right;
@@ -678,9 +792,10 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
   auto *R = dyn_cast<SDKNodeDeclType>(Right);
   if (!R)
     return;
-
+  auto Loc = R->getLoc();
   if (getDeclKind() != R->getDeclKind()) {
-    emitDiag(diag::decl_kind_changed, getDeclKindStr(R->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(R->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
     return;
   }
 
@@ -692,11 +807,27 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
     auto RSuperClass = R->getSuperClassName();
     if (!LSuperClass.empty() && LSuperClass != RSuperClass) {
       if (RSuperClass.empty()) {
-        emitDiag(diag::super_class_removed, LSuperClass);
+        emitDiag(Loc, diag::super_class_removed, LSuperClass);
       } else if (!contains(R->getClassInheritanceChain(), LSuperClass)) {
-        emitDiag(diag::super_class_changed, LSuperClass, RSuperClass);
+        emitDiag(Loc, diag::super_class_changed, LSuperClass, RSuperClass);
       }
     }
+
+    // Check for @_hasMissingDesignatedInitializers and
+    // @_inheritsConvenienceInitializers changes.
+    if (isOpen() && R->isOpen()) {
+      // It's not safe to add new, invisible designated inits to open
+      // classes.
+      if (!hasMissingDesignatedInitializers() &&
+          R->hasMissingDesignatedInitializers())
+        R->emitDiag(R->getLoc(), diag::added_invisible_designated_init);
+    }
+
+    // It's not safe to stop inheriting convenience inits, it changes
+    // the set of initializers that are available.
+    if (inheritsConvenienceInitializers() &&
+        !R->inheritsConvenienceInitializers())
+      R->emitDiag(R->getLoc(), diag::not_inheriting_convenience_inits);
     break;
   }
   default:
@@ -709,9 +840,14 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
   auto *R = dyn_cast<SDKNodeDeclAbstractFunc>(Right);
   if (!R)
     return;
-
+  auto Loc = R->getLoc();
   if (!isThrowing() && R->isThrowing()) {
-    emitDiag(diag::decl_new_attr, Ctx.buffer("throwing"));
+    emitDiag(Loc, diag::decl_new_attr, Ctx.buffer("throwing"));
+  }
+  if (Ctx.checkingABI()) {
+    if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {
+      emitDiag(Loc, diag::decl_new_witness_table_entry, reqNewWitnessTableEntry());
+    }
   }
 }
 
@@ -720,25 +856,36 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
   auto *R = dyn_cast<SDKNodeDeclFunction>(Right);
   if (!R)
     return;
+  auto Loc = R->getLoc();
   if (getSelfAccessKind() != R->getSelfAccessKind()) {
-    emitDiag(diag::func_self_access_change, getSelfAccessKind(),
+    emitDiag(Loc, diag::func_self_access_change, getSelfAccessKind(),
              R->getSelfAccessKind());
   }
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != R->hasFixedBinaryOrder()) {
-      emitDiag(diag::func_has_fixed_order_change, hasFixedBinaryOrder());
+      emitDiag(Loc, diag::func_has_fixed_order_change, hasFixedBinaryOrder());
     }
   }
 }
 
-void swift::ide::api::SDKNodeDeclSubscript::diagnose(SDKNode *Right) {
-  SDKNodeDeclAbstractFunc::diagnose(Right);
-  auto *R = dyn_cast<SDKNodeDeclSubscript>(Right);
-  if (!R)
-    return;
-  if (hasSetter() && !R->hasSetter()) {
-    emitDiag(diag::removed_setter);
+static StringRef getAttrName(DeclAttrKind Kind) {
+  switch (Kind) {
+#define DECL_ATTR(NAME, CLASS, ...)                                           \
+  case DAK_##CLASS:                                                           \
+      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
+#include "swift/AST/Attr.def"
+  case DAK_Count:
+    llvm_unreachable("unrecognized attribute kind.");
   }
+  llvm_unreachable("covered switch");
+}
+
+static bool shouldDiagnoseAddingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
+}
+
+static bool shouldDiagnoseRemovingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
 }
 
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
@@ -747,13 +894,14 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   if (!RD)
     return;
   detectRename(this, RD);
+  auto Loc = RD->getLoc();
   if (isOpen() && !RD->isOpen()) {
-    emitDiag(diag::no_longer_open);
+    emitDiag(Loc, diag::no_longer_open);
   }
 
   // Diagnose static attribute change.
   if (isStatic() ^ RD->isStatic()) {
-    emitDiag(diag::decl_new_attr, Ctx.buffer(isStatic() ? "not static" :
+    emitDiag(Loc, diag::decl_new_attr, Ctx.buffer(isStatic() ? "not static" :
                                              "static"));
   }
 
@@ -765,39 +913,68 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
         return Ctx.buffer("strong");
       return keywordOf(O);
     };
-    emitDiag(diag::decl_attr_change,
+    emitDiag(Loc, diag::decl_attr_change,
              getOwnershipDescription(getReferenceOwnership()),
              getOwnershipDescription(RD->getReferenceOwnership()));
   }
   // Diagnose generic signature change
   if (getGenericSignature() != RD->getGenericSignature()) {
-    emitDiag(diag::generic_sig_change,
-             getGenericSignature(), RD->getGenericSignature());
-  }
-  if (isOptional() != RD->isOptional()) {
-    if (Ctx.checkingABI()) {
-      // Both adding/removing optional is ABI-breaking.
-      emitDiag(diag::optional_req_changed, isOptional());
-    } else if (isOptional()) {
-      // Removing optional is source-breaking.
-      emitDiag(diag::optional_req_changed, isOptional());
+    // Prefer sugared signature in diagnostics to be more user-friendly.
+    if (Ctx.commonVersionAtLeast(2) &&
+        getSugaredGenericSignature() != RD->getSugaredGenericSignature()) {
+      emitDiag(Loc, diag::generic_sig_change,
+               getSugaredGenericSignature(), RD->getSugaredGenericSignature());
+    } else {
+      emitDiag(Loc, diag::generic_sig_change,
+               getGenericSignature(), RD->getGenericSignature());
     }
   }
 
-  // Check if some attributes with ABI/API-impact have been added/removed.
-  for (auto &Info: Ctx.getBreakingAttributeInfo()) {
-    if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
-      auto Desc = hasDeclAttribute(Info.Kind) ?
-      Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
-      Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
-      emitDiag(diag::decl_new_attr, Desc);
+  // ObjC name changes are considered breakage
+  if (getObjCName() != RD->getObjCName()) {
+    if (Ctx.commonVersionAtLeast(4)) {
+      emitDiag(Loc, diag::objc_name_change, getObjCName(), RD->getObjCName());
+    }
+  }
+
+  if (isOptional() != RD->isOptional()) {
+    if (Ctx.checkingABI()) {
+      // Both adding/removing optional is ABI-breaking.
+      emitDiag(Loc, diag::optional_req_changed, isOptional());
+    } else if (isOptional()) {
+      // Removing optional is source-breaking.
+      emitDiag(Loc, diag::optional_req_changed, isOptional());
+    }
+  }
+
+  // Diagnose removing attributes.
+  for (auto Kind: getDeclAttributes()) {
+    if (!RD->hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isRemovingBreakingABI(Kind) :
+                               DeclAttribute::isRemovingBreakingAPI(Kind)) &&
+          shouldDiagnoseRemovingAttribute(this, Kind)) {
+        emitDiag(Loc, diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("without ") + getAttrName(Kind)).str()));
+      }
+    }
+  }
+
+  // Diagnose adding attributes.
+  for (auto Kind: RD->getDeclAttributes()) {
+    if (!hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isAddingBreakingABI(Kind) :
+                               DeclAttribute::isAddingBreakingAPI(Kind)) &&
+          shouldDiagnoseAddingAttribute(this, Kind)) {
+        emitDiag(Loc, diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("with ") + getAttrName(Kind)).str()));
+      }
     }
   }
 
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() && RD->hasFixedBinaryOrder() &&
         getFixedBinaryOrder() != RD->getFixedBinaryOrder()) {
-      emitDiag(diag::decl_reorder, getFixedBinaryOrder(),
+      emitDiag(Loc, diag::decl_reorder, getFixedBinaryOrder(),
                RD->getFixedBinaryOrder());
     }
   }
@@ -808,8 +985,10 @@ void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
   auto *RO = dyn_cast<SDKNodeDeclOperator>(Right);
   if (!RO)
     return;
+  auto Loc = RO->getLoc();
   if (getDeclKind() != RO->getDeclKind()) {
-    emitDiag(diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind()));
+    emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind(),
+      getSDKContext().getOpts().CompilerStyle));
   }
 }
 
@@ -818,15 +997,10 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
   auto *RV = dyn_cast<SDKNodeDeclVar>(Right);
   if (!RV)
     return;
-  if (getSetter() && !RV->getSetter()) {
-    emitDiag(diag::removed_setter);
-  }
+  auto Loc = RV->getLoc();
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
-      emitDiag(diag::var_has_fixed_order_change, hasFixedBinaryOrder());
-    }
-    if (isLet() != RV->isLet()) {
-      emitDiag(diag::var_let_changed, isLet());
+      emitDiag(Loc, diag::var_has_fixed_order_change, hasFixedBinaryOrder());
     }
   }
 }
@@ -846,10 +1020,10 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
   if (auto *Wit = dyn_cast<SDKNodeTypeWitness>(getParent())) {
     auto *Conform = Wit->getParent()->getAs<SDKNodeConformance>();
     if (Ctx.checkingABI() && getPrintedName() != RT->getPrintedName()) {
-      Conform->getNominalTypeDecl()->emitDiag(diag::type_witness_change,
-                                              Wit->getWitnessedTypeName(),
-                                              getPrintedName(),
-                                              RT->getPrintedName());
+      auto *LD = Conform->getNominalTypeDecl();
+      LD->emitDiag(SourceLoc(), diag::type_witness_change,
+                   Wit->getWitnessedTypeName(),
+                   getPrintedName(), RT->getPrintedName());
     }
     return;
   }
@@ -858,37 +1032,50 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
   assert(isa<SDKNodeDecl>(getParent()));
   auto LParent = cast<SDKNodeDecl>(getParent());
   assert(LParent->getKind() == RT->getParent()->getAs<SDKNodeDecl>()->getKind());
-
+  auto Loc = RT->getParent()->getAs<SDKNodeDecl>()->getLoc();
   if (getPrintedName() != RT->getPrintedName()) {
-    LParent->emitDiag(diag::decl_type_change,
+    LParent->emitDiag(Loc, diag::decl_type_change,
                       Descriptor, getPrintedName(), RT->getPrintedName());
   }
 
   if (hasDefaultArgument() && !RT->hasDefaultArgument()) {
-    LParent->emitDiag(diag::default_arg_removed, Descriptor);
+    LParent->emitDiag(Loc, diag::default_arg_removed, Descriptor);
   }
   if (getParamValueOwnership() != RT->getParamValueOwnership()) {
-    getParent()->getAs<SDKNodeDecl>()->emitDiag(diag::param_ownership_change,
-                                                getTypeRoleDescription(),
-                                                getParamValueOwnership(),
-                                                RT->getParamValueOwnership());
+    LParent->emitDiag(Loc, diag::param_ownership_change,
+                      getTypeRoleDescription(),
+                      getParamValueOwnership(),
+                      RT->getParamValueOwnership());
   }
 }
 
 void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
-  SDKNode::diagnose(Right);
+  SDKNodeType::diagnose(Right);
   auto *RT = dyn_cast<SDKNodeTypeFunc>(Right);
   if (!RT || !shouldDiagnoseType(this))
     return;
   assert(isTopLevelType());
+  auto Loc = RT->getParent()->getAs<SDKNodeDecl>()->getLoc();
   if (Ctx.checkingABI() && isEscaping() != RT->isEscaping()) {
-    getParent()->getAs<SDKNodeDecl>()->emitDiag(diag::func_type_escaping_changed,
+    getParent()->getAs<SDKNodeDecl>()->emitDiag(Loc,
+                                                diag::func_type_escaping_changed,
                                                 getTypeRoleDescription(),
                                                 isEscaping());
   }
 }
 
 namespace {
+static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
+  if (D->getSDKContext().checkingABI()) {
+    // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
+    // We shouldn't include these decls in the ABI baseline file. This line is
+    // added so the checker is backward compatible.
+    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+      return;
+  }
+  D->emitDiag(SourceLoc(), diag::removed_decl, D->isDeprecated());
+}
+
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
@@ -906,12 +1093,21 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
-  llvm::StringSet<> ProtocolReqWhitelist;
+  llvm::StringSet<> ProtocolReqAllowlist;
+  SDKNodeRoot *LeftRoot;
+  SDKNodeRoot *RightRoot;
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
+    StringRef Space = "        ";
+    // Accessor doesn't have parent.
+    if (auto *AC = dyn_cast<SDKNodeDeclAccessor>(N)) {
+      OS << Space;
+      printSpaces(OS, AC->getStorage());
+      return;
+    }
     for (auto P = N; !isa<SDKNodeRoot>(P); P = P->getParent())
-      OS << "        ";
+      OS << Space;
   }
 
   static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
@@ -937,15 +1133,46 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
     }
   }
 
+  static StringRef getParentProtocolName(SDKNode *Node) {
+    if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Node)) {
+      Node = Acc->getStorage();
+    }
+    return Node->getParent()->getAs<SDKNodeDecl>()->getFullyQualifiedName();
+  }
+
 public:
   PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
-  PrunePass(SDKContext &Ctx, llvm::StringSet<> prWhitelist):
+  PrunePass(SDKContext &Ctx, llvm::StringSet<> prAllowlist):
     Ctx(Ctx),
     UpdateMap(Ctx.getNodeUpdateMap()),
-    ProtocolReqWhitelist(std::move(prWhitelist)) {}
+    ProtocolReqAllowlist(std::move(prAllowlist)) {}
 
+  void diagnoseMissingAvailable(SDKNodeDecl *D) {
+    // For extensions of external types, we diagnose individual member's missing
+    // available attribute instead of the extension itself.
+    // The reason is we may merge several extensions into a single one; some
+    // attributes are missing.
+    if (auto *DT = dyn_cast<SDKNodeDeclType>(D)) {
+      if (DT->isExtension()) {
+        for(auto MD: DT->getChildren()) {
+          diagnoseMissingAvailable(cast<SDKNodeDecl>(MD));
+        }
+        return;
+      }
+    }
+    // Diagnose the missing of @available attributes.
+    // Decls with @_alwaysEmitIntoClient aren't required to have an
+    // @available attribute.
+    if (!Ctx.getOpts().SkipOSCheck &&
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+                                                    D->getDeclKind()) &&
+        !D->getIntroducingVersion().hasOSAvailability() &&
+        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+    }
+  }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
-    if (options::Verbose)
+    if (options::DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
     case NodeMatchReason::Added:
@@ -955,8 +1182,9 @@ public:
         // Any order-important decl added to a non-resilient type breaks ABI.
         if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
           if (D->hasFixedBinaryOrder()) {
-            D->emitDiag(diag::decl_added);
+            D->emitDiag(D->getLoc(), diag::decl_added);
           }
+          diagnoseMissingAvailable(D);
         }
       }
       // Complain about added protocol requirements
@@ -969,40 +1197,70 @@ public:
               ShouldComplain = false;
           }
           if (ShouldComplain &&
-              ProtocolReqWhitelist.count(D->getParent()->getAs<SDKNodeDecl>()->
-                                         getFullyQualifiedName())) {
+              ProtocolReqAllowlist.count(getParentProtocolName(D))) {
             // Ignore protocol requirement additions if the protocol has been added
-            // to the whitelist.
+            // to the allowlist.
             ShouldComplain = false;
           }
           if (ShouldComplain)
-            D->emitDiag(diag::protocol_req_added);
+            D->emitDiag(D->getLoc(), diag::protocol_req_added);
         }
       }
       // Diagnose an inherited protocol has been added.
       if (auto *Conf = dyn_cast<SDKNodeConformance>(Right)) {
         auto *TD = Conf->getNominalTypeDecl();
         if (TD->isProtocol()) {
-          TD->emitDiag(diag::conformance_added, Conf->getName());
+          TD->emitDiag(TD->getLoc(), diag::conformance_added, Conf->getName());
+        } else {
+          // Adding conformance to an existing type can be ABI breaking.
+          if (Ctx.checkingABI() &&
+              !LeftRoot->getDescendantsByUsr(Conf->getUsr()).empty()) {
+            TD->emitDiag(TD->getLoc(), diag::existing_conformance_added,
+                         Conf->getName());
+          }
         }
       }
-
+      if (auto *CD = dyn_cast<SDKNodeDeclConstructor>(Right)) {
+        if (auto *TD = dyn_cast<SDKNodeDeclType>(Right->getParent())) {
+          if (TD->isOpen() && CD->getInitKind() == CtorInitializerKind::Designated) {
+            // If client's subclass provides an implementation of all of its superclass designated
+            // initializers, it automatically inherits all of the superclass convenience initializers.
+            // This means if a new designated init is added to the base class, the inherited
+            // convenience init may be missing and cause breakage.
+            CD->emitDiag(CD->getLoc(), diag::desig_init_added);
+          }
+        }
+      }
+      // Adding an enum case is source-breaking.
+      if (!Ctx.checkingABI()) {
+        if (auto *Var = dyn_cast<SDKNodeDeclVar>(Right)) {
+          if (Var->getDeclKind() == DeclKind::EnumElement) {
+            if (Var->getParent()->getAs<SDKNodeDeclType>()->isEnumExhaustive()) {
+              Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+            }
+          }
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
       if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
         if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
-          AT->emitDiag(diag::default_associated_type_removed,
+          AT->emitDiag(SourceLoc(), diag::default_associated_type_removed,
                        LT->getPrintedName());
         }
       }
       // Diagnose a protocol conformance has been removed.
       if (auto *Conf = dyn_cast<SDKNodeConformance>(Left)) {
         auto *TD = Conf->getNominalTypeDecl();
-        TD->emitDiag(diag::conformance_removed,
+        TD->emitDiag(SourceLoc(),
+                     diag::conformance_removed,
                      Conf->getName(),
                      TD->isProtocol());
+      }
+      if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
+        diagnoseRemovedDecl(Acc);
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -1052,11 +1310,9 @@ public:
     }
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclOperator:
-    case SDKNodeKind::DeclSubscript:
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclGetter:
+    case SDKNodeKind::DeclAccessor:
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclTypeAlias:
     case SDKNodeKind::TypeFunc:
@@ -1069,18 +1325,33 @@ public:
       SNMatcher.match();
       break;
     }
-
+    case SDKNodeKind::DeclSubscript: {
+      auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
+      auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
+      SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+                  RSub->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
+      break;
+    }
     case SDKNodeKind::DeclVar: {
-      auto &LC = *Left->getAs<SDKNodeDeclVar>()->getType();
-      auto &RC = *Right->getAs<SDKNodeDeclVar>()->getType();
-      if (LC != RC)
-        foundMatch(&LC, &RC, NodeMatchReason::Sequential);
+      auto *LVar = dyn_cast<SDKNodeDeclVar>(Left);
+      auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
+      // Match property type.
+      singleMatch(LVar->getType(), RVar->getType(), *this);
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+                  RVar->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
       break;
     }
     }
   }
 
   void pass(NodePtr Left, NodePtr Right) override {
+    LeftRoot = Left->getAs<SDKNodeRoot>();
+    RightRoot = Right->getAs<SDKNodeRoot>();
     foundMatch(Left, Right, NodeMatchReason::Root);
   }
 };
@@ -1140,7 +1411,7 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
         declNode->isStatic())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
-    else if (node->getKind() == SDKNodeKind::DeclGetter &&
+    else if (node->getKind() == SDKNodeKind::DeclAccessor &&
              diffNode->getKind() == SDKNodeKind::DeclFunction &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);
@@ -1825,6 +2096,21 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
 
+static bool diagnoseRemovedExtensionMembers(const SDKNode *Node) {
+  // If the removed decl is an extension, diagnose each member as being removed rather than
+  // the extension itself has been removed.
+  if (auto *DT= dyn_cast<SDKNodeDeclType>(Node)) {
+    if (DT->isExtension()) {
+      for (auto *C: DT->getChildren()) {
+        auto *MD = cast<SDKNodeDecl>(C);
+        diagnoseRemovedDecl(MD);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   assert(Node->isAnnotatedAs(Anno));
   auto &Ctx = Node->getSDKContext();
@@ -1836,8 +2122,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
-        Node->emitDiag(diag::moved_decl,
-          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
+        Node->emitDiag(Added->getLoc(), diag::moved_decl,
+          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind(),
+            Ctx.getOpts().CompilerStyle)) + " " +
             Added->getFullyQualifiedName()).str()));
         return;
       }
@@ -1848,8 +2135,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
     if (It != MemberChanges.end()) {
-      Node->emitDiag(diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+      Node->emitDiag(SourceLoc(), diag::renamed_decl,
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
           It->newTypeName + "." + It->newPrintedName).str()));
       return;
     }
@@ -1859,7 +2147,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     // refine diagnostics message instead of showing the type alias has been
     // removed.
     if (TypeAliasUpdateMap.find((SDKNode*)Node) != TypeAliasUpdateMap.end()) {
-      Node->emitDiag(diag::raw_type_change,
+      Node->emitDiag(SourceLoc(), diag::raw_type_change,
         Node->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->getPrintedName(),
         TypeAliasUpdateMap[(SDKNode*)Node]->getAs<SDKNodeDeclType>()->
           getRawValueType()->getPrintedName());
@@ -1881,14 +2169,34 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    Node->emitDiag(diag::removed_decl, Node->isDeprecated());
+
+    // When diagnosing API changes, avoid complaining the removal of these
+    // synthesized functions since they are compiler implementation details.
+    // If an enum is no longer equatable, another diagnostic about removing
+    // conforming protocol will be emitted.
+    if (!Ctx.checkingABI()) {
+      if (Node->getName() == Ctx.Id_derived_struct_equals ||
+          Node->getName() == Ctx.Id_derived_enum_equals) {
+        return;
+      }
+    }
+    bool handled = diagnoseRemovedExtensionMembers(Node);
+    if (!handled)
+      diagnoseRemovedDecl(Node);
     return;
   }
   case NodeAnnotation::Rename: {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    Node->emitDiag(diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
-          Count->getFullyQualifiedName()).str()));
+    SourceLoc DiagLoc;
+    // Try to get the source location from the later version of this node
+    // via UpdateMap.
+    if (auto CD = dyn_cast_or_null<SDKNodeDecl>(UpdateMap
+                                                .findUpdateCounterpart(Node))) {
+      DiagLoc = CD->getLoc();
+    }
+    Node->emitDiag(DiagLoc, diag::renamed_decl,
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
+          Ctx.getOpts().CompilerStyle)) + " " +
+          Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
   default:
@@ -2009,10 +2317,107 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
+static std::unique_ptr<DiagnosticConsumer>
+createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
+  if (!options::SerializedDiagPath.empty()) {
+    FailOnError = true;
+    return serialized_diagnostics::createConsumer(options::SerializedDiagPath);
+  } else if (options::CompilerStyleDiags) {
+    FailOnError = true;
+    return std::make_unique<PrintingDiagnosticConsumer>();
+  } else {
+    FailOnError = false;
+    return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
+  }
+}
+
+static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening file '" << Path << "': "
+      << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  StringRef BufferText = FileBufOrErr.get()->getBuffer();
+  while (!BufferText.empty()) {
+    StringRef Line;
+    std::tie(Line, BufferText) = BufferText.split('\n');
+    Line = Line.trim();
+    if (Line.empty())
+      continue;
+    if (Line.startswith("// ")) // comment.
+      continue;
+    Lines.insert(Line);
+  }
+  return 0;
+}
+
+static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines) {
+  if (options::BreakageAllowlistPath.empty())
+    return 0;
+  CompilerInstance instance;
+  CompilerInvocation invok;
+  invok.setModuleName("ForClangImporter");
+  if (instance.setup(invok))
+    return 1;
+  auto importer = ClangImporter::create(instance.getASTContext());
+  SmallString<128> preprocessedFilePath;
+  if (auto error = llvm::sys::fs::createTemporaryFile(
+    "breakage-allowlist-", "txt", preprocessedFilePath)) {
+    return 1;
+  }
+  if (importer->runPreprocessor(options::BreakageAllowlistPath,
+                                preprocessedFilePath.str())) {
+    return 1;
+  }
+  return readFileLineByLine(preprocessedFilePath, lines);
+}
+
+static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
+                             SDKNodeRoot *RightModule, StringRef OutputPath,
+                             llvm::StringSet<> ProtocolReqAllowlist) {
+  assert(LeftModule);
+  assert(RightModule);
+  llvm::raw_ostream *OS = &llvm::errs();
+  if (!LeftModule || !RightModule) {
+    *OS << "Cannot diagnose null SDKNodeRoot";
+    exit(1);
+  }
+  std::unique_ptr<llvm::raw_ostream> FileOS;
+  if (!OutputPath.empty()) {
+    std::error_code EC;
+    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
+    OS = FileOS.get();
+  }
+  bool FailOnError;
+  auto allowedBreakages = std::make_unique<llvm::StringSet<>>();
+  if (readBreakageAllowlist(Ctx, *allowedBreakages)) {
+    Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
+                            options::BreakageAllowlistPath);
+  }
+  auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
+    createDiagConsumer(*OS, FailOnError), std::move(allowedBreakages));
+  SWIFT_DEFER { pConsumer->finishProcessing(); };
+  Ctx.addDiagConsumer(*pConsumer);
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
+  TypeAliasDiffFinder(LeftModule, RightModule,
+                      Ctx.getTypeAliasUpdateMap()).search();
+  PrunePass Prune(Ctx, std::move(ProtocolReqAllowlist));
+  Prune.pass(LeftModule, RightModule);
+  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
+  RefinementPass.pass(LeftModule, RightModule);
+  // Find member hoist changes to help refine diagnostics.
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
+  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
+  return FailOnError && pConsumer->hasError() ? 1 : 0;
+}
+
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 StringRef OutputPath,
                                 CheckerOptions Opts,
-                                llvm::StringSet<> ProtocolReqWhitelist) {
+                                llvm::StringSet<> ProtocolReqAllowlist) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2021,34 +2426,13 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  llvm::raw_ostream *OS = &llvm::errs();
-  std::unique_ptr<llvm::raw_ostream> FileOS;
-  if (!OutputPath.empty()) {
-    std::error_code EC;
-    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
-    OS = FileOS.get();
-  }
-  ModuleDifferDiagsConsumer PDC(true, *OS);
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
-
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  auto LeftModule = LeftCollector.getSDKRoot();
-  auto RightModule = RightCollector.getSDKRoot();
-  TypeAliasDiffFinder(LeftModule, RightModule,
-                      Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
-  Prune.pass(LeftModule, RightModule);
-  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
-  RefinementPass.pass(LeftModule, RightModule);
-  // Find member hoist changes to help refine diagnostics.
-  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
-
-  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return 0;
+  return diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(),
+    RightCollector.getSDKRoot(), OutputPath, std::move(ProtocolReqAllowlist));
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
@@ -2072,9 +2456,10 @@ static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
   }
 }
 
-static int compareSDKs(StringRef LeftPath, StringRef RightPath,
-                       StringRef DiffPath,
-                       llvm::StringSet<> &IgnoredRemoveUsrs, CheckerOptions Opts) {
+static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
+                                   StringRef DiffPath,
+                                   llvm::StringSet<> &IgnoredRemoveUsrs,
+                                   CheckerOptions Opts) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2084,10 +2469,11 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-
-  ModuleDifferDiagsConsumer PDC(false);
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    std::make_unique<PrintingDiagnosticConsumer>():
+    std::make_unique<ModuleDifferDiagsConsumer>(false);
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.addDiagConsumer(*pConsumer);
 
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
@@ -2096,7 +2482,8 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   llvm::errs() << "Finished deserializing" << "\n";
   auto LeftModule = LeftCollector.getSDKRoot();
   auto RightModule = RightCollector.getSDKRoot();
-
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
   // Structural diffs: not merely name changes but changes in SDK tree
   // structure.
   llvm::errs() << "Detecting type member diffs" << "\n";
@@ -2164,28 +2551,6 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   return 0;
 }
 
-static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
-  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening file '" << Path << "': "
-      << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  StringRef BufferText = FileBufOrErr.get()->getBuffer();
-  while (!BufferText.empty()) {
-    StringRef Line;
-    std::tie(Line, BufferText) = BufferText.split('\n');
-    Line = Line.trim();
-    if (Line.empty())
-      continue;
-    if (Line.startswith("// ")) // comment.
-      continue;
-    Lines.insert(Line);
-  }
-  return 0;
-}
-
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -2193,26 +2558,45 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
+  if (IsBaseline) {
+    // Set baseline SDK
+    if (!options::BaselineSDK.empty()) {
+      InitInvok.setSDKPath(options::BaselineSDK);
+    }
+  } else {
+    // Set current SDK
+    if (!options::SDK.empty()) {
+      InitInvok.setSDKPath(options::SDK);
+    } else if (const char *SDKROOT = getenv("SDKROOT")) {
+      InitInvok.setSDKPath(SDKROOT);
+    } else {
+      llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
+      swift-api-digester'\n";
+      exit(1);
+    }
+  }
+}
+
 static int prepareForDump(const char *Main,
                           CompilerInvocation &InitInvok,
-                          llvm::StringSet<> &Modules) {
+                          llvm::StringSet<> &Modules,
+                          bool IsBaseline = false) {
   InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   InitInvok.setModuleName("swift_ide_test");
-  if (!options::SDK.empty()) {
-    InitInvok.setSDKPath(options::SDK);
-  } else if (const char *SDKROOT = getenv("SDKROOT")) {
-    InitInvok.setSDKPath(SDKROOT);
-  } else {
-    llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
-    swift-api-digester'\n";
-    return 1;
-  }
+  setSDKPath(InitInvok, IsBaseline);
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+
+  // Ensure the tool works on linux properly
+  InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
+  // Module recovery issue shouldn't bring down the tool.
+  InitInvok.getLangOptions().AllowDeserializingImplementationOnly = true;
 
   if (!options::SwiftVersion.empty()) {
     using version::Version;
@@ -2226,7 +2610,7 @@ static int prepareForDump(const char *Main,
     }
     if (!isValid) {
       llvm::errs() << "Unsupported Swift Version.\n";
-      return 1;
+      exit(1);
     }
   }
 
@@ -2234,27 +2618,34 @@ static int prepareForDump(const char *Main,
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
   std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : options::FrameworkPaths) {
-    FramePaths.push_back({path, /*isSystem=*/false});
-  }
   for (const auto &path : options::CCSystemFrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/true});
   }
+  if (IsBaseline) {
+    for (const auto &path : options::BaselineFrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
+    InitInvok.setImportSearchPaths(options::BaselineModuleInputPaths);
+  } else {
+    for (const auto &path : options::FrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
+    InitInvok.setImportSearchPaths(options::ModuleInputPaths);
+  }
   InitInvok.setFrameworkSearchPaths(FramePaths);
-  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
-
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
-        return 1;
+      exit(1);
   }
-
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
   }
-
+  for (auto M: options::PreferInterfaceForModules) {
+    InitInvok.getFrontendOptions().PreferInterfaceForModules.push_back(M);
+  }
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";
-    return 1;
+    exit(1);
   }
   return 0;
 }
@@ -2301,22 +2692,181 @@ static int deserializeNameCorrection(APIDiffItemStore &Store,
   return EC.value();
 }
 
-static CheckerOptions getCheckOpts() {
+static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   CheckerOptions Opts;
   Opts.AvoidLocation = options::AvoidLocation;
+  Opts.AvoidToolArgs = options::AvoidToolArgs;
   Opts.ABI = options::Abi;
+  Opts.Migrator = options::Migrator;
   Opts.Verbose = options::Verbose;
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
   Opts.LocationFilter = options::LocationFilter;
   Opts.PrintModule = options::PrintModule;
-  Opts.SwiftOnly = options::SwiftOnly;
+  // When ABI checking is enabled, we should only include Swift symbols because
+  // the checking logics are language-specific.
+  Opts.SwiftOnly = options::Abi || options::SwiftOnly;
+  Opts.SkipOSCheck = options::DisableOSChecks;
+  Opts.CompilerStyle = options::CompilerStyleDiags ||
+    !options::SerializedDiagPath.empty();
+  for (int i = 1; i < argc; ++i)
+    Opts.ToolArgs.push_back(argv[i]);
+
+  if (!options::SDK.empty()) {
+    auto Ver = getSDKBuildVersion(options::SDK);
+    if (!Ver.empty()) {
+      Opts.ToolArgs.push_back("-sdk-version");
+      Opts.ToolArgs.push_back(Ver);
+    }
+  }
   return Opts;
+}
+
+static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx, bool IsBaseline) {
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  if (prepareForDump(Main, Invok, Modules, IsBaseline))
+    return nullptr;
+  return getSDKNodeRoot(Ctx, Invok, Modules);
+}
+
+static bool hasBaselineInput() {
+  return !options::BaselineModuleInputPaths.empty() ||
+    !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
+}
+
+enum class ComparisonInputMode: uint8_t {
+  BothJson,
+  BaselineJson,
+  BothLoad,
+};
+
+static ComparisonInputMode checkComparisonInputMode() {
+  if (options::SDKJsonPaths.size() == 2)
+    return ComparisonInputMode::BothJson;
+  else if (hasBaselineInput())
+    return ComparisonInputMode::BothLoad;
+  else
+    return ComparisonInputMode::BaselineJson;
+}
+
+static std::string getDefaultBaselineDir(const char *Main) {
+  llvm::SmallString<128> BaselineDir;
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  BaselineDir.append(ExePath);
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /bin
+  llvm::sys::path::append(BaselineDir, "lib", "swift", "FrameworkABIBaseline");
+  return BaselineDir.str().str();
+}
+
+static std::string getEmptyBaselinePath(const char *Main) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, "nil.json");
+  return BaselinePath.str().str();
+}
+
+static StringRef getBaselineFilename(llvm::Triple Triple) {
+  if (Triple.isMacCatalystEnvironment())
+    return "iosmac.json";
+  else if (Triple.isMacOSX())
+    return "macos.json";
+  else if (Triple.isiOS())
+    return "iphoneos.json";
+  else if (Triple.isTvOS())
+    return "appletvos.json";
+  else if (Triple.isWatchOS())
+    return "watchos.json";
+  else if (Triple.isOSLinux())
+    return "linux.json";
+  else if (Triple.isOSWindows())
+    return "windows.json";
+  else {
+    llvm::errs() << "Unsupported triple target\n";
+    exit(1);
+  }
+}
+
+static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
+                                          llvm::Triple Triple,
+                                          bool ABI) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, Module);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
+static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
+  llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
+static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
+  SwiftDeclCollector Collector(Ctx);
+  // If the baseline path has been given, honor that.
+  if (!options::BaselineFilePath.empty()) {
+    Collector.deSerialize(options::BaselineFilePath);
+    return Collector.getSDKRoot();
+  }
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  // We need to call prepareForDump to parse target triple.
+  if (prepareForDump(Main, Invok, Modules, true))
+    return nullptr;
+
+  assert(Modules.size() == 1 &&
+         "Cannot find builtin baseline for more than one module");
+  std::string Path;
+  if (!options::BaselineDirPath.empty()) {
+    Path = getCustomBaselinePath(Invok.getLangOptions().Target,
+                                 Ctx.checkingABI());
+  } else if (options::UseEmptyBaseline) {
+    Path = getEmptyBaselinePath(Main);
+  } else {
+    Path = getDefaultBaselinePath(Main, Modules.begin()->getKey(),
+                                  Invok.getLangOptions().Target,
+                                  Ctx.checkingABI());
+  }
+  if (!fs::exists(Path)) {
+    llvm::errs() << "Baseline at " << Path << " does not exist\n";
+    exit(1);
+  }
+  if (options::Verbose) {
+    llvm::errs() << "Using baseline at " << Path << "\n";
+  }
+  Collector.deSerialize(Path);
+  return Collector.getSDKRoot();
+}
+
+static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
+  if (!options::OutputFile.empty())
+    return options::OutputFile;
+  if (!options::OutputDir.empty()) {
+    llvm::SmallString<128> OutputPath(options::OutputDir);
+    llvm::sys::path::append(OutputPath, ABI? "ABI": "API");
+    if (!llvm::sys::fs::exists(OutputPath.str())) {
+      llvm::errs() << "Baseline directory " << OutputPath.str()
+                   << " doesn't exist\n";
+      exit(1);
+    }
+    llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
+    return OutputPath.str().str();
+  }
+  llvm::errs() << "Unable to decide output file path\n";
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
 
+  llvm::cl::HideUnrelatedOptions(options::Category);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SDK Digester\n");
   CompilerInvocation InitInvok;
 
@@ -2324,36 +2874,51 @@ int main(int argc, char *argv[]) {
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   readIgnoredUsrs(IgnoredUsrs);
-  CheckerOptions Opts = getCheckOpts();
+  CheckerOptions Opts = getCheckOpts(argc, argv);
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
-  case ActionType::DumpSwiftModules:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSwiftModules(InitInvok, Modules, options::OutputFile, PrintApis, Opts);
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
-  case ActionType::CompareSDKs:
+      dumpSDKContent(InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
+                     Opts);
+  case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
-    if (options::SDKJsonPaths.size() != 2) {
-      llvm::errs() << "Only two SDK versions can be compared\n";
-      llvm::cl::PrintHelpMessage();
-      return 1;
-    }
-    llvm::StringSet<> protocolWhitelist;
-    if (!options::ProtReqWhiteList.empty()) {
-      if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
+    ComparisonInputMode Mode = checkComparisonInputMode();
+    llvm::StringSet<> protocolAllowlist;
+    if (!options::ProtReqAllowList.empty()) {
+      if (readFileLineByLine(options::ProtReqAllowList, protocolAllowlist))
           return 1;
     }
-    if (options::Action == ActionType::CompareSDKs)
-      return compareSDKs(options::SDKJsonPaths[0], options::SDKJsonPaths[1],
-                         options::OutputFile, IgnoredUsrs, Opts);
-    else
+    if (options::Action == ActionType::MigratorGen) {
+      assert(Mode == ComparisonInputMode::BothJson && "Only BothJson mode is supported");
+      return generateMigrationScript(options::SDKJsonPaths[0],
+                                     options::SDKJsonPaths[1],
+                                     options::OutputFile, IgnoredUsrs, Opts);
+    }
+    switch(Mode) {
+    case ComparisonInputMode::BothJson: {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
-                                  std::move(protocolWhitelist));
+                                  std::move(protocolAllowlist));
+    }
+    case ComparisonInputMode::BaselineJson: {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
+                                  getSDKRoot(argv[0], Ctx, false),
+                                  options::OutputFile,
+                                  std::move(protocolAllowlist));
+    }
+    case ComparisonInputMode::BothLoad: {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
+                                  getSDKRoot(argv[0], Ctx, false),
+                                  options::OutputFile,
+                                  std::move(protocolAllowlist));
+    }
+    }
   }
   case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
@@ -2378,6 +2943,11 @@ int main(int argc, char *argv[]) {
     for (unsigned I = 0; I < Paths.size(); I ++)
       Store.addStorePath(Paths[I]);
     return deserializeNameCorrection(Store, options::OutputFile);
+  }
+  case ActionType::GenerateEmptyBaseline: {
+    SDKContext Ctx(Opts);
+    dumpSDKRoot(getEmptySDKNodeRoot(Ctx), options::OutputFile);
+    return 0;
   }
   case ActionType::FindUsr: {
     if (options::SDKJsonPaths.size() != 1) {

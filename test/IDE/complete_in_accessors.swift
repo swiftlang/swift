@@ -113,6 +113,13 @@
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_DECLS < %t.txt
 // RUN: %FileCheck %s -check-prefix=ACCESSORS_IN_MEMBER_FUNC_2 < %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_OLDVALUE_COPIED | %FileCheck %s -check-prefix=IMPLICIT_OLDVALUE_COPIED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_OLDVALUE_MEMBER | %FileCheck %s -check-prefix=IMPLICIT_OLDVALUE_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_OLDVALUE_COPIEDMEMBER | %FileCheck %s -check-prefix=IMPLICIT_OLDVALUE_COPIEDMEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_OLDVALUE_COPIED | %FileCheck %s -check-prefix=EXPLICIT_OLDVALUE_COPIED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_OLDVALUE_MEMBER | %FileCheck %s -check-prefix=EXPLICIT_OLDVALUE_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_OLDVALUE_COPIEDMEMBER | %FileCheck %s -check-prefix=EXPLICIT_OLDVALUE_COPIEDMEMBER
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -132,7 +139,7 @@ func returnsInt() -> Int {}
 
 // WITH_GLOBAL_DECLS: Begin completions
 // WITH_GLOBAL_DECLS-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS: End completions
 
 // WITH_GLOBAL_DECLS1: Begin completions
@@ -142,7 +149,7 @@ func returnsInt() -> Int {}
 
 // WITH_MEMBER_DECLS: Begin completions
 // WITH_MEMBER_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[LocalVar]/Local:             self[#MemberAccessors#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]{{; name=.+$}}
@@ -159,8 +166,8 @@ func returnsInt() -> Int {}
 
 // WITH_LOCAL_DECLS: Begin completions
 // WITH_LOCAL_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
-// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule{{(/TypeRelation\[Identical\])?}}:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Identical\])?}}:             functionParam[#Int#]{{; name=.+$}}
 // WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_LOCAL_DECLS: End completions
 
@@ -456,7 +463,7 @@ func accessorsInFunction(_ functionParam: Int) {
 
 // ACCESSORS_IN_MEMBER_FUNC_2: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            self[#AccessorsInMemberFunction#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            functionParam[#Int#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Identical\])?}}:            functionParam[#Int#]
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/OutNominal:    instanceVar[#Double#]
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/OutNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_2: End completions
@@ -479,5 +486,63 @@ struct AccessorsInMemberFunction {
         #^ACCESSOR_IN_MEMBER_FUNC_2^#
       }
     }
+  }
+}
+
+var testImplicitOldValue1: Int = 0 {
+  didSet {
+    var oldV = oldValue
+    #^IMPLICIT_OLDVALUE_COPIED^#
+// IMPLICIT_OLDVALUE_COPIED: Begin completions
+// IMPLICIT_OLDVALUE_COPIED-DAG: Decl[LocalVar]/Local:               oldV[#Int#];
+// IMPLICIT_OLDVALUE_COPIED-DAG: Decl[LocalVar]/Local:               oldValue[#Int#];
+// IMPLICIT_OLDVALUE_COPIED: End completions
+  }
+}
+var testImplicitOldValue2: Int = 0 {
+  didSet {
+    oldValue.#^IMPLICIT_OLDVALUE_MEMBER^#
+// IMPLICIT_OLDVALUE_MEMBER: Begin completions
+// IMPLICIT_OLDVALUE_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Int#];
+// IMPLICIT_OLDVALUE_MEMBER: End completions
+  }
+}
+var testImplicitOldValue3: Int = 0 {
+  didSet {
+    var oldV = oldValue
+    oldV.#^IMPLICIT_OLDVALUE_COPIEDMEMBER^#
+// IMPLICIT_OLDVALUE_COPIEDMEMBER: Begin completions
+// IMPLICIT_OLDVALUE_COPIEDMEMBER-DAG: Keyword[self]/CurrNominal:          self[#Int#];
+// IMPLICIT_OLDVALUE_COPIEDMEMBER: End completions
+  }
+}
+
+var testExplicitOldValue1: Int = 0 {
+  didSet(oldVal) {
+    var oldV = oldVal
+    #^EXPLICIT_OLDVALUE_COPIED^#
+// EXPLICIT_OLDVALUE_COPIED: Begin completions
+// EXPLICIT_OLDVALUE_COPIED-NOT: oldValue
+// EXPLICIT_OLDVALUE_COPIED-DAG: Decl[LocalVar]/Local:               oldV[#Int#];
+// EXPLICIT_OLDVALUE_COPIED-DAG: Decl[LocalVar]/Local:               oldVal[#Int#];
+// EXPLICIT_OLDVALUE_COPIED-NOT: oldValue
+// EXPLICIT_OLDVALUE_COPIED: End completions
+  }
+}
+var testExplicitOldValue2: Int = 0 {
+  didSet(oldVal) {
+    oldVal.#^EXPLICIT_OLDVALUE_MEMBER^#
+// EXPLICIT_OLDVALUE_MEMBER: Begin completions
+// EXPLICIT_OLDVALUE_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Int#];
+// EXPLICIT_OLDVALUE_MEMBER: End completions
+  }
+}
+var testExplicitOldValue3: Int = 0 {
+  didSet(oldVal) {
+    var oldV = oldVal
+    oldV.#^EXPLICIT_OLDVALUE_COPIEDMEMBER^#
+// EXPLICIT_OLDVALUE_COPIEDMEMBER: Begin completions
+// EXPLICIT_OLDVALUE_COPIEDMEMBER-DAG: Keyword[self]/CurrNominal:          self[#Int#];
+// EXPLICIT_OLDVALUE_COPIEDMEMBER: End completions
   }
 }

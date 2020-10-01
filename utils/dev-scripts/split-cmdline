@@ -26,7 +26,7 @@
 #   -color-diagnostics \
 #   -module-name hello \
 #   -o hello.o
-# 
+#
 # Example usage in vim:
 # *) make sure that split-cmdline is in the $PATH
 # *) copy-paste the swift command line the text buffer
@@ -38,58 +38,94 @@
 
 from __future__ import print_function
 
-import re
-import sys
 import os
+import re
 import shlex
+import sys
+
 
 def main():
-  for line in sys.stdin:
-    first = True
-    is_arg_param = False
-    # Handle escaped spaces
-    args = shlex.split(line)
-    for arg in args:
-      if arg == '':
-        continue
-      if not first:
-        # Print option arguments in the same line
-        print(' ' if is_arg_param else ' \\\n  ', end='')
-      first = False
-
-      # Expand @ option files
-      m = re.match('^@(\S+\.txt)$', arg)
-      if m:
-        cmd_file = m.group(1)
-        if os.path.isfile(cmd_file):
-          with open(cmd_file) as f:
-            for ln in f.readlines():
-              for name in ln.rstrip().split(';'):
-                if name != '':
-                  print(name + ' \\')
+    for line in sys.stdin:
         first = True
-        continue
+        is_arg_param = False
+        # Handle escaped spaces
+        args = shlex.split(line)
+        for arg in args:
+            if arg == "":
+                continue
+            if not first:
+                # Print option arguments in the same line
+                print(" " if is_arg_param else " \\\n  ", end="")
+            first = False
 
-      if ' ' in arg:
-        print('"' + arg + '"', end='')
-      else:
-        print(arg, end='')
+            # Expand @ option files
+            m = re.match(r"^@(\S+\.txt)$", arg)
+            if m:
+                cmd_file = m.group(1)
+                if os.path.isfile(cmd_file):
+                    with open(cmd_file) as f:
+                        for ln in f.readlines():
+                            for name in ln.rstrip().split(";"):
+                                if name != "":
+                                    print(name + " \\")
+                first = True
+                continue
 
-      # A hard-coded list of options which expect a parameter
-      is_arg_param = (arg in [
-        '-o', '-target', '-isysroot', '-emit-sil', '-emit-ir', '-module-name',
-        '-framework', '-Xlinker', '-arch', '-D', '-sdk', '-module-cache-path',
-        '-F', '-output-file-map', '-emit-module-path', '-Xcc', '-I', '-iquote',
-        '-emit-objc-header-path', '-Xfrontend', '-filelist', '-num-threads',
-        '-Xclang', '-x', '-L', '-rpath', '-macosx_version_min',
-        '-syslibroot', '-add_ast_path', '-import-objc-header',
-        '-serialize-diagnostics-path', '-emit-dependencies-path',
-        '-emit-reference-dependencies-path', '-primary-file', '-resource-dir',
-        '--sdk', '--toolchain', '-emit-module-doc-path', '-module-link-name',
-        '-group-info-path', '-fileno', '-swift-version', '-Xllvm'])
+            if " " in arg:
+                print('"' + arg + '"', end="")
+            else:
+                print(arg, end="")
 
-    # Print 2 new lines after each command line
-    print('\n')
+            # A hard-coded list of options which expect a parameter
+            is_arg_param = arg in [
+                "-o",
+                "-target",
+                "-isysroot",
+                "-emit-sil",
+                "-emit-ir",
+                "-module-name",
+                "-framework",
+                "-Xlinker",
+                "-arch",
+                "-D",
+                "-sdk",
+                "-module-cache-path",
+                "-F",
+                "-output-file-map",
+                "-emit-module-path",
+                "-Xcc",
+                "-I",
+                "-iquote",
+                "-emit-objc-header-path",
+                "-Xfrontend",
+                "-filelist",
+                "-num-threads",
+                "-Xclang",
+                "-x",
+                "-L",
+                "-rpath",
+                "-macosx_version_min",
+                "-syslibroot",
+                "-add_ast_path",
+                "-import-objc-header",
+                "-serialize-diagnostics-path",
+                "-emit-dependencies-path",
+                "-emit-reference-dependencies-path",
+                "-primary-file",
+                "-resource-dir",
+                "--sdk",
+                "--toolchain",
+                "-emit-module-doc-path",
+                "-module-link-name",
+                "-group-info-path",
+                "-fileno",
+                "-swift-version",
+                "-Xllvm",
+            ]
 
-if __name__ == '__main__':
+        # Print 2 new lines after each command line
+        print("\n")
+
+
+if __name__ == "__main__":
     main()

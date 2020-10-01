@@ -42,14 +42,14 @@ public func test_scalar_strng() -> String {
 }
 
 // NOTE: 7450828190687388257.byteSwapped = 0x61 'a', 0x62 'b', 0x63 'c', 0x64 'd', 0xC3 0xA8 'è', 0x66 'f', 0x67 'g', ...
-// CHECK-LABEL test_strng_concat_smol
+// CHECK-LABEL: test_strng_concat_smol
 // CHECK:  ret { i64, %swift.bridge* } { i64 7450828190687388257, %swift.bridge* inttoptr (i64 -{{[0-9]+}} to %swift.bridge*) }
 public func test_strng_concat_smol() -> String {
   return "a" + "bc" + "dèf" + "ghī"
 }
 
 // NOTE: 1152921504606846999 = 23 (code-unit length) | `isTailAllocated` perf flag
-// CHECK-LABEL test_strng_concat_large
+// CHECK-LABEL: test_strng_concat_large
 // CHECK:  ret { i64, %swift.bridge* } { i64 1152921504606846999, %swift.bridge* inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to %swift.bridge*) }
 public func test_strng_concat_large() -> String {
   return "a" + "bc" + "dèf" + "ghī" + "jklmn" + "o" + "𝛒qr"

@@ -41,7 +41,7 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
-// CHECK-RAW: [[OPT_STORED_VALUE_COPY:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[STORED_VALUE_COPY]]
+// CHECK-RAW: [[OPT_STORED_VALUE_COPY:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[STORED_VALUE_COPY]]
 // CHECK-RAW: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
 // CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OPT_STORED_VALUE_COPY]], [[STRING_META]])
 // CHECK-RAW: return [[STRING_RESULT]]
@@ -68,7 +68,7 @@ func bridgeToNewtype() -> MyString {
 // CHECK-RAW: [[BORROW:%.*]] = begin_borrow [[STRING]]
 // CHECK-RAW: [[NS:%.*]] = apply [[TO_NS]]([[BORROW]])
 // CHECK-RAW: [[TO_MY:%.*]] = function_ref @$ss20_SwiftNewtypeWrapperPss21_ObjectiveCBridgeable8RawValueRpzrlE026_unconditionallyBridgeFromD1CyxAD_01_D5CTypeQZSgFZ : $@convention(method) <τ_0_0 where τ_0_0 : _SwiftNewtypeWrapper, τ_0_0.RawValue : _ObjectiveCBridgeable> (@guaranteed Optional<τ_0_0.RawValue._ObjectiveCType>, @thick τ_0_0.Type)
-// CHECK-RAW: [[OPTNS:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NS]]
+// CHECK-RAW: [[OPTNS:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[NS]]
 // CHECK-RAW: [[META:%.*]] = metatype $@thick MyString.Type
 // CHECK-RAW: apply [[TO_MY]]<MyString>({{.*}}, [[OPTNS]], [[META]])
   return "foo" as NSString as MyString
@@ -79,7 +79,7 @@ func bridgeFromNewtype(string: MyString) -> String {
 // CHECK-RAW: [[FROM_MY:%.*]] = function_ref @$ss20_SwiftNewtypeWrapperPss21_ObjectiveCBridgeable8RawValueRpzrlE09_bridgeToD1CAD_01_D5CTypeQZyF : $@convention(method) <τ_0_0 where τ_0_0 : _SwiftNewtypeWrapper, τ_0_0.RawValue : _ObjectiveCBridgeable> (@in_guaranteed τ_0_0) -> @owned τ_0_0.RawValue._ObjectiveCType
 // CHECK-RAW: [[NS:%.*]] = apply [[FROM_MY]]<MyString>(
 // CHECK-RAW: [[FROM_NS:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
-// CHECK-RAW: [[OPTNS:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NS]]
+// CHECK-RAW: [[OPTNS:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[NS]]
 // CHECK-RAW: [[META:%.*]] = metatype $@thin String.Type
 // CHECK-RAW: apply [[FROM_NS]]([[OPTNS]], [[META]])
   return string as NSString as String

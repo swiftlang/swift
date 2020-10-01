@@ -1,5 +1,7 @@
 #include <macros_impl.h>
 #include <macros_private_impl.h>
+#include <header_guard.h>
+#include <not_a_header_guard.h>
 
 // Get Clang's NULL.
 #include <stddef.h>
@@ -24,6 +26,8 @@
 #define false 0
 #define TRUE 1
 #define FALSE 0
+
+#define LL_TO_ULL 0x8000000000000000LL
 
 #define A_PI M_PI
 

@@ -1,16 +1,97 @@
 
+# TODO(compnerd) once we have a newer CMake we should be able to use the new
+# `Swift` LANGUAGE support in CMake to simplify the build.  For now, just add
+# the project so that it is possible to start working on extracting the Swift
+# standard library from the Swift compiler build.
+project(swift-stdlib LANGUAGES C CXX)
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
+  # All Darwin platforms have ABI stability.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+else()
+  # Any new platform should have non-stable ABI to start with.
+  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
+endif()
+
+#
+# User-configurable options for the standard library.
+#
+
+option(SWIFT_STDLIB_STABLE_ABI
+  "Should stdlib be built with stable ABI (library evolution, resilience)."
+  "${SWIFT_STDLIB_STABLE_ABI_default}")
+
+option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
+  "Support back-deploying compatibility fixes for newer apps running on older runtimes."
+  TRUE)
+
+option(SWIFT_RUNTIME_MACHO_NO_DYLD
+  "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+  FALSE)
+
+option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+    "Build the standard libraries assuming that they will be used in an environment with only a single thread."
+    FALSE)
+
+option(SWIFT_STDLIB_OS_VERSIONING
+    "Build stdlib with availability based on OS versions (Darwin only)."
+    TRUE)
+
+option(SWIFT_ENABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       "${SWIFT_STDLIB_STABLE_ABI}")
+
+option(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH
+       "Build Differentation without tgmath (and dependency on platform runtime libraries)"
+       FALSE)
+
+#
+# End of user-configurable options.
+#
 
 include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.
 
-# NOTE(compnerd) save the original compiler for the host swiftReflection that
-# we build
-set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
+# NOTE(compnerd) this will pass the *build* configuration to the *host*
+# libraries.  Explicitly indicate to CMake that it should **NOT** track the
+# implicit language runtimes.  This can go away once we migrate to an external
+# project with its own configure with the CMAKE_SYSTEM_NAME set rather than
+# using the custom cross-compilation solution
+set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
+
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
@@ -29,14 +110,18 @@ else()
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
 
-  set(CMAKE_C_COMPILER_LAUNCHER "")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_C_COMPILER_LAUNCHER "")
+  endif()
+  if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  endif()
 
   # The sanitizers require using the same version of the compiler for
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  append("-fno-sanitize=all" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+  add_compile_options(-fno-sanitize=all)
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
@@ -45,14 +130,20 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1>)
+include_directories(BEFORE ${CMAKE_PROJECT_SOURCE_DIR}/include)
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_STDLIB)
-  list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
+  else()
+    list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  endif()
 endif()
 
 function(swift_create_stdlib_targets name variant define_all_alias)
@@ -109,48 +200,9 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
-foreach(sdk ${SWIFT_SDKS})
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-    set(input "${SWIFT_SOURCE_DIR}/stdlib/public/legacy_layouts/${platform}/layouts-${arch}.yaml")
-    set(output "${SWIFTLIB_DIR}/${platform}/layouts-${arch}.yaml")
-
-    if(EXISTS "${input}")
-      # Copy the input file to the build directory.
-      add_custom_command(
-        OUTPUT "${output}"
-        DEPENDS "${input}"
-        COMMAND
-          "${CMAKE_COMMAND}" -E copy
-          "${input}"
-          "${output}")
-
-      # Define a target for this so that we can depend on it when
-      # building Swift sources.
-      add_custom_target(
-        "copy-legacy-layouts-${platform}-${arch}"
-        DEPENDS "${output}"
-        SOURCES "${input}")
-
-      # Make sure we ultimately always do this as part of building the
-      # standard library. In practice we'll do this earlier if at least
-      # one Swift source file has changed.
-      add_dependencies(
-        "swift-stdlib-${platform}-${arch}"
-        "copy-legacy-layouts-${platform}-${arch}")
-
-      swift_install_in_component(stdlib
-          FILES ${input}
-          DESTINATION "lib/swift/${platform}/")
-    else()
-      # Add a dummy target that does nothing so we can still depend on it
-      # later without checking if the input files exist.
-      add_custom_target(
-        "copy-legacy-layouts-${platform}-${arch}")
-    endif()
-  endforeach()
-endforeach()
-
+# FIXME: Include the toolchain directory before the public directory. Otherwise
+# the clang resource directory symlink stops installing correctly.
+add_subdirectory(toolchain)
 add_subdirectory(public)
 add_subdirectory(private)
 add_subdirectory(tools)

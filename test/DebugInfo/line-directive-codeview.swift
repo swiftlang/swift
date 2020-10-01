@@ -12,7 +12,7 @@ func myFunc() {
   markUsed("jump directly to def")
 }
 
-// REQUIRES: OS=Windows
+// REQUIRES: OS=windows-msvc
 // RUN: %swiftc_driver %s -S -g -debug-info-format=codeview -target x86_64-unknown-windows-msvc -o - | %FileCheck --check-prefix CV-CHECK %s
 // CV-CHECK: .cv_file [[MAIN:[0-9]+]] "{{.*}}line-directive-codeview.swift"
 // CV-CHECK: .cv_loc {{[0-9]+}} [[MAIN]] 1 {{0?}}

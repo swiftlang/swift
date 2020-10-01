@@ -42,14 +42,22 @@
 namespace swift {
 
 class SILInstruction;
-  
-/// Deletes all of the debug instructions that use \p Inst.
-inline void deleteAllDebugUses(ValueBase *Inst) {
-  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
-    auto *Inst = UI->getUser();
-    UI++;
-    if (Inst->isDebugInstruction())
-      Inst->eraseFromParent();
+
+/// Deletes all of the debug instructions that use \p value.
+inline void deleteAllDebugUses(SILValue value) {
+  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
+    auto *inst = ui->getUser();
+    ++ui;
+    if (inst->isDebugInstruction()) {
+      inst->eraseFromParent();
+    }
+  }
+}
+
+/// Deletes all of the debug uses of any result of \p inst.
+inline void deleteAllDebugUses(SILInstruction *inst) {
+  for (SILValue v : inst->getResults()) {
+    deleteAllDebugUses(v);
   }
 }
 
@@ -171,8 +179,18 @@ inline SILInstruction *getSingleNonDebugUser(SILValue V) {
 /// Precondition: The instruction may only have debug instructions as uses.
 /// If the iterator \p InstIter references any deleted instruction, it is
 /// incremented.
-inline void eraseFromParentWithDebugInsts(SILInstruction *I,
-                                          SILBasicBlock::iterator &InstIter) {
+///
+/// \p callBack will be invoked before each instruction is deleted. \p callBack
+/// is not responsible for deleting the instruction because this utility
+/// unconditionally deletes the \p I and its debug users.
+///
+/// Returns an iterator to the next non-deleted instruction after \p I.
+inline SILBasicBlock::iterator eraseFromParentWithDebugInsts(
+    SILInstruction *I, llvm::function_ref<void(SILInstruction *)> callBack =
+                           [](SILInstruction *) {}) {
+
+  auto nextII = std::next(I->getIterator());
+
   auto results = I->getResults();
 
   bool foundAny;
@@ -183,26 +201,16 @@ inline void eraseFromParentWithDebugInsts(SILInstruction *I,
         foundAny = true;
         auto *User = result->use_begin()->getUser();
         assert(User->isDebugInstruction());
-        if (InstIter == User->getIterator())
-          InstIter++;
-
+        if (nextII == User->getIterator())
+          nextII++;
+        callBack(User);
         User->eraseFromParent();
       }
     }
   } while (foundAny);
 
-  if (InstIter == I->getIterator())
-    ++InstIter;
-
   I->eraseFromParent();
-}
-
-/// Erases the instruction \p I from it's parent block and deletes it, including
-/// all debug instructions which use \p I.
-/// Precondition: The instruction may only have debug instructions as uses.
-inline void eraseFromParentWithDebugInsts(SILInstruction *I) {
-  SILBasicBlock::iterator nullIter;
-  eraseFromParentWithDebugInsts(I, nullIter);
+  return nextII;
 }
 
 /// Return true if the def-use graph rooted at \p V contains any non-debug,
@@ -212,4 +220,4 @@ bool hasNonTrivialNonDebugTransitiveUsers(
 
 } // end namespace swift
 
-#endif /* SWIFT_SIL_DEBUGUTILS_H */
+#endif // SWIFT_SIL_DEBUGUTILS_H

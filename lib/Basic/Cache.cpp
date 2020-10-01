@@ -77,16 +77,25 @@ void CacheImpl::setAndRetain(void *Key, void *Value, size_t Cost) {
 
   DefaultCacheKey CKey(Key, &DCache.CBs);
   auto Entry = DCache.Entries.find(CKey);
-  if (Entry != DCache.Entries.end()) {
-    if (Entry->second == Value)
-      return;
-    DCache.CBs.keyDestroyCB(Entry->first.Key, nullptr);
-    DCache.CBs.valueReleaseCB(Entry->second, nullptr);
-    DCache.Entries.erase(Entry);
+
+  // If there is no existing entry, retain the value and insert the entry.
+  if (Entry == DCache.Entries.end()) {
+    DCache.CBs.valueRetainCB(Value, nullptr);
+    DCache.Entries[CKey] = Value;
+    return;
   }
 
-  DCache.CBs.valueRetainCB(Value, nullptr);
-  DCache.Entries[CKey] = Value;
+  // If there is an existing entry, the the original key and the new key are ==.
+  // Swap the new key into the map and destroy the original key.
+  std::swap(Entry->first.Key, Key);
+  DCache.CBs.keyDestroyCB(Key, nullptr);
+
+  // Replace the value, if necessary.
+  if (Entry->second != Value) {
+    DCache.CBs.valueRetainCB(Value, nullptr);
+    std::swap(Entry->second, Value);
+    DCache.CBs.valueReleaseCB(Value, nullptr);
+  }
 
   // FIXME: Not thread-safe! It should avoid deleting the value until
   // 'releaseValue is called on it.

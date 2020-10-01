@@ -28,8 +28,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "SwiftHashableSupport.h"
 
-#include "llvm/Support/Compiler.h"
-
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
@@ -206,19 +204,20 @@ SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
 
 /// Breakpoint hook for debuggers.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-void swift_willThrow(SWIFT_CONTEXT void *unused,
-                     SWIFT_ERROR_RESULT SwiftError **object);
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API void
+swift_willThrow(SWIFT_CONTEXT void *unused,
+                SWIFT_ERROR_RESULT SwiftError **object);
 
 /// Halt in response to an error.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
-void swift_errorInMain(SwiftError *object);
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
-void swift_unexpectedError(SwiftError *object,
-                           OpaqueValue *filenameStart,
-                           long filenameLength,
-                           bool isAscii,
-                           unsigned long line);
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void
+swift_errorInMain(SwiftError *object);
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void
+swift_unexpectedError(SwiftError *object, OpaqueValue *filenameStart,
+                      long filenameLength, bool isAscii, unsigned long line);
 
 #if SWIFT_OBJC_INTEROP
 
@@ -253,6 +252,17 @@ Class getNSErrorClass();
 /// Get the NSError metadata.
 const Metadata *getNSErrorMetadata();
 
+/// Find the witness table for the conformance of the given type to the
+/// Error protocol, or return nullptr if it does not conform.
+const WitnessTable *findErrorWitness(const Metadata *srcType);
+
+/// Dynamically cast a value whose conformance to the Error protocol is known
+/// into an NSError instance.
+id dynamicCastValueToNSError(OpaqueValue *src,
+                             const Metadata *srcType,
+                             const WitnessTable *srcErrorWitness,
+                             DynamicCastFlags flags);
+
 #endif
 
 SWIFT_RUNTIME_STDLIB_SPI
@@ -262,5 +272,16 @@ SWIFT_RUNTIME_STDLIB_SPI
 const size_t _swift_lldb_sizeof_SwiftError;
 
 } // namespace swift
+
+#if SWIFT_OBJC_INTEROP
+// internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
+//   _ x: UnsafePointer<T>) -> AnyObject?
+#define getErrorEmbeddedNSErrorIndirect \
+  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+id getErrorEmbeddedNSErrorIndirect(const swift::OpaqueValue *error,
+                                   const swift::Metadata *T,
+                                   const swift::WitnessTable *Error);
+#endif
 
 #endif

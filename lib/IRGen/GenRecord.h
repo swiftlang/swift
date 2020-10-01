@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_GENRECORD_H
 #define SWIFT_IRGEN_GENRECORD_H
 
+#include "BitPatternBuilder.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
@@ -147,6 +148,10 @@ public:
     return new(buffer) Impl(fields, std::forward<As>(args)...);
   }
 
+  bool areFieldsABIAccessible() const {
+    return AreFieldsABIAccessible;
+  }
+
   ArrayRef<FieldImpl> getFields() const {
     return {this->template getTrailingObjects<FieldImpl>(), NumFields};
   }
@@ -238,11 +243,10 @@ public:
                           SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      IGF.Builder.CreateMemCpy(dest.getAddress(),
-                               dest.getAlignment().getValue(),
-                               src.getAddress(),
-                               src.getAlignment().getValue(),
-                 asImpl().Impl::getSize(IGF, T));
+      IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          asImpl().Impl::getSize(IGF, T));
       return;
     }
 
@@ -591,6 +595,28 @@ public:
     return 0;
   }
 
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM)) {
+      // The non-extra-inhabitant-providing fields of the type must be
+      // trivial, because an enum may contain garbage values in those fields'
+      // storage which the value witness operation won't handle.
+      for (auto &otherField : asImpl().getFields()) {
+        if (field == &otherField)
+          continue;
+        auto &ti = otherField.getTypeInfo();
+        if (!ti.isPOD(ResilienceExpansion::Maximal)) {
+          return false;
+        }
+      }
+
+      return field->getTypeInfo()
+        .canValueWitnessExtraInhabitantsUpTo(IGM, index);
+    }
+    
+    return false;
+  }
+
   APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                      unsigned bits,
                                      unsigned index) const override {
@@ -598,27 +624,32 @@ public:
     // inhabitants.
     auto &field = *asImpl().getFixedExtraInhabitantProvidingField(IGM);
     auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
-    APInt fieldValue = fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    return fieldValue.shl(field.getFixedByteOffset().getValueInBits());
+    auto fieldSize = fieldTI.getFixedExtraInhabitantMask(IGM).getBitWidth();
+
+    auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
+    value.appendClearBits(field.getFixedByteOffset().getValueInBits());
+    value.append(fieldTI.getFixedExtraInhabitantValue(IGM, fieldSize, index));
+    value.padWithClearBitsTo(bits);
+    return value.build().getValue();
   }
 
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM);
     if (!field)
       return APInt();
-    
+
     const FixedTypeInfo &fieldTI
       = cast<FixedTypeInfo>(field->getTypeInfo());
     auto targetSize = asImpl().getFixedSize().getValueInBits();
-    
+
     if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
       return APInt(targetSize, 0);
-    
-    APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-    if (targetSize > fieldMask.getBitWidth())
-      fieldMask = fieldMask.zext(targetSize);
-    fieldMask = fieldMask.shl(field->getFixedByteOffset().getValueInBits());
-    return fieldMask;
+
+    auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+    mask.appendClearBits(field->getFixedByteOffset().getValueInBits());
+    mask.append(fieldTI.getFixedExtraInhabitantMask(IGM));
+    mask.padWithClearBitsTo(targetSize);
+    return mask.build().getValue();
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,

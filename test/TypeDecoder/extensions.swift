@@ -43,3 +43,18 @@ extension Generic where T == Int {
 
 // DEMANGLE-DECL: $s10extensions7GenericVAASiRszlE7Nested2V
 // CHECK-DECL: extensions.(file).Generic extension.Nested2
+
+// Layout Constraints
+// FIXME: When other layout constraints are allowed in source level swift, test
+// that we correctly demangle those as well.
+
+extension Generic where T: AnyObject {
+  struct NestedViaAnyObject {}
+}
+
+// DEMANGLE-TYPE: $s10extensions7GenericVAARlzClE18NestedViaAnyObjectVyx_GD
+// CHECK-TYPE: Generic<τ_0_0>.NestedViaAnyObject
+
+// DEMANGLE-DECL: $s10extensions7GenericVAARlzClE18NestedViaAnyObjectV
+// CHECK-DECL: extensions.(file).Generic extension.NestedViaAnyObject
+

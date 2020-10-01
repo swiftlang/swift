@@ -7,25 +7,32 @@ func test() {
 
 }
 
-// XFAIL: broken_std_regex, linux
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
-// RUN: %FileCheck -check-prefix=NAME %s < %t.orig
-// Make sure the order is as below, foo(Int) should come before foo(String).
+// RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0,sort.byname=0 -pos=7:1 %s -- %s > %t.orig.off
+// RUN: %FileCheck -check-prefix=NAME_SORTED %s < %t.orig
+// RUN: %FileCheck -check-prefix=NAME_UNSORTED %s < %t.orig.off
+// RUN: not %diff -u %t.orig %t.orig.off
 
-// NAME: key.description: "#column"
-// NAME: key.description: "foo(a: Int)"
-// NAME-NOT: key.description
-// NAME: key.description: "foo(a: String)"
-// NAME-NOT: key.description
-// NAME: key.description: "foo(b: Int)"
-// NAME: key.description: "test()"
-// NAME: key.description: "x"
+// Make sure the order is as below, foo(Int) should come before foo(String).
+// NAME_SORTED: key.description: "#column"
+// NAME_SORTED: key.description: "foo(a: Int)"
+// NAME_SORTED-NOT: key.description
+// NAME_SORTED: key.description: "foo(a: String)"
+// NAME_SORTED-NOT: key.description
+// NAME_SORTED: key.description: "foo(b: Int)"
+// NAME_SORTED: key.description: "test()"
+// NAME_SORTED: key.description: "x"
+
+// NAME_UNSORTED-DAG: key.description: "x"
+// NAME_UNSORTED-DAG: key.description: "foo(a: String)"
+// NAME_UNSORTED-DAG: key.description: "foo(a: Int)"
+// NAME_UNSORTED-DAG: key.description: "foo(b: Int)"
 
 // RUN: %sourcekitd-test -req=complete.open -pos=7:1 -req-opts=hidelowpriority=0,hideunderscores=0 %s -- %s > %t.default
 // RUN: %sourcekitd-test -req=complete.open -pos=7:1 -req-opts=sort.byname=0,hidelowpriority=0,hideunderscores=0 %s -- %s > %t.on
 // RUN: %sourcekitd-test -req=complete.open -pos=7:1 -req-opts=sort.byname=1,hidelowpriority=0,hideunderscores=0 %s -- %s > %t.off
 // RUN: %FileCheck -check-prefix=CONTEXT %s < %t.default
-// RUN: %FileCheck -check-prefix=NAME %s < %t.off
+// RUN: %FileCheck -check-prefix=NAME_SORTED %s < %t.off
 // FIXME: rdar://problem/20109989 non-deterministic sort order
 // RUN-disabled: diff %t.on %t.default
 // RUN: %FileCheck -check-prefix=CONTEXT %s < %t.on
@@ -41,6 +48,7 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "complete_sort_order"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
 func test1() {
@@ -189,9 +197,8 @@ func test6() {
 // VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
 // VOID_1_RAW-NEXT: key.description: "foo1()",
 // VOID_1_RAW-NEXT: key.typename: "Void",
-// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
+// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
-// VOID_1_RAW-NEXT: key.not_recommended: 1,
 
 
 
@@ -204,8 +211,8 @@ func test7() {
   #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
 }
 // CASE_0: Results for filterText: caseSensitiveCheck [
-// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck
 // CASE_0: caseSensitiveCheck.
 // CASE_0: ]
 // CASE_0: Results for filterText: CaseSensitiveCheck [

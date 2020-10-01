@@ -52,8 +52,8 @@ extension String {
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
   ///
-  /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
-  /// unsigned sequence of bytes.
+  /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
+  /// an unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
     self = String._fromUTF8Repairing(
@@ -76,7 +76,7 @@ extension String {
   ///         let s = String(validatingUTF8: ptr.baseAddress!)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional(Café)"
+  ///     // Prints "Optional("Café")"
   ///
   ///     let invalidUTF8: [CChar] = [67, 97, 102, -61, 0]
   ///     invalidUTF8.withUnsafeBufferPointer { ptr in
@@ -114,7 +114,7 @@ extension String {
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional((Café, false))"
+  ///     // Prints "Optional((result: "Café", repairsMade: false))"
   ///
   ///     let invalidUTF8: [UInt8] = [67, 97, 102, 195, 0]
   ///     invalidUTF8.withUnsafeBufferPointer { ptr in
@@ -123,7 +123,7 @@ extension String {
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional((Caf�, true))"
+  ///     // Prints "Optional((result: "Caf�", repairsMade: true))"
   ///
   /// - Parameters:
   ///   - cString: A pointer to a null-terminated code sequence encoded in
@@ -140,7 +140,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF8)
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
-  public static func decodeCString<Encoding : _UnicodeEncoding>(
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true

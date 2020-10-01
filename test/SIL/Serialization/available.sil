@@ -1,0 +1,32 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name available
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name available
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name available | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc
+
+import Builtin
+
+// CHECK-LABEL: sil [serialized] [weak_imported] @weak_func : $@convention(thin) () -> ()
+sil [serialized] [weak_imported] @weak_func : $@convention(thin) () -> () {
+bb0:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [serialized] [available 123.321.444] @version_subminor : $@convention(thin) () -> ()
+sil [serialized] [available 123.321.444] @version_subminor : $@convention(thin) () -> () {
+bb0:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [serialized] [available 123] @version_major : $@convention(thin) () -> ()
+sil [serialized] [available 123] @version_major : $@convention(thin) () -> () {
+bb0:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [serialized] [available 123.321] @version_minor : $@convention(thin) () -> ()
+sil [serialized] [available 123.321] @version_minor : $@convention(thin) () -> () {
+bb0:
+  return undef : $()
+}

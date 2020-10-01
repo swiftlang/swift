@@ -75,7 +75,7 @@ static bool isUnitTest(const ValueDecl *D) {
     return false;
 
   // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
+  if (FD->getBaseIdentifier().str().startswith("test"))
     return true;
 
   return false;
@@ -84,7 +84,8 @@ static bool isUnitTest(const ValueDecl *D) {
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
-  if (FD->getAttrs().hasAttribute<IBActionAttr>())
+  if (FD->getAttrs().hasAttribute<IBActionAttr>() ||
+      FD->getAttrs().hasAttribute<IBSegueActionAttr>())
     sym.Properties |= SymbolProperty::IBAnnotated;
 
   if (isUnitTest(FD))
@@ -142,7 +143,7 @@ SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
   info.SubKind = SymbolSubKind::None;
   info.Properties = SymbolPropertySet();
   if (auto *D = Mod.getAsSwiftModule()) {
-    if (!D->isClangModule()) {
+    if (!D->isNonSwiftModule()) {
       info.Lang = SymbolLanguage::Swift;
     } else {
       info.Lang = SymbolLanguage::C;
@@ -159,9 +160,15 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
                    SymbolLanguage::Swift, SymbolPropertySet() };
   switch (D->getKind()) {
-    case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
-    case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
-    case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
+    case DeclKind::Enum:
+      info.Kind = SymbolKind::Enum;
+      break;
+    case DeclKind::Struct:
+      info.Kind = SymbolKind::Struct;
+      break;
+    case DeclKind::Protocol:
+      info.Kind = SymbolKind::Protocol;
+      break;
     case DeclKind::Class:
       info.Kind = SymbolKind::Class;
       if (isUnitTestCase(cast<ClassDecl>(D)))
@@ -234,6 +241,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PoundDiagnostic:
     case DeclKind::MissingMember:
     case DeclKind::Module:
+    case DeclKind::OpaqueType:
       break;
   }
 

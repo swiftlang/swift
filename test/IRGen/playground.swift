@@ -10,9 +10,9 @@ import Swift
 @objc class C { }
 
 private func __builtin_log_scope_entry(_ startLine: Int, _ startColumn: Int,
-  _ endLine: Int, _ endColumn: Int) { }
+  _ endLine: Int, _ endColumn: Int, _ moduleID: Int, _ fileID: Int) { }
 private func __builtin_log_scope_exit(_ startLine: Int, _ startColumn: Int,
-  _ endLine: Int, _ endColumn: Int) { }
+  _ endLine: Int, _ endColumn: Int, _ moduleID: Int, _ fileID: Int) { }
 private func __builtin_send_data<T>(_ object: T) { }
 
 public func anchor() {}

@@ -19,38 +19,38 @@ switch p {
     print("other")
 }
 
-// RUN: %sourcekitd-test -req=cursor -pos=13:19 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKX,CHECK1DECL %s
-// RUN: %sourcekitd-test -req=cursor -pos=14:18 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKX,CHECK1REF %s
+// RUN: %sourcekitd-test -req=cursor -pos=13:19 %s -- %s | %FileCheck -check-prefixes=CHECKX,CHECK1DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=14:18 %s -- %s | %FileCheck -check-prefixes=CHECKX,CHECK1REF %s
 
 // CHECK1DECL: source.lang.swift.decl.var.local (13:19-13:20)
 // CHECK1REF: source.lang.swift.ref.var.local (13:19-13:20)
 
-// RUN: %sourcekitd-test -req=cursor -pos=16:20 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKX,CHECK2DECL %s
-// RUN: %sourcekitd-test -req=cursor -pos=16:42 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKX,CHECK2DECL2 %s
-// RUN: %sourcekitd-test -req=cursor -pos=17:18 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKX,CHECK2REF %s
+// RUN: %sourcekitd-test -req=cursor -pos=16:20 %s -- %s | %FileCheck -check-prefixes=CHECKX,CHECK2DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=16:42 %s -- %s | %FileCheck -check-prefixes=CHECKX,CHECK2DECL2 %s
+// RUN: %sourcekitd-test -req=cursor -pos=17:18 %s -- %s | %FileCheck -check-prefixes=CHECKX,CHECK2REF %s
 
 // CHECK2DECL: source.lang.swift.decl.var.local (16:20-16:21)
 // CHECK2DECL2: source.lang.swift.decl.var.local (16:42-16:43)
-// CHECK2REF: source.lang.swift.ref.var.local (16:20-16:21)
+// CHECK2REF: source.lang.swift.ref.var.local (16:42-16:43)
 
 // CHECKX: x
 // CHECKX: s:33cursor_vardecl_across_fallthrough1xL_Sivp
 // CHECKX: Int
 
 
-// RUN: %sourcekitd-test -req=cursor -pos=13:26 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKY,CHECK3DECL %s
-// RUN: %sourcekitd-test -req=cursor -pos=14:23 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKY,CHECK3REF %s
+// RUN: %sourcekitd-test -req=cursor -pos=13:26 %s -- %s | %FileCheck -check-prefixes=CHECKY,CHECK3DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=14:23 %s -- %s | %FileCheck -check-prefixes=CHECKY,CHECK3REF %s
 
 // CHECK3DECL: source.lang.swift.decl.var.local (13:26-13:27)
 // CHECK3REF: source.lang.swift.ref.var.local (13:26-13:27)
 
-// RUN: %sourcekitd-test -req=cursor -pos=16:27 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKY,CHECK4DECL %s
-// RUN: %sourcekitd-test -req=cursor -pos=16:49 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKY,CHECK4DECL2 %s
-// RUN: %sourcekitd-test -req=cursor -pos=17:23 %s -- %mcp_opt %s | %FileCheck -check-prefixes=CHECKY,CHECK4REF %s
+// RUN: %sourcekitd-test -req=cursor -pos=16:27 %s -- %s | %FileCheck -check-prefixes=CHECKY,CHECK4DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=16:49 %s -- %s | %FileCheck -check-prefixes=CHECKY,CHECK4DECL2 %s
+// RUN: %sourcekitd-test -req=cursor -pos=17:23 %s -- %s | %FileCheck -check-prefixes=CHECKY,CHECK4REF %s
 
 // CHECK4DECL: source.lang.swift.decl.var.local (16:27-16:28)
 // CHECK4DECL2: source.lang.swift.decl.var.local (16:49-16:50)
-// CHECK4REF: source.lang.swift.ref.var.local (16:27-16:28)
+// CHECK4REF: source.lang.swift.ref.var.local (16:49-16:50)
 
 // CHECKY: y
 // CHECKY: s:33cursor_vardecl_across_fallthrough1yL_SSvp

@@ -38,7 +38,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!getter.1
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!getter
 // CHECK-NEXT: [[OWNED_SELF:%.*]] = apply [[T0]]([[ARG]])
 // CHECK-NEXT: [[SELF:%.*]] = begin_borrow [[OWNED_SELF]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
@@ -46,7 +46,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[SELF]])
 // CHECK-NEXT: end_borrow [[SELF]]
 //   Formal access to LHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!modify.1
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!modify
 // CHECK-NEXT: ([[T1:%.*]], [[T2:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11OrdinarySubVyS2icis
@@ -81,14 +81,14 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify.1
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify
 // CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors11MutatingSubVyS2icig : $@convention(method) (Int, @inout MutatingSub) -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[T1]])
 // CHECK-NEXT: end_apply [[TOKEN]]
 //   Formal access to LHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify.1
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify
 // CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11MutatingSubVyS2icis : $@convention(method) (Int, Int, @inout MutatingSub) -> ()
@@ -132,6 +132,40 @@ func test_rec2(_ outer: inout Rec2Outer) -> Int {
 // This uses the mutable addressor.
 // CHECK: sil hidden [ossa] @$s9accessors9test_rec2ySiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
 // CHECK:   function_ref @$s9accessors9Rec2OuterV5innerAA0B5InnerVvau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
+
+// SR-12456: Compiler crash on class var override adding observer.
+class SR12456Base {
+  open class var instance: SR12456Base {
+    get {
+      return SR12456Base()
+    }
+    set {}
+  }
+}
+
+class SR12456Subclass : SR12456Base {
+  override class var instance: SR12456Base {
+    didSet {}
+  }
+}
+
+// Make sure we can handle more complicated overrides.
+class Parent<V> {
+  class C<T, U> {
+    class var foo: Int { get { 0 } set {} }
+  }
+  class D<T> : C<T, Int> {}
+  class E : D<Double> {
+    // CHECK-LABEL: sil hidden [ossa] @$s9accessors6ParentC1EC3fooSivgZ : $@convention(method) <V> (@thick Parent<V>.E.Type) -> Int
+    // CHECK: [[TY:%.+]] = upcast {{%.+}} : $@thick Parent<V>.E.Type to $@thick Parent<V>.D<Double>.Type
+    // CHECK: [[UPCASTTY:%.+]] = upcast [[TY]] : $@thick Parent<V>.D<Double>.Type to $@thick Parent<V>.C<Double, Int>.Type
+    // CHECK: [[GETTER:%.+]] = function_ref @$s9accessors6ParentC1CC3fooSivgZ : $@convention(method) <τ_0_0><τ_1_0, τ_1_1> (@thick Parent<τ_0_0>.C<τ_1_0, τ_1_1>.Type) -> Int
+    // CHECK: apply [[GETTER]]<V, Double, Int>([[UPCASTTY]])
+    override class var foo: Int {
+      didSet {}
+    }
+  }
+}
 
 struct Foo {
   private subscript(privateSubscript x: Void) -> Void {

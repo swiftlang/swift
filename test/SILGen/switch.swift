@@ -1,5 +1,9 @@
 // RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 
+//////////////////
+// Declarations //
+//////////////////
+
 func markUsed<T>(_ t: T) {}
 
 // TODO: Implement tuple equality in the library.
@@ -24,6 +28,43 @@ func d() {}
 func e() {}
 func f() {}
 func g() {}
+
+func a(_ k: Klass) {}
+func b(_ k: Klass) {}
+func c(_ k: Klass) {}
+func d(_ k: Klass) {}
+func e(_ k: Klass) {}
+func f(_ k: Klass) {}
+func g(_ k: Klass) {}
+
+class Klass {
+  var isTrue: Bool { return true }
+  var isFalse: Bool { return false }
+}
+
+enum TrivialSingleCaseEnum {
+case a
+}
+
+enum NonTrivialSingleCaseEnum {
+case a(Klass)
+}
+
+enum MultipleNonTrivialCaseEnum {
+case a(Klass)
+case b(Klass)
+case c(Klass)
+}
+
+enum MultipleAddressOnlyCaseEnum<T : BinaryInteger> {
+case a(T)
+case b(T)
+case c(T)
+}
+
+///////////
+// Tests //
+///////////
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch5test1yyF
 func test1() {
@@ -415,7 +456,7 @@ class E : C {}
 // CHECK-LABEL: sil hidden [ossa] @$s6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@guaranteed B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
@@ -427,21 +468,18 @@ func test_isa_class_1(x: B) {
   case is D1 where runced():
   // CHECK:   function_ref @$s6switch1ayyF
   // CHECK:   destroy_value [[CAST_D1_COPY]]
-  // CHECK:   end_borrow [[CAST_D1]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[NO_CASE1]]:
   // CHECK-NEXT:   destroy_value [[CAST_D1_COPY]]
-  // CHECK-NEXT:   end_borrow [[CAST_D1]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_D1]]([[CASTFAIL_D1:%.*]] : @guaranteed $B):
-  // CHECK-NEXT:   end_borrow [[CASTFAIL_D1]]
   // CHECK-NEXT:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case is D2:
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
@@ -451,8 +489,7 @@ func test_isa_class_1(x: B) {
     b()
 
   // CHECK: [[IS_NOT_D2]]([[CASTFAIL_D2:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[CASTFAIL_D2]]
-  // CHECK:   checked_cast_br [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
@@ -467,15 +504,13 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[NO_CASE3]]:
   // CHECK-NEXT:   destroy_value [[CAST_E_COPY]]
-  // CHECK-NEXT:   end_borrow
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOTCAST_E:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOTCAST_E]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   case is C:
   // CHECK: [[IS_C]]([[CAST_C:%.*]] : @guaranteed $C):
@@ -483,12 +518,10 @@ func test_isa_class_1(x: B) {
   // CHECK:   function_ref @$s6switch1dyyF
   // CHECK-NEXT: apply
   // CHECK:   destroy_value [[CAST_C_COPY]]
-  // CHECK:   end_borrow [[CAST_C]]
   // CHECK:   br [[CONT]]
     d()
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_C]]
   default:
   // CHECK:    function_ref @$s6switch1eyyF
   // CHECK:    br [[CONT]]
@@ -506,7 +539,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
   switch x {
 
-  // CHECK:   checked_cast_br [[X]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   case let y as D1 where runced():
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
   // CHECK:   [[CAST_D1_COPY:%.*]] = copy_value [[CAST_D1]]
@@ -529,11 +562,10 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   br [[NEXT_CASE:bb5]]
 
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_D1]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to $D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case let y as D2:
   // CHECK: [[CASE2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
@@ -548,8 +580,7 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[IS_NOT_D2]]([[NOCAST_D2:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_D2]]
-  // CHECK:   checked_cast_br [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
@@ -563,21 +594,19 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]]
   // CHECK:   destroy_value [[CAST_E_COPY]]
-  // CHECK:   end_borrow [[CAST_E]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     c()
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK    destroy_value [[CAST_E_COPY]]
+  // CHECK:    destroy_value [[CAST_E_COPY]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_E]]
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]
-  // CHECK:   checked_cast_br [[X]] : $B to $C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
   case let y as C:
   // CHECK: [[CASE4]]([[CAST_C:%.*]] : @guaranteed $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
@@ -592,7 +621,6 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
-  // CHECK:   end_borrow [[NOCAST_C]]
   default:
   // CHECK:   function_ref @$s6switch1eyyF
   // CHECK:   [[X_COPY_2:%.*]] = copy_value [[X]]
@@ -619,9 +647,9 @@ func test_union_1(u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
+  // CHECK:   case #MaybePair.Left!enumelt: [[IS_LEFT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Right!enumelt: [[IS_RIGHT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Both!enumelt: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
   // CHECK-NOT: destroy_value
@@ -662,8 +690,8 @@ func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $MaybePair):
   // CHECK:   switch_enum [[ARG]] : $MaybePair,
   // CHECK:     case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:     case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:     case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
+  // CHECK:     case #MaybePair.Left!enumelt: [[IS_LEFT:bb[0-9]+]],
+  // CHECK:     case #MaybePair.Right!enumelt: [[IS_RIGHT:bb[0-9]+]],
   // CHECK:     default [[DEFAULT:bb[0-9]+]]
   switch u {
   // CHECK: [[IS_NEITHER]]:
@@ -704,9 +732,9 @@ func test_union_4(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
+  // CHECK:   case #MaybePair.Left!enumelt: [[IS_LEFT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Right!enumelt: [[IS_RIGHT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Both!enumelt: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
   case .Neither:
@@ -743,9 +771,9 @@ func test_union_5(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
+  // CHECK:   case #MaybePair.Left!enumelt: [[IS_LEFT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Right!enumelt: [[IS_RIGHT:bb[0-9]+]],
+  // CHECK:   case #MaybePair.Both!enumelt: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
   case .Neither:
@@ -789,9 +817,9 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   switch u {
   // CHECK: switch_enum_addr [[ENUM_ADDR:%.*]] : $*MaybeAddressOnlyPair,
   // CHECK:   case #MaybeAddressOnlyPair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybeAddressOnlyPair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybeAddressOnlyPair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   case #MaybeAddressOnlyPair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
+  // CHECK:   case #MaybeAddressOnlyPair.Left!enumelt: [[IS_LEFT:bb[0-9]+]],
+  // CHECK:   case #MaybeAddressOnlyPair.Right!enumelt: [[IS_RIGHT:bb[0-9]+]],
+  // CHECK:   case #MaybeAddressOnlyPair.Both!enumelt: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
   case .Neither:
@@ -800,7 +828,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     a()
 
   // CHECK: [[IS_LEFT]]:
-  // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
+  // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   case .Left(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1byyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -809,7 +837,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     b()
 
   // CHECK: [[IS_RIGHT]]:
-  // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
+  // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt
   // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1cyyF
@@ -819,7 +847,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     c()
 
   // CHECK: [[IS_BOTH]]:
-  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt.1
+  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt
   case .Both(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1dyyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -954,7 +982,7 @@ enum LabeledScalarPayload {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch24testLabeledScalarPayloadyypAA0cdE0OF
 func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
-  // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
+  // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt: bb1
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
   // CHECK:   [[X:%.*]] = destructure_tuple [[TUPLE]]
@@ -968,7 +996,7 @@ func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
 // There should be no unreachable generated.
 // CHECK-LABEL: sil hidden [ossa] @$s6switch19testOptionalPatternyySiSgF
 func testOptionalPattern(_ value : Int?) {
-  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
   case 1?: a()
   case 2?: b()
@@ -983,13 +1011,13 @@ func testOptionalPattern(_ value : Int?) {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch19testOptionalEnumMixyS2iSgF
 func testOptionalEnumMix(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
+  // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
+  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case .none:
@@ -1005,13 +1033,13 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch26testOptionalEnumMixWithNilyS2iSgF
 func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
+  // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
+  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case nil:
@@ -1034,14 +1062,13 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     print("both: \(base), \(filter)")
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:
-    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
     // CHECK-NEXT: br bb6(%8 : $Int)
 
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
-    // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
     // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
 
     // CHECK: bb6([[ARG:%.*]] : $Int):
+    // CHECK-NEXT: debug_value [[ARG]] : $Int, let, name "base"
     print("single: \(base)")
   default:
     print("default")
@@ -1091,15 +1118,6 @@ func testUninhabitedSwitchScrutinee() {
 
 // Make sure that we properly can handle address only tuples with loadable
 // subtypes.
-class Klass {}
-
-enum TrivialSingleCaseEnum {
-case a
-}
-
-enum NonTrivialSingleCaseEnum {
-case a(Klass)
-}
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch33address_only_with_trivial_subtypeyyAA21TrivialSingleCaseEnumO_yptF : $@convention(thin) (TrivialSingleCaseEnum, @in_guaranteed Any) -> () {
 // CHECK: [[MEM:%.*]] = alloc_stack $(TrivialSingleCaseEnum, Any)
@@ -1134,7 +1152,6 @@ func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any)
 // CHECK: switch_enum [[TUP_0_VAL]]
 //
 // CHECK: bb1([[CASE_VAL:%.*]] :
-// CHECK-NEXT:   end_borrow [[CASE_VAL]]
 // CHECK-NEXT:   destroy_addr [[TUP_1]]
 // CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
 // CHECK-NEXT:   destroy_addr [[TUP_0]]
@@ -1201,7 +1218,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
-// CHECK:   checked_cast_br [[TUP_0_VAL]] : $Klass to $AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br [[TUP_0_VAL]] : $Klass to AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
 //
 // CHECK: [[IS_ANYOBJECT_BB]]([[ANYOBJECT:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[ANYOBJECT_COPY:%.*]] = copy_value [[ANYOBJECT]]
@@ -1213,7 +1230,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[ISNOT_ANYOBJECT_BB]](
-// CHECK:   switch_enum_addr [[TUP_1]] : $*Optional<Any>, case #Optional.some!enumelt.1: [[HAS_TUP_1_BB:bb[0-9]+]], default [[NO_TUP_1_BB:bb[0-9]+]]
+// CHECK:   switch_enum_addr [[TUP_1]] : $*Optional<Any>, case #Optional.some!enumelt: [[HAS_TUP_1_BB:bb[0-9]+]], default [[NO_TUP_1_BB:bb[0-9]+]]
 //
 // CHECK: [[HAS_TUP_1_BB]]:
 // CHECK-NEXT: [[OPT_ANY_ADDR:%.*]] = alloc_stack $Optional<Any>
@@ -1301,5 +1318,290 @@ func testVoidType() {
     break
   case .none:
     break
+  }
+}
+
+////////////////////////////////////////////////
+// Fallthrough Multiple Case Label Item Tests //
+////////////////////////////////////////////////
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch28addressOnlyFallthroughCalleeyyAA015MultipleAddressC8CaseEnumOyxGSzRzlF : $@convention(thin) <T where T : BinaryInteger> (@in_guaranteed MultipleAddressOnlyCaseEnum<T>) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
+// CHECK:   copy_addr [[ARG]] to [initialization] [[SWITCH_ENUM_ARG]]
+// CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
+//
+// CHECK: [[BB_A]]:
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_A]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [initialization] [[AB_PHI]]
+// CHECK:   destroy_addr [[CASE_BODY_VAR_A]]
+// CHECK:   br [[BB_AB:bb[0-9]+]]
+//
+// CHECK: [[BB_B]]:
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_B]]
+// CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
+// CHECK:   [[GUARD_RESULT:%.*]] = apply [[FUNC_CMP]]<T, Int>([[CASE_BODY_VAR_B]], {{%.*}}, {{%.*}})
+// CHECK:   [[GUARD_RESULT_EXT:%.*]] = struct_extract [[GUARD_RESULT]]
+// CHECK:   cond_br [[GUARD_RESULT_EXT]], [[BB_B_GUARD_SUCC:bb[0-9]+]], [[BB_B_GUARD_FAIL:bb[0-9]+]]
+//
+// CHECK: [[BB_B_GUARD_SUCC]]:
+// CHECK:   copy_addr [[CASE_BODY_VAR_B]] to [initialization] [[AB_PHI]]
+// CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
+// CHECK:   destroy_addr [[SWITCH_ENUM_ARG_PROJ]]
+// CHECK:   br [[BB_AB]]
+//
+// CHECK: [[BB_AB]]:
+// CHECK:   copy_addr [[AB_PHI]] to [initialization] [[ABB_PHI]]
+// CHECK:   destroy_addr [[AB_PHI]]
+// CHECK:   br [[BB_AB_CONT:bb[0-9]+]]
+//
+// CHECK: [[BB_AB_CONT]]:
+// CHECK:   copy_addr [[ABB_PHI]] to [initialization] [[ABBC_PHI]]
+// CHECK:   destroy_addr [[ABB_PHI]]
+// CHECK:   br [[BB_FINAL_CONT:bb[0-9]+]]
+//
+// CHECK: [[BB_B_GUARD_FAIL]]:
+// CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
+// CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_B_2]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_B_2]] to [initialization] [[ABB_PHI]]
+// CHECK:   br [[BB_AB_CONT]]
+//
+// CHECK: [[BB_C]]:
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_C]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [initialization] [[ABBC_PHI]]
+// CHECK:   destroy_addr [[CASE_BODY_VAR_C]]
+// CHECK:   br [[BB_FINAL_CONT]]
+//
+// CHECK: [[BB_FINAL_CONT]]:
+// CHECK:   destroy_addr [[ABBC_PHI]]
+// CHECK:   return
+// CHECK: } // end sil function '$s6switch28addressOnlyFallthroughCalleeyyAA015MultipleAddressC8CaseEnumOyxGSzRzlF'
+func addressOnlyFallthroughCallee<T : BinaryInteger>(_ e : MultipleAddressOnlyCaseEnum<T>) {
+  switch e {
+  case .a(let x): fallthrough
+  case .b(let x) where x == 2: fallthrough
+  case .b(let x): fallthrough
+  case .c(let x):
+    print(x)
+  }
+}
+
+func addressOnlyFallthroughCaller() {
+  var myFoo : MultipleAddressOnlyCaseEnum = MultipleAddressOnlyCaseEnum.a(10)
+  addressOnlyFallthroughCallee(myFoo)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s6switch35nonTrivialLoadableFallthroughCalleeyyAA011MultipleNonC8CaseEnumOF : $@convention(thin) (@guaranteed MultipleNonTrivialCaseEnum) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $MultipleNonTrivialCaseEnum):
+// CHECK:   switch_enum [[ARG]] : $MultipleNonTrivialCaseEnum, case #MultipleNonTrivialCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleNonTrivialCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleNonTrivialCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
+//
+// CHECK: [[BB_A]]([[BB_A_ARG:%.*]] : @guaranteed
+// CHECK:   [[BB_A_ARG_COPY:%.*]] = copy_value [[BB_A_ARG]]
+// CHECK:   [[BB_A_ARG_COPY_BORROW:%.*]] = begin_borrow [[BB_A_ARG_COPY]]
+// CHECK:   apply {{%.*}}([[BB_A_ARG_COPY_BORROW]])
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_A_ARG_COPY]]
+// CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
+//
+// CHECK: [[BB_B]]([[BB_B_ARG:%.*]] : @guaranteed
+// CHECK:   [[BB_B_ARG_COPY:%.*]] = copy_value [[BB_B_ARG]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_B_ARG_COPY]]
+// CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
+//
+// CHECK: [[BB_AB:bb[0-9]+]]([[BB_AB_PHI:%.*]] : @owned
+// CHECK:   [[BB_AB_PHI_BORROW:%.*]] = begin_borrow [[BB_AB_PHI]]
+// CHECK:   apply {{%.*}}([[BB_AB_PHI_BORROW]])
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_AB_PHI]]
+// CHECK:   br [[BB_ABC:bb[0-9]+]]([[RESULT]] :
+//
+// CHECK: [[BB_C]]([[BB_C_ARG:%.*]] : @guaranteed
+// CHECK:   [[BB_C_COPY:%.*]] = copy_value [[BB_C_ARG]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_C_COPY]]
+// CHECK:   br [[BB_ABC]]([[RESULT]] :
+//
+// CHECK: [[BB_ABC]]([[BB_ABC_ARG:%.*]] : @owned
+// CHECK:   [[BB_ABC_ARG_BORROW:%.*]] = begin_borrow [[BB_ABC_ARG]]
+// CHECK:   apply {{%.*}}([[BB_ABC_ARG_BORROW]])
+// CHECK:   return
+// CHECK: } // end sil function '$s6switch35nonTrivialLoadableFallthroughCalleeyyAA011MultipleNonC8CaseEnumOF'
+func nonTrivialLoadableFallthroughCallee(_ e : MultipleNonTrivialCaseEnum) {
+  switch e {
+  case .a(let x):
+    a(x)
+    fallthrough
+  case .b(let x):
+    b(x)
+    fallthrough
+  case .c(let x):
+    c(x)
+  }
+}
+
+// Just make sure that we do not crash on this.
+func nonTrivialLoadableFallthroughCalleeGuards(_ e : MultipleNonTrivialCaseEnum) {
+  switch e {
+  case .a(let x) where x.isFalse:
+    a(x)
+    fallthrough
+  case .a(let x) where x.isTrue:
+    a(x)
+    fallthrough
+  case .b(let x) where x.isTrue:
+    b(x)
+    fallthrough
+  case .b(let x) where x.isFalse:
+    b(x)
+    fallthrough
+  case .c(let x) where x.isTrue:
+    c(x)
+    fallthrough
+  case .c(let x) where x.isFalse:
+    c(x)
+    break
+  default:
+    d()
+  }
+}
+
+func nonTrivialLoadableFallthroughCallee2(_ e : MultipleNonTrivialCaseEnum) {
+  switch e {
+  case .a(let x):
+    a(x)
+    fallthrough
+  case .b(let x):
+    b(x)
+    break
+  default:
+    break
+  }
+}
+
+// Make sure that we do not crash while emitting this code.
+//
+// DISCUSSION: The original crash was due to us performing an assignment/lookup
+// on the VarLocs DenseMap in the same statement. This was caught be an
+// asanified compiler. This test is just to make sure we do not regress.
+enum Storage {
+  case empty
+  case single(Int)
+  case pair(Int, Int)
+  case array([Int])
+
+  subscript(range: [Int]) -> Storage {
+    get {
+      return .empty
+    }
+    set {
+      switch self {
+      case .empty:
+        break
+      case .single(let index):
+        break
+      case .pair(let first, let second):
+        switch (range[0], range[1]) {
+        case (0, 0):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            break
+          }
+          break
+        case (0, 1):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            break
+          }
+          break
+        case (0, 2):
+          break
+        case (1, 2):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            self = .array([first] + other)
+          }
+          break
+        case (2, 2):
+          switch newValue {
+          case .empty:
+            break
+          case .single(let other):
+            break
+          case .pair(let otherFirst, let otherSecond):
+            break
+          case .array(let other):
+            self = .array([first, second] + other)
+          }
+          break
+        default:
+          let r = range
+        }
+      case .array(let indexes):
+        break
+      }
+    }
+  }
+}
+
+// Make sure that we do not leak tuple elements if we fail to match the first
+// tuple element.
+enum rdar49990484Enum1 {
+  case case1(Klass)
+  case case2(Klass, Int)
+}
+
+enum rdar49990484Enum2 {
+  case case1(Klass)
+  case case2(rdar49990484Enum1, Klass)
+}
+
+struct rdar49990484Struct {
+  var value: rdar49990484Enum2
+
+  func doSomethingIfLet() {
+    if case let .case2(.case2(k, _), _) = value {
+      return
+    }
+  }
+
+  func doSomethingSwitch() {
+    switch value {
+    case let .case2(.case2(k, _), _):
+      return
+    default:
+      return
+    }
+    return
+  }
+
+  func doSomethingGuardLet() {
+    guard case let .case2(.case2(k, _), _) = value else {
+      return
+    }
   }
 }

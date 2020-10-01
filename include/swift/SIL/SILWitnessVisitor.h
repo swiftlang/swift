@@ -38,10 +38,12 @@ namespace swift {
 /// physical projection (if we decide to support that).
 ///
 /// You must override the following methods:
+/// - addProtocolConformanceDescriptor()
 /// - addOutOfLineBaseProtocol()
-/// - addMethod()
-/// - addConstructor()
 /// - addAssociatedType()
+/// - addAssociatedConformance()
+/// - addMethod()
+/// - addPlaceholder()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
@@ -91,13 +93,11 @@ public:
     }
 
     // Add the associated types.
-    for (Decl *member : protocol->getMembers()) {
-      if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-        // If this is a new associated type (which does not override an
-        // existing associated type), add it.
-        if (associatedType->getOverriddenDecls().empty())
-          asDerived().addAssociatedType(AssociatedType(associatedType));
-      }
+    for (auto *associatedType : protocol->getAssociatedTypeMembers()) {
+      // If this is a new associated type (which does not override an
+      // existing associated type), add it.
+      if (associatedType->getOverriddenDecls().empty())
+        asDerived().addAssociatedType(AssociatedType(associatedType));
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())
@@ -122,14 +122,19 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(accessor))
+      if (SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+        addAutoDiffDerivativeMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
+      }
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    if (SILDeclRef::requiresNewWitnessTableEntry(cd))
+    if (SILDeclRef::requiresNewWitnessTableEntry(cd)) {
       asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+      addAutoDiffDerivativeMethodsIfRequired(cd, SILDeclRef::Kind::Allocator);
+    }
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -138,8 +143,10 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func))
+    if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    }
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -165,6 +172,26 @@ public:
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
     // We don't care about diagnostics at this stage.
+  }
+
+private:
+  void addAutoDiffDerivativeMethodsIfRequired(AbstractFunctionDecl *AFD,
+                                              SILDeclRef::Kind kind) {
+    SILDeclRef declRef(AFD, kind);
+    for (auto *diffAttr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
+    }
   }
 };
 

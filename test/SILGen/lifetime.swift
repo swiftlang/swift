@@ -263,9 +263,9 @@ struct Daleth {
 }
 
 class He {
-  
+
   // -- default allocator:
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
   // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
@@ -292,7 +292,7 @@ struct Waw {
   var b:Val
 
   // -- loadable value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3WawV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
+  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3WawV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw
   // CHECK: bb0([[A0:%.*]] : @owned $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
@@ -359,7 +359,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   r.int_prop = i
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
   // CHECK: [[R1:%[0-9]+]] = load [copy] [[READ]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: destroy_value [[R1]]
 
@@ -367,7 +367,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
   // CHECK: [[R2:%[0-9]+]] = load [copy] [[READ]]
   // CHECK: [[R2BORROW:%[0-9]+]] = begin_borrow [[R2]]
-  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2BORROW]] : $RefWithProp, #RefWithProp.aleph_prop!modify.1 :
+  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2BORROW]] : $RefWithProp, #RefWithProp.aleph_prop!modify :
   // CHECK: ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[R2BORROW]])
   // CHECK: end_apply [[TOKEN]]
 }
@@ -385,7 +385,7 @@ class Foo<T> {
   // Class initializer
   init() {
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
@@ -431,7 +431,7 @@ class Foo<T> {
 
     z = Foo<T>.makeT()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type
-    // CHECK: [[MAKET:%[0-9]+]] = class_method [[FOOMETA]] : {{.*}}, #Foo.makeT!1
+    // CHECK: [[MAKET:%[0-9]+]] = class_method [[FOOMETA]] : {{.*}}, #Foo.makeT :
     // CHECK: ref_element_addr
 
     // -- cleanup this lvalue and return this
@@ -447,7 +447,7 @@ class Foo<T> {
     z = Foo<T>.makeT()
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
@@ -502,7 +502,7 @@ class Foo<T> {
   }
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
 
   // -- initializing entry point
@@ -513,7 +513,7 @@ class Foo<T> {
 
     x = chi.intify()
   }
-  
+
   // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooCfd : $@convention(method) <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
 
   deinit {
@@ -526,13 +526,19 @@ class Foo<T> {
     // CHECK-NOT: ref_element_addr [[THIS]] : {{.*}}, #Foo.x
     // -- destroy_value y
     // CHECK: [[YADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.y
-    // CHECK: destroy_addr [[YADDR]]
+    // CHECK: [[YADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[YADDR]]
+    // CHECK: destroy_addr [[YADDR_ACCESS]]
+    // CHECK: end_access [[YADDR_ACCESS]]
     // -- destroy_value z
     // CHECK: [[ZADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
-    // CHECK: destroy_addr [[ZADDR]]
+    // CHECK: [[ZADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[ZADDR]]
+    // CHECK: destroy_addr [[ZADDR_ACCESS]]
+    // CHECK: end_access [[ZADDR_ACCESS]]
     // -- destroy_value w
     // CHECK: [[WADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.w
-    // CHECK: destroy_addr [[WADDR]]
+    // CHECK: [[WADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[WADDR]]
+    // CHECK: destroy_addr [[WADDR_ACCESS]]
+    // CHECK: end_access [[WADDR_ACCESS]]
     // -- return back this
     // CHECK: [[PTR:%.*]] = unchecked_ref_cast [[THIS]] : $Foo<T> to $Builtin.NativeObject
     // CHECK: [[PTR_OWNED:%.*]] = unchecked_ownership_conversion [[PTR]] : $Builtin.NativeObject, @guaranteed to @owned
@@ -567,7 +573,7 @@ class FooSubclass<T> : Foo<T> {
   // CHECK: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK: end_borrow [[BORROWED_PTR]]
   // CHECK: return [[PTR]]
-  
+
 
   deinit {
     bar()
@@ -586,18 +592,22 @@ class ImplicitDtor {
   // CHECK-NOT: ref_element_addr [[THIS]] : {{.*}}, #ImplicitDtor.x
   // -- destroy_value y
   // CHECK: [[YADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #ImplicitDtor.y
-  // CHECK: destroy_addr [[YADDR]]
+  // CHECK: [[YADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[YADDR]]
+  // CHECK: destroy_addr [[YADDR_ACCESS]]
+  // CHECK: end_access [[YADDR_ACCESS]]
   // -- destroy_value w
   // CHECK: [[WADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #ImplicitDtor.w
-  // CHECK: destroy_addr [[WADDR]]
+  // CHECK: [[WADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[WADDR]]
+  // CHECK: destroy_addr [[WADDR_ACCESS]]
+  // CHECK: end_access [[WADDR_ACCESS]]
   // CHECK: return
 }
 
 class ImplicitDtorDerived<T> : ImplicitDtor {
   var z:T
 
-  init(z : T) { 
-    super.init() 
+  init(z : T) {
+    super.init()
     self.z = z
   }
 
@@ -611,7 +621,9 @@ class ImplicitDtorDerived<T> : ImplicitDtor {
   // CHECK: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK: [[CAST_BORROWED_PTR:%.*]] = unchecked_ref_cast [[BORROWED_PTR]] : $Builtin.NativeObject to $ImplicitDtorDerived<T>
   // CHECK: [[ZADDR:%[0-9]+]] = ref_element_addr [[CAST_BORROWED_PTR]] : {{.*}}, #ImplicitDtorDerived.z
-  // CHECK: destroy_addr [[ZADDR]]
+  // CHECK: [[ZADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[ZADDR]]
+  // CHECK: destroy_addr [[ZADDR_ACCESS]]
+  // CHECK: end_access [[ZADDR_ACCESS]]
   // CHECK: end_borrow [[BORROWED_PTR]]
   // -- epilog
   // CHECK-NOT: unchecked_ref_cast
@@ -736,7 +748,7 @@ func downcast(_ b: B) {
   (b as! D).foo()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
   // CHECK: [[B:%[0-9]+]] = load [copy] [[READ]]
-  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
+  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: destroy_value [[B]]
   // CHECK: destroy_value [[D]]

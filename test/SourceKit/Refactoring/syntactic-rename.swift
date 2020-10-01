@@ -106,51 +106,51 @@ _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 
 // RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
-// RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
+// RUN: %diff -u %S/syntactic-rename/x.expected %t.result/x.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/z.in.json %s >> %t.result/z.expected
-// RUN: diff -u %S/syntactic-rename/z.expected %t.result/z.expected
+// RUN: %diff -u %S/syntactic-rename/z.expected %t.result/z.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/foo.in.json %s >> %t.result/foo_arity1.expected
-// RUN: diff -u %S/syntactic-rename/foo_arity1.expected %t.result/foo_arity1.expected
+// RUN: %diff -u %S/syntactic-rename/foo_arity1.expected %t.result/foo_arity1.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/foo_remove.in.json %s >> %t.result/foo_remove.expected
-// RUN: diff -u %S/syntactic-rename/foo_remove.expected %t.result/foo_remove.expected
+// RUN: %diff -u %S/syntactic-rename/foo_remove.expected %t.result/foo_remove.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/bar.in.json %s >> %t.result/bar.expected
-// RUN: diff -u %S/syntactic-rename/bar.expected %t.result/bar.expected
+// RUN: %diff -u %S/syntactic-rename/bar.expected %t.result/bar.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/bar_add_param.in.json %s >> %t.result/bar_add_param.expected
-// RUN: diff -u %S/syntactic-rename/bar_add_param.expected %t.result/bar_add_param.expected
+// RUN: %diff -u %S/syntactic-rename/bar_add_param.expected %t.result/bar_add_param.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/bar_drop_param.in.json %s >> %t.result/bar_drop_param.expected
-// RUN: diff -u %S/syntactic-rename/bar_drop_param.expected %t.result/bar_drop_param.expected
+// RUN: %diff -u %S/syntactic-rename/bar_drop_param.expected %t.result/bar_drop_param.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/comment.in.json %s >> %t.result/comment.expected
-// RUN: diff -u %S/syntactic-rename/comment.expected %t.result/comment.expected
+// RUN: %diff -u %S/syntactic-rename/comment.expected %t.result/comment.expected
 // RUN: not %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/invalid.in.json %s
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-memberwise.in.json %s >> %t.result/rename-memberwise.expected
-// RUN: diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
+// RUN: %diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.result/rename-layer.expected
-// RUN: diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
+// RUN: %diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s >> %t.result/rename-P.expected
-// RUN: diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
+// RUN: %diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/keywordbase.in.json %s >> %t.result/keywordbase.expected
-// RUN: diff -u %S/syntactic-rename/keywordbase.expected %t.result/keywordbase.expected
+// RUN: %diff -u %S/syntactic-rename/keywordbase.expected %t.result/keywordbase.expected
 
 // RUN: %empty-directory(%t.ranges)
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
-// RUN: diff -u %S/find-rename-ranges/x.expected %t.ranges/x.expected
+// RUN: %diff -u %S/find-rename-ranges/x.expected %t.ranges/x.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/z.in.json %s >> %t.ranges/z.expected
-// RUN: diff -u %S/find-rename-ranges/z.expected %t.ranges/z.expected
+// RUN: %diff -u %S/find-rename-ranges/z.expected %t.ranges/z.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/foo.in.json %s >> %t.ranges/foo_arity1.expected
-// RUN: diff -u %S/find-rename-ranges/foo_arity1.expected %t.ranges/foo_arity1.expected
+// RUN: %diff -u %S/find-rename-ranges/foo_arity1.expected %t.ranges/foo_arity1.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/bar.in.json %s >> %t.ranges/bar.expected
-// RUN: diff -u %S/find-rename-ranges/bar.expected %t.ranges/bar.expected
+// RUN: %diff -u %S/find-rename-ranges/bar.expected %t.ranges/bar.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/comment.in.json %s >> %t.ranges/comment.expected
-// RUN: diff -u %S/find-rename-ranges/comment.expected %t.ranges/comment.expected
+// RUN: %diff -u %S/find-rename-ranges/comment.expected %t.ranges/comment.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/init.in.json %s >> %t.ranges/init.expected
-// RUN: diff -u %S/find-rename-ranges/init.expected %t.ranges/init.expected
+// RUN: %diff -u %S/find-rename-ranges/init.expected %t.ranges/init.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/enum_case.in.json %s >> %t.result/enum_case.expected
-// RUN: diff -u %S/syntactic-rename/enum_case.expected %t.result/enum_case.expected
+// RUN: %diff -u %S/syntactic-rename/enum_case.expected %t.result/enum_case.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-memberwise.in.json %s >> %t.ranges/rename-memberwise.expected
-// RUN: diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
+// RUN: %diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.ranges/rename-layer.expected
-// RUN: diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected
+// RUN: %diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 4 >> %t.ranges/rename-P.expected
-// RUN: diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected
+// RUN: %diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 4 >> %t.ranges/keywordbase.expected
-// RUN: diff -u %S/find-rename-ranges/keywordbase.expected %t.ranges/keywordbase.expected
+// RUN: %diff -u %S/find-rename-ranges/keywordbase.expected %t.ranges/keywordbase.expected

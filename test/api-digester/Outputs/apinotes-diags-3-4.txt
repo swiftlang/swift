@@ -2,9 +2,9 @@
 /* Generic Signature Changes */
 
 /* RawRepresentable Changes */
-APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now String representable
 
 /* Removed Decls */
+APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName has been removed
 
 /* Moved Decls */
 
@@ -12,11 +12,11 @@ APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now Str
 APINotesTest(APINotesTest.h): Var globalAttributeName has been renamed to Var AnimalAttributeName.globalAttributeName
 
 /* Type Changes */
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [String]? to [AnimalAttributeName]?
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from String to AnimalAttributeName
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from String? to AnimalAttributeName?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [Swift.String : Any] to [APINotesTest.AnimalAttributeName : Any]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [Swift.String] to [APINotesTest.AnimalAttributeName]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [Swift.String : Any]? to [APINotesTest.AnimalAttributeName : Any]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [Swift.String]? to [APINotesTest.AnimalAttributeName]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from Swift.String to APINotesTest.AnimalAttributeName
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from Swift.String? to APINotesTest.AnimalAttributeName?
 
 /* Decl Attribute changes */

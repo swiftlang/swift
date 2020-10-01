@@ -27,25 +27,22 @@ namespace llvm {
 }
 
 namespace swift {
-
+enum class IntermoduleDepTrackingMode;
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
+  /// A list of arbitrary modules to import and make implicitly visible.
+  std::vector<std::string> ImplicitImportModuleNames;
+
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
-
-  /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::Swift;
 
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
-
-  /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
@@ -72,34 +69,18 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to look in when loading a parseable interface file, to see if a
+  /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
+
+  /// For these modules, we should prefer using Swift interface when importing them.
+  std::vector<std::string> PreferInterfaceForModules;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, overrides the default threshold for how long we let
-  /// the expression type checker run before we consider an expression
-  /// too complex.
-  unsigned SolverExpressionTimeThreshold = 0;
-  
-  /// If non-zero, overrides the default threshold for how many times
-  /// the Space::minus function is called before we consider switch statement
-  /// exhaustiveness checking to be too complex.
-  unsigned SwitchCheckingInvocationThreshold = 0;
+  /// If indexing system modules, don't index the stdlib.
+  bool IndexIgnoreStdlib = false;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -131,7 +112,9 @@ public:
     MergeModules,   ///< Merge modules only
 
     /// Build from a swiftinterface, as close to `import` as possible
-    BuildModuleFromParseableInterface,
+    CompileModuleFromInterface,
+    /// Same as CompileModuleFromInterface, but stopping after typechecking
+    TypecheckModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
@@ -145,13 +128,31 @@ public:
     EmitObject,   ///< Emit object file
 
     DumpTypeInfo, ///< Dump IRGen type info
+
+    EmitPCM, ///< Emit precompiled Clang module from a module map
+    DumpPCM, ///< Dump information about a precompiled Clang module
+
+    ScanDependencies,        ///< Scan dependencies of Swift source files
+    ScanClangDependencies,   ///< Scan dependencies of a Clang module
+    PrintVersion,       ///< Print version information.
   };
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
 
+  enum class ParseInputMode {
+    Swift,
+    SwiftLibrary,
+    SwiftModuleInterface,
+    SIL,
+  };
+  ParseInputMode InputMode = ParseInputMode::Swift;
+
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
+
+  /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
+  bool IgnoreSwiftSourceInfo = false;
 
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
@@ -162,20 +163,11 @@ public:
   /// the module.
   bool CheckOnoneSupportCompleteness = false;
 
-  /// If set, inserts instrumentation useful for testing the debugger.
-  bool DebuggerTestingTransform = false;
-
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
   /// If set, dumps wall time taken to check each expression.
   bool DebugTimeExpressionTypeChecking = false;
-
-  /// If set, prints the time taken in each major compilation phase to 
-  /// llvm::errs().
-  ///
-  /// \sa swift::SharedTimer
-  bool DebugTimeCompilation = false;
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
@@ -189,11 +181,6 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
-
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -220,10 +207,6 @@ public:
   /// \see ResilienceStrategy::Resilient
   bool EnableLibraryEvolution = false;
 
-  /// Indicates that the frontend should emit "verbose" SIL
-  /// (if asked to emit SIL).
-  bool EmitVerboseSIL = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
@@ -240,37 +223,66 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
-  /// Indicates whether the playground transformation should be applied.
-  bool PlaygroundTransform = false;
-  
-  /// Indicates whether the AST should be instrumented to simulate a debugger's
-  /// program counter. Similar to the PlaygroundTransform, this will instrument
-  /// the AST with function calls that get called when you would see a program
-  /// counter move in a debugger. To adopt this implement the
-  /// __builtin_pc_before and __builtin_pc_after functions.
-  bool PCMacro = false;
-
-  /// Indicates whether the playground transformation should omit
-  /// instrumentation that has a high runtime performance impact.
-  bool PlaygroundHighPerformance = false;
-
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
 
-  /// Should we sort SIL functions, vtables, witness tables, and global
-  /// variables by name when we print it out. This eases diffing of SIL files.
+  /// Indicates that the frontend should print the target triple and then
+  /// exit.
+  bool PrintTargetInfo = false;
+
+  /// See the \ref SILOptions.EmitVerboseSIL flag.
+  bool EmitVerboseSIL = false;
+
+  /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
-  /// Indicates whether the dependency tracker should track system
-  /// dependencies as well.
-  bool TrackSystemDeps = false;
+  /// Specifies the collection mode for the intermodule dependency tracker.
+  /// Note that if set, the dependency tracker will be enabled even if no
+  /// output path is configured.
+  Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
+
+  /// Should we emit the cType when printing @convention(c) or no?
+  bool PrintFullConvention = false;
 
   /// Should we serialize the hashes of dependencies (vs. the modification
-  /// times) when compiling a parseable module interface?
-  bool SerializeParseableModuleInterfaceDependencyHashes = false;
+  /// times) when compiling a module interface?
+  bool SerializeModuleInterfaceDependencyHashes = false;
+
+  /// Should we warn if an imported module needed to be rebuilt from a
+  /// module interface file?
+  bool RemarkOnRebuildFromModuleInterface = false;
+
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
+
+  /// Should we enable the dependency verifier for all primary files known to this frontend?
+  bool EnableIncrementalDependencyVerifier = false;
+
+  /// The path of the swift-frontend executable.
+  std::string MainExecutablePath;
+
+  /// The directory path we should use when print #include for the bridging header.
+  /// By default, we include ImplicitObjCHeaderPath directly.
+  llvm::Optional<std::string> BridgingHeaderDirForPrint;
+
+  /// Disable implicitly built Swift modules because they are explicitly
+  /// built and given to the compiler invocation.
+  bool DisableImplicitModules = false;
+
+  /// When performing a dependency scanning action, only identify and output all imports
+  /// of the main Swift module's source files.
+  bool ImportPrescan = false;
+
+  /// When performing an incremental build, ensure that cross-module incremental
+  /// build metadata is available in any swift modules emitted by this frontend
+  /// job.
+  ///
+  /// This flag is currently only propagated from the driver to
+  /// any merge-modules jobs.
+  bool EnableExperimentalCrossModuleIncrementalBuild = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -297,11 +309,23 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the action will immediately run code.
-  static bool isActionImmediate(ActionType);
+  /// Determines whether the static or shared resource folder is used.
+  /// When set to `true`, the default resource folder will be set to
+  /// '.../lib/swift', otherwise '.../lib/swift_static'.
+  bool UseSharedResourceFolder = true;
 
-  /// \return true if action only parses without doing other compilation steps.
+  /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
+
+  /// \return true if the given action requires the standard library to be
+  /// loaded before it is run.
+  static bool doesActionRequireSwiftStandardLibrary(ActionType);
+
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionRequireInputs(ActionType action);
+
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -312,8 +336,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::Swift &&
-           InputsAndOutputs.hasSingleInput();
+    return InputsAndOutputs.hasSingleInput() &&
+           InputMode == ParseInputMode::Swift;
   }
 
   const PrimarySpecificPaths &
@@ -321,17 +345,30 @@ public:
   const PrimarySpecificPaths &
       getPrimarySpecificPathsForPrimary(StringRef) const;
 
+  /// Retrieves the list of arbitrary modules to import and make implicitly
+  /// visible.
+  ArrayRef<std::string> getImplicitImportModuleNames() const {
+    return ImplicitImportModuleNames;
+  }
+
+  /// Whether we're configured to track system intermodule dependencies.
+  bool shouldTrackSystemDependencies() const;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
+  static bool canActionEmitSwiftRanges(ActionType);
+  static bool canActionEmitCompiledSource(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);
+  static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);

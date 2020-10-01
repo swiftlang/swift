@@ -120,9 +120,11 @@ class TestDecimal : TestDecimalSuper {
         expectFalse(zero.isNaN)
         expectFalse(zero.isSignaling)
 
-        let d1 = Decimal(1234567890123456789 as UInt64)
-        expectEqual(d1._exponent, 0)
-        expectEqual(d1._length, 4)
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            let d1 = Decimal(1234567890123456789 as UInt64)
+            expectEqual(d1._exponent, 0)
+            expectEqual(d1._length, 4)
+        }
     }
     func test_Constants() {
         expectEqual(8, NSDecimalMaxSize)
@@ -303,6 +305,9 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(Decimal(68040), Decimal(386).advanced(by: Decimal(67654)))
         expectEqual(Decimal(1.234), abs(Decimal(1.234)))
         expectEqual(Decimal(1.234), abs(Decimal(-1.234)))
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            expectTrue(Decimal.nan.magnitude.isNaN)
+        }
         var a = Decimal(1234)
         var r = a
         expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, 1, .plain))
@@ -334,6 +339,9 @@ class TestDecimal : TestDecimalSuper {
                 expectEqual(.noError, NSDecimalPower(&result, &actual, j, .plain))
                 let expected = Decimal(pow(Double(i), Double(j)))
                 expectEqual(expected, result, "\(result) == \(i)^\(j)")
+                if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+                    expectEqual(expected, pow(actual, j))
+                }
             }
         }
     }
@@ -493,7 +501,7 @@ class TestDecimal : TestDecimalSuper {
     }
 
     func test_Round() {
-        let testCases = [
+        var testCases = [
             // expected, start, scale, round
             ( 0, 0.5, 0, Decimal.RoundingMode.down ),
             ( 1, 0.5, 0, Decimal.RoundingMode.up ),
@@ -507,14 +515,18 @@ class TestDecimal : TestDecimalSuper {
             
             ( -1, -0.5, 0, Decimal.RoundingMode.down ),
             ( -2, -2.5, 0, Decimal.RoundingMode.up ),
-            ( -3, -2.5, 0, Decimal.RoundingMode.bankers ),
-            ( -4, -3.5, 0, Decimal.RoundingMode.bankers ),
             ( -5, -5.2, 0, Decimal.RoundingMode.plain ),
             ( -4.5, -4.5, 1, Decimal.RoundingMode.down ),
             ( -5.5, -5.5, 1, Decimal.RoundingMode.up ),
             ( -6.5, -6.5, 1, Decimal.RoundingMode.plain ),
             ( -7.5, -7.5, 1, Decimal.RoundingMode.bankers ),
+        ]
+        if #available(macOS 10.16, iOS 14, watchOS 7, tvOS 14, *) {
+            testCases += [
+                ( -2, -2.5, 0, Decimal.RoundingMode.bankers ),
+                ( -4, -3.5, 0, Decimal.RoundingMode.bankers ),
             ]
+        }
         for testCase in testCases {
             let (expected, start, scale, mode) = testCase
             var num = Decimal(start)

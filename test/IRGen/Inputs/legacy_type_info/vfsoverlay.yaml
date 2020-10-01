@@ -1,0 +1,14 @@
+{
+  'version': 0,
+  'use-external-names': false,
+  'roots': [
+    {
+      'name': 'OUT_DIR', 'type': 'directory',
+      'contents': [
+        { 'name': 'a_moved.yaml', 'type': 'file',
+          'external-contents': 'INPUT_DIR/legacy_type_info/a.yaml'
+        },
+      ]
+    },
+  ]
+}

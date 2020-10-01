@@ -8,11 +8,13 @@
 - (nullable id)nullabilityChangeMethod;
 - (nonnull id)typeChangeMethod;
 @property (readonly) long disappearingProperty;
+@property (readwrite) long disappearingPropertySetter;
 #else
 //- (void)disappearingMethod;
 - (nonnull id)nullabilityChangeMethod;
 - (nonnull Base *)typeChangeMethod;
 // @property (readonly) long disappearingProperty;
+@property (readonly) long disappearingPropertySetter;
 #endif
 @end
 

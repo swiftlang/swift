@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_frozen
+  @frozen
   public enum UTF32 {
   case _swift3Codec
   }
 }
 
-extension Unicode.UTF32 : Unicode.Encoding {
+extension Unicode.UTF32: Unicode.Encoding {
   public typealias CodeUnit = UInt32
   public typealias EncodedScalar = CollectionOfOne<UInt32>
 
@@ -24,16 +24,22 @@ extension Unicode.UTF32 : Unicode.Encoding {
   internal static var _replacementCodeUnit: CodeUnit {
     @inline(__always) get { return 0xFFFD }
   }
-  
+
   @inlinable
-  public static var encodedReplacementCharacter : EncodedScalar {
+  public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar(_replacementCodeUnit)
   }
 
   @inlinable
   @inline(__always)
-  public static func _isScalar(_ x: CodeUnit) -> Bool  {
+  public static func _isScalar(_ x: CodeUnit) -> Bool {
     return true
+  }
+
+  /// Returns whether the given code unit represents an ASCII scalar
+  @_alwaysEmitIntoClient
+  public static func isASCII(_ x: CodeUnit) -> Bool {
+    return x <= 0x7F
   }
 
   @inlinable
@@ -50,7 +56,7 @@ extension Unicode.UTF32 : Unicode.Encoding {
     return EncodedScalar(source.value)
   }
   
-  @_fixed_layout
+  @frozen
   public struct Parser {
     @inlinable
     public init() { }
@@ -60,12 +66,12 @@ extension Unicode.UTF32 : Unicode.Encoding {
   public typealias ReverseParser = Parser
 }
 
-extension UTF32.Parser : Unicode.Parser {
+extension UTF32.Parser: Unicode.Parser {
   public typealias Encoding = Unicode.UTF32
 
   /// Parses a single Unicode scalar value from `input`.
   @inlinable
-  public mutating func parseScalar<I : IteratorProtocol>(
+  public mutating func parseScalar<I: IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit {

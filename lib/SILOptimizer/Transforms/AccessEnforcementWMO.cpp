@@ -42,7 +42,7 @@
 ///
 /// Warning: This is only sound when unidentified accesses can never alias with
 /// Class/Global access. To enforce this, the SILVerifier calls
-/// findAccessedStorage() for every access, which asserts that any Unidentified
+/// identifyFormalAccess() for every access, which asserts that any Unidentified
 /// access belongs to a know pattern that cannot originate from Class or Global
 /// accesses.
 ///
@@ -59,7 +59,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 
@@ -70,20 +70,22 @@ using llvm::SmallDenseSet;
 // AccessedStorage. Returns nullptr for any storage that can't be partitioned
 // into a disjoint location.
 //
-// findAccessedStorage may only return Unidentified storage for a global
+// identifyFormalAccess may only return Unidentified storage for a global
 // variable access if the global is defined in a different module.
-VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
+//
+// WARNING: Retrieving VarDecl for Class access is not constant time.
+const VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
   switch (storage.getKind()) {
   case AccessedStorage::Global:
     // A global variable may return a null decl. These variables are
     // implementation details that aren't formally accessed.
     return storage.getGlobal()->getDecl();
   case AccessedStorage::Class: {
-    const ObjectProjection &objProj = storage.getObjectProjection();
-    return objProj.getProjection().getVarDecl(objProj.getObject()->getType());
+    return cast<VarDecl>(storage.getDecl());
   }
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
+  case AccessedStorage::Tail:
   case AccessedStorage::Argument:
   case AccessedStorage::Yield:
   case AccessedStorage::Unidentified:
@@ -102,7 +104,7 @@ namespace {
 //
 // The existence of unidentified access complicates this problem. For this
 // optimization to be valid, Global and Class property access must always be
-// identifiable. findAccessedStorage() in MemAccessUtils enforces a short list
+// identifiable. identifyFormalAccess() in MemAccessUtils enforces a short list
 // of unidentified producers (non-address PhiArgument, PointerToAddress, Undef,
 // & local-init). We cannot allow the address of a global variable or class
 // property to be exposed via one of these instructions, unless the declaration
@@ -133,7 +135,7 @@ class GlobalAccessRemoval {
     BeginAccessSet beginAccessSet;
   };
 
-  DenseMap<VarDecl *, DisjointAccessLocationInfo> disjointAccessMap;
+  DenseMap<const VarDecl *, DisjointAccessLocationInfo> disjointAccessMap;
 
 public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
@@ -142,7 +144,7 @@ public:
 
 protected:
   void visitInstruction(SILInstruction *I);
-  void recordAccess(SILInstruction *beginAccess, VarDecl *decl,
+  void recordAccess(SILInstruction *beginAccess, const VarDecl *decl,
                     AccessedStorage::Kind storageKind,
                     bool hasNoNestedConflict);
   void removeNonreentrantAccess();
@@ -167,14 +169,14 @@ void GlobalAccessRemoval::perform() {
 
 void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorageNonNested(BAI->getSource());
-    VarDecl *decl = getDisjointAccessLocation(storage);
+    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    const VarDecl *decl = getDisjointAccessLocation(storage);
     recordAccess(BAI, decl, storage.getKind(), BAI->hasNoNestedConflict());
     return;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorageNonNested(BUAI->getSource());
-    VarDecl *decl = getDisjointAccessLocation(storage);
+    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    const VarDecl *decl = getDisjointAccessLocation(storage);
     recordAccess(BUAI, decl, storage.getKind(), BUAI->hasNoNestedConflict());
     return;
   }
@@ -214,7 +216,7 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
 // access. This is only legal when the access is known to be a local access, not
 // a class property or global.
 void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
-                                       VarDecl *decl,
+                                       const VarDecl *decl,
                                        AccessedStorage::Kind storageKind,
                                        bool hasNoNestedConflict) {
   if (!decl || module.isVisibleExternally(decl))
@@ -253,7 +255,7 @@ void GlobalAccessRemoval::removeNonreentrantAccess() {
     if (!info.noNestedConflict)
       continue;
 
-    VarDecl *decl = declAndInfo.first;
+    const VarDecl *decl = declAndInfo.first;
     LLVM_DEBUG(llvm::dbgs() << "Eliminating all formal access on "
                             << decl->getName() << "\n");
     assert(!module.isVisibleExternally(decl));

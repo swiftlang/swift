@@ -1,6 +1,7 @@
+// REQUIRES: asan_runtime
 // This test verifies that we add the function attributes used by ASan.
 
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns -sanitize=address %s | %FileCheck %s -check-prefix=ASAN
+// RUN: %target-swift-frontend -emit-ir -sanitize=address %s | %FileCheck %s -check-prefix=ASAN
 
 // ASAN: define {{.*}} @"$s4main4testyyF"() [[DEFAULT_ATTRS:#[0-9]+]]
 public func test() {
@@ -18,5 +19,5 @@ public var x: Int {
 // ASAN-SAME: }
 
 // ASAN: attributes [[COROUTINE_ATTRS]] =
-// ASAN-NOT: sanitize_address
+// ASAN-SAME: sanitize_address
 // ASAN-SAME: }

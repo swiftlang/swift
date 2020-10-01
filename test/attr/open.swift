@@ -35,7 +35,7 @@ class ExternalSuperClassesMayBeOpen : ExternalOpenClass {}
 class NestedClassesOfPublicTypesAreOpen : ExternalStruct.OpenClass {}
 
 // This one is hard to diagnose.
-class NestedClassesOfInternalTypesAreNotOpen : ExternalInternalStruct.OpenClass {} // expected-error {{use of undeclared type 'ExternalInternalStruct'}}
+class NestedClassesOfInternalTypesAreNotOpen : ExternalInternalStruct.OpenClass {} // expected-error {{cannot find type 'ExternalInternalStruct' in scope}}
 
 class NestedPublicClassesOfOpenClassesAreNotOpen : ExternalOpenClass.PublicClass {} // expected-error {{cannot inherit from non-open class 'ExternalOpenClass.PublicClass' outside of its defining module}}
 

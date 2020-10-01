@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-note{{previously declared here}}
+  var hashValue: String { return "" } // expected-error {{invalid redeclaration of synthesized implementation for protocol requirement 'hashValue'}}
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -105,8 +105,7 @@ enum Complex {
 }
 
 func complex() {
-  if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
+  if Complex.A(1) == .B { } // expected-error{{cannot convert value of type 'Complex' to expected argument type 'CustomHashable'}}
 }
 
 // Enums with equatable payloads are equatable if they explicitly conform.
@@ -147,7 +146,8 @@ func enumWithHashablePayload() {
 // Enums with non-hashable payloads don't derive conformance.
 struct NotHashable {}
 enum EnumWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
-  case A(NotHashable)
+  case A(NotHashable) //expected-note {{associated value type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'EnumWithNonHashablePayload' to 'Hashable'}}
+  // expected-note@-1 {{associated value type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'EnumWithNonHashablePayload' to 'Equatable'}}
 }
 
 // Enums should be able to derive conformances based on the conformances of
@@ -164,7 +164,7 @@ func genericHashable() {
 // But it should be an error if the generic argument doesn't have the necessary
 // constraints to satisfy the conditions for derivation.
 enum GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform to protocol 'Hashable'}}
-  case A(T)
+  case A(T) //expected-note 2 {{associated value type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'GenericNotHashable<T>' to 'Hashable'}}
   case B
 }
 func genericNotHashable() {
@@ -178,7 +178,7 @@ enum NoCases: Hashable {}
 
 // rdar://19773050
 private enum Bar<T> {
-  case E(Unknown<T>)  // expected-error {{use of undeclared type 'Unknown'}}
+  case E(Unknown<T>)  // expected-error {{cannot find type 'Unknown' in scope}}
 
   mutating func value() -> T {
     switch self {
@@ -201,7 +201,7 @@ extension Instrument : Equatable {}
 extension Instrument : CaseIterable {}
 
 enum UnusedGeneric<T> {
-    case a, b, c
+  case a, b, c
 }
 extension UnusedGeneric : CaseIterable {}
 
@@ -224,11 +224,17 @@ enum Complex2 {
 }
 extension Complex2 : Hashable {}
 extension Complex2 : CaseIterable {}  // expected-error {{type 'Complex2' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{extension outside of file declaring enum 'FromOtherFile' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}}
+extension CaseIterableAcrossFiles: CaseIterable {
+  public static var allCases: [CaseIterableAcrossFiles] {
+    return [ .A ]
+  }
+}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
-  case A(NotHashable)
+  case A(NotHashable) //expected-note {{associated value type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Hashable'}}
+  // expected-note@-1 {{associated value type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Equatable'}}
 }
 extension NotExplicitlyHashableAndCannotDerive : Hashable {} // expected-error 2 {{does not conform}}
 extension NotExplicitlyHashableAndCannotDerive : CaseIterable {} // expected-error {{does not conform}}
@@ -242,7 +248,7 @@ extension OtherFileNonconforming: Hashable {
   func hash(into hasher: inout Hasher) {}
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{extension outside of file declaring enum 'YetOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
@@ -282,21 +288,22 @@ case only([Int])
 struct NotEquatable { }
 
 enum ArrayOfNotEquatables : Equatable { // expected-error{{type 'ArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
-case only([NotEquatable])
+case only([NotEquatable]) //expected-note {{associated value type '[NotEquatable]' does not conform to protocol 'Equatable', preventing synthesized conformance of 'ArrayOfNotEquatables' to 'Equatable'}}
 }
 
 // Conditional conformances should be able to be synthesized
 enum GenericDeriveExtension<T> {
-    case A(T)
+  case A(T)
 }
 extension GenericDeriveExtension: Equatable where T: Equatable {}
 extension GenericDeriveExtension: Hashable where T: Hashable {}
 
 // Incorrectly/insufficiently conditional shouldn't work
 enum BadGenericDeriveExtension<T> {
-    case A(T)
+    case A(T) //expected-note {{associated value type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Hashable'}}
+  //expected-note@-1 {{associated value type 'T' does not conform to protocol 'Equatable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Equatable'}}
 }
-extension BadGenericDeriveExtension: Equatable {}
+extension BadGenericDeriveExtension: Equatable {} //
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
@@ -312,7 +319,7 @@ extension UnusedGenericDeriveExtension: Hashable {}
 // Cross-file synthesis is disallowed for conditional cases just as it is for
 // non-conditional ones.
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
-// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error@-1{{extension outside of file declaring generic enum 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 
 // rdar://problem/41852654
 
@@ -325,9 +332,7 @@ enum ImpliedMain: ImplierMain {
 }
 extension ImpliedOther: ImplierMain {}
 
-
 // FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '<T> (Generic<T>, Generic<T>) -> Bool'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(InvalidCustomHashable, InvalidCustomHashable) -> Bool'

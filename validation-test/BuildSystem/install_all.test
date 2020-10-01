@@ -1,0 +1,9 @@
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake 2>&1 | %FileCheck %s
+
+# REQUIRES: standalone_build
+
+# CHECK: --- Installing cmark ---
+# CHECK: --- Installing llvm ---
+# CHECK: --- Installing swift ---

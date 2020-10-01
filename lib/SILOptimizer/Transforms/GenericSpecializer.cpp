@@ -20,13 +20,17 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
+
+// For testing during bring up.
+static llvm::cl::opt<bool> EnableGenericSpecializerWithOwnership(
+    "sil-generic-specializer-enable-ownership", llvm::cl::init(false));
 
 namespace {
 
@@ -39,7 +43,7 @@ class GenericSpecializer : public SILFunctionTransform {
     SILFunction &F = *getFunction();
 
     // TODO: We should be able to handle ownership.
-    if (F.hasOwnership())
+    if (F.hasOwnership() && !EnableGenericSpecializerWithOwnership)
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:"
@@ -57,31 +61,30 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
   SILOptFunctionBuilder FunctionBuilder(*this);
   DeadInstructionSet DeadApplies;
   llvm::SmallSetVector<SILInstruction *, 8> Applies;
-  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
+  OptRemark::Emitter ORE(DEBUG_TYPE, F);
 
   bool Changed = false;
   for (auto &BB : F) {
     // Collect the applies for this block in reverse order so that we
     // can pop them off the end of our vector and process them in
     // forward order.
-    for (auto It = BB.rbegin(), End = BB.rend(); It != End; ++It) {
-      auto *I = &*It;
+    for (auto &I : llvm::reverse(BB)) {
 
       // Skip non-apply instructions, apply instructions with no
       // substitutions, apply instructions where we do not statically
       // know the called function, and apply instructions where we do
       // not have the body of the called function.
-      ApplySite Apply = ApplySite::isa(I);
+      ApplySite Apply = ApplySite::isa(&I);
       if (!Apply || !Apply.hasSubstitutions())
         continue;
 
-      auto *Callee = Apply.getReferencedFunction();
+      auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
       if (!Callee->isDefinition()) {
         ORE.emit([&]() {
           using namespace OptRemark;
-          return RemarkMissed("NoDef", *I)
+          return RemarkMissed("NoDef", I)
                  << "Unable to specialize generic function "
                  << NV("Callee", Callee) << " since definition is not visible";
         });
@@ -99,7 +102,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *I = Applies.pop_back_val();
       auto Apply = ApplySite::isa(I);
       assert(Apply && "Expected an apply!");
-      SILFunction *Callee = Apply.getReferencedFunction();
+      SILFunction *Callee = Apply.getReferencedFunctionOrNull();
       assert(Callee && "Expected to have a known callee");
 
       if (!Apply.canOptimize() || !Callee->shouldOptimize())

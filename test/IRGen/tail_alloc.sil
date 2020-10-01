@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -enable-objc-interop  -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck --check-prefixes=CHECK,CHECK-objc %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-objc-interop -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck --check-prefixes=CHECK,CHECK-native %s -DINT=i%target-ptrsize
 //
 // REQUIRES: CPU=x86_64
 
@@ -112,11 +113,13 @@ bb0(%0 : $Builtin.Word, %1 : $@thick T.Type):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_dynamic
 // CHECK:      [[BYTE_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
-// CHECK-NEXT: [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 48
+// CHECK-objc-NEXT:   [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 48
+// CHECK-native-NEXT: [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 24
 // CHECK-NEXT: [[INT_PTR:%[0-9]+]] = bitcast i8* [[SIZE_ADDR]] to i32*
 // CHECK-NEXT: [[SIZE:%[0-9]+]] = load i32, i32* [[INT_PTR]]
 // CHECK-NEXT: [[SIZE64:%[0-9]+]] = zext i32 [[SIZE]] to i64
-// CHECK-NEXT: [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 52
+// CHECK-objc-NEXT:   [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 52
+// CHECK-native-NEXT: [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 28
 // CHECK-NEXT: [[SHORT_PTR:%[0-9]+]] = bitcast i8* [[ALIGN_ADDR]] to i16*
 // CHECK-NEXT: [[ALIGN:%[0-9]+]] = load i16, i16* [[SHORT_PTR]]
 // CHECK-NEXT: [[ALIGN64:%[0-9]+]] = zext i16 [[ALIGN]] to i64

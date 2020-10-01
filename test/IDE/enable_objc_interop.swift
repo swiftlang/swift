@@ -2,15 +2,15 @@
 
 #if _runtime(_ObjC)
 foo
-// CHECK-objc: unresolved identifier 'foo'
-// CHECK-objc-NOT: unresolved identifier 'bar'
-// CHECK-objc-NOT: unresolved identifier 'baz'
+// CHECK-objc: cannot find 'foo' in scope
+// CHECK-objc-NOT: cannot find 'bar' in scope
+// CHECK-objc-NOT: cannot find 'baz' in scope
 
 #elseif _runtime(_Native)
 bar
-// CHECK-native-NOT: unresolved identifier 'foo'
-// CHECK-native: unresolved identifier 'bar'
-// CHECK-native-NOT: unresolved identifier 'baz'
+// CHECK-native-NOT: cannot find 'foo' in scope
+// CHECK-native: cannot find 'bar' in scope
+// CHECK-native-NOT: cannot find 'baz' in scope
 
 #else
 baz

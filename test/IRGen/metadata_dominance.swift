@@ -12,23 +12,21 @@ func cond() -> Bool { return true }
 func test1() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
   if cond() {
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$syycMa"([[INT]] 0)
-// CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     use_metadata(voidToVoid)
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
-// CHECK-NOT: @"$syycMa"
+// CHECK-NOT: @"$syycMD"
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
-// CHECK-NOT: @"$syycMa"
+// CHECK-NOT: @"$syycMD"
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$syycMa"([[INT]] 0)
-// CHECK: [[T1:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T1]])
   use_metadata(voidToVoid)
 }
@@ -38,20 +36,17 @@ func test2() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
   if cond() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$syycMa"([[INT]] 0)
-// CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$syycMa"([[INT]] 0)
-// CHECK: [[T1:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T1]])
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$syycMa"([[INT]] 0)
-// CHECK: [[T2:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[T2:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T2]])
   use_metadata(voidToVoid)
 }

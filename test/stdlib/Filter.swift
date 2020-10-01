@@ -12,9 +12,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import StdlibUnittest
 
 
@@ -74,6 +71,28 @@ FilterTests.test("single-count") {
   let f1 = LazyFilterCollection(_base: 0..<30, mod7AndCount)
   _ = Array(f1)
   expectEqual(30, count)
+}
+
+FilterTests.test("chained filter order") {
+  let array = [1]
+  
+  let lazyFilter = array.lazy
+    .filter { _ in false }
+    .filter { _ in
+      expectUnreachable("Executed second filter before first")
+      return true
+    }
+  let lazyResult = Array(lazyFilter)
+  
+  let result = array
+    .filter { _ in false }
+    .filter { _ in
+      expectUnreachable("Executed second filter before first")
+      return true
+    }
+  
+  expectEqual(lazyResult.count, 0)
+  expectEqual(result.count, 0)
 }
 
 runAllTests()

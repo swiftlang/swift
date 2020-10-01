@@ -4,9 +4,9 @@
 
 import StdlibUnittest
 import SwiftPrivateThreadExtras
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -111,8 +111,7 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)
 
-  ret = _stdlib_thread_barrier_destroy(barrierVar!)
-  expectEqual(0, ret)
+  _stdlib_thread_barrier_destroy(barrierVar!)
 
   barrierVar!.deinitialize(count: 1)
   barrierVar!.deallocate()

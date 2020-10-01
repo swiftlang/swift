@@ -62,7 +62,8 @@ public:
 
     /// Returns a description of the summary. For debugging and testing
     /// purposes.
-    std::string getDescription(SILType BaseType, SILModule &M) const;
+    std::string getDescription(SILType BaseType, SILModule &M,
+                               TypeExpansionContext context) const;
   };
 
   typedef llvm::SmallDenseMap<const IndexTrieNode *, SubAccessSummary, 8>
@@ -85,7 +86,8 @@ public:
 
     /// Returns a description of the summary. For debugging and testing
     /// purposes.
-    std::string getDescription(SILType BaseType, SILModule &M) const;
+    std::string getDescription(SILType BaseType, SILModule &M,
+                               TypeExpansionContext context) const;
 
     /// Returns the accesses that the function performs to subpaths of the
     /// argument.
@@ -208,7 +210,8 @@ public:
   /// The base type must be the type of the root of the path.
   static std::string getSubPathDescription(SILType BaseType,
                                            const IndexTrieNode *SubPath,
-                                           SILModule &M);
+                                           SILModule &M,
+                                           TypeExpansionContext context);
 
   /// Performs a lexicographic comparison of two subpaths, first by path length
   /// and then by index of the last path component. Returns true when lhs

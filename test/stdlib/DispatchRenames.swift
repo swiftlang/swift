@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift %import-libdispatch
 // REQUIRES: libdispatch
 
 import Dispatch

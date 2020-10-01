@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
-import Foundation
 
 public let Calculator = BenchmarkInfo(
   name: "Calculator",
@@ -53,4 +52,3 @@ public func run_Calculator(_ N: Int) {
   }
   CheckResults(c == 0)
 }
-

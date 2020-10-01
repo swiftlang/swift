@@ -1,0 +1,3 @@
+module CXXTypesWithUserProvidedDestructor {
+  header "CXXTypesWithUserProvidedDestructor.h"
+}

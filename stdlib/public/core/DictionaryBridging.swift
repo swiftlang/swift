@@ -29,6 +29,7 @@ internal func _stdlib_NSDictionary_allKeys(
 extension _NativeDictionary { // Bridging
   @usableFromInline
   __consuming internal func bridged() -> AnyObject {
+    _connectOrphanedFoundationSubclassesIfNeeded()
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
@@ -67,19 +68,23 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   internal init(_ base: __owned _NativeDictionary<Key, Value>) {
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSDictionary<Key, Value>) {
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
@@ -311,7 +316,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let bridgedKeys = bridgeKeys()
     let bridgedValues = bridgeValues()
     var i = 0 // Current position in the output buffers
-    let bucketCount = native._storage._bucketCount
 
     defer { _fixLifetime(self) }
 
@@ -422,7 +426,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 // classes, so it was renamed. The old names must not be used in the new
 // runtime.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct __CocoaDictionary {
   @usableFromInline
   internal let object: AnyObject
@@ -565,7 +569,7 @@ extension __CocoaDictionary {
 }
 
 extension __CocoaDictionary {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Index {
     internal var _storage: Builtin.BridgeObject

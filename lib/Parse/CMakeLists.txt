@@ -16,19 +16,20 @@ add_swift_host_library(swiftParse STATIC
   ParseIfConfig.cpp
   ParsePattern.cpp
   Parser.cpp
+  ParseRequests.cpp
   ParseStmt.cpp
   ParseType.cpp
   PersistentParserState.cpp
   Scope.cpp
   SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp
-
-  GYB_SOURCES
+  SyntaxParsingContext.cpp)
+_swift_gyb_target_sources(swiftParse PRIVATE
     ParsedSyntaxBuilders.cpp.gyb
     ParsedSyntaxNodes.cpp.gyb
     ParsedSyntaxRecorder.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax)
+  swiftSyntax
+  swiftSyntaxParse)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)

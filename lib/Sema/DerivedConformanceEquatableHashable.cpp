@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file implements implicit derivation of the Equatable and Hashable
-//  protocols. (Comparable is similar enough in spirit that it would make
-//  sense to live here too when we implement its derivation.)
+//  protocols. 
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,63 +31,6 @@
 
 using namespace swift;
 
-/// Returns true if, for every element of the given enum, it either has no
-/// associated values or all of them conform to a protocol.
-/// \p theEnum The enum whose elements and associated values should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                 EnumDecl *theEnum,
-                                                 ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
-  for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
-    auto PL = elt->getParameterList();
-    if (!PL)
-      continue;
-
-    for (auto param : *PL) {
-      auto type = param->getType()->mapTypeOutOfContext();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC,
-                                           ConformanceCheckFlags::Used)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-/// Returns true if every stored property in the given struct conforms to the
-/// protocol (or, vacuously, if it has no stored properties).
-/// \p theStruct The struct whose stored properties should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all stored properties of the struct conform.
-static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
-                                                 StructDecl *theStruct,
-                                                 ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
-  auto storedProperties =
-    theStruct->getStoredProperties(/*skipInaccessible=*/true);
-  for (auto propertyDecl : storedProperties) {
-    if (!propertyDecl->hasType())
-      lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasType())
-      return false;
-
-    auto type = propertyDecl->getValueInterfaceType();
-
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                         protocol, DC,
-                                         ConformanceCheckFlags::Used)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 /// Common preconditions for Equatable and Hashable.
 static bool canDeriveConformance(DeclContext *DC,
                                  NominalTypeDecl *target,
@@ -97,213 +39,21 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
+    return DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
-    // All stored properties of the struct must conform to the protocol.
-    return allStoredPropertiesConformToProtocol(DC, structDecl, protocol);
+    // All stored properties of the struct must conform to the protocol. If
+    // there are no stored properties, we will vaccously return true.
+    return DerivedConformance::storedPropertiesNotConformingToProtocol(
+               DC, structDecl, protocol)
+        .empty();
   }
 
   return false;
 }
 
-/// Creates a named variable based on a prefix character and a numeric index.
-/// \p prefixChar The prefix character for the variable's name.
-/// \p index The numeric index to append to the variable's name.
-/// \p type The type of the variable.
-/// \p varContext The context of the variable.
-/// \return A VarDecl named with the prefix and number.
-static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
-                               DeclContext *varContext) {
-  ASTContext &C = varContext->getASTContext();
-
-  llvm::SmallString<8> indexVal;
-  indexVal.append(1, prefixChar);
-  APInt(32, index).toString(indexVal, 10, /*signed*/ false);
-  auto indexStr = C.AllocateCopy(indexVal);
-  auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
-
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
-                                 /*IsCaptureList*/true, SourceLoc(),
-                                 C.getIdentifier(indexStrRef),
-                                 varContext);
-  varDecl->setType(type);
-  varDecl->setHasNonPatternBindingInit(true);
-  return varDecl;
-}
-
-/// Returns the pattern used to match and bind the associated values (if any) of
-/// an enum case.
-/// \p enumElementDecl The enum element to match.
-/// \p varPrefix The prefix character for variable names (e.g., a0, a1, ...).
-/// \p varContext The context into which payload variables should be declared.
-/// \p boundVars The array to which the pattern's variables will be appended.
-static Pattern*
-enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
-                             char varPrefix, DeclContext *varContext,
-                             SmallVectorImpl<VarDecl*> &boundVars) {
-  auto parentDC = enumElementDecl->getDeclContext();
-  ASTContext &C = parentDC->getASTContext();
-
-  // No arguments, so no subpattern to match.
-  if (!enumElementDecl->hasAssociatedValues())
-    return nullptr;
-
-  auto argumentType = enumElementDecl->getArgumentInterfaceType();
-  if (auto tupleType = argumentType->getAs<TupleType>()) {
-    // Either multiple (labeled or unlabeled) arguments, or one labeled
-    // argument. Return a tuple pattern that matches the enum element in arity,
-    // types, and labels. For example:
-    // case a(x: Int) => (x: let a0)
-    // case b(Int, String) => (let a0, let a1)
-    SmallVector<TuplePatternElt, 3> elementPatterns;
-    int index = 0;
-    for (auto tupleElement : tupleType->getElements()) {
-      auto payloadVar = indexedVarDecl(varPrefix, index++,
-                                       tupleElement.getType(), varContext);
-      boundVars.push_back(payloadVar);
-
-      auto namedPattern = new (C) NamedPattern(payloadVar);
-      namedPattern->setImplicit();
-      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
-      elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
-                                                SourceLoc(), letPattern));
-    }
-
-    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
-                                    SourceLoc());
-    pat->setImplicit();
-    return pat;
-  }
-
-  // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
-  // underlying type is the same as the payload. For example:
-  // case a(Int) => (let a0)
-  auto underlyingType = argumentType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
-  boundVars.push_back(payloadVar);
-
-  auto namedPattern = new (C) NamedPattern(payloadVar);
-  namedPattern->setImplicit();
-  auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                       namedPattern);
-  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
-  pat->setImplicit();
-  return pat;
-}
-
-/// Create AST statements which convert from an enum to an Int with a switch.
-/// \p stmts The generated statements are appended to this vector.
-/// \p parentDC Either an extension or the enum itself.
-/// \p enumDecl The enum declaration.
-/// \p enumVarDecl The enum input variable.
-/// \p funcDecl The parent function.
-/// \p indexName The name of the output variable.
-/// \return A DeclRefExpr of the output variable (of type Int).
-static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
-                                       DeclContext *parentDC,
-                                       EnumDecl *enumDecl,
-                                       VarDecl *enumVarDecl,
-                                       AbstractFunctionDecl *funcDecl,
-                                       const char *indexName) {
-  ASTContext &C = enumDecl->getASTContext();
-  Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredType();
-
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
-                                  /*IsCaptureList*/false, SourceLoc(),
-                                  C.getIdentifier(indexName),
-                                  funcDecl);
-  indexVar->setInterfaceType(intType);
-  indexVar->setImplicit();
-
-  // generate: var indexVar
-  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
-  indexPat->setType(intType);
-  indexPat = TypedPattern::createImplicit(C, indexPat, intType);
-  indexPat->setType(intType);
-  auto *indexBind = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
-
-  unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    // generate: case .<Case>:
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
-    pat->setImplicit();
-
-    auto labelItem = CaseLabelItem(pat);
-
-    // generate: indexVar = <index>
-    auto indexExpr = IntegerLiteralExpr::createFromUnsigned(C, index++);
-    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
-                                        /*implicit*/true);
-    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
-                                         indexExpr, /*implicit*/ true);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
-                                  SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
-                                     /*case body vardecls*/ None));
-  }
-
-  // generate: switch enumVar { }
-  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
-                                     /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
-
-  stmts.push_back(indexBind);
-  stmts.push_back(switchStmt);
-
-  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
-                             AccessSemantics::Ordinary, intType);
-}
-
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns false.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality.
-static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
-  SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 1> statements;
-
-  // First, generate the statement for the body of the guard.
-  // return false
-  auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
-                                              /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
-  statements.emplace_back(ASTNode(returnStmt));
-
-  // Next, generate the condition being checked.
-  // lhs == rhs
-  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclName(C.getIdentifier("==")), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
-  conditions.emplace_back(cmpExpr);
-
-  // Build and return the complete guard statement.
-  // guard lhs == rhs else { return false }
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
-}
-
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -318,23 +68,29 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   SmallVector<ASTNode, 0> cases;
 
   // switch (a, b) { }
-  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true);
-  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true);
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  aParam->getType());
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  bParam->getType());
+  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
   auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+                                  /*implicit*/ true,
+                                  TupleType::get(abTupleElts, C));
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
                                        SourceLoc(), cases, SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -348,9 +104,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
-  DeclRefExpr *aIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *aIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            aParam, eqDecl, "index_a");
-  DeclRefExpr *bIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *bIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            bParam, eqDecl, "index_b");
 
   // Generate the compare of the indices.
@@ -367,8 +123,10 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                     AccessSemantics::Ordinary, fnType);
 
     fnType = fnType->getResult()->castTo<FunctionType>();
-    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
-    cmpFuncExpr->setImplicit();
+    auto *callExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
+    callExpr->setImplicit();
+    callExpr->setThrows(false);
+    cmpFuncExpr = callExpr;
   } else {
     cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
                                       /*implicit*/ true,
@@ -376,21 +134,26 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
+  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true);
+                                         /*Implicit*/ true,
+                                         TupleType::get(abTupleElts, C));
 
-  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true);
+  auto *cmpExpr = new (C) BinaryExpr(
+      cmpFuncExpr, abTuple, /*implicit*/ true,
+      fnType->castTo<FunctionType>()->getResult());
+  cmpExpr->setThrows(false);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                 void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -411,26 +174,26 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', eqDecl,
+    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
-    auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
-                                                 lhsSubpattern);
+    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto lhsElemPat =
+        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, lhsSubpattern);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', eqDecl,
+    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
-    auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
-                                                 rhsSubpattern);
+    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto rhsElemPat =
+        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, rhsSubpattern);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
@@ -442,9 +205,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -452,9 +214,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
-    auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
-      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) },
-                                                 SourceLoc());
+    auto caseTuplePattern = TuplePattern::createImplicit(C, {
+      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
     caseTuplePattern->setImplicit();
 
     auto labelItem = CaseLabelItem(caseTuplePattern);
@@ -464,14 +225,15 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // constructing long lists of autoclosure-wrapped conditions connected by
     // &&, which the type checker has more difficulty processing.)
     SmallVector<ASTNode, 6> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = returnIfNotEqualGuard(C, lhsExpr, rhsExpr);
+      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, 
+          lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
 
@@ -485,8 +247,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body, caseBodyVarDecls));
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls));
   }
 
   // default: result = false
@@ -494,16 +257,16 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // We only generate this if the enum has more than one case. If it has exactly
   // one case, then that single case statement is already exhaustive.
   if (elementCount > 1) {
-    auto defaultPattern = new (C) AnyPattern(SourceLoc());
-    defaultPattern->setImplicit();
+    auto defaultPattern = AnyPattern::createImplicit(C);
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     defaultItem, SourceLoc(), SourceLoc(),
+                                     body,
                                      /*case body var decls*/ None));
   }
 
@@ -518,12 +281,12 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
-                                          void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -535,27 +298,28 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
 
   SmallVector<ASTNode, 6> statements;
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // For each stored property element, generate a guard statement that returns
   // false if a property is not pairwise-equal.
   for (auto propertyDecl : storedProperties) {
-    auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto aPropertyExpr = new (C) DotSyntaxCallExpr(aPropertyRef, SourceLoc(),
-                                                   aParamRef);
+    auto aPropertyExpr = new (C) MemberRefExpr(aParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
-    auto bPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
-                                                   bParamRef);
+    auto bPropertyExpr = new (C) MemberRefExpr(bParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
-    auto guardStmt = returnIfNotEqualGuard(C, aPropertyExpr, bPropertyExpr);
+    auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
+      aPropertyExpr, bPropertyExpr);
     statements.emplace_back(guardStmt);
   }
 
@@ -568,13 +332,15 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
+deriveEquatable_eq(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -610,15 +376,16 @@ deriveEquatable_eq(DerivedConformance &derived,
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
     return param;
   };
@@ -628,7 +395,7 @@ deriveEquatable_eq(DerivedConformance &derived,
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
+  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -641,51 +408,36 @@ deriveEquatable_eq(DerivedConformance &derived,
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto eqDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  eqDecl->setImplicit();
+  auto *const eqDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
-  eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredType();
-    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    auto equatableTy = equatableProto->getDeclaredInterfaceType();
+    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
     eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
                                                   SourceRange(),
-                                                  equatableTypeLoc,
+                                                  equatableTyExpr,
                                                   equalsDeclName,
                                                   DeclNameLoc()));
   }
 
   if (!C.getEqualIntDecl()) {
-    derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_equal_overload_for_int);
+    derived.ConformanceDecl->diagnose(diag::no_equal_overload_for_int);
     return nullptr;
   }
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the interface type.
-  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
-    eqDecl->setGenericEnvironment(genericEnv);
-  eqDecl->computeType();
-
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(eqDecl);
 
   // Add the operator to the parent scope.
   derived.addMembersToConformanceContext({eqDecl});
@@ -720,8 +472,16 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
     else
       llvm_unreachable("todo");
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
+  requirement->diagnose(diag::broken_equatable_requirement);
   return nullptr;
+}
+
+void DerivedConformance::tryDiagnoseFailedEquatableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  ASTContext &ctx = DC->getASTContext();
+  auto *equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, equatableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, equatableProto);
 }
 
 /// Returns a new \c CallExpr representing
@@ -738,23 +498,22 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
                                          Expr *hashable) {
   Expr *hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasher),
                                          DeclNameLoc(), /*implicit*/ true);
-  DeclName name(C, C.Id_combine, {Identifier()});
   // hasher.combine(_:)
-  auto *combineCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
-                                                name, DeclNameLoc(),
-                                                /*implicit*/ true);
+  auto *combineCall = UnresolvedDotExpr::createImplicit(
+      C, hasherExpr, C.Id_combine, {Identifier()});
   
   // hasher.combine(hashable)
   return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
 }
 
 static FuncDecl *
-deriveHashable_hashInto(DerivedConformance &derived,
-                        void (*bodySynthesizer)(AbstractFunctionDecl *,
-                                                void *)) {
+deriveHashable_hashInto(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (into: inout Hasher) -> ()
@@ -767,17 +526,16 @@ deriveHashable_hashInto(DerivedConformance &derived,
   auto hasherDecl = C.getHasherDecl();
   if (!hasherDecl) {
     auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-    derived.TC.diagnose(hashableProto->getLoc(),
-                        diag::broken_hashable_no_hasher);
+    hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
-  Type hasherType = hasherDecl->getDeclaredType();
+  Type hasherType = hasherDecl->getDeclaredInterfaceType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
-                                            SourceLoc(),
+  auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
                                             C.Id_hasher, parentDC);
+  hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
@@ -787,31 +545,23 @@ deriveHashable_hashInto(DerivedConformance &derived,
 
   // Func name: hash(into: inout Hasher) -> ()
   DeclName name(C, C.Id_hash, params);
-  auto *hashDecl = FuncDecl::create(C,
-                                    SourceLoc(), StaticSpellingKind::None,
-                                    SourceLoc(), name, SourceLoc(),
-                                    /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
-                                    TypeLoc::withoutLoc(returnType),
-                                    parentDC);
-  hashDecl->setImplicit();
+  auto *const hashDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    hashDecl->setGenericEnvironment(env);
-  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(hashDecl);
 
   derived.addMembersToConformanceContext({hashDecl});
+
   return hashDecl;
 }
 
 /// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // func hash(into hasher: inout Hasher) {
   //   hasher.combine(self.hashValue)
@@ -822,20 +572,19 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                 C.Id_hashValue, DeclNameLoc(),
-                                                 /*implicit*/ true);
+  auto hashValueExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                         C.Id_hashValue);
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum by using its raw
 /// value.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_rawValue_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum: Int {
@@ -848,9 +597,8 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   // generate: self.rawValue
   auto *selfRef = DerivedConformance::createSelfDeclRef(hashIntoDecl);
-  auto *rawValueRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                C.Id_rawValue, DeclNameLoc(),
-                                                /*Implicit=*/true);
+  auto *rawValueRef = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                        C.Id_rawValue);
 
   // generate: hasher.combine(discriminator)
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
@@ -858,12 +606,12 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum without associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_noAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum {
@@ -889,7 +637,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   // generate: switch self {...}
   SmallVector<ASTNode, 3> stmts;
-  auto discriminatorExpr = convertEnumToIndex(stmts, parentDC, enumDecl,
+  auto discriminatorExpr = DerivedConformance::convertEnumToIndex(stmts, parentDC, enumDecl,
                                               selfDecl, hashIntoDecl,
                                               "discriminator");
   // generate: hasher.combine(discriminator)
@@ -899,24 +647,24 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum with associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnumWithAssociatedValues {
   //   case A, B(Int), C(String, Int)
   //   @derived func hash(into hasher: inout Hasher) {
   //     switch self {
-  //     case A:
+  //     case .A:
   //       hasher.combine(0)
-  //     case B(let a0):
+  //     case .B(let a0):
   //       hasher.combine(1)
   //       hasher.combine(a0)
-  //     case C(let a0, let a1):
+  //     case .C(let a0, let a1):
   //       hasher.combine(2)
   //       hasher.combine(a0)
   //       hasher.combine(a1)
@@ -944,11 +692,11 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     SmallVector<VarDecl*, 3> payloadVars;
     SmallVector<ASTNode, 3> statements;
 
-    auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
+    auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          elt->getName(), elt, payloadPattern);
+    auto pat = new (C) EnumElementPattern(
+        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
+        DeclNameRef(elt->getBaseIdentifier()), elt, payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -981,9 +729,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       for (unsigned i : indices(payloadVars)) {
         auto *vOld = payloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -991,8 +738,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body, caseBodyVarDecls,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls,
                                      /*implicit*/ true));
   }
 
@@ -1004,11 +752,11 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for a struct.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // struct SomeStruct {
   //   var x: Int
@@ -1028,17 +776,19 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // Feed each stored property into the hasher.
   for (auto propertyDecl : storedProperties) {
-    auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-    auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
-                                                      selfRef);
+    auto selfPropertyExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                                  propertyDecl, DeclNameLoc(),
+                                                  /*implicit*/ true);
+
     // Generate: hasher.combine(self.<property>)
     auto combineExpr = createHasherCombineCall(C, hasherParam, selfPropertyExpr);
     statements.emplace_back(ASTNode(combineExpr));
@@ -1046,29 +796,57 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), statements,
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hashValue' getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
   // return _hashValue(for: self)
-  auto *hashFunc = C.getHashValueForDecl();
-  auto hashExpr = new (C) DeclRefExpr(hashFunc, DeclNameLoc(),
-                                      /*implicit*/ true);
+
+  // 'self'
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
+  Type selfType = selfDecl->getType();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/ true);
+                                     /*implicit*/ true,
+                                     AccessSemantics::Ordinary,
+                                     selfType);
+
+  // _hashValue(for:)
+  auto *hashFunc = C.getHashValueForDecl();
+  auto substitutions = SubstitutionMap::get(
+      hashFunc->getGenericSignature(),
+      [&](SubstitutableType *dependentType) {
+        if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+          if (gp->getDepth() == 0 && gp->getIndex() == 0)
+            return selfType;
+        }
+
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+  ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
+
+  Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
+  auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
+                                      /*implicit*/ true,
+                                      AccessSemantics::Ordinary,
+                                      hashFuncType);
+  Type hashFuncResultType =
+      hashFuncType->castTo<AnyFunctionType>()->getResult();
   auto callExpr = CallExpr::createImplicit(C, hashExpr,
                                            { selfRef }, { C.Id_for });
+  callExpr->setType(hashFuncResultType);
+  callExpr->setThrows(false);
+
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  hashValueDecl->setBody(body);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive a 'hashValue' implementation.
@@ -1076,34 +854,33 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // @derived var hashValue: Int {
   //   return _hashValue(for: self)
   // }
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredType();
+  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!tc.conformsToProtocol(intType,
-                             C.getProtocol(KnownProtocolKind::Hashable),
-                             parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl, diag::broken_int_hashable_conformance);
+  if (TypeChecker::conformsToProtocol(
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
+          .isInvalid()) {
+    derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl,
-                diag::broken_int_integer_literal_convertible_conformance);
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
+          .isInvalid()) {
+    derived.ConformanceDecl->diagnose(
+      diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
 
   VarDecl *hashValueDecl =
-    new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
-                    /*IsCaptureList*/false, SourceLoc(),
-                    C.Id_hashValue, parentDC);
-  hashValueDecl->setType(intType);
+    new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
+                    SourceLoc(), C.Id_hashValue, parentDC);
+  hashValueDecl->setInterfaceType(intType);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -1113,29 +890,23 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
+  getterDecl->setIsTransparent(false);
 
-  // Compute the interface type of hashValue().
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
-  getterDecl->computeType();
-
-  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationToChecked();
-  hashValueDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                              SourceLoc(), {getterDecl}, SourceLoc());
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
-  Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
+  Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);
@@ -1143,10 +914,9 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
-  C.addSynthesizedDecl(hashValueDecl);
-  C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, hashValueDecl, patDecl});
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
+
   return hashValueDecl;
 }
 
@@ -1163,11 +933,11 @@ getHashValueRequirement(ASTContext &C) {
 }
 
 static ProtocolConformance *
-getHashableConformance(Decl *parentDecl) {
+getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
-  auto DC = cast<DeclContext>(parentDecl);
+  const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: DC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances()) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }
@@ -1186,6 +956,14 @@ bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   return true;
 }
 
+void DerivedConformance::tryDiagnoseFailedHashableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  ASTContext &ctx = DC->getASTContext();
+  auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, hashableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, hashableProto);
+}
+
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
   ASTContext &C = ConformanceDecl->getASTContext();
 
@@ -1201,7 +979,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(C);
     auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &TC);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
@@ -1218,7 +996,14 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
                                 hashableProto)) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,
                                   Nominal->getDeclaredType(),
-                                  hashableProto->getDeclaredType());
+                                  hashableProto->getDeclaredInterfaceType());
+        // Ideally, this would be diagnosed in
+        // ConformanceChecker::resolveWitnessViaLookup. That doesn't work for
+        // Hashable because DerivedConformance::canDeriveHashable returns true
+        // even if the conformance can't be derived. See the note there for
+        // details.
+        auto *dc = ConformanceDecl->getDeclContext();
+        tryDiagnoseFailedHashableDerivation(dc, Nominal);
         return nullptr;
       }
 
@@ -1226,7 +1011,8 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        void (*bodySynthesizer)(AbstractFunctionDecl *, void *);
+        std::pair<BraceStmt *, bool> (*bodySynthesizer)(
+            AbstractFunctionDecl *, void *);
         if (ED->isObjC())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())

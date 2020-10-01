@@ -36,8 +36,8 @@ func test(internalSub: Sub, publicSub: PublicSub) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4test11internalSub06publicD0yAA0D0C_AA06PublicD0CtF
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Sub, [[ARG1:%.*]] : @guaranteed $PublicSub):
-// CHECK: = class_method [[ARG0]] : $Sub, #Sub.foo!1
-// CHECK: = class_method [[ARG1]] : $PublicSub, #PublicSub.foo!1
+// CHECK: = class_method [[ARG0]] : $Sub, #Sub.foo :
+// CHECK: = class_method [[ARG1]] : $PublicSub, #PublicSub.foo :
 // CHECK: } // end sil function '$s4main4test11internalSub06publicD0yAA0D0C_AA06PublicD0CtF'
 
 

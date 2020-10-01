@@ -19,16 +19,18 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "llvm-inlinetree"
-#include "swift/LLVMPasses/Passes.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Format.h"
-#include "llvm/ADT/SmallSet.h"
-#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/Range.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/LLVMPasses/Passes.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 using namespace swift;
@@ -213,7 +215,7 @@ void InlineTree::buildTree(Function *F) {
 
       LLVM_DEBUG(dbgs() << I << '\n');
 
-      totalNumberOfInstructions++;
+      ++totalNumberOfInstructions;
       SmallVector<DILocation *, 8> InlineChain;
 
       // Scan the chain of inlined scopes.
@@ -224,7 +226,7 @@ void InlineTree::buildTree(Function *F) {
       }
       Node *Nd = nullptr;
       DILocation *PrevDL = nullptr;
-      for (DILocation *DL : reversed(InlineChain)) {
+      for (DILocation *DL : llvm::reverse(InlineChain)) {
         DILocalScope *Sc = DL->getScope();
         DISubprogram *SP = Sc->getSubprogram();
         assert(SP);
@@ -237,15 +239,15 @@ void InlineTree::buildTree(Function *F) {
           Nd = rootNode;
           LLVM_DEBUG(dbgs() << ", root\n");
         }
-        Nd->numTotalInsts++;
+        ++Nd->numTotalInsts;
         PrevDL = DL;
       }
 
       if (!Nd) {
         Nd = rootNode;
-        Nd->numTotalInsts++;
+        ++Nd->numTotalInsts;
       }
-      Nd->numSelfInsts++;
+      ++Nd->numSelfInsts;
     }
   }
 }
@@ -317,7 +319,7 @@ void InlineTree::print(raw_ostream &os) {
                               S.instanceOverhead;
         S.selfInstOverhead = Nd->numSelfInsts - Nd->numSelfInsts /
                              S.instanceOverhead;
-        S.instanceOverhead--;
+        --S.instanceOverhead;
       }
     } else {
       S.totalInstOverhead += Nd->numTotalInsts;

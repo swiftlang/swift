@@ -135,10 +135,10 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
-  if (!match(RecNext,
-             m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILPhiArgument(RecArg), m_One()),
-                                0)))
+  if (!match(RecNext, m_TupleExtractOperation(
+                          m_ApplyInst(BuiltinValueKind::SAddOver,
+                                      m_SILPhiArgument(RecArg), m_One()),
+                          0)))
     return None;
 
   if (RecArg->getParent() != Header)
@@ -239,18 +239,18 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
       auto *CondBr = cast<CondBranchInst>(
           Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
-        SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
-                                        CondBr->getTrueArgs());
+        SILBuilderWithScope(CondBr).createBranch(
+            CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
       else
-        SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getFalseBB(),
-                                        CondBr->getFalseArgs());
+        SILBuilderWithScope(CondBr).createBranch(
+            CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
       CondBr->eraseFromParent();
       return;
     }
 
     // Otherwise, branch to the next iteration's header.
-    SILBuilder(Br).createBranch(Br->getLoc(), NextIterationsHeader,
-                                Br->getArgs());
+    SILBuilderWithScope(Br).createBranch(Br->getLoc(), NextIterationsHeader,
+                                         Br->getArgs());
     Br->eraseFromParent();
     return;
   }
@@ -261,12 +261,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // one.
   if (CurLoopIter == LastLoopIter) {
     if (CondBr->getTrueBB() == CurrentHeader) {
-      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getFalseBB(),
-                                      CondBr->getFalseArgs());
+      SILBuilderWithScope(CondBr).createBranch(
+          CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
     } else {
       assert(CondBr->getFalseBB() == CurrentHeader);
-      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
-                                      CondBr->getTrueArgs());
+      SILBuilderWithScope(CondBr).createBranch(
+          CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
     }
     CondBr->eraseFromParent();
     return;
@@ -274,12 +274,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 
   // Otherwise, branch to the next iteration's header.
   if (CondBr->getTrueBB() == CurrentHeader) {
-    SILBuilder(CondBr).createCondBranch(
+    SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
         CondBr->getTrueArgs(), CondBr->getFalseBB(), CondBr->getFalseArgs());
   } else {
     assert(CondBr->getFalseBB() == CurrentHeader);
-    SILBuilder(CondBr).createCondBranch(
+    SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
         CondBr->getTrueArgs(), NextIterationsHeader, CondBr->getFalseArgs());
   }
@@ -334,13 +334,13 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.Initialize(OrigValue->getType());
-    SSAUp.AddAvailableValue(OrigValue->getParentBlock(), OrigValue);
+    SSAUp.initialize(OrigValue->getType());
+    SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
-      SSAUp.AddAvailableValue(NewValue->getParentBlock(), NewValue);
+      SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);
     for (auto U : UseList) {
       Operand *Use = U;
-      SSAUp.RewriteUse(*Use);
+      SSAUp.rewriteUse(*Use);
     }
   }
 }

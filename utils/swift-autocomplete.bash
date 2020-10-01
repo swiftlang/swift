@@ -27,7 +27,6 @@ _swift_complete()
       -view-cfg-remove-use-list-comments \
       -view-cfg-only-for-function \
       -sil-print-no-color \
-      -verify-skip-unreachable-must-be-last \
       -aa \
       -cache-aa-results \
       -sil-dump-call-graph \
@@ -68,6 +67,7 @@ _swift_complete()
       -sil-verify-without-invalidation \
       -sil-inline-test-threshold \
       -sil-inline-test \
+      -sil-inline-never-functions \
       -sroa-args-remove-dead-args-after \
       -ml \
       -sil-print-escapes \

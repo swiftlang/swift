@@ -1,0 +1,22 @@
+//===--- SILGenTypeIDZone.def -----------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the requests in SILGen's zone.
+//
+//===----------------------------------------------------------------------===//
+
+SWIFT_REQUEST(SILGen, ASTLoweringRequest,
+              std::unique_ptr<SILModule>(ASTLoweringDescriptor),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(SILGen, ParseSILModuleRequest,
+              std::unique_ptr<SILModule>(ASTLoweringDescriptor),
+              Uncached, NoLocationInfo)

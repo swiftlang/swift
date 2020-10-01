@@ -92,7 +92,7 @@ struct InMemberFunc {
   }
 }
 
-struct S { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'S'?}}
+struct S { // expected-note 3{{extended type declared here}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -116,7 +116,7 @@ extension S {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-enum E { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'E'?}}
+enum E { // expected-note 3{{extended type declared here}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -141,7 +141,7 @@ extension E {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-class C { // expected-note{{did you mean 'C'?}}
+class C {
   static var v1: Int = 0
   class final var v3: Int = 0 // expected-error {{class stored properties not supported}}
   class var v4: Int = 0 // expected-error {{class stored properties not supported}}
@@ -171,14 +171,14 @@ extension C {
   static final let el4: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
-protocol P {  // expected-note{{did you mean 'P'?}} expected-note{{extended type declared here}}
+protocol P {  // expected-note{{extended type declared here}}
   // Both `static` and `class` property requirements are equivalent in protocols rdar://problem/17198298
   static var v1: Int { get }
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}}
   static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
-  static let l1: Int // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  static let l1: Int // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}} expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
 }
 
 extension P {
@@ -261,10 +261,10 @@ extension ProtoAdopter : ProtosEvilTwin {}
 
 // rdar://18990358
 public struct Foo { // expected-note {{to match this opening '{'}}}
-  public static let S { a // expected-error{{computed property must have an explicit type}} {{22-22=: <# Type #>}}
+  public static let S { _ = 0; a // expected-error{{computed property must have an explicit type}} {{22-22=: <# Type #>}}
     // expected-error@-1{{type annotation missing in pattern}}
     // expected-error@-2{{'let' declarations cannot be computed properties}} {{17-20=var}}
-    // expected-error@-3{{use of unresolved identifier 'a'}}
+    // expected-error@-3{{cannot find 'a' in scope}}
 }
 
 // expected-error@+1 {{expected '}' in struct}}

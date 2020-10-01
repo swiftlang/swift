@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -enable-sil-verify-all=true %s | %target-sil-opt -enable-sil-verify-all=true | %FileCheck %s
+
+import Builtin
+
+// CHECK: sil @not_async_test : $@convention(thin) () -> () {
+sil @not_async_test : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: sil @not_async_test2 : $@convention(thin) (Builtin.Int32) -> () {
+sil @not_async_test2 : $(Builtin.Int32) -> () {
+bb0(%int : $Builtin.Int32):
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: sil @async_test : $@convention(thin) @async
+sil @async_test : $@async () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK: sil @take_async : $@convention(thin) (@async () -> ()) -> ()
+sil @take_async : $(@async () -> ()) -> () {
+bb0(%fn : $@async () -> ()):
+  %0 = tuple ()
+  return %0 : $()
+}

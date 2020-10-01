@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -1002,7 +1003,7 @@ enum MyAwesomeEnum {
 
   init?() {
 
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 // <rdar://problem/20679379> DI crashes on initializers on protocol extensions
@@ -1203,7 +1204,7 @@ enum SR1469_Enum1 {
     }
     // many lines later
     self = .A
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 enum SR1469_Enum2 {
@@ -1211,7 +1212,7 @@ enum SR1469_Enum2 {
   
   init?() {
     return
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 enum SR1469_Enum3 {
   case A, B
@@ -1221,7 +1222,7 @@ enum SR1469_Enum3 {
       self = .A
       return
     }
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 class BadFooSuper {
@@ -1579,3 +1580,29 @@ class WeakCycle {
     self.d = 10
   }
 }
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class DelegatingInitTest {
+  convenience init(x: Int) {
+    self // expected-warning {{expression of type 'DelegatingInitTest' is unused}}
+      // expected-error@-1 {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+class A {
+  var a: Int
+
+  init(x: Int) {
+    self.a = x
+  }
+
+  convenience init(i: Int) {
+    if i > 0 {
+      self.init(x: i)
+    }
+    if i > -100 {
+      self.init(x: i)
+    }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+ }

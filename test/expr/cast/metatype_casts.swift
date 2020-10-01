@@ -23,15 +23,15 @@ use(any as! P.Protocol)
 
 let anyP: Any.Protocol = Any.self
 use(anyP is Any.Type) // expected-warning{{always true}}
-use(anyP as! Int.Type) // TODO: always fails
+use(anyP as! Int.Type) // expected-warning{{always fails}}
 
 let anyObj: AnyObject.Type = D.self
-use(anyObj as! Int.Type) // TODO: always fails
+use(anyObj as! Int.Type) // expected-warning{{always fails}}
 use(anyObj as! C.Type)
 use(anyObj as! D.Type)
-use(anyObj as! AnyObject.Protocol) // TODO: always fails
+use(anyObj as! AnyObject.Protocol) // expected-warning{{always fails}}
 use(anyObj as! P.Type)
-use(anyObj as! P.Protocol) // TODO: always fails
+use(anyObj as! P.Protocol) // expected-warning{{always fails}}
 
 let c: C.Type = D.self
 use(c as! D.Type)
@@ -45,7 +45,14 @@ use(c as! Int.Type) // expected-warning{{always fails}}
 
 use(C.self as AnyObject.Protocol) // expected-error{{cannot convert value of type 'C.Type' to type 'AnyObject.Protocol' in coercion}}
 use(C.self as AnyObject.Type)
-use(C.self as P.Type) // expected-error{{'C.Type' is not convertible to 'P.Type'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
+use(C.self as P.Type) // expected-error{{cannot convert value of type 'C.Type' to type 'P.Type' in coercion}} 
 
 use(E.self as P.Protocol) // expected-error{{cannot convert value of type 'E.Type' to type 'P.Protocol' in coercion}}
 use(E.self as P.Type)
+
+// SR-12946
+func SR12946<T>(_ e: T) {
+  _ = AnyObject.self is T.Type // OK
+}
+
+SR12946(1 as AnyObject)

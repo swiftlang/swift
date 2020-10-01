@@ -142,13 +142,14 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
   if (!Dealloc)
     return false;
-
-  CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
+  TypeExpansionContext context(*ReleaseInst->getFunction());
+  CanSILFunctionType DeallocType =
+      Dealloc->getLoweredFunctionTypeInContext(context);
   auto *NTD = AllocType.getASTType()->getAnyNominal();
   auto AllocSubMap = AllocType.getASTType()
     ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
 
-  DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);
+  DeallocType = DeallocType->substGenericArgs(M, AllocSubMap, context);
 
   SILBuilder B(ReleaseInst);
   if (object->getType() != AllocType)
@@ -163,9 +164,9 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   // argument.
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
 
-  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object}, false);
+  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object});
 
-  NumReleasesDevirtualized++;
+  ++NumReleasesDevirtualized;
   ReleaseInst->eraseFromParent();
   return true;
 }

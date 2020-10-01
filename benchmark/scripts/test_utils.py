@@ -24,8 +24,10 @@ common unit testing patterns that is used in this project.
 
 import logging
 import sys
-
-from StringIO import StringIO
+try:
+    from StringIO import StringIO  # for Python 2
+except ImportError:
+    from io import StringIO  # for Python 3
 from contextlib import contextmanager
 
 
@@ -79,14 +81,15 @@ class Mock(object):
     def assert_called_with(self, expected_args):
         """Verify that the tested method was called with provided arguments."""
         expected_args = tuple(expected_args)
-        assert expected_args in self.calls, (
-            'Expected: {0} in Called: {1}'.format(expected_args, self.calls))
+        assert expected_args in self.calls, "Expected: {0} in Called: {1}".format(
+            expected_args, self.calls
+        )
 
     def assert_called_all_expected(self):
         """Verify that all expeced invocations of tested method were called."""
-        assert self.calls == self.expected, (
-            '\nExpected: {0}, \n  Called: {1}'.format(
-                self.expected, self.calls))
+        assert self.calls == self.expected, "\nExpected: {0}, \n  Called: {1}".format(
+            self.expected, self.calls
+        )
 
 
 class MockLoggingHandler(logging.Handler):
@@ -104,5 +107,9 @@ class MockLoggingHandler(logging.Handler):
     def reset(self):
         """Clear all log messages."""
         self.messages = {
-            'debug': [], 'info': [], 'warning': [], 'error': [], 'critical': []
+            "debug": [],
+            "info": [],
+            "warning": [],
+            "error": [],
+            "critical": [],
         }

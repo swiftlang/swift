@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Dispatch
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 /// dispatch_assert
 
@@ -121,7 +121,7 @@ public struct DispatchQoS : Equatable {
 }
 
 /// 
-@_frozen
+@frozen
 public enum DispatchTimeoutResult {
 	case success
 	case timedOut

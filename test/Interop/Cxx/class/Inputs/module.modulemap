@@ -1,0 +1,31 @@
+module AccessSpecifiers {
+  header "access-specifiers.h"
+}
+
+module TypeClassification {
+  header "type-classification.h"
+}
+
+module MemberwiseInitializer {
+  header "memberwise-initializer.h"
+}
+
+module MemoryLayout {
+  header "memory-layout.h"
+}
+
+module MemberVariables {
+  header "member-variables.h"
+}
+
+module ProtocolConformance {
+  header "protocol-conformance.h"
+}
+
+module SynthesizedInitializers {
+  header "synthesized-initializers.h"
+}
+
+module DebugInfo {
+  header "debug-info.h"
+}

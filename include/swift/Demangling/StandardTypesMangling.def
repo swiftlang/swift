@@ -13,10 +13,18 @@
 /// STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 ///   The 1-character MANGLING for a known TYPENAME of KIND.
 
-STANDARD_TYPE(Structure, A, AutoreleasingUnsafeMutablePointer)
+/// OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+///   The 1-character MANGLING for a known TYPENAME of KIND, for a type that's
+///   only available with ObjC interop enabled.
+
+#ifndef OBJC_INTEROP_STANDARD_TYPE
+#define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
+  STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#endif
+
+OBJC_INTEROP_STANDARD_TYPE(Structure, A, AutoreleasingUnsafeMutablePointer)
 STANDARD_TYPE(Structure, a, Array)
 STANDARD_TYPE(Structure, b, Bool)
-STANDARD_TYPE(Structure, c, UnicodeScalar)
 STANDARD_TYPE(Structure, D, Dictionary)
 STANDARD_TYPE(Structure, d, Double)
 STANDARD_TYPE(Structure, f, Float)
@@ -66,3 +74,4 @@ STANDARD_TYPE(Protocol, Z, SignedInteger)
 STANDARD_TYPE(Protocol, z, BinaryInteger)
 
 #undef STANDARD_TYPE
+#undef OBJC_INTEROP_STANDARD_TYPE

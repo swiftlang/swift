@@ -117,7 +117,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_4 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_5 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_6 | %FileCheck %s -check-prefix=FOOSTRUCT_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_7 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_8 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_CASE_PATTERN_1| %FileCheck %s -check-prefix=OPTIONAL_FOOSTRUCT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_CASE_PATTERN_2| %FileCheck %s -check-prefix=OPTIONAL_FOOSTRUCT
 
 struct FooStruct {
   var instanceVar : Int
@@ -498,10 +502,10 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
 
 // COND-WITH-RELATION1: Begin completions
 // COND-WITH-RELATION1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
@@ -518,7 +522,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 enum A { case aaa }
 enum B { case bbb }
 // UNRESOLVED_B-NOT: aaa
-// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific:     bbb[#B#]; name=bbb
+// UNRESOLVED_B: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     bbb[#B#]; name=bbb
 // UNRESOLVED_B-NOT: aaa
 
 struct AA {
@@ -605,6 +609,18 @@ func testGuardLetBinding5(x: FooStruct?) {
 func testGuardLetBinding5(x: FooStruct?) {
   guard let y = x, z = y#^GUARD_LET_BIND_6^# else {}
 }
+func testGuardLetBinding7(x: FooStruct?) {
+  guard let boundVal = x, let other = #^GUARD_LET_BIND_7^# else {}
+}
+func testGuardLetBinding8(_ x: FooStruct?) {
+  guard let boundVal = x, let other = testGuardLetBinding8(#^GUARD_LET_BIND_8^#) else {}
+}
+func testGuardCase(x:FooStruct?) {
+  guard case .#^GUARD_CASE_PATTERN_1^# = x {}
+}
+func testGuardCase(x:FooStruct?) {
+  guard case .#^GUARD_CASE_PATTERN_2^#some() = x {}
+}
 
 // FOOSTRUCT_DOT: Begin completions
 // FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
@@ -623,3 +639,22 @@ func testGuardLetBinding5(x: FooStruct?) {
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .boolGen()[#Bool#];
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .intGen()[#Int#];
 // FOOSTRUCT_NODOT: End completions
+
+// FOOSTRUCT_LOCALVAL: Begin completions
+// FOOSTRUCT_LOCALVAL-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}: boundVal[#FooStruct#];
+// FOOSTRUCT_LOCALVAL: End completions
+
+// OPTIONAL_FOOSTRUCT: Begin completions, 9 items
+// OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]:         nil[#FooStruct?#]; name=nil
+// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
+// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some(FooStruct)
+// FIXME: 'FooStruct' members should not be shown.
+// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#FooStruct#]; name=init()
+// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init(Int)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen({#(self): FooStruct#})[#() -> Bool#]; name=boolGen(self: FooStruct)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen({#(self): FooStruct#})[#() -> Int#]; name=intGen(self: FooStruct)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U) -> U?#]; name=map(self: Optional<FooStruct>)
+// OPTIONAL_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<FooStruct>#})[#((FooStruct) throws -> U?) -> U?#]; name=flatMap(self: Optional<FooStruct>)
+// OPTIONAL_FOOSTRUCT-NOT: init({#(some):
+// OPTIONAL_FOOSTRUCT-NOT: init({#nilLiteral:
+// OPTIONAL_FOOSTRUCT: End completions

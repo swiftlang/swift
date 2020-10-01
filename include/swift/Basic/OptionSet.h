@@ -19,8 +19,10 @@
 
 #include "llvm/ADT/None.h"
 
+#include <cassert>
 #include <type_traits>
 #include <cstdint>
+#include <initializer_list>
 
 namespace swift {
 
@@ -50,22 +52,26 @@ class OptionSet {
 
 public:
   /// Create an empty option set.
-  OptionSet() : Storage() { }
+  constexpr OptionSet() : Storage() {}
 
   /// Create an empty option set.
-  OptionSet(llvm::NoneType) : Storage() { }
+  constexpr OptionSet(llvm::NoneType) : Storage() {}
 
   /// Create an option set with only the given option set.
-  OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) { }
+  constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}
+
+  /// Create an option set containing the given options.
+  constexpr OptionSet(std::initializer_list<Flags> flags)
+      : Storage(combineFlags(flags)) {}
 
   /// Create an option set from raw storage.
-  explicit OptionSet(StorageType storage) : Storage(storage) { }
+  explicit constexpr OptionSet(StorageType storage) : Storage(storage) {}
 
   /// Check whether an option set is non-empty.
-  explicit operator bool() const { return Storage != 0; }
+  explicit constexpr operator bool() const { return Storage != 0; }
 
   /// Explicitly convert an option set to its underlying storage.
-  explicit operator StorageType() const { return Storage; }
+  explicit constexpr operator StorageType() const { return Storage; }
 
   /// Explicitly convert an option set to intptr_t, for use in
   /// llvm::PointerIntPair.
@@ -73,23 +79,32 @@ public:
   /// This member is not present if the underlying type is bigger than
   /// a pointer.
   template <typename T = std::intptr_t>
-  explicit operator typename std::enable_if<sizeof(StorageType) <= sizeof(T),
-      std::intptr_t>::type () const {
+  explicit constexpr
+  operator typename std::enable_if<sizeof(StorageType) <= sizeof(T),
+                                   std::intptr_t>::type() const {
     return static_cast<intptr_t>(Storage);
   }
 
   /// Retrieve the "raw" representation of this option set.
   StorageType toRaw() const { return Storage; }
-  
+
   /// Determine whether this option set contains all of the options in the
   /// given set.
-  bool contains(OptionSet set) const {
+  constexpr bool contains(OptionSet set) const {
     return !static_cast<bool>(set - *this);
   }
 
   /// Check if this option set contains the exact same options as the given set.
-  bool containsOnly(OptionSet set) {
+  constexpr bool containsOnly(OptionSet set) const {
     return Storage == set.Storage;
+  }
+
+  /// Check if this option set contains any options from \p set.
+  ///
+  /// \pre \p set must be non-empty.
+  bool containsAny(OptionSet set) const {
+    assert((bool)set && "argument must be non-empty");
+    return (bool)((*this) & set);
   }
 
   // '==' and '!=' are deliberately not defined because they provide a pitfall
@@ -97,34 +112,34 @@ public:
   // want '==' behavior, use 'containsOnly'.
 
   /// Produce the union of two option sets.
-  friend OptionSet operator|(OptionSet lhs, OptionSet rhs) {
+  friend constexpr OptionSet operator|(OptionSet lhs, OptionSet rhs) {
     return OptionSet(lhs.Storage | rhs.Storage);
   }
 
   /// Produce the union of two option sets.
-  friend OptionSet &operator|=(OptionSet &lhs, OptionSet rhs) {
+  friend constexpr OptionSet &operator|=(OptionSet &lhs, OptionSet rhs) {
     lhs.Storage |= rhs.Storage;
     return lhs;
- }
+  }
 
   /// Produce the intersection of two option sets.
-  friend OptionSet operator&(OptionSet lhs, OptionSet rhs) {
+  friend constexpr OptionSet operator&(OptionSet lhs, OptionSet rhs) {
     return OptionSet(lhs.Storage & rhs.Storage);
   }
 
   /// Produce the intersection of two option sets.
-  friend OptionSet &operator&=(OptionSet &lhs, OptionSet rhs) {
+  friend constexpr OptionSet &operator&=(OptionSet &lhs, OptionSet rhs) {
     lhs.Storage &= rhs.Storage;
     return lhs;
   }
 
   /// Produce the difference of two option sets.
-  friend OptionSet operator-(OptionSet lhs, OptionSet rhs) {
+  friend constexpr OptionSet operator-(OptionSet lhs, OptionSet rhs) {
     return OptionSet(lhs.Storage & ~rhs.Storage);
   }
 
   /// Produce the difference of two option sets.
-  friend OptionSet &operator-=(OptionSet &lhs, OptionSet rhs) {
+  friend constexpr OptionSet &operator-=(OptionSet &lhs, OptionSet rhs) {
     lhs.Storage &= ~rhs.Storage;
     return lhs;
   }
@@ -134,6 +149,14 @@ private:
   static auto _checkResultTypeOperatorOr(T t) -> decltype(t | t) { return T(); }
 
   static void _checkResultTypeOperatorOr(...) {}
+
+  static constexpr StorageType
+  combineFlags(const std::initializer_list<Flags> &flags) {
+    OptionSet result;
+    for (Flags flag : flags)
+      result |= flag;
+    return result.Storage;
+  }
 
   static_assert(!std::is_same<decltype(_checkResultTypeOperatorOr(Flags())),
                               Flags>::value,

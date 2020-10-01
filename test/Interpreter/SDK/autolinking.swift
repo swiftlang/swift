@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: echo "int global() { return 42; }" | %clang -dynamiclib -o %t/libLinkMe.dylib -x c -
+// RUN: echo "int global() { return 42; }" | %clang -dynamiclib -o %t/libLinkMe.dylib -x c -L %sdk/usr/lib -
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name LinkMe -module-link-name LinkMe %S/../../Inputs/empty.swift
 
 // RUN: %target-jit-run -DIMPORT %s -I %t -L %t 2>&1
@@ -7,7 +7,7 @@
 // RUN: not %target-jit-run -lLinkMe %s 2>&1
 
 // RUN: %target-jit-run -lLinkMe -DUSE_DIRECTLY %s -L %t 2>&1
-// RUN: not --crash %target-jit-run -DUSE_DIRECTLY -lLinkMe %s 2>&1
+// RUN: not %target-jit-run -DUSE_DIRECTLY -lLinkMe %s 2>&1
 // REQUIRES: executable_test
 
 
@@ -36,7 +36,11 @@ if global() != 42 {
 
 let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 if dlsym(RTLD_DEFAULT, "global") == nil {
-  print(String(cString: dlerror()))
+  if let err = dlerror() {
+    print(String(cString: err))
+  } else {
+    print("Unknown dlsym error")
+  }
   exit(EXIT_FAILURE)
 }
 #endif

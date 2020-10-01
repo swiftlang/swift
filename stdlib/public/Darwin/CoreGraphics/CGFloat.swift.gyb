@@ -22,7 +22,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 @_exported import CoreGraphics
 import Darwin
 
-@_fixed_layout
+@frozen
 public struct CGFloat {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
@@ -46,7 +46,7 @@ public struct CGFloat {
     self.native = NativeType(value)
   }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   @_transparent public init(_ value: Float80) {
     self.native = NativeType(value)
   }
@@ -61,9 +61,13 @@ public struct CGFloat {
 }
 
 extension CGFloat : SignedNumeric {
+  @_alwaysEmitIntoClient // availability
+  public init<T: BinaryInteger>(_ source: T) {
+    self.native = NativeType(source)
+  }
 
   @_transparent
-  public init?<T : BinaryInteger>(exactly source: T) {
+  public init?<T: BinaryInteger>(exactly source: T) {
     guard let native = NativeType(exactly: source) else { return nil }
     self.native = native
   }
@@ -72,7 +76,6 @@ extension CGFloat : SignedNumeric {
   public var magnitude: CGFloat {
     return CGFloat(native.magnitude)
   }
-
 }
 
 extension CGFloat : BinaryFloatingPoint {
@@ -397,7 +400,7 @@ extension CGFloat : Hashable {
     hasher.combine(native)
   }
 
-  @inlinable @_transparent
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   public func _rawHashValue(seed: Int) -> Int {
     return native._rawHashValue(seed: seed)
   }

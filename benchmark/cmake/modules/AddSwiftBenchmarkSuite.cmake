@@ -24,6 +24,9 @@ macro(configure_build)
     if(${c_compiler} STREQUAL "clang")
       set(CLANG_EXEC ${CMAKE_C_COMPILER})
     else()
+      if(NOT SWIFT_DARWIN_XCRUN_TOOLCHAIN)
+        set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault")
+      endif()
       runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
              VARIABLE CLANG_EXEC
              ERROR "Unable to find Clang driver")
@@ -57,18 +60,53 @@ macro(configure_build)
     endif()
   endif()
 
-  # We always infer the SWIFT_LIBRARY_PATH from SWIFT_EXEC unless
-  # SWIFT_LIBRARY_PATH is specified explicitly.
-  if(NOT SWIFT_LIBRARY_PATH)
-    get_filename_component(tmp_dir "${SWIFT_EXEC}" DIRECTORY)
-    get_filename_component(tmp_dir "${tmp_dir}" DIRECTORY)
-    set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
+  # Set LIBRARY_PATH and either RPATH or RPATH_BASE. To build and run
+  # for multiple platforms, RPATH_BASE must be set instead of RPATH. It
+  # is the platform-independent runtime library directory. The platform
+  # subdirectory name will be appended to form a different RPATH for
+  # on platform.
+
+  # If requested, use Swift-in-the-OS. This way, the benchmarks may be built
+  # standalone on the host, and the binaries can run directly from a temp dir
+  # on any target machine. Of course, this factors out performance changes in
+  # stdlib or overlays.
+  if(SWIFT_BENCHMARK_USE_OS_LIBRARIES)
+    set(SWIFT_RPATH "/usr/lib/swift")
+  endif()
+
+  # When SWIFT_LIBRARY_PATH is specified explicitly for a standalone
+  # build, use it as an absolute RPATH_BASE. This only works when
+  # running benchmarks on the host machine. Otherwise, RPATH is set
+  # assuming that libraries will be installed later (manually)
+  # relative to the benchmark binaries.
+  #
+  # When not building standalone, SWIFT_LIBRARY_PATH is set by LLVM
+  # cmake to the build directory for Swift dylibs. Otherwise, assume
+  # that the dylibs are built relative to SWIFT_EXEC.
+  if(SWIFT_LIBRARY_PATH AND SWIFT_BENCHMARK_BUILT_STANDALONE)
+    if (NOT SWIFT_RPATH)
+      set(SWIFT_RPATH_BASE ${SWIFT_LIBRARY_PATH})
+    endif()
+  else()
+    if (NOT SWIFT_LIBRARY_PATH)
+      get_filename_component(tmp_dir "${SWIFT_EXEC}" DIRECTORY)
+      get_filename_component(tmp_dir "${tmp_dir}" DIRECTORY)
+      set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
+    endif()
+    if (NOT SWIFT_RPATH)
+      # If the benchmarks are built against a local swift build, assume that
+      # either the benchmarks will be installed in the swift build dir,
+      # or the swift libraries will be installed in the benchmark location in
+      # a platform specific subdirectory.
+      # This way, performance always factors in changes to the libraries.
+      set(SWIFT_RPATH_BASE "@executable_path/../lib/swift")
+    endif()
   endif()
 endmacro()
 
 macro(configure_sdks_darwin)
-  set(macosx_arch "x86_64")
-  set(iphoneos_arch "arm64" "armv7")
+  set(macosx_arch "x86_64" "arm64")
+  set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
 
@@ -128,7 +166,7 @@ macro(configure_sdks)
   endif()
 endmacro()
 
-function (add_swift_benchmark_library objfile_out sibfile_out)
+function (add_swift_benchmark_library objfile_out sibfile_out swiftmodule_out)
   cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
 
   precondition(BENCHLIB_MODULE_PATH)
@@ -151,7 +189,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
     DEPENDS ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
     COMMAND "${SWIFT_EXEC}"
       ${BENCHLIB_LIBRARY_FLAGS}
-      "-force-single-frontend-invocation"
+      "-whole-module-optimization"
       "-parse-as-library"
       "-module-name" "${module_name}"
       "-emit-module" "-emit-module-path" "${swiftmodule}"
@@ -159,6 +197,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
       "-o" "${objfile}"
       ${sources})
   set(${objfile_out} "${objfile}" PARENT_SCOPE)
+  set(${swiftmodule_out} "${swiftmodule}" PARENT_SCOPE)
 
   if(SWIFT_BENCHMARK_EMIT_SIB)
     precondition(sibfile_out)
@@ -170,7 +209,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
       ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
       COMMAND "${SWIFT_EXEC}"
         ${BENCHLIB_LIBRARY_FLAGS}
-        "-force-single-frontend-invocation"
+        "-whole-module-optimization"
         "-parse-as-library"
         "-module-name" "${module_name}"
         "-emit-sib"
@@ -317,6 +356,10 @@ function (swift_benchmark_compile_archopts)
       "-target" "${target}"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
+  if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
+    list(APPEND common_options "-g")
+  endif()
+
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
@@ -324,27 +367,39 @@ function (swift_benchmark_compile_archopts)
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
+
+    # If we are not compiling at -Onone and are performing WMO, always emit
+    # optimization-records.
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+      list(APPEND common_options "-save-optimization-record=bitstream")
+    endif()
   endif()
 
   set(opt_view_main_dir)
   if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
     if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
-      list(APPEND common_options "-save-optimization-record")
       set(opt_view_main_dir "${objdir}/opt-view")
     endif()
   endif()
 
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
-  # Always optimize the driver modules.
-  # Note that we compile the driver for Osize also with -Osize
-  # (and not with -O), because of <rdar://problem/19614516>.
-  string(REPLACE "Onone" "O" driver_opt "${optflag}")
+  # Always optimize the driver modules, unless we're building benchmarks for
+  # debugger testing.
+  if(NOT SWIFT_BENCHMARK_UNOPTIMIZED_DRIVER)
+    # Note that we compile the driver for Osize also with -Osize
+    # (and not with -O), because of <rdar://problem/19614516>.
+    string(REPLACE "Onone" "O" driver_opt "${optflag}")
+  endif()
 
   set(common_options_driver
       "-c"
       "-target" "${target}"
       "-${driver_opt}")
+
+  if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
+    list(APPEND common_options_driver "-g")
+  endif()
 
   if (is_darwin)
     list(APPEND common_options_driver
@@ -355,12 +410,13 @@ function (swift_benchmark_compile_archopts)
   endif()
   set(bench_library_objects)
   set(bench_library_sibfiles)
+  set(bench_library_swiftmodules)
   set(opt_view_dirs)
   # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     set(sources "${srcdir}/${module_name_path}.swift")
 
-    add_swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out swiftmodule_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
@@ -368,6 +424,7 @@ function (swift_benchmark_compile_archopts)
       LIBRARY_FLAGS ${common_swift4_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
+    list(APPEND bench_library_swiftmodules "${swiftmodule_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
       precondition(sibfile_out)
       list(APPEND bench_library_sibfiles "${sibfile_out}")
@@ -387,7 +444,7 @@ function (swift_benchmark_compile_archopts)
 
     set(objfile_out)
     set(sibfile_out)
-    add_swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out swiftmodule_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
@@ -396,6 +453,7 @@ function (swift_benchmark_compile_archopts)
       DEPENDS ${bench_library_objects})
     precondition(objfile_out)
     list(APPEND bench_driver_objects "${objfile_out}")
+    list(APPEND bench_library_swiftmodules "${swiftmodule_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
       precondition(sibfile_out)
       list(APPEND bench_driver_sibfiles "${sibfile_out}")
@@ -418,6 +476,7 @@ function (swift_benchmark_compile_archopts)
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+      list(APPEND bench_library_swiftmodules "${swiftmodule}")
 
       if ("${bench_flags}" MATCHES "-whole-module.*")
         set(output_option "-o" "${objfile}")
@@ -520,7 +579,7 @@ function (swift_benchmark_compile_archopts)
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
       ${common_swift4_options}
-      "-force-single-frontend-invocation"
+      "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
       "-o" "${objdir}/${module_name}.o"
@@ -555,11 +614,7 @@ function (swift_benchmark_compile_archopts)
 
   if(is_darwin)
     # If host == target.
-    if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
-    else()
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
-    endif()
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   else()
     # If we are on Linux, we do not support cross compiling.
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
@@ -571,6 +626,20 @@ function (swift_benchmark_compile_archopts)
   # both do exactly the same thing with both sets of arguments. It also lets us
   # avoid issues around code-signing.
   if (is_darwin)
+    if (SWIFT_RPATH)
+      set(SWIFT_LINK_RPATH "${SWIFT_RPATH}")
+    else()
+      set(SWIFT_LINK_RPATH "${SWIFT_RPATH_BASE}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}")
+    endif()
+
+    # On Darwin, we pass the *.swiftmodule paths transitively referenced by the
+    # driver executable to ld64. ld64 inserts N_AST references to these modules
+    # into the program, for later use by lldb.
+    set(ld64_add_ast_path_opts)
+    foreach(ast_path ${bench_library_swiftmodules})
+      list(APPEND ld64_add_ast_path_opts "-Wl,-add_ast_path,${ast_path}")
+    endforeach()
+
     add_custom_command(
         OUTPUT "${OUTPUT_EXEC}"
         DEPENDS
@@ -592,10 +661,14 @@ function (swift_benchmark_compile_archopts)
           "-m${triple_platform}-version-min=${ver}"
           "-lobjc"
           "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+          "-L${sdk}/usr/lib/swift"
           "-Xlinker" "-rpath"
-          "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+          "-Xlinker" "${SWIFT_LINK_RPATH}"
+          "-Xlinker" "-rpath"
+          "-Xlinker" "/usr/lib/swift"
           ${bench_library_objects}
           ${bench_driver_objects}
+          ${ld64_add_ast_path_opts}
           ${SWIFT_BENCH_OBJFILES}
           ${objcfile}
           "-o" "${OUTPUT_EXEC}"
@@ -612,7 +685,7 @@ function (swift_benchmark_compile_archopts)
           "${SWIFT_EXEC}"
           "-O"
           "-target" "${target}"
-          "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+          "-L${SWIFT_LIBRARY_PATH}"
           ${bench_library_objects}
           ${bench_driver_objects}
           ${SWIFT_BENCH_OBJFILES}
@@ -625,7 +698,7 @@ function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
-    set(stdlib_dependencies "swift")
+    set(stdlib_dependencies "swift-frontend")
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
       if("${find_output}" STREQUAL "-1")
@@ -669,11 +742,13 @@ function(swift_benchmark_compile)
       add_custom_target("check-${executable_target}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                  "--architecture" "${arch}"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                  "--architecture" "${arch}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"

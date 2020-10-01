@@ -1,0 +1,29 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -disable-availability-checking  -enable-library-evolution -emit-module -emit-module-path %t/OpaqueReturnTypeExporter.swiftmodule -module-name OpaqueReturnTypeExporter %S/Inputs/OpaqueReturnTypeExporter.swift
+// RUN: %target-sil-opt -I %t %s -emit-sib -module-name test -o %t/test.sib
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir %t/test.sib
+
+import Swift
+import OpaqueReturnTypeExporter
+
+typealias SomeButt = @_opaqueReturnTypeOf("$s24OpaqueReturnTypeExporter07exportsaB0QryF", 0) opaque
+typealias SomeButt2 = @_opaqueReturnTypeOf("$sSi24OpaqueReturnTypeExporterE8someButtQryF", 0) opaque
+
+sil @$s24OpaqueReturnTypeExporter07exportsaB0QryF : $@convention(thin) () -> @out SomeButt
+sil @$sSi24OpaqueReturnTypeExporterE8someButtQryF : $@convention(thin) (Int) -> @out SomeButt2
+
+sil [serialized] @use_opaque_type : $@convention(thin) (Int) -> () {
+entry(%a : $Int):
+  %f = function_ref @$s24OpaqueReturnTypeExporter07exportsaB0QryF : $@convention(thin) () -> @out SomeButt
+  %x = alloc_stack $SomeButt
+  apply %f(%x) : $@convention(thin) () -> @out SomeButt
+  destroy_addr %x : $*SomeButt
+  dealloc_stack %x : $*SomeButt
+
+  %g = function_ref @$sSi24OpaqueReturnTypeExporterE8someButtQryF : $@convention(thin) (Int) -> @out SomeButt2
+  %y = alloc_stack $SomeButt2
+  apply %g(%y, %a) : $@convention(thin) (Int) -> @out SomeButt2
+  destroy_addr %y : $*SomeButt2
+  dealloc_stack %y : $*SomeButt2
+  return undef : $()
+}

@@ -1,10 +1,12 @@
 add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
+  IndexSubsetTests.cpp
   DiagnosticConsumerTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
   VersionRangeLattice.cpp
+  ImportTests.cpp
 )
 
 target_link_libraries(SwiftASTTests

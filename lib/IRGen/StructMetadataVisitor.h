@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
 #include "NominalMetadataVisitor.h"
+#include "swift/AST/IRGenOptions.h"
 
 namespace swift {
 namespace irgen {
@@ -42,6 +43,9 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                  "Adjustment index must be synchronized with this layout");
+
     // Metadata header.
     super::layout();
 
@@ -61,6 +65,9 @@ public:
       asImpl().addFieldOffset(prop);
 
     asImpl().noteEndOfFieldOffsets();
+
+    if (asImpl().hasTrailingFlags())
+      asImpl().addTrailingFlags();
   }
   
   // Note the start of the field offset vector.
@@ -68,6 +75,11 @@ public:
 
   // Note the end of the field offset vector.
   void noteEndOfFieldOffsets() {}
+
+  bool hasTrailingFlags() {
+    return Target->isGenericContext() &&
+           IGM.shouldPrespecializeGenericMetadata();
+  }
 };
 
 /// An "implementation" of StructMetadataVisitor that just scans through
@@ -87,19 +99,22 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }
-  void addGenericArgument() { addPointer(); }
-  void addGenericWitnessTable() { addPointer(); }
+  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
+  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 
   void noteEndOfFieldOffsets() {
     NextOffset = NextOffset.roundUpToAlignment(super::IGM.getPointerAlignment());
   }
 
+  void addTrailingFlags() { addInt64(); }
+
 private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
   void addInt32() { NextOffset += Size(4); }
+  void addInt64() { NextOffset += Size(8); }
 };
 
 } // end namespace irgen

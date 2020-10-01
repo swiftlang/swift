@@ -15,7 +15,7 @@ import TestsUtils
 // 33% isUniquelyReferenced
 //   15% swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native
 //   18% swift_isUniquelyReferencedOrPinned_nonNull_native
-public var ArraySetElement = BenchmarkInfo(
+public let ArraySetElement = BenchmarkInfo(
   name: "ArraySetElement",
   runFunction: run_ArraySetElement,
   tags: [.runtime, .cpubench]

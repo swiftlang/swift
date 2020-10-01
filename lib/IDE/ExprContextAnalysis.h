@@ -14,6 +14,7 @@
 #define SWIFT_IDE_EXPRCONTEXTANALYSIS_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -21,35 +22,66 @@ namespace swift {
 class DeclContext;
 class Expr;
 class ValueDecl;
-class AnyFunctionType;
 
 namespace ide {
-
-/// Prepare the given expression for type-checking again, prinicipally by
-/// erasing any ErrorType types on the given expression, allowing later
-/// type-checking to make progress.
-void prepareForRetypechecking(Expr *E);
+enum class SemanticContextKind;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
-void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
+void typeCheckContextAt(DeclContext *DC, SourceLoc Loc);
 
 /// From \p DC, find and returns the outer most expression which source range is
 /// exact the same as \p TargetRange. Returns \c nullptr if not found.
 Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
 
-/// Returns expected return type of the given decl context.
-/// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
-Type getReturnTypeFromContext(const DeclContext *DC);
+/// Remove \c CodeCompletionExpr from \p expr . Returns \c true if it actually
+/// mutated the expression.
+///
+/// NOTE: Currently, this only removes CodeCompletionExpr at call argument
+///       position.
+bool removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr);
 
-using FunctionTypeAndDecl = std::pair<AnyFunctionType *, ValueDecl *>;
+/// Collects possible expected return types of the given decl context.
+/// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
+void collectPossibleReturnTypesFromContext(DeclContext *DC,
+                                           SmallVectorImpl<Type> &candidates);
+
+struct FunctionTypeAndDecl {
+  AnyFunctionType *Type;
+  ValueDecl *Decl;
+  Optional<SemanticContextKind> SemanticContext;
+
+  FunctionTypeAndDecl(AnyFunctionType *Type, ValueDecl *Decl)
+      : Type(Type), Decl(Decl) {}
+  FunctionTypeAndDecl(AnyFunctionType *Type, ValueDecl *Decl,
+                      SemanticContextKind SemanticContext)
+      : Type(Type), Decl(Decl), SemanticContext(SemanticContext) {}
+};
+
+struct PossibleParamInfo {
+  /// Expected parameter.
+  /// 
+  /// 'nullptr' indicates that the code completion position is at out of
+  /// expected argument position. E.g.
+  ///   func foo(x: Int) {}
+  ///   foo(x: 1, <HERE>)
+  const AnyFunctionType::Param *Param;
+  bool IsRequired;
+
+  PossibleParamInfo(const AnyFunctionType::Param *Param, bool IsRequired)
+      : Param(Param), IsRequired(IsRequired) {
+    assert((Param || !IsRequired) &&
+           "nullptr with required flag is not allowed");
+  };
+};
 
 /// Given an expression and its decl context, the analyzer tries to figure out
 /// the expected type of the expression by analyzing its context.
 class ExprContextInfo {
   SmallVector<Type, 2> PossibleTypes;
-  SmallVector<StringRef, 2> PossibleNames;
+  SmallVector<PossibleParamInfo, 2> PossibleParams;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+  Expr *AnalyzedExpr = nullptr;
   bool singleExpressionBody = false;
 
 public:
@@ -67,12 +99,18 @@ public:
 
   // Returns a list of possible argument label names.
   // Valid only if \c getKind() is \c CallArgument.
-  ArrayRef<StringRef> getPossibleNames() const { return PossibleNames; }
+  ArrayRef<PossibleParamInfo> getPossibleParams() const {
+    return PossibleParams;
+  }
 
   // Returns a list of possible callee
   // Valid only if \c getKind() is \c CallArgument.
   ArrayRef<FunctionTypeAndDecl> getPossibleCallees() const {
     return PossibleCallees;
+  }
+
+  Expr *getAnalyzedExpr() const {
+    return AnalyzedExpr;
   }
 };
 

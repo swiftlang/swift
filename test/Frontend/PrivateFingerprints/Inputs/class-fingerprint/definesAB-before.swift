@@ -1,0 +1,4 @@
+class A {
+}
+class B {
+}

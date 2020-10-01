@@ -125,7 +125,7 @@ bb3:
 // CHECK-NOT: dealloc_stack
 // CHECK: bb2
 // CHECK: bb3:
-// CHECK  dealloc_stack [[FIXED]]
+// CHECK:  dealloc_stack [[FIXED]]
 // CHECK: dealloc_stack [[AS2]]
 // CHECK: dealloc_stack [[AS]]
 // CHECK:   return

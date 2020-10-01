@@ -231,13 +231,13 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   - type: The type `T` to which `x` is cast.
 /// - Returns: The instance `x`, cast to type `T`.
 @_transparent
-public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+public func unsafeDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @_transparent
-public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _internalInvariant(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
@@ -301,17 +301,6 @@ func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
 
-// This function is no longer used but must be kept for ABI compatibility
-// because references to it may have been inlined.
-@usableFromInline
-internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
-  // The LLVM intrinsic underlying int_expect_Int1 now requires an immediate
-  // argument for the expected value so we cannot call it here. This should
-  // never be called in cases where performance matters, so just return the
-  // value without any branch hint.
-  return actual
-}
-
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
@@ -323,6 +312,11 @@ internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
 @usableFromInline
 @_silgen_name("_swift_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
+
+/// Returns the class of a non-tagged-pointer Objective-C object
+@_effects(readonly)
+@_silgen_name("_swift_classOfObjCHeapObject")
+internal func _swift_classOfObjCHeapObject(_ object: AnyObject) -> AnyClass
 #else
 @inlinable
 @inline(__always)
@@ -350,6 +344,16 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
   return Int(getSwiftClassInstanceExtents(theClass).positive)
 #endif
 }
+
+#if INTERNAL_CHECKS_ENABLED
+@usableFromInline
+@_silgen_name("_swift_isImmutableCOWBuffer")
+internal func _swift_isImmutableCOWBuffer(_ object: AnyObject) -> Bool
+
+@usableFromInline
+@_silgen_name("_swift_setImmutableCOWBuffer")
+internal func _swift_setImmutableCOWBuffer(_ object: AnyObject, _ immutable: Bool) -> Bool
+#endif
 
 @inlinable
 internal func _isValidAddress(_ address: UInt) -> Bool {
@@ -384,8 +388,8 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(powerpc64) || arch(powerpc64le) || arch(
-  s390x)
+#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc64) || arch(
+  powerpc64le) || arch(s390x)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
@@ -689,12 +693,32 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique_native(&object))
 }
 
+@_alwaysEmitIntoClient
+@_transparent
+public // @testable
+func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
+  return Builtin.COWBufferForReading(object)
+}
+
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
 public // @testable
 func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
+}
+
+/// Returns `true` if `type` is known to refer to a concrete type once all
+/// optimizations and constant folding has occurred at the call site. Otherwise,
+/// this returns `false` if the check has failed.
+///
+/// Note that there may be cases in which, despite `T` being concrete at some
+/// point in the caller chain, this function will return `false`.
+@_alwaysEmitIntoClient
+@_transparent
+public // @testable
+func _isConcrete<T>(_ type: T.Type) -> Bool {
+  return Bool(Builtin.isConcrete(type))
 }
 
 /// Returns `true` if type is a bitwise takable. A bitwise takable type can
@@ -784,7 +808,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///         }
 ///     }
 ///
-///     class EmojiSmiley : Smiley {
+///     class EmojiSmiley: Smiley {
 ///          override class var text: String {
 ///             return "😀"
 ///         }
@@ -971,3 +995,14 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
   Builtin.unreachable()
 }
 
+/// Given a string that is constructed from a string literal, return a pointer
+/// to the global string table location that contains the string literal.
+/// This function will trap when it is invoked on strings that are not
+/// constructed from literals or if the construction site of the string is not
+/// in the function containing the call to this SPI.
+@_transparent
+@_alwaysEmitIntoClient
+public // @SPI(OSLog)
+func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
+  return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
+}

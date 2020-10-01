@@ -125,7 +125,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
-                                 ConstantConvertKind::Coerce,
+                                 ConstantConvertKind::None,
                                  /*static*/ false, ClangN);
     }
 
@@ -143,7 +143,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
-                                 ConstantConvertKind::Coerce,
+                                 ConstantConvertKind::None,
                                  /*static*/ false, ClangN);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
@@ -186,7 +186,7 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
     return nullptr;
 
   return Impl.createConstant(name, DC, importTy, parsed->getString(),
-                             ConstantConvertKind::Coerce, /*static*/ false,
+                             ConstantConvertKind::None, /*static*/ false,
                              ClangN);
 }
 
@@ -558,38 +558,38 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     } else if (tokenI[1].is(clang::tok::pipepipe)) {
       bool result  = firstValue.getBoolValue() || secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Logical AND.
     } else if (tokenI[1].is(clang::tok::ampamp)) {
       bool result  = firstValue.getBoolValue() && secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Equality.
     } else if (tokenI[1].is(clang::tok::equalequal)) {
       resultValue     = llvm::APSInt::get(firstValue == secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Less than.
     } else if (tokenI[1].is(clang::tok::less)) {
       resultValue     = llvm::APSInt::get(firstValue < secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Less than or equal.
     } else if (tokenI[1].is(clang::tok::lessequal)) {
       resultValue     = llvm::APSInt::get(firstValue <= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Greater than.
     } else if (tokenI[1].is(clang::tok::greater)) {
       resultValue     = llvm::APSInt::get(firstValue > secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Greater than or equal.
     } else if (tokenI[1].is(clang::tok::greaterequal)) {
       resultValue     = llvm::APSInt::get(firstValue >= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
 
     // Unhandled operators.
     } else {
@@ -598,7 +598,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     return createMacroConstant(impl, macro, name, DC, resultSwiftType,
                                clang::APValue(resultValue),
-                               ConstantConvertKind::Coerce,
+                               ConstantConvertKind::None,
                                /*isStatic=*/false, ClangN);
   }
   case 4: {

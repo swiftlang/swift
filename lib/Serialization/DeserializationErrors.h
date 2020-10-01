@@ -13,16 +13,18 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
 class ModuleFile;
+class ModuleFileSharedCore;
 
 StringRef getNameOfModule(const ModuleFile *);
+StringRef getNameOfModule(const ModuleFileSharedCore *);
 
 namespace serialization {
 
@@ -38,6 +40,7 @@ class XRefTracePath {
       Extension,
       GenericParam,
       PrivateDiscriminator,
+      OpaqueReturnType,
       Unknown
     };
 
@@ -61,6 +64,7 @@ class XRefTracePath {
       case Kind::Value:
       case Kind::Operator:
       case Kind::PrivateDiscriminator:
+      case Kind::OpaqueReturnType:
         return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
@@ -146,6 +150,9 @@ class XRefTracePath {
       case Kind::PrivateDiscriminator:
         os << "(in " << getDataAs<Identifier>() << ")";
         break;
+      case Kind::OpaqueReturnType:
+        os << "opaque return type of " << getDataAs<DeclBaseName>();
+        break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
         break;
@@ -196,9 +203,13 @@ public:
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
+  
+  void addOpaqueReturnType(Identifier name) {
+    path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
+  }
 
   DeclBaseName getLastName() const {
-    for (auto &piece : reversed(path)) {
+    for (auto &piece : llvm::reverse(path)) {
       DeclBaseName result = piece.getAsBaseName();
       if (!result.empty())
         return result;
@@ -227,14 +238,14 @@ class DeclDeserializationError : public llvm::ErrorInfoBase {
 public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
-    NeedsVTableEntry = 1 << 1,
-    NeedsFieldOffsetVectorEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 1,
   };
   using Flags = OptionSet<Flag>;
 
 protected:
   DeclName name;
   Flags flags;
+  uint8_t numVTableEntries = 0;
 
 public:
   DeclName getName() const {
@@ -244,8 +255,8 @@ public:
   bool isDesignatedInitializer() const {
     return flags.contains(Flag::DesignatedInitializer);
   }
-  bool needsVTableEntry() const {
-    return flags.contains(Flag::NeedsVTableEntry);
+  unsigned getNumberOfVTableEntries() const {
+    return numVTableEntries;
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
@@ -310,9 +321,11 @@ private:
   void anchor() override;
 
 public:
-  explicit OverrideError(DeclName name, Flags flags = {}) {
+  explicit OverrideError(DeclName name,
+                         Flags flags={}, unsigned numVTableEntries=0) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -332,10 +345,18 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags = {})
+                     Flags flags={}, unsigned numVTableEntries=0)
       : underlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
+  }
+
+  template <typename UnderlyingErrorT>
+  bool underlyingReasonIsA() const {
+    if (!underlyingReason)
+      return false;
+    return underlyingReason->isA<UnderlyingErrorT>();
   }
 
   void log(raw_ostream &OS) const override {
@@ -399,6 +420,26 @@ public:
   }
 };
 
+// Decl was not deserialized because its attributes did not match the filter.
+//
+// \sa getDeclChecked
+class DeclAttributesDidNotMatch : public llvm::ErrorInfo<DeclAttributesDidNotMatch> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  DeclAttributesDidNotMatch() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Decl attributes did not match filter";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 LLVM_NODISCARD
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {
@@ -421,6 +462,17 @@ public:
 
   void print(raw_ostream &os) const override {
     os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+  }
+};
+
+class PrettyStackTraceModuleFileCore : public llvm::PrettyStackTraceEntry {
+  const ModuleFileSharedCore &MF;
+public:
+  explicit PrettyStackTraceModuleFileCore(ModuleFileSharedCore &module)
+      : MF(module) {}
+
+  void print(raw_ostream &os) const override {
+    os << "While reading from \'" << getNameOfModule(&MF) << "'\n";
   }
 };
 

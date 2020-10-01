@@ -1,0 +1,595 @@
+// RUN: %target-sil-opt %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
+
+// REQUIRES: asserts
+// REQUIRES: OS=macosx
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// =============================================================================
+// Test call to array.uninitialized that has "extra" release_value uses
+
+class C {
+  var c: C
+}
+
+class DummyArrayStorage<Element> {
+  @_hasStorage var count: Int { get }
+  @_hasStorage var capacity: Int { get }
+  init()
+}
+
+// init_any_array_with_buffer
+sil [_semantics "array.uninitialized"] @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+
+// CHECK-LABEL: CG of testBadArrayUninit
+// CHECK-NEXT:  Val [ref] %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:  Con [int] %2.1 Esc: G, Succ: (%2.2)
+// CHECK-NEXT:  Con [ref] %2.2 Esc: G, Succ:
+// CHECK-NEXT:  Val %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:  Con %5.1 Esc: G, Succ: %10
+// CHECK-NEXT:  Val [ref] %10 Esc: G, Succ: (%10.1)
+// CHECK-NEXT:  Con %10.1 Esc: G, Succ:
+// CHECK-LABEL: End
+sil hidden @testBadArrayUninit : $@convention(thin) (Builtin.Word, Int32) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Int32):
+  // create an array
+  %2 = alloc_ref [tail_elems $AnyObject * %0 : $Builtin.Word] $DummyArrayStorage<AnyObject>
+  %3 = metatype $@thin Array<AnyObject>.Type
+  %4 = function_ref @init_any_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+  %5 = apply %4(%2, %1, %3) : $@convention(thin) (@owned DummyArrayStorage<AnyObject>, Int32, @thin Array<AnyObject>.Type) -> (@owned Array<AnyObject>, UnsafeMutablePointer<AnyObject>)
+  %6 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 0
+  %7 = tuple_extract %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>), 1
+  %8 = struct_extract %7 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*AnyObject
+
+  // store an elt
+  %10 = alloc_ref $C
+  %11 = init_existential_ref %10 : $C : $C, $AnyObject
+  store %11 to %9 : $*AnyObject
+
+  // extra use of the call
+  release_value %5 : $(Array<AnyObject>, UnsafeMutablePointer<AnyObject>) // id: %228
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// =============================================================================
+// testArrayEscapeToBox: test that an array is marked escaping when
+// assigned to a box. When multiple arrays are merged into the same
+// box, ensure that a previous mapping from the project_box address to
+// the box's content is not lost during the merge.
+
+class ElementClass {
+  init()
+}
+
+class StagedContext {
+  init()
+}
+
+class VFSStagedContext : StagedContext {
+  override init()
+}
+
+// specialized Array.init()
+sil @$sS2ayxGycfCSo12ElementClassC_Tg5 : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass>
+
+// specialized Array._getCount()
+sil @$sSa9_getCountSiyFSo12ElementClassC_Tg5 : $@convention(method) (@guaranteed Array<ElementClass>) -> Int
+
+// specialized static Array._adoptStorage(_:count:)
+sil shared [_semantics "array.uninitialized"] @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) {
+// %0                                             // users: %13, %3
+// %1                                             // users: %9, %4
+bb0(%0 : $_ContiguousArrayStorage<ElementClass>, %1 : $Int, %2 : $@thin Array<ElementClass>.Type):
+  %3 = upcast %0 : $_ContiguousArrayStorage<ElementClass> to $__ContiguousArrayStorageBase // users: %17, %11
+  %4 = struct_extract %1 : $Int, #Int._value      // user: %6
+  %5 = integer_literal $Builtin.Int64, 1          // users: %7, %6
+  %6 = builtin "shl_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64 // user: %7
+  %7 = builtin "or_Int64"(%6 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64 // user: %8
+  %8 = struct $UInt (%7 : $Builtin.Int64)         // user: %9
+  %9 = struct $_SwiftArrayBodyStorage (%1 : $Int, %8 : $UInt) // user: %10
+  %10 = struct $_ArrayBody (%9 : $_SwiftArrayBodyStorage) // user: %12
+  %11 = ref_element_addr %3 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity // user: %12
+  store %10 to %11 : $*_ArrayBody                 // id: %12
+  %13 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<ElementClass> to $Builtin.BridgeObject // user: %14
+  %14 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%13 : $Builtin.BridgeObject) // user: %15
+  %15 = struct $_ArrayBuffer<ElementClass> (%14 : $_BridgeStorage<__ContiguousArrayStorageBase>) // user: %16
+  %16 = struct $Array<ElementClass> (%15 : $_ArrayBuffer<ElementClass>) // user: %20
+  %17 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $ElementClass // user: %18
+  %18 = address_to_pointer %17 : $*ElementClass to $Builtin.RawPointer // user: %19
+  %19 = struct $UnsafeMutablePointer<ElementClass> (%18 : $Builtin.RawPointer) // user: %20
+  %20 = tuple (%16 : $Array<ElementClass>, %19 : $UnsafeMutablePointer<ElementClass>) // user: %21
+  return %20 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // id: %21
+}
+
+// testArrayUsePointsClosure1
+sil @testArrayUsePointsClosure1 : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> ()
+
+// testArrayUsePointsClosure2
+sil @testArrayUsePointsClosure2 : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> ()
+
+// Make sure both locally allocated array's are globally escaping.
+//
+// CHECK-LABEL: CG of testArrayEscapeToBox
+// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %1 Esc: , Succ: (%21)
+// CHECK-NEXT:   Val [ref] %4 Esc: , Succ: %0, %1
+// CHECK-NEXT:   Val [ref] %8 Esc: , Succ: (%21)
+// CHECK-NEXT:   Val [ref] %12 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %17 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %20 Esc: G, Succ: %17
+// CHECK-NEXT:   Con [int] %21 Esc: G, Succ: (%39)
+// CHECK-NEXT:   Val [ref] %31 Esc: G, Succ: (%21)
+// CHECK-NEXT:   Val [ref] %34 Esc: G, Succ: %31
+// CHECK-NEXT:   Con %39 Esc: G, Succ: (%21), %12, %20, %34
+// CHECK-NEXT:   Val [ref] %45 Esc: , Succ: %0, %8, %39
+// CHECK-NEXT: End
+sil private @testArrayEscapeToBox : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> () {
+// %0                                             // users: %54, %51, %47, %45, %5, %4
+bb0(%0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()):
+  %1 = alloc_box ${ var Optional<VFSStagedContext> }, var, name "context" // users: %59, %6, %4, %2
+  %2 = project_box %1 : ${ var Optional<VFSStagedContext> }, 0 // user: %44
+  // function_ref testArrayUsePointsClosure1
+  %3 = function_ref @testArrayUsePointsClosure1 : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> () // user: %4
+  %4 = partial_apply [callee_guaranteed] %3(%1, %0) : $@convention(thin) (@guaranteed { var Optional<VFSStagedContext> }, @guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> ()) -> ()
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %5
+  strong_retain %1 : ${ var Optional<VFSStagedContext> } // id: %6
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = alloc_box ${ var Array<ElementClass> }, var, name "intents" // users: %58, %56, %52, %48, %45, %9
+  %9 = project_box %8 : ${ var Array<ElementClass> }, 0 // users: %41, %36, %27, %22, %13
+  %10 = metatype $@thin Array<ElementClass>.Type  // users: %33, %19, %12
+  // function_ref specialized Array.init()
+  %11 = function_ref @$sS2ayxGycfCSo12ElementClassC_Tg5 : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass> // user: %12
+  %12 = apply %11(%10) : $@convention(method) (@thin Array<ElementClass>.Type) -> @owned Array<ElementClass> // user: %13
+  store %12 to %9 : $*Array<ElementClass>         // id: %13
+  cond_br undef, bb2, bb3                         // id: %14
+
+bb2:                                              // Preds: bb1
+  %15 = integer_literal $Builtin.Int64, 1         // user: %16
+  %16 = struct $Int (%15 : $Builtin.Int64)        // user: %19
+  %17 = alloc_ref [tail_elems $ElementClass * undef : $Builtin.Word] $_ContiguousArrayStorage<ElementClass> // user: %19
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %18 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // user: %19
+  %19 = apply %18(%17, %16, %10) : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // users: %21, %20
+  %20 = tuple_extract %19 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 0 // user: %27
+  %21 = tuple_extract %19 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 1
+  %22 = struct_element_addr %9 : $*Array<ElementClass>, #Array._buffer // user: %23
+  %23 = struct_element_addr %22 : $*_ArrayBuffer<ElementClass>, #_ArrayBuffer._storage // user: %24
+  %24 = struct_element_addr %23 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue // user: %25
+  %25 = load %24 : $*Builtin.BridgeObject         // user: %26
+  strong_release %25 : $Builtin.BridgeObject      // id: %26
+  store %20 to %9 : $*Array<ElementClass>         // id: %27
+  br bb4                                          // id: %28
+
+bb3:                                              // Preds: bb1
+  %29 = integer_literal $Builtin.Int64, 1         // user: %30
+  %30 = struct $Int (%29 : $Builtin.Int64)        // user: %33
+  %31 = alloc_ref [tail_elems $ElementClass * undef : $Builtin.Word] $_ContiguousArrayStorage<ElementClass> // user: %33
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %32 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo12ElementClassC_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // user: %33
+  %33 = apply %32(%31, %30, %10) : $@convention(method) (@owned _ContiguousArrayStorage<ElementClass>, Int, @thin Array<ElementClass>.Type) -> (@owned Array<ElementClass>, UnsafeMutablePointer<ElementClass>) // users: %35, %34
+  %34 = tuple_extract %33 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 0 // user: %41
+  %35 = tuple_extract %33 : $(Array<ElementClass>, UnsafeMutablePointer<ElementClass>), 1
+  %36 = struct_element_addr %9 : $*Array<ElementClass>, #Array._buffer // user: %37
+  %37 = struct_element_addr %36 : $*_ArrayBuffer<ElementClass>, #_ArrayBuffer._storage // user: %38
+  %38 = struct_element_addr %37 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue // user: %39
+  %39 = load %38 : $*Builtin.BridgeObject         // user: %40
+  strong_release %39 : $Builtin.BridgeObject      // id: %40
+  store %34 to %9 : $*Array<ElementClass>         // id: %41
+  br bb4                                          // id: %42
+
+bb4:                                              // Preds: bb3 bb2
+  // function_ref testArrayUsePointsClosure2
+  %43 = function_ref @testArrayUsePointsClosure2 : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> () // user: %45
+  %44 = load %2 : $*Optional<VFSStagedContext>    // users: %55, %53, %49, %45
+  %45 = partial_apply [callee_guaranteed] %43(%0, %44, %8) : $@convention(thin) (@guaranteed @callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> (), @guaranteed Optional<VFSStagedContext>, @guaranteed { var Array<ElementClass> }) -> () // user: %57
+  // function_ref specialized Array._getCount()
+  %46 = function_ref @$sSa9_getCountSiyFSo12ElementClassC_Tg5 : $@convention(method) (@guaranteed Array<ElementClass>) -> Int
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %47
+  strong_retain %8 : ${ var Array<ElementClass> } // id: %48
+  retain_value %44 : $Optional<VFSStagedContext>  // id: %49
+  br bb5                                          // id: %50
+
+bb5:                                              // Preds: bb4
+  strong_retain %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %51
+  strong_retain %8 : ${ var Array<ElementClass> } // id: %52
+  retain_value %44 : $Optional<VFSStagedContext>  // id: %53
+  strong_release %0 : $@callee_guaranteed (@guaranteed Optional<StagedContext>, @guaranteed Optional<Error>) -> () // id: %54
+  release_value %44 : $Optional<VFSStagedContext> // id: %55
+  strong_release %8 : ${ var Array<ElementClass> } // id: %56
+  strong_release %45 : $@callee_guaranteed () -> () // id: %57
+  strong_release %8 : ${ var Array<ElementClass> } // id: %58
+  strong_release %1 : ${ var Optional<VFSStagedContext> } // id: %59
+  br bb6                                          // id: %60
+
+bb6:                                              // Preds: bb5
+  %61 = tuple ()                                  // user: %62
+  return %61 : $()                                // id: %62
+}
+
+// =============================================================================
+// Test merging an interior node with a non-interior
+// node. Verification can fail in the time between when the properties
+// are merged and when the edges are merged.
+
+struct Poly {
+  @_hasStorage var points: Array<Int64> { get set }
+  @_hasStorage var length: Int64 { get set }
+  init(points: Array<Int64>, length: Int64)
+}
+
+// CHECK-LABEL: CG of testMergeInteriorPointsTo
+// CHECK-NEXT:  Arg [ref] %0 Esc: A, Succ: (%6.2)
+// CHECK-NEXT:  Val %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:  Con [ref] %1.1 Esc: , Succ: %0, %12.1
+// CHECK-NEXT:  Val %6 Esc: , Succ: (%6.1)
+// CHECK-NEXT:  Con [ref] %6.1 Esc: , Succ: (%6.2)
+// CHECK-NEXT:  Con [int] %6.2 Esc: G, Succ: (%6.3)
+// CHECK-NEXT:  Con %6.3 Esc: G, Succ: (%6.4)
+// CHECK-NEXT:  Con [int] %6.4 Esc: G, Succ: (%6.5)
+// CHECK-NEXT:  Con %6.5 Esc: G, Succ: (%6.6)
+// CHECK-NEXT:  Con %6.6 Esc: G, Succ:
+// CHECK-NEXT:  Val %8 Esc: , Succ: (%8.1)
+// CHECK-NEXT:  Con [ref] %8.1 Esc: , Succ: %6.1
+// CHECK-NEXT:  Val %12 Esc: , Succ: (%12.1)
+// CHECK-NEXT:  Con [ref] %12.1 Esc: , Succ: %6.1
+// CHECK-LABEL: End
+sil [serialized] @testMergeInteriorPointsTo : $@convention(method) (@owned Array<Int64>) -> () {
+bb0(%0 : $Array<Int64>):
+  %1 = alloc_stack $Poly, var, name "self"
+  %2 = struct_element_addr %1 : $*Poly, #Poly.points
+  retain_value %0 : $Array<Int64>
+  retain_value %0 : $Array<Int64>
+  store %0 to %2 : $*Array<Int64>
+  %6 = alloc_stack $Int64, var, name "length"
+  release_value %0 : $Array<Int64>
+  %8 = alloc_stack $Int64
+  copy_addr %6 to [initialization] %8 : $*Int64
+  destroy_addr %8 : $*Int64
+  dealloc_stack %8 : $*Int64
+  %12 = alloc_stack $Int64
+  copy_addr %6 to [initialization] %12 : $*Int64
+  %14 = struct_element_addr %1 : $*Poly, #Poly.length
+  copy_addr [take] %12 to [initialization] %14 : $*Int64
+  dealloc_stack %12 : $*Int64
+  destroy_addr %6 : $*Int64
+  dealloc_stack %6 : $*Int64
+  dealloc_stack %1 : $*Poly
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// =============================================================================
+// Test merging a callee graph such that when merging pointsTo nodes
+// for defer edges in the caller graph, the new pointsTo node has
+// already been merged and the deferred node has both a defer edge and
+// pointsTo edge to the same node.
+
+public protocol ProceduralOp : AnyObject {}
+
+public class OptypeBase {
+  @_hasStorage var name : String { get set }
+  @_hasStorage var id : Int { get set }
+}
+
+public class OptypeDependent : OptypeBase {
+  @_hasStorage var _enable : Bool { get set }
+  @_hasStorage var _ops : Array<ProceduralOp>
+}
+
+public class CombineAnyOp : OptypeDependent {
+  @_hasStorage var _sources : Array<(ProceduralOp, Bool)>
+}
+
+sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+
+sil @$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ : $@convention(method) <τ_0_0> (Int, @thin Array<τ_0_0>.Type) -> @owned _ArrayBuffer<τ_0_0>
+
+// specialized static Array._allocateUninitialized(_:)
+sil shared [_semantics "array.uninitialized"] @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZ12ProceduralOp_p_Tg5 : $@convention(method) (Int, @thin Array<ProceduralOp>.Type) -> (@owned Array<ProceduralOp>, UnsafeMutablePointer<ProceduralOp>) {
+// %0
+bb0(%0 : $Int, %1 : $@thin Array<ProceduralOp>.Type):
+  %2 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %3 = address_to_pointer %2 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %4 = raw_pointer_to_ref %3 : $Builtin.RawPointer to $__EmptyArrayStorage
+  %5 = unchecked_ref_cast %4 : $__EmptyArrayStorage to $Builtin.BridgeObject
+  %6 = integer_literal $Builtin.Int64, 0
+  %7 = struct_extract %0 : $Int, #Int._value
+  %8 = builtin "cmp_slt_Int64"(%6 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %8, bb1, bb2
+
+bb1:
+  %10 = metatype $@thin Array<ProceduralOp>.Type
+  // function_ref static Array._allocateBufferUninitialized(minimumCapacity:)
+  %11 = function_ref @$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ : $@convention(method) <τ_0_0> (Int, @thin Array<τ_0_0>.Type) -> @owned _ArrayBuffer<τ_0_0>
+  %12 = apply %11<ProceduralOp>(%0, %10) : $@convention(method) <τ_0_0> (Int, @thin Array<τ_0_0>.Type) -> @owned _ArrayBuffer<τ_0_0>
+  %13 = struct_extract %12 : $_ArrayBuffer<ProceduralOp>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  %15 = unchecked_ref_cast %14 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %16 = ref_element_addr %15 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %17 = struct_element_addr %16 : $*_ArrayBody, #_ArrayBody._storage
+  %18 = struct_element_addr %17 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  store %0 to %18 : $*Int
+  br bb3(%14 : $Builtin.BridgeObject)
+
+bb2:
+  strong_retain %4 : $__EmptyArrayStorage
+  br bb3(%5 : $Builtin.BridgeObject)
+
+// %23
+bb3(%23 : $Builtin.BridgeObject):
+  %24 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%23 : $Builtin.BridgeObject)
+  %25 = struct $_ArrayBuffer<ProceduralOp> (%24 : $_BridgeStorage<__ContiguousArrayStorageBase>)
+  %26 = struct $Array<ProceduralOp> (%25 : $_ArrayBuffer<ProceduralOp>)
+  %27 = unchecked_ref_cast %23 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %28 = ref_tail_addr %27 : $__ContiguousArrayStorageBase, $ProceduralOp
+  %29 = address_to_pointer %28 : $*ProceduralOp to $Builtin.RawPointer
+  %30 = struct $UnsafeMutablePointer<ProceduralOp> (%29 : $Builtin.RawPointer)
+  %31 = tuple (%26 : $Array<ProceduralOp>, %30 : $UnsafeMutablePointer<ProceduralOp>)
+  return %31 : $(Array<ProceduralOp>, UnsafeMutablePointer<ProceduralOp>)
+}
+
+sil shared [_semantics "array.uninitialized"] @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZ12ProceduralOp_p_Sbt_Tg5 : $@convention(method) (Int, @thin Array<(ProceduralOp, Bool)>.Type) -> (@owned Array<(ProceduralOp, Bool)>, UnsafeMutablePointer<(ProceduralOp, Bool)>) {
+// %0
+bb0(%0 : $Int, %1 : $@thin Array<(ProceduralOp, Bool)>.Type):
+  %2 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %3 = address_to_pointer %2 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %4 = raw_pointer_to_ref %3 : $Builtin.RawPointer to $__EmptyArrayStorage
+  %5 = unchecked_ref_cast %4 : $__EmptyArrayStorage to $Builtin.BridgeObject
+  %6 = integer_literal $Builtin.Int64, 0
+  %7 = struct_extract %0 : $Int, #Int._value
+  %8 = builtin "cmp_slt_Int64"(%6 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %8, bb1, bb2
+
+bb1:
+  %10 = metatype $@thin Array<(ProceduralOp, Bool)>.Type
+  // function_ref static Array._allocateBufferUninitialized(minimumCapacity:)
+  %11 = function_ref @$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ : $@convention(method) <τ_0_0> (Int, @thin Array<τ_0_0>.Type) -> @owned _ArrayBuffer<τ_0_0>
+  %12 = apply %11<(ProceduralOp, Bool)>(%0, %10) : $@convention(method) <τ_0_0> (Int, @thin Array<τ_0_0>.Type) -> @owned _ArrayBuffer<τ_0_0>
+  %13 = struct_extract %12 : $_ArrayBuffer<(ProceduralOp, Bool)>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  %15 = unchecked_ref_cast %14 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %16 = ref_element_addr %15 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %17 = struct_element_addr %16 : $*_ArrayBody, #_ArrayBody._storage
+  %18 = struct_element_addr %17 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  store %0 to %18 : $*Int
+  br bb3(%14 : $Builtin.BridgeObject)
+
+bb2:
+  strong_retain %4 : $__EmptyArrayStorage
+  br bb3(%5 : $Builtin.BridgeObject)
+
+// %23
+bb3(%23 : $Builtin.BridgeObject):
+  %24 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%23 : $Builtin.BridgeObject)
+  %25 = struct $_ArrayBuffer<(ProceduralOp, Bool)> (%24 : $_BridgeStorage<__ContiguousArrayStorageBase>)
+  %26 = struct $Array<(ProceduralOp, Bool)> (%25 : $_ArrayBuffer<(ProceduralOp, Bool)>)
+  %27 = unchecked_ref_cast %23 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %28 = ref_tail_addr %27 : $__ContiguousArrayStorageBase, $(ProceduralOp, Bool)
+  %29 = address_to_pointer %28 : $*(ProceduralOp, Bool) to $Builtin.RawPointer
+  %30 = struct $UnsafeMutablePointer<(ProceduralOp, Bool)> (%29 : $Builtin.RawPointer)
+  %31 = tuple (%26 : $Array<(ProceduralOp, Bool)>, %30 : $UnsafeMutablePointer<(ProceduralOp, Bool)>)
+  return %31 : $(Array<(ProceduralOp, Bool)>, UnsafeMutablePointer<(ProceduralOp, Bool)>)
+}
+
+sil @testMergePointsTo_OptypeDependent_init : $@convention(method) (@owned String, @owned OptypeDependent) -> @owned OptypeDependent {
+bb0(%0 : $String, %1 : $OptypeDependent):
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int (%3 : $Builtin.Int64)
+  %5 = metatype $@thin Array<ProceduralOp>.Type
+  // function_ref specialized static Array._allocateUninitialized(_:)
+  %6 = function_ref @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZ12ProceduralOp_p_Tg5 : $@convention(method) (Int, @thin Array<ProceduralOp>.Type) -> (@owned Array<ProceduralOp>, UnsafeMutablePointer<ProceduralOp>)
+  strong_retain %1 : $OptypeDependent             // id: %7
+  %8 = apply %6(%4, %5) : $@convention(method) (Int, @thin Array<ProceduralOp>.Type) -> (@owned Array<ProceduralOp>, UnsafeMutablePointer<ProceduralOp>)
+  %9 = tuple_extract %8 : $(Array<ProceduralOp>, UnsafeMutablePointer<ProceduralOp>), 0
+  %10 = ref_element_addr %1 : $OptypeDependent, #OptypeDependent._ops
+  store %9 to %10 : $*Array<ProceduralOp>
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = struct $Bool (%12 : $Builtin.Int1)
+  %14 = ref_element_addr %1 : $OptypeDependent, #OptypeDependent._enable
+  store %13 to %14 : $*Bool
+  strong_release %1 : $OptypeDependent
+  %17 = upcast %1 : $OptypeDependent to $OptypeBase
+  %19 = ref_element_addr %17 : $OptypeBase, #OptypeBase.name
+  store %0 to %19 : $*String
+  return %1 : $OptypeDependent
+}
+
+// CHECK-LABEL: CG of testMergePointsTo_CombineAnyOp_init
+// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: (%7.1)
+// CHECK-NEXT:   Arg [ref] %1 Esc: A, Succ: (%9)
+// CHECK-NEXT:   Val %7 Esc: A, Succ: (%7.1), %7.1
+// CHECK-NEXT:   Con [int] %7.1 Esc: G, Succ: (%7.1)
+// CHECK-NEXT:   Con [int] %9 Esc: A, Succ: (%9.1)
+// CHECK-NEXT:   Con [ref] %9.1 Esc: A, Succ: %0, %7, %7.1
+// CHECK-NEXT:   Val [ref] %18 Esc: , Succ: (%9), %1
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %18
+// CHECK-LABEL: End
+sil @testMergePointsTo_CombineAnyOp_init : $@convention(method) (@owned String, @owned CombineAnyOp) -> @owned CombineAnyOp {
+bb0(%0 : $String, %1 : $CombineAnyOp):
+  strong_retain %1 : $CombineAnyOp
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int (%4 : $Builtin.Int64)
+  %6 = metatype $@thin Array<(ProceduralOp, Bool)>.Type
+  // function_ref specialized static Array._allocateUninitialized(_:)
+  %7 = function_ref @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZ12ProceduralOp_p_Sbt_Tg5 : $@convention(method) (Int, @thin Array<(ProceduralOp, Bool)>.Type) -> (@owned Array<(ProceduralOp, Bool)>, UnsafeMutablePointer<(ProceduralOp, Bool)>)
+  %8 = apply %7(%5, %6) : $@convention(method) (Int, @thin Array<(ProceduralOp, Bool)>.Type) -> (@owned Array<(ProceduralOp, Bool)>, UnsafeMutablePointer<(ProceduralOp, Bool)>)
+  %9 = tuple_extract %8 : $(Array<(ProceduralOp, Bool)>, UnsafeMutablePointer<(ProceduralOp, Bool)>), 0
+  %10 = ref_element_addr %1 : $CombineAnyOp, #CombineAnyOp._sources
+  store %9 to %10 : $*Array<(ProceduralOp, Bool)>
+  strong_release %1 : $CombineAnyOp
+  %13 = struct_extract %0 : $String, #String._guts
+  %14 = struct_extract %13 : $_StringGuts, #_StringGuts._object
+  %15 = struct_extract %14 : $_StringObject, #_StringObject._object
+  strong_retain %15 : $Builtin.BridgeObject
+  %18 = upcast %1 : $CombineAnyOp to $OptypeDependent
+  %19 = function_ref @testMergePointsTo_OptypeDependent_init : $@convention(method) (@owned String, @owned OptypeDependent) -> @owned OptypeDependent
+  %20 = apply %19(%0, %18) : $@convention(method) (@owned String, @owned OptypeDependent) -> @owned OptypeDependent
+  %21 = unchecked_ref_cast %20 : $OptypeDependent to $CombineAnyOp
+  strong_release %15 : $Builtin.BridgeObject
+  return %21 : $CombineAnyOp
+}
+
+// =============================================================================
+// Test calling ConnectionGraph::initializePointsTo from
+// mergeAllScheduledNodes when multiple merges are pending.  In this
+// case, initializePointsTo is called and a node in the
+// to-be-initialized defer web already pointsTo a node that has been
+// marked for merging.
+
+public protocol ASTNode {}
+
+public struct AssignmentNode : ASTNode {
+  @_hasStorage public let variable: ASTNode { get }
+  @_hasStorage public let value: ASTNode { get }
+  @_hasStorage public let range: Range<Int>? { get }
+  @_hasStorage public let documentation: String? { get }
+  public init(variable: ASTNode, value: ASTNode, range: Range<Int>?, documentation: String?) throws
+  public var childNodes: [ASTNode] { get }
+}
+
+public struct VariableNode : ASTNode {
+  @_hasStorage public let name: String { get }
+  @_hasStorage public let range: Range<Int>? { get }
+  public init(name: String, range: Range<Int>?)
+  public var childNodes: [ASTNode] { get }
+  public var description: String { get }
+  public var nodeDescription: String? { get }
+}
+
+// CHECK-LABEL: CG of testPendingMergeHelper
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: %3.1
+// CHECK-NEXT:   Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:   Arg [ref] %2 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: , Succ: (%3.1)
+// CHECK-NEXT:   Con %3.1 Esc: A, Succ: %1.1, %2
+// CHECK-LABEL: End
+sil @testPendingMergeHelper : $@convention(method) (@in ASTNode, @owned Optional<String>) -> (@out AssignmentNode, @error Error) {
+bb0(%0 : $*AssignmentNode, %1 : $*ASTNode, %4 : $Optional<String>):
+  %6 = alloc_stack $AssignmentNode, var, name "self"
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*ASTNode
+  dealloc_stack %6 : $*AssignmentNode
+  throw undef : $Error
+
+bb2:
+  %160 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.variable
+  copy_addr [take] %1 to [initialization] %160 : $*ASTNode
+  %162 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.value
+  %164 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.range
+  %166 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.documentation
+  store %4 to %166 : $*Optional<String>
+  copy_addr [take] %6 to [initialization] %0 : $*AssignmentNode
+  dealloc_stack %6 : $*AssignmentNode
+  %171 = tuple ()
+  return %171 : $()
+}
+
+// CHECK-LABEL: CG of testPendingMerge
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: %1, %4.1
+// CHECK-NEXT:   Arg [ref] %1 Esc: A, Succ: (%9.1)
+// CHECK-NEXT:   Val %2 Esc: , Succ: (%9)
+// CHECK-NEXT:   Val %4 Esc: , Succ: (%4.1)
+// CHECK-NEXT:   Con %4.1 Esc: A, Succ: (%9.1), %5.1, %9
+// CHECK-NEXT:   Val %5 Esc: , Succ: (%5.1)
+// CHECK-NEXT:   Con %5.1 Esc: A, Succ: %1
+// CHECK-NEXT:   Con [ref] %9 Esc: A, Succ: (%9.1)
+// CHECK-NEXT:   Con [int] %9.1 Esc: G, Succ: (%9.2)
+// CHECK-NEXT:   Con %9.2 Esc: G, Succ: (%9.3)
+// CHECK-NEXT:   Con %9.3 Esc: G, Succ:
+// CHECK-LABEL: End
+sil private @testPendingMerge : $@convention(thin) (@owned VariableNode) -> (@out ASTNode, @error Error) {
+bb0(%0 : $*ASTNode, %1 : $VariableNode):
+  %9 = alloc_stack $Optional<String>, var, name "documentation"
+  cond_br undef, bb12, bb14
+
+bb12:
+  %113 = alloc_stack $AssignmentNode, let, name "assign"
+  %115 = alloc_stack $ASTNode
+  retain_value %1 : $VariableNode
+  %117 = init_existential_addr %115 : $*ASTNode, $VariableNode
+  store %1 to %117 : $*VariableNode
+  %122 = load %9 : $*Optional<String>
+
+  %123 = function_ref @testPendingMergeHelper : $@convention(method) (@in ASTNode, @owned Optional<String>) -> (@out AssignmentNode, @error Error)
+  try_apply %123(%113, %115, %122) : $@convention(method) (@in ASTNode, @owned Optional<String>) -> (@out AssignmentNode, @error Error), normal bb13, error bb65
+
+bb13(%125 : $()):
+  dealloc_stack %115 : $*ASTNode
+  %128 = init_existential_addr %0 : $*ASTNode, $AssignmentNode
+  copy_addr %113 to [initialization] %128 : $*AssignmentNode
+  destroy_addr %113 : $*AssignmentNode
+  dealloc_stack %113 : $*AssignmentNode
+  release_value %1 : $VariableNode
+  dealloc_stack %9 : $*Optional<String>
+  br bb61
+
+bb14:
+  destroy_addr %9 : $*Optional<String>
+  %584 = init_existential_addr %0 : $*ASTNode, $VariableNode
+  store %1 to %584 : $*VariableNode
+  dealloc_stack %9 : $*Optional<String>
+  br bb61
+
+bb61:
+  %589 = tuple ()
+  return %589 : $()
+
+
+bb65(%614 : $Error):
+  dealloc_stack %115 : $*ASTNode
+  dealloc_stack %113 : $*AssignmentNode
+  dealloc_stack %9 : $*Optional<String>
+  br bb72(undef : $Error)
+
+
+bb72(%681 : $Error):
+  throw %681 : $Error
+}
+
+//=============================================================================
+// Test an "array.uninitialized" with multiple tuple_extract's but no
+// other unusual uses. Make sure canOptimizeArrayUninitializedCall
+// returns false; otherwise graph verification can fail because only
+// one of the tuple_extracts is mapped to a node.
+
+// specialized static Array._adoptStorage(_:count:)
+sil [_semantics "array.uninitialized"] @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo5Int64V_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+
+// CHECK-LABEL: CG of testArrayUninitResultMapping
+// CHECK-NEXT:   [ref] %0 Esc: , Succ: (%0.1)
+// CHECK-NEXT:   Con [int] %0.1 Esc: G, Succ: (%0.2)
+// CHECK-NEXT:   Con [ref] %0.2 Esc: G, Succ:
+// CHECK-NEXT:   Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-LABEL: End
+sil hidden @testArrayUninitResultMapping : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [tail_elems $Int64 * undef : $Builtin.Word] $_ContiguousArrayStorage<Int64>
+  // function_ref specialized static Array._adoptStorage(_:count:)
+  %1 = function_ref @$sSa13_adoptStorage_5countSayxG_SpyxGts016_ContiguousArrayB0CyxGn_SitFZSo5Int64V_Tg5 : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+  %2 = apply %1(%0, undef, undef) : $@convention(method) (@owned _ContiguousArrayStorage<Int64>, Int, @thin Array<Int64>.Type) -> (@owned Array<Int64>, UnsafeMutablePointer<Int64>)
+  %3 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 0
+  %4 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 1
+  %5 = tuple_extract %2 : $(Array<Int64>, UnsafeMutablePointer<Int64>), 0
+  %6 = struct_extract %5 : $Array<Int64>, #Array._buffer
+  %7 = struct_extract %6 : $_ArrayBuffer<Int64>, #_ArrayBuffer._storage
+  %8 = struct_extract %7 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  strong_retain %8 : $Builtin.BridgeObject
+  %10 = tuple ()
+  return %10 : $()
+}

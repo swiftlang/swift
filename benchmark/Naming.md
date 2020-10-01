@@ -89,7 +89,7 @@ relative comparison across the different axis of variation.
 
 </details><p><!-- spacer --></p></li>
 <li>
-<strong>Groups and types are <code>UpperCase</code>, methods are
+<strong>Groups, variants and types are <code>UpperCase</code>, methods are
 <code>lowerCase</code>.</strong>
 <details>
 

@@ -105,12 +105,12 @@ bb0(%0 : $B):
 // CHECK-NEXT: [[RET0:%.+]] = alloc_stack
 // CHECK-NEXT: Projection Path [$*S1
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK: #1 store
 // CHECK-NEXT: [[RET0:%.+]] = alloc_stack
 // CHECK-NEXT: Projection Path [$*S1
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 sil @store_after_store_struct : $@convention(thin) () -> () {
   %1 = alloc_stack $S1
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
@@ -130,95 +130,95 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
 // CHECK-NEXT: alloc_stack $S2
 // CHECK-NEXT: Projection Path [$*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S2
 // CHECK-NEXT: Projection Path [$*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK: #1 store
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Projection Path [$*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Projection Path [$*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Projection Path [$*S3
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Projection Path [$*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Projection Path [$*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK: #2 store
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var y: S3 in: $*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var y: S3 in: $*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var y: S3 in: $*S3
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var y: S3 in: $*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var y: S3 in: $*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var x: S3 in: $*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var x: S3 in: $*S3
 // CHECK-NEXT:   Field: var c: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var x: S3 in: $*S3
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var x: S3 in: $*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var b: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Projection Path [$*S4
 // CHECK-NEXT:   Field: var x: S3 in: $*S3
 // CHECK-NEXT:   Field: var a: S2 in: $*S2
 // CHECK-NEXT:   Field: var a: Int in: $*Int
-// CHECK-NEXT:   Field: var value: Int64 in: $*Builtin.Int64]
+// CHECK-NEXT:   Field: var value: Builtin.Int64 in: $*Builtin.Int64]
 sil hidden @many_struct_allocs : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S2, var, name "a"                  // users: %6, %18

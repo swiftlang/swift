@@ -1,0 +1,188 @@
+// RUN: %target-sil-opt -prune-vtables %s | %FileCheck --check-prefix=NOWMO %s
+// RUN: %target-sil-opt -wmo -prune-vtables %s | %FileCheck --check-prefix=WMO %s
+
+sil_stage canonical
+
+private class PrivateA {
+  func noOverrides() {}
+  func yesOverrides() {}
+  final func isFinal() {}
+}
+
+sil @PrivateA_noOverrides  : $@convention(method) (@guaranteed PrivateA) -> ()
+sil @PrivateA_yesOverrides : $@convention(method) (@guaranteed PrivateA) -> ()
+sil @PrivateA_isFinal      : $@convention(method) (@guaranteed PrivateA) -> ()
+
+// NOWMO-LABEL: sil_vtable PrivateA {
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
+// NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PrivateA {
+// WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
+sil_vtable PrivateA {
+  #PrivateA.noOverrides:  @PrivateA_noOverrides
+  #PrivateA.yesOverrides: @PrivateA_yesOverrides
+  #PrivateA.isFinal:      @PrivateA_isFinal
+}
+
+private class PrivateB: PrivateA {
+  override func yesOverrides() {}
+}
+
+sil @PrivateB_yesOverrides : $@convention(method) (@guaranteed PrivateB) -> ()
+
+// NOWMO-LABEL: sil_vtable PrivateB {
+// NOWMO:         #PrivateA.noOverrides{{[^[]]*}}
+// NOWMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PrivateA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PrivateB {
+// WMO:         #PrivateA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PrivateA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PrivateA.isFinal{{.*}} [nonoverridden]
+sil_vtable PrivateB {
+  #PrivateA.noOverrides:  @PrivateA_noOverrides  [inherited]
+  #PrivateA.yesOverrides: @PrivateB_yesOverrides [override]
+  #PrivateA.isFinal:      @PrivateA_isFinal      [inherited]
+}
+
+internal class InternalA {
+  func noOverrides() {}
+  func yesOverrides() {}
+  final func isFinal() {}
+}
+
+sil @InternalA_noOverrides  : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_yesOverrides : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_isFinal      : $@convention(method) (@guaranteed InternalA) -> ()
+
+// NOWMO-LABEL: sil_vtable InternalA {
+// NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable InternalA {
+// WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #InternalA.isFinal{{.*}} [nonoverridden]
+sil_vtable InternalA {
+  #InternalA.noOverrides:  @InternalA_noOverrides
+  #InternalA.yesOverrides: @InternalA_yesOverrides
+  #InternalA.isFinal:      @InternalA_isFinal
+}
+
+internal class InternalB: InternalA {
+  override func yesOverrides() {}
+}
+
+sil @InternalB_yesOverrides : $@convention(method) (@guaranteed InternalB) -> ()
+
+// NOWMO-LABEL: sil_vtable InternalB {
+// NOWMO-NOT:     #InternalA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #InternalA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable InternalB {
+// WMO:         #InternalA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #InternalA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #InternalA.isFinal{{.*}} [nonoverridden]
+sil_vtable InternalB {
+  #InternalA.noOverrides:  @InternalA_noOverrides  [inherited]
+  #InternalA.yesOverrides: @InternalB_yesOverrides [override]
+  #InternalA.isFinal:      @InternalA_isFinal      [inherited]
+}
+
+public class PublicA {
+  public func noOverrides() {}
+  public func yesOverrides() {}
+  public final func isFinal() {}
+}
+
+sil @PublicA_noOverrides  : $@convention(method) (@guaranteed PublicA) -> ()
+sil @PublicA_yesOverrides : $@convention(method) (@guaranteed PublicA) -> ()
+sil @PublicA_isFinal      : $@convention(method) (@guaranteed PublicA) -> ()
+
+// NOWMO-LABEL: sil_vtable PublicA {
+// NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PublicA {
+// WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PublicA.isFinal{{.*}} [nonoverridden]
+sil_vtable PublicA {
+  #PublicA.noOverrides:  @PublicA_noOverrides
+  #PublicA.yesOverrides: @PublicA_yesOverrides
+  #PublicA.isFinal:      @PublicA_isFinal
+}
+
+public class PublicB: PublicA {
+  public override func yesOverrides() {}
+}
+
+sil @PublicB_yesOverrides : $@convention(method) (@guaranteed PublicB) -> ()
+
+// NOWMO-LABEL: sil_vtable PublicB {
+// NOWMO-NOT:     #PublicA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #PublicA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable PublicB {
+// WMO:         #PublicA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #PublicA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #PublicA.isFinal{{.*}} [nonoverridden]
+sil_vtable PublicB {
+  #PublicA.noOverrides:  @PublicA_noOverrides  [inherited]
+  #PublicA.yesOverrides: @PublicB_yesOverrides [override]
+  #PublicA.isFinal:      @PublicA_isFinal      [inherited]
+}
+
+open class OpenA {
+  open func noOverrides() {}
+  open func yesOverrides() {}
+  public final func isFinal() {}
+}
+
+sil @OpenA_noOverrides  : $@convention(method) (@guaranteed OpenA) -> ()
+sil @OpenA_yesOverrides : $@convention(method) (@guaranteed OpenA) -> ()
+sil @OpenA_isFinal      : $@convention(method) (@guaranteed OpenA) -> ()
+
+// NOWMO-LABEL: sil_vtable OpenA {
+// NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable OpenA {
+// WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #OpenA.isFinal{{.*}} [nonoverridden]
+sil_vtable OpenA {
+  #OpenA.noOverrides:  @OpenA_noOverrides
+  #OpenA.yesOverrides: @OpenA_yesOverrides
+  #OpenA.isFinal:      @OpenA_isFinal
+}
+
+open class OpenB: OpenA {
+  open override func yesOverrides() {}
+}
+
+sil @OpenB_yesOverrides : $@convention(method) (@guaranteed OpenB) -> ()
+
+// NOWMO-LABEL: sil_vtable OpenB {
+// NOWMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// NOWMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// NOWMO:         #OpenA.isFinal{{[^[]]*}}
+
+// WMO-LABEL: sil_vtable OpenB {
+// WMO-NOT:     #OpenA.noOverrides{{.*}} [nonoverridden]
+// WMO-NOT:     #OpenA.yesOverrides{{.*}} [nonoverridden]
+// WMO:         #OpenA.isFinal{{.*}} [nonoverridden]
+sil_vtable OpenB {
+  #OpenA.noOverrides:  @PublicA_noOverrides [inherited]
+  #OpenA.yesOverrides: @OpenB_yesOverrides  [override]
+  #OpenA.isFinal:      @PublicA_isFinal     [inherited]
+}

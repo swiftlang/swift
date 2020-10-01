@@ -56,6 +56,8 @@ BUILTIN_POINTER_TYPE(Bb, "Builtin.BridgeObject")
 BUILTIN_POINTER_TYPE(Bp, "Builtin.RawPointer")
 BUILTIN_TYPE(BB, "Builtin.UnsafeValueBuffer")
 
+// No longer used in the compiler as an AST type, but still used for fields 
+// shaped like AnyObject (normal mangling yXl).
 BUILTIN_POINTER_TYPE(BO, "Builtin.UnknownObject")
 
 // Int8 vector types

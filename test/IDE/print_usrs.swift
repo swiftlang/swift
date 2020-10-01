@@ -67,7 +67,7 @@ class GenericClass {
   }
 
   // CHECK: [[@LINE+2]]:3 s:14swift_ide_test12GenericClassCySfSicip{{$}}
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC1iL_Sivp{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassCySfSicip1iL_Sivp{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:14swift_ide_test12GenericClassCySfSicig{{$}}
     get { return 0.0 }
@@ -212,7 +212,7 @@ class ObjCClass1 {
   class func staticFunc1(_ a: Int) {}
 
   // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1CyS2icip{{$}}
-  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_Sivp{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1CyS2icip1xL_Sivp{{$}}
   public subscript(x: Int) -> Int {
 
     // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectAtIndexedSubscript:{{$}}
@@ -223,7 +223,7 @@ class ObjCClass1 {
   }
 
   // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1CySiACcip{{$}}
-  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_ACvp{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1CySiACcip1xL_ACvp{{$}}
   public subscript(x: ObjCClass1) -> Int {
 
     // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectForKeyedSubscript:{{$}}

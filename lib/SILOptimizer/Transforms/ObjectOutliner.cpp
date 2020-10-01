@@ -12,11 +12,12 @@
 
 #define DEBUG_TYPE "objectoutliner"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -27,23 +28,27 @@ class ObjectOutliner {
   NominalTypeDecl *ArrayDecl = nullptr;
   int GlobIdx = 0;
 
+  // Instructions to be deleted.
+  llvm::SmallVector<SILInstruction *, 4> ToRemove;
+
   bool isCOWType(SILType type) {
     return type.getNominalOrBoundGenericNominal() == ArrayDecl;
   }
 
-  bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject,
-                          ApplyInst **FindStringCall = nullptr);
+  bool isValidUseOfObject(SILInstruction *Val, EndCOWMutationInst *toIgnore);
+
+  ApplyInst *findFindStringCall(SILValue V);
 
   bool getObjectInitVals(SILValue Val,
                          llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
                          llvm::SmallVectorImpl<StoreInst *> &TailStores,
-                         ApplyInst **FindStringCall);
-  bool handleTailAddr(int TailIdx, SILInstruction *I,
-                      llvm::SmallVectorImpl<StoreInst *> &TailStores);
+                         unsigned NumTailTupleElements,
+                         EndCOWMutationInst *toIgnore);
+  bool handleTailAddr(int TailIdx, SILInstruction *I, unsigned NumTailTupleElements,
+                      llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                      EndCOWMutationInst *toIgnore);
 
-  bool
-  optimizeObjectAllocation(AllocRefInst *ARI,
-                           llvm::SmallVector<SILInstruction *, 4> &ToRemove);
+  bool optimizeObjectAllocation(AllocRefInst *ARI);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
@@ -60,23 +65,27 @@ bool ObjectOutliner::run(SILFunction *F) {
   for (auto &BB : *F) {
     auto Iter = BB.begin();
 
-    // We can't remove instructions willy-nilly as we iterate because
-    // that might cause a pointer to the next instruction to become
-    // garbage, causing iterator invalidations (and crashes).
-    // Instead, we collect in a list the instructions we want to remove
-    // and erase the BB they belong to at the end of the loop, once we're
-    // sure it's safe to do so.
-    llvm::SmallVector<SILInstruction *, 4> ToRemove;
-
     while (Iter != BB.end()) {
       SILInstruction *I = &*Iter;
-      Iter++;
+      ++Iter;
       if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
-        hasChanged |= optimizeObjectAllocation(ARI, ToRemove);
+        unsigned GarbageSize = ToRemove.size();
+
+        // Try to replace the alloc_ref with a static object.
+        if (optimizeObjectAllocation(ARI)) {
+          hasChanged = true;
+        } else {
+          // No transformation was made. Restore the original state of the garbage list.
+          assert(GarbageSize <= ToRemove.size());
+          ToRemove.resize(GarbageSize);
+        }
       }
     }
+    // Delaying the deallocation of instructions avoids problems with iterator invalidation in the
+    // instruction loop above.
     for (auto *I : ToRemove)
       I->eraseFromParent();
+    ToRemove.clear();
   }
   return hasChanged;
 }
@@ -108,13 +117,11 @@ static bool isValidInitVal(SILValue V) {
 }
 
 /// Check if a use of an object may prevent outlining the object.
-///
-/// If \p isCOWObject is true, then the object reference is wrapped into a
-/// COW container. Currently this is just Array<T>.
-/// If a use is a call to the findStringSwitchCase semantic call, the apply
-/// is returned in \p FindStringCall.
-bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
-                                      ApplyInst **FindStringCall) {
+bool ObjectOutliner::isValidUseOfObject(SILInstruction *I,
+                                        EndCOWMutationInst *toIgnore) {
+  if (I == toIgnore)
+    return true;
+
   switch (I->getKind()) {
   case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::DebugValueInst:
@@ -126,49 +133,22 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
   case SILInstructionKind::SetDeallocatingInst:
     return true;
 
-  case SILInstructionKind::ReturnInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::PartialApplyInst:
-  case SILInstructionKind::StoreInst:
-    /// We don't have a representation for COW objects in SIL, so we do some
-    /// ad-hoc testing: We can ignore uses of a COW object if any use after
-    /// this will do a uniqueness checking before the object is modified.
-    return isCOWObject;
-
-  case SILInstructionKind::ApplyInst:
-    if (!isCOWObject)
-      return false;
-    // There should only be a single call to findStringSwitchCase. But even
-    // if there are multiple calls, it's not problem - we'll just optimize the
-    // last one we find.
-    if (cast<ApplyInst>(I)->hasSemantics("findStringSwitchCase"))
-      *FindStringCall = cast<ApplyInst>(I);
-    return true;
-
-  case SILInstructionKind::StructInst:
-    if (isCOWType(cast<StructInst>(I)->getType())) {
-      // The object is wrapped into a COW container.
-      isCOWObject = true;
-    }
-    break;
-
-  case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::AddressToPointerInst:
-    assert(!isCOWObject && "instruction cannot have a COW object as operand");
-    break;
-
+  case SILInstructionKind::StructInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::EnumInst:
-    break;
-
   case SILInstructionKind::StructExtractInst:
-    // To be on the safe side we don't consider the object as COW if it is
-    // extracted again from the COW container: the uniqueness check may be
-    // optimized away in this case.
-    isCOWObject = false;
-    break;
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UpcastInst: {
+    auto SVI = cast<SingleValueInstruction>(I);
+    for (Operand *Use : getNonDebugUses(SVI)) {
+      if (!isValidUseOfObject(Use->getUser(), toIgnore))
+        return false;
+    }
+    return true;
+  }
 
   case SILInstructionKind::BuiltinInst: {
     // Handle the case for comparing addresses. This occurs when the Array
@@ -177,45 +157,93 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
     BuiltinValueKind K = BI->getBuiltinInfo().ID;
     if (K == BuiltinValueKind::ICMP_EQ || K == BuiltinValueKind::ICMP_NE)
       return true;
+    if (K == BuiltinValueKind::DestroyArray) {
+      // We must not try to delete the tail allocated values. Although this would be a no-op
+      // (because we only handle trivial types), it would be semantically wrong to apply this
+      // builtin on the outlined object.
+      ToRemove.push_back(BI);
+      return true;
+    }
     return false;
   }
 
   default:
     return false;
   }
+}
 
-  auto SVI = cast<SingleValueInstruction>(I);
-  for (Operand *Use : getNonDebugUses(SVI)) {
-    if (!isValidUseOfObject(Use->getUser(), isCOWObject, FindStringCall))
-      return false;
+/// Finds a call to findStringSwitchCase in the uses of \p V.
+ApplyInst *ObjectOutliner::findFindStringCall(SILValue V) {
+  for (Operand *use : V->getUses()) {
+    SILInstruction *user = use->getUser();
+    switch (user->getKind()) {
+    case SILInstructionKind::ApplyInst:
+      // There should only be a single call to findStringSwitchCase. But even
+      // if there are multiple calls, it's not problem - we'll just optimize the
+      // last one we find.
+      if (cast<ApplyInst>(user)->hasSemantics(semantics::FIND_STRING_SWITCH_CASE))
+        return cast<ApplyInst>(user);
+      break;
+
+    case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
+    case SILInstructionKind::UncheckedRefCastInst:
+    case SILInstructionKind::UpcastInst: {
+      if (ApplyInst *foundCall =
+           findFindStringCall(cast<SingleValueInstruction>(user))) {
+        return foundCall;
+      }
+      break;
+    }
+
+    default:
+      break;
+    }
   }
-  return true;
+  return nullptr;
 }
 
 /// Handle the address of a tail element.
 bool ObjectOutliner::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
-                              llvm::SmallVectorImpl<StoreInst *> &TailStores) {
-  if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
-    if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
-      if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
-        return false;
-      TailStores[TailIdx] = SI;
+                                    unsigned NumTailTupleElements,
+                                    llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                                    EndCOWMutationInst *toIgnore) {
+  if (NumTailTupleElements > 0) {
+    if (auto *TEA = dyn_cast<TupleElementAddrInst>(TailAddr)) {
+      unsigned TupleIdx = TEA->getFieldIndex();
+      assert(TupleIdx < NumTailTupleElements);
+      for (Operand *Use : TEA->getUses()) {
+        if (!handleTailAddr(TailIdx * NumTailTupleElements + TupleIdx, Use->getUser(), 0,
+                            TailStores, toIgnore))
+          return false;
+      }
       return true;
     }
+  } else {
+    if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
+      if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
+        if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
+          return false;
+        TailStores[TailIdx] = SI;
+        return true;
+      }
+    }
   }
-  return isValidUseOfObject(TailAddr, /*isCOWObject*/false);
+  return isValidUseOfObject(TailAddr, toIgnore);
 }
 
 /// Get the init values for an object's stored properties and its tail elements.
 bool ObjectOutliner::getObjectInitVals(SILValue Val,
                         llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
                         llvm::SmallVectorImpl<StoreInst *> &TailStores,
-                        ApplyInst **FindStringCall) {
+                        unsigned NumTailTupleElements,
+                        EndCOWMutationInst *toIgnore) {
   for (Operand *Use : Val->getUses()) {
     SILInstruction *User = Use->getUser();
     if (auto *UC = dyn_cast<UpcastInst>(User)) {
       // Upcast is transparent.
-      if (!getObjectInitVals(UC, MemberStores, TailStores, FindStringCall))
+      if (!getObjectInitVals(UC, MemberStores, TailStores, NumTailTupleElements,
+                             toIgnore))
         return false;
     } else if (auto *REA = dyn_cast<RefElementAddrInst>(User)) {
       // The address of a stored property.
@@ -225,7 +253,7 @@ bool ObjectOutliner::getObjectInitVals(SILValue Val,
           if (!isValidInitVal(SI->getSrc()) || MemberStores[REA->getField()])
             return false;
           MemberStores[REA->getField()] = SI;
-        } else if (!isValidUseOfObject(ElemAddrUser, /*isCOWObject*/false)) {
+        } else if (!isValidUseOfObject(ElemAddrUser, toIgnore)) {
           return false;
         }
       }
@@ -242,15 +270,17 @@ bool ObjectOutliner::getObjectInitVals(SILValue Val,
             TailIdx = Index->getValue().getZExtValue();
 
           for (Operand *IAUse : IA->getUses()) {
-            if (!handleTailAddr(TailIdx, IAUse->getUser(), TailStores))
+            if (!handleTailAddr(TailIdx, IAUse->getUser(), NumTailTupleElements,
+                                TailStores, toIgnore))
               return false;
           }
         // Without an index_addr it's the first tail element.
-        } else if (!handleTailAddr(/*TailIdx*/0, TailUser, TailStores)) {
+        } else if (!handleTailAddr(/*TailIdx*/0, TailUser, NumTailTupleElements,
+                                   TailStores, toIgnore)) {
           return false;
         }
       }
-    } else if (!isValidUseOfObject(User, /*isCOWObject*/false, FindStringCall)) {
+    } else if (!isValidUseOfObject(User, toIgnore)) {
       return false;
     }
   }
@@ -272,18 +302,37 @@ public:
   }
 };
 
+static EndCOWMutationInst *getEndCOWMutation(SILValue object) {
+  for (Operand *use : object->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (auto *upCast = dyn_cast<UpcastInst>(user)) {
+      // Look through upcast instructions.
+      if (EndCOWMutationInst *ecm = getEndCOWMutation(upCast))
+        return ecm;
+    } else if (auto *ecm = dyn_cast<EndCOWMutationInst>(use->getUser())) {
+      return ecm;
+    }
+  }
+  return nullptr;
+}
+
 /// Try to convert an object allocation into a statically initialized object.
 ///
 /// In general this works for any class, but in practice it will only kick in
-/// for array buffer objects. The use cases are array literals in a function.
+/// for copy-on-write buffers, like array buffer objects.
+/// The use cases are array literals in a function.
 /// For example:
 ///     func getarray() -> [Int] {
 ///       return [1, 2, 3]
 ///     }
-bool ObjectOutliner::optimizeObjectAllocation(
-    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &ToRemove) {
-
+bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
   if (ARI->isObjC())
+    return false;
+
+  // Find the end_cow_mutation. Only for such COW buffer objects we do the
+  // transformation.
+  EndCOWMutationInst *endCOW = getEndCOWMutation(ARI);
+  if (!endCOW || endCOW->doKeepUnique())
     return false;
 
   // Check how many tail allocated elements are on the object.
@@ -316,14 +365,32 @@ bool ObjectOutliner::optimizeObjectAllocation(
   llvm::SmallVector<VarDecl *, 16> Fields;
   getFields(Cl, Fields);
 
+  llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
+
+  // A store for each element of the tail allocated array. In case of a tuple, there is a store
+  // for each tuple element. For example, a 3 element array of 2-element tuples
+  //     [ (i0, i1), (i2, i3), (i4, i5) ]
+  // results in following store instructions, collected in TailStores:
+  //     [ store i0, store i1, store i2, store i3, store i4, store i5 ]
+  llvm::SmallVector<StoreInst *, 16> TailStores;
+
+  unsigned NumStores = NumTailElems;
+  unsigned NumTailTupleElems = 0;
+  if (auto Tuple = TailType.getAs<TupleType>()) {
+    NumTailTupleElems = Tuple->getNumElements();
+    if (NumTailTupleElems == 0)
+      return false;
+    NumStores *= NumTailTupleElems;
+  }
+
+  TailStores.resize(NumStores);
+
   // Get the initialization stores of the object's properties and tail
   // allocated elements. Also check if there are any "bad" uses of the object.
-  llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
-  llvm::SmallVector<StoreInst *, 16> TailStores;
-  TailStores.resize(NumTailElems);
-  ApplyInst *FindStringCall = nullptr;
-  if (!getObjectInitVals(ARI, MemberStores, TailStores, &FindStringCall))
+  if (!getObjectInitVals(ARI, MemberStores, TailStores, NumTailTupleElems,
+                         endCOW)) {
     return false;
+  }
 
   // Is there a store for all the class properties?
   if (MemberStores.size() != Fields.size())
@@ -372,13 +439,32 @@ bool ObjectOutliner::optimizeObjectAllocation(
                            cast<SingleValueInstruction>(MemberStore->getSrc())));
     ToRemove.push_back(MemberStore);
   }
-  // Create the initializers for the tail elements.
   unsigned NumBaseElements = ObjectArgs.size();
-  for (StoreInst *TailStore : TailStores) {
-    ObjectArgs.push_back(Cloner.clone(
-                           cast<SingleValueInstruction>(TailStore->getSrc())));
-    ToRemove.push_back(TailStore);
+
+  // Create the initializers for the tail elements.
+  if (NumTailTupleElems == 0) {
+    // The non-tuple element case.
+    for (StoreInst *TailStore : TailStores) {
+      ObjectArgs.push_back(Cloner.clone(
+                             cast<SingleValueInstruction>(TailStore->getSrc())));
+      ToRemove.push_back(TailStore);
+    }
+  } else {
+    // The elements are tuples: combine NumTailTupleElems elements from TailStores to a single tuple
+    // instruction.
+    for (unsigned EIdx = 0; EIdx < NumTailElems; EIdx++) {
+      SmallVector<SILValue, 8> TupleElems;
+      for (unsigned TIdx = 0; TIdx < NumTailTupleElems; TIdx++) {
+        StoreInst *TailStore = TailStores[EIdx * NumTailTupleElems + TIdx];
+        SILValue V = Cloner.clone(cast<SingleValueInstruction>(TailStore->getSrc()));
+        TupleElems.push_back(V);
+        ToRemove.push_back(TailStore);
+      }
+      auto *TI = Cloner.getBuilder().createTuple(ARI->getLoc(), TailType, TupleElems);
+      ObjectArgs.push_back(TI);
+    }
   }
+
   // Create the initializer for the object itself.
   SILBuilder StaticInitBuilder(Glob);
   StaticInitBuilder.createObject(ArtificialUnreachableLocation(),
@@ -388,6 +474,11 @@ bool ObjectOutliner::optimizeObjectAllocation(
   SILBuilder B(ARI);
   GlobalValueInst *GVI = B.createGlobalValue(ARI->getLoc(), Glob);
   B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
+
+  ApplyInst *FindStringCall = findFindStringCall(endCOW);
+  endCOW->replaceAllUsesWith(endCOW->getOperand());
+  ToRemove.push_back(endCOW);
+
   llvm::SmallVector<Operand *, 8> Worklist(ARI->use_begin(), ARI->use_end());
   while (!Worklist.empty()) {
     auto *Use = Worklist.pop_back_val();
@@ -425,7 +516,8 @@ bool ObjectOutliner::optimizeObjectAllocation(
 void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   // Find the replacement function in the swift stdlib.
   SmallVector<ValueDecl *, 1> results;
-  SILModule *Module = &FindStringCall->getFunction()->getModule();
+  auto &F = *FindStringCall->getFunction();
+  SILModule *Module = &F.getModule();
   Module->getASTContext().lookupInSwiftModule("_findStringSwitchCaseWithCache",
                                               results);
   if (results.size() != 1)
@@ -443,7 +535,10 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (FTy->getNumParameters() != 3)
     return;
 
-  SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
+  SILType cacheType =
+      FTy->getParameters()[2]
+          .getSILStorageType(*Module, FTy, TypeExpansionContext::minimal())
+          .getObjectType();
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;
@@ -453,8 +548,9 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   assert(!cacheDecl->isResilient(Module->getSwiftModule(),
                                  ResilienceExpansion::Minimal));
 
-  SILType wordTy = cacheType.getFieldType(
-                            cacheDecl->getStoredProperties().front(), *Module);
+  SILType wordTy =
+      cacheType.getFieldType(cacheDecl->getStoredProperties().front(), *Module,
+                             F.getTypeExpansionContext());
 
   GlobalVariableMangler Mangler;
   std::string GlobName =

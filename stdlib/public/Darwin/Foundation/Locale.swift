@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 /**
  `Locale` encapsulates information about linguistic, cultural, and technological conventions and standards. Examples of information encapsulated by a locale include the symbol used for the decimal separator in numbers and the way dates are formatted.
@@ -405,11 +405,12 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
     // MARK: -
     //
     
-    public var hashValue : Int {
+    public func hash(into hasher: inout Hasher) {
         if _autoupdating {
-            return 1
+            hasher.combine(false)
         } else {
-            return _wrapped.hash
+            hasher.combine(true)
+            hasher.combine(_wrapped)
         }
     }
 

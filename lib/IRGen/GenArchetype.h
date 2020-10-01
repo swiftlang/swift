@@ -59,7 +59,14 @@ namespace irgen {
                                                 Address archetypeAddr,
                                                 SILType archetypeType);
   
-  
+  /// Emit a lookup for an opaque result type's metadata.
+  MetadataResponse emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
+                                             CanOpaqueTypeArchetypeType archetype,
+                                             DynamicMetadataRequest request);
+  /// Emit a lookup for an opaque result type's protocol conformance.
+  llvm::Value *emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
+                                             CanOpaqueTypeArchetypeType archetype,
+                                             ProtocolDecl *protocol);
 } // end namespace irgen
 } // end namespace swift
 

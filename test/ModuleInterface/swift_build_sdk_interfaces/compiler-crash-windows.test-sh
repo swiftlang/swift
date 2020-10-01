@@ -1,0 +1,15 @@
+# This test is intentionally specialized on windows becauase not --crash behaves
+# differently there. The exit code from the crashing frontend invocations is
+# mapped to `-21` there, which lit's `not` along does not remap correctly.
+# See rdar://59397376
+REQUIRES: OS=windows-msvc
+
+RUN: %empty-directory(%t)
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not --crash %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/mock-sdk/ -o %t/output -debug-crash-compiler -log-path %t
+RUN: %FileCheck %s < %t/Flat-Flat-err.txt
+
+CHECK: Program arguments:
+CHECK-SAME: -debug-crash-immediately
+CHECK-SAME: {{.+}}.swiftinterface
+
+REQUIRES: asserts

@@ -17,11 +17,16 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "ConstraintSystem.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -123,64 +128,54 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   return E;
 }
 
-/// Look up the builtin precedence group with the given name.
-static PrecedenceGroupDecl *
-getBuiltinPrecedenceGroup(TypeChecker &TC, DeclContext *DC, Identifier name,
-                          SourceLoc loc) {
-  auto group = TC.lookupPrecedenceGroup(DC, name,
-                                        /*suppress diags*/ SourceLoc());
-  if (!group) {
-    TC.diagnose(loc, diag::missing_builtin_precedence_group, name);
-  }
-  return group;
-}
-
-static PrecedenceGroupDecl *
-lookupPrecedenceGroupForOperator(TypeChecker &TC, DeclContext *DC,
-                                 Identifier name, SourceLoc loc) {
-  SourceFile *SF = DC->getParentSourceFile();
-  bool isCascading = DC->isCascadingContextForLookup(true);
-  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
-    TC.validateDecl(op);
-    return op->getPrecedenceGroup();
-  } else {
-    TC.diagnose(loc, diag::unknown_binop);
-  }
-  return nullptr;
+static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
+                                                             Identifier name,
+                                                             SourceLoc loc) {
+  auto *op = DC->lookupInfixOperator(name).getSingleOrDiagnose(loc);
+  return op ? op->getPrecedenceGroup() : nullptr;
 }
 
 PrecedenceGroupDecl *
 TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
+  /// Look up the builtin precedence group with the given name.
+
+  auto getBuiltinPrecedenceGroup = [&](DeclContext *DC, Identifier name,
+                                       SourceLoc loc) -> PrecedenceGroupDecl * {
+    auto groups = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
+    return groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true);
+  };
+  
+  auto &Context = DC->getASTContext();
   if (auto ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_TernaryPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,
                                      ifExpr->getQuestionLoc());
   }
 
   if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_AssignmentPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_AssignmentPrecedence,
                                      assignExpr->getEqualLoc());
   }
 
   if (auto castExpr = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_CastingPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_CastingPrecedence,
                                      castExpr->getAsLoc());
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Identifier name = DRE->getDecl()->getBaseName().getIdentifier();
-    return lookupPrecedenceGroupForOperator(*this, DC, name, DRE->getLoc());
+    Identifier name = DRE->getDecl()->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Identifier name = OO->getDecls()[0]->getBaseName().getIdentifier();
-    return lookupPrecedenceGroupForOperator(*this, DC, name, OO->getLoc());
+    Identifier name = OO->getDecls()[0]->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
   }
 
   if (auto arrowExpr = dyn_cast<ArrowExpr>(E)) {
-    return getBuiltinPrecedenceGroup(*this, DC,
+    return getBuiltinPrecedenceGroup(DC,
                                      Context.Id_FunctionArrowPrecedence,
                                      arrowExpr->getArrowLoc());
   }
@@ -196,14 +191,14 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    Identifier name = MRE->getDecl().getDecl()->getBaseName().getIdentifier();
-    return lookupPrecedenceGroupForOperator(*this, DC, name, MRE->getLoc());
+    Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
   }
 
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
-    diagnose(E->getLoc(), diag::unknown_binop);
+    Context.Diags.diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
 }
@@ -216,7 +211,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
 /// 'findLHS(DC, expr, "<<")' returns 'B'.
 /// 'findLHS(DC, expr, '==')' returns nullptr.
 Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
-  auto right = lookupPrecedenceGroupForOperator(*this, DC, name, E->getEndLoc());
+  auto right = lookupPrecedenceGroupForOperator(DC, name, E->getEndLoc());
   if (!right)
     return nullptr;
 
@@ -236,7 +231,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     if (!left)
       // LHS is not binary expression.
       return E;
-    switch (Context.associateInfixOperators(left, right)) {
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
       case swift::Associativity::None:
         return nullptr;
       case swift::Associativity::Left:
@@ -266,28 +261,40 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
 // The way we compute isEndOfSequence relies on the assumption that
 // the sequence-folding algorithm never recurses with a prefix of the
 // entire sequence.
-static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
+static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
                        PrecedenceGroupDecl *opPrecedence,
                        bool isEndOfSequence) {
   if (!LHS || !RHS)
     return nullptr;
 
-  // If the left-hand-side is a 'try', hoist it up.
-  auto *tryEval = dyn_cast<AnyTryExpr>(LHS);
-  if (tryEval) {
-    LHS = tryEval->getSubExpr();
+  // If the left-hand-side is a 'try' or 'await', hoist it up turning
+  // "(try x) + y" into try (x + y).
+  if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
+    auto sub = makeBinOp(Ctx, Op, tryEval->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    tryEval->setSubExpr(sub);
+    return tryEval;
+  }
+  
+  if (auto *await = dyn_cast<AwaitExpr>(LHS)) {
+    auto sub = makeBinOp(Ctx, Op, await->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    await->setSubExpr(sub);
+    return await;
   }
   
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
-  OptionalEvaluationExpr *optEval = nullptr;
   if (opPrecedence && opPrecedence->isAssignment()) {
-    if ((optEval = dyn_cast<OptionalEvaluationExpr>(LHS))) {
-      LHS = optEval->getSubExpr();
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(LHS)) {
+      auto sub = makeBinOp(Ctx, Op, optEval->getSubExpr(), RHS,
+                           opPrecedence, isEndOfSequence);
+      optEval->setSubExpr(sub);
+      return optEval;
     }
   }
 
-  // If the right operand is a try, it's an error unless the operator
+  // If the right operand is a try or await, it's an error unless the operator
   // is an assignment or conditional operator and there's nothing to
   // the right that didn't parse as part of the right operand.
   //
@@ -303,12 +310,13 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<AnyTryExpr>(RHS)) {
+  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS)) {
     // If you change this, also change TRY_KIND_SELECT in diagnostics.
     enum class TryKindForDiagnostics : unsigned {
       Try,
       ForceTry,
-      OptionalTry
+      OptionalTry,
+      Await
     };
     TryKindForDiagnostics tryKind;
     switch (RHS->getKind()) {
@@ -321,6 +329,9 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     case ExprKind::OptionalTry:
       tryKind = TryKindForDiagnostics::OptionalTry;
       break;
+    case ExprKind::Await:
+      tryKind = TryKindForDiagnostics::Await;
+      break;
     default:
       llvm_unreachable("unknown try-like expression");
     }
@@ -329,38 +340,26 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
         (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
-          TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         } else {
-          TC.diagnose(RHS->getStartLoc(), diag::try_assign_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(),
+                             diag::try_assign_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         }
       }
     } else {
-      TC.diagnose(RHS->getStartLoc(), diag::try_rhs,
-                  static_cast<unsigned>(tryKind));
+      Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_rhs,
+                         static_cast<unsigned>(tryKind));
     }
   }
 
-  // Fold the result into the optional evaluation or try.
-  auto makeResultExpr = [&](Expr *result) -> Expr * {
-    if (optEval) {
-      optEval->setSubExpr(result);
-      result = optEval;
-    }
-    if (tryEval) {
-      tryEval->setSubExpr(result);
-      result = tryEval;
-    }
-    return result;
-  };
-  
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     ifExpr->setCondExpr(LHS);
     ifExpr->setElseExpr(RHS);
-    return makeResultExpr(ifExpr);
+    return ifExpr;
   }
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
@@ -368,7 +367,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     assign->setDest(LHS);
     assign->setSrc(RHS);
-    return makeResultExpr(assign);
+    return assign;
   }
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
@@ -376,7 +375,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
-    return makeResultExpr(as);
+    return as;
   }
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
@@ -384,22 +383,20 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
     arrow->setArgsExpr(LHS);
     arrow->setResultExpr(RHS);
-    return makeResultExpr(arrow);
+    return arrow;
   }
   
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
-  auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
-  TupleExpr *Arg = TupleExpr::create(TC.Context,
-                                     SourceLoc(), 
+  auto ArgElts2 = Ctx.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
+  TupleExpr *Arg = TupleExpr::create(Ctx,
+                                     SourceLoc(),
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
-
-  
   
   // Build the operation.
-  return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
+  return new (Ctx) BinaryExpr(Op, Arg, Op->isImplicit());
 }
 
 namespace {
@@ -410,20 +407,20 @@ namespace {
     PrecedenceBound(PrecedenceGroupDecl *decl, bool isStrict)
       : GroupAndIsStrict(decl, isStrict) {}
 
-    bool shouldConsider(TypeChecker &TC, PrecedenceGroupDecl *group) {
+    bool shouldConsider(PrecedenceGroupDecl *group) {
       auto storedGroup = GroupAndIsStrict.getPointer();
       if (!storedGroup) return true;
       if (!group) return false;
       if (storedGroup == group) return !GroupAndIsStrict.getInt();
-      return TC.Context.associateInfixOperators(group, storedGroup)
-               == Associativity::Left;
+      return group->getASTContext().associateInfixOperators(group, storedGroup)
+               != Associativity::Right;
     }
   };
 } // end anonymous namespace
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
+static Expr *foldSequence(DeclContext *DC,
                           Expr *LHS,
                           ArrayRef<Expr*> &S,
                           PrecedenceBound precedenceBound) {
@@ -444,8 +441,8 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    auto opPrecedence = TC.lookupPrecedenceGroupForInfixOperator(DC, op);
-    if (!precedenceBound.shouldConsider(TC, opPrecedence))
+    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, op);
+    if (!precedenceBound.shouldConsider(opPrecedence))
       return {nullptr, nullptr};
     return {op, opPrecedence};
   };
@@ -458,15 +455,16 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
   S = S.slice(2);
-  
+
+  auto &Ctx = DC->getASTContext();
   while (!S.empty()) {
     assert((S.size() & 1) == 0);
-    assert(precedenceBound.shouldConsider(TC, op1.precedence));
+    assert(precedenceBound.shouldConsider(op1.precedence));
 
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(op1.op)) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = getNextOperator();
       if (!op1) return LHS;
       RHS = S[1];
@@ -475,11 +473,11 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2 = { S[0], TC.lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
+    Op op2{ S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
 
     // If the second operator's precedence is lower than the
     // precedence bound, break out of the loop.
-    if (!precedenceBound.shouldConsider(TC, op2.precedence)) break;
+    if (!precedenceBound.shouldConsider(op2.precedence)) break;
 
     // If we're missing precedence info for either operator, treat them
     // as non-associative.
@@ -488,13 +486,13 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
       associativity = Associativity::None;
     } else {
       associativity =
-        TC.Context.associateInfixOperators(op1.precedence, op2.precedence);
+        Ctx.associateInfixOperators(op1.precedence, op2.precedence);
     }
 
     // Apply left-associativity immediately by folding the first two
     // operands.
     if (associativity == Associativity::Left) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = op2;
       RHS = S[1];
       S = S.slice(2);
@@ -507,7 +505,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // repeat.
     if (associativity == Associativity::Right &&
         op1.precedence != op2.precedence) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ true));
       continue;
     }
@@ -515,15 +513,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // Apply right-associativity by recursively folding operators
     // starting from this point, then immediately folding the LHS and RHS.
     if (associativity == Associativity::Right) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ false));
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(TC, DC, LHS, S, precedenceBound);
+      return foldSequence(DC, LHS, S, precedenceBound);
     }
 
     // If we ended up here, it's because we're either:
@@ -539,52 +537,62 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     } else if (op1.precedence == op2.precedence) {
       assert(op1.precedence->isNonAssociative());
       // FIXME: QoI ranges
-      TC.diagnose(op1.op->getLoc(), diag::non_associative_adjacent_operators,
-                  op1.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::non_associative_adjacent_operators,
+                         op1.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
 
     } else {
-      TC.diagnose(op1.op->getLoc(), diag::unordered_adjacent_operators,
-                  op1.precedence->getName(), op2.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::unordered_adjacent_operators,
+                         op1.precedence->getName(), op2.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
-    return foldSequence(TC, DC, LHS, S, precedenceBound);
+    LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
+    return foldSequence(DC, LHS, S, precedenceBound);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+  return makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
-bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics()) return false;
+bool TypeChecker::requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc) {
+  if (ctx.hasOptionalIntrinsics())
+    return false;
 
-  diagnose(loc, diag::optional_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
-  if (Context.hasPointerArgumentIntrinsics()) return false;
+bool TypeChecker::requirePointerArgumentIntrinsics(ASTContext &ctx,
+                                                   SourceLoc loc) {
+  if (ctx.hasPointerArgumentIntrinsics())
+    return false;
 
-  diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::pointer_argument_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
-  if (Context.hasArrayLiteralIntrinsics()) return false;
-  
-  diagnose(loc, diag::array_literal_intrinsics_not_found);
+bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
+                                                SourceLoc loc) {
+  if (ctx.hasArrayLiteralIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
-  auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
+  auto type = constraints::ConstraintSystem::getUnopenedTypeOfReference(
+      value, Type(), UseDC,
+      [&](VarDecl *var) -> Type { return value->getType(); });
   auto semantics = value->getAccessSemanticsFromContext(UseDC,
                                                        /*isAccessOnSelf*/false);
-  return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
+  return new (value->getASTContext())
+      DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
@@ -592,10 +600,11 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 bool Implicit, FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
-  if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
-                                                       /*isAccessOnSelf*/false);
-    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
+  auto &Context = UseDC->getASTContext();
+
+  if (Decls.size() == 1) {
+    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
+                                     AccessSemantics::Ordinary);
   }
 
   Decls = Context.AllocateCopy(Decls);
@@ -605,52 +614,17 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   return result;
 }
 
-Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                        FunctionType *closureType) {
-  bool isInDefaultArgumentContext = false;
-  if (auto *init = dyn_cast<Initializer>(DC))
-    isInDefaultArgumentContext =
-        init->getInitializerKind() == InitializerKind::DefaultArgument;
-
-  auto info = closureType->getExtInfo();
-  auto newClosureType = closureType;
-
-  if (isInDefaultArgumentContext && info.isNoEscape())
-    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
-                         ->castTo<FunctionType>();
-
-  auto *closure = new (Context) AutoClosureExpr(
-      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
-
-  closure->setParameterList(ParameterList::createEmpty(Context));
-
-  ClosuresWithUncomputedCaptures.push_back(closure);
-
-  if (!newClosureType->isEqual(closureType)) {
-    assert(isInDefaultArgumentContext);
-    assert(newClosureType
-               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
-               ->isEqual(closureType));
-    return new (Context) FunctionConversionExpr(closure, closureType);
-  }
-
-  return closure;
-}
-
-static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
+static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  if (isa<AbstractFunctionDecl>(dc))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
-                                     TC.Context.getIdentifier(name),
-                                     SourceLoc(),
-                                     lookupOptions);
+  auto &ctx = dc->getASTContext();
+  DeclNameRef nameRef(ctx.getIdentifier(name));
+  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
+                                               nameRef, SourceLoc(),
+                                               defaultUnqualifiedLookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  TC.validateDecl(TD);
-
+  
   if (TD->isInvalid())
     return Type();
 
@@ -661,45 +635,57 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
 
 static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
-  TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-
-  // clang-format off
-  #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)            \
-    if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
-      return KnownProtocolKind::Id;
-  #include "swift/AST/KnownProtocols.def"
-  #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-  // clang-format on
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
+  if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
+                                           SourceLoc(),                        \
+                                           KnownProtocolKind::Id))             \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 
   return None;
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
-    Type t = evaluateOrDefault(
-        Context.evaluator,
+    return evaluateOrDefault(
+        protocol->getASTContext().evaluator,
         DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
-    return t;
   }
-  return nullptr;
+  return Type();
 }
 
-llvm::Expected<Type>
+static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
+    const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName,          \
+                                                  performLocalLookup)          \
+  case KnownProtocolKind::Id:                                                  \
+    return {typeName, performLocalLookup};
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  default:
+    return {nullptr, false};
+  }
+}
+
+Type
 swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
                                     KnownProtocolKind knownProtocolKind,
                                     const DeclContext *dc) const {
-  const char *const name = getTypeName(knownProtocolKind);
+  const char *name;
+  bool performLocalLookup;
+  std::tie(name, performLocalLookup) =
+      lookupDefaultTypeInfoForKnownProtocol(knownProtocolKind);
   if (!name)
     return nullptr;
 
-  TypeChecker &tc = getTypeChecker();
-
   Type type;
-  if (getPerformLocalLookup(knownProtocolKind))
-    type = lookupDefaultLiteralType(tc, dc, name);
+  if (performLocalLookup)
+    type = lookupDefaultLiteralType(dc, name);
 
   if (!type)
-    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+    type = lookupDefaultLiteralType(TypeChecker::getStdlibModule(dc), name);
 
   // Strip off one level of sugar; we don't actually want to print
   // the name of the typealias itself anywhere.
@@ -710,10 +696,6 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
   return type;
 }
 
-TypeChecker &DefaultTypeRequest::getTypeChecker() const {
-  return TypeChecker::createForContext(getDeclContext()->getASTContext());
-}
-
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
@@ -722,8 +704,118 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, PrecedenceBound());
+  Expr *Result = ::foldSequence(dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
 
   return Result;
+}
+
+static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
+                                         SourceLoc loc) {
+  auto &ctx = param->getASTContext();
+  switch (param->getDefaultArgumentKind()) {
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case DefaultArgumentKind::NAME: \
+    return new (ctx) \
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::NAME, loc, \
+                                   /*implicit=*/true);
+#include "swift/AST/MagicIdentifierKinds.def"
+
+  case DefaultArgumentKind::NilLiteral:
+    return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray: {
+    auto *initExpr = ArrayExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::EmptyDictionary: {
+    auto *initExpr = DictionaryExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+    llvm_unreachable("Not a caller-side default");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+Expr *CallerSideDefaultArgExprRequest::evaluate(
+    Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
+  auto *param = defaultExpr->getParamDecl();
+  auto paramTy = defaultExpr->getType();
+
+  // Re-create the default argument using the location info of the call site.
+  auto *initExpr =
+      synthesizeCallerSideDefault(param, defaultExpr->getLoc());
+  auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  assert(dc && "Expected a DeclContext before type-checking caller-side arg");
+
+  auto &ctx = param->getASTContext();
+  DiagnosticTransaction transaction(ctx.Diags);
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    if (param->hasDefaultExpr()) {
+      // HACK: If we were unable to type-check the default argument in context,
+      // then retry by type-checking it within the parameter decl, which should
+      // also fail. This will present the user with a better error message and
+      // allow us to avoid diagnosing on each call site.
+      transaction.abort();
+      (void)param->getTypeCheckedDefaultExpr();
+      assert(ctx.Diags.hadAnyError());
+    }
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
+  }
+  return initExpr;
+}
+
+bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                               ClosureExpr *closure) const {
+  // A walker that looks for 'return' statements that aren't
+  // nested within closures or nested declarations.
+  class FindReturns : public ASTWalker {
+    bool FoundResultReturn = false;
+    bool FoundNoResultReturn = false;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return {false, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override { return false; }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Record return statements.
+      if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
+        if (ret->isImplicit())
+          return {true, stmt};
+
+        // If it has a result, remember that we saw one, but keep
+        // traversing in case there's a no-result return somewhere.
+        if (ret->hasResult()) {
+          FoundResultReturn = true;
+
+          // Otherwise, stop traversing.
+        } else {
+          FoundNoResultReturn = true;
+          return {false, nullptr};
+        }
+      }
+      return {true, stmt};
+    }
+
+  public:
+    bool hasResult() const { return !FoundNoResultReturn && FoundResultReturn; }
+  };
+
+  auto body = closure->getBody();
+  if (!body)
+    return false;
+
+  FindReturns finder;
+  body->walk(finder);
+  return finder.hasResult();
 }

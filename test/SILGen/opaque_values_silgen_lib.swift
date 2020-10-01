@@ -25,6 +25,19 @@ func s010______PAndS_cases() {
   _ = PAndSEnum.A
 }
 
+// Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
+// ---
+// CHECK-LABEL: sil private [ossa] @$ss21s010______PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $EmptyP, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
+// CHECK:   [[COPY0:%.*]] = copy_value [[ARG0]]
+// CHECK:   [[COPY1:%.*]] = copy_value [[ARG1]]
+// CHECK:   [[RTUPLE:%.*]] = tuple ([[COPY0]] : $EmptyP, [[COPY1]] : $String)
+// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt, [[RTUPLE]] : $(EmptyP, String)
+// CHECK:   return [[RETVAL]] : $PAndSEnum
+// CHECK-LABEL: } // end sil function '$ss21s010______PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_'
+enum PAndSEnum { case A(EmptyP, String) }
+
+
 // Test emitBuiltinReinterpretCast.
 // ---
 // CHECK-LABEL: sil hidden [ossa] @$ss21s020__________bitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
@@ -57,21 +70,3 @@ func s020__________bitCast<T, U>(_ x: T, to type: U.Type) -> U {
 func s030__________refCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
-
-// Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
-// ---
-// CHECK-LABEL: sil shared [transparent] [ossa] @$ss9PAndSEnumO1AyABs6EmptyP_p_SStcABmF : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {
-// CHECK: bb0([[ARG0:%.*]] : @owned $EmptyP, [[ARG1:%.*]]  : @owned $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
-// CHECK:   [[RTUPLE:%.*]] = tuple ([[ARG0]] : $EmptyP, [[ARG1]] : $String)
-// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
-// CHECK:   return [[RETVAL]] : $PAndSEnum
-// CHECK-LABEL: } // end sil function '$ss9PAndSEnumO1AyABs6EmptyP_p_SStcABmF'
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$ss9PAndSEnumO1AyABs6EmptyP_p_SStcABmFTc : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_guaranteed (@in_guaranteed EmptyP, @guaranteed String) -> @out PAndSEnum {
-// CHECK: bb0([[ARG:%.*]] : $@thin PAndSEnum.Type):
-// CHECK:   [[RETVAL:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
-// CHECK:   [[CANONICAL_THUNK_FN:%.*]] = function_ref @$ss6EmptyP_pSSs9PAndSEnumOIegixr_sAA_pSSACIegngr_TR : $@convention(thin) (@in_guaranteed EmptyP, @guaranteed String, @guaranteed @callee_guaranteed (@in EmptyP, @owned String) -> @out PAndSEnum) -> @out PAndSEnum
-// CHECK:   [[CANONICAL_THUNK:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK_FN]]([[RETVAL]])
-// CHECK:   return [[CANONICAL_THUNK]] : $@callee_guaranteed (@in_guaranteed EmptyP, @guaranteed String) -> @out PAndSEnum
-// CHECK-LABEL: } // end sil function '$ss9PAndSEnumO1AyABs6EmptyP_p_SStcABmFTc'
-enum PAndSEnum { case A(EmptyP, String) }
-

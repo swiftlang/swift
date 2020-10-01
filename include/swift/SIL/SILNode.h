@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>
@@ -285,6 +286,10 @@ protected:
                         NumAssignOwnershipQualifierBits,
     OwnershipQualifier : NumAssignOwnershipQualifierBits
   );
+  SWIFT_INLINE_BITFIELD(AssignByWrapperInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
+  );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,
@@ -299,6 +304,22 @@ protected:
     : NumPadBits,
     FieldNo : 32
   );
+
+  SWIFT_INLINE_BITFIELD(RefElementAddrInst, SingleValueInstruction, 1,
+    Immutable : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(RefTailAddrInst, SingleValueInstruction, 1,
+    Immutable : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(EndCOWMutationInst, NonValueInstruction, 1,
+    KeepUnique : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(FieldIndexCacheBase, SingleValueInstruction, 32,
+                             : NumPadBits,
+                             FieldIndex : 32);
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.
@@ -345,6 +366,12 @@ protected:
     HasDefault : 1,
     : NumPadBits,
     NumCases : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(MultipleValueInstruction, SILInstruction);
+
+  SWIFT_INLINE_BITFIELD(BeginCOWMutationInst, MultipleValueInstruction, 1,
+    Native : 1
   );
 
   } Bits;

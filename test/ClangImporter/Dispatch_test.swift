@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
 // REQUIRES: libdispatch
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-android
 
 import Dispatch
 

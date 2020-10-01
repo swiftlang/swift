@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "Constraint.h"
+#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -212,8 +213,9 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  ResolvedOverloadSetListItem *getResolvedOverloads() const {
-    return CS.resolvedOverloadSets;
+  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
+  getResolvedOverloads() const {
+    return CS.ResolvedOverloads;
   }
 
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
@@ -226,16 +228,11 @@ protected:
   Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
-    if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, minimize);
+    CS.filterSolutions(solutions, minimize);
   }
 
-  /// Check whether constraint solver is running in "debug" mode,
-  /// which should output diagnostic information.
-  bool isDebugMode() const { return CS.TC.getLangOpts().DebugConstraintSolver; }
-
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     return indent ? log.indent(CS.solverState->depth * 2) : log;
   }
 };
@@ -257,6 +254,10 @@ class SplitterStep final : public SolverStep {
 
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
+  /// Whether to include the partial results of this component in the final
+  /// merged results.
+  SmallVector<bool, 4> IncludeInMergedResults;
+
 public:
   SplitterStep(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions) {}
@@ -272,7 +273,7 @@ private:
   /// If current step needs follow-up steps to get completely solved,
   /// let's compute them using connected components algorithm.
   void computeFollowupSteps(
-      SmallVectorImpl<std::unique_ptr<ComponentStep>> &componentSteps);
+      SmallVectorImpl<std::unique_ptr<SolverStep>> &steps);
 
   /// Once all of the follow-up steps are complete, let's try
   /// to merge resulting solutions together, to form final solution(s)
@@ -281,6 +282,52 @@ private:
   /// \returns true if there are any solutions, false otherwise.
   bool mergePartialSolutions() const;
 };
+
+/// `DependentComponentSplitterStep` is responsible for composing the partial
+/// solutions from other components (on which this component depends) into
+/// the inputs based on which we can solve a particular component.
+class DependentComponentSplitterStep final : public SolverStep {
+  /// Constraints "in scope" of this step.
+  ConstraintList *Constraints;
+
+  /// Index into the parent splitter step.
+  unsigned Index;
+
+  /// The component that has dependencies.
+  ConstraintGraph::Component Component;
+
+  /// Array containing all of the partial solutions for the parent split.
+  MutableArrayRef<SmallVector<Solution, 4>> AllPartialSolutions;
+
+  /// Take all of the constraints in this component and put them into
+  /// \c Constraints.
+  void injectConstraints() {
+    for (auto constraint : Component.getConstraints()) {
+      Constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
+  }
+
+public:
+  DependentComponentSplitterStep(
+      ConstraintSystem &cs,
+      ConstraintList *constraints,
+      unsigned index,
+      ConstraintGraph::Component &&component,
+      MutableArrayRef<SmallVector<Solution, 4>> allPartialSolutions)
+    : SolverStep(cs, allPartialSolutions[index]), Constraints(constraints),
+      Index(index), Component(std::move(component)),
+      AllPartialSolutions(allPartialSolutions) {
+    assert(!Component.dependsOn.empty() && "Should use ComponentStep");
+    injectConstraints();
+  }
+
+  StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override;
+};
+
 
 /// `ComponentStep` represents a set of type variables and related
 /// constraints which could be solved independently. It's further
@@ -291,7 +338,7 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem &CS;
     ConstraintSystem::SolverScope *SolverScope;
 
-    SmallVector<TypeVariableType *, 16> TypeVars;
+    SetVector<TypeVariableType *> TypeVars;
     ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
 
     // The component this scope is associated with.
@@ -336,48 +383,76 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  SmallVector<TypeVariableType *, 16> TypeVars;
+  TinyPtrVector<TypeVariableType *> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
-  /// Number of disjunction constraints associated with this step,
-  /// used to aid in ordering of the components.
-  unsigned NumDisjunctions = 0;
+  /// The set of partial solutions that should be composed before evaluating
+  /// this component.
+  SmallVector<const Solution *, 2> DependsOnPartialSolutions;
 
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
 
 public:
-  ComponentStep(ConstraintSystem &cs, unsigned index, bool single,
+  /// Create a single component step.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
                 ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Index(index), IsSingle(single),
+      : SolverStep(cs, solutions), Index(index), IsSingle(true),
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {}
 
-  /// Record a type variable as associated with this step.
-  void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
+  /// Create a component step from a constraint graph component.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
+                ConstraintList *constraints,
+                ConstraintGraph::Component &&component,
+                SmallVectorImpl<Solution> &solutions)
+      : SolverStep(cs, solutions), Index(index), IsSingle(false),
+        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+        Constraints(constraints) {
+    if (component.isOrphaned()) {
+      assert(component.getConstraints().size() == 1);
+      OrphanedConstraint = component.getConstraints().front();
+    } else {
+      assert(component.typeVars.size() > 0);
+    }
 
-  /// Record a constraint as associated with this step.
-  void record(Constraint *constraint) {
-    Constraints->push_back(constraint);
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      ++NumDisjunctions;
+    TypeVars = std::move(component.typeVars);
+
+    for (auto constraint : component.getConstraints()) {
+      constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
+
+    assert(component.dependsOn.empty());
   }
 
-  /// Record a constraint as associated with this step but which doesn't
-  /// have any free type variables associated with it.
-  void recordOrphan(Constraint *constraint) {
-    assert(!OrphanedConstraint);
-    OrphanedConstraint = constraint;
+  /// Create a component step that composes existing partial solutions before
+  /// solving constraints.
+  ComponentStep(
+      ConstraintSystem &cs, unsigned index,
+      ConstraintList *constraints,
+      const ConstraintGraph::Component &component,
+      llvm::SmallVectorImpl<const Solution *> &&dependsOnPartialSolutions,
+      SmallVectorImpl<Solution> &solutions)
+        : SolverStep(cs, solutions), Index(index), IsSingle(false),
+          OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+          Constraints(constraints),
+          DependsOnPartialSolutions(std::move(dependsOnPartialSolutions)) {
+    TypeVars = component.typeVars;
+    assert(DependsOnPartialSolutions.size() == component.dependsOn.size());
+
+    for (auto constraint : component.getConstraints()) {
+      constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
   }
 
   StepResult take(bool prevFailed) override;
-  StepResult resume(bool prevFailed) override;
 
-  // The number of disjunction constraints associated with this component.
-  unsigned disjunctionCount() const { return NumDisjunctions; }
+  StepResult resume(bool prevFailed) override { return finalize(!prevFailed); }
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
@@ -390,14 +465,19 @@ private:
     if (IsSingle)
       return;
 
-    if (isDebugMode())
+    if (CS.isDebugMode())
       getDebugLogger() << "(solving component #" << Index << '\n';
 
-    ComponentScope = llvm::make_unique<Scope>(*this);
-    // If this component has oprhaned constraint attached,
+    ComponentScope = std::make_unique<Scope>(*this);
+
+    // If this component has orphaned constraint attached,
     // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
+
+  /// Finalize current component by either cleanup if sub-tasks
+  /// have failed, or solution generation and minimization.
+  StepResult finalize(bool isSuccess);
 };
 
 template <typename P> class BindingStep : public SolverStep {
@@ -429,7 +509,7 @@ public:
       if (shouldStopAt(*choice))
         break;
 
-      if (isDebugMode()) {
+      if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
         choice->print(log, &CS.getASTContext().SourceMgr);
@@ -437,14 +517,14 @@ public:
       }
 
       {
-        auto scope = llvm::make_unique<Scope>(CS);
+        auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
-          return suspend(llvm::make_unique<SplitterStep>(CS, Solutions));
+          return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
 
-      if (isDebugMode())
+      if (CS.isDebugMode())
         getDebugLogger() << ")\n";
 
       // If this binding didn't match, let's check if we've attempted
@@ -515,7 +595,9 @@ public:
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "TypeVariableStep for " << TypeVar->getString(PO) << " with #"
         << InitialBindings.size() << " initial bindings\n";
   }
 
@@ -531,6 +613,13 @@ protected:
   /// Check whether attempting type variable binding choices should
   /// be stopped, because optimal solution has already been found.
   bool shouldStopAt(const TypeVariableBinding &choice) const override {
+    // Let's always attempt default types inferred from literals in diagnostic
+    // mode because that could lead to better diagnostics if the problem is
+    // contextual like argument/parameter conversion or collection element
+    // mismatch.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If we were able to solve this without considering
     // default literals, don't bother looking at default literals.
     return AnySolved && choice.hasDefaultedProtocol() &&
@@ -538,6 +627,11 @@ protected:
   }
 
   bool shouldStopAfter(const TypeVariableBinding &choice) const override {
+    // Let's always attempt additional bindings in diagnostic mode, as that
+    // could lead to better diagnostic for e.g trying the unwrapped type.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If there has been at least one solution so far
     // at a current batch of bindings is done it's a
     // success because each new batch would be less
@@ -622,12 +716,12 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto *resolved = getResolvedOverloads(); resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
+    for (auto elt : getResolvedOverloads()) {
+      auto resolved = elt.second;
+      if (!resolved.boundType->isEqual(repr))
         continue;
 
-      auto &representative = resolved->Choice;
+      auto &representative = resolved.choice;
       if (!representative.isDecl())
         return;
 

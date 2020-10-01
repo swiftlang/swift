@@ -60,7 +60,7 @@ public:
   /// \p kind. Missing optional elements are represented with a null
   /// ParsedRawSyntaxNode object.
   ParsedRawSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                     ArrayRef<ParsedRawSyntaxNode> elements);
+                                      MutableArrayRef<ParsedRawSyntaxNode> elements);
 
   /// Record a raw syntax collecton without eny elements. \p loc can be invalid
   /// or an approximate location of where an element of the collection would be
@@ -68,9 +68,15 @@ public:
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,
                                                      SourceLoc loc);
 
+  void discardRecordedNode(ParsedRawSyntaxNode &node);
+
   /// Used for incremental re-parsing.
   ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,
                                  syntax::SyntaxKind kind);
+
+  #ifndef NDEBUG
+  static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
+  #endif
 };
 
 } // end namespace swift

@@ -14,6 +14,10 @@ func _allocateUninitializedArray<T>(_: Builtin.Word)
   Builtin.int_trap()
 }
 
+func _finalizeUninitializedArray<T>(_ a: Array<T>) -> Array<T> {
+  return a
+}
+
 func _deallocateUninitializedArray<T>(_: Array<T>) {}
 
 var i:Int, f:Float, c:UnicodeScalar
@@ -25,7 +29,7 @@ func arg_tuple(x: Int, y: Float) {}
 arg_tuple(x: i, y: f)
 
 func arg_deep_tuples(x: Int, y: (Float, UnicodeScalar)) {}
-// CHECK-LABEL: sil hidden [ossa] @$ss15arg_deep_tuples1x1yySi_Sf_ScttF
+// CHECK-LABEL: sil hidden [ossa] @$ss15arg_deep_tuples1x1yySi_Sf_s13UnicodeScalarVttF
 // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y_0:%[0-9]+]] : $Float, [[Y_1:%[0-9]+]] : $UnicodeScalar):
 
 arg_deep_tuples(x:i, y:(f, c))
@@ -37,7 +41,7 @@ var named_subtuple = (x:f, y:c)
 arg_deep_tuples(x:i, y: named_subtuple)
 
 func arg_deep_tuples_2(x: Int, _: (y: Float, z: UnicodeScalar)) {}
-// CHECK-LABEL: sil hidden [ossa] @$ss17arg_deep_tuples_21x_ySi_Sf1y_Sc1zttF
+// CHECK-LABEL: sil hidden [ossa] @$ss17arg_deep_tuples_21x_ySi_Sf1y_s13UnicodeScalarV1zttF
 // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Float, [[Z:%[0-9]+]] : $UnicodeScalar):
 
 arg_deep_tuples_2(x: i, (f, c))
@@ -77,6 +81,14 @@ variadic_arg_2(i, f, f, f)
 func variadic_arg_3(_ y: Float..., x: Int) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_3{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Int):
+
+func variadic_arg_4(_ y: Float..., x: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_4{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Array<Int>):
+
+func variadic_arg_5(a: Int, b: Float..., c: Int, d: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_5{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[A:%[0-9]+]] : $Int, [[B:%[0-9]+]] : $Array<Float>, [[C:%[0-9]+]] : $Int, [[D:%[0-9]+]] : $Array<Int>):
 
 variadic_arg_3(x: i)
 variadic_arg_3(f, x: i)

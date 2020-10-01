@@ -1,8 +1,8 @@
-//===--- BridgeStorage.swift.gyb ------------------------------*- swift -*-===//
+//===--- BridgeStorage.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -155,6 +155,7 @@ allTests.test("_BridgeStorage") {
   // Add a reference and verify that it's still native but no longer unique
   var c = b
   expectFalse(b.isUniquelyReferencedNative())
+  _fixLifetime(b) // make sure b is not killed early
   _fixLifetime(c) // make sure c is not killed early
 
   let n = C()

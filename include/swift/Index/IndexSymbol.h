@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "clang/Index/IndexSymbol.h"
-#include "llvm/ADT/SmallString.h"
 
 namespace swift {
 class Decl;
@@ -66,6 +65,7 @@ struct IndexSymbol : IndexRelation {
   SmallVector<IndexRelation, 3> Relations;
   unsigned line = 0;
   unsigned column = 0;
+  Optional<unsigned> offset;
 
   IndexSymbol() = default;
 

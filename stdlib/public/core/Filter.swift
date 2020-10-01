@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 ///
 /// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
 ///   is a `LazyFilterSequence`.
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct LazyFilterSequence<Base: Sequence> {
   @usableFromInline // lazy-performance
   internal var _base: Base
@@ -42,7 +42,7 @@ extension LazyFilterSequence {
   ///
   /// - Note: This is the associated `Iterator` of `LazyFilterSequence`
   /// and `LazyFilterCollection`.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     /// The underlying iterator whose elements are being filtered.
     public var base: Base.Iterator { return _base }
@@ -231,7 +231,7 @@ extension LazyFilterCollection: Collection {
     // _base at least once, to trigger a _precondition in forward only
     // collections.
     _ensureBidirectional(step: step)
-    for _ in 0 ..< abs(numericCast(n)) {
+    for _ in 0 ..< abs(n) {
       _advanceIndex(&i, step: step)
     }
     return i
@@ -252,7 +252,7 @@ extension LazyFilterCollection: Collection {
     // invoked on the _base at least once, to trigger a _precondition in
     // forward only collections.
     _ensureBidirectional(step: step)
-    for _ in 0 ..< abs(numericCast(n)) {
+    for _ in 0 ..< abs(n) {
       if i == limit {
         return nil
       }
@@ -296,8 +296,8 @@ extension LazyFilterCollection: Collection {
 
 extension LazyFilterCollection: LazyCollectionProtocol { }
 
-extension LazyFilterCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyFilterCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
 
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {
@@ -339,7 +339,7 @@ extension LazyFilterSequence {
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
     return LazyFilterSequence(_base: _base) {
-      isIncluded($0) && self._predicate($0)
+      self._predicate($0) && isIncluded($0)
     }
   }
 }

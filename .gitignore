@@ -22,8 +22,11 @@
 #==============================================================================#
 # Explicit files to ignore (only matches one).
 #==============================================================================#
+Brewfile.lock.json
 cscope.files
 cscope.out
+.vimrc
+tags
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
@@ -36,6 +39,10 @@ docs/_build
 
 # Visual Studio metadata
 .vs
+
+# clangd
+.cache
+.clangd
 
 #==============================================================================#
 # Ignore CMake temporary files

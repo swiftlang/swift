@@ -239,7 +239,7 @@ private func _findBoundary(
   }
 
   // Back up to scalar boundary
-  while _isContinuation(utf8[_unchecked: idx]) {
+  while UTF8.isContinuation(utf8[_unchecked: idx]) {
     idx &-= 1
   }
 
@@ -253,7 +253,7 @@ private func _findBoundary(
   }
 }
 
-@_frozen
+@frozen
 @usableFromInline
 internal enum _StringComparisonResult {
   case equal

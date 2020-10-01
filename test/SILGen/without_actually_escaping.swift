@@ -86,8 +86,8 @@ func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
 // CHECK: [[CLOSURE_1:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_1_FUN]](
 // CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [[CLOSURE_1]]
 // CHECK: [[COPY_BORROWED_CLOSURE_1:%.*]] = copy_value [[BORROWED_CLOSURE_1]]
-// CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
 // CHECK: [[COPY_2_BORROWED_CLOSURE_1:%.*]] = copy_value [[COPY_BORROWED_CLOSURE_1]]
+// CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
 // CHECK: [[THUNK_PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FUNC]]([[COPY_2_BORROWED_CLOSURE_1]])
 // CHECK: [[THUNK_PA_MDI:%.*]] = mark_dependence [[THUNK_PA]] : $@callee_guaranteed () -> () on [[COPY_BORROWED_CLOSURE_1]] : $@callee_guaranteed () -> ()
 // CHECK: destroy_value [[THUNK_PA_MDI]]
@@ -98,5 +98,18 @@ func withoutActuallyEscapingConflict() {
   let nestedModify = { localVar = 3 }
   withoutActuallyEscaping(nestedModify) {
     modifyAndPerform(&localVar, closure: $0)
+  }
+}
+
+// CHECK-LABEL: sil [ossa] @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tF
+// CHECK: bb0([[ARG:%.*]] : $@convention(c) @noescape () -> ()):
+// CHECK:   [[E:%.*]] = convert_function [[ARG]] : $@convention(c) @noescape () -> () to [without_actually_escaping] $@convention(c) () -> ()
+// CHECK:   [[F:%.*]] = function_ref @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tFyyyXCXEfU_ : $@convention(thin) (@convention(c) () -> ()) -> ()
+// CHECK:   apply [[F]]([[E]]) : $@convention(thin) (@convention(c) () -> ()) -> ()
+public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Void)) {
+  withoutActuallyEscaping(function) { f in
+    var pointer: UnsafeRawPointer? = nil
+    pointer = unsafeBitCast(f, to: UnsafeRawPointer.self)
+    print(pointer)
   }
 }

@@ -12,7 +12,7 @@
 
 /// A sequence whose elements consist of the elements that follow the initial
 /// consecutive elements of some base sequence that satisfy a given predicate.
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct LazyDropWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
   
@@ -37,7 +37,7 @@ extension LazyDropWhileSequence {
   /// This is the associated iterator for the `LazyDropWhileSequence`,
   /// `LazyDropWhileCollection`, and `LazyDropWhileBidirectionalCollection`
   /// types.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     public typealias Element = Base.Element
     

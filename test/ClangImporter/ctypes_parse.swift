@@ -113,7 +113,7 @@ func testFuncStructDisambiguation() {
 }
 
 func testVoid() {
-  var x: MyVoid // expected-error{{use of undeclared type 'MyVoid'}}
+  var x: MyVoid // expected-error{{cannot find type 'MyVoid' in scope}}
   returnsMyVoid()
 }
 
@@ -208,8 +208,10 @@ func testFunctionPointers() {
   var anotherFP: @convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void
     = getFunctionPointer2()
 
+  var sizedFP: (@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?
+
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '@convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void' (aka '@convention(c) (Int32, Int, Optional<UnsafeMutableRawPointer>) -> ()')}}
+  sizedFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '(@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?'}}
 }
 
 func testStructDefaultInit() {
@@ -221,7 +223,7 @@ func testStructDefaultInit() {
 
 func testArrays() {
   nonnullArrayParameters([], [], [])
-  nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
   nonnullArrayParameters([], nil, []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
   nonnullArrayParameters([], [], nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int32>'}}
 
@@ -231,7 +233,7 @@ func testArrays() {
   // It would also be nice to warn here about the arrays being too short, but
   // that's probably beyond us for a while.
   staticBoundsArray([])
-  staticBoundsArray(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  staticBoundsArray(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
 }
 
 func testVaList() {

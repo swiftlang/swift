@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -22,7 +20,8 @@
           key.name: "one",
           key.usr: "s:15index_enum_case1EO3oneyA2CmF",
           key.line: 6,
-          key.column: 10
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.public
         },
         {
           key.kind: source.lang.swift.decl.enumelement,
@@ -38,14 +37,16 @@
               key.line: 6,
               key.column: 22
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.public
         },
         {
           key.kind: source.lang.swift.decl.enumelement,
           key.name: "three",
           key.usr: "s:15index_enum_case1EO5threeyA2CmF",
           key.line: 6,
-          key.column: 31
+          key.column: 31,
+          key.effective_access: source.decl.effective_access.public
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -84,7 +85,8 @@
                 }
               ]
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -98,7 +100,8 @@
         {
           key.attribute: source.decl.attribute.public
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.public
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -121,7 +124,8 @@
           key.column: 5,
           key.is_implicit: 1
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.enum,
@@ -158,7 +162,8 @@
           key.line: 28,
           key.column: 12
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

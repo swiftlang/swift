@@ -4,9 +4,9 @@
 import StdlibUnittest
 
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -18,13 +18,13 @@ func simple_getline() -> [UInt8]? {
   var result = [UInt8]()
   while true {
     let c = getchar()
-    result.append(UInt8(c))
     if c == EOF {
       if result.count == 0 {
         return nil
       }
       return result
     }
+    result.append(UInt8(c))
     if c == CInt(UnicodeScalar("\n").value) {
       return result
     }

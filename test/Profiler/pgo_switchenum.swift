@@ -4,6 +4,7 @@
 
 // This unusual use of 'sh' allows the path of the profraw file to be
 // substituted by %target-run.
+// RUN: %target-codesign %t/main
 // RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -33,8 +34,8 @@ public enum MaybePair {
 // IR-OPT-LABEL: define swiftcc i32 @$s9pgo_switchenum6guess1s5Int32VAD1x_tF
 
 public func guess1(x: MaybePair) -> Int32 {
-  // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), case #MaybePair.Right!enumelt.1: {{.*}} !case_count(3), case #MaybePair.Both!enumelt.1: {{.*}} !case_count(5)
-  // SIL-OPT: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), case #MaybePair.Right!enumelt.1: {{.*}} !case_count(3), case #MaybePair.Both!enumelt.1: {{.*}} !case_count(5)
+  // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt: {{.*}} !case_count(5001), case #MaybePair.Right!enumelt: {{.*}} !case_count(3), case #MaybePair.Both!enumelt: {{.*}} !case_count(5)
+  // SIL-OPT: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt: {{.*}} !case_count(5001), case #MaybePair.Right!enumelt: {{.*}} !case_count(3), case #MaybePair.Both!enumelt: {{.*}} !case_count(5)
   switch x {
   case .Neither:
     return 1
@@ -50,8 +51,8 @@ public func guess1(x: MaybePair) -> Int32 {
 // SIL-LABEL: // pgo_switchenum.guess2
 // SIL-LABEL: sil @$s14pgo_switchenum6guess21xs5Int32VAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> Int32 !function_entry_count(5011) {
 public func guess2(x: MaybePair) -> Int32 {
-  // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), default {{.*}} !default_count(8)
-  // SIL-OPT: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), default {{.*}} !default_count(8)
+  // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt: {{.*}} !case_count(5001), default {{.*}} !default_count(8)
+  // SIL-OPT: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt: {{.*}} !case_count(5001), default {{.*}} !default_count(8)
   switch x {
   case .Neither:
     return 1

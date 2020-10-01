@@ -17,3 +17,9 @@ extension MyClass {
     /// and a nice subscript.
     internal subscript(i: Int) -> Int { get }
 }
+
+/// Don't print `mutating` twice.
+internal struct MyStruct {
+
+    internal mutating func foo()
+}

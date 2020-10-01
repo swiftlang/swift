@@ -205,9 +205,8 @@ func rdar37290898(_ arr: inout [P_37290898], _ element: S_37290898?) {
 // SR-8221
 infix operator ??=
 func ??= <T>(lhs: inout T?, rhs: T?) {}
-var c: Int = 0
-c ??= 5 // expected-error{{binary operator '??=' cannot be applied to two 'Int' operands}}
-// expected-note@-1{{expected an argument list of type '(inout T?, T?)'}}
+var c: Int = 0 // expected-note {{change variable type to 'Int?' if it doesn't need to be declared as 'Int'}}
+c ??= 5 // expected-error{{inout argument could be set to a value with a type other than 'Int'; use a value declared as type 'Int?' instead}}
 
 func rdar46459603() {
   enum E {
@@ -217,10 +216,86 @@ func rdar46459603() {
   let e = E.foo(value: "String")
   var arr = ["key": e]
 
+  // FIXME(rdar://problem/64844584) - on iOS simulator this diagnostic is flaky,
+  // either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
   _ = arr.values == [e]
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Dictionary<String, E>.Values' and '[E]'}}
-  // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '[Dictionary<String, E>.Values]' and '[[E]]'}}
-  // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-2 {{cannot convert value of type '[E]' to expected element type 'Dictionary<String, E>.Values'}}
 }
+
+// SR-10843
+infix operator ^^^
+func ^^^ (lhs: String, rhs: String) {}
+
+struct SR10843 {
+  static func ^^^ (lhs: SR10843, rhs: SR10843) {}
+}
+
+func sr10843() {
+  let s = SR10843()
+  (^^^)(s, s)
+  _ = (==)(0, 0)
+}
+
+// SR-10970
+precedencegroup PowerPrecedence {
+  lowerThan: BitwiseShiftPrecedence
+  higherThan: AdditionPrecedence
+  associativity: right
+}
+infix operator ^^ : PowerPrecedence
+
+extension Int {
+  static func ^^ (lhs: Int, rhs: Int) -> Int {
+    var result = 1
+    for _ in 1...rhs { result *= lhs }
+    return result
+  }
+}
+
+_ = 1 ^^ 2 ^^ 3 * 4 // expected-error {{adjacent operators are in unordered precedence groups 'PowerPrecedence' and 'MultiplicationPrecedence'}}
+
+// rdar://problem/60185506 - Ambiguity with Float comparison
+func rdar_60185506() {
+  struct X {
+    var foo: Float
+  }
+
+  func test(x: X?) {
+    let _ = (x?.foo ?? 0) <= 0.5 // Ok
+  }
+}
+
+// rdar://problem/60727310
+func rdar60727310() {
+  func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
+  var e: Error? = nil
+  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two 'Error?' operands}}
+}
+
+// FIXME(SR-12438): Bad diagnostic.
+func sr12438(_ e: Error) {
+  func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
+  foo(e, ==) // expected-error {{type of expression is ambiguous without more context}}
+}
+
+// rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable
+func rdar_62054241() {
+  struct Foo {
+    let a: Int
+  }
+
+  func test(_ arr: [Foo]) -> [Foo] {
+    return arr.sorted(by: <) // expected-error {{no exact matches in reference to operator function '<'}}
+    // expected-note@-1 {{found candidate with type '(Foo, Foo) -> Bool'}}
+  }
+}
+
+// SR-11399 - Operator returning IUO doesn't implicitly unwrap
+postfix operator ^^^
+postfix func ^^^ (lhs: Int) -> Int! { 0 }
+
+let x: Int = 1^^^

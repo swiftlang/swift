@@ -31,7 +31,7 @@ public:
     }
   }
 
-  static StringRef tokToString(swift::tok T) {
+  static std::string tokToString(swift::tok T) {
     switch (T) {
   #define KEYWORD(X) \
     case swift::tok::kw_##X: return "kw_" #X; break;
@@ -82,14 +82,10 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
-
-    bool Done = false;
-    while (!Done) {
-      PU.getParser().parseTopLevel();
-      Done = PU.getParser().Tok.is(tok::eof);
-    }
-    
+    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID,
+                         LangOpts, TypeCheckerOptions(), "unknown");
+    SmallVector<Decl *, 8> decls;
+    PU.getParser().parseTopLevel(decls);
     return PU.getParser().getSplitTokens();
   }
   

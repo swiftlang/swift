@@ -347,6 +347,19 @@ CharacterTests.test("String.append(_: Character)") {
   }
 }
 
+CharacterTests.test("utf6/16/unicodescalar views") {
+  for c in testCharacters {
+    expectEqualSequence(String(c).unicodeScalars, c.unicodeScalars)
+    expectEqualSequence(String(c).utf8, c.utf8)
+    expectEqualSequence(String(c).utf16, c.utf16)
+
+    expectEqualSequence(
+      String(c).unicodeScalars.reversed(), c.unicodeScalars.reversed())
+    expectEqualSequence(String(c).utf8.reversed(), c.utf8.reversed())
+    expectEqualSequence(String(c).utf16.reversed(), c.utf16.reversed())
+  }
+}
+
 var UnicodeScalarTests = TestSuite("UnicodeScalar")
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
@@ -402,6 +415,21 @@ UnicodeScalarTests.test("LosslessStringConvertible") {
 
   checkLosslessStringConvertible((0xE000...0xF000).map { UnicodeScalar(Int($0))! })
   checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
+}
+
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  UnicodeScalarTests.test("Views") {
+    let scalars = baseScalars + continuingScalars
+    for scalar in scalars {
+      expectEqual(scalar, String(scalar).unicodeScalars.first!)
+      expectEqualSequence(String(scalar).utf8, scalar.utf8)
+      expectEqualSequence(String(scalar).utf16, scalar.utf16)
+
+      expectEqualSequence(String(scalar).utf8.reversed(), scalar.utf8.reversed())
+      expectEqualSequence(
+        String(scalar).utf16.reversed(), scalar.utf16.reversed())
+    }
+  }
 }
 
 runAllTests()

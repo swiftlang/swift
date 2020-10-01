@@ -17,11 +17,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Callee.h"
+#include "ClassMetadataVisitor.h"
 #include "Explosion.h"
 #include "GenDecl.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -46,7 +48,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
     return entry;
   }
 
-  auto fnType = getSILModule().Types.getConstantFunctionType(declRef);
+  auto fnType = getSILModule().Types.getConstantFunctionType(
+      getMaximalTypeExpansionContext(), declRef);
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -54,8 +57,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   return entry;
 }
 
-static FunctionPointer lookupMethod(IRGenFunction &IGF,
-                                    SILDeclRef declRef) {
+static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
+  auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Protocol case.
@@ -68,7 +71,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   }
 
   // Class case.
-  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(declRef);
+  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
+      expansionContext, declRef);
 
   // Load the metadata, or use the 'self' value if we have a static method.
   llvm::Value *self;
@@ -82,7 +86,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   else
     self = (IGF.CurFn->arg_end() - 1);
 
-  auto selfTy = funcTy->getSelfParameter().getSILStorageType();
+  auto selfTy = funcTy->getSelfParameter().getSILStorageType(
+      IGF.IGM.getSILModule(), funcTy, IGF.IGM.getMaximalTypeExpansionContext());
 
   llvm::Value *metadata;
   if (selfTy.is<MetatypeType>()) {
@@ -97,6 +102,9 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
+  if (!f->isDeclaration()) {
+    return;
+  }
 
   IRGenFunction IGF(*this, f);
 
@@ -158,6 +166,10 @@ IRGenModule::getAddrOfMethodLookupFunction(ClassDecl *classDecl,
 
 void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   auto *f = getAddrOfMethodLookupFunction(classDecl, ForDefinition);
+  if (!f->isDeclaration()) {
+    assert(IRGen.isLazilyReemittingNominalTypeDescriptor(classDecl));
+    return;
+  }
 
   IRGenFunction IGF(*this, f);
 
@@ -168,6 +180,65 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   auto *description = getAddrOfTypeContextDescriptor(classDecl,
                                                      RequireMetadata);
 
+  // Check for lookups of nonoverridden methods first.
+  class LookUpNonoverriddenMethods
+    : public ClassMetadataScanner<LookUpNonoverriddenMethods> {
+  
+    IRGenFunction &IGF;
+    llvm::Value *methodArg;
+      
+  public:
+    LookUpNonoverriddenMethods(IRGenFunction &IGF,
+                               ClassDecl *classDecl,
+                               llvm::Value *methodArg)
+      : ClassMetadataScanner(IGF.IGM, classDecl), IGF(IGF),
+        methodArg(methodArg) {}
+      
+    void noteNonoverriddenMethod(SILDeclRef method) {
+      // The method lookup function would be used only for `super.` calls
+      // from other modules, so we only need to look at public-visibility
+      // methods here.
+      if (!hasPublicVisibility(method.getLinkage(NotForDefinition))) {
+        return;
+      }
+      
+      auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+      
+      auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
+      
+      auto falseBB = IGF.createBasicBlock("");
+      auto trueBB = IGF.createBasicBlock("");
+
+      IGF.Builder.CreateCondBr(isMethod, trueBB, falseBB);
+      
+      IGF.Builder.emitBlock(trueBB);
+      // Since this method is nonoverridden, we can produce a static result.
+      auto entry = VTable->getEntry(IGM.getSILModule(), method);
+      llvm::Value *impl = IGM.getAddrOfSILFunction(entry->getImplementation(),
+                                                   NotForDefinition);
+      // Sign using the discriminator we would include in the method
+      // descriptor.
+      if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
+        auto discriminator =
+          PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
+        
+        impl = emitPointerAuthSign(IGF, impl,
+                            PointerAuthInfo(schema.getKey(), discriminator));
+      }
+      impl = IGF.Builder.CreateBitCast(impl, IGM.Int8PtrTy);
+      IGF.Builder.CreateRet(impl);
+      
+      IGF.Builder.emitBlock(falseBB);
+      // Continue emission on the false branch.
+    }
+      
+    void noteResilientSuperclass() {}
+    void noteStartOfImmediateMembers(ClassDecl *clas) {}
+  };
+  
+  LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
+  
+  // Use the runtime to look up vtable entries.
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFn(),
                                         {metadata, method, description});
   IGF.Builder.CreateRet(result);

@@ -16,13 +16,13 @@
 #define DEBUG_TYPE "remove-redundant-overflow-checks"
 
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -114,7 +114,7 @@ public:
 
       for (auto *CF : ToRemove) {
         CF->eraseFromParent();
-        NumCondFailRemoved++;
+        ++NumCondFailRemoved;
       }
       ToRemove.clear();
       return true;
@@ -136,7 +136,7 @@ public:
     // For each block in a Reverse Post Order scan:
     for (auto &BB : ReversePostOrder) {
       // For each instruction:
-      for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {
+      for (auto Inst = BB->begin(), End = BB->end(); Inst != End; ++Inst) {
         // Use branch information for eliminating condfails.
         if (auto *CBI = dyn_cast<CondBranchInst>(Inst))
           registerBranchFormula(CBI);

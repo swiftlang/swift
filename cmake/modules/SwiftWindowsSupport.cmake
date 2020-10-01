@@ -49,7 +49,7 @@ function(swift_windows_lib_for_arch arch var)
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 
-function(swift_windows_generate_sdk_vfs_overlay flags)
+function(swift_windows_get_sdk_vfs_overlay overlay)
   get_filename_component(VCToolsInstallDir ${VCToolsInstallDir} ABSOLUTE)
   get_filename_component(UniversalCRTSdkDir ${UniversalCRTSdkDir} ABSOLUTE)
   set(UCRTVersion ${UCRTVersion})
@@ -58,10 +58,8 @@ function(swift_windows_generate_sdk_vfs_overlay flags)
   configure_file("${SWIFT_SOURCE_DIR}/utils/WindowsSDKVFSOverlay.yaml.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
                  @ONLY)
-
-  set(${flags}
-        -Xclang;-ivfsoverlay;-Xclang;"${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
-      PARENT_SCOPE)
+  set(${overlay} ${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-vfs-overlay.yaml
+    PARENT_SCOPE)
 endfunction()
 
 function(swift_verify_windows_VCVAR var)
@@ -84,20 +82,19 @@ endfunction()
 macro(swift_swap_compiler_if_needed target)
   if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
     if(CMAKE_SYSTEM_NAME STREQUAL CMAKE_HOST_SYSTEM_NAME)
-      get_target_property(CLANG_LOCATION clang LOCATION)
-      get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
-
-      if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR
-          "${CMAKE_C_SIMULATE_ID}" STREQUAL "MSVC")
-        set(CMAKE_C_COMPILER
-          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
-        set(CMAKE_CXX_COMPILER
-          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      if(SWIFT_BUILT_STANDALONE)
+        get_target_property(CLANG_LOCATION clang LOCATION)
+        get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
       else()
-        set(CMAKE_C_COMPILER
-          ${CLANG_LOCATION}/clang${CMAKE_EXECUTABLE_SUFFIX})
-        set(CMAKE_CXX_COMPILER
-          ${CLANG_LOCATION}/clang++${CMAKE_EXECUTABLE_SUFFIX})
+        set(CLANG_LOCATION ${LLVM_RUNTIME_OUTPUT_INTDIR})
+      endif()
+
+      if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_C_SIMULATE_ID}" STREQUAL "MSVC")
+        set(CMAKE_C_COMPILER ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        set(CMAKE_CXX_COMPILER ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      else()
+        set(CMAKE_C_COMPILER ${CLANG_LOCATION}/clang${CMAKE_EXECUTABLE_SUFFIX})
+        set(CMAKE_CXX_COMPILER ${CLANG_LOCATION}/clang++${CMAKE_EXECUTABLE_SUFFIX})
       endif()
     else()
       message(SEND_ERROR "${target} requires a clang based compiler")

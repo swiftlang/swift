@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 protocol P {
   associatedtype Assoc
@@ -80,4 +80,63 @@ func concreteJungle<T>(_: T, t: T.Foo) -> C where T : Fooable, T.Foo == C {
 func concreteJungle<T>(_: T, f: @escaping (T.Foo) -> C) -> T.Foo where T : Fooable, T.Foo == C {
   let ff: (C) -> T.Foo = f
   return ff(C())
+}
+
+protocol Whereable {
+  associatedtype Assoc
+  associatedtype Bssoc: Whereable
+}
+extension Whereable {
+  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE19staticExtensionFunc3arg7ElementSTQz8IteratorSTQz_tSTRzrlFZ : $@convention(method) <Self where Self : Sequence, Self : Whereable> (@in_guaranteed Self.Iterator, @thick Self.Type) -> @out Self.Element
+  static func staticExtensionFunc(arg: Self.Iterator) -> Self.Element
+    where Self: Sequence {
+      fatalError()
+  }
+
+  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE13extensionFuncyy5BssocQz5AssocRtzrlF : $@convention(method) <Self where Self : Whereable, Self.Assoc == Self.Bssoc> (@in_guaranteed Self) -> ()
+  func extensionFunc() where Assoc == Bssoc { }
+
+  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzSgycAabERQAD_5BssocQZAGRtzrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Bssoc == Self.Assoc.Bssoc> (@in_guaranteed Self) -> @out Optional<Self.Assoc>
+  subscript() -> Assoc
+    where Assoc: Whereable, Bssoc == Assoc.Bssoc {
+      fatalError()
+  }
+
+  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzSgycAabERQ5Bssoc_ADQZAERSrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Assoc == Self.Bssoc.Assoc> (@in_guaranteed Self) -> @out Optional<Self.Assoc>
+  subscript() -> Assoc
+    where Assoc: Whereable, Assoc == Bssoc.Assoc {
+      fatalError()
+  }
+}
+
+struct W1 {}
+struct W2 {}
+
+class Class<T> {
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC9classFuncyyAA9WhereableRz5AssocQzRszlFZ : $@convention(method) <T where T : Whereable, T == T.Assoc> (@thick Class<T>.Type) -> ()
+  class func classFunc() where T: Whereable, T.Assoc == T { }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC5func1yyAA7FooableRzlF : $@convention(method) <T where T : Fooable> (@guaranteed Class<T>) -> ()
+  func func1() where T: Fooable { }
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC5func2yyAA2W1VRszlF : $@convention(method) (@guaranteed Class<W1>) -> ()
+  func func2() where T == W1 { }
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC5func2yyAA2W2VRszlF : $@convention(method) (@guaranteed Class<W2>) -> ()
+  func func2() where T == W2 { }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC5AssocQzycAA9WhereableRzluig : $@convention(method) <T where T : Whereable> (@guaranteed Class<T>) -> @out T.Assoc
+  subscript() -> T.Assoc where T: Whereable {
+    fatalError()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC06NestedC0CAEyx_Gycfc : $@convention(method) <T where T : Fooable> (@owned Class<T>.NestedClass) -> @owned Class<T>.NestedClass
+  class NestedClass where T: Fooable { }
+}
+
+extension Class where T: Whereable {
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassCA2A9WhereableRzlE13extensionFuncyyAA7FooableRzrlF : $@convention(method) <T where T : Fooable, T : Whereable> (@guaranteed Class<T>) -> ()
+  func extensionFunc() where T: Fooable { }
+}
+extension Class.NestedClass {
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC06NestedC0C3foo3argyx_tAA9WhereableRz3FooAA7FooablePQz5AssocAaHPRtzrlF : $@convention(method) <T where T : Fooable, T : Whereable, T.Assoc == T.Foo> (@in_guaranteed T, @guaranteed Class<T>.NestedClass) -> ()
+  func foo(arg: T) where T: Whereable, T.Foo == T.Assoc { }
 }

@@ -2,16 +2,6 @@
 
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 
-#ifndef SWIFT_ENUM_EXTRA
-#  define SWIFT_ENUM_EXTRA
-#endif
-
-#ifndef SWIFT_ENUM
-#  define SWIFT_ENUM(_type, _name)    \
-  enum _name : _type _name;           \
-  enum SWIFT_ENUM_EXTRA _name : _type
-#endif
-
 // Renaming classes
 SWIFT_NAME(SomeClass)
 @interface SNSomeClass : NSObject

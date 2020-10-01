@@ -69,7 +69,7 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK);
   setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_X86_64_IS_OBJC_BIT);
 
-  if (tripleIsAnySimulator(triple)) {
+  if (triple.isSimulatorEnvironment()) {
     setToMask(target.ObjCPointerReservedBits, 64,
               SWIFT_ABI_X86_64_SIMULATOR_OBJC_RESERVED_BITS_MASK);
   } else {
@@ -134,6 +134,10 @@ static void configureSystemZ(IRGenModule &IGM, const llvm::Triple &triple,
                              SwiftTargetInfo &target) {
   setToMask(target.PointerSpareBits, 64,
             SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK);
+  setToMask(target.ObjCPointerReservedBits, 64,
+            SWIFT_ABI_S390X_OBJC_RESERVED_BITS_MASK);
+  setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_S390X_IS_OBJC_BIT);
+  target.SwiftRetainIgnoresNegativeValues = true;
 }
 
 /// Configure a default target.

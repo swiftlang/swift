@@ -37,4 +37,4 @@ func test(c: C) {
 
 // RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/ordering/ordering.in.json %s >> %t.result/ordering.expected
-// RUN: diff -u %S/ordering/ordering.expected %t.result/ordering.expected
+// RUN: %diff -u %S/ordering/ordering.expected %t.result/ordering.expected

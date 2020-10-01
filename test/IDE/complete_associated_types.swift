@@ -20,6 +20,15 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_1 > %t.types.txt
 // RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_1 < %t.types.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_UNASSIGNABLE > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_UNASSIGNABLE < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_UNASSIGNABLE_2 > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_UNASSIGNABLE < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_ASSIGNABLE > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_ASSIGNABLE < %t.types.txt
+
 // FIXME: extensions that introduce conformances?
 
 protocol FooBaseProtocolWithAssociatedTypes {
@@ -300,3 +309,44 @@ func testBrokenConformances1() {
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#(self): StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeC#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#(self): StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeD#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1: End completions
+
+
+protocol MyProto {
+    associatedtype Element
+}
+
+extension MyProto {
+    var matches: (Int, (Int, Int)) { fatalError() }
+    func first() -> Element {
+        fatalError()
+    }
+}
+
+// Does not conform - Element not specified
+struct A<T>: MyProto {
+    func foo() {
+        self.first = #^BROKEN_CONFORMANCE_UNASSIGNABLE^#
+    }
+
+    func foo2() {
+      var (a, b): (Int, Int)
+      let exact = (1, (2, 4))
+      (a, (b, self.first)) = #^BROKEN_CONFORMANCE_UNASSIGNABLE_2^#
+    }
+
+    func foo3() {
+      var (a, b, c): (Int, Int, Int)
+      let exact = (1, (2, 4))
+      (a, (b, c)) = #^BROKEN_CONFORMANCE_ASSIGNABLE^#
+    }
+}
+// BROKEN_CONFORMANCE_UNASSIGNABLE: Begin completions
+// BROKEN_CONFORMANCE_UNASSIGNABLE-NOT: TypeRelation
+// BROKEN_CONFORMANCE_UNASSIGNABLE: Decl[InstanceMethod]/Super:         first()[#MyProto.Element#]; name=first()
+// BROKEN_CONFORMANCE_UNASSIGNABLE-NOT: TypeRelation
+// BROKEN_CONFORMANCE_UNASSIGNABLE: End completions
+
+// BROKEN_CONFORMANCE_ASSIGNABLE: Begin completions
+// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: exact[#(Int, (Int, Int))#]; name=exact
+// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[InstanceVar]/Super/TypeRelation[Identical]: matches[#(Int, (Int, Int))#]; name=matches
+// BROKEN_CONFORMANCE_ASSIGNABLE: End completions

@@ -107,8 +107,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   llvm::Value *targetMetadata;
   if ((targetMetadata =
            tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getASTType(),
-                                          /*allowUninitialized*/ false,
-                                          /*allowStub*/ false))) {
+                                          /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
@@ -160,11 +159,12 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return llvm::makeArrayRef(argsBuf, n-3);
     break;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit a checked unconditional downcast of a class value.
 llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
-                                      SILType toType, CheckedCastMode mode) {
+                                      CanType toType, CheckedCastMode mode) {
   // Emit the value we're casting from.
   if (from->getType() != IGF.IGM.Int8PtrTy)
     from = IGF.Builder.CreateBitOrPointerCast(from, IGF.IGM.Int8PtrTy);
@@ -174,11 +174,19 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   llvm::Value *metadataRef;
   llvm::Constant *castFn;
 
+  // If true, the target class is not known at compile time because it is a
+  // class-bounded archetype or the dynamic Self type.
+  bool nonSpecificClass = false;
+
   // Get the best known type information about the destination type.
   ClassDecl *destClass = nullptr;
-  if (auto archetypeTy = toType.getAs<ArchetypeType>()) {
+  if (auto archetypeTy = dyn_cast<ArchetypeType>(toType)) {
+    nonSpecificClass = true;
     if (auto superclassTy = archetypeTy->getSuperclass())
       destClass = superclassTy->getClassOrBoundGenericClass();
+  } else if (auto selfTy = dyn_cast<DynamicSelfType>(toType)) {
+    nonSpecificClass = true;
+    destClass = selfTy->getSelfType()->getClassOrBoundGenericClass();
   } else {
     destClass = toType.getClassOrBoundGenericClass();
     assert(destClass != nullptr);
@@ -187,7 +195,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
   if (destClass && destClass->hasKnownSwiftImplementation()) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
+    metadataRef = IGF.emitTypeMetadataRef(toType);
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -200,9 +208,9 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // If the destination type is a CF type or a non-specific
   // class-bounded archetype, use the most general cast entrypoint.
-  } else if (toType.is<ArchetypeType>() ||
+  } else if (nonSpecificClass ||
              destClass->getForeignClassKind()==ClassDecl::ForeignKind::CFType) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
+    metadataRef = IGF.emitTypeMetadataRef(toType);
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -249,7 +257,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 
-  llvm::Type *subTy = IGF.getTypeInfo(toType).getStorageType();
+  llvm::Type *subTy = IGF.getTypeInfoForUnlowered(toType).getStorageType();
   return IGF.Builder.CreateBitCast(call, subTy);
 }
 
@@ -349,7 +357,7 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 /// The function's output type is (value, witnessTable...)
 ///
 /// The value is NULL if the cast failed.
-static llvm::Function *
+static llvm::Constant *
 emitExistentialScalarCastFn(IRGenModule &IGM,
                             unsigned numProtocols,
                             CheckedCastMode mode,
@@ -377,13 +385,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
     }
   }
   
-  // See if we already defined this function.
-  
-  if (auto fn = IGM.Module.getFunction(name))
-    return fn;
-  
   // Build the function type.
-  
   llvm::SmallVector<llvm::Type *, 4> argTys;
   llvm::SmallVector<llvm::Type *, 4> returnTys;
   argTys.push_back(IGM.Int8PtrTy);
@@ -397,84 +399,77 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
   
   llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
-  
-  auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
-  auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
-                                   llvm::Twine(name), IGM.getModule());
-  fn->setAttributes(IGM.constructInitialAttributes());
-  
-  IRGenFunction IGF(IGM, fn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
-  Explosion args = IGF.collectParameters();
 
-  auto value = args.claimNext();
-  auto ref = args.claimNext();
-  auto failBB = IGF.createBasicBlock("fail");
-  auto conformsToProtocol = IGM.getConformsToProtocolFn();
-  
-  Explosion rets;
-  rets.add(value);
+  return IGM.getOrCreateHelperFunction(name, returnTy, argTys,
+                                       [&](IRGenFunction &IGF) {
+    Explosion args = IGF.collectParameters();
 
-  // Check the class constraint if necessary.
-  if (checkSuperclassConstraint) {
-    auto superclassMetadata = args.claimNext();
-    auto castFn = IGF.IGM.getDynamicCastMetatypeFn();
-    auto castResult = IGF.Builder.CreateCall(castFn, {ref,
-                                                      superclassMetadata});
+    auto value = args.claimNext();
+    auto ref = args.claimNext();
+    auto failBB = IGF.createBasicBlock("fail");
+    auto conformsToProtocol = IGM.getConformsToProtocolFn();
 
-    auto cc = cast<llvm::Function>(castFn)->getCallingConv();
+    Explosion rets;
+    rets.add(value);
 
-    // FIXME: Eventually, we may want to throw.
-    castResult->setCallingConv(cc);
-    castResult->setDoesNotThrow();
+    // Check the class constraint if necessary.
+    if (checkSuperclassConstraint) {
+      auto superclassMetadata = args.claimNext();
+      auto castFn = IGF.IGM.getDynamicCastMetatypeFn();
+      auto castResult = IGF.Builder.CreateCall(castFn, {ref,
+                                                        superclassMetadata});
 
-    auto isClass = IGF.Builder.CreateICmpNE(
-        castResult,
-        llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+      auto cc = cast<llvm::Function>(castFn)->getCallingConv();
 
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-    IGF.Builder.emitBlock(contBB);
-  } else if (checkClassConstraint) {
-    auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-    IGF.Builder.emitBlock(contBB);
-  }
+      // FIXME: Eventually, we may want to throw.
+      castResult->setCallingConv(cc);
+      castResult->setDoesNotThrow();
 
-  // Look up each protocol conformance we want.
-  for (unsigned i = 0; i < numProtocols; ++i) {
-    auto proto = args.claimNext();
-    auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
-    auto isNull = IGF.Builder.CreateICmpEQ(witness,
-                     llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-    auto contBB = IGF.createBasicBlock("cont");
-    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+      auto isClass = IGF.Builder.CreateICmpNE(
+          castResult,
+          llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+      IGF.Builder.emitBlock(contBB);
+    } else if (checkClassConstraint) {
+      auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+      IGF.Builder.emitBlock(contBB);
+    }
+
+    // Look up each protocol conformance we want.
+    for (unsigned i = 0; i < numProtocols; ++i) {
+      auto proto = args.claimNext();
+      auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
+      auto isNull = IGF.Builder.CreateICmpEQ(witness,
+                       llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+      auto contBB = IGF.createBasicBlock("cont");
+      IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+
+      IGF.Builder.emitBlock(contBB);
+      rets.add(witness);
+    }
+
+    // If we succeeded, return the witnesses.
+    IGF.emitScalarReturn(returnTy, rets);
     
-    IGF.Builder.emitBlock(contBB);
-    rets.add(witness);
-  }
+    // If we failed, return nil or trap.
+    IGF.Builder.emitBlock(failBB);
+    switch (mode) {
+    case CheckedCastMode::Conditional: {
+      auto null = llvm::ConstantStruct::getNullValue(returnTy);
+      IGF.Builder.CreateRet(null);
+      break;
+    }
 
-  // If we succeeded, return the witnesses.
-  IGF.emitScalarReturn(returnTy, rets);
-  
-  // If we failed, return nil or trap.
-  IGF.Builder.emitBlock(failBB);
-  switch (mode) {
-  case CheckedCastMode::Conditional: {
-    auto null = llvm::ConstantStruct::getNullValue(returnTy);
-    IGF.Builder.CreateRet(null);
-    break;
-  }
-
-  case CheckedCastMode::Unconditional: {
-    IGF.emitTrap(/*EmitUnreachable=*/true);
-    break;
-  }
-  }
-  
-  return fn;
+    case CheckedCastMode::Unconditional: {
+      IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
+      break;
+    }
+    }
+  });
 }
 
 llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
@@ -638,8 +633,12 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool checkSuperclassConstraint = false;
   if (hasSuperclassConstraint) {
     Type srcSuperclassType = srcInstanceType;
-    if (srcSuperclassType->isExistentialType())
+    if (srcSuperclassType->isExistentialType()) {
       srcSuperclassType = srcSuperclassType->getSuperclass();
+      // Look for an AnyObject superclass (getSuperclass() returns nil).
+      if (!srcSuperclassType && srcInstanceType->isClassExistentialType())
+        checkSuperclassConstraint = true;
+    }
     if (srcSuperclassType) {
       checkSuperclassConstraint =
         !destInstanceType->getSuperclass()->isExactSuperclassOf(
@@ -867,12 +866,14 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 /// isn't exposed.
 void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   Explosion &value,
-                                  SILType sourceType,
-                                  SILType targetType,
+                                  SILType sourceLoweredType,
+                                  CanType sourceFormalType,
+                                  SILType targetLoweredType,
+                                  CanType targetFormalType,
                                   CheckedCastMode mode,
                                   Explosion &out) {
-  assert(sourceType.isObject());
-  assert(targetType.isObject());
+  assert(sourceLoweredType.isObject());
+  assert(targetLoweredType.isObject());
 
   llvm::BasicBlock *nilCheckBB = nullptr;
   llvm::BasicBlock *nilMergeBB = nullptr;
@@ -902,22 +903,23 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     }
   };
 
-  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
+  if (auto sourceOptObjectType = sourceLoweredType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
     // for the particular case of an optional class-reference or metatype
     // value.
     Explosion optValue;
     auto someDecl = IGF.IGM.Context.getOptionalSomeDecl();
-    emitProjectLoadableEnum(IGF, sourceType, value, someDecl, optValue);
+    emitProjectLoadableEnum(IGF, sourceLoweredType, value, someDecl, optValue);
 
     assert(value.empty());
     value = std::move(optValue);
-    sourceType = sourceOptObjectType;
+    sourceLoweredType = sourceOptObjectType;
+    sourceFormalType = sourceFormalType.getOptionalObjectType();
 
     // We need a null-check because the runtime function can't handle null in
     // some of the cases.
-    if (targetType.isExistentialType()) {
+    if (targetLoweredType.isExistentialType()) {
       auto &Builder = IGF.Builder;
       auto val = value.getAll()[0];
       auto isNotNil = Builder.CreateICmpNE(
@@ -934,7 +936,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   // If the source value is a metatype, either do a metatype-to-metatype
   // cast or cast it to an object instance and continue.
-  if (auto sourceMetatype = sourceType.getAs<AnyMetatypeType>()) {
+  if (auto sourceMetatype = sourceLoweredType.getAs<AnyMetatypeType>()) {
     llvm::Value *metatypeVal = nullptr;
     if (sourceMetatype->getRepresentation() != MetatypeRepresentation::Thin)
       metatypeVal = value.claimNext();
@@ -948,37 +950,36 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     SmallVector<ProtocolDecl*, 1> protocols;
 
     // Casts to existential metatypes.
-    if (auto existential = targetType.getAs<ExistentialMetatypeType>()) {
-      emitScalarExistentialDowncast(IGF, metatypeVal, sourceType, targetType,
-                                    mode, existential->getRepresentation(),
+    if (auto existential = targetLoweredType.getAs<ExistentialMetatypeType>()) {
+      emitScalarExistentialDowncast(IGF, metatypeVal, sourceLoweredType,
+                                    targetLoweredType, mode,
+                                    existential->getRepresentation(),
                                     out);
       return;
 
     // Casts to concrete metatypes.
-    } else if (auto destMetaType = targetType.getAs<MetatypeType>()) {
+    } else if (auto destMetaType = targetLoweredType.getAs<MetatypeType>()) {
       emitMetatypeDowncast(IGF, metatypeVal, destMetaType, mode, out);
       return;
     }
 
     // Otherwise, this is a metatype-to-object cast.
-    assert(targetType.isAnyClassReferenceType());
+    assert(targetLoweredType.isAnyClassReferenceType());
 
     // Convert the metatype value to AnyObject.
     llvm::Value *object =
       emitMetatypeToAnyObjectDowncast(IGF, metatypeVal, sourceMetatype, mode);
 
-    SILType anyObjectType =
-      SILType::getPrimitiveObjectType(
-        IGF.IGM.Context.getAnyObjectType());
+    sourceFormalType = IGF.IGM.Context.getAnyObjectType();
+    sourceLoweredType = SILType::getPrimitiveObjectType(sourceFormalType);
 
     // Continue, pretending that the source value was an (optional) value.
     Explosion newValue;
     newValue.add(object);
     value = std::move(newValue);
-    sourceType = anyObjectType;
   }
 
-  assert(!targetType.is<AnyMetatypeType>() &&
+  assert(!targetLoweredType.is<AnyMetatypeType>() &&
          "scalar cast of class reference to metatype is unimplemented");
 
   // If the source type is existential, project out the class pointer.
@@ -986,22 +987,24 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   // TODO: if we're casting to an existential type, don't throw away the
   // protocol conformance information we already have.
   llvm::Value *instance;
-  if (sourceType.isExistentialType()) {
-    instance = emitClassExistentialProjection(IGF, value, sourceType,
+  if (sourceLoweredType.isExistentialType()) {
+    instance = emitClassExistentialProjection(IGF, value, sourceLoweredType,
                                               CanArchetypeType());
   } else {
     instance = value.claimNext();
   }
 
-  if (targetType.isExistentialType()) {
+  if (targetFormalType.isExistentialType()) {
     Explosion outRes;
-    emitScalarExistentialDowncast(IGF, instance, sourceType, targetType,
-                                  mode, /*not a metatype*/ None, outRes);
+    emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
+                                  targetLoweredType, mode,
+                                  /*not a metatype*/ None, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
 
   Explosion outRes;
-  llvm::Value *result = emitClassDowncast(IGF, instance, targetType, mode);
+  llvm::Value *result = emitClassDowncast(IGF, instance, targetFormalType,
+                                          mode);
   out.add(result);
 }

@@ -43,12 +43,12 @@ struct ObjectValue {
 sil [ossa] @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
   %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
   store %6 to [trivial] %4 : $*(TripleInt, (TripleInt, TripleInt))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -73,12 +73,12 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 sil [ossa] @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
   %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
   %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
   store %6 to [init] %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -103,12 +103,12 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 sil [ossa] @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
   %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
   assign %6 to %4 : $*(TripleInt, (TripleInt, TripleInt))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -139,14 +139,14 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 sil [ossa] @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
   %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
   %7 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
   assign %6 to %4 : $*(TripleInt, (TripleInt, TripleInt))
   assign %7 to %4 : $*(TripleInt, (TripleInt, TripleInt))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -171,12 +171,12 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 sil [ossa] @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
   %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
   %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
   assign %6 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -209,14 +209,14 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 sil [ossa] @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
-  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
-  %4 = mark_uninitialized [var] %3 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
   %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
   %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
   %7 = copy_value %6 : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
   assign %6 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
   assign %7 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %9999 = tuple()
   return %9999 : $()
 }

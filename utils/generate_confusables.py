@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: UTF-8 -*-
 # utils/update_confusables.py - Utility to update definitions of unicode
 # confusables
 #
@@ -56,18 +57,22 @@ def main(args=sys.argv):
     )
 
     pairs = []
+    regex = r"(.+)\W+;\W+(.+)\W+;\W+MA*.[#*]*.[(].*[)](.+)\W→(.+)\W#.*"
     with open(confusablesFilePath, 'r') as f:
-        pattern = re.compile(r"(.+)\W+;\W+(.+)\W+;")
+        pattern = re.compile(regex)
         for line in f:
             match = pattern.match(line)
             if match is not None:
                 confusedString = match.group(1).replace(" ", "")
                 normalString = match.group(2).replace(" ", "")
+                confusedName = match.group(3).strip().title()
+                normalName = match.group(4).strip().replace("-", " ").title()
                 for hexValue in modifiedHex:
                     if hexValue == normalString:
                         confused = hex(int(confusedString, 16))
                         normal = hex(int(normalString, 16))
-                        pairs.append((confused, normal))
+                        pairs.append((confused, confusedName,
+                                      normal, normalName))
 
     defFilePath = os.path.abspath(
         os.path.join(basepath, "..", "include/swift/Parse/Confusables.def")
@@ -79,19 +84,35 @@ def main(args=sys.argv):
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
+//===----------------------------------------------------------------------===//
+
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from
+// utils/UnicodeData/confusables.txt and should not be directly modified.
+// Run utils/generate_confusables.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+
 '''
         f.write(header)
-        f.write("//===----------------------------------------------------")
-        f.write("------------------===//\n\n")
-        f.write("// CONFUSABLE(CONFUSABLE_POINT, BASEPOINT)\n\n")
-        for (confused, expected) in pairs:
-            f.write("CONFUSABLE(" + confused + ", " + expected + ")\n")
+        f.write("// CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, " +
+                "BASE_POINT, BASE_NAME)\n\n")
+        for (confused, confusedName, expected, expectedName) in pairs:
+            # Ad-hoc substitutions for clarity
+            mappings = {"Solidus": "Forward Slash",
+                        "Reverse Solidus": "Back Slash"}
+            newExpectedName = expectedName
+            if expectedName in mappings:
+                newExpectedName = mappings[expectedName]
+            f.write("CONFUSABLE(" + confused + ", " + '"' +
+                    confusedName + '"' + ", " + expected + ", " +
+                    '"' + newExpectedName + '"' + ")\n")
         f.write("\n#undef CONFUSABLE\n")
 
 

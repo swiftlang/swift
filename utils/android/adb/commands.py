@@ -44,10 +44,24 @@ def rmdir(path):
     shell(['rm', '-rf', '{}/*'.format(path)])
 
 
-def push(local_path, device_path):
-    """Move the file at the given local path to the path on the device."""
-    return subprocess.check_output(['adb', 'push', local_path, device_path],
-                                   stderr=subprocess.STDOUT).strip()
+def push(local_paths, device_path):
+    """Move the files at the given local paths to the path on the device."""
+    if isinstance(local_paths, str):
+        local_paths = [local_paths]
+    try:
+        # In recent versions of ADB, push supports --sync, which checksums the
+        # files to be transmitted and skip the ones that haven't changed, which
+        # improves the effective transfer speed.
+        return subprocess.check_output(
+            ['adb', 'push', '--sync'] + local_paths + [device_path],
+            stderr=subprocess.STDOUT).strip()
+    except subprocess.CalledProcessError as e:
+        if "unrecognized option '--sync'" in e.output:
+            return subprocess.check_output(
+                ['adb', 'push'] + local_paths + [device_path],
+                stderr=subprocess.STDOUT).strip()
+        else:
+            raise e
 
 
 def reboot():

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -467,7 +467,7 @@ public func checkOneLevelOfForwardCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -693,7 +693,7 @@ public func checkOneLevelOfBidirectionalCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -906,7 +906,6 @@ public func checkOneLevelOfRandomAccessCollection<
   //===------------------------------------------------------------------===//
 
   let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : succ($0) }
@@ -924,7 +923,6 @@ public func checkOneLevelOfRandomAccessCollection<
   let count: Distance  = collection.count
   let offset0 = min(5, count)
   let offset1 = min(10, count)
-  let offset2 = min(15, count)
 
   let distanceCandidates: [Distance] = [
     -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
@@ -943,7 +941,7 @@ public func checkOneLevelOfRandomAccessCollection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    distanceOracle: { (x:Int, y:Int) in y - x },
     advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), message(),
@@ -978,7 +976,7 @@ public func checkOneLevelOfRandomAccessCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1237,7 +1235,7 @@ public func checkOneLevelOfForwardCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1463,7 +1461,7 @@ public func checkOneLevelOfBidirectionalCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1676,7 +1674,6 @@ public func checkOneLevelOfRandomAccessCollection<
   //===------------------------------------------------------------------===//
 
   let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : succ($0) }
@@ -1694,7 +1691,6 @@ public func checkOneLevelOfRandomAccessCollection<
   let count: Distance  = collection.count
   let offset0 = min(5, count)
   let offset1 = min(10, count)
-  let offset2 = min(15, count)
 
   let distanceCandidates: [Distance] = [
     -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
@@ -1713,7 +1709,7 @@ public func checkOneLevelOfRandomAccessCollection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    distanceOracle: { (x:Int, y:Int) in y - x },
     advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), message(),
@@ -1748,7 +1744,7 @@ public func checkOneLevelOfRandomAccessCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1871,7 +1867,7 @@ public func checkRangeReplaceable<C, N>(
   let source = Array<A.Element>(makeCollection())
 
   for (ix, i) in source.indices.enumerated() {
-    for (jx_, j) in (i..<source.endIndex).enumerated() {
+    for (jx_, _) in (i..<source.endIndex).enumerated() {
       let jx = jx_ + ix
 
       let oldCount = jx - ix
@@ -1892,7 +1888,7 @@ public func checkRangeReplaceable<C, N>(
         let growth = newCount - oldCount
 
         let expectedCount = source.count + growth
-        let actualCount = numericCast(a.count) as Int
+        let actualCount = a.count
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")

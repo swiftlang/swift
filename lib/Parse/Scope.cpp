@@ -50,14 +50,14 @@ static bool isResolvableScope(ScopeKind SK) {
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock)
-  : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
-    PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC),
-    IsInactiveConfigBlock(isInactiveConfigBlock) {
+    : Scope(P->getScopeInfo(), SC, isInactiveConfigBlock) {}
+
+Scope::Scope(ScopeInfo &SI, ScopeKind SC, bool isInactiveConfigBlock)
+    : SI(SI), HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
+      IsInactiveConfigBlock(isInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
-  
+
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
     IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
@@ -104,7 +104,8 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
 
 /// addToScope - Register the specified decl as being in the current lexical
 /// scope.
-void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
+void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
+                           bool diagnoseRedefinitions) {
   if (!CurScope->isResolvable())
     return;
 
@@ -113,7 +114,7 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
 
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getFullName());
+  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getName());
 
   // A redefinition is a hit in the scoped table at the same depth.
   if (EntryI != HT.end() && EntryI->first == CurScope->getDepth()) {
@@ -121,9 +122,13 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
     
     // If this is in a resolvable scope, diagnose redefinitions.  Later
     // phases will handle scopes like module-scope, etc.
-    if (CurScope->getDepth() >= ResolvableDepth)
-      return TheParser.diagnoseRedefinition(PrevDecl, D);
-    
+    if (CurScope->getDepth() >= ResolvableDepth) {
+      if (diagnoseRedefinitions) {
+        return TheParser.diagnoseRedefinition(PrevDecl, D);
+      }
+      return;
+    }
+
     // If this is at top-level scope, validate that the members of the overload
     // set all agree.
     
@@ -136,9 +141,16 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
   }
 
   HT.insertIntoScope(CurScope->HTScope,
-                     D->getFullName(),
+                     D->getName(),
                      std::make_pair(CurScope->getDepth(), D));
 }
+
+
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
 
 void ScopeInfo::dump() const {
 #ifndef NDEBUG
@@ -162,3 +174,7 @@ void ScopeInfo::dump() const {
   llvm::dbgs() << "\n";
 #endif
 }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif

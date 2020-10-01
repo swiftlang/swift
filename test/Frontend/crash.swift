@@ -3,7 +3,8 @@
 
 // Check that we see the contents of the input file list in the crash log.
 // CHECK-LABEL: Stack dump
-// CHECK-NEXT: Program arguments: {{.*swift(c?)(.EXE)?}} -frontend
+// CHECK-NEXT: Program arguments: {{.*swift(-frontend)?(c?)(\.exe)?}}
+// CHECK-NEXT: Swift version
 // CHECK-NEXT: Contents of {{.*}}.filelist.txt:
 // CHECK-NEXT: ---
 // CHECK-NEXT: test{{[\\/]}}Frontend{{[\\/]}}crash.swift{{$}}

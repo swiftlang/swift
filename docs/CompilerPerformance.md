@@ -83,8 +83,8 @@ The set of jobs that are run, and the way they spend their time, is itself
 highly dependent on **compilation modes**. Information concerning those modes
 that's relevant to compilation performance is recounted in the following
 section; for more details on the driver, see [the driver docs](Driver.md), as
-well as docs on [driver internals](DriverInternals.rst)
-and [driver parseable output](DriverParseableOutput.rst).
+well as docs on [driver internals](DriverInternals.md)
+and [driver parseable output](DriverParseableOutput.md).
 
 After discussing compilation modes in the following section, we'll also touch on
 large-scale variation in workload that can occur _without_ obvious hotspots, in
@@ -100,8 +100,7 @@ running in, and often to perform separate analysis for each mode. The
 significant modes are:
 
   - **Primary-file** vs. **whole-module**: this varies depending on whether the
-    driver is run with the flag `-wmo`, `-whole-module-optimization` or
-    `-force-single-frontend-invocation` (all these options are synonymous).
+    driver is run with the flag `-wmo` (a.k.a. `-whole-module-optimization`).
 
     - **Batch** vs. **single-file** primary-file mode. This distinction refines
     the behaviour of primary-file mode, with the new batch mode added in the
@@ -560,30 +559,6 @@ compilers on hand while you're working.
        0.0001 (100.0%)   0.0001 (100.0%)   0.0001 (100.0%)   0.0490 (100.0%)  Total
     ```
 
-  - `-Xfrontend -debug-time-compilation`: asks each frontend to print out timers
-    for each phase of its execution. Its output (per-frontend) looks like this:
-
-    ```
-    ===-------------------------------------------------------------------------===
-                                 Swift compilation
-    ===-------------------------------------------------------------------------===
-    Total Execution Time: 0.0876 seconds (0.0877 wall clock)
-
-     ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Name ---
-     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Name binding
-     0.0170 ( 38.0%)   0.0025 (  5.8%)   0.0195 ( 22.3%)   0.0195 ( 22.2%)  Type checking / Semantic analysis
-     0.0013 (  3.0%)   0.0004 (  0.8%)   0.0017 (  1.9%)   0.0017 (  1.9%)  LLVM output
-     0.0010 (  2.3%)   0.0003 (  0.7%)   0.0013 (  1.5%)   0.0013 (  1.5%)  SILGen
-     0.0006 (  1.4%)   0.0002 (  0.4%)   0.0008 (  0.9%)   0.0008 (  0.9%)  IRGen
-     0.0004 (  0.8%)   0.0000 (  0.1%)   0.0004 (  0.5%)   0.0004 (  0.5%)  SIL optimization
-     0.0002 (  0.5%)   0.0001 (  0.1%)   0.0003 (  0.3%)   0.0003 (  0.3%)  LLVM optimization
-     0.0001 (  0.1%)   0.0000 (  0.1%)   0.0001 (  0.1%)   0.0001 (  0.1%)  Parsing
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  SIL verification (pre-optimization)
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  SIL verification (post-optimization)
-     0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)   0.0000 (  0.0%)  AST verification
-     0.0448 (100.0%)   0.0428 (100.0%)   0.0876 (100.0%)   0.0877 (100.0%)  Total
-    ```
-
   - `-Xfrontend -debug-time-function-bodies`: asks each frontend to print out
     the time spent typechecking _every function_ in the program, sorted by time
     taken. The output is therefore voluminous, but can help when reducing a
@@ -717,7 +692,6 @@ $ cat /tmp/stats/*.json
   "AST.NumSourceLinesPerSecond": 3,
   "AST.NumLinkLibraries": 0,
   "AST.NumLoadedModules": 4,
-  "AST.NumImportedExternalDefinitions": 0,
   "AST.NumTotalClangImportedEntities": 0,
   ...
   "time.swift.Parsing.wall": 5.038023e-03,
@@ -754,7 +728,7 @@ Time,Live,IsEntry,EventName,CounterName,CounterDelta,CounterValue,EntityName,Ent
 40032,0,"entry","typecheck-decl","Sema.NumLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumTypesDeserialized",106,106,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumUnloadedLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
-40135,0,"entry","typecheck-decl","Sema.NumDeclsValidated",1,1,"","[test.swift:1:13 - line:1:29]"
+40135,0,"entry","typecheck-decl","Sema.InterfaceTypeRequest",1,1,"","[test.swift:1:13 - line:1:29]"
 ...
 ```
 
@@ -794,7 +768,7 @@ performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 ```
 $ mkdir stats-old stats-new
 $ ${OLD}/swiftc -stats-output-dir stats-old test.swift
-$ ${OLD}/swiftc -stats-output-dir stats-new test.swift
+$ ${NEW}/swiftc -stats-output-dir stats-new test.swift
 $ utils/process-stats-dir.py --compare-stats-dirs stats-old stats-new
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated
@@ -908,9 +882,9 @@ judge whether a revision contains a bug looks something like this:
 #!/bin/sh
 THRESHOLD=500000000
 CURR=$(git describe)
-utils/update-checkout --scheme master --reset-to-remote --clone --clean
+utils/update-checkout --scheme main --reset-to-remote --clone --clean
 git checkout ${CURR}
-utils/update-checkout --scheme master --match-timestamp
+utils/update-checkout --scheme main --match-timestamp
 git checkout ${CURR}
 if utils/build-script -r
 then
@@ -1055,10 +1029,8 @@ getting slower between versions:
      parameter of the script). Reconfirm that _just those two isolated frontend
      processes_ still show the regression you're interested in isolating.
 
-  6. Check high-level diagnostic output between the two compilers, either the
-     newer unified stats reporter (`-stats-output-dir`) or the older flags
-     (`-Xfrontend -debug-time-compilation` and friends). Comparing the two will
-     often guide the search.
+  6. Check the value of performance counters between the two compilers via the
+     unified stats reporter (`-stats-output-dir`).
 
   7. Run both frontend processes under a profiler and compare the profiles in
      detail. At this point there ought to be _some_ sign of a difference, either
@@ -1093,7 +1065,7 @@ getting slower between versions:
      of the compiler from swift.org. While only a handful of recent snapshots
      are linked on the swift.org webpage, all historical snapshots remain
      available to download by substituting the appropriate timestamp into the
-     snapshot URL. For example, the master-branch, macOS snapshot from June 9
+     snapshot URL. For example, the main-branch, macOS snapshot from June 9
      2017 is available
      at
      [https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg](https://swift.org/builds/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a/swift-DEVELOPMENT-SNAPSHOT-2017-06-09-a-osx.pkg),
@@ -1144,7 +1116,7 @@ driver. These files contain the driver's summary-view of the dependencies
 between entities defined and referenced in each source file; it is from these
 files that the driver decides when a file "needs" to be rebuilt because it
 depends on another file that needs to be rebuilt, and so on transitively. The
-file format is [documented here](DependencyAnalysis.rst).
+file format is [documented here](DependencyAnalysis.md).
 
 ### Finding areas in need of general improvement
 

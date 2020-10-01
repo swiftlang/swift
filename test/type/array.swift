@@ -114,3 +114,14 @@ func passAssocType<T : HasAssocType>(_ t: T) {
   takesAssocType(t, [T.A](), [T.A?]())
 }
 
+// SR-11134
+
+let sr_11134_1 = [[1, 2, 3][0]] // ok
+let sr_11134_2 = [[1, 2, 3] [1]] // expected-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
+// expected-note@-1 {{add a separator between the elements}}{{28-28=,}}
+// expected-note@-2 {{remove the space between the elements to silence this warning}}{{28-29=}}
+let sr_11134_3 = [
+  [1, 2, 3] [1] // expected-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
+// expected-note@-1 {{add a separator between the elements}}{{12-12=,}}
+// expected-note@-2 {{remove the space between the elements to silence this warning}}{{12-13=}}
+]

@@ -11,7 +11,9 @@ func testNSArrayBridging(_ hive: Hive) {
 }
 
 func testNSDictionaryBridging(_ hive: Hive) {
-  _ = hive.beesByName as [String : Bee] // expected-error{{'[String : Bee]?' is not convertible to '[String : Bee]'; did you mean to use 'as!' to force downcast?}}
+  _ = hive.beesByName as [String : Bee] // expected-error{{value of optional type '[String : Bee]?' must be unwrapped to a value of type '[String : Bee]'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 
   var dict1 = hive.anythingToBees
   let dict2: [AnyHashable : Bee] = dict1

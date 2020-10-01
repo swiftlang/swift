@@ -4,7 +4,7 @@
 
 import resilient_struct
 
-// Resilient structs are always address-only
+// Resilient structs from outside our resilience domain are always address-only
 
 // CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Size, @noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size) -> @out Size
 // CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size):
@@ -178,7 +178,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> @owned @callee_guaranteed () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
-// CHECK-LABEL: sil shared [serialized] [ossa] @$s17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVFSiycfU_ : $@convention(thin) (@guaranteed { var MySize }) -> Int
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVFSiycfU_ : $@convention(thin) (@in_guaranteed MySize) -> Int
 // CHECK: function_ref @$s17struct_resilience6MySizeV1wSivg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 

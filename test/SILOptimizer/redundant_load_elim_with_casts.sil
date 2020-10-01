@@ -352,10 +352,10 @@ sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) (
 bb0:
   %0 = alloc_stack $Optional<Builtin.Int32>
   %1 = integer_literal $Builtin.Int32, 0
-  %2 = enum $Optional<Builtin.Int32>, #Optional.some!enumelt.1, %1 : $Builtin.Int32
+  %2 = enum $Optional<Builtin.Int32>, #Optional.some!enumelt, %1 : $Builtin.Int32
   %3 = load %0 : $*Optional<Builtin.Int32>
   store %3 to %0 : $*Optional<Builtin.Int32>
-  %5 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.Int32>, #Optional.some!enumelt.1
+  %5 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.Int32>, #Optional.some!enumelt
   dealloc_stack %0 : $*Optional<Builtin.Int32>
   %9999 = tuple()
   return %9999 : $()
@@ -374,7 +374,7 @@ sil @bad_store_forward : $@convention(thin) (@guaranteed Optional<HoldsRef>) -> 
 bb0(%0 : $Optional<HoldsRef>):
 // CHECK: [[LOC:%.*]] = alloc_stack
   %1 = alloc_stack $HoldsRef
-  switch_enum %0 : $Optional<HoldsRef>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<HoldsRef>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 // CHECK: bb1([[ARG:%.*]] : ${{.*}}):
 bb1(%3 : $HoldsRef):

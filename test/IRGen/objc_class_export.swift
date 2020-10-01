@@ -22,7 +22,7 @@
 // CHECK-SAME:   i64 ptrtoint ({{.*}}* @_METACLASS_DATA__TtC17objc_class_export3Foo to i64)
 // CHECK-SAME: }
 // CHECK: [[FOO_NAME:@.*]] = private unnamed_addr constant [28 x i8] c"_TtC17objc_class_export3Foo\00"
-// CHECK: @_METACLASS_DATA__TtC17objc_class_export3Foo = private constant {{.*\*}} } {
+// CHECK: @_METACLASS_DATA__TtC17objc_class_export3Foo = internal constant {{.*\*}} } {
 // CHECK-SAME:   i32 129,
 // CHECK-SAME:   i32 40,
 // CHECK-SAME:   i32 40,
@@ -34,8 +34,8 @@
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
-// CHECK: @_DATA__TtC17objc_class_export3Foo = private constant {{.*\*}} } {
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
+// CHECK: @_DATA__TtC17objc_class_export3Foo = internal constant {{.*\*}} } {
 // CHECK-SAME:   i32 128,
 // CHECK-SAME:   i32 16,
 // CHECK-SAME:   i32 24,
@@ -47,7 +47,7 @@
 // CHECK-SAME:   @_IVARS__TtC17objc_class_export3Foo,
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   _PROPERTIES__TtC17objc_class_export3Foo
-// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 // CHECK: @"$s17objc_class_export3FooCMf" = internal global <{{.*}} }> <{
 // CHECK-SAME:   void ([[FOO]]*)* @"$s17objc_class_export3FooCfD",
 // CHECK-SAME:   i8** @"$sBOWV",
@@ -81,7 +81,7 @@ struct BigStructWithNativeObjects {
 
   @objc func drawInRect(dirty dirty: NSRect) {
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]* %0, i8* %1, [[NSRECT]]* byval align 8 %2) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call swiftcc void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
@@ -90,14 +90,14 @@ struct BigStructWithNativeObjects {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"([[NSRECT]]* noalias nocapture sret %0, [[OPAQUE4:%.*]]* %1, i8* %2) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC6boundsSo6NSRectVyF"([[FOO]]* swiftself [[CAST]])
 
   @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret %0, [[OPAQUE5:%.*]]* %1, i8* %2, [[NSRECT]]* byval align 8 %3) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
 

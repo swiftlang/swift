@@ -21,45 +21,82 @@
 
 namespace swift {
 
-/// This is a small and fast implementation of memcpy with a constant count. It
-/// should be a performance win for small constant values where the function
-/// can be inlined, the loop unrolled and the memory accesses merged.
-template <unsigned count> static void small_memcpy(void *dest, const void *src) {
-  uint8_t *d8 = (uint8_t*)dest;
-  const uint8_t *s8 = (const uint8_t*)src;
-  for (unsigned i = 0; i < count; i++) {
-    *d8++ = *s8++;
+/// Store the given 4-byte unsigned integer value into the variable-
+/// length destination buffer. The value will be zero extended or
+/// truncated to fit in the buffer.
+static inline void storeEnumElement(uint8_t *dst,
+                                    uint32_t value,
+                                    size_t size) {
+  // Note: we use fixed size memcpys to encourage the compiler to
+  // optimize them into unaligned stores.
+  switch (size) {
+  case 0:
+    return;
+  case 1:
+    dst[0] = uint8_t(value);
+    return;
+  case 2:
+#if defined(__BIG_ENDIAN__)
+    value <<= 16;
+#endif
+    memcpy(dst, &value, 2);
+    return;
+  case 3:
+#if defined(__BIG_ENDIAN__)
+    value <<= 8;
+#endif
+    memcpy(dst, &value, 3);
+    return;
+  case 4:
+    memcpy(dst, &value, 4);
+    return;
   }
+  // Store zero extended value in the destination.
+#if defined(__BIG_ENDIAN__)
+  memset(&dst[0], 0, size - 4);
+  memcpy(&dst[size - 4], &value, 4);
+#else
+  memcpy(&dst[0], &value, 4);
+  memset(&dst[4], 0, size - 4);
+#endif
 }
 
-static inline void small_memcpy(void *dest, const void *src, unsigned count,
-                                bool countMaybeThree = false) {
-  // This is specialization of the memcpy line below with
-  // specialization for values of 1, 2 and 4.
-  // memcpy(dst, src, count)
-  if (count == 1) {
-    small_memcpy<1>(dest, src);
-  } else if (count == 2) {
-    small_memcpy<2>(dest, src);
-  } else if (countMaybeThree && count == 3) {
-    small_memcpy<3>(dest, src);
-  } else if (count == 4) {
-    small_memcpy<4>(dest, src);
-  } else {
-    swift::crash("Tagbyte values should be 1, 2 or 4.");
+/// Load a 4-byte unsigned integer value from the variable-length
+/// source buffer. The value will be zero-extended or truncated to fit
+/// into the returned value.
+static inline uint32_t loadEnumElement(const uint8_t *src,
+                                       size_t size) {
+  // Note: we use fixed size memcpys to encourage the compiler to
+  // optimize them into unaligned loads.
+  uint32_t result = 0;
+  switch (size) {
+  case 0:
+    return 0;
+  case 1:
+    return uint32_t(src[0]);
+  case 2:
+    memcpy(&result, src, 2);
+#if defined(__BIG_ENDIAN__)
+    result >>= 16;
+#endif
+    return result;
+  case 3:
+    memcpy(&result, src, 3);
+#if defined(__BIG_ENDIAN__)
+    result >>= 8;
+#endif
+    return result;
+  case 4:
+    memcpy(&result, src, 4);
+    return result;
   }
-}
-
-static inline void small_memset(void *dest, uint8_t value, unsigned count) {
-  if (count == 1) {
-    memset(dest, value, 1);
-  } else if (count == 2) {
-    memset(dest, value, 2);
-  } else if (count == 4) {
-    memset(dest, value, 4);
-  } else {
-    swift::crash("Tagbyte values should be 1, 2 or 4.");
-  }
+  // Load value by truncating the source to 4 bytes.
+#if defined(__BIG_ENDIAN__)
+  memcpy(&result, &src[size - 4], 4);
+#else
+  memcpy(&result, &src[0], 4);
+#endif
+  return result;
 }
 
 inline unsigned getEnumTagSinglePayloadImpl(
@@ -71,18 +108,12 @@ inline unsigned getEnumTagSinglePayloadImpl(
   if (emptyCases > payloadNumExtraInhabitants) {
     auto *valueAddr = reinterpret_cast<const uint8_t *>(enumAddr);
     auto *extraTagBitAddr = valueAddr + payloadSize;
-    unsigned extraTagBits = 0;
     unsigned numBytes =
         getEnumTagCounts(payloadSize,
                          emptyCases - payloadNumExtraInhabitants,
                          1 /*payload case*/).numTagBytes;
 
-#if defined(__BIG_ENDIAN__)
-    small_memcpy(reinterpret_cast<uint8_t *>(&extraTagBits) + 4 - numBytes,
-                 extraTagBitAddr, numBytes);
-#else
-    small_memcpy(&extraTagBits, extraTagBitAddr, numBytes);
-#endif
+    unsigned extraTagBits = loadEnumElement(extraTagBitAddr, numBytes);
 
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
@@ -90,24 +121,7 @@ inline unsigned getEnumTagSinglePayloadImpl(
     if (extraTagBits > 0) {
       unsigned caseIndexFromExtraTagBits =
           payloadSize >= 4 ? 0 : (extraTagBits - 1U) << (payloadSize * 8U);
-
-#if defined(__BIG_ENDIAN__)
-      // On BE high order bytes contain the index
-      unsigned long caseIndexFromValue = 0;
-      unsigned numPayloadTagBytes = std::min(size_t(8), payloadSize);
-      if (numPayloadTagBytes)
-        memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 8 -
-               numPayloadTagBytes,
-               valueAddr, numPayloadTagBytes);
-#else
-      // In practice we should need no more than four bytes from the payload
-      // area.
-      unsigned caseIndexFromValue = 0;
-      unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-      if (numPayloadTagBytes)
-        small_memcpy(&caseIndexFromValue, valueAddr,
-                     numPayloadTagBytes, true);
-#endif
+      unsigned caseIndexFromValue = loadEnumElement(valueAddr, payloadSize);
       unsigned noPayloadIndex =
           (caseIndexFromExtraTagBits | caseIndexFromValue) +
           payloadNumExtraInhabitants;
@@ -143,7 +157,7 @@ inline void storeEnumTagSinglePayloadImpl(
   // if any.
   if (whichCase <= payloadNumExtraInhabitants) {
     if (numExtraTagBytes != 0)
-      small_memset(extraTagBitAddr, 0, numExtraTagBytes);
+      storeEnumElement(extraTagBitAddr, 0, numExtraTagBytes);
 
     // If this is the payload case, we're done.
     if (whichCase == 0)
@@ -169,29 +183,10 @@ inline void storeEnumTagSinglePayloadImpl(
   }
 
     // Store into the value.
-#if defined(__BIG_ENDIAN__)
-  uint64_t payloadIndexBuf = static_cast<uint64_t>(payloadIndex);
-  if (payloadSize >= 8) {
-    memcpy(valueAddr, &payloadIndexBuf, 8);
-    memset(valueAddr + 8, 0, payloadSize - 8);
-  } else if (payloadSize > 0) {
-    payloadIndexBuf <<= (8 - payloadSize) * 8;
-    memcpy(valueAddr, &payloadIndexBuf, payloadSize);
-  }
+  if (payloadSize)
+    storeEnumElement(valueAddr, payloadIndex, payloadSize);
   if (numExtraTagBytes)
-    small_memcpy(extraTagBitAddr,
-                 reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -
-                     numExtraTagBytes,
-                 numExtraTagBytes);
-#else
-  unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-  if (numPayloadTagBytes)
-    small_memcpy(valueAddr, &payloadIndex, numPayloadTagBytes, true);
-  if (payloadSize > 4)
-    memset(valueAddr + 4, 0, payloadSize - 4);
-  if (numExtraTagBytes)
-    small_memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
-#endif
+    storeEnumElement(extraTagBitAddr, extraTagIndex, numExtraTagBytes);
 }
 
 } /* end namespace swift */

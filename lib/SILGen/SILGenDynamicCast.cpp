@@ -101,10 +101,12 @@ namespace {
       ManagedValue result;
       if (Strategy == CastStrategy::Address) {
         result = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, operand, origTargetTL.getLoweredType());
+            Loc, operand, SourceType,
+            origTargetTL.getLoweredType(), TargetType);
       } else {
         result = SGF.B.createUnconditionalCheckedCast(
-            Loc, operand, origTargetTL.getLoweredType());
+            Loc, operand,
+            origTargetTL.getLoweredType(), TargetType);
       }
 
       return RValue(SGF, Loc, TargetType,
@@ -147,7 +149,9 @@ namespace {
         // Opaque value mode
         operandValue = std::move(operand);
         SGF.B.createCheckedCastValueBranch(
-            Loc, operandValue, origTargetTL.getLoweredType(), trueBB, falseBB);
+            Loc, operandValue, SourceType,
+            origTargetTL.getLoweredType(), TargetType,
+            trueBB, falseBB);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
@@ -162,8 +166,8 @@ namespace {
           operandValue = operandValue.borrow(SGF, Loc);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
-                                      origTargetTL.getLoweredType(), trueBB,
-                                      falseBB, TrueCount, FalseCount);
+                                      origTargetTL.getLoweredType(), TargetType,
+                                      trueBB, falseBB, TrueCount, FalseCount);
       }
 
       // Emit the success block.
@@ -181,7 +185,7 @@ namespace {
           // argument.
           ManagedValue argument;
           if (!shouldTakeOnSuccess(consumption)) {
-            argument = SGF.B.createGuaranteedPhiArgument(
+            argument = SGF.B.createGuaranteedTransformingTerminatorArgument(
                 origTargetTL.getLoweredType());
           } else {
             argument =
@@ -232,7 +236,8 @@ namespace {
         switch (consumption) {
         case CastConsumptionKind::BorrowAlways:
         case CastConsumptionKind::CopyOnSuccess:
-          SGF.B.createGuaranteedPhiArgument(operandValue.getType());
+          SGF.B.createGuaranteedTransformingTerminatorArgument(
+              operandValue.getType());
           handleFalse(None);
           break;
         case CastConsumptionKind::TakeAlways:
@@ -588,7 +593,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Any);
+  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::None);
   return isa;
 }
 

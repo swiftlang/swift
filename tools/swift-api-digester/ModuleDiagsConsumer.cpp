@@ -33,17 +33,17 @@ enum LocalDiagID : uint32_t {
 static StringRef getCategoryName(uint32_t ID) {
   switch(ID) {
   case LocalDiagID::removed_decl:
-  case LocalDiagID::removed_setter:
     return "/* Removed Decls */";
   case LocalDiagID::moved_decl:
   case LocalDiagID::decl_kind_changed:
     return "/* Moved Decls */";
   case LocalDiagID::renamed_decl:
+  case LocalDiagID::objc_name_change:
     return "/* Renamed Decls */";
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
-  case LocalDiagID::var_let_changed:
   case LocalDiagID::func_self_access_change:
+  case LocalDiagID::new_decl_without_intro:
     return "/* Decl Attribute changes */";
   case LocalDiagID::default_arg_removed:
   case LocalDiagID::decl_type_change:
@@ -55,6 +55,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* RawRepresentable Changes */";
   case LocalDiagID::generic_sig_change:
     return "/* Generic Signature Changes */";
+  case LocalDiagID::enum_case_added:
   case LocalDiagID::decl_added:
   case LocalDiagID::decl_reorder:
   case LocalDiagID::var_has_fixed_order_change:
@@ -63,16 +64,21 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::conformance_added:
   case LocalDiagID::conformance_removed:
   case LocalDiagID::optional_req_changed:
+  case LocalDiagID::existing_conformance_added:
     return "/* Protocol Conformance Change */";
   case LocalDiagID::default_associated_type_removed:
   case LocalDiagID::protocol_req_added:
+  case LocalDiagID::decl_new_witness_table_entry:
     return "/* Protocol Requirement Change */";
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:
   case LocalDiagID::no_longer_open:
+  case LocalDiagID::desig_init_added:
+  case LocalDiagID::added_invisible_designated_init:
+  case LocalDiagID::not_inheriting_convenience_inits:
     return "/* Class Inheritance Change */";
   default:
-    return StringRef();
+    return "/* Others */";
   }
 }
 }
@@ -89,16 +95,11 @@ ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
 #include "swift/AST/DiagnosticsModuleDiffer.def"
 }
 
-void swift::ide::api::
-ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) {
+void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
+    SourceManager &SM, const DiagnosticInfo &Info) {
   auto Category = getCategoryName((uint32_t)Info.ID);
   if (Category.empty()) {
-    PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
-      FormatArgs, Info);
+    PrintingDiagnosticConsumer::handleDiagnostic(SM, Info);
     return;
   }
   if (!DiagnoseModuleDiff)
@@ -106,7 +107,8 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
   AllDiags[Category].insert(Text.str().str());
 }
@@ -118,5 +120,30 @@ swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
     for (auto &Item: Pair.second) {
       OS << Item << "\n";
     }
+  }
+}
+
+bool swift::ide::api::
+FilteringDiagnosticConsumer::shouldProceed(const DiagnosticInfo &Info) {
+  if (allowedBreakages->empty()) {
+    return true;
+  }
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+  return allowedBreakages->count(Text.str()) == 0;
+}
+
+void swift::ide::api::
+FilteringDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
+                                              const DiagnosticInfo &Info) {
+  if (shouldProceed(Info)) {
+    if (Info.Kind == DiagnosticKind::Error) {
+      HasError = true;
+    }
+    subConsumer->handleDiagnostic(SM, Info);
   }
 }

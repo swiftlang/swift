@@ -20,6 +20,7 @@
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Explosion.h"
@@ -30,6 +31,10 @@
 
 using namespace swift;
 using namespace irgen;
+
+static llvm::cl::opt<bool> EnableTrapDebugInfo(
+    "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
+    llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              OptimizationMode OptMode,
@@ -98,7 +103,8 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                llvm::Value *size, Alignment align) {
-  Builder.CreateMemCpy(dest, align.getValue(), src, align.getValue(), size);
+  Builder.CreateMemCpy(dest, llvm::MaybeAlign(align.getValue()), src,
+                       llvm::MaybeAlign(align.getValue()), size);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
@@ -172,7 +178,7 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -189,7 +195,7 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *alignMask,
                                           llvm::Value *&outBox,
                                           llvm::Value *&outValueAddress) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -204,7 +210,7 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
 
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -221,7 +227,7 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
     llvm::Attribute::ReadNone,
   };
   auto attrs = llvm::AttributeList::get(
-      IGM.LLVMContext, llvm::AttributeList::FunctionIndex, attrKinds);
+      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrKinds);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getProjectBoxFn(), box);
   call->setCallingConv(IGM.DefaultCC);
@@ -230,7 +236,7 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
 }
 
 llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
   llvm::CallInst *call =
@@ -432,7 +438,8 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   return Address(slotPtr, objectAlignment);
 }
 
-llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM) {
+llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
+                                                  StringRef failureMsg) {
   if (IGM.IRGen.Opts.shouldOptimize()) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
@@ -451,14 +458,17 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM) {
 
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
+    IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
+  }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
   return Call;
 }
 
-void IRGenFunction::emitTrap(bool EmitUnreachable) {
-  Builder.CreateNonMergeableTrap(IGM);
+void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
+  Builder.CreateNonMergeableTrap(IGM, failureMessage);
   if (EmitUnreachable)
     Builder.CreateUnreachable();
 }

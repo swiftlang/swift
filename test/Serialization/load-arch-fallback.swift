@@ -15,4 +15,4 @@
 // REQUIRES: CPU=armv7 || CPU=armv7k || CPU=armv7s
 
 import empty
-// CHECK: :[[@LINE-1]]:8: error: malformed module file: {{.*}}arm.swiftmodule
+// CHECK: :[[@LINE-1]]:8: error: malformed compiled module: {{.*}}arm.swiftmodule

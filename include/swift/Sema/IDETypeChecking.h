@@ -19,26 +19,32 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
-#include "llvm/ADT/MapVector.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
+#include <tuple>
 
 namespace swift {
   class AbstractFunctionDecl;
-  class Decl;
-  class Expr;
-  class LazyResolver;
-  class ExtensionDecl;
-  class ProtocolDecl;
-  class Type;
-  class TypeChecker;
-  class DeclContext;
+  class ASTContext;
   class ConcreteDeclRef;
-  class ValueDecl;
+  class Decl;
+  class DeclContext;
   class DeclName;
-
-  /// Typecheck a declaration parsed during code completion.
-  void typeCheckCompletionDecl(Decl *D);
+  enum class DeclRefKind;
+  class Expr;
+  class ExtensionDecl;
+  class FunctionType;
+  class LookupResult;
+  class NominalTypeDecl;
+  class PatternBindingDecl;
+  class ProtocolDecl;
+  class SourceFile;
+  class SubscriptDecl;
+  class TopLevelCodeDecl;
+  class Type;
+  class ValueDecl;
+  struct PrintOptions;
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
@@ -46,13 +52,7 @@ namespace swift {
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
-
-  bool isEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
+  bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
@@ -65,16 +65,27 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
     ArrayRef<ValueDecl*> getMemberDecls(InterestedMemberKind Kind);
   };
 
+  /// Look up a member with the given name in the given type.
+  ///
+  /// Unlike other member lookup functions, \c swift::resolveValueMember()
+  /// should be used when you want to look up declarations with the same name as
+  /// one you already have.
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
@@ -122,20 +133,16 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
+  /// Type check a function body element which is at \p TagetLoc .
+  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
   /// Typecheck top-level code parsed during code completion.
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  TypeChecker &createTypeChecker(ASTContext &Ctx);
+  LookupResult
+  lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -196,12 +203,13 @@ namespace swift {
   /// be printed to \c OS.
   ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
     ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+    std::vector<ExpressionTypeInfo> &scratch,
+    bool CanonicalType,
+    llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
-  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
-                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
+  ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);
 
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.
@@ -221,6 +229,60 @@ namespace swift {
   /// Sometimes for diagnostics we want to work on the original argument list as
   /// written by the user; this performs the reverse transformation.
   OriginalArgumentList getOriginalArgumentList(Expr *expr);
+
+  /// Returns the root type and result type of the keypath type in a keypath
+  /// dynamic member lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  Type getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
+  Type getResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
+  /// Collect all the protocol requirements that a given declaration can
+  ///   provide default implementations for. VD is a declaration in extension
+  ///   declaration. Scratch is the buffer to collect those protocol
+  ///   requirements.
+  ///
+  /// \returns the slice of Scratch
+  ArrayRef<ValueDecl*>
+  canDeclProvideDefaultImplementationFor(ValueDecl* VD);
+
+  /// Get decls that the given decl overrides, protocol requirements that
+  ///   it serves as a default implementation of, and optionally protocol
+  ///   requirements it satisfies in a conforming class
+  ArrayRef<ValueDecl*>
+  collectAllOverriddenDecls(ValueDecl *VD,
+                            bool IncludeProtocolRequirements = true,
+                            bool Transitive = false);
+
+  /// Enumerates the various kinds of "build" functions within a function
+  /// builder.
+  enum class FunctionBuilderBuildFunction {
+    BuildBlock,
+    BuildExpression,
+    BuildOptional,
+    BuildEitherFirst,
+    BuildEitherSecond,
+    BuildArray,
+    BuildLimitedAvailability,
+    BuildFinalResult,
+  };
+
+  /// Try to infer the component type of a function builder from the type
+  /// of buildBlock or buildExpression, if it was there.
+  Type inferFunctionBuilderComponentType(NominalTypeDecl *builder);
+
+  /// Print the declaration for a function builder "build" function, for use
+  /// in Fix-Its, code completion, and so on.
+  void printFunctionBuilderBuildFunction(
+      NominalTypeDecl *builder, Type componentType,
+      FunctionBuilderBuildFunction function,
+      Optional<std::string> stubIndent, llvm::raw_ostream &out);
+
+  /// Compute the insertion location, indentation string, and component type
+  /// for a Fix-It that adds a new build* function to a function builder.
+  std::tuple<SourceLoc, std::string, Type>
+  determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder);
 }
 
 #endif

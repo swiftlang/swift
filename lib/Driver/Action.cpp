@@ -28,10 +28,12 @@ const char *Action::getClassName(Kind AC) {
   case Kind::ModuleWrapJob:  return "modulewrap";
   case Kind::AutolinkExtractJob:  return "swift-autolink-extract";
   case Kind::REPLJob:  return "repl";
-  case Kind::LinkJob:  return "link";
+  case Kind::DynamicLinkJob:  return "link";
+  case Kind::StaticLinkJob:  return "static-link";
   case Kind::GenerateDSYMJob:  return "generate-dSYM";
   case Kind::VerifyDebugInfoJob:  return "verify-debug-info";
   case Kind::GeneratePCHJob:  return "generate-pch";
+  case Kind::VerifyModuleInterfaceJob: return "verify-module-interface";
   }
 
   llvm_unreachable("invalid class");
@@ -55,10 +57,14 @@ void AutolinkExtractJobAction::anchor() {}
 
 void REPLJobAction::anchor() {}
 
-void LinkJobAction::anchor() {}
+void DynamicLinkJobAction::anchor() {}
+
+void StaticLinkJobAction::anchor() {}
 
 void GenerateDSYMJobAction::anchor() {}
 
 void VerifyDebugInfoJobAction::anchor() {}
 
 void GeneratePCHJobAction::anchor() {}
+
+void VerifyModuleInterfaceJobAction::anchor() {}

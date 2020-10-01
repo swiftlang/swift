@@ -107,7 +107,7 @@
 // LINK-DEBUG-SWIFTMODULES: 7: link, {1, 2, 3, 4, 5, 6}, image
 
 // RUN: touch %t/a.o %t/b.o
-// RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -force-single-frontend-invocation 2>&1 | %FileCheck %s -check-prefix=WHOLE-MODULE
+// RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -whole-module-optimization 2>&1 | %FileCheck %s -check-prefix=WHOLE-MODULE
 // WHOLE-MODULE: 0: input, "{{.*}}Inputs/main.swift", swift
 // WHOLE-MODULE: 1: input, "{{.*}}Inputs/empty.swift", swift
 // WHOLE-MODULE: 2: input, "{{.*}}actions-dsym.swift", swift

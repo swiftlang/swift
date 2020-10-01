@@ -1,0 +1,23 @@
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+// CHECK-LABEL: sil @test : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <Int, String>) -> ()
+sil @test : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <A, B> (@in A, @in B) -> () for <Int, String>) -> () {
+entry(%0 : $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <Int, String>):
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @test_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()
+sil @test_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed @substituted <A, B> (@in A, @in B) -> () for <X, Y>) -> () {
+entry(%0 : $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <X, Y>):
+  return undef : $()
+}
+
+sil @test_substituted_generic : $@convention(thin) <X, Y> @substituted <Z> (@in Z) -> (@out Z) for <(X, Y)> {
+entry(%0 : $*(X, Y), %1 : $*(X, Y)):
+  copy_addr [take] %1 to [initialization] %0 : $*(X,Y)
+  return undef : $()
+}

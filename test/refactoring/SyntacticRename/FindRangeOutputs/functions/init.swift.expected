@@ -63,7 +63,7 @@ class SomeClass {
 
 let someClass = SomeClass();
 let _ = /*init:call*/SomeClass(<callarg index=0>a</callarg><callcolon index=0>:</callcolon>1, <callarg index=1>b</callarg><callcolon index=1>:</callcolon>1, <callarg index=2>c</callarg><callcolon index=2>:</callcolon>1)
-let _ = SomeClass . /*init*/init(<sel index=0>a</sel>:<sel index=1>b</sel>:<sel index=2>c</sel>:)
+let _ = SomeClass . /*init*/<keywordBase>init</keywordBase>(<sel index=0>a</sel>:<sel index=1>b</sel>:<sel index=2>c</sel>:)
 _ = someClass/*sub:ref*/[1, y: 2]
 someClass/*sub:ref*/[1, y: 2] = 2
 

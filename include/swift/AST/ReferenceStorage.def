@@ -55,6 +55,7 @@
 /// UNCHECKED_REF_STORAGE
 ///   Name##RetainValueInst
 ///   Name##ReleaseValueInst
+///   StrongCopy##Name##ValueInst
 /// LOADABLE_REF_STORAGE
 ///   Ref*ToNameInst
 ///   Name*ToRefInst
@@ -62,7 +63,7 @@
 ///   Load##Name##Inst
 ///   Store##Name##Inst
 /// ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst
@@ -77,7 +78,7 @@
 /// ALWAYS_LOADABLE_CHECKED_REF_STORAGE
 ///   Ref*ToNameInst
 ///   Name*ToRefInst
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst
@@ -86,7 +87,7 @@
 ///   Name*ToRefInst
 ///   Load##Name##Inst
 ///   Store##Name##Inst
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst
@@ -98,6 +99,10 @@
 /// storage type, and SOMETIMES_LOADABLE_CHECKED_REF_STORAGE needs *two*
 /// TypeInfos to be created. One for the loadable scenario, and one for the
 /// address-only scenario.
+///
+/// TODO: We should change Copy##Name##ValueInst to be defined on
+/// LOADABLE_REF_STORAGE. It just will require us to go through, refactor, and
+/// fix up this code.
 
 
 #ifndef REF_STORAGE

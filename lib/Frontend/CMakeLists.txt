@@ -3,23 +3,28 @@ add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendOptionsConverter.cpp
   ArgsToFrontendOutputsConverter.cpp
   CompilerInvocation.cpp
+  DependencyVerifier.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
-  ParseableInterfaceModuleLoader.cpp
-  ParseableInterfaceSupport.cpp
+  ModuleInterfaceBuilder.cpp
+  ModuleInterfaceLoader.cpp
+  ModuleInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
-  SerializedDiagnosticConsumer.cpp
-  DEPENDS
-    SwiftOptions)
+  SerializedDiagnosticConsumer.cpp)
+add_dependencies(swiftFrontend
+  SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
+  swiftAST
   swiftSIL
   swiftMigrator
   swiftOption
-  swiftParseSIL
   swiftSILGen
   swiftSILOptimizer
+  swiftIRGen
+  swiftLocalization
   swiftSema
-  swiftSerialization)
+  swiftSerialization
+  swiftTBDGen)
 

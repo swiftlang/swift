@@ -167,9 +167,9 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
-  // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
+  // CHECK: [[NEXT:%[0-9]+]] = witness_method $IndexingIterator<Array<MyClass>>, #IteratorProtocol.next : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+  // CHECK-NEXT: apply [[NEXT]]<IndexingIterator<Array<MyClass>>>
+  // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo :
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
     obj.foo()
@@ -246,7 +246,7 @@ func test_if_break(_ c : C?) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 label1:
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : @owned $C):
 
@@ -268,7 +268,7 @@ func test_if_else_break(_ c : C?) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 label2:
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
@@ -292,7 +292,7 @@ func test_if_else_then_break(_ a : Bool, _ c : C?) {
 label3:
   // CHECK: bb0({{.*}}, [[ARG2:%.*]] : @guaranteed $Optional<C>):
   // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
-  // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
@@ -518,20 +518,21 @@ func defer_in_closure_in_generic<T>(_ x: T) {
   // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
     // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
-    defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
+    defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
   }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements13defer_mutableyySiF
 func defer_mutable(_ x: Int) {
   var x = x
+  // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
   // CHECK-NEXT: project_box [[BOX]]
   // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
   // CHECK: destroy_value [[BOX]]
-  defer { _ = x } // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
+  defer { _ = x } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }
 
 protocol StaticFooProtocol { static func foo() }
@@ -578,7 +579,7 @@ func testRequireExprPattern(_ a : Int) {
 // CHECK-LABEL: sil hidden [ossa] @$s10statements20testRequireOptional1yS2iSgF
 // CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<Int>, let, name "a"
-// CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
+// CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
@@ -598,7 +599,7 @@ func testRequireOptional1(_ a : Int?) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<String>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<String>
-// CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
@@ -631,7 +632,7 @@ func testCleanupEmission<T>(_ x: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements15test_is_patternyyAA9BaseClassCF
 func test_is_pattern(_ y : BaseClass) {
-  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  // checked_cast_br %0 : $BaseClass to DerivedClass
   guard case is DerivedClass = y else { marker_1(); return }
 
   marker_2()
@@ -641,7 +642,7 @@ func test_is_pattern(_ y : BaseClass) {
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $BaseClass):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to $DerivedClass
+  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : @owned $DerivedClass):
 
@@ -660,7 +661,7 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: bb0([[ARG:%.*]] : $Optional<(Int, Int)>):
   // CHECK-NEXT:   debug_value [[ARG]] : $Optional<(Int, Int)>, let, name "a"
-  // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
   guard let (x, y) = a else { }
   _ = y

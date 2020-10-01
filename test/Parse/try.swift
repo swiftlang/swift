@@ -253,7 +253,7 @@ let _: String = try? optProducer?.produceDoubleOptionalInt() // expected-error {
 
 let producer = ThingProducer()
 
-let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int???' to specified type 'Int'}}
+let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int?? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int??? = try? producer.produceDoubleOptionalInt() // good

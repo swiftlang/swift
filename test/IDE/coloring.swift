@@ -18,6 +18,15 @@ struct S {
   var a, b : Int
 }
 
+enum EnumWhereCaseHasADefaultedFunctionTypeParam {
+// CHECK: <kw>enum</kw> EnumWhereCaseHasADefaultedFunctionTypeParam {
+  case foo(x: () -> () = {
+  // CHECK: <kw>case</kw> foo(x: () -> () = {
+    func inner(x: S) {}
+    // CHECK: <kw>func</kw> inner(x: <type>S</type>) {}
+  })
+}
+
 enum EnumWithDerivedEquatableConformance : Int {
 // CHECK-LABEL: <kw>enum</kw> EnumWithDerivedEquatableConformance : {{(<type>)}}Int{{(</type>)?}} {
   case CaseA
@@ -151,6 +160,12 @@ func foo(n: Float) -> Int {
 
 // CHECK: <kw>protocol</kw> Prot
 protocol Prot {
+  // CHECK: <kw>associatedtype</kw> Assoc1 = <type>Array</type><<type>Never</type>>
+  associatedtype Assoc1 = Array<Never>
+  // CHECK: <kw>associatedtype</kw> Assoc2 = <type>Void</type> <kw>where</kw> <type>Assoc2</type>: <type>Equatable</type>
+  associatedtype Assoc2 = Void where Assoc2: Equatable
+  // CHECK: <kw>associatedtype</kw> Assoc3: <type>Prot</type>, <type>Prot</type> = <type>Void</type> <kw>where</kw> <type>Assoc3</type>: <type>Prot</type>
+  associatedtype Assoc3: Prot, Prot = Void where Assoc3: Prot
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
   // CHECK: <kw>func</kw> protMeth(x: <type>Int</type>)
@@ -165,7 +180,7 @@ protocol Prot {
 infix operator *-* : FunnyPrecedence
 
 // CHECK: <kw>precedencegroup</kw> FunnyPrecedence
-// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>associativity</kw>: <kw>left</kw>{{$}}
 // CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
 precedencegroup FunnyPrecedence {
   associativity: left
@@ -262,6 +277,40 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
+// Check cases where an ObjectLiteralExpr appears in the AST
+//
+#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+test(#imageLiteral(resourceName: "test"), test: 0)
+// CHECK: test(<object-literal>#imageLiteral(resourceName: "test")</object-literal>, test: <int>0</int>)
+
+// Check best-effort fallback handling when no ObjectLiteralExpr appears in the
+// AST.
+//
+_: Foo = #colorLiteral(red: 1.0, green: 0, blue: 1.0, alpha: 1.0)
+// CHECK: <kw>_</kw>: Foo = <object-literal>#colorLiteral(red: 1.0, green: 0, blue: 1.0, alpha: 1.0)</object-literal>
+_ = [#imageLiteral(resourceName: "foo.png")] + ;
+// CHECK: <kw>_</kw> = [<object-literal>#imageLiteral(resourceName: "foo.png")</object-literal>] + ;
+import let bad = #fileLiteral(resourceName: "foo.txt")
+// CHECK: <kw>import</kw> <kw>let</kw> bad = <object-literal>#fileLiteral(resourceName: "foo.txt")</object-literal>
+import let fixme = #fileLiteral(badArg: 65);
+// CHECK: <kw>import</kw> <kw>let</kw> fixme = <kw>#fileLiteral</kw>(badArg: <int>65</int>);
+let x = #colorLiteral(red: 1.0 / 2.0, green: 0.1 + 0.2, blue: 0.5, alpha: 0.5)
+// CHECK: <kw>let</kw> x = <object-literal>#colorLiteral(red: 1.0 / 2.0, green: 0.1 + 0.2, blue: 0.5, alpha: 0.5)</object-literal>
+
+// Some editors (including Xcode) don't support multi-line object literals well, so
+// check we don't report them regardless of whether they exist in the AST or not.
+//
+_: Foo = #colorLiteral(red: 1.0, green: 0,
+// CHECK: <kw>_</kw>: Foo = <kw>#colorLiteral</kw>(red: <float>1.0</float>, green: <int>0</int>,
+blue: 1.0, alpha: 1.0)
+// CHECK: blue: <float>1.0</float>, alpha: <float>1.0</float>)
+// CHECK: <kw>let</kw> x = <kw>#colorLiteral</kw>(red: <float>1.0</float>, green: <float>1.0</float>,
+let x = #colorLiteral(red: 1.0, green: 1.0,
+// CHECK: blue: <float>1.0</float>, alpha: <float>1.0</float>)
+blue: 1.0, alpha: 1.0)
+
+
 class GenC<T1,T2> {}
 
 func test() {
@@ -276,6 +325,9 @@ func test2(x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
+
+// CHECK: <kw>#colorLiteral</kw>
+#colorLiteral
 
 // CHECK: <kw>class</kw> Observers {
 class Observers {
@@ -402,6 +454,13 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   }
 }
 
+enum CasesWithMissingElement {
+  case a(Int, String),
+  // CHECK: <kw>case</kw> a(<type>Int</type>, <type>String</type>)
+  case b(Int, String),
+  // CHECK: <kw>case</kw> b(<type>Int</type>, <type>String</type>)
+}
+
 // CHECK: <kw>class</kw> Ownership {
 class Ownership {
   // CHECK: <attr-builtin>weak</attr-builtin> <kw>var</kw> w
@@ -417,3 +476,86 @@ let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] i
 protocol FakeClassRestrictedProtocol : `class` {}
 // CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
 // FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> {}
+func foo() -> some P {}
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
+func foo() -> some P & Q {}
+
+// CHECK: <kw>class</kw> PropertyDelgate {
+class PropertyDelgate {
+  // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
+  @MyDelegate(1, receiveClosure {
+    // CHECK: <kw>var</kw> x = <int>1</int>; x
+    var x = 1; x
+  })
+  var something
+}
+
+// CHECK: <kw>func</kw> acceptBuilder<T>(
+func acceptBuilder<T>(
+  // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
+  @SomeBuilder<Element> label param: () -> T
+) {}
+
+// CHECK: <kw>func</kw> typeAttr(a: <attr-builtin>@escaping</attr-builtin> () -> <type>Int</type>) {}
+func typeAttr(a: @escaping () -> Int) {}
+
+// CHECK: <kw>func</kw> typeAttr3(a: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
+func typeAttr3(a: @ escaping () -> Int) {}
+
+// CHECK: <kw>func</kw> typeAttr2(a: @ <comment-block>/*this is fine...*/</comment-block> escaping () -> <type>Int</type>, b: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
+func typeAttr2(a: @ /*this is fine...*/ escaping () -> Int, b: @ escaping () -> Int) {}
+
+// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> iHave = <int>10</int>, multipleVars = <int>20</int>
+@available(iOS 99, *)
+var iHave = 10, multipleVars = 20
+
+enum MultipleCaseElements {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> foo, bar
+  @available(iOS 99, *)
+  case foo, bar
+}
+
+protocol P {}
+enum E {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> a(<type>P</type>)
+  @available(iOS 99, *)
+  case a(P)
+}
+
+// Ideally this would be attr-builtin, but we don't actually have the attribute
+// in the AST at all.
+//
+// CHECK: <attr-id>@available</attr-id>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> <kw>_</kw> = <int>10</int>
+@available(iOS 99, *)
+var _ = 10
+
+// CHECK: <type>Array</type><<type>T</type>> <kw>where</kw> <type>T</type>: <type>Equatable</type>
+typealias GenericAlias<T> = Array<T> where T: Equatable
+
+// Where clauses on contextually generic declarations
+//
+struct FreeWhere<T> {
+  // CHECK: <kw>func</kw> foo() <kw>where</kw> <type>T</type> == <type>Int</type>
+  func foo() where T == Int {}
+
+  // CHECK: <kw>subscript</kw>() -> <type>Int</type> <kw>where</kw> <type>T</type>: <type>Sequence</type>
+  subscript() -> Int where T: Sequence {}
+
+  // CHECK: <kw>enum</kw> Enum <kw>where</kw> <type>T</type> == <type>Int</type>
+  enum Enum where T == Int {}
+
+  // CHECK: <kw>typealias</kw> Alias = <type>Int</type> <kw>where</kw> <type>T</type> == <type>Int</type>
+  typealias Alias = Int where T == Int
+}
+
+// Renamed attribute ('fixed' to @available by the parser after emitting an error, so not treated as a custom attribute)
+// CHECK: @availability(<kw>macOS</kw> <float>10.11</float>, *)
+@availability(macOS 10.11, *)
+class HasMisspelledAttr {}

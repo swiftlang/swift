@@ -12,19 +12,19 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -100,6 +100,56 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   }
 
   llvm_unreachable("Unhandled TypeTraitResult in switch.");
+}
+
+SILInstruction *SILCombiner::optimizeBuiltinIsConcrete(BuiltinInst *BI) {
+  if (BI->getOperand(0)->getType().hasArchetype())
+    return nullptr;
+
+  return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), 1);
+}
+
+/// Replace
+/// \code
+///   %b = builtin "COWBufferForReading" %r
+///   %a = ref_element_addr %b
+/// \endcode
+/// with
+/// \code
+///   %a = ref_element_addr [immutable] %r
+/// \endcode
+/// The same for ref_tail_addr.
+SILInstruction *SILCombiner::optimizeBuiltinCOWBufferForReading(BuiltinInst *BI) {
+  auto useIter = BI->use_begin();
+  while (useIter != BI->use_end()) {
+    auto nextIter = std::next(useIter);
+    SILInstruction *user = useIter->getUser();
+    SILValue ref = BI->getOperand(0);
+    switch (user->getKind()) {
+      case SILInstructionKind::RefElementAddrInst: {
+        auto *REAI = cast<RefElementAddrInst>(user);
+        REAI->setOperand(ref);
+        REAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::RefTailAddrInst: {
+        auto *RTAI = cast<RefTailAddrInst>(user);
+        RTAI->setOperand(ref);
+        RTAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::StrongReleaseInst:
+        cast<StrongReleaseInst>(user)->setOperand(ref);
+        break;
+      default:
+        break;
+    }
+    useIter = nextIter;
+  }
+  // If there are unknown users, keep the builtin, and IRGen will handle it.
+  if (BI->use_empty())
+    return eraseInstFromFunction(*BI);
+  return nullptr;
 }
 
 static unsigned getTypeWidth(SILType Ty) {
@@ -245,7 +295,11 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     };
     return B.createTuple(I->getLoc(), Ty, Elements);
   }
-      
+
+  // Replace the type check with 'true'.
+  case BuiltinValueKind::IsSameMetatype:
+    return Builder.createIntegerLiteral(I->getLoc(), I->getType(), true);
+
   default:
     break;
   }
@@ -263,29 +317,27 @@ matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
 
   SILValue Dist;
   MetatypeInst *StrideType;
-  if (match(
-          Res->getOperand(1),
-          m_ApplyInst(
-              BuiltinValueKind::TruncOrBitCast,
-              m_TupleExtractInst(
-                  m_ApplyInst(
-                      BuiltinValueKind::SMulOver, m_SILValue(Dist),
-                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::Strideof,
-                                              m_MetatypeInst(StrideType)))),
-                  0))) ||
-      match(
-          Res->getOperand(1),
-          m_ApplyInst(
-              BuiltinValueKind::TruncOrBitCast,
-              m_TupleExtractInst(
-                  m_ApplyInst(
-                      BuiltinValueKind::SMulOver,
-                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::Strideof,
-                                              m_MetatypeInst(StrideType))),
-                      m_SILValue(Dist)),
-                  0)))) {
+  if (match(Res->getOperand(1),
+            m_ApplyInst(
+                BuiltinValueKind::TruncOrBitCast,
+                m_TupleExtractOperation(
+                    m_ApplyInst(
+                        BuiltinValueKind::SMulOver, m_SILValue(Dist),
+                        m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                    m_ApplyInst(BuiltinValueKind::Strideof,
+                                                m_MetatypeInst(StrideType)))),
+                    0))) ||
+      match(Res->getOperand(1),
+            m_ApplyInst(
+                BuiltinValueKind::TruncOrBitCast,
+                m_TupleExtractOperation(
+                    m_ApplyInst(
+                        BuiltinValueKind::SMulOver,
+                        m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                    m_ApplyInst(BuiltinValueKind::Strideof,
+                                                m_MetatypeInst(StrideType))),
+                        m_SILValue(Dist)),
+                    0)))) {
     if (StrideType != RequiredType)
       return nullptr;
     TruncOrBitCast = cast<BuiltinInst>(Res->getOperand(1));
@@ -525,8 +577,15 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 }
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+  if (I->getFunction()->hasOwnership())
+    return nullptr;
+
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
+    return optimizeBuiltinIsConcrete(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::COWBufferForReading)
+    return optimizeBuiltinCOWBufferForReading(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayNoAlias ||
@@ -622,6 +681,15 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     }
     break;
   }
+  case BuiltinValueKind::CondFailMessage:
+    if (auto *SLI = dyn_cast<StringLiteralInst>(I->getOperand(1))) {
+      if (SLI->getEncoding() == StringLiteralInst::Encoding::UTF8) {
+        Builder.createCondFail(I->getLoc(), I->getOperand(0), SLI->getValue());
+        eraseInstFromFunction(*I);
+        return nullptr;
+      }
+    }
+    break;
   default:
     break;
   }

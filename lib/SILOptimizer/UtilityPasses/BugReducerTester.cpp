@@ -83,12 +83,10 @@ class BugReducerTester : public SILFunctionTransform {
     ResultInfoArray.push_back(
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(
-        nullptr, SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                                          false /*isPseudoGeneric*/,
-                                          false /*noescape*/),
-        SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
-        ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(),
-        ResultInfoArray, None, getFunction()->getModule().getASTContext());
+        nullptr, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, ArrayRef<SILParameterInfo>(),
+        ArrayRef<SILYieldInfo>(), ResultInfoArray, None, SubstitutionMap(),
+        SubstitutionMap(), getFunction()->getModule().getASTContext());
 
     SILOptFunctionBuilder FunctionBuilder(*this);
     SILFunction *F = FunctionBuilder.getOrCreateSharedFunction(
@@ -129,8 +127,8 @@ class BugReducerTester : public SILFunctionTransform {
         }
 
         auto *FRI = dyn_cast<FunctionRefInst>(FAS.getCallee());
-        if (!FRI ||
-            !FRI->getReferencedFunction()->getName().equals(FunctionTarget)) {
+        if (!FRI || !FRI->getInitiallyReferencedFunction()->getName().equals(
+                        FunctionTarget)) {
           ++II;
           continue;
         }
@@ -166,7 +164,7 @@ class BugReducerTester : public SILFunctionTransform {
         SILBuilder B(II);
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
                       SubstitutionMap(),
-                      ArrayRef<SILValue>(), false /*NoThrow*/);
+                      ArrayRef<SILValue>());
 
         auto *Inst = cast<SingleValueInstruction>(&*II);
         ++II;

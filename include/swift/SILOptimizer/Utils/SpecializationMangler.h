@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILLinkage.h"
@@ -21,6 +22,7 @@
 
 namespace swift {
 namespace Mangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 enum class SpecializationKind : uint8_t {
   Generic,
@@ -78,7 +80,7 @@ public:
                               Serialized, F),
         SubMap(SubMap), isReAbstracted(isReAbstracted), isInlined(isInlined) {}
 
-  std::string mangle(GenericSignature *Sig = nullptr);
+  std::string mangle(GenericSignature Sig = GenericSignature());
 };
 
 class PartialSpecializationMangler : public SpecializationMangler {
@@ -169,6 +171,7 @@ private:
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Mangle
 } // end namespace swift
 

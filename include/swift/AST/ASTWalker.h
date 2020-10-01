@@ -20,11 +20,11 @@ namespace swift {
 
 class Decl;
 class Expr;
+class ClosureExpr;
 class ModuleDecl;
 class Stmt;
 class Pattern;
 class TypeRepr;
-struct TypeLoc;
 class ParameterList;
 enum class AccessKind: unsigned char;
 
@@ -36,13 +36,16 @@ enum class SemaReferenceKind : uint8_t {
   TypeRef,
   EnumElementRef,
   SubscriptRef,
+  DynamicMemberRef,
 };
 
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
   llvm::Optional<AccessKind> AccKind;
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind) :
-    Kind(Kind), AccKind(AccKind) {}
+  bool isImplicit = false;
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+                    bool isImplicit = false)
+      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
 };
 
 /// An abstract class used to traverse an AST.
@@ -173,19 +176,6 @@ public:
   /// returns failure.
   virtual bool walkToDeclPost(Decl *D) { return true; }
 
-  /// This method is called when first visiting a TypeLoc, before
-  /// walking into its TypeRepr children.  If it returns false, the subtree is
-  /// skipped.
-  ///
-  /// \param TL The TypeLoc to check.
-  virtual bool walkToTypeLocPre(TypeLoc &TL) { return true; }
-
-  /// This method is called after visiting the children of a TypeLoc.
-  /// If it returns false, the remaining traversal is terminated and returns
-  /// failure.
-  virtual bool walkToTypeLocPost(TypeLoc &TL) { return true; }
-
-
   /// This method is called when first visiting a TypeRepr, before
   /// walking into its children.  If it returns false, the subtree is skipped.
   ///
@@ -210,6 +200,34 @@ public:
   /// LazyInitializerExpr with the initializer as its sub-expression.
   /// However, ASTWalker does not walk into LazyInitializerExprs on its own.
   virtual bool shouldWalkIntoLazyInitializers() { return true; }
+
+  /// This method configures whether the walker should visit the body of a
+  /// closure that was checked separately from its enclosing expression.
+  ///
+  /// For work that is performed for every top-level expression, this should
+  /// be overridden to return false, to avoid duplicating work or visiting
+  /// bodies of closures that have not yet been type checked.
+  virtual bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *) {
+    return true;
+  }
+
+  /// This method configures whether the walker should visit the body of a
+  /// TapExpr.
+  virtual bool shouldWalkIntoTapExpression() { return true; }
+
+  /// This method configures whether the walker should visit the capture
+  /// initializer expressions within a capture list directly, rather than
+  /// walking the declarations.
+  virtual bool shouldWalkCaptureInitializerExpressions() { return false; }
+
+  /// This method configures whether the walker should exhibit the legacy
+  /// behavior where accessors appear as peers of their storage, rather
+  /// than children nested inside of it.
+  ///
+  /// Please don't write new ASTWalker implementations that override this
+  /// method to return true; instead, refactor existing code as needed
+  /// until eventually we can remove this altogether.
+  virtual bool shouldWalkAccessorsTheOldWay() { return false; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,

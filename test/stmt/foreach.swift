@@ -5,7 +5,7 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
+  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
@@ -53,24 +53,27 @@ struct GoodTupleIterator: Sequence, IteratorProtocol {
   func makeIterator() -> GoodTupleIterator {}
 }
 
+protocol ElementProtocol {}
+
 func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sum : Int
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{'Int' is not convertible to 'Float'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'GoodRange<Int>.Element' (aka 'Int') to expected type 'Float'}}
+  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'GoodRange<Int>.Element' (aka 'Int') does not conform to expected protocol 'ElementProtocol'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+    sum = sum + f  // expected-error {{cannot convert value of type 'Float' to expected argument type 'Int'}} {{17-17=Int(}} {{18-18=)}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
 
-  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'GoodTupleIterator.Element' (aka '(Int, Float)') is not convertible to '(Int, Int)'}}
+  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{cannot convert sequence element type 'GoodTupleIterator.Element' (aka '(Int, Float)') to expected type '(Int, Int)'}}
 
   for (i, f) in gtr {}
 }
@@ -127,14 +130,14 @@ func testForEachInference() {
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }
   for d: Double in getGenericSeq() { }
-  
+
   // Inference of generic arguments in the element type from the
   // sequence.
-  for x: X in getXIntSeq() { 
+  for x: X in getXIntSeq() {
     let z = x.value + 1
   }
 
-  for x: X in getOvlSeq() { 
+  for x: X in getOvlSeq() {
     let z = x.value + 1
   }
 
@@ -168,15 +171,13 @@ func testMatchingPatterns() {
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
   let array : [Int]?
-  for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
-    // expected-note@-1{{coalesce}}
-    // expected-note@-2{{force-unwrap}}
+  for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'Sequence'; did you mean to unwrap optional?}}
   }
 }
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{protocol type 'Sequence' cannot conform to 'Sequence' because only concrete types can conform to protocols}}
+  for x in s { // expected-error {{protocol 'Sequence' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
     _ = x
   }
 }
@@ -218,4 +219,22 @@ extension Int : P { }
 
 func testRepeated(ri: RepeatedSequence<Int>) {
   for x in ri { _ = x }
+}
+
+// SR-12398: Poor pattern matching diagnostic: "for-in loop requires '[Int]' to conform to 'Sequence'"
+func sr_12398(arr1: [Int], arr2: [(a: Int, b: String)]) {
+  for (x, y) in arr1 {}
+  // expected-error@-1 {{tuple pattern cannot match values of non-tuple type 'Int'}}
+
+  for (x, y, _) in arr2 {}
+  // expected-error@-1 {{pattern cannot match values of type '(a: Int, b: String)'}}
+}
+
+// rdar://62339835
+func testForEachWhereWithClosure(_ x: [Int]) {
+  func foo<T>(_ fn: () -> T) -> Bool { true }
+
+  for i in x where foo({ i }) {}
+  for i in x where foo({ i.byteSwapped == 5 }) {}
+  for i in x where x.contains(where: { $0.byteSwapped == i }) {}
 }

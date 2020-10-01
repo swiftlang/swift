@@ -29,7 +29,7 @@ sil @no_return_func : $@convention(thin) () -> Never
 //         |  |
 //         ----
 //
-// CHECK-LABEL: @one_natural_self_loop@
+// CHECK-LABEL: Start @one_natural_self_loop@
 // CHECK: (region id:3 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -76,6 +76,7 @@ sil @no_return_func : $@convention(thin) () -> Never
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @one_natural_self_loop@
 sil @one_natural_self_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -95,7 +96,7 @@ bb2:
 //         |             |
 //         ---------------
 //
-// CHECK-LABEL: @one_natural_loop@
+// CHECK-LABEL: Start @one_natural_loop@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -162,6 +163,7 @@ bb2:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @one_natural_loop@
 sil @one_natural_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -189,7 +191,7 @@ bb4:
 //         |             |
 //         ---------------
 //
-// CHECK-LABEL: @one_natural_loop_with_diamond@
+// CHECK-LABEL: Start @one_natural_loop_with_diamond@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -268,6 +270,7 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @one_natural_loop_with_diamond@
 sil @one_natural_loop_with_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -296,7 +299,7 @@ bb5:
 //         |      |      |
 //         ---------------
 //
-// CHECK-LABEL: @one_natural_loop_multiple_backedges@
+// CHECK-LABEL: Start @one_natural_loop_multiple_backedges@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -364,6 +367,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @one_natural_loop_multiple_backedges@
 sil @one_natural_loop_multiple_backedges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -388,7 +392,7 @@ bb4:
 //
 // This is an example that can not happen in sil with canonicalized loops.
 //
-// CHECK-LABEL: @inner_natural_loop_with_multiple_backedges@
+// CHECK-LABEL: Start @inner_natural_loop_with_multiple_backedges@
 // CHECK: (region id:8 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -498,6 +502,7 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @inner_natural_loop_with_multiple_backedges@
 sil @inner_natural_loop_with_multiple_backedges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -533,7 +538,7 @@ bb7:
 //         |      |      |      |
 //         --------      --------
 //
-// CHECK-LABEL: @two_separate_natural_loops@
+// CHECK-LABEL: Start @two_separate_natural_loops@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -621,6 +626,7 @@ bb7:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @two_separate_natural_loops@
 sil @two_separate_natural_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -652,8 +658,128 @@ bb5:
 //         |      |        |      |
 //         --------        --------
 //
-// CHECK-LABEL: @two_separate_natural_loops_separated_by_diamond@
-// CHECK(region id:6 kind:func ucfh:false ucft:false
+// CHECK-LABEL: Start @two_separate_natural_loops_separated_by_diamond@
+// CHECK: (region id:9 kind:func ucfh:false ucft:false
+// CHECK:     (preds)
+// CHECK:     (succs)
+// CHECK:     (subregs
+// CHECK:         (region id:0)
+// CHECK:         (region id:10)
+// CHECK:         (region id:3)
+// CHECK:         (region id:4)
+// CHECK:         (region id:11)
+// CHECK:         (region id:7))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:11))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:3)
+// CHECK:         (region id:4))
+// CHECK:     (succs
+// CHECK:         (region id:7))
+// CHECK:     (subregs
+// CHECK:         (region id:5)
+// CHECK:         (region id:6))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs
+// CHECK:         (region id:6))
+// CHECK:     (backedge-regs
+// CHECK:         (region id:6)))
+// CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:11
+// CHECK:     (preds
+// CHECK:         (region id:5))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs
+// CHECK:         (parentindex:0))
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:11
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:6))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:10))
+// CHECK:     (succs
+// CHECK:         (region id:11))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:10))
+// CHECK:     (succs
+// CHECK:         (region id:11))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:10 kind:loop ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:0))
+// CHECK:     (succs
+// CHECK:         (region id:3)
+// CHECK:         (region id:4))
+// CHECK:     (subregs
+// CHECK:         (region id:1)
+// CHECK:         (region id:2)
+// CHECK:         (region id:8))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs
+// CHECK:         (region id:2))
+// CHECK:     (backedge-regs
+// CHECK:         (region id:8)))
+// CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds
+// CHECK:         (region id:2))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds
+// CHECK:         (region id:1))
+// CHECK:     (succs
+// CHECK:         (region id:8))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs
+// CHECK:         (parentindex:0)
+// CHECK:         (parentindex:1))
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:2))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:10))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: End @two_separate_natural_loops_separated_by_diamond@
 sil @two_separate_natural_loops_separated_by_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -698,7 +824,7 @@ bb6:
 //         |      |           |      |
 //         --------           --------
 //
-// CHECK-LABEL: @two_separate_natural_loops_separated_by_diamond_with_loop@
+// CHECK-LABEL: Start @two_separate_natural_loops_separated_by_diamond_with_loop@
 // CHECK: (region id:13 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -864,6 +990,7 @@ bb6:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @two_separate_natural_loops_separated_by_diamond_with_loop@
 sil @two_separate_natural_loops_separated_by_diamond_with_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -906,7 +1033,7 @@ bb7:
   return %9999 : $()
 }
 
-// CHECK-LABEL: @three_separate_natural_loops@
+// CHECK-LABEL: Start @three_separate_natural_loops@
 // CHECK: (region id:11 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1058,6 +1185,7 @@ bb7:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @three_separate_natural_loops@
 sil @three_separate_natural_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1101,7 +1229,7 @@ bb7:
 //         |      |--    |
 //         ---------------
 //
-// CHECK-LABEL: @two_level_natural_loop@
+// CHECK-LABEL: Start @two_level_natural_loop@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1179,6 +1307,7 @@ bb7:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @two_level_natural_loop@
 sil @two_level_natural_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1205,7 +1334,7 @@ bb4:
 //         |      |--    |
 //         ---------------
 //
-// CHECK-LABEL: @two_level_natural_loop_with_diamond_and_multiple_loop_exits@
+// CHECK-LABEL: Start @two_level_natural_loop_with_diamond_and_multiple_loop_exits@
 // CHECK: (region id:9 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1328,6 +1457,7 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @two_level_natural_loop_with_diamond_and_multiple_loop_exits@
 sil @two_level_natural_loop_with_diamond_and_multiple_loop_exits : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1358,7 +1488,7 @@ bb5:
   return %9999 : $()
 }
 
-// CHECK-LABEL: @three_level_natural_loop_with_inner_loop_in_diamond@
+// CHECK-LABEL: Start @three_level_natural_loop_with_inner_loop_in_diamond@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1448,6 +1578,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @three_level_natural_loop_with_inner_loop_in_diamond@
 sil @three_level_natural_loop_with_inner_loop_in_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -1473,7 +1604,7 @@ bb5:
 //
 // Make sure that we properly identify irreducible loop boundaries.
 //
-// CHECK-LABEL: @one_level_irreducible_loop@
+// CHECK-LABEL: Start @one_level_irreducible_loop@
 // CHECK: (region id:8 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1565,6 +1696,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @one_level_irreducible_loop@
 sil @one_level_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   cond_br undef, bb1, bb3
@@ -1594,7 +1726,7 @@ bb5:
 
 // One natural loop with one internal irreducible loop
 //
-// CHECK-LABEL: @natural_loop_containing_irreducible_loop@
+// CHECK-LABEL: Start @natural_loop_containing_irreducible_loop@
 // CHECK: (region id:10 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1717,6 +1849,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @natural_loop_containing_irreducible_loop@
 sil @natural_loop_containing_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -1755,7 +1888,7 @@ bb7:
 // This makes sure that irreducibility is only propagated up the loop nest, not
 // into siblings.
 //
-// CHECK-LABEL: @two_natural_loop_one_with_irreducible_loop@
+// CHECK-LABEL: Start @two_natural_loop_one_with_irreducible_loop@
 // CHECK: (region id:12 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1909,6 +2042,7 @@ bb7:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @two_natural_loop_one_with_irreducible_loop@
 sil @two_natural_loop_one_with_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -1948,7 +2082,7 @@ bb9:
   return %9999 : $()
 }
 
-// CHECK-LABEL: @multiple_level_natural_loop_with_irreducible_loop_sandwich@
+// CHECK-LABEL: Start @multiple_level_natural_loop_with_irreducible_loop_sandwich@
 // CHECK: (region id:15 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2154,6 +2288,7 @@ bb9:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @multiple_level_natural_loop_with_irreducible_loop_sandwich@
 sil @multiple_level_natural_loop_with_irreducible_loop_sandwich : $@convention(thin) () -> () {
 bb0:
   br bb6
@@ -2202,7 +2337,7 @@ bb12:
   br bb3
 }
 
-// CHECK-LABEL: @unreachable_bb_in_loop@
+// CHECK-LABEL: Start @unreachable_bb_in_loop@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2265,6 +2400,7 @@ bb12:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
+// CHECK: End @unreachable_bb_in_loop@
 sil @unreachable_bb_in_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2282,7 +2418,7 @@ bb4:
   return undef : $()
 }
 
-// CHECK-LABEL: @unreachable_bb_in_inner_loop@
+// CHECK-LABEL: Start @unreachable_bb_in_inner_loop@
 // CHECK: (region id:7 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2376,6 +2512,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
+// CHECK: End @unreachable_bb_in_inner_loop@
 sil @unreachable_bb_in_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2399,7 +2536,7 @@ bb6:
   return undef : $()
 }
 
-// CHECK-LABEL: @unreachable_bb_in_inner_loop_with_multiple_edges@
+// CHECK-LABEL: Start @unreachable_bb_in_inner_loop_with_multiple_edges@
 // CHECK: (region id:13 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2569,6 +2706,7 @@ bb6:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @unreachable_bb_in_inner_loop_with_multiple_edges@
 sil @unreachable_bb_in_inner_loop_with_multiple_edges : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2611,7 +2749,7 @@ bb6:
 }
 
 
-// CHECK-LABEL: @noreturn_bb_in_loop@
+// CHECK-LABEL: Start @noreturn_bb_in_loop@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2672,6 +2810,7 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
+// CHECK: End @noreturn_bb_in_loop@
 sil @noreturn_bb_in_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2691,7 +2830,7 @@ bb4:
   return undef : $()
 }
 
-// CHECK-LABEL: @noreturn_bb_in_three_level_loop@
+// CHECK-LABEL: Start @noreturn_bb_in_three_level_loop@
 // CHECK: (region id:10 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2819,6 +2958,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
+// CHECK: End @noreturn_bb_in_three_level_loop@
 sil @noreturn_bb_in_three_level_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2854,7 +2994,8 @@ bb9:
 }
 
 // Make sure we do not crash in these cases.
-// CHECK-LABEL: @bb_with_unreachable_predecessor@
+// CHECK-LABEL: Start @bb_with_unreachable_predecessor@
+// CHECK: End @bb_with_unreachable_predecessor@
 sil @bb_with_unreachable_predecessor : $@convention(thin) () -> () {
 bb0:
   br bb2
@@ -2866,7 +3007,8 @@ bb2:
   return undef : $()
 }
 
-// CHECK-LABEL: @self_loop_with_unreachable_predecessor@
+// CHECK-LABEL: Start @self_loop_with_unreachable_predecessor@
+// CHECK: End @self_loop_with_unreachable_predecessor@
 sil @self_loop_with_unreachable_predecessor : $@convention(thin) () -> () {
 bb0:
   br bb2
@@ -2881,7 +3023,8 @@ bb3:
   return undef : $()
 }
 
-// CHECK-LABEL: @multibb_loop_with_unreachable_predecessor@
+// CHECK-LABEL: Start @multibb_loop_with_unreachable_predecessor@
+// CHECK: End @multibb_loop_with_unreachable_predecessor@
 sil @multibb_loop_with_unreachable_predecessor : $@convention(thin) () -> () {
 bb0:
   br bb2
@@ -2899,7 +3042,7 @@ bb4:
   return undef : $()
 }
 
-// CHECK-LABEL: @exit_block_that_is_a_loop@
+// CHECK-LABEL: Start @exit_block_that_is_a_loop@
 // CHECK: (region id:5 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -2971,6 +3114,7 @@ bb4:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
+// CHECK: End @exit_block_that_is_a_loop@
 sil @exit_block_that_is_a_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -2990,7 +3134,7 @@ bb4:
 
 // This is the double backedge loop case.
 //
-// CHECK-LABEL: @multiple_exit_blocks_that_are_loops@
+// CHECK-LABEL: Start @multiple_exit_blocks_that_are_loops@
 // CHECK: (region id:15 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -3186,6 +3330,7 @@ bb4:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @multiple_exit_blocks_that_are_loops@
 sil @multiple_exit_blocks_that_are_loops : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -3233,7 +3378,7 @@ bb8:
   return undef : $()
 }
 
-// CHECK-LABEL: @loop_with_multiple_early_exit@
+// CHECK-LABEL: Start @loop_with_multiple_early_exit@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -3314,6 +3459,7 @@ bb8:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @loop_with_multiple_early_exit@
 sil @loop_with_multiple_early_exit : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -3344,7 +3490,7 @@ bb5:
 //          \                   |
 //           \-----------------/
 //
-// CHECK-LABEL: @loop_with_one_early_exit_from_inner_loop@
+// CHECK-LABEL: Start @loop_with_one_early_exit_from_inner_loop@
 // CHECK: (region id:6 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -3434,6 +3580,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @loop_with_one_early_exit_from_inner_loop@
 sil @loop_with_one_early_exit_from_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
@@ -3454,7 +3601,7 @@ bb5:
   return undef : $()
 }
 
-// CHECK-LABEL: @loop_with_multiple_early_exit_from_inner_loop@
+// CHECK-LABEL: Start @loop_with_multiple_early_exit_from_inner_loop@
 // CHECK: (region id:7 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -3558,6 +3705,7 @@ bb5:
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs)
 // CHECK-NEXT:     (backedge-regs))
+// CHECK: End @loop_with_multiple_early_exit_from_inner_loop@
 sil @loop_with_multiple_early_exit_from_inner_loop : $@convention(thin) () -> () {
 bb0:
   br bb1

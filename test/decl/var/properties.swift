@@ -96,6 +96,7 @@ var implicitGet1: X {
 
 var implicitGet2: Int {
   var zzz = 0
+  // expected-warning@-1 {{initialization of variable 'zzz' was never used; consider replacing with assignment to '_' or removing it}}
   // For the purpose of this test, any other function attribute work as well.
   @inline(__always)
   func foo() {}
@@ -191,6 +192,7 @@ func disambiguateGetSet4() {
 func disambiguateGetSet4Attr() {
   func set(_ x: Int, fn: () -> ()) {}
   var newValue: Int = 0
+  // expected-warning@-1 {{variable 'newValue' was never mutated; consider changing to 'let' constant}}
   var a: Int = takeTrailingClosure {
     @inline(__always)
     func foo() {}
@@ -335,9 +337,9 @@ var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing pro
 }
 
 var extraTokensInAccessorBlock8: X {
-  foo // expected-error {{use of unresolved identifier 'foo'}}
-  get {} // expected-error{{use of unresolved identifier 'get'}}
-  set {} // expected-error{{use of unresolved identifier 'set'}}
+  foo // expected-error {{cannot find 'foo' in scope}}
+  get {} // expected-error{{cannot find 'get' in scope}}
+  set {} // expected-error{{cannot find 'set' in scope}}
 }
 
 var extraTokensInAccessorBlock9: Int {
@@ -378,6 +380,12 @@ var x12: X {
 
 var x13: X {} // expected-error {{computed property must have accessors specified}}
 
+struct X14 {}
+extension X14 {
+  var x14: X {
+  } // expected-error {{computed property must have accessors specified}}
+}
+
 // Type checking problems
 struct Y { }
 var y: Y
@@ -405,7 +413,7 @@ var x23: Int, x24: Int { // expected-error{{'var' declarations with multiple var
 
 var x25: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
-}, x26: Int
+}, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
 
 // Properties of struct/enum/extensions
 struct S {
@@ -487,7 +495,7 @@ extension ProtocolWithExtension2 {
   static let baz: ProtocolWithExtension2 = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
-func getS() -> S {
+func getS() -> S { // expected-note 2{{did you mean 'getS'?}}
   let s: S
   return s
 }
@@ -545,7 +553,7 @@ struct Aleph {
   }
 }
 
-struct Beth {
+struct Beth { // expected-note 2{{did you mean 'Beth'?}}
   var c: Int
 }
 
@@ -882,7 +890,7 @@ protocol ProtocolWillSetDidSet4 {
   var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet5 {
-  let a: Int { didSet willSet }  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
+  let a: Int { didSet willSet }  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}
@@ -928,7 +936,7 @@ class ObservingPropertiesNotMutableInWillSet {
   }
 
   func localCase() {
-    var localProperty: Int = 42 {
+    var localProperty: Int = 42 { // expected-warning {{variable 'localProperty' was written to, but never read}}
       willSet {
         localProperty = 19   // expected-warning {{attempting to store to property 'localProperty' within its own willSet}}
       }
@@ -1270,13 +1278,34 @@ class WeakFixItTest {
 
 // SR-8811 (Warning)
 
-let sr8811a = fatalError() // expected-warning {{constant 'sr8811a' inferred to have type 'Never', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+let sr8811a = fatalError() // expected-warning {{constant 'sr8811a' inferred to have type 'Never', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}} {{12-12=: Never}}
 
 let sr8811b: Never = fatalError() // Ok
 
-let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}} {{12-12=: (Int, Never)}}
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
+
+// SR-10995
+
+class SR_10995 {
+  func makeDoubleOptionalNever() -> Never?? {
+    return nil
+  }
+
+  func makeSingleOptionalNever() -> Never? {
+    return nil
+  }
+
+  func sr_10995_foo() {
+    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}}
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never??}}
+    // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+    let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never?}}
+    // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
 
 // SR-9267
 
@@ -1305,4 +1334,9 @@ class SR_9267_C {
 
 class SR_9267_C2 {
   let SR_9267_prop_3: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop_3' a computed property}}{{3-6=var}}{{27-29=}}
+}
+
+class LazyPropInClass {
+  lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+  // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
 }

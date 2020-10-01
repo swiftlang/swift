@@ -20,7 +20,7 @@ class A {
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF_COPY]])
 // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
-// CHECK-NEXT: switch_enum [[T1]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[T1]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 //   Something branch: project value, translate, inject into result.
 // CHECK:    [[SOME_BB]]([[STR:%.*]] : @owned $String):
@@ -28,7 +28,7 @@ class A {
 // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_STR]])
 // CHECK-NEXT: end_borrow [[BORROWED_STR:%.*]]
-// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt, [[T1]]
 // CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
@@ -45,16 +45,16 @@ class A {
 // CHECK:    bb0([[ARG:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $A):
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:      switch_enum [[ARG_COPY]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK:      switch_enum [[ARG_COPY]] : $Optional<NSString>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 //   Something branch: project value, translate, inject into result.
 // CHECK:    [[SOME_BB]]([[NSSTR:%.*]] : @owned $NSString):
 // CHECK:      [[T0:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
-// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
+// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[NSSTR]] : $NSString
 // CHECK-NEXT: [[STRING_META:%.*]] = metatype $@thin String.Type
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]], [[STRING_META]])
-// CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt.1, [[T1]]
+// CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt, [[T1]]
 // CHECK-NEXT: destroy_value [[NSSTR_BOX]]
 // CHECK-NEXT: br
 //

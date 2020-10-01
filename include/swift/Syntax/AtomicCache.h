@@ -72,4 +72,4 @@ public:
 
 } // end namespace swift
 
-#endif /* SWIFT_SYNTAX_ATOMICCACHE_H */
+#endif // SWIFT_SYNTAX_ATOMICCACHE_H

@@ -237,4 +237,49 @@ SwitchTestSuite.test("Protocol Conformance Check Leaks") {
   }
 }
 
+SwitchTestSuite.test("Enum Initialization Leaks") {
+  enum Enum1 {
+  case case1(LifetimeTracked)
+  case case2(LifetimeTracked, Int)
+  }
+
+  enum Enum2 {
+  case case1(LifetimeTracked)
+  case case2(Enum1, LifetimeTracked)
+  }
+
+  struct Struct {
+    var value: Enum2 = .case2(.case1(LifetimeTracked(0)), LifetimeTracked(1))
+
+    func doSomethingIfLet() {
+      if case let .case2(.case2(k, _), _) = value {
+        return
+      }
+    }
+
+    func doSomethingSwitch() {
+      switch value {
+      case let .case2(.case2(k, _), _):
+        return
+      default:
+        return
+      }
+      return
+    }
+
+    func doSomethingGuardLet() {
+      guard case let .case2(.case2(k, _), _) = value else {
+        return
+      }
+    }
+  }
+
+  do {
+    let s = Struct()
+    s.doSomethingIfLet()
+    s.doSomethingSwitch()
+    s.doSomethingGuardLet()
+  }
+}
+
 runAllTests()

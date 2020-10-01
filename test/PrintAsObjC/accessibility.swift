@@ -21,6 +21,9 @@
 
 // REQUIRES: objc_interop
 
+// CHECK: #ifndef ACCESSIBILITY_SWIFT_H
+// CHECK-NEXT: #define ACCESSIBILITY_SWIFT_H
+
 // CHECK-LABEL: @interface A_Public{{$}}
 // CHECK-INTERNAL-NEXT: init
 // CHECK-NEXT: @end
@@ -37,13 +40,13 @@
 
 
 #if MAIN
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
 
 @NSApplicationMain
 @objc class AppDelegate : NSApplicationDelegate {}
 
-#elseif os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
 
 @UIApplicationMain
@@ -51,5 +54,6 @@ import UIKit
 
 #else
 // Uh oh, this test depends on having an app delegate.
+#error("Unsupported platform")
 #endif
 #endif

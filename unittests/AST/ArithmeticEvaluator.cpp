@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 #include <cmath>
@@ -81,15 +82,23 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
   }
 }
 
-/// Rule to evaluate the value of the expression.
-template<typename Derived, CacheKind Caching>
-struct EvaluationRule
-  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
-{
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+/// Helper to short-circuit errors to NaN.
+template<typename Request>
+static double evalOrNaN(Evaluator &evaluator, const Request &request) {
+  return evaluateOrDefault(evaluator, request, NAN);
+}
 
-  llvm::Expected<double>
-  evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
+/// Rule to evaluate the value of the expression.
+template<typename Derived, RequestFlags Caching>
+struct EvaluationRule
+  : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+{
+  using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+      ::SimpleRequest;
+
+  static bool brokeCycle;
+
+  double evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return static_cast<Literal *>(expr)->value;
@@ -98,30 +107,36 @@ struct EvaluationRule
       auto binary = static_cast<Binary *>(expr);
 
       // Evaluate the left- and right-hand sides.
-      auto lhsValue = evaluator(Derived{binary->lhs});
-      if (!lhsValue)
+      auto lhsValue = evalOrNaN(evaluator, Derived{binary->lhs});
+      if (std::isnan(lhsValue)) {
+        brokeCycle = true;
         return lhsValue;
-      auto rhsValue = evaluator(Derived{binary->rhs});
-      if (!rhsValue)
+      }
+      auto rhsValue = evalOrNaN(evaluator, Derived{binary->rhs});
+      if (std::isnan(rhsValue)) {
+        brokeCycle = true;
         return rhsValue;
+      }
 
       switch (binary->operatorKind) {
       case Binary::OperatorKind::Sum:
-        return *lhsValue + *rhsValue;
+        return lhsValue + rhsValue;
 
       case Binary::OperatorKind::Product:
-        return *lhsValue * *rhsValue;
+        return lhsValue * rhsValue;
       }
     }
     }
   }
 
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
+template<typename Derived, RequestFlags Caching>
+bool EvaluationRule<Derived, Caching>::brokeCycle = false;
+
 struct InternallyCachedEvaluationRule :
-EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
+EvaluationRule<InternallyCachedEvaluationRule, RequestFlags::Cached>
 {
   using EvaluationRule::EvaluationRule;
 
@@ -138,13 +153,13 @@ EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
 };
 
 struct UncachedEvaluationRule
-    : EvaluationRule<UncachedEvaluationRule, CacheKind::Uncached> {
+    : EvaluationRule<UncachedEvaluationRule, RequestFlags::Uncached> {
   using EvaluationRule::EvaluationRule;
 };
 
 struct ExternallyCachedEvaluationRule
     : EvaluationRule<ExternallyCachedEvaluationRule,
-                     CacheKind::SeparatelyCached> {
+                     RequestFlags::SeparatelyCached> {
   using EvaluationRule::EvaluationRule;
 
   bool isCached() const {
@@ -174,12 +189,11 @@ struct ExternallyCachedEvaluationRule
 
 // Define the arithmetic evaluator's zone.
 namespace swift {
-#define SWIFT_ARITHMETIC_EVALUATOR_ZONE 255
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 
@@ -187,17 +201,11 @@ namespace swift {
 
 /// All of the arithmetic request functions.
 static AbstractRequestFunction *arithmeticRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "ArithmeticEvaluatorTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
-
-/// Helper to short-circuit errors to NaN.
-template<typename Request>
-static double evalOrNaN(Evaluator &evaluator, const Request &request) {
-  return evaluateOrDefault(evaluator, request, NAN);
-}
 
 
 TEST(ArithmeticEvaluator, Simple) {
@@ -211,8 +219,11 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  LangOptions opts;
+  opts.DebugDumpCycles = false;
+  opts.BuildRequestDependencyGraph = true;
+  Evaluator evaluator(diags, opts);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
@@ -334,20 +345,50 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  LangOptions opts;
+  opts.DebugDumpCycles = false;
+  opts.BuildRequestDependencyGraph = false;
+  Evaluator evaluator(diags, opts);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.
-  bool cycleDetected = false;
-  auto result = evaluator(UncachedEvaluationRule(sum));
-  if (auto err = result.takeError()) {
-    llvm::handleAllErrors(std::move(err),
-      [&](const CyclicalRequestError<UncachedEvaluationRule> &E) {
-        cycleDetected = true;
-      });
-  }
-  EXPECT_TRUE(cycleDetected);
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
+  EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  ExternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  ExternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Dependency printing.
   std::string productDependencies;

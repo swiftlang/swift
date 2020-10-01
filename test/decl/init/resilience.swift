@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 4 %s
 // RUN: %target-swift-frontend -typecheck -swift-version 5 %s
 
-// Animal is not @_fixed_layout, so we cannot define an @inlinable
+// Animal is not @frozen, so we cannot define an @inlinable
 // designated initializer
 public struct Animal {
   public let name: String // expected-note 2 {{declared here}}

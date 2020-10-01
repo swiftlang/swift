@@ -25,93 +25,183 @@
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 
-#include <iostream>
 #include <vector>
 #include <unordered_map>
 
 namespace swift {
 namespace reflection {
 
+using remote::RemoteRef;
+
 template <typename Runtime> class ReflectionContext;
 
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
-  const void * Begin;
-  const void * End;
+  RemoteRef<void> Start;
+  uint64_t Size;
 
 public:
-  ReflectionSection(const void * Begin,
-                    const void * End)
-  : Begin(Begin), End(End) {}
+  ReflectionSection(RemoteRef<void> Start, uint64_t Size)
+    : Start(Start), Size(Size) {}
 
-  ReflectionSection(uint64_t Begin, uint64_t End)
-  : Begin(reinterpret_cast<const void *>(Begin)),
-    End(reinterpret_cast<const void *>(End)) {}
+  RemoteRef<void> startAddress() const {
+    return Start;
+  }
 
-  void *startAddress() {
-    return const_cast<void *>(Begin);
-  }
-  const void *startAddress() const {
-    return Begin;
-  }
-  
-  const void *endAddress() const {
-    return End;
+  RemoteRef<void> endAddress() const {
+    return Start.atByteOffset(Size);
   }
 
   const_iterator begin() const {
-    return const_iterator(Begin, End);
+    return const_iterator(Start, Size);
   }
 
   const_iterator end() const {
-    return const_iterator(End, End);
+    return const_iterator(endAddress(), 0);
   }
 
   size_t size() const {
-    return (const char *)End - (const char *)Begin;
+    return Size;
+  }
+  
+  bool containsRemoteAddress(uint64_t remoteAddr,
+                             uint64_t size) const {
+    return Start.getAddressData() <= remoteAddr
+      && remoteAddr + size <= Start.getAddressData() + Size;
+  }
+  
+  template<typename U>
+  RemoteRef<U> getRemoteRef(uint64_t remoteAddr) const {
+    assert(containsRemoteAddress(remoteAddr, sizeof(U)));
+    auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer()
+      + (remoteAddr - Start.getAddressData());
+    
+    return RemoteRef<U>(remoteAddr, (const U*)localAddr);
   }
 };
 
+template<typename Self, typename Descriptor>
+class ReflectionSectionIteratorBase
+  : public std::iterator<std::forward_iterator_tag, Descriptor> {
+protected:
+  Self &asImpl() {
+    return *static_cast<Self *>(this);
+  }
+public:
+  RemoteRef<void> Cur;
+  uint64_t Size;
+    
+  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
+    : Cur(Cur), Size(Size) {
+    if (Size != 0 && Self::getCurrentRecordSize(this->operator*()) > Size) {
+      fputs("reflection section too small!\n", stderr);
+      abort();
+    }
+  }
+
+  RemoteRef<Descriptor> operator*() const {
+    assert(Size > 0);
+    return RemoteRef<Descriptor>(Cur.getAddressData(),
+                                 (const Descriptor*)Cur.getLocalBuffer());
+  }
+
+  Self &operator++() {
+    auto CurRecord = this->operator*();
+    auto CurSize = Self::getCurrentRecordSize(CurRecord);
+    Cur = Cur.atByteOffset(CurSize);
+    Size -= CurSize;
+    
+    if (Size > 0) {
+      auto NextRecord = this->operator*();
+      auto NextSize = Self::getCurrentRecordSize(NextRecord);
+      if (NextSize > Size) {
+        fputs("reflection section too small!\n", stderr);
+        abort();
+      }
+    }
+
+    return asImpl();
+  }
+
+  bool operator==(const Self &other) const {
+    return Cur == other.Cur && Size == other.Size;
+  }
+
+  bool operator!=(const Self &other) const {
+    return !(*this == other);
+  }
+};
+
+class FieldDescriptorIterator
+  : public ReflectionSectionIteratorBase<FieldDescriptorIterator,
+                                         FieldDescriptor>
+{
+public:
+  FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
+    return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
+  }
+};
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
+
+class AssociatedTypeIterator
+  : public ReflectionSectionIteratorBase<AssociatedTypeIterator,
+                                         AssociatedTypeDescriptor>
+{
+public:
+  AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR){
+    return sizeof(AssociatedTypeDescriptor)
+      + ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+  }
+};
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
+
+class BuiltinTypeDescriptorIterator
+  : public ReflectionSectionIteratorBase<BuiltinTypeDescriptorIterator,
+                                         BuiltinTypeDescriptor> {
+public:
+  BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR){
+    return sizeof(BuiltinTypeDescriptor);
+  }
+};
 using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
+
+class CaptureDescriptorIterator
+  : public ReflectionSectionIteratorBase<CaptureDescriptorIterator,
+                                         CaptureDescriptor> {
+public:
+  CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR){
+    return sizeof(CaptureDescriptor)
+      + CR->NumCaptureTypes * sizeof(CaptureTypeRecord)
+      + CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+  }
+};
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  struct {
-    FieldSection Metadata;
-    uint64_t SectionOffset;
-  } Field;
-
-  struct {
-    AssociatedTypeSection Metadata;
-    uint64_t SectionOffset;
-  } AssociatedType;
-
-  struct {
-    BuiltinTypeSection Metadata;
-    uint64_t SectionOffset;
-  } Builtin;
-
-  struct {
-    CaptureSection Metadata;
-    uint64_t SectionOffset;
-  } Capture;
-
-  struct {
-    GenericSection Metadata;
-    uint64_t SectionOffset;
-  } TypeReference;
-
-  struct {
-    GenericSection Metadata;
-    uint64_t SectionOffset;
-  } ReflectionString;
-
-  uint64_t LocalStartAddress;
-  uint64_t RemoteStartAddress;
+  FieldSection Field;
+  AssociatedTypeSection AssociatedType;
+  BuiltinTypeSection Builtin;
+  CaptureSection Capture;
+  GenericSection TypeReference;
+  GenericSection ReflectionString;
 };
 
 struct ClosureContextInfo {
@@ -120,28 +210,29 @@ struct ClosureContextInfo {
   unsigned NumBindings = 0;
 
   void dump() const;
-  void dump(std::ostream &OS) const;
+  void dump(FILE *file) const;
 };
 
 struct FieldTypeInfo {
   std::string Name;
+  int Value;
   const TypeRef *TR;
   bool Indirect;
 
-  FieldTypeInfo() : Name(""), TR(nullptr), Indirect(false) {}
-  FieldTypeInfo(const std::string &Name, const TypeRef *TR, bool Indirect)
-      : Name(Name), TR(TR), Indirect(Indirect) {}
+  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false) {}
+  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect)
+    : Name(Name), Value(Value), TR(TR), Indirect(Indirect) {}
 
-  static FieldTypeInfo forEmptyCase(std::string Name) {
-    return FieldTypeInfo(Name, nullptr, false);
+  static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
+    return FieldTypeInfo(Name, Value, nullptr, false);
   }
 
-  static FieldTypeInfo forIndirectCase(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, true);
+  static FieldTypeInfo forIndirectCase(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, true);
   }
 
-  static FieldTypeInfo forField(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, false);
+  static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, false);
   }
 };
 
@@ -157,10 +248,9 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltTypeDecl = Optional<std::string>;
-  using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
-
-  TypeRefBuilder();
+  using BuiltTypeDecl = llvm::Optional<std::string>;
+  using BuiltProtocolDecl =
+      llvm::Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
@@ -177,9 +267,7 @@ private:
                      TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
 
   /// Cache for field info lookups.
-  std::unordered_map<std::string,
-                     std::pair<const FieldDescriptor *, const ReflectionInfo *>>
-                     FieldTypeInfoCache;
+  std::unordered_map<std::string, RemoteRef<FieldDescriptor>> FieldTypeInfoCache;
 
   TypeConverter TC;
   MetadataSourceBuilder MSB;
@@ -208,8 +296,7 @@ public:
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  Optional<std::string>
-  createTypeDecl(Node *node, bool &typeAlias) {
+  llvm::Optional<std::string> createTypeDecl(Node *node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
@@ -223,25 +310,25 @@ public:
     return std::make_pair(name, true);
   }
 
-  Optional<std::string> createTypeDecl(std::string &&mangledName,
-                                       bool &typeAlias) {
+  llvm::Optional<std::string> createTypeDecl(std::string &&mangledName,
+                                             bool &typeAlias) {
     return std::move(mangledName);
   }
-  
-  const NominalTypeRef *createNominalType(
-                                    const Optional<std::string> &mangledName) {
+
+  const NominalTypeRef *
+  createNominalType(const llvm::Optional<std::string> &mangledName) {
     return NominalTypeRef::create(*this, *mangledName, nullptr);
   }
 
-  const NominalTypeRef *createNominalType(
-                                    const Optional<std::string> &mangledName,
-                                    const TypeRef *parent) {
+  const NominalTypeRef *
+  createNominalType(const llvm::Optional<std::string> &mangledName,
+                    const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
   }
 
-  const TypeRef *createTypeAliasType(
-                                    const Optional<std::string> &mangledName,
-                                    const TypeRef *parent) {
+  const TypeRef *
+  createTypeAliasType(const llvm::Optional<std::string> &mangledName,
+                      const TypeRef *parent) {
     // TypeRefs don't contain sugared types
     return nullptr;
   }
@@ -267,38 +354,72 @@ public:
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
+  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
-                         ArrayRef<const TypeRef *> args,
+  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
+                         llvm::ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
 
-  const TupleTypeRef *
-  createTupleType(ArrayRef<const TypeRef *> elements,
-                  std::string &&labels, bool isVariadic) {
-    // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
-    // unittests/Reflection/TypeRef.cpp if using labels for identity.
-    return TupleTypeRef::create(*this, elements, isVariadic);
+  const TypeRef *
+  resolveOpaqueType(NodePointer opaqueDescriptor,
+                    llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> genericArgs,
+                    unsigned ordinal) {
+    // TODO: Produce a type ref for the opaque type if the underlying type isn't
+    // available.
+
+    // Try to resolve to the underlying type, if we can.
+    if (opaqueDescriptor->getKind() ==
+                            Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
+      auto underlyingTy = OpaqueUnderlyingTypeReader(
+                                         opaqueDescriptor->getIndex(), ordinal);
+      
+      if (!underlyingTy)
+        return nullptr;
+      
+      GenericArgumentMap subs;
+      for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
+        auto argsForDepth = genericArgs[d];
+        for (unsigned i = 0, ie = argsForDepth.size(); i < ie; ++i) {
+          subs.insert({{d, i}, argsForDepth[i]});
+        }
+      }
+      
+      return underlyingTy->subst(*this, subs);
+    }
+    
+    // Otherwise, build a type ref that represents the opaque type.
+    return OpaqueArchetypeTypeRef::create(*this,
+                                          mangleNode(opaqueDescriptor,
+                                                     SymbolicResolver(),
+                                                     Dem),
+                                          nodeToString(opaqueDescriptor),
+                                          ordinal,
+                                          genericArgs);
+  }
+
+  const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
+                                      std::string &&labels) {
+    return TupleTypeRef::create(*this, elements, std::move(labels));
   }
 
   const FunctionTypeRef *createFunctionType(
-      ArrayRef<remote::FunctionParam<const TypeRef *>> params,
+      llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags) {
     return FunctionTypeRef::create(*this, params, result, flags);
   }
 
   const FunctionTypeRef *createImplFunctionType(
-    Demangle::ImplParameterConvention calleeConvention,
-    ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
-    ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
-    Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
-    ImplFunctionTypeFlags flags) {
+      Demangle::ImplParameterConvention calleeConvention,
+      llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
+      llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
+      llvm::Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
+      ImplFunctionTypeFlags flags) {
     // Minimal support for lowered function types. These come up in
     // reflection as capture types. For the reflection library's
     // purposes, the only part that matters is the convention.
@@ -322,14 +443,15 @@ public:
       break;
     }
 
-    auto result = createTupleType({}, "", false);
+    funcFlags = funcFlags.withAsync(flags.isAsync());
+
+    auto result = createTupleType({}, "");
     return FunctionTypeRef::create(*this, {}, result, funcFlags);
   }
 
   const ProtocolCompositionTypeRef *
-  createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass,
-                                bool isClassBound) {
+  createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
+                                BuiltType superclass, bool isClassBound) {
     std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
       if (!protocol)
@@ -345,14 +467,15 @@ public:
                                               isClassBound);
   }
 
-  const ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(const TypeRef *instance,
-                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+  const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
+      const TypeRef *instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
-  const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
-                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+  const MetatypeTypeRef *createMetatypeType(
+      const TypeRef *instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) {
     bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
@@ -406,7 +529,7 @@ public:
 
   const ObjCClassTypeRef *
   createBoundGenericObjCClassType(const std::string &name,
-                                  ArrayRef<const TypeRef *> args) {
+                                  llvm::ArrayRef<const TypeRef *> args) {
     // Remote reflection just ignores generic arguments for Objective-C
     // lightweight generic types, since they don't affect layout.
     return createObjCClassType(name);
@@ -443,43 +566,65 @@ public:
     return ReflectionInfos;
   }
 
+public:
+  enum ForTesting_t { ForTesting };
+  
+  // Only for testing. A TypeRefBuilder built this way will not be able to
+  // decode records in remote memory.
+  explicit TypeRefBuilder(ForTesting_t) : TC(*this) {}
+
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
-  
-  uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
+    
+  std::string normalizeReflectionName(RemoteRef<char> name);
+  bool reflectionNameMatches(RemoteRef<char> reflectionName,
+                             StringRef searchName);
 
 public:
+  RemoteRef<char> readTypeRef(uint64_t remoteAddr);
+  
+  template<typename Record, typename Field>
+  RemoteRef<char> readTypeRef(RemoteRef<Record> record,
+                              const Field &field) {
+    uint64_t remoteAddr = record.resolveRelativeFieldData(field);
+    
+    return readTypeRef(remoteAddr);
+  }
+
+  StringRef getTypeRefString(RemoteRef<char> record) {
+    return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
+  }
+  
+private:
+  // These fields are captured from the MetadataReader template passed into the
+  // TypeRefBuilder struct, to isolate its template-ness from the rest of
+  // TypeRefBuilder.
+  unsigned PointerSize;
+  std::function<Demangle::Node * (RemoteRef<char>)>
+    TypeRefDemangler;
+  std::function<const TypeRef* (uint64_t, unsigned)>
+    OpaqueUnderlyingTypeReader;
+  
+public:
   template<typename Runtime>
-  void setSymbolicReferenceResolverReader(
-                      remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
-    // Have the TypeRefBuilder demangle symbolic references by reading their
-    // demangling out of the referenced context descriptors in the target
-    // process.
-    Dem.setSymbolicReferenceResolver(
-    [this, &reader](SymbolicReferenceKind kind,
-                    Directness directness,
-                    int32_t offset, const void *base) -> Demangle::Node * {
-      // Resolve the reference to a remote address.
-      auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
-      if (remoteAddress == 0)
-        return nullptr;
-      
-      auto address = remoteAddress + offset;
-      if (directness == Directness::Indirect) {
-        if (auto indirectAddress = reader.readPointerValue(address)) {
-          address = *indirectAddress;
-        } else {
-          return nullptr;
-        }
-      }
-      
-      switch (kind) {
-      case Demangle::SymbolicReferenceKind::Context:
-        return reader.readDemanglingForContextDescriptor(address, Dem);
-      }
-      
-      return nullptr;
-    });
+  TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader)
+    : TC(*this),
+      PointerSize(sizeof(typename Runtime::StoredPointer)),
+      TypeRefDemangler(
+      [this, &reader](RemoteRef<char> string) -> Demangle::Node * {
+        return reader.demangle(string,
+                               remote::MangledNameKind::Type,
+                               Dem, /*useOpaqueTypeSymbolicReferences*/ true);
+      }),
+      OpaqueUnderlyingTypeReader(
+      [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
+          descriptorAddr, ordinal).getType();
+      })
+  {}
+
+  Demangle::Node *demangleTypeRef(RemoteRef<char> string) {
+    return TypeRefDemangler(string);
   }
 
   TypeConverter &getTypeConverter() { return TC; }
@@ -489,40 +634,37 @@ public:
                     const std::string &Member,
                     StringRef Protocol);
 
-  const TypeRef *
-  lookupSuperclass(const TypeRef *TR);
+  const TypeRef *lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  std::pair<const FieldDescriptor *, const ReflectionInfo *>
-  getFieldTypeInfo(const TypeRef *TR);
+  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR,
-           const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD,
-           std::vector<FieldTypeInfo> &Fields);
+  bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+                        remote::TypeInfoProvider *ExternalTypeInfo,
+                        std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
-  const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
+  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  const CaptureDescriptor *getCaptureDescriptor(uint64_t RemoteAddress);
+  RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
-                                           uint64_t Offset);
+  ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(llvm::StringRef MangledName,
-                   std::ostream &OS, bool printTypeName = false);
-  void dumpFieldSection(std::ostream &OS);
-  void dumpAssociatedTypeSection(std::ostream &OS);
-  void dumpBuiltinTypeSection(std::ostream &OS);
-  void dumpCaptureSection(std::ostream &OS);
-  void dumpAllSections(std::ostream &OS);
+  void dumpTypeRef(RemoteRef<char> MangledName,
+                   FILE *file, bool printTypeName = false);
+  void dumpFieldSection(FILE *file);
+  void dumpAssociatedTypeSection(FILE *file);
+  void dumpBuiltinTypeSection(FILE *file);
+  void dumpCaptureSection(FILE *file);
+  void dumpAllSections(FILE *file);
 };
 
 

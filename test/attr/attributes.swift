@@ -210,8 +210,9 @@ func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {
 
 func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
-// @thin is not supported except in SIL.
-var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
+// @thin and @pseudogeneric are not supported except in SIL.
+var thinFunc : @thin () -> () // expected-error {{unknown attribute 'thin'}}
+var pseudoGenericFunc : @pseudogeneric () -> () // expected-error {{unknown attribute 'pseudogeneric'}}
 
 @inline(never) func nolineFunc() {}
 @inline(never) var noinlineVar : Int { return 0 }
@@ -281,4 +282,31 @@ func unownedOptionals(x: C) {
 
   _ = y
   _ = y2
+}
+
+// @_nonEphemeral attribute
+struct S1<T> {
+  func foo(@_nonEphemeral _ x: String) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+  func bar(@_nonEphemeral _ x: T) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+
+  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+
+  func qux(@_nonEphemeral _ x: UnsafeMutableRawPointer) {}
+  func quux(@_nonEphemeral _ x: UnsafeMutablePointer<Int>?) {}
+}
+
+@_nonEphemeral struct S2 {} // expected-error {{@_nonEphemeral may only be used on 'parameter' declarations}}
+
+protocol P {}
+extension P {
+  // Allow @_nonEphemeral on the protocol Self type, as the protocol could be adopted by a pointer type.
+  func foo(@_nonEphemeral _ x: Self) {}
+  func bar(@_nonEphemeral _ x: Self?) {}
+}
+
+enum E1 {
+  case str(@_nonEphemeral _: String) // expected-error {{expected parameter name followed by ':'}}
+  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-error {{expected parameter name followed by ':'}}
+
+  func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
 }

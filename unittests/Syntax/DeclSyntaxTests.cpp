@@ -97,7 +97,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addGenericArgument(ElementArg)
+      .addArgument(ElementArg)
       .build();
 
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -135,7 +135,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -181,7 +181,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -389,7 +389,7 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
   auto Return = SyntaxFactory::makeReturnClause(Arrow, Int);
 
-  return SyntaxFactory::makeFunctionSignature(Parameter, Throws, Return);
+  return SyntaxFactory::makeFunctionSignature(Parameter, None, Throws, Return);
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
@@ -426,7 +426,7 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
 
   auto Sig = SyntaxFactory::makeFunctionSignature(
     SyntaxFactory::makeParameterClause(LParen, List, RParen),
-    Throws,
+    None, Throws,
     SyntaxFactory::makeReturnClause(Arrow, Int));
 
   ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
@@ -550,11 +550,11 @@ GenericWhereClauseSyntax getCannedWhereClause() {
   auto T = SyntaxFactory::makeTypeIdentifier("T", {}, Trivia::spaces(1));
   auto EqualEqual = SyntaxFactory::makeEqualityOperator({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
-  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int,
-                                                         None);
+  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int);
+  auto Req = SyntaxFactory::makeGenericRequirement(SameType, None);
 
   auto Requirements = SyntaxFactory::makeBlankGenericRequirementList()
-    .appending(SameType);
+    .appending(Req);
 
   return SyntaxFactory::makeBlankGenericWhereClause()
     .withWhereKeyword(WhereKW)

@@ -23,7 +23,8 @@ namespace swift {
   class SourceFile;
 
 namespace syntax {
-  class SyntaxArena;
+class SyntaxArena;
+class SourceFileSyntax;
 }
 
 /// Receives the parsed syntax info from the parser and constructs a persistent
@@ -51,7 +52,8 @@ public:
                     RC<syntax::SyntaxArena> arena);
   ~SyntaxTreeCreator();
 
-  void acceptSyntaxRoot(OpaqueSyntaxNode root, SourceFile &SF);
+  Optional<syntax::SourceFileSyntax>
+  realizeSyntaxRoot(OpaqueSyntaxNode root, const SourceFile &SF) override;
 
 private:
   OpaqueSyntaxNode recordToken(tok tokenKind,
@@ -64,6 +66,8 @@ private:
   OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
                                    ArrayRef<OpaqueSyntaxNode> elements,
                                    CharSourceRange range) override;
+
+  void discardRecordedNode(OpaqueSyntaxNode node) override;
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;

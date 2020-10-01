@@ -10,7 +10,9 @@ public func f<Type>(_ value : Type)
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA]], align
   // No deref here.
   // CHECK: ![[TY:.*]] = !DICompositeType({{.*}}identifier: "$sxD"
+  // CHECK: ![[LET_TY:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type,
+  // CHECK-SAME:                                baseType: ![[TY]])
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-  // CHECK-SAME:                        line: [[@LINE+1]], type: ![[TY]])
+  // CHECK-SAME:                        line: [[@LINE+1]], type: ![[LET_TY]])
   apply(value) { arg in return arg }
 }

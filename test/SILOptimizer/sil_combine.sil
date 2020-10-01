@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -34,6 +34,10 @@ enum AddressOnlyEnum {
 
 protocol FakeProtocol {
   func requirement()
+}
+
+struct MyInt {
+  var value: Builtin.Int32
 }
 
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
@@ -488,8 +492,8 @@ enum U {
 // CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
-// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
-// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: enum $U, #U.Y!enumelt, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt, {{%[0-9]+}} : $C
 // CHECK-NEXT: strong_release [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
@@ -504,9 +508,9 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   release_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
-  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  %4 = enum $U, #U.Y!enumelt, %3 : $Builtin.Int64
   release_value %4 : $U
-  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  %5 = enum $U, #U.Z!enumelt, %1 : $C
   release_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
@@ -516,8 +520,8 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 // CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
-// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
-// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: enum $U, #U.Y!enumelt, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt, {{%[0-9]+}} : $C
 // CHECK-NEXT: strong_retain [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
@@ -531,9 +535,9 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   retain_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
-  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  %4 = enum $U, #U.Y!enumelt, %3 : $Builtin.Int64
   retain_value %4 : $U
-  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  %5 = enum $U, #U.Z!enumelt, %1 : $C
   retain_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
@@ -560,7 +564,7 @@ bb0(%0 : $C):
 sil @downcast_upcast_roundtrip : $@convention(thin) <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
-  %3 = unconditional_checked_cast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  %3 = unconditional_checked_cast %2 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
@@ -622,7 +626,7 @@ sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NOT:  strong_release
 // CHECK:      bb2:
 // CHECK-NEXT:   strong_release %0
-// CHECK         return
+// CHECK:         return
 sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()
@@ -805,6 +809,44 @@ bb0(%0 : $C3):
   return %2 : $C1
 }
 
+// CHECK-LABEL: sil @dead_upcast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_upcast : $@convention(thin) (C2) -> C2 {
+bb0(%0 : $C2):
+  %1 = upcast %0 : $C2 to $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C2
+  return %0 : $C2
+}
+
+// CHECK-LABEL: sil @dead_unchecked_ref_cast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_unchecked_ref_cast : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = unchecked_ref_cast %0 : $C1 to $C2
+  strong_retain %1 : $C2
+  strong_release %0 : $C1
+  return %0 : $C1
+}
+
+// CHECK-LABEL: sil @dead_end_cow_mutation
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_end_cow_mutation : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = end_cow_mutation %0 : $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C1
+  return %0 : $C1
+}
 
 struct XS {
   var m: Int
@@ -1053,7 +1095,7 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 // CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]
 // CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[INT:%[0-9]+]] = load [[INT_PTR]] : $*Builtin.Int1
-// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, [[INT]] : $Builtin.Int1
 // CHECK-NEXT: store [[ENUM2]] to [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1]]
 // CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [[ALLOCA2]]
@@ -1068,10 +1110,10 @@ bb0(%0 : $*Builtin.Int1):
 
   %2 = integer_literal $Builtin.Int1, 1
   %3 = alloc_stack $FakeOptional<Builtin.Int1>
-  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
   %5 = load %0 : $*Builtin.Int1
   store %5 to %4 : $*Builtin.Int1
-  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
 
   %6 = load %1 : $*FakeOptional<Builtin.Int1>
   %7 = load %3 : $*FakeOptional<Builtin.Int1>
@@ -1087,7 +1129,7 @@ bb0(%0 : $*Builtin.Int1):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_retain [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -1096,14 +1138,14 @@ bb0(%0 : $*Builtin.Int1):
 sil @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_retain %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -1116,7 +1158,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
 // CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT:  inject_enum_addr
 // CHECK-NEXT: cond_br
@@ -1135,9 +1177,9 @@ bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>
   inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   cond_br %2, bb1, bb2
 
 bb1:
@@ -1197,8 +1239,8 @@ bb0(%0 : $*E):
 sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
-  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, %0 : $Builtin.Int1
-  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, %0 : $Builtin.Int1
+  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
   return %2 : $Builtin.Int1
 }
 
@@ -1305,10 +1347,10 @@ bb0(%0 : $E):
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
-  switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
@@ -1609,7 +1651,7 @@ bb0:
 // CHECK-NEXT: return
 sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   br bb1
 
@@ -1625,9 +1667,22 @@ bb1:
 // CHECK-NEXT: return
 sil @loadable_payload_address_only_enum_payload_promotion : $@convention(thin) (@in AddressOnlyEnum) -> Builtin.Int32 {
 bb0(%0 : $*AddressOnlyEnum):
-  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt
   %2 = load %1 : $*Builtin.Int32
   return %2 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @dead_unchecked_take_enum_data_addr
+// CHECK:      bb0(%0 : $*AddressOnlyEnum):
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @dead_unchecked_take_enum_data_addr : $@convention(thin) (@in AddressOnlyEnum) -> () {
+bb0(%0 : $*AddressOnlyEnum):
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt
+  destroy_addr %1 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
 }
 
 sil @partial_apply_arg_fun : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
@@ -1795,7 +1850,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 //CHECK: return
 sil @remove_pointer_compare_to_zero : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
   %6 = builtin "cmp_eq_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
@@ -1810,7 +1865,7 @@ bb0(%0 : $Int):
 //CHECK: unreachable
 sil @remove_pointer_compare_to_zero_NE : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %4 = builtin "inttoptr_Word"(%2 : $Builtin.Word) : $Builtin.RawPointer
   %6 = builtin "cmp_ne_RawPointer"(%1 : $Builtin.RawPointer, %4 : $Builtin.RawPointer) : $Builtin.Int1
@@ -1826,7 +1881,7 @@ bb0(%0 : $Int):
 //CHECK: return
 sil @remove_pointer_compare_to_zero_arith : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
-  %1 = string_literal utf16 "ss"
+  %1 = string_literal utf8 "ss"
   %2 = integer_literal $Builtin.Word, 0
   %3 = integer_literal $Builtin.Word, 4
   %4 = integer_literal $Builtin.Int1, -1
@@ -1846,11 +1901,11 @@ bb0:
 // CHECK-NOT: select_enum
   %1 = integer_literal $Builtin.Int32, 8
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt, %2 : $Int32
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }
@@ -1864,7 +1919,7 @@ bb0:
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ZERO:%[^ ]+]] = integer_literal $Builtin.Int1, 0
-  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ZERO]]
   return %5 : $Builtin.Int1
 }
@@ -2200,7 +2255,7 @@ struct FakeInt32 {
 // CHECK-NOT: switch_enum_addr
 sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
-  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -2277,14 +2332,13 @@ bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObjec
 // CHECK-NOT:     open_existential_ref
 // CHECK:         unchecked_ref_cast [[Ref]]
 
-sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> () {
+sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> Builtin.NativeObject {
 bb0(%0: $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
   %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   strong_retain %3: $Builtin.NativeObject
-  %5 = tuple ()
-  return %5 : $()
+  return %3 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
@@ -2359,19 +2413,6 @@ bb0:
 }
 
 
-// CHECK-LABEL:   sil @remove_dead_code_after_unreachable
-// CHECK-NEXT:      bb0
-// CHECK-NEXT:      unreachable
-// CHECK-NEXT:      } // end sil function 'remove_dead_code_after_unreachable'
-sil @remove_dead_code_after_unreachable : $@convention(thin) () -> (Int32) {
-bb0:
-  unreachable
-  %2 = integer_literal $Builtin.Int32, -2
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  return %3 : $Int32
-}
-
-
 // CHECK-LABEL:   sil @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
 // CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Int32, -2
@@ -2416,6 +2457,16 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   %12 = builtin "takeArrayFrontToBack"<Int32>(%4 : $@thick Int32.Type, %10 : $Builtin.RawPointer, %11 : $Builtin.RawPointer, %5 : $Builtin.Word) : $()
   %13 = tuple ()
   return %13 : $()
+}
+
+// Make sure we do not crash here. This ensures that when checking for
+// tuple_extract, we check if we have an argument or not.
+sil @builtin_array_opt_index_raw_pointer_to_index_addr_no_crash : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %4 = load %3 : $*Builtin.Word
+  return %4 : $Builtin.Word
 }
 
 // CHECK-LABEL: sil @cmp_zext_peephole
@@ -2504,15 +2555,12 @@ sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK-NEXT: [[R:%[0-9]+]] = alloc_ref $E
 // CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
-// CHECK: return
-sil @alloc_ref_dynamic_with_upcast_metatype : $() -> () {
+// CHECK-NEXT: return [[C]]
+sil @alloc_ref_dynamic_with_upcast_metatype : $() -> B {
   %1 = metatype $@thick E.Type
   %2 = upcast %1 : $@thick E.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
-  strong_release %3 : $B
-  %4 = tuple()
-  return %4 : $()
+  return %3 : $B
 }
 
 // CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br
@@ -2522,7 +2570,7 @@ sil @alloc_ref_dynamic_with_upcast_metatype : $() -> () {
 // CHECK: alloc_ref $B
 sil @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to $@thick B.Type, bb1, bb2
+  checked_cast_br [exact] %1 : $@thick B.Type to B.Type, bb1, bb2
 
 bb1(%2 : $@thick B.Type):
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -2543,11 +2591,10 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: bb1
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK:      [[R:%[0-9]+]] = alloc_ref $E
-// CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
+// CHECK-NEXT: strong_release [[R]]
 sil @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to $@thick E.Type, bb1, bb2
+  checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
 
 bb1(%2 : $@thick E.Type):
   %3 = upcast %2 : $@thick E.Type to $@thick B.Type
@@ -2626,6 +2673,107 @@ bb0(%0 : $*B):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion1
+// CHECK: copy_addr
+// CHECK: strong_retain
+// CHECK: destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion1'
+sil @moved_retain_prevents_alloc_stack_deletion1 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion2
+// CHECK:   copy_addr
+// CHECK: bb1:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion2'
+sil @moved_retain_prevents_alloc_stack_deletion2 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @retain_is_after_stack_location
+// CHECK-NOT:   copy_addr
+// CHECK: } // end sil function 'retain_is_after_stack_location'
+sil @retain_is_after_stack_location : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb2:
+  destroy_addr %3 : $*B
+  strong_retain %0 : $B
+  dealloc_stack %3 : $*B
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @moved_retain_prevents_alloc_stack_deletion3
+// CHECK:   copy_addr
+// CHECK: bb2:
+// CHECK:   strong_retain
+// CHECK:   destroy_addr
+// CHECK: } // end sil function 'moved_retain_prevents_alloc_stack_deletion3'
+sil @moved_retain_prevents_alloc_stack_deletion3 : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %3 = alloc_stack $B
+  %4 = alloc_stack $B
+  store %0 to %4 : $*B
+  copy_addr [take] %4 to [initialization] %3 : $*B
+  dealloc_stack %4 : $*B
+  br bb1
+bb1:
+  cond_br undef, bb1, bb2
+bb2:
+  strong_retain %0 : $B
+  destroy_addr %3 : $*B
+  dealloc_stack %3 : $*B
+  %14 = tuple ()
+  return %14 : $()
+}
+
 protocol someProtocol {
     var i: Int { get }
 }
@@ -2645,7 +2793,7 @@ bb0(%0 : $*T):
   copy_addr %0 to [initialization] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
   %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
-  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
+  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
   %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %3 : $*someProtocol              // id: %13
   dealloc_stack %3 : $*someProtocol // id: %15
@@ -2695,9 +2843,11 @@ bb3:
   br bb2(%14 : $Builtin.Int1)
 }
 
-// Make sure we do not crash on this and remove everything.
+// Make sure we do not crash on this and remove everything, except a trivial retain/release pair.
 // CHECK-LABEL: sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
 // CHECK-NEXT: return
 sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
@@ -2806,6 +2956,318 @@ bb3(%19 : $Double):                               // Preds: bb1 bb2
   return %19 : $Double                            // id: %20
 }
 
+enum ErrorEnum: Error {
+    case errorCase(label: [Error])
+    case other
+}
+
+// CHECK-LABEL: sil @insert_compensating_release_at_release_of_box
+// CHECK:      [[L:%[0-9]+]] = load
+// CHECK-NEXT: [[T:%[0-9]+]] = tuple
+// CHECK-NEXT: retain_value [[L]]
+// CHECK-NEXT: release_value [[T]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @insert_compensating_release_at_release_of_box : $@convention(method) (@in_guaranteed Array<Error>) -> () {
+bb0(%0 : $*Array<Error>):
+  %20 = load %0 : $*Array<Error>
+  %22 = tuple $(label: Array<Error>) (%20)
+  %23 = enum $ErrorEnum, #ErrorEnum.errorCase!enumelt, %22 : $(label: Array<Error>)
+  %36 = alloc_existential_box $Error, $ErrorEnum
+  %37 = project_existential_box $ErrorEnum in %36 : $Error
+  store %23 to %37 : $*ErrorEnum
+  retain_value %20 : $Array<Error>
+  strong_release %36 : $Error
+  %52 = tuple ()
+  return %52 : $()
+}
+
+struct TestError: Error {
+  var payload: AnyObject
+}
+
+struct OtherError: Error {
+  var payload: AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: struct_element_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast'
+sil @unconditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_TestError : $@convention(thin) (@inout TestError) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user1
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user1'
+sil @unconditional_existential_box_cast_unknown_user1 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %u = function_ref @unknown_use_of_TestError : $@convention(thin) (@inout TestError) -> ()
+  %r = apply %u(%2) : $@convention(thin) (@inout TestError) -> ()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_box : $@convention(thin) (Error) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user2
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user2'
+sil @unconditional_existential_box_cast_unknown_user2 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %u = function_ref @unknown_use_of_box : $@convention(thin) (Error) -> ()
+  %r = apply %u(%1) : $@convention(thin) (Error) -> ()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+sil @unknown_use_of_Error : $@convention(thin) (@inout Error) -> ()
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_unknown_user3
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user3'
+sil @unconditional_existential_box_cast_unknown_user3 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %u = function_ref @unknown_use_of_Error : $@convention(thin) (@inout Error) -> ()
+  %r = apply %u(%5) : $@convention(thin) (@inout Error) -> ()
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_multiple_stores1
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores1'
+sil @unconditional_existential_box_cast_multiple_stores1 : $@convention(thin) (@guaranteed TestError, @guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError, %0a : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  store %0a to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_multiple_stores2
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores2'
+sil @unconditional_existential_box_cast_multiple_stores2 : $@convention(thin) (@guaranteed TestError, @owned Error) -> @owned AnyObject {
+bb0(%0 : $TestError, %0a : $Error):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  store %1 to %5 : $*Error
+  store %0a to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_wrong_type
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_wrong_type'
+sil @unconditional_existential_box_cast_wrong_type : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $OtherError
+  unconditional_checked_cast_addr Error in %5 : $*Error to OtherError in %7 : $*OtherError
+  %10 = struct_element_addr %7 : $*OtherError, #OtherError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*OtherError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+}
+
+// CHECK-LABEL: sil @unconditional_existential_box_cast_not_dominating
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: struct_element_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast_not_dominating'
+sil @unconditional_existential_box_cast_not_dominating : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  cond_br undef, bb1, bb2
+bb1:
+  store %0 to %2 : $*TestError
+  br bb2
+bb2:
+  cond_br undef, bb3, bb4
+bb3:
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  unconditional_checked_cast_addr Error in %5 : $*Error to TestError in %7 : $*TestError
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+bb4:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @conditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'conditional_existential_box_cast'
+sil @conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  checked_cast_addr_br copy_on_success Error in %5 : $*Error to TestError in %7 : $*TestError, bb1, bb2
+
+bb1:
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+
+bb2:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @taking_conditional_existential_box_cast
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store %0 to [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'taking_conditional_existential_box_cast'
+sil @taking_conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
+bb0(%0 : $TestError):
+  %1 = alloc_existential_box $Error, $TestError
+  %2 = project_existential_box $TestError in %1 : $Error
+  store %0 to %2 : $*TestError
+  %4 = builtin "willThrow"(%1 : $Error) : $()
+  %5 = alloc_stack $Error
+  strong_retain %1 : $Error
+  store %1 to %5 : $*Error
+  %7 = alloc_stack $TestError
+  checked_cast_addr_br take_on_success Error in %5 : $*Error to TestError in %7 : $*TestError, bb1, bb2
+
+bb1:
+  %10 = struct_element_addr %7 : $*TestError, #TestError.payload
+  %11 = load %10 : $*AnyObject
+  strong_release %1 : $Error
+  dealloc_stack %7 : $*TestError
+  dealloc_stack %5 : $*Error
+  return %11 : $AnyObject
+
+bb2:
+  %20 = integer_literal $Builtin.Int1, -1
+  cond_fail %20 : $Builtin.Int1
+  unreachable
+}
+
 sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool
 sil [reabstraction_thunk] @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@in String) -> @out Bool) -> Bool
 
@@ -2865,231 +3327,6 @@ bb0:
   return %2 : $Builtin.Int1
 }
 
-class CC1 {
-   deinit
-  init()
-}
-
-class CC2 {
-   deinit
-  init()
-}
-
-class CC3 {
-   deinit
-  init()
-}
-
-class CC4 {
-   deinit
-  init()
-}
-
-
-// Function that takes different kinds of arguments: @in, @guaranteed, @owned,
-sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
-
-// Test the peephole performing apply{partial_apply(x, y, z)}(a) -> apply(a, x, y, z)
-// We need to check the following:
-// - all arguments of a partial_apply, which are either results of a stack_alloc or consumed indirect arguments
-//  should be copied into temporaries. This should happen just before that partial_apply instruction.
-// - The temporaries are allocated at the beginning of the function and deallocated at the end.
-// - Before each apply of the partial_apply, we retain values of any arguments which are of non-address type.
-//   This is required because they could be consumed (i.e. released by the callee).
-// - After each apply of the partial_apply, we release values of any arguments which are non-consumed by the callee (e.g. @guaranteed ones)
-
-// CHECK-LABEL: sil @test_apply_of_partial_apply
-
-// CHECK: bb0{{.*}}:
-// A new temporary should have been created for each alloc_stack argument passed to partial_apply
-// CHECK: [[TMP:%[0-9]+]] = alloc_stack $CC4
-// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @closure_with_in_guaranteed_owned_in_args
-// Copy the original value of the argument into a temporary
-// CHECK: copy_addr {{.*}} to [initialization] [[TMP]] : $*CC4
-// CHECK-NOT: partial_apply
-
-// CHECK: bb1:
-// CHECK-NOT: partial_apply
-// Check that the peephole inserted a retain of the closure's guaranteed argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC1
-// Check that the peephole inserted a retain of the closure's owned argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC3
-// CHECK: apply [[CLOSURE]]
-// Check that the peephole inserted a release the closure's guaranteed argument
-// CHECK: strong_release %{{[0-9]+}} : $CC1
-// CHECK-NOT: partial_apply
-// Retain the guaranteed argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC1
-// Retain the owned argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC3
-// CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
-// Check that the peephole inserted a release the guaranteed argument
-// CHECK: strong_release %{{[0-9]+}} : $CC1
-// Release the @owned CC4 argument of the function
-// CHECK: load {{%[0-9]+}} : $*CC4
-// CHECK: strong_release {{%[0-9]+}} : $CC4
-// CHECK: br bb3
-
-// CHECK: bb2:
-// CHECK-NOT: partial_apply
-// Check that the peephole inserted a retain of the closure's guaranteed argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC1
-// Check that the peephole inserted a retain of the closure's owned argument
-// CHECK: strong_retain %{{[0-9]+}} : $CC3
-// CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
-// Check that the peephole inserted a release the closure's guaranteed argument
-// CHECK: strong_release %{{[0-9]+}} : $CC1
-// Release the @owned CC4 argument of the function
-// CHECK: load {{%[0-9]+}} : $*CC4
-// CHECK: strong_release {{%[0-9]+}} : $CC4
-// CHECK: br bb3
-
-// bb3:
-// dealloc_stack [[TMP]] : $CC4
-
-sil @test_apply_of_partial_apply : $@convention(thin) (@in Optional<CC2>, @guaranteed CC1, @guaranteed CC3, @guaranteed CC4, @guaranteed CC2) -> Optional<Int> {
-bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
-
-  %5 = function_ref @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
-  %6 = alloc_stack $CC3
-  store %2 to %6 : $*CC3
-  %8 = load %6 : $*CC3
-  %9 = alloc_stack $CC4
-  store %3 to %9 : $*CC4
-  %11 = load %9 : $*CC4
-  strong_retain %1 : $CC1
-  %12 = partial_apply %5(%1, %8, %9) : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
-  dealloc_stack %9 : $*CC4
-  dealloc_stack %6 : $*CC3
-  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
-  %16 = alloc_stack $Optional<Int>
-  %17 = alloc_stack $Optional<CC2>
-  copy_addr %0 to [initialization] %17 : $*Optional<CC2>
-  switch_enum_addr %17 : $*Optional<CC2>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-
-bb1:
-  %21 = unchecked_take_enum_data_addr %17 : $*Optional<CC2>, #Optional.some!enumelt.1
-
-  %22 = alloc_stack $CC2
-  copy_addr [take] %21 to [initialization] %22 : $*CC2
-  %24 = alloc_stack $CC2
-  copy_addr %22 to [initialization] %24 : $*CC2
-  destroy_addr %22 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
-  %28 = apply %12(%24) : $@callee_owned (@in CC2) -> Optional<Int>
-  store %28 to %16 : $*Optional<Int>
-  dealloc_stack %24 : $*CC2
-  dealloc_stack %22 : $*CC2
-
-  %102 = alloc_stack $CC2
-  copy_addr [take] %21 to [initialization] %102 : $*CC2
-  %104 = alloc_stack $CC2
-  copy_addr %102 to [initialization] %104 : $*CC2
-  destroy_addr %102 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
-  %108 = apply %12(%104) : $@callee_owned (@in CC2) -> Optional<Int>
-  store %108 to %16 : $*Optional<Int>
-  dealloc_stack %104 : $*CC2
-  dealloc_stack %102 : $*CC2
-
-  dealloc_stack %17 : $*Optional<CC2>
-
-  br bb3
-
-bb2:
-  %39 = alloc_stack $CC2
-  store %4 to %39 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
-  %42 = apply %12(%39) : $@callee_owned (@in CC2) -> Optional<Int>
-  store %42 to %16 : $*Optional<Int>
-  dealloc_stack %39 : $*CC2
-  dealloc_stack %17 : $*Optional<CC2>
-  br bb3
-
-bb3:
-  destroy_addr %0 : $*Optional<CC2>
-  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
-  %36 = load %16 : $*Optional<Int>
-  dealloc_stack %16 : $*Optional<Int>
-  return %36 : $Optional<Int>
-}
-
-// Test if we insert the right stack/dealloc-stack when converting apply{partial_apply}.
-
-// CHECK-LABEL: sil @test_stack_insertion_for_partial_apply_apply
-// CHECK:     bb0({{.*}}):
-// CHECK-NEXT:  [[T:%[0-9]+]] = alloc_stack $Int
-// CHECK-NEXT:  alloc_stack $Bool
-// CHECK-NEXT:  [[S2:%[0-9]+]] = alloc_stack $Int
-// CHECK:       copy_addr [[S2]] to [initialization] [[T]]
-// CHECK:       dealloc_stack [[S2]] : $*Int
-// CHECK:       apply
-// CHECK:     bb1:
-// CHECK-NOT:   dealloc_stack
-// CHECK:     bb2:
-// CHECK:       dealloc_stack {{.*}} : $*Bool
-// CHECK:       dealloc_stack [[T]] : $*Int
-// CHECK:       return
-sil @test_stack_insertion_for_partial_apply_apply : $@convention(thin) (Int, Double) -> () {
-bb0(%0 : $Int, %1 : $Double):
-  %s1 = alloc_stack $Bool
-  %s2 = alloc_stack $Int
-  store %0 to %s2 : $*Int
-  %f1 = function_ref @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
-  %pa = partial_apply %f1(%s2) : $@convention(thin) (Double, @in_guaranteed Int) -> ()
-  dealloc_stack %s2 : $*Int
-  %a1 = apply %pa(%1) : $@callee_owned (Double) -> ()
-  cond_br undef, bb1, bb2
-
-bb1:
-  %f2 = function_ref @noreturn_func : $@convention(thin) () -> Never
-  %a2 = apply %f2() : $@convention(thin) () -> Never
-  unreachable
-
-bb2:
-  dealloc_stack %s1 : $*Bool
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @test_generic_partial_apply_apply
-// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
-// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
-// CHECK: [[FN:%.*]] = function_ref @generic_callee
-// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
-// CHECK-NEXT: destroy_addr [[ARG1]]
-// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
-// CHECK-NEXT: destroy_addr [[TMP]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack [[TMP]]
-// CHECK-NEXT: return
-sil @test_generic_partial_apply_apply : $@convention(thin) <T> (@in T, @in T) -> () {
-bb0(%0 : $*T, %1 : $*T):
-  %f1 = function_ref @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
-  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
-  %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @test_existential_partial_apply_apply
-// CHECK: bb0(%0 : $*FakeProtocol):
-// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK-NEXT: [[FN:%.*]] = witness_method
-// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
-bb0(%0: $*FakeProtocol):
-  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
-  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
-  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
-  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
-
-  %r = tuple ()
-  return %r : $()
-}
-
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
 sil @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
 sil @noreturn_func : $@convention(thin) () -> Never
@@ -3131,7 +3368,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_release [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -3140,14 +3377,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_release %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -3165,16 +3402,16 @@ sil @init_enum : $@convention(thin) () -> @out B
 // CHECK:  [[V3:%.*]] = alloc_stack $B
 // CHECK:               apply [[V2]]([[V3]])
 // CHECK:  [[V4:%.*]] = load [[V3]]
-// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[V4]]
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[V4]]
 // CHECK:  store [[V5]] to [[V1]]
 
 sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %4 = function_ref @init_enum : $@convention(thin) () -> @out B
   %5 = apply %4(%3) : $@convention(thin) () -> @out B
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   return %7 : $FakeOptional<B>
@@ -3202,7 +3439,7 @@ bb0:
   %0 = metatype $@thick ClientSocket.Type
   %1 = init_existential_metatype %0 : $@thick ClientSocket.Type, $@thick Socket.Type
   %2 = open_existential_metatype %1 : $@thick Socket.Type to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type
-  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig!1, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
   try_apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket>(%2) : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
@@ -3257,6 +3494,33 @@ bb0(%0 : $VV):
   %26 = tuple ()
   return %26 : $()
 }
+
+sil @any_to_object : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+
+// CHECK-LABEL: sil @dont_crash_when_propagating_existentials
+// CHECK:   [[EM:%[0-9]+]] = init_existential_metatype %0
+// CHECK:   [[S:%[0-9]+]] = alloc_stack $Any
+// CHECK:   [[M:%[0-9]+]] = open_existential_metatype [[EM]]
+// CHECK:   [[E:%[0-9]+]] = init_existential_addr [[S]]
+// CHECK:   store [[M]] to [[E]]
+// CHECK:   apply {{%[0-9]+}}<(@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type>([[E]])
+// CHECK: } // end sil function 'dont_crash_when_propagating_existentials'
+sil @dont_crash_when_propagating_existentials : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = metatype $@thick C.Type
+  %1 = init_existential_metatype %0 : $@thick C.Type, $@thick AnyObject.Type
+  %3 = alloc_stack $Any, let, name "object"
+  %4 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  %5 = init_existential_addr %3 : $*Any, $(@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  store %4 to %5 : $*@thick (@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134") AnyObject).Type
+  %7 = open_existential_addr immutable_access %3 : $*Any to $*@opened("5F9F1B04-EC40-11EA-9534-8C8590A6A134") Any
+  %8 = function_ref @any_to_object : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+  %9 = apply %8<@opened("5F9F1B04-EC40-11EA-9534-8C8590A6A134") Any>(%7) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+  destroy_addr %3 : $*Any
+  dealloc_stack %3 : $*Any
+  return %9 : $AnyObject
+}
+
 
 // CHECK-LABEL: sil @remove_unused_alloc_ref
 // CHECK-NEXT: bb0
@@ -3483,7 +3747,7 @@ sil @getMetaType : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:bb0:
 // CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
-// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig!1 : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 // CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1>([[OE]]) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 sil @meta_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
@@ -3492,7 +3756,7 @@ bb0:
   %open = open_existential_metatype %apply : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
   %1 = init_existential_metatype %open : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type, $@thick Prot1.Type
   %2 = open_existential_metatype %1 : $@thick Prot1.Type to $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type
-  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig!1, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
   try_apply %3<@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1>(%2) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
@@ -3512,10 +3776,23 @@ bb2(%5 : $MyErrorType):
 sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
-  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt.1, %x : $AnyObject
+  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt, %x : $AnyObject
   %3 = mark_dependence %0 : $*Builtin.Int64 on %2 : $Optional<AnyObject>
   %4 = load %3 : $*Builtin.Int64
   return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @mark_dependence_trivial_object_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+sil @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
+  %2 = mark_dependence %0 : $B on %1 : $Optional<Int>
+  return %2 : $B
 }
 
 protocol _NSArrayCore {}
@@ -3683,7 +3960,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
 // CHECK-NOT: value_metatype
 // CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
-// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
 // CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
 // CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
 sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
@@ -3692,8 +3969,150 @@ bb0(%2 : $TestObjCInit):
   dealloc_partial_ref %2 : $TestObjCInit, %8 : $@thick TestObjCInit.Type
   %11 = thick_to_objc_metatype %8 : $@thick TestObjCInit.Type to $@objc_metatype TestObjCInit.Type
   %12 = alloc_ref_dynamic [objc] %11 : $@objc_metatype TestObjCInit.Type, $TestObjCInit
-  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
   %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
-  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
+  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt, %14 : $TestObjCInit
   return %19 : $Optional<TestObjCInit>
+}
+
+// CHECK-LABEL: sil @isConcrete_true : $@convention(thin) (@thin MyInt.Type) -> Builtin.Int1 {
+// CHECK:       bb0(%0 : $@thin MyInt.Type):
+// CHECK:         [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[RESULT]]
+// CHECK:       } // end sil function 'isConcrete_true'
+sil @isConcrete_true : $@convention(thin) (@thin MyInt.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin MyInt.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin MyInt.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+// CHECK:       bb0(%0 : $@thin T.Type):
+// CHECK:         [[RESULT:%.*]] = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+// CHECK:         return [[RESULT]]
+// CHECK:       } // end sil function 'isConcrete_false'
+sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  // FIXME: Explicit specialization is required here when it shouldn't be
+  %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
+// CHECK:       bb0(%0 : $@callee_guaranteed () -> @out ()):
+// CHECK:         apply %0
+sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> @out ()):
+  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <A> () -> @out A for <()>
+  %2 = alloc_stack $()
+  apply %1(%2) : $@callee_guaranteed @substituted <A> () -> @out A for <()>
+  dealloc_stack %2 : $*()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @convert_function_substitution_pa :
+sil @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
+bb0(%0 : $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
+  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
+  %5 = convert_function %4 : $@callee_guaranteed @substituted <A, B, C> () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
+  return %5 : $@callee_guaranteed () -> @out ()
+
+}
+
+// Test builtin "is_same_metatype" folding.
+protocol SomeP {}
+
+public enum SpecialEnum : SomeP {}
+
+// CHECK-LABEL: sil @testFoldBuiltinIsSameMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+// CHECK-NEXT: bb0(%0 : $@thick SpecialEnum.Type):
+// CHECK-NEXT:   [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   struct $Bool ([[TRUE]] : $Builtin.Int1)
+// CHECK-NEXT:   return
+// CHECK-LABEL: }  // end sil function 'testFoldBuiltinIsSameMetatype'
+sil @testFoldBuiltinIsSameMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+bb0(%0 : $@thick SpecialEnum.Type):
+  %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %1 : $@thick Any.Type) : $Builtin.Int1
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  return %4 : $Bool
+}
+
+struct IntTuple {
+  @_hasStorage var t: (Int64, Int64)
+}
+
+sil_global [let] @initialized_let_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global @initialized_var_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global [let] @initialized_tuple_global : $IntTuple = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = integer_literal $Builtin.Int64, 28
+  %2 = struct $Int64 (%0 : $Builtin.Int64)
+  %3 = struct $Int64 (%1 : $Builtin.Int64)
+  %4 = tuple (%2 : $Int64, %3 : $Int64)
+  %initval = struct $IntTuple (%4 : $(Int64, Int64))
+}
+
+// CHECK-LABEL: sil @load_from_global_let
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK:         [[R:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'load_from_global_let'
+sil @load_from_global_let : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_let_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_with_projections
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_global_with_projections'
+sil @load_from_global_with_projections : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = struct_element_addr %0 : $*IntTuple, #IntTuple.t
+  %2 = tuple_element_addr %1 : $*(Int64, Int64), 1
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_without_projections
+// CHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK-DAG:     [[S1:%.*]] = struct $Int64 ([[I1]] : $Builtin.Int64)
+// CHECK-DAG:     [[S2:%.*]] = struct $Int64 ([[I2]] : $Builtin.Int64)
+// CHECK-DAG:     [[T:%.*]] = tuple ([[S1]] : $Int64, [[S2]] : $Int64)
+// CHECK-DAG:     [[IT:%.*]] = struct $IntTuple ([[T]] : $(Int64, Int64))
+// CHECK:         return [[IT]]
+// CHECK:       } // end sil function 'load_from_global_without_projections'
+sil @load_from_global_without_projections : $@convention(thin) () -> IntTuple {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = load %0 : $*IntTuple
+  return %1 : $IntTuple
+}
+
+// CHECK-LABEL: sil @load_from_global_var
+// CHECK:         global_addr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'load_from_global_var'
+sil @load_from_global_var : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_var_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
 }

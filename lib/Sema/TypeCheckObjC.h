@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_OBJC_H
 #define SWIFT_SEMA_TYPE_CHECK_OBJC_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
 
@@ -25,9 +26,9 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class SubscriptDecl;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
+class InFlightDiagnostic;
 
 using llvm::Optional;
 
@@ -49,6 +50,8 @@ public:
     ExplicitlyIBOutlet,
     /// Has an explicit '@IBAction' attribute.
     ExplicitlyIBAction,
+    /// Has an explicit '@IBSegueAction' attribute.
+    ExplicitlyIBSegueAction,
     /// Has an explicit '@NSManaged' attribute.
     ExplicitlyNSManaged,
     /// Is a member of an @objc protocol.
@@ -121,6 +124,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 /// and figure out its foreign error convention (if any).
 bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                            ObjCReason Reason,
+                           Optional<ForeignAsyncConvention> &asyncConvention,
                            Optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.
@@ -132,10 +136,25 @@ bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 /// Check whether the given declaration can be represented in Objective-C.
 bool canBeRepresentedInObjC(const ValueDecl *decl);
 
-/// Check that specific, known bridging functions are fully type-checked.
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
 ///
-/// NOTE: This is only here to support the --enable-source-import hack.
-void checkBridgedFunctions(ASTContext &ctx);
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                            Optional<ObjCSelector> nameOpt,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

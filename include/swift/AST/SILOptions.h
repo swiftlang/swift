@@ -23,6 +23,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include <string>
 #include <climits>
 
@@ -39,30 +40,33 @@ public:
   /// Controls the aggressiveness of the loop unroller.
   int UnrollThreshold = 250;
 
-  /// The number of threads for multi-threaded code generation.
-  int NumThreads = 0;
-  
-  /// Controls whether to pull in SIL from partial modules during the
-  /// merge modules step. Could perhaps be merged with the link mode
-  /// above but the interactions between all the flags are tricky.
-  bool MergePartialModules = false;
-
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable existential specializer optimization.
-  bool ExistentialSpecializer = false;
-
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
+
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
+
+  /// Controls whether to turn on speculative devirtualization.
+  /// It is turned off by default.
+  bool EnableSpeculativeDevirtualization = false;
 
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
   bool DisableSILPerfOptimizations = false;
 
+  /// Controls whether cross module optimization is enabled.
+  bool CrossModuleOptimization = false;
+  
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
+
+  /// If true, no SIL verification is done at all.
+  bool VerifyNone = false;
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
@@ -70,8 +74,22 @@ public:
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
 
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
+
+  /// See \ref FrontendOptions.PrintFullConvention
+  bool PrintFullConvention = false;
+
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
+
+  /// Whether to stop the optimization pipeline right before we lower ownership
+  /// and go from OSSA to non-ownership SIL.
+  bool StopOptimizationBeforeLoweringOwnership = false;
+
+  /// Whether to skip emitting non-inlinable function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -117,6 +135,11 @@ public:
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 
+  /// Turn @inline(__always) attributes into no-ops.
+  ///
+  /// For experimentation around code size reduction.
+  bool IgnoreAlwaysInline = false;
+
   /// Indicates which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
@@ -129,16 +152,29 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
+  /// Calls to the replaced method inside of the replacement method will call
+  /// the previous implementation.
+  ///
+  /// @_dynamicReplacement(for: original())
+  /// func replacement() {
+  ///   if (...)
+  ///     original() // calls original() implementation if true
+  /// }
+  bool EnableDynamicReplacementCanCallPreviousImplementation = true;
+
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
-  /// Should the default pass pipelines strip ownership during the diagnostic
-  /// pipeline.
-  bool StripOwnershipDuringDiagnosticsPipeline = true;
-
-  /// The name of the file to which the backend should save YAML optimization
+  /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
+
+  /// The regex that filters the passes that should be saved to the optimization
+  /// records.
+  std::string OptRecordPasses;
+
+  /// The format used for serializing remarks (default: YAML)
+  llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
   SILOptions() {}
 
@@ -151,10 +187,6 @@ public:
   bool shouldOptimize() const {
     return OptMode > OptimizationMode::NoOptimization;
   }
-
-  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
-  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
-  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

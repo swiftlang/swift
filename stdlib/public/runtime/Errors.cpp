@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(__HAIKU__) || defined(__wasi__)
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
@@ -24,6 +24,7 @@
 #include <mutex>
 #endif
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +40,6 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)
@@ -57,6 +57,12 @@
 #elif defined(__ANDROID__)
 #include <android/log.h>
 #endif
+
+#if defined(__ELF__)
+#include <unwind.h>
+#endif
+
+#include <inttypes.h>
 
 namespace FatalErrorFlags {
 enum: uint32_t {
@@ -131,7 +137,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -143,7 +149,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  StringRef libraryName = StringRef(syminfo.fileName);
+  llvm::StringRef libraryName{syminfo.fileName};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
@@ -188,22 +194,70 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
 #endif
 }
 
-LLVM_ATTRIBUTE_NOINLINE
-void swift::printCurrentBacktrace(unsigned framesToSkip) {
+#if defined(__ELF__)
+struct UnwindState {
+  void **current;
+  void **end;
+};
+
+static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, void *arg) {
+  struct UnwindState *state = static_cast<struct UnwindState *>(arg);
+  if (state->current == state->end) {
+    return _URC_END_OF_STACK;
+  }
+
+  uintptr_t pc;
+#if defined(__arm__)
+  // ARM r15 is PC.  UNW_REG_PC is *not* the same value, and using that will
+  // result in abnormal behaviour.
+  _Unwind_VRS_Get(context, _UVRSC_CORE, 15, _UVRSD_UINT32, &pc);
+  // Clear the ISA bit during the reporting.
+  pc &= ~(uintptr_t)0x1;
+#else
+  pc = _Unwind_GetIP(context);
+#endif
+  if (pc) {
+    *state->current++ = reinterpret_cast<void *>(pc);
+  }
+  return _URC_NO_REASON;
+}
+#endif
+
+SWIFT_ALWAYS_INLINE
+static bool withCurrentBacktraceImpl(std::function<void(void **, int)> call) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
 #if defined(_WIN32)
   int symbolCount = CaptureStackBackTrace(0, maxSupportedStackDepth, addrs, NULL);
+#elif defined(__ELF__)
+  struct UnwindState state = {&addrs[0], &addrs[maxSupportedStackDepth]};
+  _Unwind_Backtrace(SwiftUnwindFrame, &state);
+  int symbolCount = state.current - addrs;
 #else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
 #endif
-  for (int i = framesToSkip; i < symbolCount; ++i) {
-    dumpStackTraceEntry(i - framesToSkip, addrs[i]);
-  }
+  call(addrs, symbolCount);
+  return true;
 #else
-  fprintf(stderr, "<backtrace unavailable>\n");
+  return false;
 #endif
+}
+
+SWIFT_NOINLINE
+bool swift::withCurrentBacktrace(std::function<void(void **, int)> call) {
+  return withCurrentBacktraceImpl(call);
+}
+
+SWIFT_NOINLINE
+void swift::printCurrentBacktrace(unsigned framesToSkip) {
+  bool success = withCurrentBacktraceImpl([&](void **addrs, int symbolCount) {
+    for (int i = framesToSkip; i < symbolCount; ++i) {
+      dumpStackTraceEntry(i - framesToSkip, addrs[i]);
+    }
+  });
+  if (!success)
+    fprintf(stderr, "<backtrace unavailable>\n");
 }
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
@@ -215,7 +269,7 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 // The layout of this struct is CrashReporter ABI, so there are no ABI concerns
 // here.
 extern "C" {
-LLVM_LIBRARY_VISIBILITY
+SWIFT_LIBRARY_VISIBILITY
 struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
@@ -280,9 +334,9 @@ reportNow(uint32_t flags, const char *message)
 #endif
 }
 
-LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
-void _swift_runtime_on_report(uintptr_t flags, const char *message,
-                              RuntimeErrorDetails *details) {
+SWIFT_NOINLINE SWIFT_RUNTIME_EXPORT void
+_swift_runtime_on_report(uintptr_t flags, const char *message,
+                         RuntimeErrorDetails *details) {
   // Do nothing. This function is meant to be used by the debugger.
 
   // The following is necessary to avoid calls from being optimized out.
@@ -336,10 +390,7 @@ static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-LLVM_ATTRIBUTE_NORETURN
-void
-swift::fatalError(uint32_t flags, const char *format, ...)
-{
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
   va_list args;
   va_start(args, format);
 
@@ -379,14 +430,10 @@ swift::warning(uint32_t flags, const char *format, ...)
 }
 
 // Crash when a deleted method is called by accident.
-SWIFT_RUNTIME_EXPORT
-LLVM_ATTRIBUTE_NORETURN
-void
-swift_deletedMethodError() {
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "Fatal error: Call of deleted method\n");
 }
-
 
 // Crash due to a retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks

@@ -38,6 +38,7 @@ class TypeContextInfoConsumer {
 public:
   virtual ~TypeContextInfoConsumer() {}
   virtual void handleResults(ArrayRef<TypeContextInfoItem>) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
 };
 
 /// Printing consumer
@@ -48,6 +49,7 @@ public:
   PrintingTypeContextInfoConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
   void handleResults(ArrayRef<TypeContextInfoItem>) override;
+  void setReusingASTContext(bool flag) override {}
 };
 
 /// Create a factory for code completion callbacks.

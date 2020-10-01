@@ -37,7 +37,8 @@ class DiagnosticSuppression {
 public:
   explicit DiagnosticSuppression(DiagnosticEngine &diags);
   ~DiagnosticSuppression();
+  static bool isEnabled(const DiagnosticEngine &diags);
 };
 
 }
-#endif /* SWIFT_AST_DIAGNOSTIC_SUPPRESSION_H */
+#endif // SWIFT_AST_DIAGNOSTIC_SUPPRESSION_H

@@ -90,6 +90,36 @@ The Swift compiler has a setting (under LangOptions) called `DiagnosticsEditorMo
 
 Most diagnostics have no reason to change behavior under editor mode. An example of an exception is the "protocol requirements not satisfied diagnostic"; on the command line, it may be better to show all unsatisfied requirements, while in an IDE a single multi-line fix-it would be preferred.
 
+### Educational Notes ###
+
+Educational notes are short-form documentation attached to a diagnostic which explain relevant language concepts. They are intended to further Swift's goal of progressive disclosure by providing a learning resource at the point of use when encountering an error message for the first time. In very limited circumstances, they also allow the main diagnostic message to use precise terminology (e.g. nominal types) which would otherwise be too unfriendly for beginners.
+
+When outputting diagnostics on the command line, educational notes will be printed after the main diagnostic body if enabled using the `-print-educational-notes` driver option. When presented in an IDE, it's expected they will be collapsed under a disclosure arrow, info button, or similar to avoid cluttering output.
+
+Educational notes should:
+- Explain a single language concept. This makes them easy to reuse across related diagnostics and helps keep them clear, concise, and easy to understand.
+- Be written in unabbreviated English. These are longer-form messages compared to the main diagnostic, so there's no need to omit needless words and punctuation.
+- Not generally exceed 3-4 paragraphs. Educational notes should be clear and easily digestible. Messages which are too long also have the potential to create UX issues on the command line.
+- Be accessible. Educational notes should be beginner friendly and avoid assuming unnecesary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
+- Include references to relevant chapters of _The Swift Programming Language_.
+- Be written in Markdown, but avoid excessive markup which negatively impacts the terminal UX.
+
+### Quick-Start Guide for Contributing New Educational Notes ###
+
+Adding new educational notes is a great way to get familiar with the process of contributing to Swift, while also making a big impact!
+
+To add a new educational note:
+1. Follow the [directions in the README](https://github.com/apple/swift#getting-sources-for-swift-and-related-projects) to checkout the Swift sources locally. Being able to build the Swift compiler is recommended, but not required, when contributing a new note.
+2. Identify a diagnostic to write an educational note for. To associate an educational note with a diagnostic name, you'll need to know its internal identifier. The easiest way to do this is to write a small program which triggers the diagnostic, and run it using the `-debug-diagnostic-names` compiler flag. This flag will cause the internal diagnostic identifier to be printed after the diagnostic message in square brackets.
+3. Find any closely related diagnostics. Sometimes, what appears to be one diagnostic from a user's perspective may have multiple variations internally. After determining a diagnostic's internal identifier, run a search for it in the compiler source. You should find:
+    - An entry in a `Diagnostics*.def` file describing the diagnostic. If there are any closely related diagnostics the note should also be attached to, they can usually be found nearby.
+    - Each point in the compiler source where the diagnostic is emitted. This can be helpful in determining the exact circumstances which cause it to be emitted.
+4. Add a new Markdown file in the `userdocs/diagnostics/` directory in the swift repository containing the contents of the note. When writing a note, keep the writing guidelines from the section above in mind. The existing notes in the directory are another useful guide.
+5. Associate the note with the appropriate diagnostics in `EducationalNotes.def`. An entry like `EDUCATIONAL_NOTES(property_wrapper_failable_init, "property-wrapper-requirements.md")` will associate the note with filename `property-wrapper-requirements.md` with the diagnostic having an internal identifier of `property_wrapper_failable_init`.
+6. If possible, rebuild the compiler and try recompiling your test program with `-print-educational-notes`. Your new note should appear after the diagnostic in the terminal.
+7. That's it! The new note is now ready to be submitted as a pull request on GitHub.
+
+If you run into any issues or have questions while following the steps above, feel free to post a question on the Swift forums or open a work-in-progress pull request on GitHub.
 
 ### Format Specifiers ###
 
@@ -97,10 +127,28 @@ Most diagnostics have no reason to change behavior under editor mode. An example
 
 - `%0`, `%1`, etc - Formats the specified diagnostic argument based on its type.
 
-- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output.
+- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output. The argument to the %select may be an integer, enum, or StringRef. If it's a StringRef, the specifier acts as an emptiness check.
 
 - `%s0` - Produces an "s" if the given argument is anything other than 1, as meant for an English plural. This isn't particularly localizable without a more general `%plural` form, but most diagnostics try to avoid cases where a plural/singular distinction would be necessary in the first place.
 
 - `%error` - Represents a branch in a `%select` that should never be taken. In debug builds of the compiler this produces an assertion failure.
 
 - `%%` - Emits a literal percent sign.
+
+### Diagnostic Verifier ###
+
+(This section is specific to the Swift compiler's diagnostic engine.)
+
+If the `-verify` frontend flag is used, the Swift compiler will check emitted diagnostics against specially formatted comments in the source. This feature is used extensively throughout the test suite to ensure diagnostics are emitted with the correct message and source location.
+
+An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. It is followed by:
+
+- (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
+
+- (Optional) A match count which specifies how many times the diagnostic is expected to appear. This may be a positive integer or `*`, which allows for zero or more matches. The match count must be surrounded by whitespace if present. For example, `// expected-error 2 ...` looks for two matching errors, and `// expected-warning * ...` looks for any number of matching warnings.
+
+- (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.
+
+- (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'. The special {{none}} specifier is also supported, which will cause the diagnostic match to fail if unexpected fix-its are produced.
+
+- (Optional) Expected educational notes. These appear as a comma separated list after the expected message, enclosed in double curly braces and prefixed by 'educational-notes='. For example, `{{educational-notes=some-note,some-other-note}}` will verify the educational notes with filenames `some-note` and `some-other-note` appear. Do not include the file extension when specifying note names.

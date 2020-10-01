@@ -194,7 +194,7 @@ public:
   using iterator = llvm::mapped_iterator<
       decltype(handlerSet)::const_iterator,
       decltype(&DeserializationNotificationHandlerSet::getUnderlyingHandler)>;
-  using range = llvm::iterator_range<iterator>;
+  using range = iterator_range<iterator>;
 
   /// Returns an iterator to the first element of the handler set.
   ///

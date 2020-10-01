@@ -168,7 +168,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeRawPointer: _Pointer {
   
   public typealias Pointee = UInt8
@@ -191,7 +191,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init<T>(_ other: UnsafePointer<T>) {
+  public init<T>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -204,7 +204,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: UnsafePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ other: UnsafePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -217,7 +217,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   /// - Parameter other: The mutable raw pointer to convert.
   @_transparent
-  public init(_ other: UnsafeMutableRawPointer) {
+  public init(@_nonEphemeral _ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
@@ -230,7 +230,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
   @_transparent
-  public init?(_ other: UnsafeMutableRawPointer?) {
+  public init?(@_nonEphemeral _ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -243,7 +243,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///		
   /// - Parameter other: The typed pointer to convert.		
   @_transparent		
-  public init<T>(_ other: UnsafeMutablePointer<T>) {		
+  public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
    _rawValue = other._rawValue		
   }		
 
@@ -256,7 +256,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
   ///   result is `nil`.		
   @_transparent		
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {		
+  public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
    guard let unwrapped = other else { return nil }		
    _rawValue = unwrapped._rawValue		
   }		
@@ -288,8 +288,8 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: 100,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: 100,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let int8Pointer = bytesPointer.bindMemory(to: Int8.self, capacity: count)
   ///
   /// After calling `bindMemory(to:capacity:)`, the first four bytes of the
@@ -520,7 +520,7 @@ extension UnsafeRawPointer: Strideable {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeMutableRawPointer: _Pointer {
   
   public typealias Pointee = UInt8
@@ -543,7 +543,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
+  public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -556,7 +556,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -569,7 +569,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   /// - Parameter other: The immutable raw pointer to convert.
   @_transparent
-  public init(mutating other: UnsafeRawPointer) {
+  public init(@_nonEphemeral mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
   }
 
@@ -582,7 +582,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Parameter other: The immutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafeRawPointer?) {
+  public init?(@_nonEphemeral mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -653,8 +653,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: 100,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: 100,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let int8Pointer = bytesPointer.bindMemory(to: Int8.self, capacity: count)
   ///
   /// After calling `bindMemory(to:capacity:)`, the first four bytes of the
@@ -716,7 +716,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
   ///             byteCount: count * MemoryLayout<Int8>.stride,
   ///             alignment: MemoryLayout<Int8>.alignment)
-  ///     let int8Pointer = myBytes.initializeMemory(
+  ///     let int8Pointer = bytesPointer.initializeMemory(
   ///             as: Int8.self, repeating: 0, count: count)
   ///
   ///     // After using 'int8Pointer':
@@ -764,8 +764,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: count * MemoryLayout<Int8>.stride,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: count * MemoryLayout<Int8>.stride,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let values: [Int8] = [1, 2, 3, 4]
   ///     let int8Pointer = values.withUnsafeBufferPointer { buffer in
   ///         return bytesPointer.initializeMemory(as: Int8.self,
@@ -776,7 +776,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     // (int8Pointer + 3).pointee == 4
   ///
   ///     // After using 'int8Pointer':
-  ///     int8Pointer.deallocate(count)
+  ///     int8Pointer.deallocate()
   ///
   /// After calling this method on a raw pointer `p`, the region starting at
   /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
@@ -933,7 +933,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let typedPointer = p.bindMemory(to: U.self, capacity: 1)
   ///     typedPointer.deinitialize(count: 1)
-  ///     p.initializeMemory(as: T.self, to: newValue)
+  ///     p.initializeMemory(as: T.self, repeating: newValue, count: 1)
   ///
   /// - Parameters:
   ///   - value: The value to store as raw bytes.
@@ -966,14 +966,17 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// must be properly aligned for accessing `T`, and `byteCount` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyMemory(from:byteCount:)`, the `byteCount` bytes of memory
-  /// referenced by this pointer are initialized to raw bytes. If the memory
-  /// is bound to type `T`, then it contains values of type `T`.
+  /// The memory in the region `source..<(source + byteCount)` may overlap with
+  /// the memory referenced by this pointer.
+  ///
+  /// After calling `copyMemory(from:byteCount:)`, the `byteCount` bytes of 
+  /// memory referenced by this pointer are initialized to raw bytes. If the
+  /// memory is bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameters:
   ///   - source: A pointer to the memory to copy bytes from. The memory in the
-  ///     region `source..<(source + byteCount)` must be initialized to a trivial
-  ///     type.
+  ///     region `source..<(source + byteCount)` must be initialized to a
+  ///     trivial type.
   ///   - byteCount: The number of bytes to copy. `byteCount` must not be negative.
   @inlinable
   public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {
@@ -994,23 +997,23 @@ extension UnsafeMutableRawPointer: Strideable {
 
 extension OpaquePointer {
   @_transparent
-  public init(_ from: UnsafeMutableRawPointer) {
+  public init(@_nonEphemeral _ from: UnsafeMutableRawPointer) {
     self._rawValue = from._rawValue
   }
 
   @_transparent
-  public init?(_ from: UnsafeMutableRawPointer?) {
+  public init?(@_nonEphemeral _ from: UnsafeMutableRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }
 
   @_transparent
-  public init(_ from: UnsafeRawPointer) {
+  public init(@_nonEphemeral _ from: UnsafeRawPointer) {
     self._rawValue = from._rawValue
   }
 
   @_transparent
-  public init?(_ from: UnsafeRawPointer?) {
+  public init?(@_nonEphemeral _ from: UnsafeRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }

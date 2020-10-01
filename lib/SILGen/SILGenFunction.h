@@ -324,7 +324,7 @@ public:
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
-  std::vector<SILDebugScope*> DebugScopeStack;
+  std::vector<const SILDebugScope *> DebugScopeStack;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -490,9 +490,15 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  const SILFunction &getFunction() const { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
-  SILOptions &getOptions() { return getModule().getOptions(); }
+  const SILOptions &getOptions() { return getModule().getOptions(); }
+
+  // Returns the type expansion context for types in this function.
+  TypeExpansionContext getTypeExpansionContext() const {
+    return TypeExpansionContext(getFunction());
+  }
 
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return F.getTypeLowering(orig, subst);
@@ -500,16 +506,24 @@ public:
   const TypeLowering &getTypeLowering(Type t) {
     return F.getTypeLowering(t);
   }
-  CanSILFunctionType getSILFunctionType(AbstractionPattern orig,
+  CanSILFunctionType getSILFunctionType(TypeExpansionContext context,
+                                        AbstractionPattern orig,
                                         CanFunctionType substFnType) {
-    return SGM.Types.getSILFunctionType(orig, substFnType);
+    return SGM.Types.getSILFunctionType(context, orig, substFnType);
   }
-  SILType getLoweredType(AbstractionPattern orig, Type subst) {
+  SILType getLoweredType(AbstractionPattern orig,
+                         Type subst) {
     return F.getLoweredType(orig, subst);
   }
   SILType getLoweredType(Type t) {
     return F.getLoweredType(t);
   }
+  SILType getLoweredTypeForFunctionArgument(Type t) {
+    auto typeForConv =
+        SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
+    return getLoweredType(t).getCategoryType(typeForConv.getCategory());
+  }
+
   SILType getLoweredLoadableType(Type t) {
     return F.getLoweredLoadableType(t);
   }
@@ -517,15 +531,35 @@ public:
     return F.getTypeLowering(type);
   }
 
-  SILType getSILType(SILParameterInfo param) const {
-    return silConv.getSILType(param);
+  SILType getSILInterfaceType(SILParameterInfo param) const {
+    return silConv.getSILType(param, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
-  SILType getSILType(SILResultInfo result) const {
-    return silConv.getSILType(result);
+  SILType getSILInterfaceType(SILResultInfo result) const {
+    return silConv.getSILType(result, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
 
-  const SILConstantInfo &getConstantInfo(SILDeclRef constant) {
-    return SGM.Types.getConstantInfo(constant);
+  SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(param, fnTy, getTypeExpansionContext());
+  }
+  SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(result, fnTy, getTypeExpansionContext());
+  }
+
+  SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
+    auto t = F.mapTypeIntoContext(getSILType(result, fnTy));
+    return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
+  }
+
+  SILType getSILTypeInContext(SILParameterInfo param, CanSILFunctionType fnTy) {
+    auto t = F.mapTypeIntoContext(getSILType(param, fnTy));
+    return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
+  }
+
+  const SILConstantInfo &getConstantInfo(TypeExpansionContext context,
+                                         SILDeclRef constant) {
+    return SGM.Types.getConstantInfo(context, constant);
   }
 
   Optional<SILAccessEnforcement> getStaticEnforcement(VarDecl *var = nullptr);
@@ -533,13 +567,19 @@ public:
   Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
+  std::string getMagicFileIDString(SourceLoc loc);
+  StringRef getMagicFilePathString(SourceLoc loc);
+  StringRef getMagicFunctionString();
 
-  /// Push a new debug scope and set its parent pointer.
+  /// Enter the debug scope for \p Loc, creating it if necessary.
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M)
-        SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
+    auto *DS = Parent;
+    // Don't nest a scope for Loc under Parent unless it's actually different.
+    if (Parent->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation())
+      DS = DS = new (SGM.M)
+          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
@@ -553,6 +593,11 @@ public:
     // because the debugger is not expecting the function epilogue to
     // be in a different scope.
   }
+
+  std::unique_ptr<Initialization>
+  prepareIndirectResultInit(CanType formalResultType,
+                            SmallVectorImpl<SILValue> &directResultsBuffer,
+                            SmallVectorImpl<CleanupHandle> &cleanups);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -568,9 +613,9 @@ public:
   void emitDestroyingDestructor(DestructorDecl *dd);
 
   /// Generates code for an artificial top-level function that starts an
-  /// application based on a main class.
-  void emitArtificialTopLevel(ClassDecl *mainClass);
-  
+  /// application based on a main type and optionally a main type.
+  void emitArtificialTopLevel(Decl *mainDecl);
+
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingDestructor(DestructorDecl *dd);
@@ -613,16 +658,20 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
-  /// Generates code for a curry thunk from one uncurry level
-  /// of a function to another.
-  void emitCurryThunk(SILDeclRef thunk);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
   /// Generate a nullary function that returns the given value.
-  void emitGeneratorFunction(SILDeclRef function, Expr *value);
+  /// If \p emitProfilerIncrement is set, emit a profiler increment for
+  /// \p value.
+  void emitGeneratorFunction(SILDeclRef function, Expr *value,
+                             bool emitProfilerIncrement = false);
+
+  /// Generate a nullary function that returns the value of the given variable's
+  /// expression initializer.
+  void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -652,7 +701,19 @@ public:
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
                            bool isSelfConformance);
-  
+
+  /// Generates subscript arguments for keypath. This function handles lowering
+  /// of all index expressions including default arguments.
+  ///
+  /// \returns Lowered index arguments.
+  /// \param subscript - The subscript decl who's arguments are being lowered.
+  /// \param subs - Used to get subscript function type and to substitute generic args.
+  /// \param indexExpr - An expression holding the indices of the
+  /// subscript (either a TupleExpr or a ParenExpr).
+  SmallVector<ManagedValue, 4>
+  emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
+                               Expr *indexExpr);
+
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
                                ManagedValue block,
@@ -673,11 +734,17 @@ public:
   /// \param inputOrigType Abstraction pattern of base class method
   /// \param inputSubstType Formal AST type of base class method
   /// \param outputSubstType Formal AST type of derived class method
-  void emitVTableThunk(SILDeclRef derived,
+  /// \param baseLessVisibleThanDerived If true, the thunk does a
+  /// double dispatch to the derived method's vtable entry, so that if
+  /// the derived method has an override that cannot access the base,
+  /// calls to the base dispatch to the correct method.
+  void emitVTableThunk(SILDeclRef base,
+                       SILDeclRef derived,
                        SILFunction *implFn,
                        AbstractionPattern inputOrigType,
                        CanAnyFunctionType inputSubstType,
-                       CanAnyFunctionType outputSubstType);
+                       CanAnyFunctionType outputSubstType,
+                       bool baseLessVisibleThanDerived);
   
   //===--------------------------------------------------------------------===//
   // Control flow
@@ -752,12 +819,14 @@ public:
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(AnyFunctionRef TheClosure,
+  void emitProlog(CaptureInfo captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
-                  Type resultType, bool throws);
+                  DeclContext *DC, Type resultType,
+                  bool throws, SourceLoc throwsLoc);
   /// returns the number of variables in paramPatterns.
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DeclCtx, bool throws);
+                      Type resultType, DeclContext *DC,
+                      bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -772,13 +841,12 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
-  /// \param returnType  If non-null, the epilog block will be created with an
-  ///                    argument of this type to receive the return value for
-  ///                    the function.
+  /// \param hasDirectResults  If true, the epilog block will be created with
+  ///                    arguments for each direct result of this function.
   /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
+  void prepareEpilog(bool hasDirectResults, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
@@ -1026,7 +1094,7 @@ public:
   void emitBreakOutOf(SILLocation loc, Stmt *S);
 
   void emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
-                         ArrayRef<CatchStmt*> clauses,
+                         ArrayRef<CaseStmt *> clauses,
                          JumpDest catchFallthroughDest);
 
   /// Emit code for the throw expr. If \p emitWillThrow is set then emit a
@@ -1122,10 +1190,14 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+  ManagedValue emitUninitializedArrayFinalization(SILLocation loc,
+                                                  ManagedValue array);
 
-  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
-                                                      SILValue address,
-                                                      SILValue newValue);
+  /// Emit a cleanup for an owned value that should be written back at end of
+  /// scope if the value is not forwarded.
+  CleanupHandle enterOwnedValueWritebackCleanup(SILLocation loc,
+                                                SILValue address,
+                                                SILValue newValue);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
@@ -1142,7 +1214,8 @@ public:
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
   SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant) {
-    return emitGlobalFunctionRef(loc, constant, getConstantInfo(constant));
+    return emitGlobalFunctionRef(
+        loc, constant, getConstantInfo(getTypeExpansionContext(), constant));
   }
   SILValue
   emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
@@ -1193,7 +1266,7 @@ public:
                                   bool isBaseGuaranteed = false);
 
   void emitCaptures(SILLocation loc,
-                    AnyFunctionRef TheClosure,
+                    SILDeclRef closure,
                     CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
@@ -1277,6 +1350,11 @@ public:
   ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v,
                                       const TypeLowering &lowering);
   ManagedValue emitManagedBeginBorrow(SILLocation loc, SILValue v);
+
+  ManagedValue
+  emitManagedBorrowedRValueWithCleanup(SILValue borrowedValue,
+                                       const TypeLowering &lowering);
+  ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue borrowedValue);
 
   ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                     SILValue borrowedValue);
@@ -1434,11 +1512,18 @@ public:
 
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
-      const PatternBindingEntry &entry,
+      VarDecl *anchoringVar,
       SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,
       SGFContext C);
+
+  RValue emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation loc,
+      VarDecl *var,
+      SubstitutionMap subs,
+      RValue &&originalValue,
+      SGFContext C = SGFContext());
 
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
@@ -1462,6 +1547,10 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
+  RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
+                         ArgumentSource &&self, PreparedArguments &&args,
+                         SGFContext C);
+
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
@@ -1483,6 +1572,7 @@ public:
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
+                                      CanSILFunctionType fnTy,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 
@@ -1695,9 +1785,19 @@ public:
                                     AbstractionPattern origType,
                                     CanType substType,
                                     SGFContext ctx = SGFContext());
+  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
   RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Convert a value with the abstraction patterns of the substituted
@@ -1709,6 +1809,16 @@ public:
   RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
+  RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Transform the AST-level types in the function signature without an
@@ -1724,12 +1834,14 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
+                                    SILType loweredResultTy,
                                     SGFContext ctx = SGFContext());
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
                               AbstractionPattern outputOrigType,
                               CanType outputSubstType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Used for emitting SILArguments of bare functions, such as thunks.
@@ -1756,12 +1868,32 @@ public:
                                        SILType escapingFnTy);
 
   //===--------------------------------------------------------------------===//
+  // Differentiation thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Get or create a thunk for reabstracting and self-reordering
+  /// differentials/pullbacks returned by user-defined JVP/VJP functions, and
+  /// apply it to the given differential/pullback.
+  ///
+  /// If `reorderSelf` is true, reorder self so that it appears as:
+  /// - The last parameter, for differentials.
+  /// - The last result, for pullbacks.
+  ManagedValue getThunkedAutoDiffLinearMap(ManagedValue linearMap,
+                                           AutoDiffLinearMapKind linearMapKind,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType,
+                                           bool reorderSelf);
+
+  //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//
   
   void visitDecl(Decl *D) {
     llvm_unreachable("Not yet implemented");
   }
+
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *D) {}
 
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
@@ -1865,7 +1997,8 @@ public:
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
-  RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
+  RValue emitRValueForNonMemberVarDecl(SILLocation loc,
+                                       ConcreteDeclRef declRef,
                                        CanType formalRValueType,
                                        AccessSemantics semantics,
                                        SGFContext C);

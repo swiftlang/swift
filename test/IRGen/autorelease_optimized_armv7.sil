@@ -1,6 +1,7 @@
 // RUN: %swift -gnone -O -target armv7-apple-ios7 -disable-legacy-type-info -emit-assembly %s -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: rdar49791522
 
 // rdar://17999904
 

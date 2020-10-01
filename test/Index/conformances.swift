@@ -65,17 +65,17 @@ extension SubMultiConf {
 }
 class SubMultiConf: BaseMultiConf,P2,P1,P3 { // CHECK: [[@LINE]]:7 | class/Swift | SubMultiConf | [[SubMultiConf_USR:.*]] | Def
   // CHECK: [[@LINE-1]]:7 | instance-method/Swift | foo() | [[P2_ext_foo_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | foo() | [[P2_foo_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[P2_foo_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-4]]:7 | instance-method/Swift | foo() | [[P2_ext_foo_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | foo() | [[P1_foo_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[P1_foo_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-7]]:7 | instance-method/Swift | meth1() | [[SubMultiConf_ext_meth1_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | meth1() | [[P3_meth1_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | meth1() | [[P3_meth1_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-10]]:7 | instance-method/Swift | meth2() | [[BaseMultiConf_meth2_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | meth2() | [[P3_meth2_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | meth2() | [[P3_meth2_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK-NOT: [[@LINE-13]]:7 | instance-method
 }
 
@@ -124,3 +124,11 @@ struct AssocViaExtension {
 extension AssocViaExtension: WithAssocType {} // CHECK: [[@LINE]]:11 | struct/Swift | T | [[AssocViaExtensionT_USR]] | Impl,RelOver,RelCont | rel: 2
   // CHECK-NEXT: RelOver | type-alias/associated-type/Swift | T | [[WithAssocT_USR]]
   // CHECK-NEXT: RelCont | extension/ext-struct/Swift | AssocViaExtension
+
+func returnOpaqueResultType() -> some BaseConfFromBase & P1 & WithAssocType {} // CHECK: [[@LINE]]:6 | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF | Def | rel: 0
+// CHECK: [[@LINE-1]]:39 | class/Swift | BaseConfFromBase | s:14swift_ide_test012BaseConfFromD0C | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-3]]:58 | protocol/Swift | P1 | s:14swift_ide_test2P1P | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-5]]:63 | protocol/Swift | WithAssocType | s:14swift_ide_test13WithAssocTypeP | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF

@@ -24,8 +24,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -33,14 +35,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Utils/IndexTrie.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -51,6 +52,9 @@ STATISTIC(DeadAllocRefEliminated,
 
 STATISTIC(DeadAllocStackEliminated,
           "number of AllocStack instructions removed");
+
+STATISTIC(DeadKeyPathEliminated,
+          "number of keypath instructions removed");
 
 STATISTIC(DeadAllocApplyEliminated,
           "number of allocating Apply instructions removed");
@@ -208,6 +212,9 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<InjectEnumAddrInst>(Inst))
     return true;
 
+  if (isa<KeyPathInst>(Inst))
+    return true;
+
   // We know that the destructor has no side effects so we can remove the
   // deallocation instruction too.
   if (isa<DeallocationInst>(Inst) || isa<AllocationInst>(Inst))
@@ -217,15 +224,17 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // The only store instructions which is guaranteed to store a trivial value
-  // is an inject_enum_addr witout a payload (i.e. without init_enum_data_addr).
-  // There can also be a 'store [trivial]', but we don't handle that yet.
-  if (onlyAcceptTrivialStores)
-    return false;
-
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
-  if (isa<StoreInst>(Inst))
+  if (auto *store = dyn_cast<StoreInst>(Inst)) {
+    // TODO: when we have OSSA, we can also accept stores of non trivial values:
+    //       just replace the store with a destroy_value.
+    return !onlyAcceptTrivialStores ||
+           store->getSrc()->getType().isTrivial(*store->getFunction());
+  }
+
+  // Conceptually this instruction has no side-effects.
+  if (isa<InitExistentialAddrInst>(Inst))
     return true;
 
   // If Inst does not read or write to memory, have side effects, and is not a
@@ -403,7 +412,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User)) {
+        isa<DebugValueInst>(User) ||
+        isa<FixLifetimeInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -436,13 +446,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       continue;
     }
     // Recursively follow projections.
-    if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
-      ProjectionIndex PI(ProjInst);
+    if (auto *svi = dyn_cast<SingleValueInstruction>(User)) {
+      ProjectionIndex PI(svi);
       if (PI.isValid()) {
         IndexTrieNode *ProjAddrNode = AddressNode;
         bool ProjInteriorAddr = IsInteriorAddress;
-        if (Projection::isAddressProjection(ProjInst)) {
-          if (isa<IndexAddrInst>(ProjInst)) {
+        if (Projection::isAddressProjection(svi)) {
+          if (isa<IndexAddrInst>(svi)) {
             // Don't support indexing within an interior address.
             if (IsInteriorAddress)
               return false;
@@ -457,11 +467,17 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
           // Don't expect to extract values once we've taken an address.
           return false;
         }
-        if (!recursivelyCollectInteriorUses(ProjInst,
+        if (!recursivelyCollectInteriorUses(svi,
                                             ProjAddrNode->getChild(PI.Index),
                                             ProjInteriorAddr)) {
           return false;
         }
+        continue;
+      }
+      ArraySemanticsCall AS(svi);
+      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+        if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
+          return false;
         continue;
       }
     }
@@ -519,10 +535,10 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.Initialize(StVal->getType());
+  SSAUp.initialize(StVal->getType());
 
   for (auto *Store : Stores)
-    SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
+    SSAUp.addAvailableValue(Store->getParent(), Store->getSrc());
 
   SILLocation Loc = Stores[0]->getLoc();
   for (auto *RelPoint : ReleasePoints) {
@@ -531,7 +547,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // the right thing for local uses. We have already ensured a single store
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
-    SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
+    SILValue RelVal = SSAUp.getValueAtEndOfBlock(RelPoint->getParent());
     if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
       B.createStrongRelease(Loc, RelVal, B.getDefaultAtomicity());
     else
@@ -557,9 +573,9 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
     auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
     if (!TupleElt)
       return false;
-    if (TupleElt->getFieldNo() == 0 && !ArrayDef) {
+    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
       ArrayDef = TupleElt;
-    } else if (TupleElt->getFieldNo() == 1 && !StorageAddress) {
+    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
       StorageAddress = TupleElt;
     } else {
       return false;
@@ -634,7 +650,8 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
 /// side effect?
 static bool isAllocatingApply(SILInstruction *Inst) {
   ArraySemanticsCall ArrayAlloc(Inst);
-  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized;
+  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
+         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
 }
 
 namespace {
@@ -643,17 +660,20 @@ class DeadObjectElimination : public SILFunctionTransform {
   llvm::SmallVector<SILInstruction*, 16> Allocations;
 
   void collectAllocations(SILFunction &Fn) {
-    for (auto &BB : Fn)
+    for (auto &BB : Fn) {
       for (auto &II : BB) {
-        if (isa<AllocationInst>(&II))
+        if (isa<AllocationInst>(&II) ||
+            isAllocatingApply(&II) ||
+            isa<KeyPathInst>(&II)) {
           Allocations.push_back(&II);
-        else if (isAllocatingApply(&II))
-          Allocations.push_back(&II);
+        }
       }
+    }
   }
 
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
+  bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
@@ -668,6 +688,8 @@ class DeadObjectElimination : public SILFunctionTransform {
         Changed |= processAllocRef(A);
       else if (auto *A = dyn_cast<AllocStackInst>(II))
         Changed |= processAllocStack(A);
+      else if (auto *KPI = dyn_cast<KeyPathInst>(II))
+        Changed |= processKeyPath(KPI);
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
@@ -749,6 +771,30 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   return true;
 }
 
+bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(KPI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/ false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // For simplicity just bail if the keypath has a non-trivial operands.
+  // TODO: don't bail but insert compensating destroys for such operands.
+  for (const Operand &Op : KPI->getAllOperands()) {
+    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+      return false;
+  }
+
+  // Remove the keypath and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
+
+  ++DeadKeyPathEliminated;
+  return true;
+}
+
 /// If AI is the version of an initializer where we pass in either an apply or
 /// an alloc_ref to initialize in place, validate that we are able to continue
 /// optimizing and return To
@@ -796,7 +842,7 @@ static bool getDeadInstsAfterInitializerRemoved(
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
+  if (!isAllocatingApply(AI))
     return false;
 
   llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -32,11 +32,13 @@ func inferFromParameterType<T>(_ x: X1<T>) {
 
 // Infer protocol requirements from the return type of a generic function.
 func inferFromReturnType<T>(_ x: T) -> X1<T> {
+  _ = 0
   x.p1()
 }
 
 // Infer protocol requirements from the superclass of a generic parameter.
 func inferFromSuperclass<T, U : X2<T>>(_ t: T, u: U) -> T {
+  _ = 0
   t.p1()
 }
 
@@ -339,7 +341,7 @@ protocol P25b {
 
 protocol P25c {
   associatedtype A: P24
-  associatedtype B where A == X<B> // expected-error{{use of undeclared type 'X'}}
+  associatedtype B where A == X<B> // expected-error{{cannot find type 'X' in scope}}
 }
 
 protocol P25d {

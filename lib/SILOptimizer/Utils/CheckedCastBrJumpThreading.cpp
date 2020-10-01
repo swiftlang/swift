@@ -11,15 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILInliner.h"
 
 using namespace swift;
 
@@ -86,8 +87,8 @@ class CheckedCastBrJumpThreading {
       hasUnknownPreds(hasUnknownPreds) { }
 
     void modifyCFGForUnknownPreds();
-    void modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner);
-    void modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner);
+    void modifyCFGForFailurePreds(BasicBlockCloner &Cloner);
+    void modifyCFGForSuccessPreds(BasicBlockCloner &Cloner);
   };
 
   // Contains an entry for each checked_cast_br to be optimized.
@@ -155,7 +156,7 @@ static bool canDuplicateBlock(SILBasicBlock *BB) {
 void CheckedCastBrJumpThreading::classifyPredecessor(
     SILBasicBlock *Pred, bool SuccessDominates, bool FailureDominates) {
   if (SuccessDominates == FailureDominates) {
-    numUnknownPreds++;
+    ++numUnknownPreds;
     return;
   }
   if (SuccessDominates) {
@@ -233,8 +234,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
   if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == stripClassCasts(CCBI->getOperand())) {
       // Replace checked_cast_br by branch to FailureBB.
-      SILBuilder(CCBI->getParent()).createBranch(CCBI->getLoc(),
-                                                 CCBI->getFailureBB());
+      SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
+                                             CCBI->getFailureBB());
       CCBI->eraseFromParent();
     }
   }
@@ -242,15 +243,14 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
 
 /// Create a copy of the BB as a landing BB
 /// for all FailurePreds.
-void CheckedCastBrJumpThreading::Edit::
-modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
+void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
+    BasicBlockCloner &Cloner) {
   if (FailurePreds.empty())
     return;
 
-  assert(!Cloner.hasValue());
-  Cloner.emplace(CCBBlock);
-  Cloner->cloneBlock();
-  SILBasicBlock *TargetFailureBB = Cloner->getNewBB();
+  assert(!Cloner.wasCloned());
+  Cloner.cloneBlock();
+  SILBasicBlock *TargetFailureBB = Cloner.getNewBB();
   auto *TI = TargetFailureBB->getTerminator();
   SILBuilderWithScope Builder(TI);
   // This BB copy branches to a FailureBB.
@@ -270,13 +270,13 @@ modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
 
 /// Create a copy of the BB or reuse BB as
 /// a landing basic block for all FailurePreds.
-void CheckedCastBrJumpThreading::Edit::
-modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
+void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
+    BasicBlockCloner &Cloner) {
   auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
 
   if (InvertSuccess) {
-    SILBuilder B(CCBBlock);
-    B.createBranch(CCBI->getLoc(), CCBI->getFailureBB());
+    SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
+                                           CCBI->getFailureBB());
     CCBI->eraseFromParent();
     return;
   }
@@ -284,10 +284,9 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
     if (!SuccessPreds.empty()) {
       // Create a copy of the BB as a landing BB.
       // for all SuccessPreds.
-      assert(!Cloner.hasValue());
-      Cloner.emplace(CCBBlock);
-      Cloner->cloneBlock();
-      SILBasicBlock *TargetSuccessBB = Cloner->getNewBB();
+      assert(!Cloner.wasCloned());
+      Cloner.cloneBlock();
+      SILBasicBlock *TargetSuccessBB = Cloner.getNewBB();
       auto *TI = TargetSuccessBB->getTerminator();
       SILBuilderWithScope Builder(TI);
       // This BB copy branches to SuccessBB.
@@ -313,8 +312,8 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
 
   // Add an unconditional jump at the end of the block.
   // Take argument value from the dominating BB
-  SILBuilder(CCBBlock).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
-                              {SuccessArg});
+  SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
+                                         {SuccessArg});
   CCBI->eraseFromParent();
 }
 
@@ -342,6 +341,11 @@ bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
 
 // Returns false if cloning required by jump threading cannot
 // be performed, because some of the constraints are violated.
+//
+// This does not check the constraint on address projections with out-of-block
+// uses. Those are rare enough that they don't need to be checked first for
+// efficiency, but they need to be gathered later, just before cloning, anyway
+// in order to sink the projections.
 bool CheckedCastBrJumpThreading::checkCloningConstraints() {
   // Check some cloning related constraints.
 
@@ -410,8 +414,8 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
           IncomingValue, DomBB, DomCondition, DT);
 
       if (ReachingValue == SILValue()) {
-        numUnknownPreds++;
-        idx++;
+        ++numUnknownPreds;
+        ++idx;
         continue;
       }
 
@@ -431,7 +435,7 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
 
       classifyPredecessor(
           PredBB, SuccessDominates, FailureDominates);
-      idx++;
+      ++idx;
     }
   } else {
     // ArgBB is the entry block. Check that conditions are the equivalent in this
@@ -526,7 +530,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // fact that the source operand is the same for
     // both instructions.
     if (!CCBI->isExact() && !DomCCBI->isExact()) {
-      if (DomCCBI->getCastType() != CCBI->getCastType())
+      if (DomCCBI->getTargetFormalType() != CCBI->getTargetFormalType())
         continue;
     }
 
@@ -598,7 +602,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 
     bool InvertSuccess = false;
     if (DomCCBI->isExact() && CCBI->isExact() &&
-        DomCCBI->getCastType() != CCBI->getCastType()) {
+        DomCCBI->getTargetFormalType() != CCBI->getTargetFormalType()) {
       if (TotalPreds == SuccessPreds.size()) {
         // The dominating exact cast was successful, but it casted to a
         // different type. Therefore, the current cast fails for sure.
@@ -672,7 +676,9 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
   Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
-    Optional<BasicBlockCloner> Cloner;
+    BasicBlockCloner Cloner(edit->CCBBlock);
+    if (!Cloner.canCloneBlock())
+      continue;
 
     // Create a copy of the BB as a landing BB
     // for all FailurePreds.
@@ -683,12 +689,11 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     // Handle unknown preds.
     edit->modifyCFGForUnknownPreds();
 
-    if (Cloner.hasValue()) {
-      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getNewBB(),
-                            edit->CCBBlock);
+    if (Cloner.wasCloned()) {
+      Cloner.updateSSAAfterCloning();
 
-      if (!Cloner->getNewBB()->pred_empty())
-        BlocksForWorklist.push_back(Cloner->getNewBB());
+      if (!Cloner.getNewBB()->pred_empty())
+        BlocksForWorklist.push_back(Cloner.getNewBB());
     }
     if (!edit->CCBBlock->pred_empty())
       BlocksForWorklist.push_back(edit->CCBBlock);

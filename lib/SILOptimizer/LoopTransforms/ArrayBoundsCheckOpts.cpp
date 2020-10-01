@@ -12,8 +12,15 @@
 
 #define DEBUG_TYPE "sil-abcopts"
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PatternMatch.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -24,16 +31,9 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "swift/SIL/Dominance.h"
-#include "swift/SIL/PatternMatch.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/InstructionUtils.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -458,7 +458,7 @@ static CondFailInst *hasCondFailUse(SILValue V) {
 /// a cond_fail on the second result.
 static CondFailInst *isOverflowChecked(BuiltinInst *AI) {
   for (auto *Op : AI->getUses()) {
-    if (!match(Op->getUser(), m_TupleExtractInst(m_ValueBase(), 1)))
+    if (!match(Op->getUser(), m_TupleExtractOperation(m_ValueBase(), 1)))
       continue;
 
     TupleExtractInst *TEI = cast<TupleExtractInst>(Op->getUser());
@@ -474,11 +474,10 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
   // If we have an inclusive range "low...up" the loop exit count will be
   // "up + 1" but the overflow check is on "up".
   SILValue PreInclusiveEnd;
-  if (!match(
-          End,
-          m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                         m_SILValue(PreInclusiveEnd), m_One()),
-                             0)))
+  if (!match(End, m_TupleExtractOperation(
+                      m_ApplyInst(BuiltinValueKind::SAddOver,
+                                  m_SILValue(PreInclusiveEnd), m_One()),
+                      0)))
     PreInclusiveEnd = SILValue();
 
   bool IsPreInclusiveEndLEQ = false;
@@ -712,7 +711,7 @@ struct InductionInfo {
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
     auto *CmpSGE = Builder.createBuiltinBinaryFunction(
         Loc, "cmp_sge", Start->getType(), ResultTy, {Start, End});
-    Builder.createCondFail(Loc, CmpSGE);
+    Builder.createCondFail(Loc, CmpSGE, "loop induction variable overflowed");
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
@@ -811,11 +810,11 @@ private:
     // Look for a compare of induction variable + 1.
     // TODO: obviously we need to handle many more patterns.
     if (!match(Cond, m_ApplyInst(BuiltinValueKind::ICMP_EQ,
-                                 m_TupleExtractInst(m_Specific(Inc), 0),
+                                 m_TupleExtractOperation(m_Specific(Inc), 0),
                                  m_SILValue(End))) &&
         !match(Cond,
                m_ApplyInst(BuiltinValueKind::ICMP_EQ, m_SILValue(End),
-                           m_TupleExtractInst(m_Specific(Inc), 0)))) {
+                           m_TupleExtractOperation(m_Specific(Inc), 0)))) {
       LLVM_DEBUG(llvm::dbgs() << " found no exit condition\n");
       return nullptr;
     }
@@ -1075,7 +1074,7 @@ static bool isComparisonKnownFalse(BuiltinInst *Builtin,
   // Iteration count + 1 < 0 (start)
   // Iteration count + 1 == 0 (start)
   auto MatchIndVarHeader = m_Specific(IndVar.HeaderVal);
-  auto MatchIncrementIndVar = m_TupleExtractInst(
+  auto MatchIncrementIndVar = m_TupleExtractOperation(
       m_ApplyInst(BuiltinValueKind::SAddOver, MatchIndVarHeader, m_One()), 0);
   auto MatchIndVarStart = m_Specific(IndVar.Start);
 

@@ -1,7 +1,5 @@
 set(swift_stdlib_unittest_compile_flags)
 
-# TODO: support this on non-POSIX platforms.  It cannot be currently as it
-# depends on pthreads.
 add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -14,6 +12,7 @@ add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BU
   CheckRangeReplaceableSliceType.swift
   CheckSequenceInstance.swift
   CheckSequenceType.swift
+  COWLoggingArray.swift
   LoggingWrappers.swift
   MinimalCollections.swift
   RangeSelection.swift
@@ -22,9 +21,11 @@ add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BU
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
-  TARGET_SDKS ALL_POSIX_PLATFORMS
-  INSTALL_IN_COMPONENT stdlib-experimental)
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  INSTALL_IN_COMPONENT stdlib-experimental
+  DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
 

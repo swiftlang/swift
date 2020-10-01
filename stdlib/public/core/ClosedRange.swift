@@ -60,7 +60,7 @@
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-@_fixed_layout
+@frozen
 public struct ClosedRange<Bound: Comparable> {
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -126,15 +126,15 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
 }
 
-extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_frozen // FIXME(resilience)
+extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
+  @frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
   }
 }
 
-extension ClosedRange.Index : Comparable {
+extension ClosedRange.Index: Comparable {
   @inlinable
   public static func == (
     lhs: ClosedRange<Bound>.Index,
@@ -188,7 +188,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
 // FIXME: this should only be conformance to RandomAccessCollection but
 // the compiler balks without all 3
 extension ClosedRange: Collection, BidirectionalCollection, RandomAccessCollection
-where Bound : Strideable, Bound.Stride : SignedInteger
+where Bound: Strideable, Bound.Stride: SignedInteger
 {
   // while a ClosedRange can't be empty, a _slice_ of a ClosedRange can,
   // so ClosedRange can't be its own self-slice unlike Range
@@ -330,10 +330,12 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `minimum <= maximum`.
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+      minimum <= maximum, "Range requires lowerBound <= upperBound")
     return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
@@ -368,7 +370,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 }
 
-extension ClosedRange : CustomStringConvertible {
+extension ClosedRange: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation...
   public var description: String {
@@ -376,7 +378,7 @@ extension ClosedRange : CustomStringConvertible {
   }
 }
 
-extension ClosedRange : CustomDebugStringConvertible {
+extension ClosedRange: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
@@ -384,7 +386,7 @@ extension ClosedRange : CustomDebugStringConvertible {
   }
 }
 
-extension ClosedRange : CustomReflectable {
+extension ClosedRange: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -425,7 +427,7 @@ extension ClosedRange {
   }
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {  
+extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Creates an instance equivalent to the given `Range`.
   ///
   /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
@@ -444,7 +446,12 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
 extension ClosedRange {
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound) || other.contains(lowerBound)
+    // Disjoint iff the other range is completely before or after our range.
+    // Unlike a `Range`, a `ClosedRange` can *not* be empty, so no check for
+    // that case is needed here.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound < other.lowerBound
+    return !isDisjoint
   }
 
   @inlinable
@@ -456,7 +463,7 @@ extension ClosedRange {
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger
 
 extension ClosedRange: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {

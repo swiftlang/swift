@@ -123,7 +123,7 @@
                     "autorelease_value" "copy_value" "destroy_value"
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"
-                    "copy_unowned_value"
+                    "strong_copy_unowned_value" "strong_copy_unmanaged_value"
                     "destructure_struct" "destructure_tuple")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
@@ -150,6 +150,7 @@
                     "unchecked_ref_cast"
                     "unchecked_trivial_bit_cast"
                     "unchecked_bitwise_cast"
+                    "unchecked_value_cast"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "unowned_to_ref" "ref_to_unowned"
                     "convert_function" "convert_escape_to_noescape"
@@ -258,6 +259,7 @@
 ;; *NOTE* viewcfg must be in the $PATH and .dot files should be associated with
 ;; the graphviz app.
 (defvar sil-mode-viewcfg-program-name "viewcfg")
+(defvar sil-mode-viewcfg-renderer "dot")
 (defvar sil-mode-viewcfg-buffer-name "*viewcfg*")
 
 (defcustom sil-mode-viewcfg-command-default "viewcfg"
@@ -280,7 +282,8 @@
          (process-connection-type nil))
      (let ((p (start-process sil-mode-viewcfg-program-name
                              sil-mode-viewcfg-buffer-name
-                             sil-mode-viewcfg-command)))
+                             sil-mode-viewcfg-command
+                             (concat "--renderer=" sil-mode-viewcfg-renderer))))
        (process-send-region p brace-start brace-end)
        (process-send-eof p)))))
 

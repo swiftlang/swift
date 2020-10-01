@@ -183,7 +183,7 @@ public:
   /// Return an abstract measurement of the cost of this path.
   OperationCost cost() const {
     auto cost = OperationCost::Free;
-    for (const Component &component : Path)
+    for (const Component component : Path)
       cost += component.cost();
     return cost;
   }

@@ -28,7 +28,7 @@ internal protocol _SetBuffer {
 
 extension Set {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawSetStorage>
@@ -36,7 +36,7 @@ extension Set {
     @inlinable
     @inline(__always)
     init(dummy: ()) {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
       self.init(native: _NativeSet())
 #else
       self.object = _BridgeStorage(taggedPayload: 0)

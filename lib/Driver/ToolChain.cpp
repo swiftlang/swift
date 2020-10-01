@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
@@ -52,14 +53,39 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   SmallString<128> buffer;
   std::error_code EC = llvm::sys::fs::createTemporaryFile(name, suffix, buffer);
   if (EC) {
+    // Use the constructor that prints both the error code and the description.
     // FIXME: This should not take down the entire process.
-    llvm::report_fatal_error("unable to create temporary file for filelist");
+    auto error = llvm::make_error<llvm::StringError>(
+        EC,
+        "- unable to create temporary file for " + name + "." + suffix);
+    llvm::report_fatal_error(std::move(error));
   }
 
   C.addTemporaryFile(buffer.str(), PreserveOnSignal::Yes);
   // We can't just reference the data in the TemporaryFiles vector because
   // that could theoretically get copied to a new address.
   return C.getArgs().MakeArgString(buffer.str());
+}
+
+Optional<Job::ResponseFileInfo>
+ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
+                               const ToolChain::InvocationInfo &invocationInfo,
+                               const ToolChain::JobContext &context) const {
+  const bool forceResponseFiles =
+      C.getArgs().hasArg(options::OPT_driver_force_response_files);
+  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
+         "Cannot force response file if platform does not allow it");
+
+  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
+                             !llvm::sys::commandLineFitsWithinSystemLimits(
+                                 executablePath, invocationInfo.Arguments))) {
+    const char *responseFilePath =
+        context.getTemporaryFilePath("arguments", "resp");
+    const char *responseFileArg =
+        C.getArgs().MakeArgString(Twine("@") + responseFilePath);
+    return {{responseFilePath, responseFileArg}};
+  }
+  return None;
 }
 
 std::unique_ptr<Job> ToolChain::constructJob(
@@ -78,12 +104,14 @@ std::unique_ptr<Job> ToolChain::constructJob(
       CASE(BackendJob)
       CASE(MergeModuleJob)
       CASE(ModuleWrapJob)
-      CASE(LinkJob)
+      CASE(DynamicLinkJob)
+      CASE(StaticLinkJob)
       CASE(GenerateDSYMJob)
       CASE(VerifyDebugInfoJob)
       CASE(GeneratePCHJob)
       CASE(AutolinkExtractJob)
       CASE(REPLJob)
+      CASE(VerifyModuleInterfaceJob)
 #undef CASE
     case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
@@ -114,28 +142,16 @@ std::unique_ptr<Job> ToolChain::constructJob(
     }
   }
 
-  const char *responseFilePath = nullptr;
-  const char *responseFileArg = nullptr;
+  // Determine if the argument list is so long that it needs to be written into
+  // a response file.
+  auto responseFileInfo =
+      getResponseFileInfo(C, executablePath, invocationInfo, context);
 
-  const bool forceResponseFiles =
-      C.getArgs().hasArg(options::OPT_driver_force_response_files);
-  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
-         "Cannot force response file if platform does not allow it");
-
-  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
-                             !llvm::sys::commandLineFitsWithinSystemLimits(
-                                 executablePath, invocationInfo.Arguments))) {
-    responseFilePath = context.getTemporaryFilePath("arguments", "resp");
-    responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
-  }
-
-  return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
-                                executablePath,
-                                std::move(invocationInfo.Arguments),
-                                std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfos),
-                                responseFilePath,
-                                responseFileArg);
+  return std::make_unique<Job>(
+      JA, std::move(inputs), std::move(output), executablePath,
+      std::move(invocationInfo.Arguments),
+      std::move(invocationInfo.ExtraEnvironment),
+      std::move(invocationInfo.FilelistInfos), responseFileInfo);
 }
 
 std::string
@@ -162,26 +178,6 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
 
 file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return file_types::lookupTypeForExtension(Ext);
-}
-
-/// Return a _single_ TY_Swift InputAction, if one exists;
-/// if 0 or >1 such inputs exist, return nullptr.
-static const InputAction *findSingleSwiftInput(const CompileJobAction *CJA) {
-  auto Inputs = CJA->getInputs();
-  const InputAction *IA = nullptr;
-  for (auto const *I : Inputs) {
-    if (auto const *S = dyn_cast<InputAction>(I)) {
-      if (S->getType() == file_types::TY_Swift) {
-        if (IA == nullptr) {
-          IA = S;
-        } else {
-          // Already found one, two is too many.
-          return nullptr;
-        }
-      }
-    }
-  }
-  return IA;
 }
 
 static bool jobsHaveSameExecutableNames(const Job *A, const Job *B) {
@@ -224,7 +220,12 @@ bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   auto const *CJActA = dyn_cast<const CompileJobAction>(&A->getSource());
   if (!CJActA)
     return false;
-  return findSingleSwiftInput(CJActA) != nullptr;
+  // When having only one job output a dependency file, that job is not
+  // batchable since it has an oddball set of additional output types.
+  if (C.OnlyOneDependencyFile &&
+      A->getOutput().hasAdditionalOutputForType(file_types::TY_Dependencies))
+    return false;
+  return CJActA->findSingleSwiftInput() != nullptr;
 }
 
 bool ToolChain::jobsAreBatchCombinable(const Compilation &C, const Job *A,
@@ -241,7 +242,7 @@ static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
                        file_types::ID outputType) {
   auto output =
-      llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
+      std::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {
     output->addOutputs(J->getOutput());
   }
@@ -286,33 +287,6 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
-/// Unfortunately the success or failure of a Swift compilation is currently
-/// sensitive to the order in which files are processed, at least in terms of
-/// the order of processing extensions (and likely other ways we haven't
-/// discovered yet). So long as this is true, we need to make sure any batch job
-/// we build names its inputs in an order that's a subsequence of the sequence
-/// of inputs the driver was initially invoked with.
-static void
-sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
-                                 SmallVectorImpl<const Job *> &sortedJobs,
-                                 Compilation &C) {
-  llvm::DenseMap<StringRef, const Job *> jobsByInput;
-  for (const Job *J : unsortedJobs) {
-    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction *IA = findSingleSwiftInput(CJA);
-    auto R =
-        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-    assert(R.second);
-    (void)R;
-  }
-  for (const InputPair &P : C.getInputFiles()) {
-    auto I = jobsByInput.find(P.second->getValue());
-    if (I != jobsByInput.end()) {
-      sortedJobs.push_back(I->second);
-    }
-  }
-}
-
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.
@@ -324,7 +298,7 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
     return nullptr;
 
   llvm::SmallVector<const Job *, 16> sortedJobs;
-  sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs, C);
+  C.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.
@@ -345,10 +319,12 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
                      *output, OI};
   auto invocationInfo = constructInvocation(*batchCJA, context);
   // Batch mode can produce quite long command lines; in almost every case these
-  // will trigger use of supplementary output file maps, but in some rare corner
-  // cases (very few files, very long paths) they might not. However, in those
-  // cases we _should_ degrade to using response files to pass arguments to the
-  // frontend, which is done automatically by code elsewhere.
+  // will trigger use of supplementary output file maps. However, if the driver
+  // command line is long for reasons unrelated to the number of input files,
+  // such as passing a large number of flags, then the individual batch jobs are
+  // also likely to overflow. We have to check for that explicitly here, because
+  // the BatchJob created here does not go through the same code path in
+  // constructJob above.
   //
   // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
   // only to model external tools that don't know about response files, such as
@@ -356,9 +332,35 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   // should always be true. But double check with an assert here in case someone
   // failed to set it in `constructInvocation`.
   assert(invocationInfo.allowsResponseFiles);
-  return llvm::make_unique<BatchJob>(
+  auto responseFileInfo =
+      getResponseFileInfo(C, executablePath, invocationInfo, context);
+
+  return std::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
-      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID);
+      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID,
+      responseFileInfo);
+}
+
+llvm::Expected<file_types::ID>
+ToolChain::remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const {
+  const Arg *A = Args.getLastArg(options::OPT_save_optimization_record_EQ);
+  if (!A)
+    return file_types::TY_YAMLOptRecord;
+
+  llvm::Expected<llvm::remarks::Format> FormatOrErr =
+      llvm::remarks::parseFormat(A->getValue());
+  if (llvm::Error E = FormatOrErr.takeError())
+    return std::move(E);
+
+  switch (*FormatOrErr) {
+  case llvm::remarks::Format::YAML:
+    return file_types::TY_YAMLOptRecord;
+  case llvm::remarks::Format::Bitstream:
+    return file_types::TY_BitstreamOptRecord;
+  default:
+    return llvm::createStringError(std::errc::invalid_argument,
+                                   "Unknown remark format.");
+  }
 }

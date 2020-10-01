@@ -1,10 +1,13 @@
 add_swift_host_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
+  CodeCompletionResultPrinter.cpp
   CommentConversion.cpp
+  CompletionInstance.cpp
   ConformingMethodList.cpp
   ExprContextAnalysis.cpp
   Formatting.cpp
+  FuzzyStringMatcher.cpp
   Refactoring.cpp
   ModuleInterfacePrinting.cpp
   REPLCodeCompletion.cpp
@@ -14,11 +17,12 @@ add_swift_host_library(swiftIDE STATIC
   IDETypeChecking.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
-  TypeContextInfo.cpp)
+  TypeContextInfo.cpp
+  IDERequests.cpp)
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
-  swiftDWARFImporter
+  swiftDriver
   swiftFrontend
   swiftIndex
   swiftParse

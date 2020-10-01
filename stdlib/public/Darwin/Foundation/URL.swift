@@ -528,7 +528,7 @@ public struct URLResourceValues {
 */
 public struct URL : ReferenceConvertible, Equatable {
     public typealias ReferenceType = NSURL
-    fileprivate var _url : NSURL
+    private var _url: NSURL
     
     public typealias BookmarkResolutionOptions = NSURL.BookmarkResolutionOptions
     public typealias BookmarkCreationOptions = NSURL.BookmarkCreationOptions
@@ -586,7 +586,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// If the data representation is not a legal URL string as ASCII bytes, the URL object may not behave as expected. If the URL cannot be formed then this will return nil.
     @available(macOS 10.11, iOS 9.0, *)
     public init?(dataRepresentation: __shared Data, relativeTo url: __shared URL?, isAbsolute: Bool = false) {
-        guard dataRepresentation.count > 0 else { return nil }
+        guard !dataRepresentation.isEmpty else { return nil }
         
         if isAbsolute {
             _url = URL._converted(from: NSURL(absoluteURLWithDataRepresentation: dataRepresentation, relativeTo: url))
@@ -621,11 +621,11 @@ public struct URL : ReferenceConvertible, Equatable {
     public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
-    
-    public var hashValue: Int {
-        return _url.hash
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_url)
     }
-    
+
     // MARK: -
     
     /// Returns the data representation of the URL's relativeString. 
@@ -1090,7 +1090,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Returns bookmark data for the URL, created with specified options and resource values.
     public func bookmarkData(options: BookmarkCreationOptions = [], includingResourceValuesForKeys keys: Set<URLResourceKey>? = nil, relativeTo url: URL? = nil) throws -> Data {
         let result = try _url.bookmarkData(options: options, includingResourceValuesForKeys: keys.flatMap { Array($0) }, relativeTo: url)
-        return result as Data
+        return result
     }
     
     /// Returns the resource values for properties identified by a specified array of keys contained in specified bookmark data. If the result dictionary does not contain a resource value for one or more of the requested resource keys, it means those resource properties are not available in the bookmark data.
@@ -1107,7 +1107,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Initializes and returns bookmark data derived from an alias file pointed to by a specified URL. If bookmarkFileURL refers to an alias file created prior to OS X v10.6 that contains Alias Manager information but no bookmark data, this method synthesizes bookmark data for the file.
     public static func bookmarkData(withContentsOf url: URL) throws -> Data {
         let result = try NSURL.bookmarkData(withContentsOf: url)
-        return result as Data
+        return result
     }
     
     /// Given an NSURL created by resolving a bookmark data created with security scope, make the resource referenced by the url accessible to the process. When access to this resource is no longer needed the client must call stopAccessingSecurityScopedResource. Each call to startAccessingSecurityScopedResource must be balanced with a call to stopAccessingSecurityScopedResource (Note: this is not reference counted).
@@ -1135,11 +1135,11 @@ public struct URL : ReferenceConvertible, Equatable {
         }
     }
     
-    fileprivate init(reference: __shared NSURL) {
+    private init(reference: __shared NSURL) {
         _url = URL._converted(from: reference).copy() as! NSURL
     }
     
-    private var reference : NSURL {
+    private var reference: NSURL {
         return _url
     }
 

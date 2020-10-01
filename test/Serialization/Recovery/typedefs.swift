@@ -1,4 +1,7 @@
 // RUN: %empty-directory(%t)
+
+// Cannot use -parse-as-library here because that would compile also the
+// #if VERIFY path, which contains top-level code.
 // RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
@@ -10,8 +13,8 @@
 // RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -DVERIFY %s -verify
 // RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-SIL %s
 
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck --check-prefixes=CHECK-IR,CHECK-IR-%target-runtime %s
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck --check-prefixes=CHECK-IR,CHECK-IR-%target-runtime %s
 
 // RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD %S/Inputs/typedefs-helper.swift -verify
 
@@ -23,9 +26,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden [ossa] @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
+  // CHECK-SIL: global_addr @$s3Lib9usesAssocs5Int32VSgvp
   _ = Lib.x
-  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: global_addr @$s3Lib1xs5Int32Vvp
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
@@ -35,8 +38,9 @@ public func testVTableBuilding(user: User) {
   // for the vtable slot for 'lastMethod()'. If the layout here
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
-  _ = user.lastMethod()
+  // CHECK-IR-objc: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
+  // CHECK-IR-native: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 25|i32 28}}
+  user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY
@@ -48,16 +52,16 @@ let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert va
 let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
 let _: Int32? = useAssoc(AnotherType.self)
 
-let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
+let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}
 let _ = unwrapped // okay
 
-_ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
+_ = usesWrapped(nil) // expected-error {{cannot find 'usesWrapped' in scope}}
 _ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
-let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
+let _: WrappedAlias = nil // expected-error {{cannot find type 'WrappedAlias' in scope}}
 let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
 
-let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
+let _: ConstrainedWrapped<Int> = nil // expected-error {{cannot find type 'ConstrainedWrapped' in scope}}
 let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
 
 func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {
@@ -100,31 +104,29 @@ open class User {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK_RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) (field offsets: 1) */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
   public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
   // CHECK: func returnsWrappedMethod() -> WrappedInt
-  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
+  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
   // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == UnwrappedInt
   // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
   // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt
-  // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) */
+  // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) (vtable entries: 1) */
   public func constrainedWrapped<T: HasAssoc>(_: T) where T.Assoc == WrappedInt { fatalError() }
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript(_: WrappedInt) -> () { return () }
 
   // CHECK: subscript<T>(_: T) -> () where T : HasAssoc, T.Assoc == WrappedInt { get }
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript<T: HasAssoc>(_: T) -> () where T.Assoc == WrappedInt { return () }
 
   // CHECK: init()
@@ -132,7 +134,7 @@ open class User {
   public init() {}
 
   // CHECK: init(wrapped: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) (vtable entries: 1) */
   public init(wrapped: WrappedInt) {}
 
   // CHECK: convenience init(conveniently: Int)
@@ -144,11 +146,11 @@ open class User {
   public convenience init<T: HasAssoc>(generic: T) where T.Assoc == WrappedInt { self.init() }
 
   // CHECK: required init(wrappedRequired: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) (vtable entries: 1) */
   public required init(wrappedRequired: WrappedInt) {}
 
   // CHECK: {{^}} init(wrappedRequiredInSub: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) (vtable entries: 1) */
   public init(wrappedRequiredInSub: WrappedInt) {}
 
   // CHECK: dynamic init(wrappedDynamic: WrappedInt)
@@ -168,23 +170,23 @@ open class User {
 // above.
 // CHECK-VTABLE-LABEL: sil_vtable [serialized] User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
-// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
-// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
-// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
-// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
-// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
-// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
-// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:
-// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped!1:
-// 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 23 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 24 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 25 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 26 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter:
+// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify:
+// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter:
+// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify:
+// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod:
+// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod:
+// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped:
+// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped:
+// 20 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 21 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 23 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 24 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 25 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 26 CHECK-VTABLE-NEXT: #User.lastMethod:
 // CHECK-VTABLE: }
 
 
@@ -247,15 +249,15 @@ open class UserDynamicConvenience {
 // CHECK-RECOVERY-LABEL: class UserSub
 open class UserSub : User {
   // CHECK: init(wrapped: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) (vtable entries: 1) */
   public override init(wrapped: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequired: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) (vtable entries: 1) */
   public required init(wrappedRequired: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequiredInSub: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) (vtable entries: 1) */
   public required override init(wrappedRequiredInSub: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequiredDynamic: WrappedInt)

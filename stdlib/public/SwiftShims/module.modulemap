@@ -6,6 +6,7 @@ module SwiftShims {
   header "HeapObject.h"
   header "KeyPath.h"
   header "LibcShims.h"
+  header "MetadataSections.h"
   header "Random.h"
   header "RefCount.h"
   header "RuntimeShims.h"
@@ -48,6 +49,10 @@ module _SwiftSafariServicesOverlayShims {
   header "SafariServicesOverlayShims.h"
 }
 
+module _SwiftAppKitOverlayShims {
+  header "AppKitOverlayShims.h"
+}
+
 module _SwiftUIKitOverlayShims {
   header "UIKitOverlayShims.h"
 }
@@ -70,4 +75,16 @@ module _SwiftFoundationOverlayShims {
 
 module _SwiftNetworkOverlayShims {
   header "NetworkOverlayShims.h"
+}
+
+module _SwiftClockKitOverlayShims {
+    header "ClockKitOverlayShims.h"
+}
+
+module _SwiftCoreMediaOverlayShims {
+  header "CoreMediaOverlayShims.h"
+}
+
+module _SwiftConcurrencyShims {
+  header "_SwiftConcurrency.h"
 }

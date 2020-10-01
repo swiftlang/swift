@@ -17,22 +17,37 @@
 #ifndef TYPECHECKACCESS_H
 #define TYPECHECKACCESS_H
 
+#include <cstdint>
+
 namespace swift {
 
 class Decl;
-class TypeChecker;
+class SourceFile;
 
-/// Checks the given declaration's signature does not reference any other
-/// declarations that are less visible than the declaration itself.
+/// Performs access-related checks for \p D.
 ///
-/// \p D must be a ValueDecl or a Decl that can appear in a type context.
-void checkAccessControl(TypeChecker &TC, Decl *D);
+/// At a high level, this checks the given declaration's signature does not
+/// reference any other declarations that are less visible than the declaration
+/// itself. Related checks may also be performed.
+void checkAccessControl(Decl *D);
 
-/// Checks that the generic parameters of the given extension do not reference
-/// any other declarations that are less visible than the user-specified access
-/// on the extension.
-void checkExtensionGenericParamAccess(TypeChecker &TC, const ExtensionDecl *ED,
-                                      AccessLevel userSpecifiedAccess);
+// Problematic origin of an exported type.
+//
+// This enum must be kept in sync with
+// diag::decl_from_hidden_module and
+// diag::conformance_from_implementation_only_module.
+enum class DisallowedOriginKind : uint8_t {
+  ImplementationOnly,
+  SPIImported,
+  SPILocal,
+  None
+};
+
+/// Returns the kind of origin, implementation-only import or SPI declaration,
+/// that restricts exporting \p decl from the given file and context.
+DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
+                                             const SourceFile &userSF,
+                                             const Decl *userContext);
 
 } // end namespace swift
 

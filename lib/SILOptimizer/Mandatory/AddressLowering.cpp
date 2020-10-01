@@ -96,7 +96,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -247,7 +247,7 @@ struct AddressLoweringState {
   AddressLoweringState(SILFunction *F, DominanceInfo *domInfo)
       : F(F),
         loweredFnConv(F->getLoweredFunctionType(),
-                      SILModuleConventions::getLoweredAddressConventions()),
+            SILModuleConventions::getLoweredAddressConventions(F->getModule())),
         domInfo(domInfo) {}
 
   bool isDead(SILInstruction *inst) const { return instsToDelete.count(inst); }
@@ -346,7 +346,7 @@ void OpaqueValueVisitor::visitApply(ApplySite applySite) {
 /// If `value` is address-only add it to the `valueStorageMap`.
 void OpaqueValueVisitor::visitValue(SILValue value) {
   if (value->getType().isObject()
-      && value->getType().isAddressOnly(pass.F->getModule())) {
+      && value->getType().isAddressOnly(*pass.F)) {
     if (pass.valueStorageMap.contains(value)) {
       assert(isa<SILFunctionArgument>(
           pass.valueStorageMap.getStorage(value).storageAddress));
@@ -388,15 +388,6 @@ protected:
 
 /// Top-level entry point: allocate storage for all opaque/resilient values.
 void OpaqueStorageAllocation::allocateOpaqueStorage() {
-  // TODO: I think we need a GenericContextScope for mapTypeIntoContext, but all
-  // tests are currently passing without it.
-#if 0
-  auto canFnType = pass.F->getLoweredFunctionType();
-
-  // Setup a generic context for argument and result types.
-  swift::Lowering::GenericContextScope scope(pass.F->getModule().Types,
-                                             canFnType->getGenericSignature());
-#endif
   // Fixup this function's argument types with temporary loads.
   convertIndirectFunctionArgs();
 
@@ -408,7 +399,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
 
   // Create an AllocStack for every opaque value defined in the function.  Visit
   // values in post-order to create storage for aggregates before subobjects.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap))
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap))
     allocateForValue(valueStorageI.first, valueStorageI.second);
 }
 
@@ -418,7 +409,7 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
   // Insert temporary argument loads at the top of the function.
   SILBuilder argBuilder(pass.F->getEntryBlock()->begin());
   argBuilder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions());
+       SILModuleConventions::getLoweredAddressConventions(pass.F->getModule()));
 
   auto fnConv = pass.F->getConventions();
   unsigned argIdx = fnConv.getSILArgIndexOfFirstParam();
@@ -438,12 +429,11 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
       assert(!pass.valueStorageMap.contains(arg));
 
       arg = arg->getParent()->replaceFunctionArgument(
-          arg->getIndex(), addrType, ValueOwnershipKind::Any,
-          arg->getDecl());
+          arg->getIndex(), addrType, ValueOwnershipKind::None, arg->getDecl());
 
       loadArg->setOperand(arg);
 
-      if (addrType.isAddressOnly(pass.F->getModule()))
+      if (addrType.isAddressOnly(*pass.F))
         pass.valueStorageMap.insertValue(loadArg).storageAddress = arg;
     }
     ++argIdx;
@@ -457,17 +447,18 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   auto &ctx = pass.F->getModule().getASTContext();
   unsigned argIdx = 0;
-  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes()) {
+  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(
+           pass.F->getTypeExpansionContext())) {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
-        ParamDecl(VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
+        ParamDecl(SourceLoc(), SourceLoc(),
                   ctx.getIdentifier("$return_value"), SourceLoc(),
                   ctx.getIdentifier("$return_value"),
                   pass.F->getDeclContext());
+    var->setSpecifier(ParamSpecifier::InOut);
 
-    pass.F->begin()->insertFunctionArgument(argIdx,
-                                            bodyResultTy.getAddressType(),
-                                            ValueOwnershipKind::Any, var);
+    pass.F->begin()->insertFunctionArgument(
+        argIdx, bodyResultTy.getAddressType(), ValueOwnershipKind::None, var);
     ++argIdx;
   }
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults());
@@ -570,7 +561,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
   allocBuilder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions());
+       SILModuleConventions::getLoweredAddressConventions(pass.F->getModule()));
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -580,7 +571,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   for (TermInst *termInst : pass.returnInsts) {
     SILBuilder deallocBuilder(termInst);
     deallocBuilder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions());
+       SILModuleConventions::getLoweredAddressConventions(pass.F->getModule()));
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 }
@@ -619,7 +610,7 @@ protected:
 SILValue AddressMaterialization::initializeOperandMem(Operand *operand) {
   SILValue def = operand->get();
   SILValue destAddr;
-  if (operand->get()->getType().isAddressOnly(pass.F->getModule())) {
+  if (operand->get()->getType().isAddressOnly(*pass.F)) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
     // Source value should already be rewritten.
     assert(storage.isRewritten());
@@ -719,7 +710,7 @@ public:
   ApplyRewriter(ApplySite origCall, AddressLoweringState &pass)
       : pass(pass), apply(origCall), argBuilder(origCall.getInstruction()) {
     argBuilder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions());
+      SILModuleConventions::getLoweredAddressConventions(origCall.getModule()));
   }
 
   void rewriteParameters();
@@ -764,7 +755,7 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
   case SILInstructionKind::ApplyInst: {
     SILBuilder deallocBuilder(&*std::next(lastUse->getIterator()));
     deallocBuilder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions());
+      SILModuleConventions::getLoweredAddressConventions(applyInst->getModule()));
     deallocBuilder.createDeallocStack(allocInst->getLoc(), allocInst);
     break;
   }
@@ -789,7 +780,7 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
 void ApplyRewriter::rewriteIndirectParameter(Operand *operand) {
   SILValue argValue = operand->get();
 
-  if (argValue->getType().isAddressOnly(pass.F->getModule())) {
+  if (argValue->getType().isAddressOnly(*pass.F)) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(argValue);
     // Source value should already be rewritten.
     assert(storage.isRewritten());
@@ -834,13 +825,13 @@ void ApplyRewriter::canonicalizeResults(
       if (!result) {
         SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(applyInst)));
         resultBuilder.setSILConventions(
-            SILModuleConventions::getLoweredAddressConventions());
+            SILModuleConventions::getLoweredAddressConventions(applyInst->getModule()));
         result = resultBuilder.createTupleExtract(applyInst->getLoc(),
                                                   applyInst, resultIdx);
         directResultValues[resultIdx] = result;
       }
       SILBuilder B(destroyInst);
-      B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+      B.setSILConventions(SILModuleConventions::getLoweredAddressConventions(applyInst->getModule()));
       auto &TL = pass.F->getTypeLowering(result->getType());
       TL.emitDestroyValue(B, destroyInst->getLoc(), result);
     }
@@ -857,7 +848,7 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(
     SingleValueInstruction *origDirectResultVal, SILType argTy) {
 
   if (origDirectResultVal
-      && origDirectResultVal->getType().isAddressOnly(pass.F->getModule())) {
+      && origDirectResultVal->getType().isAddressOnly(*pass.F)) {
     auto &storage = pass.valueStorageMap.getStorage(origDirectResultVal);
     storage.markRewritten();
     // Pass the local storage address as the indirect result address.
@@ -873,7 +864,7 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(
     // Build results outside-in to next stack allocations.
     SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(origCallInst)));
     resultBuilder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions());
+        SILModuleConventions::getLoweredAddressConventions(origCallInst->getModule()));
     // This is a formally indirect argument, but is loadable.
     loadInst = resultBuilder.createLoad(loc, allocInst,
                                         LoadOwnershipQualifier::Unqualified);
@@ -900,7 +891,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   if (origCallInst->getType().is<TupleType>()) {
     for (Operand *operand : origCallInst->getUses()) {
       if (auto *extract = dyn_cast<TupleExtractInst>(operand->getUser()))
-        origDirectResultValues[extract->getFieldNo()] = extract;
+        origDirectResultValues[extract->getFieldIndex()] = extract;
       else
         nonCanonicalUses.push_back(operand);
     }
@@ -922,12 +913,12 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   SILLocation loc = origCallInst->getLoc();
   SILBuilder callBuilder(origCallInst);
   callBuilder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions());
+      SILModuleConventions::getLoweredAddressConventions(origCallInst->getModule()));
 
   // The new call instruction's SIL calling convention.
   SILFunctionConventions loweredCalleeConv(
       apply.getSubstCalleeType(),
-      SILModuleConventions::getLoweredAddressConventions());
+      SILModuleConventions::getLoweredAddressConventions(origCallInst->getModule()));
 
   // The new call instruction's SIL argument list.
   SmallVector<SILValue, 8> newCallArgs(loweredCalleeConv.getNumSILArguments());
@@ -954,7 +945,9 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
 
       if (loweredCalleeConv.isSILIndirect(resultInfo)) {
         SILValue indirectResultAddr = materializeIndirectResultAddress(
-            origDirectResultVal, loweredCalleeConv.getSILType(resultInfo));
+            origDirectResultVal,
+            loweredCalleeConv.getSILType(
+                resultInfo, callBuilder.getTypeExpansionContext()));
         // Record the new indirect call argument.
         newCallArgs[newResultArgIdx++] = indirectResultAddr;
         // Leave a placeholder for indirect results.
@@ -982,7 +975,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-        cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
+        cast<ApplyInst>(origCallInst)->isNonThrowing());
     break;
   case SILInstructionKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
@@ -999,7 +992,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   SILBuilder resultBuilder(
     std::next(SILBasicBlock::iterator(origCallInst)));
   resultBuilder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions());
+        SILModuleConventions::getLoweredAddressConventions(apply.getModule()));
 
   SmallVector<Operand*, 8> origUses(origCallInst->getUses());
   for (Operand *operand : origUses) {
@@ -1009,10 +1002,10 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
       assert(pass.valueStorageMap.contains(origCallInst));
       continue;
     }
-    unsigned origResultIdx = extractInst->getFieldNo();
+    unsigned origResultIdx = extractInst->getFieldIndex();
     auto resultInfo = origFnConv.getResults()[origResultIdx];
 
-    if (extractInst->getType().isAddressOnly(pass.F->getModule())) {
+    if (extractInst->getType().isAddressOnly(*pass.F)) {
       // Uses of indirect results will be rewritten by AddressOnlyUseRewriter.
       assert(loweredCalleeConv.isSILIndirect(resultInfo));
       assert(pass.valueStorageMap.contains(extractInst));
@@ -1074,7 +1067,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
       break;
   }
   SILBuilder B(insertPt);
-  B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+  B.setSILConventions(
+    SILModuleConventions::getLoweredAddressConventions(returnInst->getModule()));
 
   // Gather direct function results.
   unsigned numOrigDirectResults =
@@ -1109,7 +1103,7 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
           SILArgument *resultArg = B.getFunction().getArgument(newResultArgIdx);
           SILType resultTy = origDirectResultVal->getType();
-          if (resultTy.isAddressOnly(pass.F->getModule())) {
+          if (resultTy.isAddressOnly(*pass.F)) {
             ValueStorage &storage =
                 pass.valueStorageMap.getStorage(origDirectResultVal);
             assert(storage.isRewritten());
@@ -1140,9 +1134,10 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   } else if (newDirectResults.size() == 1) {
     newReturnVal = newDirectResults[0];
   } else {
-    newReturnVal =
-        B.createTuple(returnInst->getLoc(),
-                      pass.loweredFnConv.getSILResultType(), newDirectResults);
+    newReturnVal = B.createTuple(
+        returnInst->getLoc(),
+        pass.loweredFnConv.getSILResultType(B.getTypeExpansionContext()),
+        newDirectResults);
   }
   SILValue origFullResult = returnInst->getOperand();
   returnInst->setOperand(newReturnVal);
@@ -1172,7 +1167,8 @@ class AddressOnlyUseRewriter
 public:
   explicit AddressOnlyUseRewriter(AddressLoweringState &pass)
       : pass(pass), B(*pass.F), addrMat(pass, B) {
-    B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+    B.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions(pass.F->getModule()));
   }
 
   void visitOperand(Operand *operand) {
@@ -1311,7 +1307,8 @@ class AddressOnlyDefRewriter
 public:
   explicit AddressOnlyDefRewriter(AddressLoweringState &pass)
       : pass(pass), B(*pass.F), addrMat(pass, B) {
-    B.setSILConventions(SILModuleConventions::getLoweredAddressConventions());
+    B.setSILConventions(
+       SILModuleConventions::getLoweredAddressConventions(pass.F->getModule()));
   }
 
   void visitInst(SILInstruction *inst) { visit(inst); }
@@ -1402,7 +1399,7 @@ protected:
     unsigned eltIdx = 0;
     for (Operand &operand : tupleInst->getAllOperands()) {
       SILType eltTy = operand.get()->getType();
-      if (eltTy.isAddressOnly(pass.F->getModule()))
+      if (eltTy.isAddressOnly(*pass.F))
         addrMat.initializeOperandMem(&operand);
       else {
         auto *elementAddr = B.createTupleElementAddr(
@@ -1453,7 +1450,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (apply.getSubstCalleeType()->hasIndirectFormalResults()) {
       bool isRewritten = false;
       visitCallResults(apply, [&](SILValue result) {
-        if (result->getType().isAddressOnly(pass.F->getModule())) {
+        if (result->getType().isAddressOnly(*pass.F)) {
           assert(pass.valueStorageMap.getStorage(result).isRewritten());
           isRewritten = true;
           return false;
@@ -1507,7 +1504,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   //
   // Add the rest of the instructions to the dead list in post order.
   // FIXME: make sure we cleaned up address-only BB arguments.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap)) {
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap)) {
     // TODO: MultiValueInstruction: ApplyInst
     auto *deadInst = dyn_cast<SingleValueInstruction>(valueStorageI.first);
     if (!deadInst)

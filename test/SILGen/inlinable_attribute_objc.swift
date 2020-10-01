@@ -28,21 +28,6 @@ public class Horse : NSObject {
 // However, make sure we can reference dynamic thunks and curry thunks
 // from inlinable scopes
 
-// CHECK-LABEL: sil [serialized] [ossa] @$s24inlinable_attribute_objc15talkAboutAHorse1hyAA5HorseC_tF : $@convention(thin) (@guaranteed Horse) -> () {
-// CHECK: function_ref @$s24inlinable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@guaranteed Horse) -> @owned @callee_guaranteed () -> ()
-// CHECK: return
-// CHECK: }
-
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@guaranteed Horse) -> @owned @callee_guaranteed () -> ()
-// CHECK:   %1 = function_ref @$s24inlinable_attribute_objc5HorseC6gallopyyFTD
-// CHECK: return
-// CHECK: }
-
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s24inlinable_attribute_objc5HorseC6gallopyyFTD : $@convention(method) (@guaranteed Horse) -> ()
-// CHECK: objc_method
-// CHECK: return
-// CHECK: }
-
 @inlinable public func talkAboutAHorse(h: Horse) {
   _ = h.gallop
 }

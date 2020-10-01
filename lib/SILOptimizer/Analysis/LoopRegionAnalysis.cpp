@@ -45,8 +45,8 @@ LoopRegion::FunctionTy *LoopRegion::getFunction() const {
   return Ptr.get<FunctionTy *>();
 }
 
-void LoopRegion::dump() const {
-  print(llvm::outs());
+void LoopRegion::dump(bool isVerbose) const {
+  print(llvm::outs(), false, isVerbose);
   llvm::outs() << "\n";
 }
 
@@ -69,7 +69,8 @@ void LoopRegion::printName(llvm::raw_ostream &os) const {
   return;
 }
 
-void LoopRegion::print(llvm::raw_ostream &os, bool isShort) const {
+void LoopRegion::print(llvm::raw_ostream &os, bool isShort,
+                       bool isVerbose) const {
   os << "(region id:" << ID;
   if (isShort) {
     os << ")";
@@ -88,6 +89,20 @@ void LoopRegion::print(llvm::raw_ostream &os, bool isShort) const {
 
   os << " ucfh:" << (IsUnknownControlFlowEdgeHead? "true " : "false")
      << " ucft:" << (IsUnknownControlFlowEdgeTail? "true " : "false");
+
+  if (!isVerbose) {
+    return;
+  }
+  os << "\n";
+  if (isBlock()) {
+    getBlock()->dump();
+  } else if (isLoop()) {
+    getLoop()->dump();
+  } else if (isFunction()) {
+    getFunction()->dump();
+  } else {
+    llvm_unreachable("Unknown region type");
+  }
 }
 
 llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, LoopRegion &LR) {
@@ -355,9 +370,9 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
   // Initialize regions for each BB and associate RPO numbers with each BB.
   //
   // We use the RPO number of a BB as its Index in our data structures.
-  for (auto P : PI->getEnumeratedReversePostOrder()) {
-    BlockTy *BB = P.first;
-    unsigned RPOIndex = P.second;
+  for (auto P : llvm::enumerate(PI->getReversePostOrder())) {
+    BlockTy *BB = P.value();
+    unsigned RPOIndex = P.index();
     auto *BBRegion = createRegion(BB, RPOIndex);
     assert(BBRegion && "Create region fail to create a BB?");
     assert(*PI->getRPONumber(BB) == RPOIndex &&

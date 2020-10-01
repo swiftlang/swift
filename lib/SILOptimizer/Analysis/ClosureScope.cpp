@@ -82,7 +82,10 @@ public:
   void recordScope(PartialApplyInst *PAI) {
     // Only track scopes of non-escaping closures.
     auto closureTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
-    if (!isNonEscapingClosure(closureTy))
+    // FIXME: isCalleeDynamicallyReplaceable should not be true but can today
+    // because local functions can be marked dynamic.
+    if (!isNonEscapingClosure(closureTy) ||
+        PAI->isCalleeDynamicallyReplaceable())
       return;
 
     auto closureFunc = PAI->getCalleeFunction();
@@ -156,7 +159,7 @@ void ClosureScopeAnalysis::notifyWillDeleteFunction(SILFunction *F) {
 
 ClosureScopeData *ClosureScopeAnalysis::getOrComputeScopeData() {
   if (!scopeData) {
-    scopeData = llvm::make_unique<ClosureScopeData>();
+    scopeData = std::make_unique<ClosureScopeData>();
     scopeData->compute(M);
   }
   return scopeData.get();

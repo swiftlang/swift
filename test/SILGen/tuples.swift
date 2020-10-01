@@ -128,7 +128,7 @@ func testTupleUnsplat() {
   let x = 1, y = 2
 
   // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
+  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt, [[TUPLE]]
   _ = GenericEnum<(Int, Int)>.one((x, y))
 
   // CHECK: [[THUNK:%.+]] = function_ref @$sSi_SitIegn_S2iIegyy_TR
@@ -198,7 +198,7 @@ public func testTupleAssign(x: inout [Int]) {
 // CHECK:     [[Y_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 0
 // CHECK:     [[Z_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 1
 // CHECK:     [[X_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 2
-// CHECK:     [[NEW_Y:%.*]] = enum $Optional<Int>, #Optional.some!enumelt.1, %14 : $Int
+// CHECK:     [[NEW_Y:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, %14 : $Int
 // CHECK:     store [[NEW_Y]] to [trivial] [[Y_ADDR]] : $*Optional<Int>
 // CHECK:     [[NEW_Z:%.*]] = init_existential_addr [[Z_ADDR]] : $*Any, $String
 // CHECK:     store [[Z]] to [init] [[NEW_Z]] : $*String

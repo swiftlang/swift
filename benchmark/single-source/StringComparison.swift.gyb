@@ -80,7 +80,7 @@ public let StringNormalization: [BenchmarkInfo] = [
 ]
 
 % for Name in AllWorkloads:
-var Workload_${Name}: Workload! = Workload.${Name}
+let Workload_${Name}: Workload! = Workload.${Name}
 
 % end # AllWorkloads
 

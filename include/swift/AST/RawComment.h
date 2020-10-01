@@ -78,6 +78,20 @@ struct CommentInfo {
   uint32_t SourceOrder;
 };
 
+struct LineColumn {
+  uint32_t Line = 0;
+  uint32_t Column = 0;
+  bool isValid() const { return Line && Column; }
+};
+
+struct BasicDeclLocs {
+  StringRef SourceFilePath;
+  SmallVector<std::pair<LineColumn, uint32_t>, 4> DocRanges;
+  LineColumn Loc;
+  LineColumn StartLoc;
+  LineColumn EndLoc;
+};
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_RAW_COMMENT_H

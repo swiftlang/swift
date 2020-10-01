@@ -4,9 +4,9 @@ struct X { }
 struct Y { }
 struct Z { }
 
-func f0(_ x1: X, x2: X) -> X {} // expected-note{{found this candidate}}
-func f0(_ y1: Y, y2: Y) -> Y {} // expected-note{{found this candidate}}
-var f0 : X // expected-note {{found this candidate}} expected-note {{'f0' previously declared here}}
+func f0(_ x1: X, x2: X) -> X {}
+func f0(_ y1: Y, y2: Y) -> Y {}
+var f0 : X // expected-note {{'f0' previously declared here}}
 func f0_init(_ x: X, y: Y) -> X {}
 var f0 : (_ x : X, _ y : Y) -> X = f0_init // expected-error{{invalid redeclaration}}
 func f1(_ x: X) -> X {}
@@ -16,7 +16,7 @@ func f2(_ g: (_ x: X) -> X) -> ((_ y: Y) -> Y) { }
 func test_conv() {
   var _ : (_ x1 : X, _ x2 : X) -> X = f0
   var _ : (X, X) -> X = f0
-  var _ : (Y, X) -> X = f0 // expected-error{{ambiguous reference to member 'f0(_:x2:)'}}
+  var _ : (Y, X) -> X = f0 // expected-error{{cannot convert value of type 'X' to specified type '(Y, X) -> X'}}
   var _ : (X) -> X = f1
   var a7 : (X) -> (X) = f1
   var a8 : (_ x2 : X) -> (X) = f1

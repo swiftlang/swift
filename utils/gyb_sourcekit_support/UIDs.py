@@ -65,6 +65,7 @@ UID_KEYS = [
         'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
+    KEY('TypeRelation', 'key.typerelation'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
     KEY('NumBytesToErase', 'key.num_bytes_to_erase'),
     KEY('NotRecommended', 'key.not_recommended'),
@@ -95,8 +96,11 @@ UID_KEYS = [
     KEY('Ranges', 'key.ranges'),
     KEY('Fixits', 'key.fixits'),
     KEY('Diagnostics', 'key.diagnostics'),
+    KEY('EducationalNotePaths', 'key.educational_note_paths'),
     KEY('FormatOptions', 'key.editor.format.options'),
     KEY('CodeCompleteOptions', 'key.codecomplete.options'),
+    KEY('TypeContextInfoOptions', 'key.typecontextinfo.options'),
+    KEY('ConformingMethodListOptions', 'key.conformingmethods.options'),
     KEY('FilterRules', 'key.codecomplete.filterrules'),
     KEY('NextRequestStart', 'key.nextrequeststart'),
     KEY('Popular', 'key.popular'),
@@ -169,6 +173,21 @@ UID_KEYS = [
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
     KEY('ExpressionType', 'key.expression_type'),
+    KEY('CanonicalizeType', 'key.canonicalize_type'),
+    KEY('InternalDiagnostic', "key.internal_diagnostic"),
+    KEY('VFSName', 'key.vfs.name'),
+    KEY('VFSOptions', 'key.vfs.options'),
+    KEY('Files', 'key.files'),
+    KEY('OptimizeForIDE', 'key.optimize_for_ide'),
+    KEY('RequiredBystanders', 'key.required_bystanders'),
+    KEY('ReusingASTContext', 'key.reusingastcontext'),
+    KEY('CompletionMaxASTContextReuseCount',
+        'key.completion_max_astcontext_reuse_count'),
+    KEY('CompletionCheckDependencyInterval',
+        'key.completion_check_dependency_interval'),
+    KEY('AnnotatedTypename', 'key.annotated.typename'),
+    KEY('CompileOperation', 'key.compile_operation'),
+    KEY('EffectiveAccess', 'key.effective_access'),
 ]
 
 
@@ -226,6 +245,7 @@ UID_REQUESTS = [
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
+    REQUEST('GlobalConfiguration', 'source.request.configuration.global')
 ]
 
 
@@ -322,6 +342,8 @@ UID_KINDS = [
     KIND('DeclExtensionProtocol', 'source.lang.swift.decl.extension.protocol'),
     KIND('DeclAssociatedType', 'source.lang.swift.decl.associatedtype'),
     KIND('RefAssociatedType', 'source.lang.swift.ref.associatedtype'),
+    KIND('DeclOpaqueType', 'source.lang.swift.decl.opaquetype'),
+    KIND('RefOpaqueType', 'source.lang.swift.ref.opaquetype'),
     KIND('DeclTypeAlias', 'source.lang.swift.decl.typealias'),
     KIND('RefTypeAlias', 'source.lang.swift.ref.typealias'),
     KIND('DeclGenericTypeParam', 'source.lang.swift.decl.generic_type_param'),

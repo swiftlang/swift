@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Diff.h"
+#include "Diff.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
@@ -26,8 +26,8 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemapIfNeeded(
-    CompilerInstance *Instance, const CompilerInvocation &Invocation) {
+bool migrator::updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance) {
+  const auto &Invocation = Instance->getInvocation();
   if (!Invocation.getMigratorOptions().shouldRunMigrator())
     return false;
 
@@ -142,11 +142,12 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
          "Migration must have a primary");
   for (const auto &input : OrigFrontendOpts.InputsAndOutputs.getAllInputs()) {
     Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-        InputFile(input.file(), input.isPrimary(),
-                  input.isPrimary() ? InputBuffer.get() : input.buffer()));
+        InputFile(input.getFileName(), input.isPrimary(),
+                  input.isPrimary() ? InputBuffer.get() : input.getBuffer(),
+                  input.getType()));
   }
 
-  auto Instance = llvm::make_unique<swift::CompilerInstance>();
+  auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation)) {
     return nullptr;
   }
@@ -185,7 +186,7 @@ bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
     new clang::DiagnosticIDs()
   };
   auto ClangDiags =
-    llvm::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
+    std::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
                                                 new clang::DiagnosticOptions,
                                                 new clang::DiagnosticConsumer(),
                                                 /*ShouldOwnClient=*/true);
@@ -279,7 +280,8 @@ void printRemap(const StringRef OriginalFilename,
   assert(!OriginalFilename.empty());
 
   diff_match_patch<std::string> DMP;
-  const auto Diffs = DMP.diff_main(InputText, OutputText, /*checkLines=*/false);
+  const auto Diffs =
+      DMP.diff_main(InputText.str(), OutputText.str(), /*checkLines=*/false);
 
   OS << "[";
 
@@ -354,7 +356,7 @@ void printRemap(const StringRef OriginalFilename,
       continue;
     Current.Offset -= 1;
     Current.Remove += 1;
-    Current.Text = InputText.substr(Current.Offset, 1);
+    Current.Text = InputText.substr(Current.Offset, 1).str();
   }
 
   for (auto Rep = Replacements.begin(); Rep != Replacements.end(); ++Rep) {
@@ -433,5 +435,5 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 const StringRef Migrator::getInputFilename() const {
   auto &PrimaryInput = StartInvocation.getFrontendOptions()
                            .InputsAndOutputs.getRequiredUniquePrimaryInput();
-  return PrimaryInput.file();
+  return PrimaryInput.getFileName();
 }

@@ -16,11 +16,42 @@
 
 using namespace SourceKit;
 
-SourceKit::Context::Context(StringRef RuntimeLibPath,
+GlobalConfig::Settings
+GlobalConfig::update(Optional<bool> OptimizeForIDE,
+                     Optional<unsigned> CompletionMaxASTContextReuseCount,
+                     Optional<unsigned> CompletionCheckDependencyInterval) {
+  llvm::sys::ScopedLock L(Mtx);
+  if (OptimizeForIDE.hasValue())
+    State.OptimizeForIDE = *OptimizeForIDE;
+  if (CompletionMaxASTContextReuseCount.hasValue())
+    State.CompletionOpts.MaxASTContextReuseCount =
+        *CompletionMaxASTContextReuseCount;
+  if (CompletionCheckDependencyInterval.hasValue())
+    State.CompletionOpts.CheckDependencyInterval =
+        *CompletionCheckDependencyInterval;
+  return State;
+};
+
+bool GlobalConfig::shouldOptimizeForIDE() const {
+  llvm::sys::ScopedLock L(Mtx);
+  return State.OptimizeForIDE;
+}
+GlobalConfig::Settings::CompletionOptions
+GlobalConfig::getCompletionOpts() const {
+  llvm::sys::ScopedLock L(Mtx);
+  return State.CompletionOpts;
+}
+
+SourceKit::Context::Context(
+    StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
-    LangSupportFactoryFn,
-    bool shouldDispatchNotificationsOnMain) : RuntimeLibPath(RuntimeLibPath),
-    NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)) {
+        LangSupportFactoryFn,
+    bool shouldDispatchNotificationsOnMain)
+    : RuntimeLibPath(RuntimeLibPath),
+      DiagnosticDocumentationPath(DiagnosticDocumentationPath),
+      NotificationCtr(
+          new NotificationCenter(shouldDispatchNotificationsOnMain)),
+      Config(new GlobalConfig()) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }

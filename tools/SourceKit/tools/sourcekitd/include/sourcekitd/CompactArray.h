@@ -20,7 +20,7 @@ namespace sourcekitd {
 
 class CompactArrayBuilderImpl {
 public:
-  std::unique_ptr<llvm::MemoryBuffer> createBuffer() const;
+  std::unique_ptr<llvm::MemoryBuffer> createBuffer(CustomBufferKind Kind) const;
   void appendTo(llvm::SmallVectorImpl<char> &Buf) const;
   unsigned copyInto(char *BufPtr) const;
   size_t sizeInBytes() const;

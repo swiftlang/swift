@@ -33,11 +33,11 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(Type(), false, CleanupLocation::get(Loc));
+  prepareEpilog(false, false, CleanupLocation::get(Loc));
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
-  emitStmt(dd->getBody());
+  emitStmt(dd->getTypecheckedBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(Loc);
@@ -69,7 +69,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
 
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
-                                    dtorTy, objectPtrTy, subMap, baseSelf);
+                                    subMap, baseSelf);
   } else {
     resultSelfValue = selfValue;
   }
@@ -128,9 +128,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   {
     FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
-    SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
-    selfForDealloc = B.createApply(loc, dtorValue.forward(*this),
-                                   dtorTy, objectPtrTy, subMap,
+    selfForDealloc = B.createApply(loc, dtorValue.forward(*this), subMap,
                                    borrowedSelf.getUnmanagedValue());
   }
 
@@ -153,7 +151,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
   B.createDeallocRef(loc, selfForDealloc, false);
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
 
   // Return.
   B.createReturn(loc, emitEmptyTuple(loc));
@@ -168,7 +166,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
       emitSelfDecl(cd->getDestructor()->getImplicitSelfDecl()));
 
   auto cleanupLoc = CleanupLocation::get(loc);
-  prepareEpilog(TupleType::getEmpty(getASTContext()), false, cleanupLoc);
+  prepareEpilog(false, false, cleanupLoc);
   {
     Scope S(*this, cleanupLoc);
     emitClassMemberDestruction(selfValue, cd, cleanupLoc);
@@ -188,7 +186,11 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       SILValue addr =
           B.createRefElementAddr(cleanupLoc, selfValue.getValue(), vd,
                                  ti.getLoweredType().getAddressType());
+      addr = B.createBeginAccess(
+          cleanupLoc, addr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+          false /*noNestedConflict*/, false /*fromBuiltin*/);
       B.createDestroyAddr(cleanupLoc, addr);
+      B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
     }
   }
 }
@@ -208,11 +210,11 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(Type(), false, CleanupLocation::get(loc));
+  prepareEpilog(false, false, CleanupLocation::get(loc));
 
-  emitProfilerIncrement(dd->getBody());
+  emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
-  emitStmt(dd->getBody());
+  emitStmt(dd->getTypecheckedBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(loc);
@@ -234,7 +236,8 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)
     .asForeign();
-  auto superclassDtorType = SGM.Types.getConstantType(superclassDtor);
+  auto superclassDtorType =
+      SGM.Types.getConstantType(getTypeExpansionContext(), superclassDtor);
   SILValue superclassDtorValue = B.createObjCSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,
                                    superclassDtorType);
@@ -248,15 +251,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                               superclass);
 
-  auto substDtorType = superclassDtorType.substGenericArgs(SGM.M, subMap);
-  CanSILFunctionType substFnType = substDtorType.castTo<SILFunctionType>();
-  SILFunctionConventions dtorConv(substFnType, SGM.M);
-  assert(substFnType->getSelfParameter().getConvention() ==
-             ParameterConvention::Direct_Unowned &&
-         "Objective C deinitializing destructor takes self as unowned");
-
-  B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
-                dtorConv.getSILResultType(), subMap, superSelf);
+  B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 
   // We know that the givne value came in at +1, but we pass the relevant value
   // as unowned to the destructor. Create a fake balance for the verifier to be

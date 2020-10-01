@@ -29,12 +29,12 @@
 #define SWIFT_SIL_LAYOUT_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
 
-class GenericSignature;
 class SILType;
 
 /// A field of a SIL aggregate layout.

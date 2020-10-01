@@ -1,0 +1,2 @@
+*.swift.gyb linguist-language=Swift
+*.cpp.gyb linguist-language=C++

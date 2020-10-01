@@ -106,7 +106,7 @@ public func run_FloatingPointPrinting_Double_description_small(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+#if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
@@ -152,7 +152,7 @@ public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+#if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
@@ -202,7 +202,7 @@ public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+#if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)

@@ -12,24 +12,24 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 
-#include "RefCountState.h"
 #include "ARCMatchingSet.h"
+#include "RefCountState.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -68,8 +68,6 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
       continue;
     }
 
-    // We need to be known safe over all increments/decrements we are matching
-    // up to ignore insertion points.
     bool BUIsKnownSafe = (*BURefCountState)->second.isKnownSafe();
     LLVM_DEBUG(llvm::dbgs() << "        BOTTOM UP KNOWNSAFE: "
                             << (BUIsKnownSafe ? "true" : "false") << "\n");
@@ -77,7 +75,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
     bool BUCodeMotionSafe = (*BURefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        BOTTOM UP CODEMOTIONSAFE: "
-                            << (BUIsKnownSafe ? "true" : "false") << "\n");
+                            << (BUCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= BUCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
@@ -152,8 +150,6 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
       continue;
     }
 
-    // We need to be known safe over all increments/decrements we are matching
-    // up to ignore insertion points.
     bool TDIsKnownSafe = (*TDRefCountState)->second.isKnownSafe();
     LLVM_DEBUG(llvm::dbgs() << "        TOP DOWN KNOWNSAFE: "
                             << (TDIsKnownSafe ? "true" : "false") << "\n");
@@ -161,7 +157,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
     bool TDCodeMotionSafe = (*TDRefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        TOP DOWN CODEMOTIONSAFE: "
-                            << (TDIsKnownSafe ? "true" : "false") << "\n");
+                            << (TDCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= TDCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
@@ -223,7 +219,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
     LLVM_DEBUG(llvm::dbgs() << "Attempting to match up increments -> "
                "decrements:\n");
     // For each increment in our list of new increments, attempt to match them
-    // up with decrements and gather the insertion points of the decrements.
+    // up with decrements.
     auto Result = matchIncrementsToDecrements();
     if (!Result) {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED TO MATCH INCREMENTS -> "
@@ -287,8 +283,6 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   assert(MatchSet.Increments.empty() == MatchSet.Decrements.empty() &&
          "Match set without increments or decrements");
 
-  // If we do not have any insertion points but we do have increments, we must
-  // be eliminating pairs.
   if (!MatchSet.Increments.empty())
     MatchedPair = true;
 

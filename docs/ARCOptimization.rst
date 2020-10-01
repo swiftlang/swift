@@ -335,7 +335,7 @@ is_unique performs depends on the argument type:
 
     - Objective-C object types require an additional check that the
       dynamic object type uses native Swift reference counting:
-      (Builtin.UnknownObject, unknown class reference, class existential)
+      (unknown class reference, class existential)
 
     - Bridged object types allow the dynamic object type check to be
       bypassed based on the pointer encoding:
@@ -439,8 +439,8 @@ In the following we assume that all loops are canonicalized such that:
 2. The loop has one backedge.
 3. All exiting edges have a unique exit block.
 
-Motiviation
------------
+Motivation
+----------
 
 Consider the following simple loop::
 

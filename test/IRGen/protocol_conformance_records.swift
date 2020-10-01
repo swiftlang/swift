@@ -108,10 +108,6 @@ public struct Concrete : AssociateConformance {
 // -- no flags are set, and no generic witness table follows
 // CHECK-SAME:           i32 0 }
 
-// CHECK-LABEL: @"\01l_protocols"
-// CHECK-SAME: @"$s28protocol_conformance_records8RuncibleMp"
-// CHECK-SAME: @"$s28protocol_conformance_records5SpoonMp"
-
 public protocol Spoon { }
 
 // Conditional conformances
@@ -166,6 +162,10 @@ extension Int : OtherResilientProtocol { }
 extension Dependent : Associate {
   public typealias X = (T, T)
 }
+
+// CHECK-LABEL: @"\01l_protocols"
+// CHECK-SAME: @"$s28protocol_conformance_records8RuncibleMp"
+// CHECK-SAME: @"$s28protocol_conformance_records5SpoonMp"
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant
 // CHECK-SAME: @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"

@@ -24,16 +24,14 @@ func customSourceLocation(a: Int) {}
 // CHECK-FUNC-THEB-NOT: PARENT OFFSET
 
 // RUN: %sourcekitd-test -req=cursor -pos=4:13 %s -- %s | %FileCheck -check-prefix=CHECK-SUBSCRIPT-A %s
-// FIXME: This USR is wrong; see https://bugs.swift.org/browse/SR-8660.
-// CHECK-SUBSCRIPT-A: s:17cursor_info_param12AccessorTestV1aL_Sivp
+// CHECK-SUBSCRIPT-A: s:17cursor_info_param12AccessorTestV_1bS2i_Sitcip1aL_Sivp
 // CHECK-SUBSCRIPT-A: PARENT OFFSET: 67
 
 // RUN: %sourcekitd-test -req=cursor -pos=4:21 %s -- %s | %FileCheck -check-prefix=CHECK-SUBSCRIPT-B %s
 // CHECK-SUBSCRIPT-B: s:17cursor_info_param12AccessorTestV
 
 // RUN: %sourcekitd-test -req=cursor -pos=4:23 %s -- %s | %FileCheck -check-prefix=CHECK-SUBSCRIPT-THEB %s
-// FIXME: This USR is wrong; see https://bugs.swift.org/browse/SR-8660.
-// CHECK-SUBSCRIPT-THEB: s:17cursor_info_param12AccessorTestV4theBL_Sivp
+// CHECK-SUBSCRIPT-THEB: s:17cursor_info_param12AccessorTestV_1bS2i_Sitcip4theBL_Sivp
 // CHECK-SUBSCRIPT-THEB-NOT: PARENT OFFSET
 
 // RUN: %sourcekitd-test -req=cursor -pos=7:9 %s -- %s | %FileCheck -check-prefix=CHECK-SETTER-V %s

@@ -44,6 +44,9 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                  "Adjustment index must be synchronized with this layout");
+
     // Metadata header.
     super::layout();
 
@@ -62,6 +65,14 @@ public:
            Target->getDeclaredTypeInContext()->getCanonicalType());
     if (strategy.needsPayloadSizeInMetadata())
       asImpl().addPayloadSize();
+
+    if (asImpl().hasTrailingFlags())
+      asImpl().addTrailingFlags();
+  }
+
+  bool hasTrailingFlags() {
+    return Target->isGenericContext() &&
+           IGM.shouldPrespecializeGenericMetadata();
   }
 };
 
@@ -82,15 +93,17 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addGenericArgument() { addPointer(); }
-  void addGenericWitnessTable() { addPointer(); }
+  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
+  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
+  void addTrailingFlags() { addInt64(); }
 
 private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
+  void addInt64() { NextOffset += Size(8); }
 };
 
 } // end namespace irgen

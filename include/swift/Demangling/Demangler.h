@@ -20,19 +20,16 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
-
-#ifdef NODE_FACTORY_DEBUGGING
-#include <iostream>
-#endif
-
 
 using namespace swift::Demangle;
 using llvm::StringRef;
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 class CharVector;
   
@@ -86,7 +83,7 @@ public:
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "## New NodeFactory\n";
+    fprintf(stderr, "%s## New NodeFactory\n", indent().c_str());
     nestingLevel++;
 #endif
   }
@@ -96,8 +93,7 @@ public:
   /// Only if this memory overflows, the factory begins to malloc.
   void providePreallocatedMemory(char *Memory, size_t Size) {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "++ provide preallocated memory, size = "
-                          << Size << '\n';
+    fprintf(stderr, "%s++ provide preallocated memory, size = %zu\n", indent().c_str(), Size);
 #endif
     assert(!CurPtr && !End && !CurrentSlab);
     CurPtr = Memory;
@@ -116,8 +112,7 @@ public:
     CurPtr = BorrowFrom.CurPtr;
     End = BorrowFrom.End;
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "++ borrow memory, size = "
-                          << (End - CurPtr) << '\n';
+    fprintf(stderr, "%s++ borrow memory, size = %zu\n", indent().c_str(), (End - CurPtr));
 #endif
   }
 
@@ -125,8 +120,7 @@ public:
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
     nestingLevel--;
-    std::cerr << indent() << "## Delete NodeFactory: allocated memory = "
-                          << allocatedMemory  << '\n';
+    fprintf(stderr, "%s## Delete NodeFactory: allocated memory = %zu\n", indent().c_str(), allocatedMemory)
 #endif
     if (BorrowedFrom) {
       BorrowedFrom->isBorrowed = false;
@@ -141,8 +135,7 @@ public:
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "alloc " << ObjectSize << ", CurPtr = "
-              << (void *)CurPtr << "\n";
+    fprintf(stderr, "%salloc %zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
     allocatedMemory += ObjectSize;
 #endif
 
@@ -163,9 +156,8 @@ public:
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << indent() << "** new slab " << newSlab << ", allocsize = "
-                << AllocSize << ", CurPtr = " << (void *)CurPtr
-                << ", End = " << (void *)End << "\n";
+      fprintf(stderr, "%s** new slab %p, allocsize = %zu, CurPtr = %p, End = %p\n",
+            indent().c_str(), newSlab, AllocSize, (void *)CurPtr, (void *)End);
 #endif
     }
     T *AllocatedObj = (T *)CurPtr;
@@ -189,9 +181,8 @@ public:
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "realloc: capacity = " << Capacity
-              << " (size = " << OldAllocSize << "), growth = " << MinGrowth
-              << " (size = " << AdditionalAlloc << ")\n";
+    fprintf(stderr, "%srealloc: capacity = %d (size = %zu), growth = %zu (size = %zu)\n",
+          indent().c_str(), Capacity, OldAllocSize, MinGrowth, AdditionalAlloc);
 #endif
     if ((char *)Objects + OldAllocSize == CurPtr
         && CurPtr + AdditionalAlloc <= End) {
@@ -200,7 +191,7 @@ public:
       CurPtr += AdditionalAlloc;
       Capacity += MinGrowth;
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << indent() << "** can grow: " << (void *)CurPtr << '\n';
+      fprintf(stderr, "%s** can grow: %p\n", indent().c_str(), (void *)CurPtr);
       allocatedMemory += AdditionalAlloc;
 #endif
       return;
@@ -348,7 +339,10 @@ public:
 enum class SymbolicReferenceKind : uint8_t {
   /// A symbolic reference to a context descriptor, representing the
   /// (unapplied generic) context.
-  Context,  
+  Context,
+  /// A symbolic reference to an accessor function, which can be executed in
+  /// the process to get a pointer to the referenced entity.
+  AccessorFunctionReference,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -444,7 +438,23 @@ protected:
     return popNode();
   }
 
-  void init(StringRef MangledName);
+  /// This class handles preparing the initial state for a demangle job in a reentrant way, pushing the
+  /// existing state back when a demangle job is completed.
+  class DemangleInitRAII {
+    Demangler &Dem;
+    Vector<NodePointer> NodeStack;
+    Vector<NodePointer> Substitutions;
+    int NumWords;
+    StringRef Text;
+    size_t Pos;
+    std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
+    
+  public:
+    DemangleInitRAII(Demangler &Dem, StringRef MangledName,
+         std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver);
+    ~DemangleInitRAII();
+  };
+  friend DemangleInitRAII;
   
   void addSubstitution(NodePointer Nd) {
     if (Nd)
@@ -474,6 +484,7 @@ protected:
   int demangleNatural();
   int demangleIndex();
   NodePointer demangleIndexAsNode();
+  NodePointer demangleDependentConformanceIndex();
   NodePointer demangleIdentifier();
   NodePointer demangleOperatorIdentifier();
 
@@ -507,8 +518,9 @@ protected:
   NodePointer popAnyProtocolConformanceList();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
-  NodePointer demangleImplParamConvention();
+  NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
   NodePointer demanglePrivateContextDescriptor();
@@ -554,11 +566,12 @@ protected:
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
 
-  NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
-  NodePointer demangleSymbolicReference(unsigned char rawKind,
-                                        const void *at);
+  NodePointer demangleSymbolicReference(unsigned char rawKind);
 
+  bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
+                             NodePointer &RetroactiveConformances);
+  
   void dump();
 
 public:
@@ -566,39 +579,35 @@ public:
   
   void clear() override;
 
-  /// Install a resolver for symbolic references in a mangled string.
-  void setSymbolicReferenceResolver(
-                          std::function<SymbolicReferenceResolver_t> resolver) {
-    SymbolicReferenceResolver = resolver;
-  }
-
-  /// Take the symbolic reference resolver.
-  std::function<SymbolicReferenceResolver_t> &&
-  takeSymbolicReferenceResolver() {
-    return std::move(SymbolicReferenceResolver);
-  }
-
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the
   /// mangling prefix $S.
+  /// \param SymbolicReferenceResolver A function invoked to resolve symbolic references in
+  /// the string. If null, then symbolic references will cause the demangle to fail.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleSymbol(StringRef MangledName);
+  NodePointer demangleSymbol(StringRef MangledName,
+            std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
+               = nullptr);
 
   /// Demangle the given type and return the parse tree.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
   /// the mangling prefix $S.
+  /// \param SymbolicReferenceResolver A function invoked to resolve symbolic references in
+  /// the string. If null, then symbolic references will cause the demangle to fail.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleType(StringRef MangledName);
+  NodePointer demangleType(StringRef MangledName,
+            std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
+              = nullptr);
 };
 
 /// A demangler which uses stack space for its initial memory.
@@ -615,6 +624,7 @@ public:
 
 NodePointer demangleOldSymbolAsNode(StringRef MangledName,
                                     NodeFactory &Factory);
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

@@ -55,6 +55,12 @@ func one() {
 #endif
   } catch {    // don't warn, #if code should be scanned.
   }
+  
+  do {
+    throw opaque_error()
+  } catch MSV.Foo, MSV.CarriesInt(let num) { // expected-error {{'num' must be bound in every pattern}}
+  } catch {
+  }
 }
 
 func takesAutoclosure(_ fn : @autoclosure () -> Int) {}
@@ -94,19 +100,19 @@ func illformed() throws {
     }
 }
 
-func postThrows() -> Int throws { // expected-error{{'throws' may only occur before '->'}}{{19-19=throws }}{{25-32=}}
+func postThrows() -> Int throws { // expected-error{{'throws' may only occur before '->'}}{{19-19=throws }}{{26-33=}}
   return 5
 }
 
-func postThrows2() -> throws Int { // expected-error{{'throws' may only occur before '->'}}{{20-22=throws}}{{23-29=->}}
+func postThrows2() -> throws Int { // expected-error{{'throws' may only occur before '->'}}{{20-20=throws }}{{23-30=}}
   return try postThrows()
 }
 
-func postRethrows(_ f: () throws -> Int) -> Int rethrows { // expected-error{{'rethrows' may only occur before '->'}}{{42-42=rethrows }}{{48-57=}}
+func postRethrows(_ f: () throws -> Int) -> Int rethrows { // expected-error{{'rethrows' may only occur before '->'}}{{42-42=rethrows }}{{49-58=}}
   return try f()
 }
 
-func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'rethrows' may only occur before '->'}}{{43-45=rethrows}}{{46-54=->}}
+func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'rethrows' may only occur before '->'}}{{43-43=rethrows }}{{46-55=}}
   return try f()
 }
 
@@ -125,3 +131,11 @@ func fixitThrow2() throws {
   throw MSV.Foo
   var _: (Int) throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{16-21=throws}}
 }
+
+let fn: () -> throws Void  // expected-error{{'throws' may only occur before '->'}} {{12-12=throws }} {{15-22=}}
+
+// SR-11574
+func fixitTry0<T>(a: T) try where T:ExpressibleByStringLiteral {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry1<T>(a: T) try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry2() try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{18-21=throws}}
+let fixitTry3 : () try -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{20-23=throws}}

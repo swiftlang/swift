@@ -140,7 +140,7 @@ func testIUOResult(x: IUOResult) {
 // Subscript index must be ExpressibleByStringLiteral.
 @dynamicMemberLookup
 struct Invalid1 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: Int) -> Int {
     return 42
   }
@@ -149,7 +149,7 @@ struct Invalid1 {
 // Subscript may not be variadic.
 @dynamicMemberLookup
 struct Invalid2 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: String...) -> Int {
     return 42
   }
@@ -188,7 +188,7 @@ func NotAllowedOnFunc() {}
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
+// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 class InvalidBase {}
 
@@ -392,8 +392,433 @@ func testGenerics<S, T, P: GenericProtocol>(
 //===----------------------------------------------------------------------===//
 
 @dynamicMemberLookup
-class C {
+class KP {
   subscript(dynamicMember member: String) -> Int { return 7 }
 }
-_ = \C.[dynamicMember: "hi"]
-_ = \C.testLookup
+_ = \KP.[dynamicMember: "hi"]
+_ = \KP.testLookup
+
+/* KeyPath based dynamic lookup */
+
+struct Point {
+  var x: Int
+  let y: Int // expected-note 2 {{change 'let' to 'var' to make it mutable}}
+
+  private let z: Int = 0 // expected-note 10 {{declared here}}
+}
+
+struct Rectangle {
+  var topLeft, bottomRight: Point
+}
+
+@dynamicMemberLookup
+struct Lens<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> Lens<U> {
+    get { return Lens<U>(obj[keyPath: member]) }
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> Lens<U> {
+    get { return Lens<U>(obj[keyPath: member]) }
+    set { obj[keyPath: member] = newValue.obj }
+  }
+}
+
+var topLeft = Point(x: 0, y: 0)
+var bottomRight = Point(x: 10, y: 10)
+
+var lens = Lens(Rectangle(topLeft: topLeft,
+                          bottomRight: bottomRight))
+
+_ = lens.topLeft
+_ = lens.topLeft.x
+_ = lens.topLeft.y
+_ = lens.topLeft.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+_ = lens.bottomRight
+_ = lens.bottomRight.x
+_ = lens.bottomRight.y
+_ = lens.bottomRight.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+_ = \Lens<Point>.x
+_ = \Lens<Point>.y
+_ = \Lens<Point>.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+_ = \Lens<Rectangle>.topLeft.x
+_ = \Lens<Rectangle>.topLeft.y
+_ = \Lens<Rectangle>.topLeft.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+_ = \Lens<[Int]>.count
+_ = \Lens<[Int]>.[0]
+_ = \Lens<[[Int]]>.[0].count
+
+lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
+lens.bottomRight.x = Lens(11)          // Ok
+lens.bottomRight.y = Lens(12)          // expected-error {{cannot assign to property: 'y' is a 'let' constant}}
+lens.bottomRight.z = Lens(13)          // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+func acceptKeyPathDynamicLookup(_: Lens<Int>) {}
+
+acceptKeyPathDynamicLookup(lens.topLeft.x)
+acceptKeyPathDynamicLookup(lens.topLeft.y)
+acceptKeyPathDynamicLookup(lens.topLeft.z) // expected-error {{'z' is inaccessible due to 'private' protection level}}
+
+var tupleLens = Lens<(String, Int)>(("ultimate question", 42))
+_ = tupleLens.0.count
+_ = tupleLens.1
+
+var namedTupleLens = Lens<(question: String, answer: Int)>((question: "ultimate question", answer: 42))
+_ = namedTupleLens.question.count
+_ = namedTupleLens.answer
+
+@dynamicMemberLookup
+class A<T> {
+  var value: T
+
+  init(_ v: T) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+// Let's make sure that keypath dynamic member lookup
+// works with inheritance
+
+class B<T> : A<T> {}
+
+func bar(_ b: B<Point>) {
+  let _: Int = b.x
+  let _ = b.y
+  let _: Float = b.y // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
+  let _ = b.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}
+
+// Existentials and IUOs
+
+@dynamicMemberLookup
+protocol KeyPathLookup {
+  associatedtype T
+
+  var value: T { get }
+
+  subscript(dynamicMember member: KeyPath<T, Int>) -> Int! { get }
+}
+
+extension KeyPathLookup {
+  subscript(dynamicMember member: KeyPath<T, Int>) -> Int! {
+    get { return value[keyPath: member] }
+  }
+}
+
+class C<T> : KeyPathLookup {
+  var value: T
+  init(_ v: T) {
+    self.value = v
+  }
+}
+
+func baz(_ c: C<Point>) {
+  let _: Int = c.x
+  let _ = c.y
+  let _: Float = c.y // expected-error {{cannot convert value of type 'Int?' to specified type 'Float'}}
+  let _ = c.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}
+
+@dynamicMemberLookup
+class D<T> {
+  var value: T
+
+  init(_ v: T) {
+    self.value = v
+  }
+
+  subscript<U: Numeric>(dynamicMember member: KeyPath<T, U>) -> (U) -> U {
+    get { return { offset in self.value[keyPath: member] + offset } }
+  }
+}
+
+func faz(_ d: D<Point>) {
+  let _: Int = d.x(42)
+  let _ = d.y(1 + 0)
+  let _: Float = d.y(1 + 0) // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
+  let _ = d.z(1 + 0)        // expected-error {{'z' is inaccessible due to 'private' protection level}}
+}
+
+@dynamicMemberLookup
+struct SubscriptLens<T> {
+  var value: T
+
+  var counter: Int = 0
+
+  subscript(foo: String) -> Int {
+    get { return 42 }
+  }
+
+  subscript(offset: Int) -> Int {
+    get { return counter }
+    set { counter = counter + newValue }
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U! {
+    get { return value[keyPath: member] }
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+    set { value[keyPath: member] = newValue }
+  }
+}
+
+func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
+                             _ dict: inout SubscriptLens<[String: Int]>) {
+  _ = arr[0..<3]
+  for idx in 0..<arr.count {
+    let _ = arr[idx]
+    print(arr[idx])
+  }
+
+  _ = arr["hello"]  // Ok
+  _ = dict["hello"] // Ok
+
+  _ = arr["hello"] = 42 // expected-error {{cannot assign through subscript: subscript is get-only}}
+  _ = dict["hello"] = 0 // Ok
+
+  _ = arr[0] = 42 // expected-error {{cannot assign through subscript: 'arr' is a 'let' constant}}
+  _ = dict[0] = 1 // Ok
+
+  if let index = dict.value.firstIndex(where: { $0.value == 42 }) {
+    let _ = dict[index]
+  }
+  dict["ultimate question"] = 42
+}
+
+func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
+  for idx in 0..<arr.count {
+    // expected-error@-1 {{cannot convert value of type 'Lens<Int>' to expected argument type 'Int'}}
+    let _ = arr[idx]
+  }
+}
+
+struct WithTrailingClosure {
+  subscript(fn: () -> Int) -> Int {
+    get { return fn() }
+    nonmutating set { _ = fn() + newValue }
+  }
+
+  subscript(offset: Int, _ fn: () -> Int) -> Int {
+    get { return offset + fn() }
+  }
+}
+
+func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrailingClosure>) {
+  _ = ty[0] { 42 } // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[0] { 42 } = 0 // expected-error {{cannot assign through subscript: subscript is get-only}}
+  // expected-error@-1 {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+  _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
+}
+
+func keypath_to_subscript_to_property(_ lens: inout Lens<Array<Rectangle>>) {
+  _ = lens[0].topLeft.x
+  _ = lens[0].topLeft.y
+  _ = lens[0].topLeft.x = Lens(0)
+  _ = lens[0].topLeft.y = Lens(1)
+  // expected-error@-1 {{cannot assign to property: 'y' is a 'let' constant}}
+}
+
+@dynamicMemberLookup
+struct SingleChoiceLens<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+    set { obj[keyPath: member] = newValue }
+  }
+}
+
+// Make sure that disjunction filtering optimization doesn't
+// impede keypath dynamic member lookup by eagerly trying to
+// simplify disjunctions with a single viable choice.
+func test_lens_with_a_single_choice(a: inout SingleChoiceLens<[Int]>) {
+  a[0] = 1 // Ok
+}
+
+func test_chain_of_recursive_lookups(_ lens: Lens<Lens<Lens<Point>>>) {
+  _ = lens.x
+  _ = lens.y
+  _ = lens.z // expected-error {{'z' is inaccessible due to 'private' protection level}}
+  // Make sure that 'obj' field could be retrieved at any level
+  _ = lens.obj
+  _ = lens.obj.obj
+  _ = lens.obj.x
+  _ = lens.obj.obj.x
+
+  _ = \Lens<Lens<Point>>.x
+  _ = \Lens<Lens<Point>>.obj.x
+}
+
+// KeyPath Dynamic Member Lookup can't refer to methods, mutating setters and static members
+// because of the KeyPath limitations
+func invalid_refs_through_dynamic_lookup() {
+  struct S {
+    static var foo: Int = 42
+    func bar() -> Q { return Q() }
+    static func baz(_: String) -> Int { return 0 }
+  }
+
+  struct Q {
+    var faz: Int = 0
+  }
+
+  func test(_ lens: A<S>) {
+    _ = lens.foo           // expected-error {{dynamic key path member lookup cannot refer to static member 'foo'}}
+    _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
+    _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
+    _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
+  }
+}
+
+// SR-10597
+
+final class SR10597 {
+}
+
+@dynamicMemberLookup
+struct SR10597_W<T> {
+  var obj: T
+  init(_ obj: T) { self.obj = obj }
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    return obj[keyPath: member]
+  }
+  var wooo: SR10597 { SR10597() } // expected-note {{declared here}}
+}
+
+_ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'wooooo' using key path from root type 'SR10597'; did you mean 'wooo'?}}
+_ = SR10597_W<SR10597>(SR10597()).bla // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'bla' using key path from root type 'SR10597'}}
+
+final class SR10597_1 {
+    var woo: Int? // expected-note 2 {{'woo' declared here}}
+}
+
+@dynamicMemberLookup
+struct SR10597_1_W<T> {
+  var obj: T
+  init(_ obj: T) { self.obj = obj }
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    return obj[keyPath: member]
+  }
+}
+
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).bla // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'bla' using key path from root type 'SR10597_1'}}
+
+// SR-10557
+
+@dynamicMemberLookup
+struct SR_10557_S {
+  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}}{{13-13=dynamicMember }}
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+struct SR_10557_S1 {
+  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+    fatalError()
+  }
+
+  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+struct SR11877 {
+  subscript(dynamicMember member: Substring) -> Int { 0 }
+}
+
+_ = \SR11877.okay
+
+func test_infinite_self_recursion() {
+  @dynamicMemberLookup
+  struct Recurse<T> {
+    subscript<U>(dynamicMember member: KeyPath<Recurse<T>, U>) -> Int {
+      return 1
+    }
+  }
+
+  _ = Recurse<Int>().foo
+  // expected-error@-1 {{value of type 'Recurse<Int>' has no dynamic member 'foo' using key path from root type 'Recurse<Int>'}}
+}
+
+// rdar://problem/60225883 - crash during solution application (ExprRewritter::buildKeyPathDynamicMemberIndexExpr)
+func test_combination_of_keypath_and_string_lookups() {
+  @dynamicMemberLookup
+  struct Outer {
+    subscript(dynamicMember member: String) -> Outer {
+      Outer()
+    }
+
+    subscript(dynamicMember member: KeyPath<Inner, Inner>) -> Outer {
+      Outer()
+    }
+  }
+
+  @dynamicMemberLookup
+  struct Inner {
+    subscript(dynamicMember member: String) -> Inner {
+      Inner()
+    }
+  }
+
+  func test(outer: Outer) {
+    _ = outer.hello.world // Ok
+  }
+}
+
+// SR-12626
+@dynamicMemberLookup
+struct SR12626 {
+  var i: Int
+
+  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+    get { self[keyPath: member] }
+    set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
+  }
+}
+
+// SR-12245
+public struct SR12425_S {}
+
+@dynamicMemberLookup
+public struct SR12425_R {}
+
+internal var rightStructInstance: SR12425_R = SR12425_R()
+
+public extension SR12425_R {
+  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
+      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}
+
+@dynamicMemberLookup
+public struct SR12425_R1 {}
+
+public extension SR12425_R1 {
+  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
+    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}

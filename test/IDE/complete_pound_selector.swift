@@ -71,23 +71,23 @@ class Subclass : NSObject {
 }
 
 
+// CHECK-AFTER_POUND-NOT: selector
 // CHECK-AFTER_POUND: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)
-// CHECK-AFTER_POUND: Keyword/ExprSpecific:               selector({#@objc method#}); name=selector(@objc method)
 
-// CHECK-CONTEXT_SELECTOR: Keyword/None:                  #selector({#@objc method#}); name=#selector(@objc method)
+// CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Identical]: #selector({#@objc method#})[#Selector#]; name=#selector(@objc method)
 
 // CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: @objc property
 // CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: @objc property
 
 // CHECK-IN_SELECTOR-NOT: getter:
-// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal:      {{.?}}init; name=init
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}description; name=description
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}isEqual(_:); name=isEqual(_:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal/IsSystem:    {{.?}}init[#(NSObject.Type) -> () -> NSObject#]; name=init
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}perform(_:with:)[#(Selector?, Any?) -> Unmanaged<AnyObject>?#]; name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:)[#(NSObject) -> (Selector?, Any?) -> Unmanaged<AnyObject>?#]; name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass[#(NSObject) -> () -> AnyClass?#]; name=myClass
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}description[#() -> Any#]; name=description
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}isEqual(_:)[#(NSObject?) -> Bool#]; name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:)[#(NSObject) -> (NSObject?) -> Bool#]; name=isEqual(_:)
 
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:)[#(Selector?, Any?) -> Unmanaged<AnyObject>?#]; name=perform(_:with:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass[#() -> AnyClass?#]; name=myClass
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:)[#(NSObject?) -> Bool#]; name=isEqual(_:)

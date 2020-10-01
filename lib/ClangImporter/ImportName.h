@@ -23,6 +23,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "clang/Sema/Sema.h"
 
@@ -42,15 +43,18 @@ enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
 class ImportNameVersion : public RelationalOperationsBase<ImportNameVersion> {
-  unsigned rawValue;
+  unsigned rawValue : 31;
+  unsigned concurrency : 1;
+
   friend llvm::DenseMapInfo<ImportNameVersion>;
 
   enum AsConstExpr_t { AsConstExpr };
 
-  constexpr ImportNameVersion() : rawValue(0) {}
+  constexpr ImportNameVersion() : rawValue(0), concurrency(false) {}
   constexpr ImportNameVersion(unsigned version, AsConstExpr_t)
-      : rawValue(version) {}
-  explicit ImportNameVersion(unsigned version) : rawValue(version) {
+      : rawValue(version), concurrency(false) {}
+  explicit ImportNameVersion(unsigned version, bool concurrency = false)
+      : rawValue(version), concurrency(concurrency) {
     assert(version >= 2 && "only Swift 2 and later are supported");
   }
 public:
@@ -67,7 +71,7 @@ public:
       return ImportNameVersion::swift4_2();
     }
     unsigned major = version[0];
-    return ImportNameVersion(major >= 5 ? major + 1 : major);
+    return ImportNameVersion(major >= 5 ? major + 1 : major, false);
   }
 
   unsigned majorVersionNumber() const {
@@ -89,11 +93,21 @@ public:
     return llvm::VersionTuple(majorVersionNumber(), minorVersionNumber());
   }
 
+  /// Whether to consider importing functions as 'async'.
+  bool supportsConcurrency() const { return concurrency; }
+
+  ImportNameVersion withConcurrency(bool concurrency) const {
+    ImportNameVersion result = *this;
+    result.concurrency = concurrency;
+    return result;
+  }
+
   bool operator==(ImportNameVersion other) const {
-    return rawValue == other.rawValue;
+    return rawValue == other.rawValue && concurrency == other.concurrency;
   }
   bool operator<(ImportNameVersion other) const {
-    return rawValue < other.rawValue;
+    return rawValue < other.rawValue ||
+        (rawValue == other.rawValue && concurrency < other.concurrency);
   }
 
   /// Calls \p action for each name version other than this one, first going
@@ -102,10 +116,19 @@ public:
   ///
   /// This is the most useful order for importing compatibility stubs.
   void forEachOtherImportNameVersion(
+      bool withConcurrency,
       llvm::function_ref<void(ImportNameVersion)> action) const {
     assert(*this >= ImportNameVersion::swift2());
 
     ImportNameVersion nameVersion = *this;
+    assert(!nameVersion.supportsConcurrency());
+
+    // If we've been asked to also consider concurrency, do so for the
+    // primary version (only).
+    if (withConcurrency) {
+      action(nameVersion.withConcurrency(true));
+    }
+
     while (nameVersion > ImportNameVersion::swift2()) {
       --nameVersion.rawValue;
       action(nameVersion);
@@ -175,6 +198,10 @@ class ImportedName {
     /// throwing Swift methods, describes how the mapping is performed.
     ForeignErrorConvention::Info errorInfo;
 
+    /// For names that map Objective-C completion handlers into async
+    /// Swift methods, describes how the mapping is performed.
+    ForeignAsyncConvention::Info asyncInfo;
+
     /// For a declaration name that makes the declaration into an
     /// instance member, the index of the "Self" parameter.
     unsigned selfIndex;
@@ -201,11 +228,13 @@ class ImportedName {
 
     unsigned hasErrorInfo : 1;
 
+    unsigned hasAsyncInfo : 1;
+
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
-          hasErrorInfo(false) {}
+          hasErrorInfo(false), hasAsyncInfo(false) {}
   } info;
 
 public:
@@ -236,6 +265,14 @@ public:
   Optional<ForeignErrorConvention::Info> getErrorInfo() const {
     if (info.hasErrorInfo)
       return info.errorInfo;
+    return None;
+  }
+
+  /// For names that map Objective-C methods with completion handlers into
+  /// async Swift methods, describes how the mapping is performed.
+  Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
+    if (info.hasAsyncInfo)
+      return info.asyncInfo;
     return None;
   }
 
@@ -415,6 +452,14 @@ private:
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
+
+  Optional<ForeignAsyncConvention::Info>
+  considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
+                      StringRef &baseName,
+                      SmallVectorImpl<StringRef> &paramNames,
+                      ArrayRef<const clang::ParmVarDecl *> params,
+                      bool isInitializer, bool hasCustomName,
+                      Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

@@ -1,0 +1,1072 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import Builtin
+
+sil @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil [ossa] @bridged_cast_anyhashable : $@convention(method) (@guaranteed NSArray) -> @out Optional<AnyHashable> {
+// CHECK: [[FUNC:%.*]] = function_ref @$ss37_forceBridgeFromObjectiveC_bridgeableyx01_D5CTypeQz_xmts01_D11CBridgeableRzlF :
+// CHECK: apply [[FUNC]]<Array<AnyHashable>>(
+// CHECK: } // end sil function 'bridged_cast_anyhashable'
+sil [ossa] @bridged_cast_anyhashable : $@convention(method) (@guaranteed NSArray) -> @out Optional<AnyHashable> {
+bb0(%0 : $*Optional<AnyHashable>, %1 : @guaranteed $NSArray):
+  %3 = init_enum_data_addr %0 : $*Optional<AnyHashable>, #Optional.some!enumelt
+  %4 = metatype $@thin AnyHashable.Type
+  %5 = alloc_stack $NSArray
+  %6 = copy_value %1 : $NSArray
+  store %6 to [init] %5 : $*NSArray
+  %8 = alloc_stack $Array<AnyHashable>
+  unconditional_checked_cast_addr NSArray in %5 : $*NSArray to Array<AnyHashable> in %8 : $*Array<AnyHashable>
+  %10 = load [take] %8 : $*Array<AnyHashable>
+  %11 = alloc_stack $Array<AnyHashable>
+  store %10 to [init] %11 : $*Array<AnyHashable>
+  %13 = function_ref @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+  %14 = apply %13<[AnyHashable]>(%3, %11, %4) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+  dealloc_stack %11 : $*Array<AnyHashable>
+  dealloc_stack %8 : $*Array<AnyHashable>
+  dealloc_stack %5 : $*NSArray
+  inject_enum_addr %0 : $*Optional<AnyHashable>, #Optional.some!enumelt
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_copyonsuccess'
+sil [ossa] @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br copy_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_takeonsuccess'
+sil [ossa] @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_takealways'
+sil [ossa] @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_always NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we handle correctly various sorts of NSObject casts without
+// breaking ownership invariants when compiling in ossa.
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_always_string : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $String
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<String>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<String>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_always_string'
+sil [ossa] @nsobject_test_take_always_string : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $String
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_always NSObject in %nsSource : $*NSObject to String in %stringDest : $*String, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*String
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*String
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_on_success_string : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $String
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<String>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<String>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: [[UNCAST_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
+// CHECK-NEXT: store [[UNCAST_INPUT:%.*]] to [init] [[INPUT]]
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_on_success_string'
+sil [ossa] @nsobject_test_take_on_success_string : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $String
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_on_success NSObject in %nsSource : $*NSObject to String in %stringDest : $*String, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*String
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*String
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_copy_on_success_string : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $String
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<String>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<String>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   destroy_addr [[INPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_copy_on_success_string'
+sil [ossa] @nsobject_test_copy_on_success_string : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $String
+  br bb1
+
+bb1:
+  checked_cast_addr_br copy_on_success NSObject in %nsSource : $*NSObject to String in %stringDest : $*String, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*String
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*String
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_always_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Array<Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Array<Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_always_array_of_any'
+sil [ossa] @nsobject_test_take_always_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Array<Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_always NSObject in %nsSource : $*NSObject to Array<Any> in %stringDest : $*Array<Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Array<Any>
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Array<Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_on_success_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Array<Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Array<Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
+// CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_on_success_array_of_any'
+sil [ossa] @nsobject_test_take_on_success_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Array<Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_on_success NSObject in %nsSource : $*NSObject to Array<Any> in %stringDest : $*Array<Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Array<Any>
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Array<Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_copy_on_success_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Array<Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Array<Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   destroy_addr [[INPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_copy_on_success_array_of_any'
+sil [ossa] @nsobject_test_copy_on_success_array_of_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Array<Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br copy_on_success NSObject in %nsSource : $*NSObject to Array<Any> in %stringDest : $*Array<Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Array<Any>
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Array<Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_always_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Dictionary<AnyHashable, Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Dictionary<AnyHashable, Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Dictionary<AnyHashable, Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_always_dictionary_anyhashable_to_any'
+sil [ossa] @nsobject_test_take_always_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Dictionary<AnyHashable, Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_always NSObject in %nsSource : $*NSObject to Dictionary<AnyHashable, Any> in %stringDest : $*Dictionary<AnyHashable, Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Dictionary<AnyHashable, Any>
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Dictionary<AnyHashable, Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_on_success_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Dictionary<AnyHashable, Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Dictionary<AnyHashable, Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Dictionary<AnyHashable, Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
+// CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_on_success_dictionary_anyhashable_to_any'
+sil [ossa] @nsobject_test_take_on_success_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Dictionary<AnyHashable, Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_on_success NSObject in %nsSource : $*NSObject to Dictionary<AnyHashable, Any> in %stringDest : $*Dictionary<AnyHashable, Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Dictionary<AnyHashable, Any>
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Dictionary<AnyHashable, Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_copy_on_success_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Dictionary<AnyHashable, Any>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Dictionary<AnyHashable, Any>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Dictionary<AnyHashable, Any>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   destroy_addr [[INPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_copy_on_success_dictionary_anyhashable_to_any'
+sil [ossa] @nsobject_test_copy_on_success_dictionary_anyhashable_to_any : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Dictionary<AnyHashable, Any>
+  br bb1
+
+bb1:
+  checked_cast_addr_br copy_on_success NSObject in %nsSource : $*NSObject to Dictionary<AnyHashable, Any> in %stringDest : $*Dictionary<AnyHashable, Any>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Dictionary<AnyHashable, Any>
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Dictionary<AnyHashable, Any>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_always_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Set<AnyHashable>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Set<AnyHashable>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Set<AnyHashable>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_always_set_anyhashable'
+sil [ossa] @nsobject_test_take_always_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Set<AnyHashable>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_always NSObject in %nsSource : $*NSObject to Set<AnyHashable> in %stringDest : $*Set<AnyHashable>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Set<AnyHashable>
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Set<AnyHashable>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_take_on_success_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Set<AnyHashable>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Set<AnyHashable>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Set<AnyHashable>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_value [[CASTED_INPUT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
+// CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_take_on_success_set_anyhashable'
+sil [ossa] @nsobject_test_take_on_success_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Set<AnyHashable>
+  br bb1
+
+bb1:
+  checked_cast_addr_br take_on_success NSObject in %nsSource : $*NSObject to Set<AnyHashable> in %stringDest : $*Set<AnyHashable>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Set<AnyHashable>
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Set<AnyHashable>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nsobject_test_copy_on_success_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSObject
+// CHECK:   store [[ARG]] to [init] [[INPUT]] :
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Set<AnyHashable>
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
+// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
+// CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
+// CHECK-NEXT:   br [[FAIL_EXIT_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[YES_BB]]([[CASTED_INPUT:%.*]] :
+// CHECK:   [[CAST_RESULT:%.*]] = alloc_stack $Optional<Set<AnyHashable>>
+// CHECK:   [[CASTED_INPUT_COPY:%.*]] = copy_value [[CASTED_INPUT]]
+// CHECK:   apply {{%.*}}<Set<AnyHashable>>([[CAST_RESULT]], [[CASTED_INPUT_COPY]], {{%.*}}) :
+// CHECK:   destroy_value [[CASTED_INPUT_COPY]]
+// CHECK-NOT:   destroy_value [[CASTED_INPUT]]
+// CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_SUCC]]:
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_RESULT]]
+// CHECK:   destroy_addr [[OUTPUT]]
+// CHECK:   destroy_addr [[INPUT]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
+//
+// CHECK: [[FAIL_EXIT_TRAMPOLINE]]:
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'nsobject_test_copy_on_success_set_anyhashable'
+sil [ossa] @nsobject_test_copy_on_success_set_anyhashable : $@convention(thin) (@owned NSObject) -> () {
+bb0(%0 : @owned $NSObject):
+  %nsSource = alloc_stack $NSObject
+  store %0 to [init] %nsSource : $*NSObject
+  %stringDest = alloc_stack $Set<AnyHashable>
+  br bb1
+
+bb1:
+  checked_cast_addr_br copy_on_success NSObject in %nsSource : $*NSObject to Set<AnyHashable> in %stringDest : $*Set<AnyHashable>, bb2, bb3
+
+bb2:
+  destroy_addr %stringDest : $*Set<AnyHashable>
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb3:
+  destroy_addr %nsSource : $*NSObject
+  br bb4
+
+bb4:
+  dealloc_stack %stringDest : $*Set<AnyHashable>
+  dealloc_stack %nsSource : $*NSObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we properly emit ossa in this case. We just want to know that
+// the optimization actually happened.
+//
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_copy_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_copy_on_success'
+sil [ossa] @array_to_nsarray_conditional_copy_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br copy_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*NSArray
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*Array<NSObject>
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_take_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_take_on_success'
+sil [ossa] @array_to_nsarray_conditional_take_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br take_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*NSArray
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Array<NSObject>
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_take_always : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_take_always'
+sil [ossa] @array_to_nsarray_conditional_take_always : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br take_always Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*NSArray
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @nsarray_user : $@convention(thin) (@in_guaranteed NSArray) -> ()
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_unconditional_loadable_address : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: } // end sil function 'array_to_nsarray_unconditional_loadable_address'
+sil [ossa] @array_to_nsarray_unconditional_loadable_address : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  unconditional_checked_cast_addr Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray
+  %3 = function_ref @nsarray_user : $@convention(thin) (@in_guaranteed NSArray) -> ()
+  apply %3(%2) : $@convention(thin) (@in_guaranteed NSArray) -> ()
+  destroy_addr %2 : $*NSArray
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}

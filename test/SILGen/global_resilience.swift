@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_global.swiftmodule -module-name=resilient_global %S/../Inputs/resilient_global.swift
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -emit-module-path=%t/resilient_global.swiftmodule -module-name=resilient_global %S/../Inputs/resilient_global.swift
 // RUN: %target-swift-emit-silgen -I %t -enable-library-evolution -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %t -O -enable-library-evolution -parse-as-library %s | %FileCheck --check-prefix=CHECK-OPT %s
 
@@ -8,6 +8,10 @@ import resilient_global
 public struct MyEmptyStruct {}
 
 // CHECK-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
+
+// CHECK-OPT-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct = {
+// CHECK-OPT-LABEL:   %initval = struct $MyEmptyStruct ()
+// CHECK-OPT-LABEL: }
 
 public var myEmptyGlobal = MyEmptyStruct()
 
@@ -39,17 +43,22 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 // Mutable addressor for fixed-layout global
 
+// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ
+// CHECK:         alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
+// CHECK:         return
+
 // CHECK-LABEL: sil [global_init] [ossa] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
+// CHECK:         function_ref @{{.*}}WZ
 // CHECK:         global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
-// CHECK-OPT-LABEL: sil private @globalinit_{{.*}}_func0
+// CHECK-OPT-LABEL: sil private [global_init_once_fn] @{{.*}}WZ
 // CHECK-OPT:     alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK-OPT:     return
 
 // CHECK-OPT-LABEL: sil [global_init] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
+// CHECK-OPT:     function_ref @{{.*}}WZ
 // CHECK-OPT:     global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvp
-// CHECK-OPT:     function_ref @globalinit_{{.*}}_func0
 // CHECK-OPT:     return
 
 // Accessing resilient global from our resilience domain --

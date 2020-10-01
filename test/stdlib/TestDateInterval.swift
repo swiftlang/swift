@@ -65,6 +65,36 @@ class TestDateInterval : TestDateIntervalSuper {
         }
     }
 
+    func test_hashing() {
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
+
+        let start1a = dateWithString("2019-04-04 17:09:23 -0700")
+        let start1b = dateWithString("2019-04-04 17:09:23 -0700")
+        let start2a = Date(timeIntervalSinceReferenceDate: start1a.timeIntervalSinceReferenceDate.nextUp)
+        let start2b = Date(timeIntervalSinceReferenceDate: start1a.timeIntervalSinceReferenceDate.nextUp)
+        let duration1 = 1800.0
+        let duration2 = duration1.nextUp
+        let intervals: [[DateInterval]] = [
+            [
+                DateInterval(start: start1a, duration: duration1),
+                DateInterval(start: start1b, duration: duration1),
+            ],
+            [
+                DateInterval(start: start1a, duration: duration2),
+                DateInterval(start: start1b, duration: duration2),
+            ],
+            [
+                DateInterval(start: start2a, duration: duration1),
+                DateInterval(start: start2b, duration: duration1),
+            ],
+            [
+                DateInterval(start: start2a, duration: duration2),
+                DateInterval(start: start2b, duration: duration2),
+            ],
+        ]
+        checkHashableGroups(intervals)
+    }
+
     func test_checkIntersection() {
         if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
             let start1 = dateWithString("2010-05-17 14:49:47 -0700")
@@ -171,6 +201,7 @@ class TestDateInterval : TestDateIntervalSuper {
 var DateIntervalTests = TestSuite("TestDateInterval")
 DateIntervalTests.test("test_compareDateIntervals") { TestDateInterval().test_compareDateIntervals() }
 DateIntervalTests.test("test_isEqualToDateInterval") { TestDateInterval().test_isEqualToDateInterval() }
+DateIntervalTests.test("test_hashing") { TestDateInterval().test_hashing() }
 DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_checkIntersection() }
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
 DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }

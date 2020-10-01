@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,9 +15,10 @@ import SwiftPrivate
 import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
+import Foundation
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -117,6 +118,10 @@ fileprivate struct AtomicBool {
     func orAndFetch(_ b: Bool) -> Bool {
         return _value.orAndFetch(b ? 1 : 0) != 0
     }
+
+    func fetchAndClear() -> Bool {
+        return _value.fetchAndAnd(0) != 0
+    }
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
@@ -139,16 +144,22 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
-  let endAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
   )
   _anyExpectFailed.orAndFetch(startAnyExpectFailed)
+}
+
+/// An opaque function that ignores its argument and returns nothing.
+public func noop<T>(_ value: T) {}
+
+/// An opaque function that simply returns its argument.
+public func identity<T>(_ value: T) -> T {
+  return value
 }
 
 public func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
@@ -737,6 +748,9 @@ extension ProcessTerminationStatus {
     case .signal(let signal):
 #if os(Windows)
       return CInt(signal) == SIGILL
+#elseif os(WASI)
+      // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+      return false
 #else
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
 #endif
@@ -931,7 +945,10 @@ class _ParentProcess {
     let (_, stdoutThread) = _stdlib_thread_create_block({
       while !self._childStdout.isEOF {
         self._childStdout.read()
-        while let line = self._childStdout.getline() {
+        while var line = self._childStdout.getline() {
+          if let cr = line.firstIndex(of: "\r") {
+            line.remove(at: cr)
+          }
           var done: Bool
           (done: done, ()) = onStdoutLine(line)
           if done { return }
@@ -1711,14 +1728,9 @@ public final class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("getSystemVersionPlistProperty")
-func _getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
-
+#if canImport(Darwin)
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
-  let cs = _getSystemVersionPlistPropertyImpl(propertyName)
-  return cs.map(String.init(cString:))
+  return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }
 #endif
 
@@ -1732,11 +1744,13 @@ public enum OSVersion : CustomStringConvertible {
   case watchOSSimulator
   case linux
   case freeBSD
+  case openBSD
   case android
   case ps4
   case windowsCygnus
   case windows
   case haiku
+  case wasi
 
   public var description: String {
     switch self {
@@ -1758,6 +1772,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case .freeBSD:
       return "FreeBSD"
+    case .openBSD:
+      return "OpenBSD"
     case .ps4:
       return "PS4"
     case .android:
@@ -1768,6 +1784,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Windows"
     case .haiku:
       return "Haiku"
+    case .wasi:
+      return "WASI"
     }
   }
 }
@@ -1777,7 +1795,7 @@ func _parseDottedVersion(_ s: String) -> [Int] {
 }
 
 public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
-  var array = _parseDottedVersion(s)
+  let array = _parseDottedVersion(s)
   if array.count >= 4 {
     fatalError("unexpected version")
   }
@@ -1802,6 +1820,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(OpenBSD)
+  return .openBSD
 #elseif os(PS4)
   return .ps4
 #elseif os(Android)
@@ -1812,6 +1832,8 @@ func _getOSVersion() -> OSVersion {
   return .windows
 #elseif os(Haiku)
   return .haiku
+#elseif os(WASI)
+  return .wasi
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -1857,6 +1879,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case iOSAny(/*reason:*/ String)
   case iOSMajor(Int, reason: String)
+  case iOSMajorRange(ClosedRange<Int>, reason: String)
   case iOSMinor(Int, Int, reason: String)
   case iOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case iOSBugFix(Int, Int, Int, reason: String)
@@ -1866,6 +1889,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case tvOSAny(/*reason:*/ String)
   case tvOSMajor(Int, reason: String)
+  case tvOSMajorRange(ClosedRange<Int>, reason: String)
   case tvOSMinor(Int, Int, reason: String)
   case tvOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case tvOSBugFix(Int, Int, Int, reason: String)
@@ -1875,6 +1899,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case watchOSAny(/*reason:*/ String)
   case watchOSMajor(Int, reason: String)
+  case watchOSMajorRange(ClosedRange<Int>, reason: String)
   case watchOSMinor(Int, Int, reason: String)
   case watchOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case watchOSBugFix(Int, Int, Int, reason: String)
@@ -1926,6 +1951,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "iOS(*, reason: \(reason))"
     case .iOSMajor(let major, let reason):
       return "iOS(\(major).*, reason: \(reason))"
+    case .iOSMajorRange(let range, let reason):
+      return "iOS([\(range)], reason: \(reason))"
     case .iOSMinor(let major, let minor, let reason):
       return "iOS(\(major).\(minor), reason: \(reason))"
     case .iOSMinorRange(let major, let minorRange, let reason):
@@ -1942,6 +1969,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "tvOS(*, reason: \(reason))"
     case .tvOSMajor(let major, let reason):
       return "tvOS(\(major).*, reason: \(reason))"
+    case .tvOSMajorRange(let range, let reason):
+      return "tvOS([\(range)], reason: \(reason))"
     case .tvOSMinor(let major, let minor, let reason):
       return "tvOS(\(major).\(minor), reason: \(reason))"
     case .tvOSMinorRange(let major, let minorRange, let reason):
@@ -1958,6 +1987,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "watchOS(*, reason: \(reason))"
     case .watchOSMajor(let major, let reason):
       return "watchOS(\(major).*, reason: \(reason))"
+    case .watchOSMajorRange(let range, let reason):
+      return "watchOS([\(range)], reason: \(reason))"
     case .watchOSMinor(let major, let minor, let reason):
       return "watchOS(\(major).\(minor), reason: \(reason))"
     case .watchOSMinorRange(let major, let minorRange, let reason):
@@ -2072,6 +2103,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .iOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .iOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .iOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, _):
@@ -2128,6 +2167,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .tvOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .tvOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .tvOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, _):
@@ -2180,6 +2227,14 @@ public enum TestRunPredicate : CustomStringConvertible {
       switch _getRunningOSVersion() {
       case .watchOS(major, _, _):
         return true
+      default:
+        return false
+      }
+
+    case .watchOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(let major, _, _):
+        return range.contains(major)
       default:
         return false
       }
@@ -2362,17 +2417,22 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        (predictedXY
-           ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
-        "rhs (at index \(j)): \(String(reflecting: y))",
+        """
+        \((predictedXY
+           ? "expected equal, found not equal"
+           : "expected not equal, found equal"))
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
+        """
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       if !allowBrokenTransitivity {
@@ -2414,6 +2474,10 @@ public func checkEquatable<T : Equatable>(
     showFrame: false)
 }
 
+/// Produce an integer hash value for `value` by feeding it to a dedicated
+/// `Hasher`. This is always done by calling the `hash(into:)` method.
+/// If a non-nil `seed` is given, it is used to perturb the hasher state;
+/// this is useful for resolving accidental hash collisions.
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   var hasher = Hasher()
   if let seed = seed {
@@ -2429,6 +2493,7 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
 public func checkHashableGroups<Groups: Collection>(
   _ groups: Groups,
   _ message: @autoclosure () -> String = "",
+  allowIncompleteHashing: Bool = false,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
@@ -2446,6 +2511,7 @@ public func checkHashableGroups<Groups: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: false,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2457,6 +2523,7 @@ public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2467,6 +2534,7 @@ public func checkHashable<Instances: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: allowBrokenTransitivity,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2480,6 +2548,7 @@ public func checkHashable<Instances: Collection>(
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2532,12 +2601,12 @@ public func checkHashable<Instances: Collection>(
         expectEqual(
           x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
-          _rawHashValue expected to match, found to differ
+          _rawHashValue(seed:) expected to match, found to differ
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-      } else {
+      } else if !allowIncompleteHashing {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
         // all ten attempts, unless the type's hash encoding is not unique,
@@ -2795,7 +2864,7 @@ public func checkLosslessStringConvertible<Instance>(
 }
 
 public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
-  return x.index(x.startIndex, offsetBy: numericCast(n))
+  return x.index(x.startIndex, offsetBy: n)
 }
 
 public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {

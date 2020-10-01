@@ -27,7 +27,7 @@ func main() {
 
   // CHECK: [[globalString:%.*]] = load [copy] {{%.*}} : $*NSString
   // CHECK: [[bridgeStringFunc:%.*]] = function_ref @{{.*}} : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
-  // CHECK: [[wrappedString:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[globalString]] : $NSString
+  // CHECK: [[wrappedString:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[globalString]] : $NSString
   // CHECK: [[stringMetaType:%.*]] = metatype $@thin String.Type
   // CHECK: [[bridgedString:%.*]] = apply [[bridgeStringFunc]]([[wrappedString]], [[stringMetaType]]) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
   let string = globalString // Problematic case, wasn't being retained

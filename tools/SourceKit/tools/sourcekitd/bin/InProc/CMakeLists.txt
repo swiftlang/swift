@@ -5,8 +5,7 @@ option(SOURCEKITD_BUILD_STATIC_INPROC
 
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
-  LINK_LIBS SourceKitSwiftLang sourcekitdAPI
-  LLVM_COMPONENT_DEPENDS support coverage
+  LLVM_LINK_COMPONENTS support coverage
 )
 
 if (SOURCEKIT_INSTALLING_INPROC)
@@ -36,6 +35,9 @@ else()
     SHARED
   )
 endif()
+target_link_libraries(sourcekitdInProc PRIVATE
+  SourceKitSwiftLang
+  sourcekitdAPI)
 
 # While it is possible to build this as a static library,
 # to get the runtime paths correct, it must be linked into a binary
@@ -46,6 +48,9 @@ if (SOURCEKITD_BUILD_STATIC_INPROC)
       ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     ${sourcekitdInProc_args}
   )
+  target_link_libraries(sourcekitdInProc_Static PRIVATE
+    SourceKitSwiftLang
+    sourcekitdAPI)
 endif()
 
 if (SOURCEKIT_BUILT_STANDALONE)

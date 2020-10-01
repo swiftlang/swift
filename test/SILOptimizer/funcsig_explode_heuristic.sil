@@ -1,0 +1,207 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -function-signature-opts -sil-fso-disable-dead-argument -sil-fso-disable-owned-to-guaranteed -enable-expand-all -sil-fso-optimize-if-not-called %s | %FileCheck %s
+
+// *NOTE* We turn off all other fso optimizations including dead arg so we can
+// make sure that we are not exploding those.
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+struct BigTrivial {
+  var x1: Builtin.Int32
+  var x2: Builtin.Int32
+  var x3: Builtin.Int32
+  var x4: Builtin.Int32
+  var x5: Builtin.Int32
+  var x6: Builtin.Int32
+}
+
+class Klass {}
+
+struct LargeNonTrivialStructOneNonTrivialField {
+  var k1: Klass
+  var k2: Klass
+  var x1: Builtin.Int32
+  var x2: Builtin.Int32
+  var x3: Builtin.Int32
+  var x4: Builtin.Int32
+}
+
+sil @int_user : $@convention(thin) (Builtin.Int32) -> ()
+sil @consuming_user : $@convention(thin) (@owned Klass) -> ()
+sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+
+///////////
+// Tests //
+///////////
+
+// We should never optimize this. If we did this would become a thunk, so we
+// know that just be checking NFC we have proven no optimization has occured.
+//
+// CHECK-LABEL: sil @never_explode_trivial : $@convention(thin) (BigTrivial) -> () {
+// CHECK: } // end sil function 'never_explode_trivial'
+sil @never_explode_trivial : $@convention(thin) (BigTrivial) -> () {
+bb0(%0 : $BigTrivial):
+  %1 = struct_extract %0 : $BigTrivial, #BigTrivial.x1
+  %intfunc = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%1) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If a value is never used, do not touch it. We leave it for dead argument
+// elimination. We have delibrately turned this off to test that behavior.
+//
+// CHECK-LABEL: sil @big_arg_with_no_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'big_arg_with_no_uses'
+sil @big_arg_with_no_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We are using a single non-trivial field of the struct. We should explode this
+// so we eliminate the second non-trivial leaf.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s31big_arg_with_one_nontrivial_useTf4x_n
+// CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+// CHECK:   apply [[FUNC]]([[FIELD]])
+// CHECK: } // end sil function 'big_arg_with_one_nontrivial_use'
+sil @big_arg_with_one_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We are using a single non-trivial field and a single trivial field. We are
+// willing to blow this up.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_one_trivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s032big_arg_with_one_nontrivial_use_d9_trivial_F0Tf4x_n : $@convention(thin) (@guaranteed Klass, Builtin.Int32) -> ()
+// CHECK:   [[TRIVIAL_FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
+// CHECK:   [[NON_TRIVIAL_FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+// CHECK:   apply [[FUNC]]([[NON_TRIVIAL_FIELD]], [[TRIVIAL_FIELD]])
+// CHECK: } // end sil function 'big_arg_with_one_nontrivial_use_one_trivial_use'
+sil @big_arg_with_one_nontrivial_use_one_trivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %intfunc = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can still explode this, since our limit is 3 values.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_two_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s48big_arg_with_one_nontrivial_use_two_trivial_usesTf4x_n : $@convention(thin)
+// CHECK:   [[TRIVIAL_FIELD1:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x2
+// CHECK:   [[TRIVIAL_FIELD2:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
+// CHECK:   [[NON_TRIVIAL_FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+// CHECK:   apply [[FUNC]]([[NON_TRIVIAL_FIELD]], [[TRIVIAL_FIELD2]], [[TRIVIAL_FIELD1]])
+sil @big_arg_with_one_nontrivial_use_two_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
+  %3 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x2
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %4(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %intfunc = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%3) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not blow up the struct here since we have 4 uses, not 3.
+//
+// CHECK-LABEL: sil @big_arg_with_one_nontrivial_use_three_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+sil @big_arg_with_one_nontrivial_use_three_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
+  %3 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x2
+  %3a = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x3
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %4(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %intfunc = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%3) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %intfunc(%3a) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// In this case, we shouldn't blow up the struct since we have not reduced the
+// number of non-trivial leaf nodes used.
+//
+// CHECK-LABEL: sil @big_arg_with_two_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+sil @big_arg_with_two_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k2
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If we have one non-trivial value that is live and only live because of a
+// destroy, we can delete the argument after performing o2g.
+//
+// We are using a single non-trivial field of the struct. We should explode this
+// so we eliminate the second non-trivial leaf.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_o2g_other_dead : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-NOT: release_value
+// CHECK: apply
+// CHECK-NOT: release_value
+// CHECK: } // end sil function 'big_arg_with_one_nontrivial_use_o2g_other_dead'
+sil @big_arg_with_one_nontrivial_use_o2g_other_dead : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  release_value %1 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If we have two non-trivial values that are live and one is always dead and
+// the other is kept alive due to a release, we can get rid of both since FSO
+// reruns with o2g. Test here that we explode it appropriatel even though we
+// aren't reducing the number of non-trivial uses. The
+// funcsig_explode_heuristic_inline.sil test makes sure we in combination
+// produce the appropriate SIL.
+//
+// We check that we can inline this correctly in the inline test.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FUNC:%.*]] = function_ref @$s35big_arg_with_one_nontrivial_use_o2gTf4x_n : $@convention(thin) (@owned Klass, @owned Klass) -> ()
+// CHECK:   apply [[FUNC]](
+// CHECK: } // end sil function 'big_arg_with_one_nontrivial_use_o2g'
+sil @big_arg_with_one_nontrivial_use_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k2
+  %3 = function_ref @consuming_user : $@convention(thin) (@owned Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@owned Klass) -> ()
+  release_value %1 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

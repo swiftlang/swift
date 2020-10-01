@@ -1,0 +1,9 @@
+module FooKit {
+  header "FooKit.h"
+  export *
+}
+
+module FooKit_SECRET {
+  header "FooKit_SECRET.h"
+  export *
+}

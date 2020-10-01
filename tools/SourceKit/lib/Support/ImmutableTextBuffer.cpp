@@ -107,6 +107,19 @@ bool ImmutableTextSnapshot::foreachReplaceUntil(
   
   assert(EndSnapshot);
   ImmutableTextUpdateRef Upd = DiffEnd;
+
+  // Since `getBufferForSnapshot` may produce a snapshot with edits consolidated
+  // into a buffer, we need to check the stamp explicitly for "equal" snapshots.
+  // Otherwise, the following code, which should be a no-op, will behave
+  // incorrectly:
+  //
+  //     auto snap1 = editableBuffer->getSnapshot();
+  //     auto buffer = editableBuffer->getBuffer();
+  //     auto snap2 = editableBuffer->getSnapshot();
+  //     snap2->forEachReplaceUntil(snap1, ...); // should be no-op
+  if (getStamp() == EndSnapshot->getStamp())
+    return true;
+
   while (Upd != EndSnapshot->DiffEnd) {
     Upd = Upd->getNext();
     if (!Upd) {
@@ -124,7 +137,7 @@ bool ImmutableTextSnapshot::foreachReplaceUntil(
 static std::atomic<uint64_t> Generation{ 0 };
 
 EditableTextBuffer::EditableTextBuffer(StringRef Filename, StringRef Text) {
-  this->Filename = Filename;
+  this->Filename = Filename.str();
   Root = new ImmutableTextBuffer(Filename, Text, ++Generation);
   CurrUpd = Root;
 }

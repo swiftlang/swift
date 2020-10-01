@@ -30,8 +30,10 @@ using namespace swift;
 namespace {
 
 class Devirtualizer : public SILFunctionTransform {
+  bool Changed = false;
+  bool ChangedCFG = false;
 
-  bool devirtualizeAppliesInFunction(SILFunction &F,
+  void devirtualizeAppliesInFunction(SILFunction &F,
                                      ClassHierarchyAnalysis *CHA);
 
   /// The entry point to the transformation.
@@ -41,7 +43,12 @@ class Devirtualizer : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
                             << " *****\n");
 
-    if (devirtualizeAppliesInFunction(F, CHA))
+    Changed = false;
+    ChangedCFG = false;
+    devirtualizeAppliesInFunction(F, CHA);
+    if (ChangedCFG)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    else if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
@@ -49,11 +56,11 @@ class Devirtualizer : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
+// Return true if any calls changed, and true if the CFG also changed.
+void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
-  bool Changed = false;
   llvm::SmallVector<ApplySite, 8> NewApplies;
-  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
+  OptRemark::Emitter ORE(DEBUG_TYPE, F);
 
   SmallVector<ApplySite, 16> Applies;
   for (auto &BB : F) {
@@ -69,11 +76,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
+    ApplySite NewInst;
+    bool modifiedCFG;
+    std::tie(NewInst, modifiedCFG) = tryDevirtualizeApply(Apply, CHA, &ORE);
     if (!NewInst)
       continue;
 
     Changed = true;
+    ChangedCFG |= modifiedCFG;
 
     deleteDevirtualizedApply(Apply);
     NewApplies.push_back(NewInst);
@@ -89,7 +99,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   while (!NewApplies.empty()) {
     auto Apply = NewApplies.pop_back_val();
 
-    auto *CalleeFn = Apply.getReferencedFunction();
+    auto *CalleeFn = Apply.getInitiallyReferencedFunction();
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
@@ -105,8 +115,6 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
       addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
-
-  return Changed;
 }
 
 SILTransform *swift::createDevirtualizer() { return new Devirtualizer(); }

@@ -273,7 +273,7 @@
 ///         }
 ///     }
 ///     // Prints "Response 200: OK"
-///     // Prints "Response 403: Access Forbidden"
+///     // Prints "Response 403: Access forbidden"
 ///     // Prints "Unknown response 301"
 ///
 /// You can also update, modify, or remove keys and values from a dictionary
@@ -351,7 +351,7 @@
 /// the corresponding key-value pair as a non-optional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
-///     // Prints "("star", "/glyphs/star.png")"
+///     // Prints "(key: "star", value: "/glyphs/star.png")"
 ///
 /// A dictionary's indices stay valid across additions to the dictionary as
 /// long as the dictionary has enough capacity to store the added values
@@ -385,7 +385,7 @@
 /// `NSDictionary` and `Dictionary` share buffer using the same copy-on-write
 /// optimization that is used when two instances of `Dictionary` share
 /// buffer.
-@_fixed_layout
+@frozen
 public struct Dictionary<Key: Hashable, Value> {
   /// The element type of a dictionary: a tuple containing an individual
   /// key-value pair.
@@ -696,7 +696,7 @@ extension Dictionary: Collection {
   ///     } else {
   ///         print("Didn't find 'Japan' as a value in the dictionary.")
   ///     }
-  ///     // Prints "("JP", "Japan")"
+  ///     // Prints "(key: "JP", value: "Japan")"
   ///     // Prints "Japan's country code is 'JP'."
   ///
   /// - Parameter position: The position of the key-value pair to access.
@@ -851,7 +851,7 @@ extension Dictionary {
   ///         print("Response \(code): \(message)")
   ///     }
   ///     // Prints "Response 200: OK"
-  ///     // Prints "Response 403: Access Forbidden"
+  ///     // Prints "Response 403: Access forbidden"
   ///     // Prints "Response 301: Unknown response"
   ///
   /// When a dictionary's `Value` type has value semantics, you can use this
@@ -862,7 +862,7 @@ extension Dictionary {
   ///     let message = "Hello, Elle!"
   ///     var letterCounts: [Character: Int] = [:]
   ///     for letter in message {
-  ///         letterCounts[letter, defaultValue: 0] += 1
+  ///         letterCounts[letter, default: 0] += 1
   ///     }
   ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
   ///
@@ -879,7 +879,7 @@ extension Dictionary {
   ///   - key: The key the look up in the dictionary.
   ///   - defaultValue: The default value to use if `key` doesn't exist in the
   ///     dictionary.
-  /// - Returns: The value associated with `key` in the dictionary`; otherwise,
+  /// - Returns: The value associated with `key` in the dictionary; otherwise,
   ///   `defaultValue`.
   @inlinable
   public subscript(
@@ -933,7 +933,7 @@ extension Dictionary {
   ///     let data = ["a": "1", "b": "three", "c": "///4///"]
   ///
   ///     let m: [String: Int?] = data.mapValues { str in Int(str) }
-  ///     // ["a": 1, "b": nil, "c": nil]
+  ///     // ["a": Optional(1), "b": nil, "c": nil]
   ///
   ///     let c: [String: Int] = data.compactMapValues { str in Int(str) }
   ///     // ["a": 1]
@@ -1183,7 +1183,7 @@ extension Dictionary {
   /// If the key isn't found in the dictionary, `removeValue(forKey:)` returns
   /// `nil`.
   ///
-  ///     if let value = hues.removeValueForKey("Cerise") {
+  ///     if let value = hues.removeValue(forKey: "Cerise") {
   ///         print("The value \(value) was removed.")
   ///     } else {
   ///         print("No value found for that key.")
@@ -1280,7 +1280,7 @@ extension Dictionary {
   }
 
   /// A view of a dictionary's keys.
-  @_fixed_layout
+  @frozen
   public struct Keys
     : Collection, Equatable,
       CustomStringConvertible, CustomDebugStringConvertible {
@@ -1407,7 +1407,7 @@ extension Dictionary {
   }
 
   /// A view of a dictionary's values.
-  @_fixed_layout
+  @frozen
   public struct Values
     : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Value
@@ -1505,7 +1505,7 @@ extension Dictionary {
 }
 
 extension Dictionary.Keys {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _base: Dictionary<Key, Value>.Iterator
@@ -1538,7 +1538,7 @@ extension Dictionary.Keys {
 }
 
 extension Dictionary.Values {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _base: Dictionary<Key, Value>.Iterator
@@ -1678,7 +1678,7 @@ extension Collection {
   internal func _makeKeyValuePairDescription<K, V>(
     withTypeName type: String? = nil
   ) -> String where Element == (key: K, value: V) {
-    if self.count == 0 {
+    if self.isEmpty {
       return "[:]"
     }
     
@@ -1713,7 +1713,7 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 @usableFromInline
-@_frozen
+@frozen
 internal enum _MergeError: Error {
   case keyCollision
 }
@@ -1730,7 +1730,7 @@ extension Dictionary {
   /// 2. Subscripting with an index, yielding a key-value pair:
   ///
   ///        (k, v) = d[i]
-  @_fixed_layout
+  @frozen
   public struct Index {
     // Index for native dictionary is efficient.  Index for bridged NSDictionary
     // is not, because neither NSEnumerator nor fast enumeration support moving
@@ -1739,7 +1739,7 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
-    @_frozen
+    @frozen
     @usableFromInline
     internal enum _Variant {
       case native(_HashTable.Index)
@@ -1908,7 +1908,7 @@ extension Dictionary.Index: Hashable {
 
 extension Dictionary {
   /// An iterator over the members of a `Dictionary<Key, Value>`.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     // Dictionary has a separate IteratorProtocol and Index because of
     // efficiency and implementability reasons.
@@ -1921,7 +1921,7 @@ extension Dictionary {
     // IteratorProtocol, which is being consumed as iteration proceeds.
 
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Variant {
       case native(_NativeDictionary<Key, Value>.Iterator)
 #if _runtime(_ObjC)

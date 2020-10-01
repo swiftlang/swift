@@ -17,7 +17,7 @@
 
 
 public protocol _UTFParser {
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding: _UnicodeEncoding
 
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
@@ -26,11 +26,11 @@ public protocol _UTFParser {
 }
 
 extension _UTFParser
-where Encoding.EncodedScalar : RangeReplaceableCollection {
+where Encoding.EncodedScalar: RangeReplaceableCollection {
 
   @inlinable
   @inline(__always)
-  public mutating func parseScalar<I : IteratorProtocol>(
+  public mutating func parseScalar<I: IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
     where I.Element == Encoding.CodeUnit {

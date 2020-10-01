@@ -1,6 +1,6 @@
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread -o %t_tsan-binary
+// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
-// RUN: not env %env-TSAN_OPTIONS="abort_on_error=0" %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
@@ -10,9 +10,9 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -44,6 +44,7 @@ public func call_foobar() {
 var threads: [pthread_t] = []
 var racey_x: Int;
 
+// TSan %deflake as part of the test.
 for _ in 1...5 {
 #if os(macOS) || os(iOS)
   var t : pthread_t?

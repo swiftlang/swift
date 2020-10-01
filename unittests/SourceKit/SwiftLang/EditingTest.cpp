@@ -34,10 +34,18 @@ static StringRef getRuntimeLibPath() {
 
 namespace {
 
-class DiagConsumer : public EditorConsumer {
+struct Token {
+  unsigned Offset;
+  unsigned Length;
+  UIdent Kind;
+  bool IsSystem;
+};
+
+class TestConsumer : public EditorConsumer {
 public:
   UIdent DiagStage;
   std::vector<DiagnosticEntryInfo> Diags;
+  std::vector<Token> Annotations;
 
 private:
   void handleRequestError(const char *Description) override {
@@ -50,7 +58,9 @@ private:
   }
 
   void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
-                                bool isSystem) override {}
+                                bool isSystem) override {
+    Annotations.push_back({Offset, Length, Kind, isSystem});
+  }
 
   bool documentStructureEnabled() override { return false; }
 
@@ -114,6 +124,7 @@ public:
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
     Ctx = new SourceKit::Context(getRuntimeLibPath(),
+                                 /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
@@ -154,7 +165,7 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
   }
 
   void close(const char *DocName) {
@@ -173,14 +184,33 @@ public:
     return pos;
   }
 
-  void reset(DiagConsumer &Consumer) {
+  void reset(TestConsumer &Consumer) {
     Consumer.Diags.clear();
     Consumer.DiagStage = UIdent();
+    Consumer.Annotations.clear();
     std::unique_lock<std::mutex> lk(DocUpdState->Mtx);
     DocUpdState->HasUpdate = false;
   }
 
   void doubleOpenWithDelay(std::chrono::microseconds delay, bool close);
+
+  void setupThreeAnnotations(const char *DocName, TestConsumer &Consumer) {
+    // The following is engineered so that the references to `mem` are at
+    // offsets 60, 70, and 80 for convenience. They're on the same line so
+    // that tests do not accidentally depend on line separation.
+    const char *Contents =
+    "struct S {\n"
+    "  var mem: Int = 0\n"
+    "  func test() {\n"
+    "          _ = mem;  _ = mem;  _ = mem\n"
+    "  }\n"
+    "}\n";
+    const char *Args[] = { "-parse-as-library" };
+
+    open(DocName, Contents, Args, Consumer);
+    ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+    reset(Consumer);
+  }
 
 private:
   std::vector<const char *> makeArgs(const char *DocName,
@@ -197,13 +227,13 @@ static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
 static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
 TEST_F(EditTest, DiagsAfterEdit) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "func foo {}\n"
     "let v = 0\n";
   const char *Args[] = { "-parse-as-library" };
 
-  DiagConsumer Consumer;
+  TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
   ASSERT_EQ(1u, Consumer.Diags.size());
   EXPECT_STREQ("expected '(' in argument list of function declaration", Consumer.Diags[0].Description.c_str());
@@ -234,22 +264,34 @@ TEST_F(EditTest, DiagsAfterEdit) {
 
 void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
                                    bool closeDoc) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "func foo() { _ = unknown_name }\n";
   const char *Args[] = { "-parse-as-library" };
 
-  DiagConsumer Consumer;
+  TestConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
-  ASSERT_EQ(0u, Consumer.Diags.size());
+  ASSERT_LE(Consumer.Diags.size(), 1u);
+  if (Consumer.Diags.size() > 0) {
+    EXPECT_EQ(SemaDiagStage, Consumer.DiagStage);
+    Consumer.Diags.clear();
+    Consumer.DiagStage = UIdent();
+  }
+
   // Open again without closing; this reinitializes the semantic info on the doc
   if (delay > std::chrono::microseconds(0))
     std::this_thread::sleep_for(delay);
   if (closeDoc)
     close(DocName);
   reset(Consumer);
+
   open(DocName, Contents, Args, Consumer);
-  ASSERT_EQ(0u, Consumer.Diags.size());
+  ASSERT_LE(Consumer.Diags.size(), 1u);
+  if (Consumer.Diags.size() > 0) {
+    EXPECT_EQ(SemaDiagStage, Consumer.DiagStage);
+    Consumer.Diags.clear();
+    Consumer.DiagStage = UIdent();
+  }
 
   // Wait for the document update from the second time we open the document. We
   // may or may not get a notification from the first time it was opened, but
@@ -265,7 +307,7 @@ void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
   }
 
   ASSERT_EQ(1u, Consumer.Diags.size());
-  EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
+  EXPECT_STREQ("cannot find 'unknown_name' in scope", Consumer.Diags[0].Description.c_str());
 
   close(DocName);
 }
@@ -296,4 +338,335 @@ TEST_F(EditTest, DiagsAfterReopen) {
   doubleOpenWithDelay(std::chrono::milliseconds(1), false);
   doubleOpenWithDelay(std::chrono::milliseconds(10), false);
   doubleOpenWithDelay(std::chrono::milliseconds(100), false);
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Token &Tok) {
+  OS << "[off=" << Tok.Offset << " len=" << Tok.Length << " " << Tok.Kind.getName();
+  if (Tok.IsSystem)
+    OS << " system";
+  OS << "]";
+  return OS;
+}
+
+template<typename Collection>
+std::string dumpStrings(const Collection &Annotations) {
+  std::string tmp;
+  llvm::raw_string_ostream OS(tmp);
+  for (auto &tok : Annotations) {
+    OS << tok << "\n";
+  }
+  return OS.str();
+}
+
+void checkTokens(llvm::ArrayRef<Token> Annotations, llvm::ArrayRef<const char *> Expected) {
+  EXPECT_EQ(Annotations.size(), Expected.size()) <<
+      dumpStrings(Annotations) << "  vs\n" << dumpStrings(Expected);
+  if (Annotations.size() != Expected.size())
+    return;
+
+  for (unsigned i = 0, e = Annotations.size(); i != e; ++i) {
+    std::string tok;
+    {
+      llvm::raw_string_ostream OS(tok);
+      OS << Annotations[i];
+    }
+    EXPECT_EQ(tok, Expected[i]);
+  }
+}
+
+TEST_F(EditTest, AnnotationsAfterOpen) {
+  const char *DocName = "test.swift";
+  const char *Contents =
+    "struct S {\n"
+    "  var mem: Int = 0\n"
+    "  func test() {\n"
+    "    _ = self.mem\n"
+    "  }\n"
+    "}\n";
+  const char *Args[] = { "-parse-as-library" };
+
+  TestConsumer Consumer;
+  open(DocName, Contents, Args, Consumer);
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
+  reset(Consumer);
+  replaceText(DocName, 0, 0, "", Consumer);
+
+  ASSERT_EQ(0u, Consumer.Diags.size());
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=59 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  reset(Consumer);
+  replaceText(DocName, 0, 0, "", Consumer);
+  // FIXME: we currently "take" the annotations instead of "get"ing them.
+  EXPECT_EQ(0u, Consumer.Annotations.size());
+
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsAfterEdit) {
+  const char *DocName = "test.swift";
+  const char *Contents =
+    "struct S {\n"
+    "  var mem: Int = 0\n"
+    "  func test() {\n"
+    "    _ = self.me\n"
+    "  }\n"
+    "}\n";
+  const char *Args[] = { "-parse-as-library" };
+
+  TestConsumer Consumer;
+  open(DocName, Contents, Args, Consumer);
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  ASSERT_EQ(ParseDiagStage, Consumer.DiagStage);
+  reset(Consumer);
+  replaceText(DocName, 0, 0, "", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+  });
+
+  reset(Consumer);
+  replaceText(DocName, 61, 0, "m", Consumer);
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+
+  if (Consumer.DiagStage == SemaDiagStage) {
+    // AST already built, annotations are on Consumer.
+  } else {
+    // Re-query.
+    reset(Consumer);
+    replaceText(DocName, 0, 0, "", Consumer);
+  }
+
+  ASSERT_EQ(0u, Consumer.Diags.size());
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=59 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertStart) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 70, 0, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+    // Shifted by 1
+    "[off=81 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceStart) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 70, 1, "XYZ", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted 3-1 = 2
+    "[off=82 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteStart) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 70, 2, "", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted -2
+    "[off=78 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteMiddle) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 71, 2, "", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted -2
+    "[off=78 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertMiddle) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 71, 0, "XY", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted 2
+    "[off=82 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertEnd) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 73, 0, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted 1
+    "[off=81 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 72, 1, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    "[off=80 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteEnd) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 72, 1, "", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+
+    // Shifted -1
+    "[off=79 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditLast) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 80, 0, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    "[off=70 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=79 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditLast2) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 83, 0, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    "[off=70 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=80 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsRangeShiftingAfterEditTouchMultiple) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 63, 17, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    // Removed, touches edit.
+    // "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    // "[off=70 len=3 source.lang.swift.ref.var.instance]",
+    // "[off=80 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
+}
+
+TEST_F(EditTest, AnnotationsRangeShiftingAfterMultipleEdits) {
+  const char *DocName = "test.swift";
+  TestConsumer Consumer;
+  setupThreeAnnotations(DocName, Consumer);
+  replaceText(DocName, 83, 0, "X", Consumer);
+  checkTokens(Consumer.Annotations, {
+    "[off=22 len=3 source.lang.swift.ref.struct system]",
+    "[off=60 len=3 source.lang.swift.ref.var.instance]",
+    "[off=70 len=3 source.lang.swift.ref.var.instance]",
+    // Removed, touches edit.
+    // "[off=80 len=3 source.lang.swift.ref.var.instance]",
+  });
+
+  // Re-sync
+  ASSERT_FALSE(waitForDocUpdate()) << "timed out";
+  close(DocName);
 }

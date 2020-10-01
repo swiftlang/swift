@@ -10,14 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Range.h"
+#include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/Range.h"
+#include "swift/Reflection/TypeRef.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
-#include "Private.h"
 
 #include <vector>
+#include <inttypes.h>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -33,7 +35,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
   NodePointer node = nullptr;
 
   // Walk up the context tree.
-  SmallVector<const ContextDescriptor *, 8> descriptorPath;
+  llvm::SmallVector<const ContextDescriptor *, 8> descriptorPath;
   {
     const ContextDescriptor *parent = context;
     while (parent) {
@@ -68,7 +70,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  for (auto component : reversed(descriptorPath)) {
+  for (auto component : llvm::reverse(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
       assert(node == nullptr && "module should be top level");
@@ -80,7 +82,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     case ContextDescriptorKind::Extension: {
       auto extension = llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
-      auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
+      auto selfType = Dem.demangleType(extension->getMangledExtendedContext(),
+                                       ResolveToDemanglingForContext(Dem));
       if (selfType->getKind() == Node::Kind::Type)
         selfType = selfType->getChild(0);
       
@@ -283,11 +286,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   // Gather the complete set of generic arguments that must be written to
   // form this type.
-  SmallVector<const Metadata *, 8> allGenericArgs;
+  llvm::SmallVector<const Metadata *, 8> allGenericArgs;
   gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
 
   // Demangle the generic arguments.
-  SmallVector<NodePointer, 8> demangledGenerics;
+  llvm::SmallVector<NodePointer, 8> demangledGenerics;
   for (auto genericArg : allGenericArgs) {
     // When there is no generic argument, put in a placeholder.
     if (!genericArg) {
@@ -468,7 +471,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       break;
     }
 
-    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
       auto param = func->getParameter(i);
       auto flags = func->getParameterFlags(i);
@@ -515,7 +518,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       }
 
       // Otherwise it requires a tuple wrapper.
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     // This covers both none and multiple parameters.
@@ -558,8 +561,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     result->addChild(resultTy, Dem);
     
     auto funcNode = Dem.createNode(kind);
-    if (func->throws())
+    if (func->isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;
@@ -666,13 +671,14 @@ char *swift_demangle(const char *mangledName,
     return strdup(result.c_str());
   }
 
-  // Indicate a failure if the result does not fit and will be truncated
-  // and set the required outputBufferSize.
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+
+  // Indicate a failure if the result did not fit and was truncated
+  // by setting the required outputBufferSize.
   if (*outputBufferSize < result.length() + 1) {
     *outputBufferSize = result.length() + 1;
   }
 
-  // Copy into the provided buffer.
-  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
   return outputBuffer;
 }

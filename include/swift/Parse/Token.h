@@ -165,12 +165,16 @@ public:
       if (getRawText().equals("__shared") ||
           getRawText().equals("__owned"))
         return false;
+      
+/*      // ...or some
+      if (getRawText().equals("some"))
+        return false;*/
 
       return true;
     }
 
-    // 'let', 'var', and 'inout' cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout))
+    // inout cannot be used as an argument label.
+    if (is(tok::kw_inout))
       return false;
 
     // All other keywords can be argument labels.
@@ -246,17 +250,6 @@ public:
 
   CharSourceRange getRange() const {
     return CharSourceRange(getLoc(), getLength());
-  }
-
-  CharSourceRange getRangeWithoutBackticks() const {
-    SourceLoc TokLoc = getLoc();
-    unsigned TokLength = getLength();
-    if (isEscapedIdentifier()) {
-      // Adjust to account for the backticks.
-      TokLoc = TokLoc.getAdvancedLoc(1);
-      TokLength -= 2;
-    }
-    return CharSourceRange(TokLoc, TokLength);
   }
 
   bool hasComment() const {

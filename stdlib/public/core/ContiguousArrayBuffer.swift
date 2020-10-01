@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+
+#if INTERNAL_CHECKS_ENABLED
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_COWChecksEnabled")
+public func _COWChecksEnabled() -> Bool
+#endif
 
 /// Class used whose sole instance is used as storage for empty
 /// arrays.  The instance is defined in the runtime and statically
@@ -40,11 +46,6 @@ internal final class __EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  @nonobjc
-  override internal func _getNonVerbatimBridgedCount() -> Int {
-    return 0
-  }
-
   override internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     return _BridgingBuffer(0)
   }
@@ -65,7 +66,7 @@ internal final class __EmptyArrayStorage
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
 @inlinable
-internal var _emptyArrayStorage : __EmptyArrayStorage {
+internal var _emptyArrayStorage: __EmptyArrayStorage {
   return Builtin.bridgeFromRawPointer(
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
@@ -75,7 +76,7 @@ internal var _emptyArrayStorage : __EmptyArrayStorage {
 @usableFromInline
 internal final class _ContiguousArrayStorage<
   Element
-> : __ContiguousArrayStorageBase {
+>: __ContiguousArrayStorageBase {
 
   @inlinable
   deinit {
@@ -84,6 +85,97 @@ internal final class _ContiguousArrayStorage<
   }
 
 #if _runtime(_ObjC)
+  
+  internal final override func withUnsafeBufferOfObjects<R>(
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
+  ) rethrows -> R {
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
+    let count = countAndCapacity.count
+    let elements = UnsafeRawPointer(_elementPointer)
+      .assumingMemoryBound(to: AnyObject.self)
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: elements, count: count))
+  }
+  
+  @objc(countByEnumeratingWithState:objects:count:)
+  @_effects(releasenone)
+  internal final override func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    var enumerationState = state.pointee
+    
+    if enumerationState.state != 0 {
+      return 0
+    }
+    
+    return withUnsafeBufferOfObjects {
+      objects in
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr =
+        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+      enumerationState.state = 1
+      state.pointee = enumerationState
+      return objects.count
+    }
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  @nonobjc private func _objectAt(_ index: Int) -> Unmanaged<AnyObject> {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArraySubscript(index, count: objects.count),
+        "Array index out of range")
+      return Unmanaged.passUnretained(objects[index])
+    }
+  }
+  
+  @objc(objectAtIndexedSubscript:)
+  @_effects(readonly)
+  final override internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
+    return _objectAt(index)
+  }
+  
+  @objc(objectAtIndex:)
+  @_effects(readonly)
+  final override internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
+    return _objectAt(index)
+  }
+  
+  @objc internal override final var count: Int {
+    @_effects(readonly) get {
+      return withUnsafeBufferOfObjects { $0.count }
+    }
+  }
+
+  @_effects(releasenone)
+  @objc internal override final func getObjects(
+    _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArrayIndex(range.location, count: objects.count),
+        "Array index out of range")
+
+      _precondition(
+        _isValidArrayIndex(
+          range.location + range.length, count: objects.count),
+        "Array index out of range")
+
+      if objects.isEmpty { return }
+
+      // These objects are "returned" at +0, so treat them as pointer values to
+      // avoid retains. Copy bytes via a raw pointer to circumvent reference
+      // counting while correctly aliasing with all other pointer types.
+      UnsafeMutableRawPointer(aBuffer).copyMemory(
+        from: objects.baseAddress! + range.location,
+        byteCount: range.length * MemoryLayout<AnyObject>.stride)
+    }
+  }
+  
   /// If the `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
@@ -109,17 +201,6 @@ internal final class _ContiguousArrayStorage<
       defer { _fixLifetime(self) }
       try body(UnsafeBufferPointer(start: elements, count: count))
     }
-  }
-
-  /// Returns the number of elements in the array.
-  ///
-  /// - Precondition: `Element` is bridged non-verbatim.
-  @nonobjc
-  override internal func _getNonVerbatimBridgedCount() -> Int {
-    _internalInvariant(
-      !_isBridgedVerbatimToObjectiveC(Element.self),
-      "Verbatim bridging should be handled separately")
-    return countAndCapacity.count
   }
 
   /// Bridge array elements and return a new buffer that owns them.
@@ -165,14 +246,14 @@ internal final class _ContiguousArrayStorage<
   }
 
   @inlinable
-  internal final var _elementPointer : UnsafeMutablePointer<Element> {
+  internal final var _elementPointer: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
 }
 
 @usableFromInline
-@_fixed_layout
-internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
+@frozen
+internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
@@ -193,11 +274,15 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
-
-      _initStorageHeader(
-        count: uninitializedCount, capacity: realCapacity)
+      if let allocSize = _mallocSize(ofAllocation: storageAddr) {
+        let endAddr = storageAddr + allocSize
+        let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realCapacity)
+      } else {
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realMinimumCapacity)
+      }
     }
   }
 
@@ -250,6 +335,15 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(Builtin.projectTailElems(_storage,
+                                                         Element.self))
+  }
+
+  /// A mutable pointer to the first element.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(Builtin.projectTailElems(mutableOrEmptyStorage,
                                                          Element.self))
   }
 
@@ -320,8 +414,90 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inline(__always)
   internal func getElement(_ i: Int) -> Element {
     _internalInvariant(i >= 0 && i < count, "Array index out of range")
-    return firstElementAddress[i]
+    let addr = UnsafePointer<Element>(
+      Builtin.projectTailElems(immutableStorage, Element.self))
+    return addr[i]
   }
+
+  /// The storage of an immutable buffer.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var immutableStorage : __ContiguousArrayStorageBase {
+#if INTERNAL_CHECKS_ENABLED
+    _internalInvariant(isImmutable, "Array storage is not immutable")
+#endif
+    return Builtin.COWBufferForReading(_storage)
+  }
+
+  /// The storage of a mutable buffer.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var mutableStorage : __ContiguousArrayStorageBase {
+#if INTERNAL_CHECKS_ENABLED
+    _internalInvariant(isMutable, "Array storage is immutable")
+#endif
+    return _storage
+  }
+
+  /// The storage of a mutable or empty buffer.
+  ///
+  /// - Precondition: The buffer must be mutable or the empty array singleton.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var mutableOrEmptyStorage : __ContiguousArrayStorageBase {
+#if INTERNAL_CHECKS_ENABLED
+    _internalInvariant(isMutable || _storage.countAndCapacity.capacity == 0,
+                       "Array storage is immutable and not empty")
+#endif
+    return _storage
+  }
+
+#if INTERNAL_CHECKS_ENABLED
+  @_alwaysEmitIntoClient
+  internal var isImmutable: Bool {
+    get {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        if (_COWChecksEnabled()) {
+          return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
+        }
+      }
+      return true
+    }
+    nonmutating set {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        if (_COWChecksEnabled()) {
+          if newValue {
+            if capacity > 0 {
+              let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
+              _internalInvariant(!wasImmutable,
+                "re-setting immutable array buffer to immutable")
+            }
+          } else {
+            _internalInvariant(capacity > 0,
+              "setting empty array buffer to mutable")
+             let wasImmutable = _swift_setImmutableCOWBuffer(_storage, false)
+            _internalInvariant(wasImmutable,
+              "re-setting mutable array buffer to mutable")
+          }
+        }
+      }
+    }
+  }
+  
+  @_alwaysEmitIntoClient
+  internal var isMutable: Bool {
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      if (_COWChecksEnabled()) {
+        return !_swift_isImmutableCOWBuffer(_storage)
+      }
+    }
+    return true
+  }
+#endif
 
   /// Get or set the value of the ith element.
   @inlinable
@@ -345,6 +521,10 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// The number of elements the buffer stores.
+  ///
+  /// This property is obsolete. It's only used for the ArrayBufferProtocol and
+  /// to keep backward compatibility.
+  /// Use `immutableCount` or `mutableCount` instead.
   @inlinable
   internal var count: Int {
     get {
@@ -354,28 +534,95 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       _internalInvariant(newValue >= 0)
 
       _internalInvariant(
-        newValue <= capacity,
+        newValue <= mutableCapacity,
         "Can't grow an array buffer past its capacity")
 
-      _storage.countAndCapacity.count = newValue
+      mutableStorage.countAndCapacity.count = newValue
+    }
+  }
+  
+  /// The number of elements of the buffer.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var immutableCount: Int {
+    return immutableStorage.countAndCapacity.count
+  }
+
+  /// The number of elements of the buffer.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal var mutableCount: Int {
+    @inline(__always)
+    get {
+      return mutableOrEmptyStorage.countAndCapacity.count
+    }
+    @inline(__always)
+    nonmutating set {
+      _internalInvariant(newValue >= 0)
+
+      _internalInvariant(
+        newValue <= mutableCapacity,
+        "Can't grow an array buffer past its capacity")
+
+      mutableStorage.countAndCapacity.count = newValue
     }
   }
 
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
+  ///
+  /// - Precondition: The buffer must be immutable.
   @inlinable
   @inline(__always)
-  internal func _checkValidSubscript(_ index : Int) {
+  internal func _checkValidSubscript(_ index: Int) {
     _precondition(
-      (index >= 0) && (index < count),
+      (index >= 0) && (index < immutableCount),
+      "Index out of range"
+    )
+  }
+
+  /// Traps unless the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func _checkValidSubscriptMutating(_ index: Int) {
+    _precondition(
+      (index >= 0) && (index < mutableCount),
       "Index out of range"
     )
   }
 
   /// The number of elements the buffer can store without reallocation.
+  ///
+  /// This property is obsolete. It's only used for the ArrayBufferProtocol and
+  /// to keep backward compatibility.
+  /// Use `immutableCapacity` or `mutableCapacity` instead.
   @inlinable
   internal var capacity: Int {
     return _storage.countAndCapacity.capacity
+  }
+
+  /// The number of elements the buffer can store without reallocation.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var immutableCapacity: Int {
+    return immutableStorage.countAndCapacity.capacity
+  }
+
+  /// The number of elements the buffer can store without reallocation.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var mutableCapacity: Int {
+    return mutableOrEmptyStorage.countAndCapacity.capacity
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
@@ -413,7 +660,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     get {
       return _SliceBuffer(
         owner: _storage,
-        subscriptBaseAddress: subscriptBaseAddress,
+        subscriptBaseAddress: firstElementAddress,
         indices: bounds,
         hasNativeBuffer: true)
     }
@@ -424,22 +671,122 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   ///
-  /// - Note: This does not mean the buffer is mutable.  Other factors
-  ///   may need to be considered, such as whether the buffer could be
-  ///   some immutable Cocoa container.
+  /// This function should only be used for internal sanity checks.
+  /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     return _isUnique(&_storage)
   }
 
+  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
+  /// storage is uniquely-referenced.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  ///
+  /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
+  ///   is mutated.
+  @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutation() -> Bool {
+    if Bool(Builtin.beginCOWMutation(&_storage)) {
+#if INTERNAL_CHECKS_ENABLED
+      isImmutable = false
+#endif
+      return true
+    }
+    return false;
+  }
+
+  /// Puts the buffer in an immutable state.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  ///
+  /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
+  ///   until the next call of `beginCOWMutation`.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+#if INTERNAL_CHECKS_ENABLED
+    isImmutable = true
+#endif
+    Builtin.endCOWMutation(&_storage)
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew() -> _ContiguousArrayBuffer {
+    return _consumeAndCreateNew(bufferIsUnique: false,
+                                minimumCapacity: count,
+                                growForAppend: false)
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced and the elements are moved - instead of copied - to the new
+  /// buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ContiguousArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.mutableFirstElementAddress
+      dest.moveInitialize(from: firstElementAddress,
+                          count: c)
+      mutableCount = 0
+    } else {
+      _copyContents(
+        subRange: 0..<c,
+        initializing: newBuffer.mutableFirstElementAddress)
+    }
+    return newBuffer
+  }
+
 #if _runtime(_ObjC)
+  
   /// Convert to an NSArray.
   ///
   /// - Precondition: `Element` is bridged to Objective-C.
   ///
   /// - Complexity: O(1).
-  @inlinable
+  @usableFromInline
   internal __consuming func _asCocoaArray() -> AnyObject {
+    // _asCocoaArray was @inlinable in Swift 5.0 and 5.1, which means that there
+    // are existing apps out there that effectively have the old implementation
+    // Be careful with future changes to this function. Here be dragons!
+    // The old implementation was
+    // if count == 0 {
+    //   return _emptyArrayStorage
+    // }
+    // if _isBridgedVerbatimToObjectiveC(Element.self) {
+    //   return _storage
+    // }
+    // return __SwiftDeferredNSArray(_nativeStorage: _storage)
+    
+    _connectOrphanedFoundationSubclassesIfNeeded()
     if count == 0 {
       return _emptyArrayStorage
     }
@@ -509,18 +856,20 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
 /// Append the elements of `rhs` to `lhs`.
 @inlinable
-internal func += <Element, C : Collection>(
+internal func += <Element, C: Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
 
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count)
+  let newCount = oldCount + rhs.count
 
   let buf: UnsafeMutableBufferPointer<Element>
   
   if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
-    lhs.count = newCount
+    buf = UnsafeMutableBufferPointer(
+      start: lhs.firstElementAddress + oldCount,
+      count: rhs.count)
+    lhs.mutableCount = newCount
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
@@ -529,9 +878,11 @@ internal func += <Element, C : Collection>(
 
     newLHS.firstElementAddress.moveInitialize(
       from: lhs.firstElementAddress, count: oldCount)
-    lhs.count = 0
+    lhs.mutableCount = 0
     (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+    buf = UnsafeMutableBufferPointer(
+      start: lhs.firstElementAddress + oldCount,
+      count: rhs.count)
   }
 
   var (remainders,writtenUpTo) = buf.initialize(from: rhs)
@@ -541,7 +892,7 @@ internal func += <Element, C : Collection>(
   _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
 }
 
-extension _ContiguousArrayBuffer : RandomAccessCollection {
+extension _ContiguousArrayBuffer: RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -572,7 +923,7 @@ extension Sequence {
 
 @inlinable
 internal func _copySequenceToContiguousArray<
-  S : Sequence
+  S: Sequence
 >(_ source: S) -> ContiguousArray<S.Element> {
   let initialCapacity = source.underestimatedCount
   var builder =
@@ -620,19 +971,21 @@ extension _ContiguousArrayBuffer {
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
 @inlinable
 internal func _copyCollectionToContiguousArray<
-  C : Collection
+  C: Collection
 >(_ source: C) -> ContiguousArray<C.Element>
 {
-  let count: Int = numericCast(source.count)
+  let count = source.count
   if count == 0 {
     return ContiguousArray()
   }
 
-  let result = _ContiguousArrayBuffer<C.Element>(
+  var result = _ContiguousArrayBuffer<C.Element>(
     _uninitializedCount: count,
     minimumCapacity: 0)
 
-  let p = UnsafeMutableBufferPointer(start: result.firstElementAddress, count: count)
+  let p = UnsafeMutableBufferPointer(
+    start: result.firstElementAddress,
+    count: count)
   var (itr, end) = source._copyContents(initializing: p)
 
   _debugPrecondition(itr.next() == nil,
@@ -643,6 +996,7 @@ internal func _copyCollectionToContiguousArray<
   _precondition(end == p.endIndex,
     "invalid Collection: less than 'count' elements in collection")
 
+  result.endCOWMutation()
   return ContiguousArray(_buffer: result)
 }
 
@@ -652,7 +1006,7 @@ internal func _copyCollectionToContiguousArray<
 /// element-by-element. The type is unsafe because it cannot be deinitialized
 /// until the buffer has been finalized by a call to `finish`.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @usableFromInline
   internal var result: _ContiguousArrayBuffer<Element>
@@ -690,11 +1044,11 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       if !result.isEmpty {
-        // This check prevents a data race writting to _swiftEmptyArrayStorage
+        // This check prevents a data race writing to _swiftEmptyArrayStorage
         // Since count is always 0 there, this code does nothing anyway
         newResult.firstElementAddress.moveInitialize(
           from: result.firstElementAddress, count: result.capacity)
-        result.count = 0
+        result.mutableCount = 0
       }
       (result, newResult) = (newResult, result)
     }
@@ -722,7 +1076,12 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @inline(__always) // For performance reasons.
   internal mutating func finish() -> ContiguousArray<Element> {
     // Adjust the initialized count of the buffer.
-    result.count = result.capacity - remainingCapacity
+    if (result.capacity != 0) {
+      result.mutableCount = result.capacity - remainingCapacity
+    } else {
+      _internalInvariant(remainingCapacity == 0)
+      _internalInvariant(result.count == 0)      
+    }
 
     return finishWithOriginalCount()
   }
@@ -741,6 +1100,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     var finalResult = _ContiguousArrayBuffer<Element>()
     (finalResult, result) = (result, finalResult)
     remainingCapacity = 0
+    finalResult.endCOWMutation()
     return ContiguousArray(_buffer: finalResult)
   }
 }

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name nested_types_referencing_nested_functions %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify -module-name nested_types_referencing_nested_functions %s | %FileCheck %s
 
 do {
   func foo() { bar(2) }
@@ -31,4 +31,21 @@ do {
   _ = Foo.zang as (Foo) -> (Int) -> ()
   _ = x.zim
   _ = x.zang as (Int) -> ()
+}
+
+// Invalid case
+do {
+  var x = 123 // expected-note {{captured value declared here}}
+  // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
+
+  func local() {
+    // expected-error@-1 {{closure captures 'x' before it is declared}}
+    _ = x // expected-note {{captured here}}
+  }
+
+  class Bar {
+    func zang() {
+      local()
+    }
+  }
 }

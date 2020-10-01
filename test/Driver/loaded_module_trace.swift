@@ -6,17 +6,28 @@
 // RUN: %FileCheck -check-prefix=CHECK-CONFIRM-ONELINE %s < %t/loaded_module_trace.trace.json
 
 // CHECK: {
+// CHECK: "version":2
 // CHECK: "name":"loaded_module_trace"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
 // CHECK-DAG: "{{[^"]*\\[/\\]}}Module2.swiftmodule"
 // CHECK-DAG: "{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
 // CHECK-DAG: "{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
+// CHECK-DAG: "{{[^"]*\\[/\\]}}Module.swiftmodule"
+// CHECK: ]
+
+// The checks are compressed into one line as the order of the objects varies
+// between OSes due to change in filepaths.
+
+// CHECK: "swiftmodulesDetailedInfo":[
+// CHECK-DAG: {"name":"Module2","path":"{{[^"]*\\[/\\]}}Module2.swiftmodule","isImportedDirectly":true,"supportsLibraryEvolution":false}
+// CHECK-DAG: {"name":"Swift","path":"{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}","isImportedDirectly":true,"supportsLibraryEvolution":true}
+// CHECK-DAG: {"name":"SwiftOnoneSupport","path":"{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}","isImportedDirectly":true,"supportsLibraryEvolution":true}
+// CHECK-DAG: {"name":"Module","path":"{{[^"]*\\[/\\]}}Module.swiftmodule","isImportedDirectly":false,"supportsLibraryEvolution":false}
 // CHECK: ]
 // CHECK: }
 
 // Make sure it's all on a single line.
 // CHECK-CONFIRM-ONELINE: {"name":{{.*}}]}
 
-// 'Module2' imports 'Module', so we're also checking we don't get transitive dependencies.
 import Module2

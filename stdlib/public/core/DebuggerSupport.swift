@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-@_frozen // namespace
+@frozen // namespace
 public enum _DebuggerSupport {
   private enum CollectionStatus {
     case notACollection
@@ -110,7 +110,7 @@ public enum _DebuggerSupport {
 
   private static func ivarCount(mirror: Mirror) -> Int {
     let ivars = mirror.superclassMirror.map(ivarCount) ?? 0
-    return ivars + mirror.children.count
+    return ivars + mirror._children.count
   }
 
   private static func shouldExpand(
@@ -119,13 +119,13 @@ public enum _DebuggerSupport {
     isRoot: Bool
   ) -> Bool {
     if isRoot || collectionStatus.isCollection { return true }
-    if mirror.children.count > 0 { return true }
+    if !mirror._children.isEmpty { return true }
     if mirror.displayStyle == .`class` { return true }
     if let sc = mirror.superclassMirror { return ivarCount(mirror: sc) > 0 }
     return true
   }
 
-  private static func printForDebuggerImpl<StreamType : TextOutputStream>(
+  private static func printForDebuggerImpl<StreamType: TextOutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,
@@ -152,9 +152,16 @@ public enum _DebuggerSupport {
     // yes, a type can lie and say it's a class when it's not since we only
     // check the displayStyle - but then the type would have a custom Mirror
     // anyway, so there's that...
-    let willExpand = mirror.displayStyle != .`class` || value is CustomReflectable?
+    let isNonClass = mirror.displayStyle != .`class`
+    let isCustomReflectable: Bool
+    if let value = value {
+      isCustomReflectable = value is CustomReflectable
+    } else {
+      isCustomReflectable = true
+    }
+    let willExpand = isNonClass || isCustomReflectable
 
-    let count = mirror.children.count
+    let count = mirror._children.count
     let bullet = isRoot && (count == 0 || !willExpand) ? ""
       : count == 0    ? "- "
       : maxDepth <= 0 ? "▹ " : "▿ "
@@ -202,7 +209,7 @@ public enum _DebuggerSupport {
         target: &target)
     }
   
-    for (optionalName,child) in mirror.children {
+    for (optionalName,child) in mirror._children {
       let childName = optionalName ?? "\(printedElements)"
       if maxItemCounter <= 0 {
         print(String(repeating: " ", count: indent+4), terminator: "", to: &target)
@@ -261,6 +268,6 @@ public func _debuggerTestingCheckExpect(_: String, _: String) { }
 @_silgen_name("swift_retainCount")
 public func _getRetainCount(_ Value: AnyObject) -> UInt
 @_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value : AnyObject) -> UInt
+public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
 @_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value : AnyObject) -> UInt
+public func _getWeakRetainCount(_ Value: AnyObject) -> UInt

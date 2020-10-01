@@ -8,8 +8,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Use swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
 
 import StdlibUnittest
 import StdlibCollectionUnittest

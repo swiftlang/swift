@@ -72,3 +72,25 @@ protocol P2 { }
 // CHECK-SAME: i16 3, i16 3, i16 5, i16 0
 class Generic3WithReqs<T: P1, U: P2, V: P2> { }
 sil_vtable Generic3WithReqs { }
+
+
+class SomeClass{}
+sil_vtable SomeClass {}
+
+// This used to assert.
+sil @repo : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>) -> () {
+bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>> >):
+  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>, let, name "completion", argno 1
+  %2 = tuple ()
+  return %2 : $()
+}
+
+struct PlainGeneric<T> {}
+
+// This used to assert.
+sil @repo2 : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>) -> () {
+bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>> >):
+  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>, let, name "completion", argno 1
+  %2 = tuple ()
+  return %2 : $()
+}

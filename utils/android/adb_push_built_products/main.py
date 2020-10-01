@@ -53,9 +53,9 @@ def argument_parser():
     return parser
 
 
-def _push(source, destination):
-    print('Pushing "{}" to device path "{}".'.format(source, destination))
-    print(adb.commands.push(source, destination))
+def _push(sources, destination):
+    print('Pushing "{}" to device path "{}".'.format(sources, destination))
+    print(adb.commands.push(sources, destination))
 
 
 def main():
@@ -70,8 +70,10 @@ def main():
 
     for path in args.paths:
         if os.path.isdir(path):
-            for basename in glob.glob(os.path.join(path, '*.so')):
-                _push(os.path.join(path, basename), args.destination)
+            full_paths = [
+                os.path.join(path, basename)
+                for basename in glob.glob(os.path.join(path, '*.so'))]
+            _push(full_paths, args.destination)
         else:
             _push(path, args.destination)
 

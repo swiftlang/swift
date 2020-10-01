@@ -84,6 +84,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 else()
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
 endif()
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "stdlib-experimental")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
@@ -91,10 +92,22 @@ macro(swift_configure_components)
     "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
+    add_custom_target(${component})
+    add_llvm_install_targets(install-${component}
+                             DEPENDS ${component}
+                             COMPONENT ${component})
+
     string(TOUPPER "${component}" var_name_piece)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     set(SWIFT_INSTALL_${var_name_piece} FALSE)
   endforeach()
+
+  # NOTE: never_install is a dummy component to indicate something should not
+  # be installed. We explicitly do not add an install target for this.
+  add_custom_target(never_install)
+
+  add_custom_target(swift-components)
+  add_custom_target(install-swift-components)
 
   foreach(component ${SWIFT_INSTALL_COMPONENTS})
     if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
@@ -105,6 +118,8 @@ macro(swift_configure_components)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     if(NOT SWIFT_INSTALL_EXCLUDE_${var_name_piece})
       set(SWIFT_INSTALL_${var_name_piece} TRUE)
+      add_dependencies(swift-components ${component})
+      add_dependencies(install-swift-components install-${component})
     endif()
   endforeach()
 endmacro()
@@ -126,40 +141,28 @@ function(swift_is_installing_component component result_var_name)
   endif()
 endfunction()
 
-# swift_install_in_component(<COMPONENT NAME>
-#   <same parameters as install()>)
+# swift_install_in_component(<same parameters as install()>)
 #
 # Executes the specified installation actions if the named component is
 # requested to be installed.
 #
 # This function accepts the same parameters as install().
-function(swift_install_in_component component)
-  precondition(component MESSAGE "Component name is required")
+function(swift_install_in_component)
+  cmake_parse_arguments(
+      ARG # prefix
+      "" # options
+      "COMPONENT" # single-value args
+      "" # multi-value args
+      ${ARGN})
 
-  swift_is_installing_component("${component}" is_installing)
+  precondition(ARG_COMPONENT MESSAGE "Component name is required")
+
+  swift_is_installing_component("${ARG_COMPONENT}" is_installing)
   if(NOT is_installing)
     return()
   endif()
 
   install(${ARGN})
-endfunction()
-
-# swift_install_in_either_component(<COMPONENT1 NAME> <COMPONENT2 NAME>
-#   <same parameters as install()>)
-#
-# Executes the specified installation actions if either one of the named
-# components is requested to be installed.
-#
-# This function accepts the same parameters as install().
-function(swift_install_in_either_component comp1 comp2)
-  foreach(component ${comp1} ${comp2})
-    precondition(component MESSAGE "Component name is required")
-    swift_is_installing_component("${component}" is_installing)
-    if(is_installing)
-      install(${ARGN})
-      return()
-    endif()
-  endforeach(component)
 endfunction()
 
 function(swift_install_symlink_component component)
@@ -184,6 +187,10 @@ function(swift_install_symlink_component component)
   precondition(INSTALL_SYMLINK
     MESSAGE "LLVMInstallSymlink script must be available.")
 
+  # Create the directory if it doesn't exist. It will fail to create a symlink
+  # otherwise.
+  install(DIRECTORY DESTINATION "${ARG_DESTINATION}" COMPONENT ${component})
   install(SCRIPT ${INSTALL_SYMLINK}
-          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})")
+          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})"
+          COMPONENT ${component})
 endfunction()

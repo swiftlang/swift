@@ -67,6 +67,12 @@ NSSetAPI.test("AnyHashable containing NSSet that contains an NSSet") {
   }
 }
 
+NSSetAPI.test("Incorrectly constructed Set for backwards compatibility") {
+  let array:NSArray = [NSObject()] as NSArray
+  let wrongSet = Set<NSObject>(_immutableCocoaSet: array)
+  print(wrongSet.startIndex)
+}
+
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("Sequence") {

@@ -58,7 +58,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${PYTHON_EXECUTABLE}" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
           "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
@@ -121,6 +121,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/DeclNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/ExprNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/GenericNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/NodeSerializationCodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/PatternNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/StmtNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/TypeNodes.py"

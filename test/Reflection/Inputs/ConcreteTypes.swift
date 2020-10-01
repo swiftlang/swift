@@ -63,3 +63,11 @@ public struct References {
   public unowned var unownedRef: C
   public unowned(unsafe) var unownedUnsafeRef: C
 }
+
+private struct PrivateStructField {
+  var x: Int16
+}
+
+public struct HasArrayOfPrivateStructField {
+  private var x: [PrivateStructField]
+}

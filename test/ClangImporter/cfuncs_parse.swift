@@ -17,6 +17,7 @@ func test_cfunc2(_ i: Int) {
 #endif
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
   cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
 }
 
@@ -68,6 +69,17 @@ func test_pow() {
 // Swift, so don't test this. SR-9072.
 func test_powl() {
   powl(1.5, 2.5)
+}
+#endif
+
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+func test_f16() {
+  var x = Float16.zero
+  f16ptrfunc(&x)
+  #if arch(arm) || arch(arm64)
+  f16func(x)
+  #endif
 }
 #endif
 

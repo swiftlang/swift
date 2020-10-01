@@ -30,14 +30,14 @@ extension ProtoRefinesClass {
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
     // CHECK-NEXT: [[UPCAST2:%.*]] = upcast [[UPCAST]] : $Generic<Int> to $Concrete
-    // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST2]] : $Concrete, #Concrete.concreteMethod!1 : (Concrete) -> (String) -> (), $@convention(method) (@guaranteed String, @guaranteed Concrete) -> ()
+    // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST2]] : $Concrete, #Concrete.concreteMethod : (Concrete) -> (String) -> (), $@convention(method) (@guaranteed String, @guaranteed Concrete) -> ()
     // CHECK-NEXT: apply [[METHOD]](%0, [[UPCAST2]])
     // CHECK-NEXT: destroy_value [[UPCAST2]]
     concreteMethod(x)
 
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
-    // CHECK:      [[METHOD:%.*]] = class_method [[UPCAST]] : $Generic<Int>, #Generic.genericMethod!1 : <T> (Generic<T>) -> ((T, T)) -> (), $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @guaranteed Generic<τ_0_0>) -> ()
+    // CHECK:      [[METHOD:%.*]] = class_method [[UPCAST]] : $Generic<Int>, #Generic.genericMethod : <T> (Generic<T>) -> ((T, T)) -> (), $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @guaranteed Generic<τ_0_0>) -> ()
     // CHECK-NEXT: apply [[METHOD]]<Int>({{.*}}, [[UPCAST]])
     // CHECK-NEXT: dealloc_stack
     // CHECK-NEXT: dealloc_stack
@@ -202,7 +202,7 @@ protocol ProtocolWithClassInits : ClassWithInits<Int> {}
 func useProtocolWithClassInits1(_ t: ProtocolWithClassInits.Type) {
   // CHECK: [[OPENED:%.*]] = open_existential_metatype %0 : $@thick ProtocolWithClassInits.Type
   // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[OPENED]] : $@thick (@opened("{{.*}}") ProtocolWithClassInits).Type to $@thick ClassWithInits<Int>.Type
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST]] : $@thick ClassWithInits<Int>.Type, #ClassWithInits.init!allocator.1 : <T> (ClassWithInits<T>.Type) -> (()) -> ClassWithInits<T>, $@convention(method) <τ_0_0> (@thick ClassWithInits<τ_0_0>.Type) -> @owned ClassWithInits<τ_0_0>
+  // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST]] : $@thick ClassWithInits<Int>.Type, #ClassWithInits.init!allocator : <T> (ClassWithInits<T>.Type) -> (()) -> ClassWithInits<T>, $@convention(method) <τ_0_0> (@thick ClassWithInits<τ_0_0>.Type) -> @owned ClassWithInits<τ_0_0>
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]<Int>([[UPCAST]])
   // CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[RESULT]] : $ClassWithInits<Int> to $@opened("{{.*}}") ProtocolWithClassInits
   // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[CAST]] : $@opened("{{.*}}") ProtocolWithClassInits : $@opened("{{.*}}") ProtocolWithClassInits, $ProtocolWithClassInits
@@ -241,8 +241,8 @@ protocol SillyDefault : ClassWithDefault<Int> {
 
 class ConformsToSillyDefault : ClassWithDefault<Int>, SillyDefault {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW : $@convention(witness_method: SillyDefault) (@guaranteed ConformsToSillyDefault) -> Int
-// CHECK: class_method %1 : $ClassWithDefault<Int>, #ClassWithDefault.makeT!1 : <T> (ClassWithDefault<T>) -> () -> T, $@convention(method) <τ_0_0> (@guaranteed ClassWithDefault<τ_0_0>) -> @out τ_0_0
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW :
+// CHECK: class_method %1 : $ClassWithDefault<Int>, #ClassWithDefault.makeT : <T> (ClassWithDefault<T>) -> () -> T, $@convention(method) <τ_0_0> (@guaranteed ClassWithDefault<τ_0_0>) -> @out τ_0_0
 // CHECK: return
 
 class BaseClass : BaseProto {}
@@ -269,6 +269,25 @@ func passesRefinedProtocol(_ r: RefinedProto) {
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 
+func takesFuncTakingRefinedProto(arg: (RefinedProto) -> ()) {}
+
+func passesFuncTakingBaseClass() {
+  let closure: (BaseClass) -> () = { _ in }
+  takesFuncTakingRefinedProto(arg: closure)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass25passesFuncTakingBaseClassyyF : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s24protocol_with_superclass9BaseClassCIegg_AA12RefinedProto_pIegg_TR : $@convention(thin) (@guaranteed RefinedProto, @guaranteed @callee_guaranteed (@guaranteed BaseClass) -> ()) -> ()
+// CHECK: [[PAYLOAD:%.*]] = open_existential_ref %0 : $RefinedProto to $@opened("{{.*}}") RefinedProto
+// CHECK: [[COPY:%.*]] = copy_value [[PAYLOAD]]
+// CHECK: [[UPCAST:%.*]] = upcast [[COPY]] : $@opened("{{.*}}") RefinedProto to $BaseClass
+// CHECK: [[BORROW:%.*]] = begin_borrow [[UPCAST]]
+// CHECK: apply %1([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[UPCAST]]
+// CHECK: return
+
 // CHECK-LABEL: sil_witness_table hidden ConformsToSillyDefault: SillyDefault module protocol_with_superclass {
-// CHECK-NEXT: method #SillyDefault.makeT!1: <Self where Self : SillyDefault> (Self) -> () -> Int : @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW
+// CHECK-NEXT: method #SillyDefault.makeT: <Self where Self : SillyDefault> (Self) -> () -> Int : @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW
 // CHECK-NEXT: }

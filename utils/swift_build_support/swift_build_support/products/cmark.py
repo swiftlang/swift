@@ -14,4 +14,15 @@ from . import product
 
 
 class CMark(product.Product):
-    pass
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    # This is the root of the build-graph, so it doesn't have any dependencies.
+    @classmethod
+    def get_dependencies(cls):
+        return []

@@ -17,10 +17,16 @@
 #ifndef SWIFT_RUNTIME_PRIVATE_H
 #define SWIFT_RUNTIME_PRIVATE_H
 
+#include <functional>
+
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
-#include "llvm/Support/Compiler.h"
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
 
 // Opaque ISAs need to use object_getClass which is in runtime.h
 #if SWIFT_HAS_OPAQUE_ISAS
@@ -46,8 +52,10 @@ public:
 
 #define REF_STORAGE(Name, ...) \
   void set##Name() { Data |= Name; } \
-  bool is##Name() const { return Data & Name; }
+  bool is##Name() const { return Data == Name; }
 #include "swift/AST/ReferenceStorage.def"
+
+  bool isStrong() const { return Data == 0; }
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -72,9 +80,13 @@ public:
   const Metadata *getMetadata() const { return Response.Value; }
   MetadataResponse getResponse() const { return Response; }
 
-  bool isWeak() const { return ReferenceOwnership.isWeak(); }
-  bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
-  bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+  operator bool() const { return getMetadata(); }
+
+#define REF_STORAGE(Name, ...) \
+  bool is##Name() const { return ReferenceOwnership.is##Name(); }
+#include "swift/AST/ReferenceStorage.def"
+
+  bool isStrong() const { return ReferenceOwnership.isStrong(); }
 
   TypeReferenceOwnership getReferenceOwnership() const {
     return ReferenceOwnership;
@@ -84,6 +96,35 @@ public:
 #if SWIFT_HAS_ISA_MASKING
   SWIFT_RUNTIME_EXPORT
   uintptr_t swift_isaMask;
+
+// Hardcode the mask. We have our own copy of the value, as it's hard to work
+// out the proper includes from libobjc. The values MUST match the ones from
+// libobjc. Debug builds check these values against objc_debug_isa_class_mask
+// from libobjc.
+#  if TARGET_OS_SIMULATOR && __x86_64__
+// Simulators don't currently use isa masking on x86, but we still want to emit
+// swift_isaMask and the corresponding code in case that changes. libobjc's
+// mask has the bottom bits clear to include pointer alignment, match that
+// value here.
+#    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
+#  elif __arm64__
+// The ISA mask used when ptrauth is available.
+#  define SWIFT_ISA_MASK_PTRAUTH 0x007ffffffffffff8ULL
+// ARM64 simulators always use the ARM64e mask.
+#    if __has_feature(ptrauth_calls) || TARGET_OS_SIMULATOR
+#      define SWIFT_ISA_MASK SWIFT_ISA_MASK_PTRAUTH
+#    else
+#      if TARGET_OS_OSX
+#      define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
+#      else
+#      define SWIFT_ISA_MASK 0x0000000ffffffff8ULL
+#      endif
+#    endif
+#  elif __x86_64__
+#    define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
+#  else
+#    error Unknown architecture for masked isa.
+#  endif
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -134,7 +175,7 @@ public:
 
 #if SWIFT_HAS_ISA_MASKING
     // Apply the mask.
-    bits &= swift_isaMask;
+    bits &= SWIFT_ISA_MASK;
 #endif
 
     // The result is a class pointer.
@@ -166,16 +207,16 @@ public:
   }
 #endif
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
   static inline
   bool objectUsesNativeSwiftReferenceCounting(const void *object) {
     assert(!isObjCTaggedPointerOrNull(object));
-#if SWIFT_HAS_OPAQUE_ISAS
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
     // Fast path for opaque ISAs.  We don't want to call
     // _swift_getClassOfAllocated as that will call object_getClass.
     // Instead we can look at the bits in the ISA and tell if its a
@@ -261,7 +302,7 @@ public:
     /// An element in the descriptor path.
     struct PathElement {
       /// The generic parameters local to this element.
-      ArrayRef<GenericParamDescriptor> localGenericParams;
+      llvm::ArrayRef<GenericParamDescriptor> localGenericParams;
 
       /// The total number of generic parameters.
       unsigned numTotalGenericParams;
@@ -287,7 +328,8 @@ public:
     ///
     /// \returns a pair containing the number of key generic parameters in
     /// the path up to this point.
-    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+    unsigned buildDescriptorPath(const ContextDescriptor *context,
+                                 Demangler &demangler) const;
 
     /// Builds a path from the generic environment.
     unsigned buildEnvironmentPath(
@@ -317,6 +359,8 @@ public:
                const void * const *arguments)
       : sourceIsMetadata(false), environment(environment),
         genericArgs(arguments) { }
+    
+    const void * const *getGenericArgs() const { return genericArgs; }
 
     const Metadata *getMetadata(unsigned depth, unsigned index) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
@@ -330,10 +374,11 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledNode(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledNode(
                                MetadataRequest request,
                                Demangler &demangler,
                                Demangle::NodePointer node,
+                               const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
 
@@ -344,9 +389,10 @@ public:
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
   SWIFT_CC(swift)
-  TypeInfo swift_getTypeByMangledName(
+  TypeLookupErrorOr<TypeInfo> swift_getTypeByMangledName(
                                MetadataRequest request,
                                StringRef typeName,
+                               const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
 
@@ -357,10 +403,10 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
     /// The complete set of generic arguments.
-    const SmallVectorImpl<const Metadata *> &allGenericArgs;
+    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
 
     /// The counts of generic parameters at each level.
-    const SmallVectorImpl<unsigned> &genericParamCounts;
+    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
 
   public:
     /// Initialize a new function object to handle substitutions. Both
@@ -374,10 +420,10 @@ public:
     /// \param genericParamCounts The count of generic parameters at each
     /// generic level, typically gathered by _gatherGenericParameterCounts.
     explicit SubstGenericParametersFromWrittenArgs(
-        const SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const SmallVectorImpl<unsigned> &genericParamCounts)
-      : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
-    }
+        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
+        : allGenericArgs(allGenericArgs),
+          genericParamCounts(genericParamCounts) {}
 
     const Metadata *getMetadata(unsigned depth, unsigned index) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
@@ -406,12 +452,12 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool _checkGenericRequirements(
-                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    llvm::SmallVectorImpl<const void *> &extraArguments,
-                    SubstGenericParameterFn substGenericParam,
-                    SubstDependentWitnessTableFn substWitnessTable);
+  /// \returns the error if an error occurred, None otherwise.
+  llvm::Optional<TypeLookupError> _checkGenericRequirements(
+      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+      llvm::SmallVectorImpl<const void *> &extraArguments,
+      SubstGenericParameterFn substGenericParam,
+      SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -436,6 +482,24 @@ public:
 #else
     return c;
 #endif
+  }
+  
+  template<> inline const ClassMetadata *
+  Metadata::getClassObject() const {
+    switch (getKind()) {
+    case MetadataKind::Class: {
+      // Native Swift class metadata is also the class object.
+      return static_cast<const ClassMetadata *>(this);
+    }
+    case MetadataKind::ObjCClassWrapper: {
+      // Objective-C class objects are referenced by their Swift metadata wrapper.
+      auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
+      return wrapper->Class;
+    }
+    // Other kinds of types don't have class objects.
+    default:
+      return nullptr;
+    }
   }
 
   void *allocateMetadata(size_t size, size_t align);
@@ -568,6 +632,13 @@ public:
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
+
+#if SWIFT_OBJC_INTEROP
+  /// Returns a retained Quick Look representation object an Obj-C object.
+  SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+  id _quickLookObjectForPointer(void *value);
+#endif
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

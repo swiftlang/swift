@@ -1,4 +1,3 @@
-
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
@@ -907,7 +906,6 @@ bb1(%6 : $()):
 
 bb2:
   strong_release %2 : $@callee_owned () -> (@out T, @error Error)
-  destroy_addr %1 : $*T
   %10 = tuple ()
   return %10 : $()
 
@@ -968,5 +966,31 @@ bb2(%7 : $Error):
 }
 
 sil_vtable C {
-  #C.callThrowing!1: @callThrowing
+  #C.callThrowing: @callThrowing
 }
+
+// Test that the inliner doesn't crash if a dynamic-self callee is called from a
+// non-dynamic-self caller. Currently we just prevent inlining in this case.
+// We could handle this at some time, but we must not crash.
+
+class X { }
+protocol PX : X { }
+
+sil @no_self_metadata : $@convention(method) <Self where Self : PX> (@thick Self.Type) -> () {
+bb0(%1 : $@thick Self.Type):
+  %4 = upcast %1 : $@thick Self.Type to $@thick X.Type
+  %5 = function_ref @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X
+  %6 = apply %5(%4) : $@convention(method) (@thick X.Type) -> @owned X
+  strong_release %6 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [always_inline] @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X {
+bb0(%1 : $@thick X.Type):
+  %3 = unchecked_trivial_bit_cast %1 : $@thick X.Type to $@thick @dynamic_self X.Type
+  %27 = upcast %3 : $@thick @dynamic_self X.Type to $@thick X.Type
+  %30 = alloc_ref_dynamic %27 : $@thick X.Type, $X
+  return %30 : $X
+}
+

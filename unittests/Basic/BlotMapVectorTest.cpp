@@ -464,6 +464,19 @@ TYPED_TEST(BlotMapVectorTest, InsertTest) {
   this->NumExpectedLiveTesters = 1;
 }
 
+// Test try_emplace() method
+TYPED_TEST(BlotMapVectorTest, TryEmplaceTest) {
+  this->Map.try_emplace(this->getKey(), this->getValue());
+  EXPECT_EQ(1u, this->Map.size());
+  EXPECT_EQ(this->getValue(), this->Map[this->getKey()]);
+  EXPECT_EQ(1u, this->Map.size());
+  this->Map.try_emplace(this->getKey(), this->getValue());
+  EXPECT_EQ(1u, this->Map.size());
+  EXPECT_EQ(this->getValue(), this->Map[this->getKey()]);
+  EXPECT_EQ(1u, this->Map.size());
+  this->NumExpectedLiveTesters = 1;
+}
+
 // Test copy constructor method
 TYPED_TEST(BlotMapVectorTest, CopyConstructorTest) {
   this->Map[this->getKey()] = this->getValue();

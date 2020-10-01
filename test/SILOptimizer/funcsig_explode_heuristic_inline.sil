@@ -1,0 +1,90 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -sil-inline-generics -inline -function-signature-opts -enable-expand-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct LargeNonTrivialStructOneNonTrivialField {
+  var k1: Klass
+  var k2: Klass
+  var x1: Builtin.Int32
+  var x2: Builtin.Int32
+  var x3: Builtin.Int32
+  var x4: Builtin.Int32
+}
+
+sil @consuming_user : $@convention(thin) (@owned Klass) -> ()
+sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+
+// This test makes sure that if we have two non-trivial values that are live and
+// one is always dead and the other is a value that we have a release for, we
+// can get rid of the first argument and FSO the other. Test here that we
+// explode it appropriately and do a partial o2g even though we aren't reducing
+// the number of non-trivial uses.
+
+// CHECK-LABEL: sil @caller1 : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FUNC:%.*]] = function_ref @partial_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+// CHECK:   apply [[FUNC]]([[ARG]]) : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+// CHECK: } // end sil function 'caller1'
+sil @caller1 : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = function_ref @partial_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+  apply %1(%0) : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If we have two non-trivial values that are live and one is always dead and
+// the other is kept alive due to a release, we can get rid of both since FSO
+// reruns with o2g. Test here that we explode it appropriately and do a partial
+// o2g even though we aren't reducing the number of non-trivial uses.
+sil hidden [noinline] @partial_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k2
+  %3 = function_ref @consuming_user : $@convention(thin) (@owned Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@owned Klass) -> ()
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %4(%1) :$@convention(thin) (@guaranteed Klass) -> ()
+  release_value %1 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @caller2 : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
+// CHECK:   [[FIELD1:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k2
+// CHECK:   [[FIELD2:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+// CHECK:   [[FUNC:%.*]] = function_ref @$s23partiallydead_after_o2gTf4x_nTf4dn_n : $@convention(thin) (@owned Klass) -> ()
+// CHECK:   apply [[FUNC]]([[FIELD1]]) : $@convention(thin) (@owned Klass) -> ()
+// CHECK:   release_value [[FIELD2]]
+// CHECK: } // end sil function 'caller2'
+sil @caller2 : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = function_ref @partiallydead_after_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+  apply %1(%0) : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If we have two non-trivial values that are live and one is always dead and
+// the other is kept alive due to a release, we can get rid of both since FSO
+// reruns with o2g. Test here that we explode it appropriately and do a partial
+// o2g even though we aren't reducing the number of non-trivial uses.
+sil hidden [noinline] @partiallydead_after_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
+  %1 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
+  %2 = struct_extract %0 : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k2
+  %3 = function_ref @consuming_user : $@convention(thin) (@owned Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@owned Klass) -> ()
+  release_value %1 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

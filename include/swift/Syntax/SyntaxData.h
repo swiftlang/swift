@@ -39,6 +39,7 @@
 #ifndef SWIFT_SYNTAX_SYNTAXDATA_H
 #define SWIFT_SYNTAX_SYNTAXDATA_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Syntax/AtomicCache.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
@@ -133,6 +134,10 @@ class SyntaxData final
   }
 
 public:
+  /// Disable sized deallocation for SyntaxData, because it has tail-allocated
+  /// data.
+  void operator delete(void *p) { ::operator delete(p); }
+
   /// Get the node immediately before this current node that does contain a
   /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getPreviousNode() const;
@@ -178,7 +183,7 @@ public:
                              CursorIndex IndexInParent = 0);
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> getRaw() const {
+  const RC<RawSyntax> &getRaw() const {
     return Raw;
   }
 
@@ -284,8 +289,7 @@ public:
   /// standard error.
   void dump(llvm::raw_ostream &OS) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace syntax

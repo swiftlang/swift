@@ -49,13 +49,35 @@ import SingleGenericClass
 // CHECK-NEXT: @end
 @objc class B1 : A1 {}
 
+// Used in BridgedTypes test case
+struct Notification: _ObjectiveCBridgeable {
+  func _bridgeToObjectiveC() -> NSNotification { fatalError() }
+  static func _forceBridgeFromObjectiveC(
+    _ source: NSNotification,
+    result: inout Self?
+  ) { fatalError() }
+  @discardableResult
+  static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSNotification,
+    result: inout Self?
+  ) -> Bool { fatalError() }
+  @_effects(readonly)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+    -> Self { fatalError() }
+}
+
 // CHECK-LABEL: @interface BridgedTypes
 // CHECK-NEXT: - (NSDictionary * _Nonnull)dictBridge:(NSDictionary * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSNotification * _Nonnull)noteBridge:(NSNotification * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (NSSet * _Nonnull)setBridge:(NSSet * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc @objcMembers class BridgedTypes {
   @objc func dictBridge(_ x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
+    return x
+  }
+
+  @objc func noteBridge(_ x: Notification) -> Notification {
     return x
   }
 
@@ -223,6 +245,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary<NSString *, NSString *> * _Nonnull)a;
 // CHECK-NEXT: - (void)testSetBridging:(NSSet * _Nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id _Nonnull)_;
+// CHECK-NEXT: - (IBSegueAction NSObject * _Nonnull)segueActionMethod:(NSCoder * _Nonnull)coder sender:(id _Nonnull)sender SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id _Nonnull)long_ protected:(id _Nonnull)protected_;
 // CHECK-NEXT: - (void)honorRenames:(CustomName * _Nonnull)_;
 // CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_ SWIFT_WARN_UNUSED_RESULT;
@@ -280,6 +303,7 @@ class NotObjC {}
   @objc func testSetBridging(_ a: Set<NSObject>) {}
 
   @IBAction func actionMethod(_: AnyObject) {}
+  @IBSegueAction func segueActionMethod(_ coder: NSCoder, sender: Any) -> NSObject { fatalError() }
 
   @objc func methodWithReservedParameterNames(_ long: AnyObject, protected: AnyObject) {}
 
@@ -356,6 +380,14 @@ typealias AliasForNSRect = NSRect
 
   @objc func testBridgingOptionality(_ a: UnsafePointer<Int>?, b: UnsafeMutablePointer<Int>!, c: AutoreleasingUnsafeMutablePointer<Methods?>?) {}
 }
+
+// CHECK-LABEL: IB_DESIGNABLE
+// CHECK-NEXT: SWIFT_CLASS(
+// CHECK-NEXT: @interface MyDesignableObject : NSObject
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface NSObject
+@IBDesignable class MyDesignableObject : NSObject {}
 
 // CHECK-LABEL: @interface MyObject : NSObject
 // CHECK-NEXT: init
@@ -515,6 +547,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic) CFAliasForTypeRef _Nullable anyCF2;
 // CHECK-NEXT: @property (nonatomic, weak) IBOutlet id _Null_unspecified outlet;
 // CHECK-NEXT: @property (nonatomic, strong) IBOutlet Properties * _Null_unspecified typedOutlet;
+// CHECK-NEXT: @property (nonatomic) IBInspectable NSInteger inspectable;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * _Nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * _Nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> * _Nonnull arrayOfArrays;
@@ -606,6 +639,7 @@ public class NonObjCClass { }
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!
+  @IBInspectable var inspectable: Int = 0
 
   @objc var string = "abc"
   @objc var array: Array<AnyObject> = []
@@ -786,6 +820,9 @@ public class NonObjCClass { }
   // CHECK-NEXT: - (StringCheese * _Nullable)foo SWIFT_WARN_UNUSED_RESULT;
   @objc func foo() -> StringCheese? { return nil }
 
+  // CHECK-NEXT: - (GymClass<StringCheese *> * _Nullable)foosball SWIFT_WARN_UNUSED_RESULT;
+  @objc func foosball() -> GymClass<StringCheese>? { return nil }
+
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 }
 // CHECK-NEXT: @end
@@ -805,3 +842,9 @@ public class NonObjCClass { }
   @objc func referenceSingleGenericClass(_: SingleImportedObjCGeneric<AnyObject>?) {}
 }
 // CHECK: @end
+
+// CHECK: SWIFT_WEAK_IMPORT
+// CHECK-NEXT: SWIFT_CLASS("_TtC7classes17WeakImportedClass")
+// CHECK-NEXT: @interface WeakImportedClass
+// CHECK-NEXT: @end
+@_weakLinked @objc class WeakImportedClass {}

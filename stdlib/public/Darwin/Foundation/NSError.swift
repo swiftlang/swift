@@ -13,7 +13,7 @@
 @_exported import Foundation // Clang module
 import CoreFoundation
 import Darwin
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 //===----------------------------------------------------------------------===//
 // NSError (as an out parameter).
@@ -234,8 +234,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
     if domain != NSCocoaErrorDomain {
       _errorDomainUserInfoProviderQueue.sync {
         if NSError.userInfoValueProvider(forDomain: domain) != nil { return }
-        NSError.setUserInfoValueProvider(forDomain: domain) { (nsError, key) in
-          let error = nsError as Error
+        NSError.setUserInfoValueProvider(forDomain: domain) { (error, key) in
 
           switch key {
           case NSLocalizedDescriptionKey:
@@ -489,6 +488,10 @@ extension _BridgedStoredNSError {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_nsError)
   }
+
+  @_alwaysEmitIntoClient public var hashValue: Int {
+    return _nsError.hashValue
+  }
 }
 
 /// Describes the code of an error.
@@ -563,6 +566,10 @@ public struct CocoaError : _BridgedStoredNSError {
   }
 
   public static var errorDomain: String { return NSCocoaErrorDomain }
+
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
 
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
@@ -1791,6 +1798,10 @@ public struct URLError : _BridgedStoredNSError {
 
   public static var errorDomain: String { return NSURLErrorDomain }
 
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
+
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = URLError
@@ -1967,6 +1978,26 @@ extension URLError.Code {
 }
 
 extension URLError {
+  /// Reasons used by URLError to indicate why a background URLSessionTask was cancelled.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public enum BackgroundTaskCancelledReason : Int {
+    case userForceQuitApplication
+    case backgroundUpdatesDisabled
+    case insufficientSystemResources
+  }
+}
+
+extension URLError {
+  /// Reasons used by URLError to indicate that a URLSessionTask failed because of unsatisfiable network constraints.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public enum NetworkUnavailableReason : Int {
+    case cellular
+    case expensive
+    case constrained
+  }
+}
+
+extension URLError {
   private var _nsUserInfo: [AnyHashable : Any] {
     return (self as NSError).userInfo
   }
@@ -1988,6 +2019,24 @@ extension URLError {
     }
 
     return nil
+  }
+
+  /// The reason why a background URLSessionTask was cancelled.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var backgroundTaskCancelledReason: BackgroundTaskCancelledReason? {
+    return (_nsUserInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? Int).flatMap(BackgroundTaskCancelledReason.init(rawValue:))
+  }
+
+  /// The reason why the network is unavailable when the task failed due to unsatisfiable network constraints.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var networkUnavailableReason: NetworkUnavailableReason? {
+    return (_nsUserInfo[NSURLErrorNetworkUnavailableReasonKey] as? Int).flatMap(NetworkUnavailableReason.init(rawValue:))
+  }
+
+  /// An opaque data blob to resume a failed download task.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var downloadTaskResumeData: Data? {
+    return _nsUserInfo[NSURLSessionDownloadTaskResumeData] as? Data
   }
 }
 
@@ -2446,6 +2495,10 @@ public struct POSIXError : _BridgedStoredNSError {
   }
 
   public static var errorDomain: String { return NSPOSIXErrorDomain }
+
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
 
   public typealias Code = POSIXErrorCode
 }
@@ -2932,6 +2985,10 @@ public struct MachError : _BridgedStoredNSError {
   }
 
   public static var errorDomain: String { return NSMachErrorDomain }
+
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
 
   public typealias Code = MachErrorCode
 }

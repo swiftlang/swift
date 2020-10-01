@@ -19,13 +19,38 @@
 #ifndef SWIFT_BASIC_TYPEID_H
 #define SWIFT_BASIC_TYPEID_H
 
-#include "llvm/ADT/StringRef.h"
+// NOTE: Most of these includes are for CTypeIDZone.def and DefineTypeIDZone.h.
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/StringRef.h"
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace swift {
+
+enum class Zone : uint8_t {
+  C                       = 0,
+  AST                     = 1,
+  AccessControl           = 11,
+  IDETypes                = 136,
+  IDE                     = 137,
+  IDETypeChecking         = 97,
+  NameLookup              = 9,
+  Parse                   = 8,
+  TypeChecker             = 10,
+  SILGen                  = 12,
+  SILOptimizer            = 13,
+  TBDGen                  = 14,
+  IRGen                   = 20,
+
+  // N.B. This is not a formal zone and exists solely to support the unit tests.
+  ArithmeticEvaluator     = 255,
+};
+
+static_assert(std::is_same<std::underlying_type<Zone>::type, uint8_t>::value,
+              "underlying type is no longer uint8_t!");
 
 /// Form a unique 64-bit integer value describing the type `T`.
 ///
@@ -37,15 +62,38 @@ struct TypeID;
 
 /// Template whose specializations provide the set of type IDs within a
 /// given zone.
-template<uint8_t Zone> struct TypeIDZoneTypes;
+template<Zone Zone> struct TypeIDZoneTypes;
 
 /// Form a type ID given a zone and type value.
 constexpr uint64_t formTypeID(uint8_t zone, uint8_t type) {
   return (uint64_t(zone) << 8) | uint64_t(type);
 }
 
+namespace evaluator {
+/// The return type of requests that execute side effects.
+///
+/// In general, it is not appropriate to use the request evaluator framework to
+/// execute a request for the sake of its side effects. However, there are
+/// operations we would currently like to be requests because it makes modelling
+/// some aspect of their implementation particularly nice. For example, an
+/// operation that emits diagnostics to run some checking code in a primary
+/// file may be desirable to requestify because it should be run only once per
+/// declaration, but it has no coherent return value. Another category of
+/// side-effecting requests are those that adapt existing parts of the compiler that
+/// do not yet behave in a "functional" manner to have a functional interface. Consider
+/// the request to run the SIL Optimizer. In theory, it should be a request that takes in
+/// a SILModule and returns a SILModule. In practice, it is a request that executes
+/// effects against a SILModule.
+///
+/// To make these requests stand out - partially in the hope we can return and
+/// refactor them to behave in a more well-structured manner, partially because
+/// they cannot return \c void or we will get template substitution failures - we
+/// annotate them as computing an \c evaluator::SideEffect.
+using SideEffect = std::tuple<>;
+}
+
 // Define the C type zone (zone 0).
-#define SWIFT_TYPEID_ZONE 0
+#define SWIFT_TYPEID_ZONE C
 #define SWIFT_TYPEID_HEADER "swift/Basic/CTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 

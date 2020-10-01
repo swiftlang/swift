@@ -8,7 +8,7 @@ The "Complete Generics" goal for Swift 3 has been fairly ill-defined thus far, w
 
 This message expands upon the notion of "completing generics". It is not a plan for Swift 3, nor an official core team communication, but it collects the results of numerous discussions among the core team and Swift developers, both of the compiler and the standard library. I hope to achieve several things:
 
-* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/master/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
+* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/main/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
 
 * **Establish some terminology** that the Swift developers have been using for these features, so our discussions can be more productive ("oh, you're proposing what we refer to as 'conditional conformances'; go look over at this thread").
 
@@ -87,6 +87,30 @@ typealias StringDictionary<Value> = Dictionary<String, Value>
 var d1 = StringDictionary<Int>()
 var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dictionary<String, Int>
 ```
+
+### Generic associatedtypes
+
+Associatedtypes could be allowed to carry generic parameters. 
+
+```Swift
+    protocol Wrapper {
+      associatedtype Wrapped<T>
+      
+      static func wrap<T>(_ t: T) -> Wrapped<T>
+    }
+```
+
+Generic associatedtypes would support all constraints supported by the language including where clauses.  As with non-generic associatedtypes conforming types would be required to provide a nested type or typealias matching the name of the associatedtype.  However, in this case the nested type or typealias would be generic.  
+
+```Swift
+    enum OptionalWrapper {
+      typealias Wrapped<T> = Optional<T>
+      
+      static func wrap<T>(_ t: T) -> Optional<T>
+    }
+```
+
+Note: generic associatedtypes address many use cases also addressed by higher-kinded types but with lower implementation complexity.
 
 ### Generic subscripts
 
@@ -249,6 +273,21 @@ typealias AnyObject = protocol<class>
 
 See the "Existentials" section, particularly "Generalized existentials", for more information.
 
+### Generalized supertype constraints
+
+Currently, supertype constraints may only be specified using a concrete class or protocol type.  This prevents us from abstracting over the supertype.
+
+```Swift
+protocol P {
+  associatedtype Base
+  associatedtype Derived: Base
+}
+```
+
+In the above example `Base` may be any type.  `Derived` may be the same as `Base` or may be _any_ subtype of `Base`.  All subtype relationships supported by Swift should be supported in this context including (but not limited to) classes and subclasses, existentials and conforming concrete types or refining existentials, `T?` and  `T`, `((Base) -> Void)` and `((Derived) -> Void)`, etc.
+
+Generalized supertype constraints would be accepted in all syntactic locations where generic constraints are accepted.
+
 ### Allowing subclasses to override requirements satisfied by defaults (*)
 
 When a superclass conforms to a protocol and has one of the protocol's requirements satisfied by a member of a protocol extension, that member currently cannot be overridden by a subclass. For example:
@@ -283,7 +322,7 @@ Unlike the minor extensions, major extensions to the generics model provide more
 
 ### Conditional conformances (*)
 
-*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is under development.*
+*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is implemented in Swift 4.2.*
 
 Conditional conformances express the notion that a generic type will conform to a particular protocol only under certain circumstances. For example, `Array` is `Equatable` only when its elements are `Equatable`:
 
@@ -655,9 +694,9 @@ foo(X())
 
 Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems--none of which is an acceptable result.
 
-### Conditional conformances via protocol extensions
+### Retroactive protocol refinement
 
-We often get requests to make a protocol conform to another protocol. This is, effectively, the expansion of the notion of "Conditional conformances" to protocol extensions. For example:
+We often get requests to make protocols retroactively refine other protocols. For example:
 
 ```Swift
 protocol P {
@@ -668,8 +707,8 @@ protocol Q {
   func bar()
 }
 
-extension Q : P { // every type that conforms to Q also conforms to P
-  func foo() {    // implement "foo" requirement in terms of "bar"
+extension Q : P { // Make every type that conforms to Q also conforms to P
+  func foo() {    // Implement `P.foo` requirement in terms of `Q.bar`
     bar()
   }
 }

@@ -58,36 +58,42 @@ macro(swift_common_standalone_build_config_llvm product)
     fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
   endif()
 
-  if(NOT CMAKE_CROSSCOMPILING)
+  if(NOT CMAKE_CROSSCOMPILING AND NOT SWIFT_CROSS_COMPILING)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
-  if(CMAKE_CROSSCOMPILING)
-    set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
-    if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
-      message(FATAL_ERROR
-        "Attempting to cross-compile swift standalone but no native LLVM build
-        found.  Please cross-compile LLVM as well.")
-    endif()
-
-    if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
-      set(HOST_EXECUTABLE_SUFFIX ".exe")
-    endif()
-
-    if(NOT CMAKE_CONFIGURATION_TYPES)
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+  if(SWIFT_INCLUDE_TOOLS)
+    if(LLVM_TABLEGEN)
+      set(LLVM_TABLEGEN_EXE ${LLVM_TABLEGEN})
     else()
-      # NOTE: LLVM NATIVE build is always built Release, as is specified in
-      # CrossCompile.cmake
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-    endif()
-  else()
-    find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
-      NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
-    if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
-      message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+      if(CMAKE_CROSSCOMPILING)
+        set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
+        if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
+          message(FATAL_ERROR
+            "Attempting to cross-compile swift standalone but no native LLVM build
+            found.  Please cross-compile LLVM as well.")
+        endif()
+
+        if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
+          set(HOST_EXECUTABLE_SUFFIX ".exe")
+        endif()
+
+        if(NOT CMAKE_CONFIGURATION_TYPES)
+          set(LLVM_TABLEGEN_EXE
+            "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+        else()
+          # NOTE: LLVM NATIVE build is always built Release, as is specified in
+          # CrossCompile.cmake
+          set(LLVM_TABLEGEN_EXE
+            "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+        endif()
+      else()
+        find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
+          NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+        if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
+          message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+        endif()
+      endif()
     endif()
   endif()
 
@@ -108,6 +114,9 @@ macro(swift_common_standalone_build_config_llvm product)
   # add_swift_host_library and add_swift_target_library within AddSwift.cmake.
   string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
   string(REGEX REPLACE "-Wl,-z,nodelete" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+  # Android build on macOS cross-compile host don't support `-Wl,-headerpad_max_install_names` and `-dynamiclib` as a linker flags.
+  string(REGEX REPLACE "-Wl,-headerpad_max_install_names" "" CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS}")
+  string(REGEX REPLACE "-dynamiclib" "" CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS}")
 
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
   string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" PACKAGE_VERSION_MAJOR
@@ -184,7 +193,7 @@ macro(swift_common_standalone_build_config_cmark product)
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  include(${PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake)
   add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 
@@ -194,13 +203,12 @@ endmacro()
 #   product
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
-#
-#   is_cross_compiling
-#     Whether this is cross-compiling host tools.
 macro(swift_common_standalone_build_config product)
   swift_common_standalone_build_config_llvm(${product})
-  swift_common_standalone_build_config_clang(${product})
-  swift_common_standalone_build_config_cmark(${product})
+  if(SWIFT_INCLUDE_TOOLS)
+    swift_common_standalone_build_config_clang(${product})
+    swift_common_standalone_build_config_cmark(${product})
+  endif()
 
   # Enable groups for IDE generators (Xcode and MSVC).
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)

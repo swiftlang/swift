@@ -24,24 +24,27 @@
 #include <objc/objc.h>
 #endif
 #include "llvm/ADT/StringRef.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/AssertionReporting.h"
 #include "CompatibilityOverride.h"
+#include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
-#include "swift/Runtime/Debug.h"
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
 #endif
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
@@ -58,17 +61,7 @@ using namespace swift;
 OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
-static uintptr_t computeISAMask() {
-  // The versions of the Objective-C runtime which use non-pointer
-  // ISAs also export this symbol.
-  if (auto runtimeSymbol = &objc_debug_isa_class_mask)
-    return *runtimeSymbol;
-  return ~uintptr_t(0);
-}
-
-SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
-uintptr_t swift::swift_isaMask = computeISAMask();
-SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+uintptr_t swift::swift_isaMask = SWIFT_ISA_MASK;
 #endif
 
 const ClassMetadata *swift::_swift_getClass(const void *object) {
@@ -178,28 +171,48 @@ static SwiftObject *_allocHelper(Class cls) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-NSString *swift_stdlib_getDescription(OpaqueValue *value,
+Class _swift_classOfObjCHeapObject(OpaqueValue *value) {
+  return _swift_getObjCClassOfAllocated(value);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+id swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 
-NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
-  auto result = swift_stdlib_getDescription(value, type);
+id swift::getDescription(OpaqueValue *value, const Metadata *type) {
+  id result = swift_stdlib_getDescription(value, type);
   type->vw_destroy(value);
   return [result autorelease];
 }
 
-static NSString *_getObjectDescription(SwiftObject *obj) {
+static id _getObjectDescription(SwiftObject *obj) {
   swift_retain((HeapObject*)obj);
   return getDescription((OpaqueValue*)&obj,
                         _swift_getClassOfAllocated(obj));
 }
 
-static NSString *_getClassDescription(Class cls) {
-  return NSStringFromClass(cls);
+static id _getClassDescription(Class cls) {
+  const char *name = class_getName(cls);
+  int len = strlen(name);
+  return [swift_stdlib_NSStringFromUTF8(name, len) autorelease];
 }
 
-
 @implementation SwiftObject
-+ (void)initialize {}
++ (void)initialize {
+#if SWIFT_HAS_ISA_MASKING && !TARGET_OS_SIMULATOR && !NDEBUG
+  uintptr_t libObjCMask = (uintptr_t)&objc_absolute_packed_isa_class_mask;
+  assert(libObjCMask);
+
+#  if __arm64__ && !__has_feature(ptrauth_calls)
+  // When we're built ARM64 but running on ARM64e hardware, we will get an
+  // ARM64e libobjc with an ARM64e ISA mask. This mismatch is harmless and we
+  // shouldn't assert.
+  assert(libObjCMask == SWIFT_ISA_MASK || libObjCMask == SWIFT_ISA_MASK_PTRAUTH);
+#  else
+  assert(libObjCMask == SWIFT_ISA_MASK);
+#  endif
+#endif
+}
 
 + (instancetype)allocWithZone:(struct _NSZone *)zone {
   assert(zone == nullptr);
@@ -253,33 +266,7 @@ static NSString *_getClassDescription(Class cls) {
              class_getName(cls), sel_getName(sel));
 }
 
-- (id)retain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_retain(SELF);
-  return self;
-}
-- (void)release {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_release(SELF);
-}
-- (id)autorelease {
-  return _objc_rootAutorelease(self);
-}
-- (NSUInteger)retainCount {
-  return swift::swift_retainCount(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)_isDeallocating {
-  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)_tryRetain {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
-}
-- (BOOL)allowsWeakReference {
-  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)retainWeakReference {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
-}
+STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
 // Retaining the class object itself is a no-op.
 + (id)retain {
@@ -305,10 +292,6 @@ static NSString *_getClassDescription(Class cls) {
 }
 + (BOOL)retainWeakReference {
   return YES;
-}
-
-- (void)dealloc {
-  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {
@@ -408,21 +391,21 @@ static NSString *_getClassDescription(Class cls) {
                                                                  object2);
 }
 
-- (NSString *)description {
+- (id /* NSString */)description {
   return _getObjectDescription(self);
 }
-- (NSString *)debugDescription {
+- (id /* NSString */)debugDescription {
   return _getObjectDescription(self);
 }
 
-+ (NSString *)description {
++ (id /* NSString */)description {
   return _getClassDescription(self);
 }
-+ (NSString *)debugDescription {
++ (id /* NSString */)debugDescription {
   return _getClassDescription(self);
 }
 
-- (NSString *)_copyDescription {
+- (id /* NSString */)_copyDescription {
   // The NSObject version of this pushes an autoreleasepool in case -description
   // autoreleases, but we're OK with leaking things if we're at the top level
   // of the main thread with no autorelease pool.
@@ -430,15 +413,7 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (CFTypeID)_cfTypeID {
-  // Adopt the same CFTypeID as NSObject.
-  static CFTypeID result;
-  static dispatch_once_t predicate;
-  dispatch_once_f(&predicate, &result, [](void *resultAddr) {
-    id obj = [[NSObject alloc] init];
-    *(CFTypeID*)resultAddr = [obj _cfTypeID];
-    [obj release];
-  });
-  return result;
+  return (CFTypeID)1; //NSObject's CFTypeID is constant
 }
 
 // Foundation collections expect these to be implemented.
@@ -1096,6 +1071,20 @@ swift_dynamicCastObjCClassImpl(const void *object,
     return object;
   }
 
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
+  }
+
   return nullptr;
 }
 
@@ -1110,6 +1099,20 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
 
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
+  }
+
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
   }
 
   Class sourceType = object_getClass(id_const_cast(object));
@@ -1269,7 +1272,11 @@ Class swift::swift_getInitializedObjCClass(Class c) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective-C runtime. We need to do this because the
   // class "c" might be valid metadata, but it hasn't been initialized yet.
-  return [c class];
+  // Send a message that's likely not to be overridden to minimize potential
+  // side effects. Ignore the return value in case it is overridden to
+  // return something different. See SR-10463 for an example.
+  [c self];
+  return c;
 }
 
 static const ClassMetadata *
@@ -1474,22 +1481,9 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   //      if possible.
   //   3: Complain about uses of implicit @objc entrypoints, then abort().
   //
-  // The actual reportLevel is stored as the above values +1, so that
-  // 0 indicates we have not yet checked. It's fine to race through here.
-  //
   // The default, if SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT is not set, is 2.
-  static int storedReportLevel = 0;
-  if (storedReportLevel == 0) {
-    auto reportLevelStr = getenv("SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT");
-    if (reportLevelStr &&
-        reportLevelStr[0] >= '0' && reportLevelStr[0] <= '3' &&
-        reportLevelStr[1] == 0)
-      storedReportLevel = (reportLevelStr[0] - '0') + 1;
-    else
-      storedReportLevel = 3;
-  }
-
-  int reportLevel = storedReportLevel - 1;
+  uint8_t reportLevel =
+    runtime::environment::SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT();
   if (reportLevel < 1) return;
 
   // Report the error.
@@ -1515,8 +1509,8 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails::FixIt fixit = {
     .filename = nullTerminatedFilename,
     .startLine = line,
-    .endLine = line,
     .startColumn = column,
+    .endLine = line,
     .endColumn = column,
     .replacementText = "@objc "
   };
@@ -1544,6 +1538,11 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
            nullTerminatedFilename, line, column, message);
   free(message);
   free(nullTerminatedFilename);
+}
+
+const Metadata *swift::getNSObjectMetadata() {
+  return SWIFT_LAZY_CONSTANT(
+      swift_getObjCClassMetadata((const ClassMetadata *)[NSObject class]));
 }
 
 #endif

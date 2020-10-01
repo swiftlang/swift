@@ -6,15 +6,15 @@
 sil_stage canonical
 
 // CHECK-DAG: define{{( protected)?}} swiftcc void @weakButDefined() {{#[0-9]+}} {
-sil public [_weakLinked] @weakButDefined : $@convention(thin) () -> () {
+sil public [weak_imported] @weakButDefined : $@convention(thin) () -> () {
   %unit = tuple()
   return %unit : $()
 }
 
 // CHECK-DAG: declare extern_weak swiftcc void @weakExternal()
-sil public_external [_weakLinked] @weakExternal : $@convention(thin) () -> ()
+sil public_external [weak_imported] @weakExternal : $@convention(thin) () -> ()
 
-sil [_weakLinked] @testWeak : $@convention(thin) () -> () {
+sil [weak_imported] @testWeak : $@convention(thin) () -> () {
   %weakButDefined = function_ref @weakButDefined : $@convention(thin) () -> ()
   %wbdResult      = apply %weakButDefined() : $@convention(thin) () -> ()
   %weakExternal   = function_ref @weakExternal : $@convention(thin) () -> ()

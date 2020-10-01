@@ -72,12 +72,12 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = optional as? ${Type}
   _ = optional as! ${Type}
 
-  _ = array as [${Type}] // expected-error{{use 'as!'}}
+  _ = array as [${Type}] // expected-error{{cannot convert value of type '[${ObjectType}]' to type '[${Type}]' in coercion}} expected-note {{arguments to generic parameter 'Element' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = array is [${Type}]
   _ = array as? [${Type}]
   _ = array as! [${Type}]
 
-  _ = dictKeys as [${Type}: Any] // expected-error{{use 'as!'}}
+  _ = dictKeys as [${Type}: Any] // expected-error{{cannot convert value of type '[${ObjectType} : Any]' to type '[${Type} : Any]' in coercion}} expected-note {{arguments to generic parameter 'Key' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = dictKeys is [${Type}: Any]
   _ = dictKeys as? [${Type}: Any]
   _ = dictKeys as! [${Type}: Any]
@@ -87,7 +87,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictKeys as? [${Type}: AnyObject]
   _ = dictKeys as! [${Type}: AnyObject]
 
-  _ = dictValues as [AnyHashable: ${Type}] // expected-error{{use 'as!'}}
+  _ = dictValues as [AnyHashable: ${Type}] // expected-error{{cannot convert value of type '[AnyHashable : ${ObjectType}]' to type '[AnyHashable : ${Type}]' in coercion}} expected-note {{arguments to generic parameter 'Value' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = dictValues is [AnyHashable: ${Type}]
   _ = dictValues as? [AnyHashable: ${Type}]
   _ = dictValues as! [AnyHashable: ${Type}]
@@ -97,12 +97,12 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictValues as? [NSObject: ${Type}]
   _ = dictValues as! [NSObject: ${Type}]
 
-  _ = dictBoth as [${ObjectType}: ${Type}] // expected-error{{use 'as!'}}
+  _ = dictBoth as [${ObjectType}: ${Type}] // expected-error{{cannot convert value of type '[${ObjectType} : ${ObjectType}]' to type '[${ObjectType} : ${Type}]' in coercion}} expected-note {{arguments to generic parameter 'Value' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = dictBoth is [${ObjectType}: ${Type}]
   _ = dictBoth as? [${ObjectType}: ${Type}]
   _ = dictBoth as! [${ObjectType}: ${Type}]
 
-  _ = dictBoth as [${Type}: ${ObjectType}] // expected-error{{use 'as!'}}
+  _ = dictBoth as [${Type}: ${ObjectType}] // expected-error{{cannot convert value of type '[${ObjectType} : ${ObjectType}]' to type '[${Type} : ${ObjectType}]' in coercion}} expected-note {{arguments to generic parameter 'Key' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = dictBoth is [${Type}: ${ObjectType}]
   _ = dictBoth as? [${Type}: ${ObjectType}]
   _ = dictBoth as! [${Type}: ${ObjectType}]
@@ -112,7 +112,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = dictBoth as? [${Type}: ${Type}]
   _ = dictBoth as! [${Type}: ${Type}]
 
-  _ = set as Set<${Type}> // expected-error{{use 'as!'}}
+  _ = set as Set<${Type}> // expected-error{{cannot convert value of type 'Set<${ObjectType}>' to type 'Set<${Type}>' in coercion}} expected-note {{arguments to generic parameter 'Element' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = set is Set<${Type}>
   _ = set as? Set<${Type}>
   _ = set as! Set<${Type}>

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/Range.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -53,7 +54,7 @@ operator=(const FrontendInputsAndOutputs &other) {
 std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
   std::vector<std::string> filenames;
   for (auto &input : AllInputs) {
-    filenames.push_back(input.file());
+    filenames.push_back(input.getFileName());
   }
   return filenames;
 }
@@ -65,7 +66,7 @@ bool FrontendInputsAndOutputs::isReadingFromStdin() const {
 const std::string &FrontendInputsAndOutputs::getFilenameOfFirstInput() const {
   assert(hasInputs());
   const InputFile &inp = AllInputs[0];
-  const std::string &f = inp.file();
+  const std::string &f = inp.getFileName();
   assert(!f.empty());
   return f;
 }
@@ -134,7 +135,7 @@ FrontendInputsAndOutputs::getRequiredUniquePrimaryInput() const {
 std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
   // Use the first primary, even if there are multiple primaries.
   // That's enough to keep the file names unique.
-  return isWholeModule() ? "all" : firstPrimaryInput().file();
+  return isWholeModule() ? "all" : firstPrimaryInput().getFileName();
 }
 
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
@@ -145,7 +146,7 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
     StringRef extension) const {
   unsigned n = 0;
   (void)forEachPrimaryInput([&](const InputFile &input) -> bool {
-    if (llvm::sys::path::extension(input.file()).endswith(extension))
+    if (llvm::sys::path::extension(input.getFileName()).endswith(extension))
       ++n;
     return false;
   });
@@ -174,7 +175,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
 
   StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
   file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
-  return InputType == file_types::TY_SwiftParseableInterfaceFile;
+  return InputType == file_types::TY_SwiftModuleInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
@@ -198,11 +199,24 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
+bool FrontendInputsAndOutputs::shouldTreatAsObjCHeader() const {
+  if (hasSingleInput()) {
+    StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+    switch (file_types::lookupTypeForExtension(InputExt)) {
+    case file_types::TY_ObjCHeader:
+      return true;
+    default:
+      return false;
+    }
+  }
+  return false;
+}
+
 bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : AllInputs) {
     if (input.isPrimary())
       continue;
-    StringRef extension = llvm::sys::path::extension(input.file());
+    StringRef extension = llvm::sys::path::extension(input.getFileName());
     if (file_types::lookupTypeForExtension(extension) != file_types::TY_SIB) {
       return false;
     }
@@ -255,7 +269,7 @@ void FrontendInputsAndOutputs::addInput(const InputFile &input) {
   AllInputs.push_back(input);
   if (input.isPrimary()) {
     PrimaryInputsInOrder.push_back(index);
-    PrimaryInputsByName.insert(std::make_pair(AllInputs.back().file(), index));
+    PrimaryInputsByName.insert({AllInputs.back().getFileName(), index});
   }
 }
 
@@ -316,7 +330,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     for (auto &input : AllInputs) {
       if (input.isPrimary()) {
         input.setPrimarySpecificPaths(PrimarySpecificPaths(
-            outputFiles[i], input.file(), supplementaryOutputs[i]));
+            outputFiles[i], input.getFileName(), supplementaryOutputs[i]));
         ++i;
       }
     }
@@ -326,7 +340,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
          "WMO only ever produces one set of supplementary outputs");
   if (outputFiles.size() == 1) {
     AllInputs.front().setPrimarySpecificPaths(PrimarySpecificPaths(
-        outputFiles.front(), firstInputProducingOutput().file(),
+        outputFiles.front(), firstInputProducingOutput().getFileName(),
         supplementaryOutputs.front()));
     return;
   }
@@ -411,6 +425,18 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
+bool FrontendInputsAndOutputs::hasSwiftRangesPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.SwiftRangesFilePath;
+      });
+}
+bool FrontendInputsAndOutputs::hasCompiledSourcePath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.CompiledSourceFilePath;
+      });
+}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
@@ -435,10 +461,28 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
         return outs.ModuleDocOutputPath;
       });
 }
-bool FrontendInputsAndOutputs::hasParseableInterfaceOutputPath() const {
+bool FrontendInputsAndOutputs::hasModuleSourceInfoOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ParseableInterfaceOutputPath;
+        return outs.ModuleSourceInfoOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleInterfaceOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.PrivateModuleInterfaceOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSummaryOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasTBDPath() const {

@@ -11,7 +11,7 @@ target triple = "x86_64-apple-macosx10.9"
 declare void @swift_bridgeObjectRelease(%a* nocapture)
 declare %a *@swift_bridgeObjectRetain(%a* nocapture)
 
-; CHECK-LABEL: define void @testcase1(%a*) {
+; CHECK-LABEL: define void @testcase1(%a* %0) {
 ; CHECK: entry:
 ; CHECK-NEXT: [[CAST:%.*]] = bitcast %a* %0 to %swift.bridge*
 ; CHECK-NEXT: call void @swift_bridgeObjectRelease_n(%swift.bridge* [[CAST]], i32 2)
@@ -25,7 +25,7 @@ entry:
 
 declare void @user(%a*)
 
-; CHECK-LABEL: define %a* @testcase2(%a*) {
+; CHECK-LABEL: define %a* @testcase2(%a* %0) {
 ; CHECK: entry:
 ; CHECK-NEXT: [[CAST1:%.*]] = bitcast %a* %0 to %swift.bridge*
 ; CHECK-NEXT: [[RESULT:%.*]] ={{( tail)?}} call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* [[CAST1]], i32 2)

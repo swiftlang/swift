@@ -27,7 +27,7 @@
 /// - Returns: The instance passed as `value`.
 @discardableResult
 @_semantics("optimize.sil.specialize.generic.never")
-public func dump<T, TargetStream : TextOutputStream>(
+public func dump<T, TargetStream: TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
@@ -36,7 +36,7 @@ public func dump<T, TargetStream : TextOutputStream>(
   maxItems: Int = .max
 ) -> T {
   var maxItemCounter = maxItems
-  var visitedItems = [ObjectIdentifier : Int]()
+  var visitedItems = [ObjectIdentifier: Int]()
   target._lock()
   defer { target._unlock() }
   _dump_unlocked(
@@ -84,14 +84,14 @@ public func dump<T>(
 
 /// Dump an object's contents. User code should use dump().
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _dump_unlocked<TargetStream : TextOutputStream>(
+internal func _dump_unlocked<TargetStream: TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
   name: String?,
   indent: Int,
   maxDepth: Int,
   maxItemCounter: inout Int,
-  visitedItems: inout [ObjectIdentifier : Int]
+  visitedItems: inout [ObjectIdentifier: Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -99,7 +99,7 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
   for _ in 0..<indent { target.write(" ") }
 
   let mirror = Mirror(reflecting: value)
-  let count = mirror.children.count
+  let count = mirror._children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
   target.write(bullet)
@@ -149,7 +149,7 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
       visitedItems: &visitedItems)
   }
 
-  var currentIndex = mirror.children.startIndex
+  var currentIndex = mirror._children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
@@ -167,8 +167,8 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
       return
     }
 
-    let (name, child) = mirror.children[currentIndex]
-    mirror.children.formIndex(after: &currentIndex)
+    let (name, child) = mirror._children[currentIndex]
+    mirror._children.formIndex(after: &currentIndex)
     _dump_unlocked(
       child,
       to: &target,
@@ -183,20 +183,20 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
+internal func _dumpSuperclass_unlocked<TargetStream: TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
   maxItemCounter: inout Int,
-  visitedItems: inout [ObjectIdentifier : Int]
+  visitedItems: inout [ObjectIdentifier: Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
 
   for _ in 0..<indent { target.write(" ") }
 
-  let count = mirror.children.count
+  let count = mirror._children.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
   target.write(bullet)
@@ -216,7 +216,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
       visitedItems: &visitedItems)
   }
 
-  var currentIndex = mirror.children.startIndex
+  var currentIndex = mirror._children.startIndex
   for i in 0..<count {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
@@ -234,8 +234,8 @@ internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
       return
     }
 
-    let (name, child) = mirror.children[currentIndex]
-    mirror.children.formIndex(after: &currentIndex)
+    let (name, child) = mirror._children[currentIndex]
+    mirror._children.formIndex(after: &currentIndex)
     _dump_unlocked(
       child,
       to: &target,

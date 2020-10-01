@@ -41,8 +41,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Barable & Fooable'}}
-f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Barable & Fooable'}}
+f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Fooable'}}
+f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Fooable'}}
 
 //===----------------------------------------------------------------------===//
 // Subtyping
@@ -51,11 +51,7 @@ g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
 g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(Barable & Fooable) -> ()'}}
-
-// FIXME: Workaround for ?? not playing nice with function types.
-infix operator ??*
-func ??*<T>(lhs: T?, rhs: T) -> T { return lhs ?? rhs }
-g(nilFunc ??* f0)
+g(nilFunc ?? f0)
 
 gc(fc0) // okay
 gc(fc1) // okay
@@ -107,6 +103,10 @@ protocol P : Initable {
   func bar(_ x: Int)
   mutating func mut(_ x: Int)
   static func tum()
+  
+  typealias E = Int
+  typealias F = Self.E
+  typealias G = Array
 }
 
 protocol ClassP : class {
@@ -212,10 +212,21 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   // Instance member of existential metatype -- not allowed
   _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
   _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
+  // expected-error@-1 {{partial application of 'mutating' method is not allowed}}
 
   // Static member of metatype -- not allowed
   _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
   _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+
+  // Access typealias through protocol and existential metatypes
+  _ = pp.E.self
+  _ = p.E.self
+
+  _ = pp.F.self
+  _ = p.F.self
+
+  // Make sure that we open generics
+  let _: [Int].Type = p.G.self
 }
 
 protocol StaticP {
@@ -362,4 +373,52 @@ func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
   let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
 
+}
+
+
+// rdar://problem/50099849
+
+protocol Trivial {
+  associatedtype T
+}
+
+func rdar_50099849() {
+  struct A : Trivial {
+    typealias T = A
+  }
+
+  struct B<C : Trivial> : Trivial { // expected-note {{'C' declared as parameter to type 'B'}}
+    typealias T = C.T
+  }
+
+  struct C<W: Trivial, Z: Trivial> : Trivial where W.T == Z.T {
+    typealias T = W.T
+  }
+
+  let _ = C<A, B>() // expected-error {{generic parameter 'C' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#C: Trivial#>>}}
+}
+
+// rdar://problem/50512161 - improve diagnostic when generic parameter cannot be deduced
+func rdar_50512161() {
+  struct Item {}
+
+  struct TrivialItem : Trivial {
+    typealias T = Item?
+  }
+
+  func foo<I>(_: I.Type = I.self, item: I.T) where I : Trivial { // expected-note {{in call to function 'foo(_:item:)'}}
+    fatalError()
+  }
+
+  func bar(_ item: Item) {
+    foo(item: item) // expected-error {{generic parameter 'I' could not be inferred}}
+  }
+}
+
+// SR-11609: Compiler crash on missing conformance for default param
+func test_sr_11609() {
+  func foo<T : Initable>(_ x: T = .init()) -> T { x } // expected-note {{where 'T' = 'String'}}
+  let _: String = foo()
+  // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
 }

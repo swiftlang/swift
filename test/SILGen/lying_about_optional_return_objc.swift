@@ -2,13 +2,13 @@
 
 // CHECK-LABEL: sil hidden [ossa] @$s32lying_about_optional_return_objc0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
 func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   b?.readWriteBlock()
 
   // CHECK: enum $Optional
   _ = b?.readWriteBlock
 
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   b?.readOnlyBlock()
 
   // CHECK: enum $Optional
@@ -17,7 +17,7 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: unchecked_trivial_bit_cast
   _ = b?.selector
 
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   _ = b?.voidReturning()
   // CHECK: unchecked_trivial_bit_cast
   _ = b?.voidPointerReturning()
@@ -50,7 +50,7 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK-LABEL: debug_value {{.*}} name "dynamic"
   let dynamic: AnyObject? = b!
 
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   _ = dynamic?.voidReturning()
   // CHECK: unchecked_trivial_bit_cast {{.*}} $UnsafeMutableRawPointer to $Optional
   _ = dynamic?.voidPointerReturning()
@@ -83,7 +83,7 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: inject_enum_addr {{%.*}} : $*Optional<{{.*}} -> @owned BlockProperty>, #Optional.some
   _ = dynamic?.objectReturning
 
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   _ = dynamic?.voidReturning?()
   // CHECK: unchecked_trivial_bit_cast
   _ = dynamic?.voidPointerReturning?()

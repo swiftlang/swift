@@ -1,0 +1,28 @@
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib | %FileCheck %s
+
+// This file provides examples on how vector computations are written at the SIL
+// level and how they are translated by IRGen to LLVM IR intrinsics.
+
+import Builtin
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x i32> @vector_int_add(<4 x i32> %0, <4 x i32> %1) {{.*}} {
+// CHECK-NEXT: entry:
+// CHECK-NEXT: %2 = add <4 x i32> %0, %1
+// CHECK-NEXT: ret <4 x i32> %2
+// CHECK-NEXT: }
+sil @vector_int_add : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "add_Vec4xInt32" (%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x float> @vector_float_add(<4 x float> %0, <4 x float> %1) {{.*}} {
+// CHECK-NEXT: entry:
+// CHECK-NEXT: %2 = fadd <4 x float> %0, %1
+// CHECK-NEXT: ret <4 x float> %2
+// CHECK-NEXT: }
+sil @vector_float_add : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "fadd_Vec4xFPIEEE32"(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}

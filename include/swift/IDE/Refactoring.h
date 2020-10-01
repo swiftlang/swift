@@ -141,8 +141,17 @@ collectAvailableRefactorings(SourceFile *SF, ResolvedCursorInfo CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename);
 
+/// Stores information about the reference that rename availability is being
+/// queried on.
+struct RenameRefInfo {
+  SourceFile *SF; ///< The source file containing the reference.
+  SourceLoc Loc; ///< The reference's source location.
+  bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
+};
+
 ArrayRef<RenameAvailabiliyInfo>
 collectRenameAvailabilityInfo(const ValueDecl *VD,
+                              Optional<RenameRefInfo> RefInfo,
                               std::vector<RenameAvailabiliyInfo> &Scratch);
 
 } // namespace ide

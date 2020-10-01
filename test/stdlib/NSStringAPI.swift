@@ -91,6 +91,17 @@ NSStringAPIs.test("NSStringEncoding") {
   expectEqual(.utf8, enc)
 }
 
+NSStringAPIs.test("NSStringEncoding.Hashable") {
+  let instances: [String.Encoding] = [
+    .windowsCP1250,
+    .utf32LittleEndian,
+    .utf32BigEndian,
+    .ascii,
+    .utf8,
+  ]
+  checkHashable(instances, equalityOracle: { $0 == $1 })
+}
+
 NSStringAPIs.test("localizedStringWithFormat(_:...)") {
   let world: NSString = "world"
   expectEqual("Hello, world!%42", String.localizedStringWithFormat(
@@ -1357,7 +1368,7 @@ NSStringAPIs.test("smallestEncoding") {
 func getHomeDir() -> String {
 #if os(macOS)
   return String(cString: getpwuid(getuid()).pointee.pw_dir)
-#elseif os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(Darwin)
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
 #else

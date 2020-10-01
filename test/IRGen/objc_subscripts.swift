@@ -8,7 +8,7 @@
 // CHECK: [[KEYED_SETTER_ENCODING:@.+]] = private unnamed_addr constant [14 x i8] c"v32@0:8q16@24\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
-// CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
+// CHECK:   internal constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
 // CHECK:   { i32 24, i32 5, [5 x { i8*, i8*, i8* }] 
 // CHECK:     [
 // CHECK:       { i8*, i8*, i8* } 
@@ -42,7 +42,7 @@
 
 @objc class SomeObject {
   @objc subscript (i : Int) -> SomeObject {
-    // CHECK: define internal [[OPAQUE0:%.*]]* @"$s15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]*, i8*, i64) unnamed_addr
+    // CHECK: define internal [[OPAQUE0:%.*]]* @"$s15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]* %0, i8* %1, i64 %2) {{[#0-9]*}} {
     get {
       // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @"$s15objc_subscripts10SomeObjectCyACSicig"
       return self

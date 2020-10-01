@@ -16,7 +16,9 @@
 #include "SwiftInvocation.h"
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <string>
 
@@ -41,6 +43,7 @@ namespace SourceKit {
   class SwiftLangSupport;
   class SwiftInvocation;
   struct SwiftStatistics;
+  class GlobalConfig;
   typedef RefPtr<SwiftInvocation> SwiftInvocationRef;
   class EditorDiagConsumer;
 
@@ -87,33 +90,48 @@ typedef std::shared_ptr<SwiftASTConsumer> SwiftASTConsumerRef;
 class SwiftASTManager : public std::enable_shared_from_this<SwiftASTManager> {
 public:
   explicit SwiftASTManager(std::shared_ptr<SwiftEditorDocumentFileMap>,
+                           std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
-                           StringRef RuntimeResourcePath);
+                           StringRef RuntimeResourcePath,
+                           StringRef DiagnosticDocumentationPath);
   ~SwiftASTManager();
 
-  SwiftInvocationRef getInvocation(ArrayRef<const char *> Args,
-                                   StringRef PrimaryFile,
-                                   std::string &Error);
+  SwiftInvocationRef getInvocation(
+      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error);
+
+  /// Same as the previous `getInvocation`, but allows the caller to specify a
+  /// custom `FileSystem` to be used throughout the invocation.
+  SwiftInvocationRef getInvocation(
+      ArrayRef<const char *> Args, StringRef PrimaryFile,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
 
   /// Provides the AST associated with an invocation to the AST consumer,
   /// asynchronously.
   /// \param OncePerASTToken if non-null, a previous query with the same value
   /// token, that is enqueued waiting to be executed on the same AST, will be
   /// cancelled.
-  void processASTAsync(SwiftInvocationRef Invok,
-                       SwiftASTConsumerRef ASTConsumer,
-                       const void *OncePerASTToken,
-                       ArrayRef<ImmutableTextSnapshotRef> Snapshots =
-                           ArrayRef<ImmutableTextSnapshotRef>());
+  void
+  processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
+                  const void *OncePerASTToken,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+                  ArrayRef<ImmutableTextSnapshotRef> Snapshots =
+                      ArrayRef<ImmutableTextSnapshotRef>());
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);
 
-  bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
-                              ArrayRef<const char *> Args,
-                              swift::DiagnosticEngine &Diags,
-                              StringRef PrimaryFile,
-                              std::string &Error);
+  bool initCompilerInvocation(
+      swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
+      swift::DiagnosticEngine &Diags, StringRef PrimaryFile, std::string &Error);
+
+  /// Same as the previous `initCompilerInvocation`, but allows the caller to
+  /// specify a custom `FileSystem` to be used throughout the invocation.
+  bool initCompilerInvocation(
+      swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
+      swift::DiagnosticEngine &Diags, StringRef PrimaryFile,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &CompInvok,
                               ArrayRef<const char *> OrigArgs,

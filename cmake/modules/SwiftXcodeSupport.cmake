@@ -100,8 +100,8 @@ macro(swift_common_xcode_cxx_config)
   # Force usage of Clang.
   set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
       CACHE STRING "Xcode Compiler")
-  # Use C++'11.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11"
+  # Use C++'14.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++14"
       CACHE STRING "Xcode C++ Language Standard")
   # Use libc++.
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++"

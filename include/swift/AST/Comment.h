@@ -18,20 +18,26 @@
 
 namespace swift {
 class Decl;
-class DocComment;
+class TypeDecl;
 struct RawComment;
 
 class DocComment {
   const Decl *D;
-  const swift::markup::Document *Doc = nullptr;
-  const swift::markup::CommentParts Parts;
+  swift::markup::Document *Doc = nullptr;
+  swift::markup::CommentParts Parts;
 
-public:
   DocComment(const Decl *D, swift::markup::Document *Doc,
              swift::markup::CommentParts Parts)
       : D(D), Doc(Doc), Parts(Parts) {}
 
+public:
+  static DocComment *create(const Decl *D, swift::markup::MarkupContext &MC,
+                            RawComment RC);
+
+  void addInheritanceNote(swift::markup::MarkupContext &MC, TypeDecl *base);
+
   const Decl *getDecl() const { return D; }
+  void setDecl(const Decl *D) { this->D = D; }
 
   const swift::markup::Document *getDocument() const { return Doc; }
 
@@ -87,19 +93,35 @@ public:
 };
 
 /// Get a parsed documentation comment for the declaration, if there is one.
-Optional<DocComment *>getSingleDocComment(swift::markup::MarkupContext &Context,
-                                          const Decl *D);
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
+DocComment *getSingleDocComment(swift::markup::MarkupContext &Context,
+                                const Decl *D, bool AllowSerialized = false);
+
+/// Get the declaration that actually provides a doc comment for another.
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
+const Decl *getDocCommentProvidingDecl(const Decl *D,
+                                       bool AllowSerialized = false);
 
 /// Attempt to get a doc comment from the declaration, or other inherited
 /// sources, like from base classes or protocols.
-Optional<DocComment *> getCascadingDocComment(swift::markup::MarkupContext &MC,
-                                             const Decl *D);
+///
+/// \param AllowSerialized Allow loading serialized doc comment data, including
+/// comment ranges.
+DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                   const Decl *D,
+                                   bool AllowSerialized = false);
 
 /// Extract comments parts from the given Markup node.
 swift::markup::CommentParts
 extractCommentParts(swift::markup::MarkupContext &MC,
                     swift::markup::MarkupASTNode *Node);
+
+/// Extract brief comment from \p RC, and print it to \p OS .
+void printBriefComment(RawComment RC, llvm::raw_ostream &OS);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H
-

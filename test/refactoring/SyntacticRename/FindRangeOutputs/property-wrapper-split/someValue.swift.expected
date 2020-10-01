@@ -1,0 +1,21 @@
+@propertyWrapper
+struct Wrapper<T> {
+    var wrappedValue: T
+    /*split:def*/init(initialValue: T, fieldName: String, special: Bool = false) {
+        wrappedValue = initialValue
+    }
+}
+let /*someValue:def*/<base>someValue</base> = "some"
+struct User {
+    @/*split:call*/Wrapper(fieldName: "bar")
+    var bar = 10
+
+    @/*split:call*/Wrapper(fieldName: {
+        return /*someValue*/<base>someValue</base>
+    }(), special: true)
+    var complex: Int = {
+        return /*someValue*/<base>someValue</base>.starts(with: "b") ? 43 : 0
+    }()
+}
+
+

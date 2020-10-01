@@ -43,7 +43,7 @@
 ///         print(i)
 ///         i -= 1
 ///     }
-///     // error: 'Int' is not convertible to 'Bool'
+///     // error: Cannot convert value of type 'Int' to expected condition type 'Bool'
 ///
 /// The correct approach in Swift is to compare the `i` value with zero in the
 /// `while` statement.
@@ -60,7 +60,7 @@
 /// bridged into Swift as `Bool`. The single `Bool` type in Swift guarantees
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
-@_fixed_layout
+@frozen
 public struct Bool {
   @usableFromInline
   internal var _value: Builtin.Int1
@@ -140,7 +140,7 @@ public struct Bool {
   }
 }
 
-extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
+extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -170,7 +170,7 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool : CustomStringConvertible {
+extension Bool: CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
   public var description: String {
@@ -197,7 +197,7 @@ extension Bool: Hashable {
   }
 }
 
-extension Bool : LosslessStringConvertible {
+extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
   /// If the `description` value is any string other than `"true"` or
@@ -254,7 +254,7 @@ extension Bool {
   /// `lhs` evaluates to `true`. For example:
   ///
   ///     let measurements = [7.44, 6.51, 4.74, 5.88, 6.27, 6.12, 7.76]
-  ///     let sum = measurements.reduce(0, combine: +)
+  ///     let sum = measurements.reduce(0, +)
   ///
   ///     if measurements.count > 0 && sum / Double(measurements.count) < 6.5 {
   ///         print("Average measurement is less than 6.5")

@@ -5,8 +5,8 @@
 // DEBUG_LINUX: bin/swift
 // DEBUG_LINUX-NEXT: bin/swift-autolink-extract
 // DEBUG_LINUX-NEXT: bin/swift
-// DEBUG_LINUX-NEXT: bin/swift -modulewrap
-// DEBUG_LINUX-NEXT: bin/clang++{{"? }}
+// DEBUG_LINUX-NEXT: bin/swift-frontend -modulewrap
+// DEBUG_LINUX-NEXT: bin/clang{{"? }}
 // DEBUG_LINUX: -o main
 // DEBUG_LINUX-NOT: dsymutil
 

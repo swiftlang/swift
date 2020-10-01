@@ -6,6 +6,7 @@
 // LIBFUZZER_OSX: libclang_rt.fuzzer
 // LIBFUZZER_LINUX: -fsanitize=address,fuzzer
 
-@_cdecl("LLVMFuzzerTestOneInput") public func fuzzOneInput(Data: UnsafePointer<CChar>, Size: CLong) -> CInt {
-  return 0;
+@_cdecl("LLVMFuzzerTestOneInput")
+public func test(_ start: UnsafeRawPointer, _ count: Int) -> CInt {
+  return 0
 }

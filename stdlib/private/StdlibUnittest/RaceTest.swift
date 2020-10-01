@@ -39,9 +39,9 @@
 import SwiftPrivate
 import SwiftPrivateLibcExtras
 import SwiftPrivateThreadExtras
-#if os(macOS) || os(iOS)
+#if canImport(Darwin)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -517,7 +517,7 @@ class _InterruptibleSleep {
   var completed: Bool = false
 
   init() {
-    self.event = CreateEventW(nil, TRUE, FALSE, nil)
+    self.event = CreateEventW(nil, true, false, nil)
     precondition(self.event != nil)
   }
 
@@ -536,8 +536,8 @@ class _InterruptibleSleep {
 
   func wake() {
     guard completed == false else { return }
-    let result: BOOL = SetEvent(self.event)
-    precondition(result == TRUE)
+    let result: Bool = SetEvent(self.event)
+    precondition(result == true)
   }
 }
 #else
@@ -562,7 +562,9 @@ class _InterruptibleSleep {
       return
     }
 
-    var timeout = timeval(tv_sec: duration, tv_usec: 0)
+    // WebAssembly/WASI on wasm32 is the only 32-bit platform with Int64 time_t,
+    // needs an explicit conversion to `time_t` because of this.
+    var timeout = timeval(tv_sec: time_t(duration), tv_usec: 0)
 
     var readFDs = _stdlib_fd_set()
     var writeFDs = _stdlib_fd_set()

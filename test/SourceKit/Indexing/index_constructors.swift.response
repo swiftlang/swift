@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -63,7 +61,8 @@
               key.is_dynamic: 1,
               key.is_implicit: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -79,9 +78,11 @@
             {
               key.attribute: source.decl.attribute.objc
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

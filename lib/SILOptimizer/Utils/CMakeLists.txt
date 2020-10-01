@@ -1,5 +1,7 @@
-silopt_register_sources(
-  CFG.cpp
+target_sources(swiftSILOptimizer PRIVATE
+  BasicBlockOptUtils.cpp
+  CFGOptUtils.cpp
+  CanonicalizeInstruction.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
   ConstantFolding.cpp
@@ -8,13 +10,15 @@ silopt_register_sources(
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp
+  InstOptUtils.cpp
+  KeyPathProjector.cpp
   LoadStoreOptUtils.cpp
-  Local.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
+  PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
-)
+  ValueLifetime.cpp)

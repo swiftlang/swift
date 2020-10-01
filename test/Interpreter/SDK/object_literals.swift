@@ -2,13 +2,11 @@
 // RUN: %empty-directory(%t/Test.app/Contents/MacOS)
 // RUN: cp -r %S/Inputs/object_literals-Resources %t/Test.app/Contents/Resources
 // RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main
+// RUN: %target-codesign %t/Test.app/Contents/MacOS/main
 // RUN: %target-run %t/Test.app/Contents/MacOS/main %t/Test.app/Contents/Resources/*
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 import AppKit
 import StdlibUnittest

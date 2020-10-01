@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@ import SwiftShims
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-@available(swift, deprecated: 4.2, renamed: "abs")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, renamed: "abs")
 public func fabs<T: FloatingPoint>(_ x: T) -> T {
   return x.magnitude
 }
@@ -112,7 +112,7 @@ public func isnan<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
 @available(*, unavailable, message: "use the sign property.")
 public func signbit<T: FloatingPoint>(_ value: T) -> Int { fatalError() }
 
-@available(swift, deprecated: 4.2, message: "use the exponent property.")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message: "use the exponent property.")
 public func ilogb<T: BinaryFloatingPoint>(_ x: T) -> Int {
   return Int(x.exponent)
 }
@@ -222,7 +222,7 @@ def TypedBinaryFunctions():
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -239,7 +239,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -258,7 +258,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 % for ufunc in UnaryIntrinsicFunctions:
 %  for T, CT, f in OverlayFloatTypes():
 %   if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %   end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -275,7 +275,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 
 % for T, CT, f, bfunc in TypedBinaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
@@ -290,7 +290,7 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || os(OpenBSD))
 %  else:
 //  lgamma not available on Windows, apparently?
 #if !os(Windows)
@@ -308,7 +308,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
@@ -324,10 +324,10 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
-@available(swift, deprecated: 4.2, message:
-           "use ${T}(nan: ${T}.RawSignificand) instead.")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
+           "use ${T}(nan: ${T}.RawSignificand).")
 @_transparent
 public func nan(_ tag: String) -> ${T} {
   return ${T}(nan${f}(tag))

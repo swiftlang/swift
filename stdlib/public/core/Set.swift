@@ -116,13 +116,10 @@
 /// collection wrapper instead of a set. To restore efficient set operations,
 /// create a new set from the result.
 ///
-///     let morePrimes = primes.union([11, 13, 17, 19])
-///
-///     let laterPrimes = morePrimes.filter { $0 > 10 }
-///     // 'laterPrimes' is of type Array<Int>
-///
-///     let laterPrimesSet = Set(morePrimes.filter { $0 > 10 })
-///     // 'laterPrimesSet' is of type Set<Int>
+///     let primesStrings = primes.map(String.init)
+///     // 'primesStrings' is of type Array<String>
+///     let primesStringsSet = Set(primes.map(String.init))
+///     // 'primesStringsSet' is of type Set<String>
 ///
 /// Bridging Between Set and NSSet
 /// ==============================
@@ -146,7 +143,7 @@
 /// unspecified. The instances of `NSSet` and `Set` share buffer using the
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
-@_fixed_layout
+@frozen
 public struct Set<Element: Hashable> {
   @usableFromInline
   internal var _variant: _Variant
@@ -522,14 +519,14 @@ extension Set: SetAlgebra {
   ///
   ///     var classDays: Set<DayOfTheWeek> = [.wednesday, .friday]
   ///     print(classDays.insert(.monday))
-  ///     // Prints "(true, .monday)"
+  ///     // Prints "(inserted: true, memberAfterInsert: DayOfTheWeek.monday)"
   ///     print(classDays)
-  ///     // Prints "[.friday, .wednesday, .monday]"
+  ///     // Prints "[DayOfTheWeek.friday, DayOfTheWeek.wednesday, DayOfTheWeek.monday]"
   ///
   ///     print(classDays.insert(.friday))
-  ///     // Prints "(false, .friday)"
+  ///     // Prints "(inserted: false, memberAfterInsert: DayOfTheWeek.friday)"
   ///     print(classDays)
-  ///     // Prints "[.friday, .wednesday, .monday]"
+  ///     // Prints "[DayOfTheWeek.friday, DayOfTheWeek.wednesday, DayOfTheWeek.monday]"
   ///
   /// - Parameter newMember: An element to insert into the set.
   /// - Returns: `(true, newMember)` if `newMember` was not contained in the
@@ -559,7 +556,7 @@ extension Set: SetAlgebra {
   ///
   ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
   ///     print(classDays.update(with: .monday))
-  ///     // Prints "Optional(.monday)"
+  ///     // Prints "Optional(DayOfTheWeek.monday)"
   ///
   /// - Parameter newMember: An element to insert into the set.
   /// - Returns: An element equal to `newMember` if the set already contained
@@ -1265,7 +1262,7 @@ extension Set {
 
 extension Set {
   /// The position of an element in a set.
-  @_fixed_layout
+  @frozen
   public struct Index {
     // Index for native buffer is efficient.  Index for bridged NSSet is
     // not, because neither NSEnumerator nor fast enumeration support moving
@@ -1274,7 +1271,7 @@ extension Set {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSSet in terms of Cocoa enumeration facilities.
 
-    @_frozen
+    @frozen
     @usableFromInline
     internal enum _Variant {
       case native(_HashTable.Index)
@@ -1451,7 +1448,7 @@ extension Set.Index: Hashable {
 
 extension Set {
   /// An iterator over the members of a `Set<Element>`.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     // Set has a separate IteratorProtocol and Index because of efficiency
     // and implementability reasons.
@@ -1463,7 +1460,7 @@ extension Set {
     // IteratorProtocol, which is being consumed as iteration proceeds.
 
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Variant {
       case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)

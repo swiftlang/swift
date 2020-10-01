@@ -104,7 +104,7 @@ public:
 
   /// If this initializes a single @lazy variable, lazily create a self
   /// declaration for it to refer to.
-  ParamDecl *getImplicitSelfDecl();
+  ParamDecl *getImplicitSelfDecl() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -150,12 +150,6 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-  friend class ASTContext; // calls reset on unused contexts
-  void reset(DeclContext *parent, unsigned index) {
-    setParent(parent);
-    SpareBits = index;
-  }
-
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {

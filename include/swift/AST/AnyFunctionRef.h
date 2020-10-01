@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -52,10 +53,32 @@ public:
     }
   }
 
-  CaptureInfo &getCaptureInfo() const {
+  /// Construct an AnyFunctionRef from a decl context that might be
+  /// some sort of function.
+  static Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      return AnyFunctionRef(fn);
+    }
+
+    if (auto ace = dyn_cast<AbstractClosureExpr>(dc)) {
+      return AnyFunctionRef(ace);
+    }
+
+    return None;
+  }
+
+  CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
+  }
+
+  void setCaptureInfo(CaptureInfo captures) const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setCaptureInfo(captures);
+      return;
+    }
+    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -66,6 +89,18 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
+  }
+
+  bool hasSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->hasSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
+  }
+
+  Expr *getSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
   Type getType() const {
@@ -102,6 +137,21 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
+  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
+      AFD->setHasSingleExpressionBody(isSingleExpression);
+      return;
+    }
+
+    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+      return CE->setBody(stmt, isSingleExpression);
+    }
+
+    llvm_unreachable("autoclosures don't have statement bodies");
+  }
+
   DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;
@@ -114,6 +164,12 @@ public:
   
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
+  }
+
+  bool isDeferBody() const {
+    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
+      return fd->isDeferBody();
+    return false;
   }
 
   /// Return true if this closure is passed as an argument to a function and is
@@ -151,8 +207,7 @@ public:
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->dump();
     }
@@ -172,7 +227,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericSignature();
     }
@@ -180,6 +235,23 @@ public:
       return ce->getGenericSignatureOfContext();
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+
+  friend bool operator==(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction == rhs.TheFunction;
+   }
+
+   friend bool operator!=(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction != rhs.TheFunction;
+   }
+
+  friend llvm::hash_code hash_value(AnyFunctionRef fn) {
+    using llvm::hash_value;
+    return hash_value(fn.TheFunction.getOpaqueValue());
+  }
+
+  friend SourceLoc extractNearestSourceLoc(AnyFunctionRef fn) {
+    return fn.getLoc();
   }
 
 private:
@@ -208,6 +280,8 @@ private:
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
+
+void simple_display(llvm::raw_ostream &out, AnyFunctionRef fn);
 
 } // namespace swift
 

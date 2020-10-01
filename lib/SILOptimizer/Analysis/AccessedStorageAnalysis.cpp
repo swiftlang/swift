@@ -129,7 +129,6 @@ bool AccessedStorageResult::mergeAccesses(
   // can occur ~1000 elements. 200 is large enough to cover "normal" code,
   // while ensuring compile time isn't affected.
   if (storageAccessSet.size() > 200) {
-    llvm::dbgs() << "BIG SET " << storageAccessSet.size() << "\n";
     setWorstEffects();
     return true;
   }
@@ -231,16 +230,21 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   case AccessedStorage::Global:
     // Global accesses is universal.
     return storage;
-  case AccessedStorage::Class: {
+  case AccessedStorage::Class:
+  case AccessedStorage::Tail: {
     // If the object's value is an argument, translate it into a value on the
     // caller side.
-    SILValue obj = storage.getObjectProjection().getObject();
+    SILValue obj = storage.getObject();
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        auto *instr = storage.getObjectProjection().getInstr();
-        // Remap the argument source value and inherit the old storage info.
-        return StorageAccessInfo(AccessedStorage(argVal, instr), storage);
+        unsigned idx = (storage.getKind() == AccessedStorage::Class)
+                           ? storage.getPropertyIndex()
+                           : AccessedStorage::TailIndex;
+        // Remap this storage info. The argument source value is now the new
+        // object. The old storage info is inherited.
+        return StorageAccessInfo(AccessedStorage::forClass(argVal, idx),
+                                 storage);
       }
     }
     // Otherwise, continue to reference the value in the callee because we don't
@@ -252,7 +256,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      auto calleeStorage = findAccessedStorageNonNested(argVal);
+      auto calleeStorage = findAccessedStorage(argVal);
       if (calleeStorage)
         return StorageAccessInfo(calleeStorage, storage);
     }
@@ -261,7 +265,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     //
     // This is an untested bailout. It is only reachable if the call graph
     // contains an edge that getCallerArg is unable to analyze OR if
-    // findAccessedStorageNonNested returns an invalid SILValue, which won't
+    // findAccessedStorage returns an invalid SILValue, which won't
     // pass SIL verification.
     //
     // FIXME: In case argVal is invalid, support Unidentified access for invalid
@@ -298,7 +302,7 @@ void AccessedStorageResult::visitBeginAccess(B *beginAccess) {
     return;
 
   const AccessedStorage &storage =
-      findAccessedStorageNonNested(beginAccess->getSource());
+      findAccessedStorage(beginAccess->getSource());
 
   if (storage.getKind() == AccessedStorage::Unidentified) {
     // This also catches invalid storage.

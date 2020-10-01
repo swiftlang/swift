@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend  -enable-objc-interop -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefixes=CHECK,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-cpu -D#MDSIZE=7
+// RUN: %target-swift-frontend -disable-objc-interop -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefixes=CHECK,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-cpu -D#MDSIZE=4
 
 class A {}
 
@@ -20,21 +21,25 @@ class A {}
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 13,
-// CHECK-64-SAME: i32 10,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3]],
 //   V-table offset.
-// CHECK-32-SAME: i32 13,
-// CHECK-64-SAME: i32 10,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3]],
 //   V-table length.
 // CHECK-SAME: i32 1,
-// CHECK-SMAE: %swift.method_descriptor {
+// CHECK-SAME: %swift.method_descriptor {
 //   V-table entry #1: flags.
-// CHECK-SAME: i32 1
+// CHECK-i386-SAME: i32 1,
+// CHECK-x86_64-SAME: i32 1,
+// CHECK-armv7k-SAME: i32 1,
+// CHECK-arm64-SAME: i32 1,
+// CHECK-arm64e-SAME: i32 1882783745
 //   V-table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1ACACycfC"
 // CHECK-SAME: }>, section
@@ -57,15 +62,15 @@ class B : A {}
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
 //   Immediate member count.
 // CHECK-SAME: i32 0,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
 //   Number of method overrides.
 // CHECK-SAME: i32 1,
 // CHECK-SAME: %swift.method_override_descriptor {
@@ -96,15 +101,15 @@ class C<T> : B {}
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
-// CHECK-32-SAME: i32 15,
-// CHECK-64-SAME: i32 12,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 2]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 2]],
 //   Num immediate members.
 // CHECK-32-SAME: i32 1,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 15,
-// CHECK-64-SAME: i32 12,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 2]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 2]],
 //   Instantiation cache.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1CCMI"
 //   Instantiation pattern.
@@ -159,15 +164,15 @@ class D : E {}
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
 //   Immediate member count.
 // CHECK-SAME: i32 0,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
+// CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
 //   Number of method overrides.
 // CHECK-SAME: i32 1,
 // CHECK-SAME: %swift.method_override_descriptor {

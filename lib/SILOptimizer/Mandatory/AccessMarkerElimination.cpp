@@ -143,7 +143,7 @@ AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
 bool AccessMarkerElimination::stripMarkers() {
   // Iterating in reverse eliminates more begin_access users before they
   // need to be replaced.
-  for (auto &BB : reversed(*F)) {
+  for (auto &BB : llvm::reverse(*F)) {
     // Don't cache the begin iterator since we're reverse iterating.
     for (auto II = BB.end(); II != BB.begin();) {
       SILInstruction *inst = &*(--II);

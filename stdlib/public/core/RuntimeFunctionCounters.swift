@@ -33,7 +33,7 @@
 internal func _collectAllReferencesInsideObjectImpl(
   _ value: Any,
   references: inout [UnsafeRawPointer],
-  visitedItems: inout [ObjectIdentifier : Int]
+  visitedItems: inout [ObjectIdentifier: Int]
 ) {
   // Use the structural reflection and ignore any
   // custom reflectable overrides.
@@ -108,8 +108,8 @@ struct _RuntimeFunctionCounters {
   public static let runtimeFunctionCountersOffsets =
     _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
   public static let numRuntimeFunctionCounters =
-    _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
-  public static let runtimeFunctionNameToIndex: [String : Int] =
+    Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
+  public static let runtimeFunctionNameToIndex: [String: Int] =
     getRuntimeFunctionNameToIndex()
 
   /// Get the names of all runtime functions whose calls are being
@@ -121,8 +121,8 @@ struct _RuntimeFunctionCounters {
   public static func getRuntimeFunctionNames() -> [String] {
     let names = _RuntimeFunctionCounters._getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
-      _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
-    var functionNames : [String] = []
+      Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
+    var functionNames: [String] = []
     functionNames.reserveCapacity(numRuntimeFunctionCounters)
     for index in 0..<numRuntimeFunctionCounters {
       let name = String(cString: names[index])
@@ -140,7 +140,7 @@ struct _RuntimeFunctionCounters {
   /// Get the number of different runtime functions whose calls are being
   /// tracked.
   @_silgen_name("_swift_getNumRuntimeFunctionCounters")
-  public static func getNumRuntimeFunctionCounters() -> Int
+  public static func getNumRuntimeFunctionCounters() -> UInt64
 
   /// Dump all per-object runtime function counters.
   @_silgen_name("_swift_dumpObjectsRuntimeFunctionPointers")
@@ -155,7 +155,7 @@ struct _RuntimeFunctionCounters {
   /// Collect all references inside the object using Mirrors.
   public static func collectAllReferencesInsideObject(_ value: Any) ->
     [UnsafeRawPointer] {
-    var visited : [ObjectIdentifier : Int] = [:]
+    var visited: [ObjectIdentifier: Int] = [:]
     var references: [UnsafeRawPointer] = []
     _collectAllReferencesInsideObjectImpl(
       value, references: &references, visitedItems: &visited)
@@ -163,11 +163,11 @@ struct _RuntimeFunctionCounters {
   }
 
   /// Build a map from counter name to counter index inside the state struct.
-  internal static func getRuntimeFunctionNameToIndex() -> [String : Int] {
+  internal static func getRuntimeFunctionNameToIndex() -> [String: Int] {
     let runtimeFunctionNames = _RuntimeFunctionCounters.getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
-      _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
-    var runtimeFunctionNameToIndex : [String : Int] = [:]
+      Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
+    var runtimeFunctionNameToIndex: [String: Int] = [:]
     runtimeFunctionNameToIndex.reserveCapacity(numRuntimeFunctionCounters)
 
     for index in 0..<numRuntimeFunctionCounters {
@@ -181,15 +181,15 @@ struct _RuntimeFunctionCounters {
 /// This protocol defines a set of operations for accessing runtime function
 /// counters statistics.
 public // @testable
-protocol _RuntimeFunctionCountersStats : CustomDebugStringConvertible {
+protocol _RuntimeFunctionCountersStats: CustomDebugStringConvertible {
   init()
 
   /// Dump the current state of all counters.
-  func dump<T : TextOutputStream>(skipUnchanged: Bool, to: inout T)
+  func dump<T: TextOutputStream>(skipUnchanged: Bool, to: inout T)
 
   /// Dump the diff between the current state and a different state of all
   /// counters.
-  func dumpDiff<T : TextOutputStream>(
+  func dumpDiff<T: TextOutputStream>(
     _ after: Self, skipUnchanged: Bool, to: inout T
   )
 
@@ -375,7 +375,7 @@ extension _RuntimeFunctionCountersStats {
   typealias Counters = _RuntimeFunctionCounters
   @inline(never)
   public // @testable
-  func dump<T : TextOutputStream>(skipUnchanged: Bool, to: inout T) {
+  func dump<T: TextOutputStream>(skipUnchanged: Bool, to: inout T) {
     for i in 0..<Counters.numRuntimeFunctionCounters {
       if skipUnchanged && self[i] == 0 {
         continue
@@ -390,7 +390,7 @@ extension _RuntimeFunctionCountersStats {
 
   @inline(never)
   public // @testable
-  func dumpDiff<T : TextOutputStream>(
+  func dumpDiff<T: TextOutputStream>(
     _ after: Self, skipUnchanged: Bool, to: inout T
   ) {
     for i in 0..<Counters.numRuntimeFunctionCounters {

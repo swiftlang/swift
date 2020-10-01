@@ -109,3 +109,14 @@ struct UsesSameTypedDefaultDerivedWithoutSatisfyingReqts: SameTypedDefaultDerive
     static var y: YType { return YType() }
 }
 
+// SR-12199
+
+protocol SR_12199_P1 {
+  associatedtype Assoc
+}
+
+enum SR_12199_E {}
+
+protocol SR_12199_P2: SR_12199_P1 where Assoc == SR_12199_E {
+  associatedtype Assoc: SR_12199_E // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'SR_12199_E'}}
+}

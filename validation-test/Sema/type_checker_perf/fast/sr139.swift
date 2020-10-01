@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck %s -solver-enable-operator-designated-types
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// REQUIRES: tools-release,no_asan
 
 // SR-139:
 // Infinite recursion parsing bitwise operators

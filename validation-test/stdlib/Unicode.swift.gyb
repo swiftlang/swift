@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
 import SwiftPrivate
 import StdlibUnittest
 import StdlibUnicodeUnittest

@@ -15,7 +15,6 @@
 //
 // Description:
 //     Create a sorted sparse RGB histogram from an array of 300 RGB values.
-import Foundation
 import TestsUtils
 
 public let RGBHistogram = [

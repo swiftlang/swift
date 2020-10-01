@@ -1,0 +1,13 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name _OverlayLibrary
+
+import Swift
+@_exported import DeclaringLibrary
+import BystandingLibrary
+
+public struct OverlayLibraryTy {
+  public func x() -> DeclaringLibrary.DeclaringLibraryTy
+  public func y() -> BystandingLibrary.BystandingLibraryTy
+}
+
+public struct ShadowTy {}

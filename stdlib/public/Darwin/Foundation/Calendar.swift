@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 /**
  `Calendar` encapsulates information about systems of reckoning time in which the beginning, length, and divisions of a year are defined. It provides information about the calendar and support for calendrical computations such as determining the range of a given calendrical unit and adding units to a given absolute time.
@@ -899,15 +899,16 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     
     // MARK: -
     
-    public var hashValue : Int {
-        // We implement hash ourselves, because we need to make sure autoupdating calendars have the same hash
+    public func hash(into hasher: inout Hasher) {
+        // We need to make sure autoupdating calendars have the same hash
         if _autoupdating {
-            return 1
+            hasher.combine(false)
         } else {
-            return _handle.map { $0.hash }
+            hasher.combine(true)
+            hasher.combine(_handle.map { $0 })
         }
     }
-    
+
     // MARK: -
     // MARK: Conversion Functions
     

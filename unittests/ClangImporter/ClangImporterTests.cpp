@@ -5,7 +5,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -25,7 +24,7 @@ static bool emitFileWithContents(StringRef path, StringRef contents,
   if (llvm::sys::fs::openFileForWrite(path, FD))
     return true;
   if (pathOut)
-    *pathOut = path;
+    *pathOut = path.str();
   llvm::raw_fd_ostream file(FD, /*shouldClose=*/true);
   file << contents;
   return false;
@@ -69,13 +68,15 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   // Set up the importer and emit a bridging PCH.
   swift::LangOptions langOpts;
   langOpts.Target = llvm::Triple("x86_64", "apple", "darwin");
+  swift::TypeCheckerOptions typeckOpts;
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
   std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags));
-  auto importer = ClangImporter::create(*context, options);
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, options,
+                      sourceMgr, diags));
+  auto importer = ClangImporter::create(*context);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
   ASSERT_FALSE(importer->canReadPCH(PCH));

@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -O -emit-sil %s | %FileCheck %s
+
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time

@@ -1,0 +1,18 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s --expected-exit-code 1
+// REQUIRES: asserts,no_asan
+
+% enum_cases = 3
+% array_elements = N
+
+% array = str(list(range(array_elements)))
+enum E {
+% for i in range(enum_cases):
+  case x${i}
+% end
+}
+
+let a = [
+% for i in range(enum_cases):
+  .x${i}  : ${array},
+% end
+]

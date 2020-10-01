@@ -11,15 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "TestContext.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
 using namespace swift::unittest;
 
-
-static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
+static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
                                 Identifier name) {
   auto wrapped = new (ctx) GenericTypeParamDecl(fileForLookups,
                                                 ctx.getIdentifier("Wrapped"),
@@ -30,26 +31,34 @@ static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
   auto decl = new (ctx) EnumDecl(SourceLoc(), name, SourceLoc(),
                                  /*inherited*/{}, params, fileForLookups);
   wrapped->setDeclContext(decl);
-  fileForLookups->Decls.push_back(decl);
+  return decl;
 }
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
-    : Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SourceMgr, Diags)) {
+    : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+                           ClangImporterOpts, SourceMgr, Diags)) {
+  registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
-  Ctx.LoadedModules[stdlibID] = module;
+  Ctx.addLoadedModule(module);
 
-  using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        /*buffer*/None,
-                                        ImplicitModuleImportKind::None,
-                                        /*keeps token*/false);
+                                        /*buffer*/ None);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {
-    declareOptionalType(Ctx, FileForLookups, Ctx.getIdentifier("Optional"));
-    declareOptionalType(Ctx, FileForLookups,
-                        Ctx.getIdentifier("ImplicitlyUnwrappedOptional"));
+    SmallVector<Decl *, 2> optionalTypes;
+    optionalTypes.push_back(createOptionalType(
+        Ctx, FileForLookups, Ctx.getIdentifier("Optional")));
+    optionalTypes.push_back(createOptionalType(
+        Ctx, FileForLookups, Ctx.getIdentifier("ImplicitlyUnwrappedOptional")));
+
+    auto result = SourceFileParsingResult{
+        Ctx.AllocateCopy(optionalTypes), /*tokens*/ None,
+        /*interfaceHash*/ None, /*syntaxRoot*/ None};
+
+    Ctx.evaluator.cacheOutput(ParseSourceFileRequest{FileForLookups},
+                              std::move(result));
   }
 }

@@ -19,6 +19,7 @@
 #define SWIFT_ABI_TYPEIDENTITY_H
 
 #include "swift/Basic/LLVM.h"
+#include <llvm/ADT/StringRef.h>
 
 namespace swift {
 template <class> class TargetTypeContextDescriptor;
@@ -113,7 +114,7 @@ public:
   ///
   /// \return true if collection was successful.
   template <bool Asserting>
-  bool collect(StringRef value) {
+  bool collect(llvm::StringRef value) {
 #define check(CONDITION, COMMENT)            \
     do {                                     \
       if (!Asserting) {                      \
@@ -128,16 +129,16 @@ public:
     value = value.drop_front(1);
 
     switch (component) {
-#define case_setIfNonEmpty(FIELD)                                      \
-    case TypeImportComponent::FIELD:                                   \
-      check(!value.empty(), "incoming value of " #FIELD " was empty"); \
-      check(FIELD.empty(), #FIELD " was already set");                 \
-      FIELD = value;                                                   \
-      return true;                                                     \
+#define case_setIfNonEmpty(FIELD)                                              \
+  case TypeImportComponent::FIELD:                                             \
+    check(!value.empty(), "incoming value of " #FIELD " was empty");           \
+    check(FIELD.empty(), #FIELD " was already set");                           \
+    FIELD = StringType(value);                                                 \
+    return true;
 
-    case_setIfNonEmpty(ABIName)
-    case_setIfNonEmpty(SymbolNamespace)
-    case_setIfNonEmpty(RelatedEntityName)
+      case_setIfNonEmpty(ABIName)
+      case_setIfNonEmpty(SymbolNamespace)
+      case_setIfNonEmpty(RelatedEntityName)
 
 #undef case_setIfNonEmpty
 #undef check
@@ -176,17 +177,17 @@ public:
 class ParsedTypeIdentity {
 public:
   /// The user-facing name of the type.
-  StringRef UserFacingName;
+  llvm::StringRef UserFacingName;
 
   /// The full identity of the type.
   /// Note that this may include interior '\0' characters.
-  StringRef FullIdentity;
+  llvm::StringRef FullIdentity;
 
   /// Any extended information that type might have.
-  Optional<TypeImportInfo<StringRef>> ImportInfo;
+  llvm::Optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
 
   /// The ABI name of the type.
-  StringRef getABIName() const {
+  llvm::StringRef getABIName() const {
     if (ImportInfo && !ImportInfo->ABIName.empty())
       return ImportInfo->ABIName;
     return UserFacingName;
@@ -201,11 +202,11 @@ public:
     return ImportInfo && !ImportInfo->RelatedEntityName.empty();
   }
 
-  bool isRelatedEntity(StringRef entityName) const {
+  bool isRelatedEntity(llvm::StringRef entityName) const {
     return ImportInfo && ImportInfo->RelatedEntityName == entityName;
   }
 
-  StringRef getRelatedEntityName() const {
+  llvm::StringRef getRelatedEntityName() const {
     assert(isAnyRelatedEntity());
     return ImportInfo->RelatedEntityName;
   }
@@ -215,4 +216,4 @@ public:
 
 } // end namespace swift
 
-#endif  /* SWIFT_ABI_TYPEIDENTITY_H */
+#endif // SWIFT_ABI_TYPEIDENTITY_H

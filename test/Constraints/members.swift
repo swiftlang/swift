@@ -301,7 +301,7 @@ func test15117741(_ s: r15117741S) {
 // <rdar://problem/22491394> References to unavailable decls sometimes diagnosed as ambiguous
 struct UnavailMember {
   @available(*, unavailable)
-  static var XYZ : X { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
+  static var XYZ : UnavailMember { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
 }
 
 let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
@@ -316,7 +316,7 @@ struct S22490787 {
 func f22490787() {
   var path: S22490787 = S22490787()
 
-  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
+  for p in path {  // expected-error {{for-in loop requires 'S22490787' to conform to 'Sequence'}}
   }
 }
 
@@ -325,6 +325,7 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
 
 
 
@@ -354,7 +355,7 @@ do {
 // rdar://problem/25341015
 extension Sequence {
   func r25341015_1() -> Int {
-    return max(1, 2) // expected-error {{use of 'max' refers to instance method 'max(by:)' rather than global function 'max' in module 'Swift'}} expected-note {{use 'Swift.' to reference the global function in module 'Swift'}}
+    return max(1, 2) // expected-error {{use of 'max' refers to instance method rather than global function 'max' in module 'Swift'}} expected-note {{use 'Swift.' to reference the global function in module 'Swift'}}
   }
 }
 
@@ -380,7 +381,7 @@ func r25341015() {
   class Bar {
     func baz() {}
     func qux() {
-      baz(1, 2) // expected-error {{argument passed to call that takes no arguments}}
+      baz(1, 2) // expected-error {{use of 'baz' refers to instance method rather than local function 'baz'}}
     }
   }
 }
@@ -404,17 +405,17 @@ func bar_32854314() -> Int {
 extension Array where Element == Int {
   func foo() {
     let _ = min(foo_32854314(), bar_32854314()) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 
   func foo(_ x: Int, _ y: Double) {
     let _ = min(x, y) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 
   func bar() {
     let _ = min(1.0, 2) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 }
 
@@ -465,7 +466,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {
@@ -522,7 +523,7 @@ class A {}
 
 enum B {
   static func foo() {
-    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+    bar(A()) // expected-error {{instance member 'bar' cannot be used on type 'B'}}
   }
 
   func bar(_: A) {}
@@ -566,14 +567,162 @@ func rdar_48114578() {
 }
 
 struct S_Min {
-  var min: Int = 42
+  var xmin: Int = 42
 }
 
-func min(_: Int, _: Float) -> Int { return 0 }
-func min(_: Float, _: Int) -> Int { return 0 }
+func xmin(_: Int, _: Float) -> Int { return 0 }
+func xmin(_: Float, _: Int) -> Int { return 0 }
 
 extension S_Min : CustomStringConvertible {
   public var description: String {
-    return "\(min)" // Ok
+    return "\(xmin)" // Ok
   }
+}
+
+// rdar://problem/50679161
+
+func rdar50679161() {
+  struct Point {}
+
+  struct S {
+    var w, h: Point
+  }
+
+  struct Q {
+    init(a: Int, b: Int) {}
+    init(a: Point, b: Point) {}
+  }
+
+  func foo() {
+    _ = { () -> Void in
+      var foo = S
+      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+      // expected-note@-3 {{use '.self' to reference the type object}}
+      if let v = Int?(1) {
+        var _ = Q(
+          a: v + foo.w,
+          // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
+          b: v + foo.h
+          // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
+        )
+      }
+    }
+  }
+}
+
+
+func rdar_50467583_and_50909555() {
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    // rdar://problem/50467583
+    let _: Set = [Int][] // expected-error {{no 'subscript' candidates produce the expected contextual result type 'Set'}}
+    // expected-error@-1 {{no exact matches in call to subscript}}
+    // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
+    // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-5 {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
+    // expected-note@-6 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
+  }
+  
+  // rdar://problem/50909555
+  struct S {
+    static subscript(x: Int, y: Int) -> Int { // expected-note {{'subscript(_:_:)' declared here}}
+      return 1
+    }
+  }
+
+  func test(_ s: S) {
+    s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
+    // expected-error@-1 {{missing argument for parameter #2 in call}} {{8-8=, <#Int#>}}
+  }
+}
+
+// SR-9396 (rdar://problem/46427500) - Nonsensical error message related to constrained extensions
+struct SR_9396<A, B> {}
+
+extension SR_9396 where A == Bool {  // expected-note {{where 'A' = 'Int'}}
+  func foo() {}
+}
+
+func test_sr_9396(_ s: SR_9396<Int, Double>) {
+  s.foo() // expected-error {{referencing instance method 'foo()' on 'SR_9396' requires the types 'Int' and 'Bool' be equivalent}}
+}
+
+// rdar://problem/34770265 - Better diagnostic needed for constrained extension method call
+extension Dictionary where Key == String { // expected-note {{where 'Key' = 'Int'}}
+  func rdar_34770265_key() {}
+}
+
+extension Dictionary where Value == String { // expected-note {{where 'Value' = 'Int'}}
+  func rdar_34770265_val() {}
+}
+
+func test_34770265(_ dict: [Int: Int]) {
+  dict.rdar_34770265_key()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_key()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
+  dict.rdar_34770265_val()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_val()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
+}
+
+// SR-12672
+_ = [.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+let _ : [Any] = [.e] // expected-error {{type 'Any' has no member 'e'}}
+_ = [1 :.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+_ = [.e: 1] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+let _ : [Int: Any] = [1 : .e] // expected-error {{type 'Any' has no member 'e'}}
+let _ : (Int, Any) = (1, .e) // expected-error {{type 'Any' has no member 'e'}}
+_ = (1, .e) // expected-error {{cannot infer contextual base in reference to member 'e'}}
+
+// SR-13359
+typealias Pair = (Int, Int)
+func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: Int, b: Int)) {
+  _ = pair[0] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.0'?}} {{11-14=.0}}
+  _ = pair[1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.1'?}} {{11-14=.1}}
+  _ = pair[2] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair[100] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair["strting"] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair[-1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair[1, 1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = void[0] // expected-error {{value of type 'Void' has no subscripts}}
+  // Other representations of literals
+  _ = pair[0x00] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+  _ = pair[0b00] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
+
+  _ = alias[0] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); did you mean to use '.0'?}} {{12-15=.0}}
+  _ = alias[1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); did you mean to use '.1'?}} {{12-15=.1}}
+  _ = alias[2] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias[100] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias["strting"] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias[-1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias[1, 1] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias[0x00] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+  _ = alias[0b00] // expected-error {{cannot access element using subscript for tuple type 'Pair' (aka '(Int, Int)'); use '.' notation instead}} {{none}}
+
+  // Labeled tuple base
+  _ = labeled[0] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.0'?}} {{14-17=.0}}
+  _ = labeled[1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.1'?}} {{14-17=.1}}
+  _ = labeled[2] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[100] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled["strting"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[-1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[1, 1] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[0x00] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[0b00] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+
+  // Suggesting use label access
+  _ = labeled["a"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.a'?}} {{14-19=.a}}
+  _ = labeled["b"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; did you mean to use '.b'?}} {{14-19=.b}}
+  _ = labeled["c"] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+  _ = labeled[""] // expected-error {{cannot access element using subscript for tuple type '(a: Int, b: Int)'; use '.' notation instead}} {{none}}
+
+}
+
+// rdar://problem/66891544 - incorrect diagnostic ("type is ambiguous") when base type of a reference cannot be determined
+func rdar66891544() {
+  func foo<T>(_: T, defaultT: T? = nil) {}
+  func foo<U>(_: U, defaultU: U? = nil) {}
+
+  foo(.bar) // expected-error {{cannot infer contextual base in reference to member 'bar'}}
 }

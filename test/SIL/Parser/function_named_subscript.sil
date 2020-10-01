@@ -18,6 +18,6 @@ bb0(%0 : @guaranteed $SubscriptAsFunction):
 }
 
 sil_vtable SubscriptAsFunction {
-  // CHECK: #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
-  #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
+  // CHECK: #SubscriptAsFunction.`subscript`: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
+  #SubscriptAsFunction.`subscript`: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
 }

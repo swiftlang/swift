@@ -17,7 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) -
     return true
   }
 
-  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}} expected-note {{expected an argument list of type '(T)'}}
+  return t1.isEqual(u) // expected-error {{cannot convert value of type 'U' to expected argument type 'T'}}
 }
 
 protocol MethodLessComparable {
@@ -36,8 +36,7 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
-  if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {} // expected-error{{member 'isEqual' cannot be used on value of protocol type 'EqualComparable'; use a generic constraint instead}}
 }
 
@@ -54,7 +53,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{'T' is not convertible to 'EqualComparable & OtherEqualComparable'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {
@@ -75,13 +74,13 @@ protocol Overload {
   associatedtype B
   func getA() -> A
   func getB() -> B
-  func f1(_: A) -> A
-  func f1(_: B) -> B
+  func f1(_: A) -> A // expected-note {{candidate expects value of type 'OtherOvl.A' for parameter #1}}
+  func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
-  func f3(_: Int) -> Int // expected-note {{found this candidate}}
-  func f3(_: Float) -> Float // expected-note {{found this candidate}}
-  func f3(_: Self) -> Self // expected-note {{found this candidate}}
+  func f3(_: Int) -> Int // expected-note {{found candidate with type '(Int) -> Int'}}
+  func f3(_: Float) -> Float // expected-note {{found candidate with type '(Float) -> Float'}}
+  func f3(_: Self) -> Self // expected-note {{found candidate with type '(OtherOvl) -> OtherOvl'}}
 
   var prop : Self { get }
 }
@@ -106,15 +105,14 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
-  // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
-                                                        
+  other.f1(a) // expected-error{{no exact matches in call to instance method 'f1'}}
+
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
   var f3f : (Float) -> Float = ovl.f3
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{ambiguous reference to member 'f3'}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no 'f3' candidates produce the expected contextual result type '(Ovl) -> Ovl'}}
 
   var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
   var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3
@@ -133,7 +131,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set }
+  subscript (index : Index) -> Value { get set } // expected-note {{found this candidate}}
 }
 
 protocol IntSubscriptable {
@@ -141,7 +139,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  }
+  subscript (index : Int) -> ElementType { get  } // expected-note {{found this candidate}}
 }
 
 func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
@@ -154,8 +152,7 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
-  t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
+  t[value] = 17 // expected-error{{no exact matches in call to subscript}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -171,7 +168,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(_ t: T, u: U) {
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
 
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}} expected-note {{expected an argument list of type '(T, y: T)'}}
+  T.isEqual(t, y: u) // expected-error{{cannot convert value of type 'U' to expected argument type 'T'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -283,11 +280,11 @@ func beginsWith3<S0: P2, S1: P2>(_ seq1: S0, _ seq2: S1) -> Bool
 //===----------------------------------------------------------------------===//
 // Bogus requirements
 //===----------------------------------------------------------------------===//
-func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
+func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{cannot find type 'Wibble' in scope}}
 func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
-func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
-func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
+func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{cannot find type 'Wibble' in scope}}
+func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{cannot find type 'Wibble' in scope}}
 func sameTypeEq<T>(_: T) where T = T {} // expected-error{{use '==' for same-type requirements rather than '='}} {{34-35===}}
 // expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
 

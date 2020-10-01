@@ -20,10 +20,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -72,12 +69,13 @@ bool mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// Returns true if \p Inst can never conservatively decrement reference counts.
 bool canNeverDecrementRefCounts(SILInstruction *Inst);
 
-/// \returns True if \p User can never use a value in a way that requires the
-/// value to be alive.
+/// Returns true if \p Inst may access any indirect object either via an address
+/// or reference.
 ///
-/// This is purposefully a negative query to contrast with canUseValue which is
-/// about a specific value while this is about general values.
-bool canNeverUseValues(SILInstruction *User);
+/// If false is returned and \p Inst has an address or reference type operand,
+/// then \p Inst only operates on the value of the address itself, not the
+/// memory. i.e. it does not dereference the address.
+bool canUseObject(SILInstruction *Inst);
 
 /// \returns true if the user \p User may use \p Ptr in a manner that requires
 /// Ptr's life to be guaranteed to exist at this point.
@@ -331,6 +329,17 @@ public:
     return completeList.getValue();
   }
 
+  Optional<ArrayRef<SILInstruction *>>
+  getPartiallyPostDomReleaseSet(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return None;
+    auto partialList = iter->second.getPartiallyPostDomReleases();
+    if (!partialList)
+      return None;
+    return partialList;
+  }
+
   ArrayRef<SILInstruction *> getReleasesForArgument(SILValue value) const {
     auto *arg = dyn_cast<SILArgument>(value);
     if (!arg)
@@ -379,47 +388,6 @@ private:
   /// epilogue releases are found.
   void processMatchingReleases();
 };
-
-class ReleaseTracker {
-  llvm::SmallSetVector<SILInstruction *, 4> TrackedUsers;
-  llvm::SmallSetVector<SILInstruction *, 4> FinalReleases;
-  std::function<bool(SILInstruction *)> AcceptableUserQuery;
-  std::function<bool(SILInstruction *)> TransitiveUserQuery;
-
-public:
-  ReleaseTracker(std::function<bool(SILInstruction *)> AcceptableUserQuery,
-                 std::function<bool(SILInstruction *)> TransitiveUserQuery)
-      : TrackedUsers(), FinalReleases(),
-        AcceptableUserQuery(AcceptableUserQuery),
-        TransitiveUserQuery(TransitiveUserQuery) {}
-
-  void trackLastRelease(SILInstruction *Inst) { FinalReleases.insert(Inst); }
-
-  bool isUserAcceptable(SILInstruction *User) const {
-    return AcceptableUserQuery(User);
-  }
-  bool isUserTransitive(SILInstruction *User) const {
-    return TransitiveUserQuery(User);
-  }
-
-  bool isUser(SILInstruction *User) { return TrackedUsers.count(User); }
-
-  void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
-
-  using range = iterator_range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
-
-  // An ordered list of users, with "casts" before their transitive uses.
-  range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
-
-  range getFinalReleases() {
-    return {FinalReleases.begin(), FinalReleases.end()};
-  }
-};
-
-/// Return true if we can find a set of post-dominating final releases. Returns
-/// false otherwise. The FinalRelease set is placed in the out parameter
-/// FinalRelease.
-bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool isARCInertTrapBB(const SILBasicBlock *BB);

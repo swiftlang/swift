@@ -2,8 +2,8 @@
 
 struct A<T> {}
 
-extension A where T == Int32 { // expected-note 2 {{where 'T' = 'Int'}}
-  struct B : ExpressibleByIntegerLiteral { // expected-note {{where 'T' = 'Int'}}
+extension A where T == Int32 { // expected-note 3{{requirement specified as 'T' == 'Int32' [with T = Int]}}
+  struct B : ExpressibleByIntegerLiteral {
     typealias E = Int
     typealias IntegerLiteralType = Int
 
@@ -14,8 +14,23 @@ extension A where T == Int32 { // expected-note 2 {{where 'T' = 'Int'}}
 }
 
 let _: A<Int>.B = 0
-// expected-error@-1 {{referencing struct 'B' on 'A' requires the types 'Int' and 'Int32' be equivalent}}
+// expected-error@-1 {{'A<T>.B' requires the types 'Int' and 'Int32' be equivalent}}
 let _: A<Int>.C = 0
-// expected-error@-1 {{referencing type alias 'C' on 'A' requires the types 'Int' and 'Int32' be equivalent}}
+// expected-error@-1 {{'A<T>.C' (aka 'Int') requires the types 'Int' and 'Int32' be equivalent}}
 let _: A<Int>.B.E = 0
-// expected-error@-1 {{referencing type alias 'E' on 'A.B' requires the types 'Int' and 'Int32' be equivalent}}
+// expected-error@-1 {{'A<T>.B' requires the types 'Int' and 'Int32' be equivalent}}
+
+
+protocol P {}
+
+@propertyWrapper
+struct Wrapper<T: P> { // expected-note {{where 'T' = 'Int'}}
+  var wrappedValue: T
+}
+
+class C {
+  static let i = 1
+
+  @Wrapper // expected-error{{generic struct 'Wrapper' requires that 'Int' conform to 'P'}}
+  var value = C.i
+}

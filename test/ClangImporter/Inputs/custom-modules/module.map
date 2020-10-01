@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
@@ -34,6 +34,10 @@ module CoreData {
 module CoreCooling {
   header "CoreCooling.h"
   export *
+}
+
+module CXXInterop {
+  header "cxx_interop.h"
 }
 
 module ctypes_bits_exported {
@@ -53,6 +57,11 @@ module HasSubmodule {
   module Submodule {
     header "Submodule.h"
   }
+}
+
+module ImageInitializers {
+  header "ImageInitializers.h"
+  export *
 }
 
 module ImportsMissingHeader {
@@ -85,6 +94,10 @@ module MoreSwiftNewtypes {
 
 module Newtype {
   header "Newtype.h"
+}
+
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
 }
 
 module ImportAsMember {
@@ -157,6 +170,7 @@ module SubclassExistentialsExtra {
 
 module SwiftPrivateAttr {
   header "SwiftPrivateAttr.h"
+  export *
 }
 
 module TestProtocols { header "Protocols.h" }
@@ -207,6 +221,10 @@ module BlocksReturningBool {
   header "BlocksReturningBool.h"
 }
 
+module MacOSVersionCanonicalization {
+  header "MacOSVersionCanonicalization.h"
+}
+
 module Warnings1 { header "Warnings1.h" }
 module Warnings2 { header "Warnings2.h" }
 module Warnings3 { header "Warnings3.h" }
@@ -224,4 +242,12 @@ module ConditionallyFoo {
 
 module ForwardDeclarationsHelper {
   header "ForwardDeclarationsHelper.h"
+}
+
+module LocalVsFileScopeBase {
+  header "LocalVsFileScopeBase.h"
+}
+module LocalVsFileScope {
+  header "LocalVsFileScope.h"
+  export *
 }

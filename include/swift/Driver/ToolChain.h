@@ -24,6 +24,8 @@
 #include <memory>
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace driver {
 class CommandOutput;
 class Compilation;
@@ -134,6 +136,13 @@ protected:
           ExtraEnvironment(std::move(extraEnv)) {}
   };
 
+  /// Handle arguments common to all invocations of the frontend (compilation,
+  /// module-merging, LLDB's REPL, etc).
+  virtual void addCommonFrontendArgs(const OutputInfo &OI,
+                                     const CommandOutput &output,
+                                     const llvm::opt::ArgList &inputArgs,
+                                     llvm::opt::ArgStringList &arguments) const;
+
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -153,12 +162,18 @@ protected:
   virtual InvocationInfo
   constructInvocation(const VerifyDebugInfoJobAction &job,
                       const JobContext &context) const;
+  virtual InvocationInfo
+  constructInvocation(const VerifyModuleInterfaceJobAction &job,
+                      const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const GeneratePCHJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual InvocationInfo constructInvocation(const LinkJobAction &job,
+  virtual InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                             const JobContext &context) const;
+
+  virtual InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                              const JobContext &context) const;
 
   /// Searches for the given executable in appropriate paths relative to the
@@ -191,23 +206,42 @@ protected:
                               file_types::ID InputType,
                               const char *PrefixArgument = nullptr) const;
 
-  /// Get the runtime library link path, which is platform-specific and found
+  /// Get the resource dir link path, which is platform-specific and found
   /// relative to the compiler.
-  void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                             const llvm::opt::ArgList &args, bool shared) const;
+  void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
+                          const llvm::opt::ArgList &args, bool shared) const;
+
+  /// Get the secondary runtime library link path given the primary path.
+  void getSecondaryResourceDirPath(
+      SmallVectorImpl<char> &secondaryResourceDirPath,
+      StringRef primaryPath) const;
+
+  /// Get the runtime library link paths, which typically include the resource
+  /// dir path and the SDK.
+  void getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                              const llvm::opt::ArgList &args,
+                              StringRef SDKPath, bool shared) const;
 
   void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
                                           const char *name,
                                           const char *separator,
                                           options::ID optionID,
                                           const llvm::opt::ArgList &args,
-                                          StringRef extraEntry = "") const;
+                                          ArrayRef<std::string> extraEntries = {}) const;
 
   /// Specific toolchains should override this to provide additional conditions
   /// under which the compiler invocation should be written into debug info. For
   /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
   /// set to match the behavior of Clang.
   virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
+
+  /// Gets the response file path and command line argument for an invocation
+  /// if the tool supports response files and if the command line length would
+  /// exceed system limits.
+  Optional<Job::ResponseFileInfo>
+  getResponseFileInfo(const Compilation &C, const char *executablePath,
+                      const InvocationInfo &invocationInfo,
+                      const JobContext &context) const;
 
 public:
   virtual ~ToolChain() = default;
@@ -263,6 +297,9 @@ public:
   void getClangLibraryPath(const llvm::opt::ArgList &Args,
                            SmallString<128> &LibPath) const;
 
+  // Returns the Clang driver executable to use for linking.
+  const char *getClangLinkerDriver(const llvm::opt::ArgList &Args) const;
+
   /// Returns the name the clang library for a given sanitizer would have on
   /// the current toolchain.
   ///
@@ -285,6 +322,24 @@ public:
   void addLinkRuntimeLib(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &Arguments,
                          StringRef LibName) const;
+    
+  /// Validates arguments passed to the toolchain.
+  ///
+  /// An override point for platform-specific subclasses to customize the
+  /// validations that should be performed.
+  virtual void validateArguments(DiagnosticEngine &diags,
+                                 const llvm::opt::ArgList &args,
+                                 StringRef defaultTarget) const {}
+
+  /// Validate the output information.
+  ///
+  /// An override point for platform-specific subclasses to customize their
+  /// behavior once the outputs are known.
+  virtual void validateOutputInfo(DiagnosticEngine &diags,
+                                  const OutputInfo &outputInfo) const { }
+
+  llvm::Expected<file_types::ID>
+  remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const;
 };
 } // end namespace driver
 } // end namespace swift

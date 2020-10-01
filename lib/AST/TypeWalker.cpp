@@ -34,12 +34,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
+  bool visitHoleType(HoleType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
-    for (auto arg : ty->getInnermostGenericArgs())
+    for (const auto &arg : ty->getDirectGenericArgs())
       if (doIt(arg))
         return true;
     
@@ -117,14 +118,32 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILFunctionType(SILFunctionType *ty) {
+    // TODO: Should this be the only kind of walk we allow?
+    if (auto subs = ty->getInvocationSubstitutions()) {
+      for (auto paramTy : subs.getReplacementTypes()) {
+        if (doIt(paramTy))
+          return true;
+      }
+
+      return false;
+    }
+    if (auto subs = ty->getPatternSubstitutions()) {
+      for (auto paramTy : subs.getReplacementTypes()) {
+        if (doIt(paramTy))
+          return true;
+      }
+
+      return false;
+    }
+    
     for (auto param : ty->getParameters())
-      if (doIt(param.getType()))
+      if (doIt(param.getInterfaceType()))
         return true;
     for (auto result : ty->getResults())
-      if (doIt(result.getType()))
+      if (doIt(result.getInterfaceType()))
         return true;
     if (ty->hasErrorResult())
-      if (doIt(ty->getErrorResult().getType()))
+      if (doIt(ty->getErrorResult().getInterfaceType()))
         return true;
     return false;
   }
@@ -167,6 +186,19 @@ class Traversal : public TypeVisitor<Traversal, bool>
       if (doIt(arg))
         return true;
 
+    return false;
+  }
+  
+  bool visitArchetypeType(ArchetypeType *ty) {
+    // If the root is an opaque archetype, visit its substitution replacement
+    // types.
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
+      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+        if (doIt(arg)) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 

@@ -786,7 +786,7 @@ bool YAMLRequestParser::parseArray(sourcekitd_object_t Array,
 
 void YAMLRequestParser::initError(StringRef Desc, llvm::yaml::Node *Node,
                                   std::string &Error) {
-  Error = Desc;
+  Error = Desc.str();
   Error += " at: ";
   llvm::SMRange Range = Node->getSourceRange();
   StringRef Text(Range.Start.getPointer(),

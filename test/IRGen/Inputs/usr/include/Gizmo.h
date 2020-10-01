@@ -45,6 +45,7 @@ typedef long NSInteger;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 - (void) test: (struct Fob) fob;
+- (void) perform: (void (^)(NS_CONSUMED Gizmo*)) block;
 + (void) runce;
 @end
 
@@ -157,4 +158,11 @@ struct StructOfNSStrings useStructOfNSStringsInObjC(struct StructOfNSStrings);
 
 __attribute__((swift_name("OuterType.InnerType")))
 @interface OuterTypeInnerType : NSObject<NSRuncing>
+@end
+
+@protocol P
+- (oneway void)stuff;
+@end
+
+@interface ObjcGenericClass<__covariant SectionType>
 @end

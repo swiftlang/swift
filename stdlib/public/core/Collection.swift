@@ -65,8 +65,8 @@
 ///     }
 ///     // Prints "15.0"
 ///     // Prints "20.0"
-@_fixed_layout
-public struct IndexingIterator<Elements : Collection> {
+@frozen
+public struct IndexingIterator<Elements: Collection> {
   @usableFromInline
   internal let _elements: Elements
   @usableFromInline
@@ -346,7 +346,7 @@ public protocol Collection: Sequence {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  associatedtype Index : Comparable
+  associatedtype Index: Comparable
 
   /// The position of the first element in a nonempty collection.
   ///
@@ -457,7 +457,7 @@ public protocol Collection: Sequence {
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : Collection = DefaultIndices<Self>
+  associatedtype Indices: Collection = DefaultIndices<Self>
     where Indices.Element == Index, 
           Indices.Index == Index,
           Indices.SubSequence == Indices
@@ -491,7 +491,7 @@ public protocol Collection: Sequence {
   ///
   ///     let horseName = "Silver"
   ///     if horseName.isEmpty {
-  ///         print("I've been through the desert on a horse with no name.")
+  ///         print("My horse has no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
@@ -1070,7 +1070,7 @@ extension Collection {
   ///
   ///     let horseName = "Silver"
   ///     if horseName.isEmpty {
-  ///         print("I've been through the desert on a horse with no name.")
+  ///         print("My horse has no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
@@ -1571,7 +1571,7 @@ extension Collection {
   }
 }
 
-extension Collection where Element : Equatable {
+extension Collection where Element: Equatable {
   /// Returns the longest possible subsequences of the collection, in order,
   /// around elements equal to the given element.
   ///
@@ -1664,8 +1664,10 @@ extension Collection where SubSequence == Self {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
+    guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[idx..<endIndex]
   }
 }

@@ -22,14 +22,15 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -48,7 +49,6 @@ class DependentMemberType;
 class GenericParamList;
 class GenericSignatureBuilder;
 class GenericTypeParamType;
-class LazyResolver;
 class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
@@ -92,10 +92,10 @@ public:
   class ResolvedType;
 
   using UnresolvedRequirementRHS =
-      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+      llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
 
   using RequirementRHS =
-    llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+    llvm::PointerUnion<Type, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
@@ -253,9 +253,7 @@ public:
     void dump(llvm::raw_ostream &out,
               GenericSignatureBuilder *builder = nullptr) const;
 
-    LLVM_ATTRIBUTE_DEPRECATED(
-                  void dump(GenericSignatureBuilder *builder = nullptr) const,
-                  "only for use in the debugger");
+    SWIFT_DEBUG_DUMPER(dump(GenericSignatureBuilder *builder = nullptr));
 
     /// Caches.
 
@@ -519,14 +517,9 @@ public:
     explicit LookUpConformanceInBuilder(GenericSignatureBuilder *builder)
       : builder(builder) {}
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const {
-      return builder->lookupConformance(dependentType,
-                                        conformingReplacementType,
-                                        conformedProtocol);
-    }
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Retrieve a function that can perform conformance lookup for this
@@ -534,13 +527,9 @@ public:
   LookUpConformanceInBuilder getLookupConformanceFn();
 
   /// Lookup a protocol conformance in a module-agnostic manner.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType dependentType, Type conformingReplacementType,
-                    ProtocolDecl *conformedProtocol);
-
-
-  /// Retrieve the lazy resolver, if there is one.
-  LazyResolver *getLazyResolver() const;
+  ProtocolConformanceRef lookupConformance(CanType dependentType,
+                                           Type conformingReplacementType,
+                                           ProtocolDecl *conformedProtocol);
 
   /// Enumerate the requirements that describe the signature of this
   /// generic signature builder.
@@ -599,7 +588,7 @@ public:
                                   ModuleDecl *inferForModule);
 
   /// Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig);
+  void addGenericSignature(GenericSignature sig);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -615,7 +604,6 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   void inferRequirements(ModuleDecl &module,
                          Type type,
-                         const TypeRepr *typeRepr,
                          FloatingRequirementSource source);
 
   /// Infer requirements from the given pattern, recursively.
@@ -637,13 +625,13 @@ public:
   ///
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
-  GenericSignature *computeGenericSignature(
+  GenericSignature computeGenericSignature(
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false,
                       bool allowBuilderToMove = true) &&;
 
   /// Compute the requirement signature for the given protocol.
-  static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
+  static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
 
 private:
   /// Finalize the set of requirements, performing any remaining checking
@@ -756,12 +744,6 @@ private:
                             TypeArrayView<GenericTypeParamType> genericParams,
                             EquivalenceClass *equivClass);
 
-  /// Realize a potential archetype for the given type.
-  ///
-  /// The resolved archetype will be written back into the unresolved type,
-  /// to make the next resolution more efficient.
-  PotentialArchetype *realizePotentialArchetype(UnresolvedType &type);
-
 public:
   /// Try to resolve the equivalence class of the given type.
   ///
@@ -770,7 +752,7 @@ public:
   /// \param resolutionKind How to perform the resolution.
   ///
   /// \param wantExactPotentialArchetype Whether to return the precise
-  /// potential archetype described by the type (vs. just the equivalance
+  /// potential archetype described by the type (vs. just the equivalence
   /// class and resolved type).
   ResolvedType maybeResolveEquivalenceClass(
                                       Type type,
@@ -812,17 +794,17 @@ public:
   /// This routine will test that the given generic signature is both minimal
   /// and canonical, emitting errors if it is not.
   static void verifyGenericSignature(ASTContext &context,
-                                     GenericSignature *sig);
+                                     GenericSignature sig);
 
   /// Verify all of the generic sigantures in the given module.
   static void verifyGenericSignaturesInModule(ModuleDecl *module);
 
-  /// Dump all of the requirements, both specified and inferred.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(),
-      "only for use within the debugger");
+  /// Dump all of the requirements, both specified and inferred. It cannot be
+  /// statically proven that this doesn't modify the GSB.
+  SWIFT_DEBUG_HELPER(void dump());
 
-  /// Dump all of the requirements to the given output stream.
+  /// Dump all of the requirements to the given output stream. It cannot be
+   /// statically proven that this doesn't modify the GSB.
   void dump(llvm::raw_ostream &out);
 };
 
@@ -1056,7 +1038,7 @@ public:
                     WrittenRequirementLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
-      usesRequirementSignature(protocol->isRequirementSignatureComputed()),
+      usesRequirementSignature(!protocol->isComputingRequirementSignature()),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -1339,17 +1321,12 @@ public:
     ID.AddPointer(storage3);
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(print());
 
   /// Dump the requirement source.
   void dump(llvm::raw_ostream &out, SourceManager *SrcMgr,
             unsigned indent) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void print() const,
-    "only for use within the debugger");
 
   /// Print the requirement source (shorter form)
   void print(llvm::raw_ostream &out, SourceManager *SrcMgr) const;
@@ -1374,8 +1351,8 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   } kind;
 
   using Storage =
-    llvm::PointerUnion3<const RequirementSource *, const TypeRepr *,
-                        const RequirementRepr *>;
+    llvm::PointerUnion<const RequirementSource *, const TypeRepr *,
+                       const RequirementRepr *>;
 
   Storage storage;
 
@@ -1559,17 +1536,10 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
   /// Construct a new potential archetype for a concrete declaration.
-  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-      : parentOrContext(parent), identifier(assocType) {
-    assert(parent != nullptr && "Not a nested type?");
-    assert(assocType->getOverriddenDecls().empty());
-  }
+  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType);
 
   /// Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam)
-    : parentOrContext(&ctx), identifier(genericParam)
-  {
-  }
+  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam);
 
 public:
   /// Retrieve the representative for this archetype, performing
@@ -1692,15 +1662,28 @@ public:
   /// Retrieve the AST context in which this potential archetype resides.
   ASTContext &getASTContext() const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent) const;
 
   friend class GenericSignatureBuilder;
 };
+
+template <typename C>
+bool GenericSignatureBuilder::Constraint<C>::isSubjectEqualTo(Type T) const {
+  return getSubjectDependentType({ })->isEqual(T);
+}
+
+template <typename T>
+bool GenericSignatureBuilder::Constraint<T>::isSubjectEqualTo(const GenericSignatureBuilder::PotentialArchetype *PA) const {
+  return getSubjectDependentType({ })->isEqual(PA->getDependentType({ }));
+}
+
+template <typename T>
+bool GenericSignatureBuilder::Constraint<T>::hasSameSubjectAs(const GenericSignatureBuilder::Constraint<T> &C) const {
+  return getSubjectDependentType({ })->isEqual(C.getSubjectDependentType({ }));
+}
 
 /// Describes a requirement whose processing has been delayed for some reason.
 class GenericSignatureBuilder::DelayedRequirement {
@@ -1725,8 +1708,7 @@ public:
   /// Dump a debugging representation of this delayed requirement class.
   void dump(llvm::raw_ostream &out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 /// Whether the given constraint result signals an error.

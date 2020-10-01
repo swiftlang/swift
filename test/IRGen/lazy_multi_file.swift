@@ -13,7 +13,7 @@ class Subclass : LazyContainerClass {
   // an indirect return value. When it shrinks back, remove the optional
   // indirect out.
   //
-  // CHECK-LABEL: @"$s15lazy_multi_file8SubclassC6getStrSSyF"({{(\%TSS\* noalias nocapture sret, )?}}%T15lazy_multi_file8SubclassC* swiftself) {{.*}} {
+  // CHECK-LABEL: @"$s15lazy_multi_file8SubclassC6getStrSSyF"({{(\%TSS\* noalias nocapture sret, )?}}%T15lazy_multi_file8SubclassC* swiftself %0) {{.*}} {
   func getStr() -> String {
     // CHECK: = getelementptr inbounds %T15lazy_multi_file8SubclassC, %T15lazy_multi_file8SubclassC* %0, i32 0, i32 3
     return str

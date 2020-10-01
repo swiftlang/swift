@@ -81,12 +81,12 @@ extension Container.Inner {
     obj.privateExtensionMethod()
 
     // FIXME: Unqualified lookup won't look into Container from here.
-    _ = PrivateInner() // expected-error {{use of unresolved identifier 'PrivateInner'}}
+    _ = PrivateInner() // expected-error {{cannot find 'PrivateInner' in scope}}
     _ = Container.PrivateInner()
   }
 
   // FIXME: Unqualified lookup won't look into Container from here.
-  var inner: PrivateInner? { return nil } // expected-error {{use of undeclared type 'PrivateInner'}}
+  var inner: PrivateInner? { return nil } // expected-error {{cannot find type 'PrivateInner' in scope}}
   var innerQualified: Container.PrivateInner? { return nil } // expected-error {{invalid redeclaration of 'innerQualified'}} expected-error {{property must be declared private because its type uses a private type}}
 }
 
@@ -197,6 +197,7 @@ extension Container {
   // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}
+  // expected-error@-4 {{an enum with no cases cannot declare a raw type}}
   fileprivate enum PrivatePayload {
     case A(VeryPrivateStruct) // expected-error {{enum case in an internal enum uses a private type}} {{none}}
   }

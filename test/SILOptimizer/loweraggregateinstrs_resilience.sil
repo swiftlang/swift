@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -lower-aggregate-instrs -enable-library-evolution | %FileCheck %s
+
+// This file makes sure that given the current code-size metric we properly
+// expand operations for small structs and not for large structs in a consistent
+// way for all operations we expand.
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+public struct ResilientStruct {
+    var x: AnyObject
+}
+
+// CHECK-LABEL: sil @$test_retain_release : $@convention(thin) (@in_guaranteed ResilientStruct) -> ()
+// CHECK:         retain_value %2 : $(ResilientStruct, ResilientStruct)
+// CHECK-NEXT:    release_value %2 : $(ResilientStruct, ResilientStruct)
+// CHECK-NEXT:    release_value %2 : $(ResilientStruct, ResilientStruct)
+// CHECK:         return
+
+sil @$test_retain_release : $@convention(thin) (@in_guaranteed ResilientStruct) -> () {
+bb0(%0 : $*ResilientStruct):
+  %1 = load %0 : $*ResilientStruct
+  %3 = tuple (%1 : $ResilientStruct, %1 : $ResilientStruct)
+  retain_value %3 : $(ResilientStruct, ResilientStruct)
+  release_value %3 : $(ResilientStruct, ResilientStruct)
+  release_value %3 : $(ResilientStruct, ResilientStruct)
+  %result = tuple ()
+  return %result : $()
+}

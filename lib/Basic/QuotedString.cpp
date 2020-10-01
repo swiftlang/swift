@@ -36,7 +36,7 @@ void swift::printAsQuotedString(llvm::raw_ostream &out, llvm::StringRef text) {
         };
         out << "\\u{" << hexdigit[c >> 4] << hexdigit[c & 0xF] << '}';
       } else {
-        out << c;
+        out << (char)c;
       }
       break;
     }

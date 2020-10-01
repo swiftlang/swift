@@ -23,3 +23,15 @@ extern NSString *TypedefDomain2;
 typedef enum __attribute__((ns_error_domain(TypedefDomain2))) {
   Illness
 } TypedefError2;
+
+@interface Nested @end
+
+extern NSString * const NestedTagDomain;
+typedef MY_ERROR_ENUM(int, NestedTagError, NestedTagDomain) {
+  Trappedness
+} __attribute__((swift_name("Nested.TagError")));
+
+extern NSString *NestedTypedefDomain;
+typedef enum __attribute__((ns_error_domain(NestedTypedefDomain))) {
+  Brokenness
+} NestedTypedefError __attribute__((swift_name("Nested.TypedefError")));

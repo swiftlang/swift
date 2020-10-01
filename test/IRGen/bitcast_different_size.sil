@@ -9,7 +9,7 @@ import Swift
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @bitcast_different_size1
 
-// OPT-LABEL: define{{.*}}@bitcast_different_size1(i32)
+// OPT-LABEL: define{{.*}}@bitcast_different_size1(i32 %0)
 // OPT:   tail call void asm sideeffect "", "n"(i32 0)
 // OPT-NEXT:   tail call void @llvm.trap()
 // OPT-NEXT:   unreachable

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_toplevel %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK: sil_coverage_map{{.*}}__tlcd_line:[[@LINE+2]]:1
 // CHECK:  [[@LINE+1]]:1 -> [[@LINE+1]]:11

@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
 // RUN: %target-codesign %t/existentials
-// RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 /*
    This file pokes at the swift_reflection_projectExistential API
@@ -67,6 +68,8 @@ reflect(any: mc)
 // CHECK-64-NEXT:    (struct Swift.Int))
 // CHECK-64: Type info:
 // CHECK-64: (reference kind=strong refcounting=native)
+// CHECK-64: Mangled name: $s12existentials7MyClassCyS2iG
+// CHECK-64: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -76,6 +79,8 @@ reflect(any: mc)
 // CHECK-32-NEXT:   (struct Swift.Int))
 // CHECK-32: Type info:
 // CHECK-32: (reference kind=strong refcounting=native)
+// CHECK-32: Mangled name: $s12existentials7MyClassCyS2iG
+// CHECK-32: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
 // This value fits in the 3-word buffer in the container.
 var smallStruct = MyStruct(x: 1, y: 2, z: 3)
@@ -103,6 +108,8 @@ reflect(any: smallStruct)
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
+// CHECK-64-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -126,6 +133,8 @@ reflect(any: smallStruct)
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
+// CHECK-32-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
 // This value will be copied into a heap buffer, with a
 // pointer to it in the existential.
@@ -192,6 +201,8 @@ reflect(any: largeStruct)
 // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
+// CHECK-64-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -253,6 +264,48 @@ reflect(any: largeStruct)
 // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
+// CHECK-32-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
+
+// Function type:
+reflect(any: {largeStruct})
+// CHECK-64: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+// CHECK-64: Demangled name: () -> existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
+// CHECK-32: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+// CHECK-32: Demangled name: () -> existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
+
+// Protocol composition:
+protocol P {}
+protocol Q {}
+protocol Composition : P, Q {}
+struct S : Composition {}
+func getComposition() -> P & Q { return S() }
+reflect(any: getComposition())
+// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-64: Demangled name: existentials.P & existentials.Q
+// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-32: Demangled name: existentials.P & existentials.Q
+
+// Metatype:
+reflect(any: Int.self)
+// CHECK-64: Mangled name: $sSiXMt
+// CHECK-64: Demangled name: @thin Swift.Int.Type
+// CHECK-32: Mangled name: $sSiXMt
+// CHECK-32: Demangled name: @thin Swift.Int.Type
+
+protocol WithType {
+  associatedtype T
+  func f() -> T
+}
+struct S1 : WithType {
+  typealias T = Int
+  func f() -> Int { return 0 }
+}
+func getWithType<T>(_ t: T)  where T: WithType {
+  reflect(any: T.self)
+}
+getWithType(S1())
+
 
 var he = HasError(singleError: MyError(), errorInComposition: MyError(), customError: MyCustomError(), customErrorInComposition: MyCustomError())
 reflect(any: he)
@@ -265,31 +318,33 @@ reflect(any: he)
 // CHECK-64:        Type info:
 // CHECK-64:        (struct size=144 alignment=8 stride=144
 // CHECK-64-NEXT:   (field name=singleError offset=0
-// CHECK-64-NEXT:     (error_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (error_existential size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=error offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-64-NEXT:   (field name=errorInComposition offset=8
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=customError offset=56
-// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=customErrorInComposition offset=96
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials8HasErrorV
+// CHECK-64-NEXT:   Demangled name: existentials.HasError
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -324,6 +379,8 @@ reflect(any: he)
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-32-NEXT:       (field name=wtable offset=20
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials8HasErrorV
+// CHECK-32-NEXT:   Demangled name: existentials.HasError
 
 reflect(error: MyError())
 
@@ -338,6 +395,8 @@ reflect(error: MyError())
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials7MyErrorV
+// CHECK-64-NEXT:   Demangled name: existentials.MyError
 
 // CHECK-32: Reflecting an error existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -350,5 +409,7 @@ reflect(error: MyError())
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials7MyErrorV
+// CHECK-32-NEXT:   Demangled name: existentials.MyError
 
 doneReflecting()

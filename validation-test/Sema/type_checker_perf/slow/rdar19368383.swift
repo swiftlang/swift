@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release,no_asan
 
 // Missing force of optional result of dictionary lookup.
 func rdar19368383(d: [String : String]) -> [String] {

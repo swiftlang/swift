@@ -67,7 +67,7 @@ struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
   unsigned BlockCount = 0;
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
-    BlockCount++;
+    ++BlockCount;
     SILInstructionVisitor<InstCountVisitor>::visitSILBasicBlock(BB);
   }
 
@@ -104,14 +104,14 @@ class InstCount : public SILFunctionTransform {
       if (F->isDefinition()) {
         TotalExternalFuncInsts += V.InstCount;
         TotalExternalFuncBlocks += V.BlockCount;
-        TotalExternalFuncDefs++;
+        ++TotalExternalFuncDefs;
       } else {
-        TotalExternalFuncDecls++;
+        ++TotalExternalFuncDecls;
       }
     } else {
       TotalInsts += V.InstCount;
       TotalBlocks += V.BlockCount;
-      TotalFuncs++;
+      ++TotalFuncs;
     }
 
     switch (F->getLinkage()) {
@@ -155,7 +155,6 @@ SILTransform *swift::createInstCount() {
 void swift::performSILInstCountIfNeeded(SILModule *M) {
   if (!M->getOptions().PrintInstCounts)
     return;
-  SILPassManager PrinterPM(M);
-  PrinterPM.executePassPipelinePlan(
-      SILPassPipelinePlan::getInstCountPassPipeline(M->getOptions()));
+  executePassPipelinePlan(
+      M, SILPassPipelinePlan::getInstCountPassPipeline(M->getOptions()));
 }

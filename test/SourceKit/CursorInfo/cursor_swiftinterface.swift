@@ -17,7 +17,7 @@ func test() {
 
 // Setup phase 1: build the module interface (.swiftinterface) and doc (.swiftdoc).
 //
-// RUN: %target-swift-frontend -I %t -module-name SomeModule -emit-parseable-module-interface-path %t/SomeModule.swiftinterface -emit-module-doc-path %t/SomeModule.swiftdoc %S/Inputs/SomeModule.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -module-name SomeModule -emit-module-interface-path %t/SomeModule.swiftinterface -emit-module-doc-path %t/SomeModule.swiftdoc %S/Inputs/SomeModule.swift -emit-module -o /dev/null
 
 // Actual test: Check the CusorInfo results of references to symbols in that
 // module, including the available refactoring actions, and associated doc

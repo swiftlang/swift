@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name main %s -o %t/hash
 // RUN: %target-codesign %t/hash
-// RUN: (export -n %env-SWIFT_DETERMINISTIC_HASHING; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=RANDOM %s
-// RUN: (export %env-SWIFT_DETERMINISTIC_HASHING=1; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=STABLE %s
+// RUN: env -u %env-SWIFT_DETERMINISTIC_HASHING %target-run %t/hash > %t/nondeterministic.log
+// RUN: env -u %env-SWIFT_DETERMINISTIC_HASHING %target-run %t/hash >> %t/nondeterministic.log
+// RUN: %FileCheck --check-prefixes=RANDOM %s < %t/nondeterministic.log
+// RUN: env %env-SWIFT_DETERMINISTIC_HASHING=1 %target-run %t/hash > %t/deterministic.log
+// RUN: env %env-SWIFT_DETERMINISTIC_HASHING=1 %target-run %t/hash >> %t/deterministic.log
+// RUN: %FileCheck --check-prefixes=STABLE %s < %t/deterministic.log
 
 // REQUIRES: executable_test
 

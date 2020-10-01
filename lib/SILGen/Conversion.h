@@ -73,6 +73,7 @@ private:
   struct ReabstractionTypes {
     AbstractionPattern OrigType;
     CanType SubstType;
+    SILType LoweredResultType;
   };
 
   using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
@@ -104,20 +105,24 @@ private:
                                           loweredResultTy, isExplicit);
   }
 
-  Conversion(KindTy kind, AbstractionPattern origType, CanType substType)
+  Conversion(KindTy kind, AbstractionPattern origType, CanType substType,
+             SILType loweredResultTy)
       : Kind(kind) {
-    Types.emplaceAggregate<ReabstractionTypes>(kind, origType, substType);
+    Types.emplaceAggregate<ReabstractionTypes>(kind, origType, substType,
+                                               loweredResultTy);
   }
 
 public:
   static Conversion getOrigToSubst(AbstractionPattern origType,
-                                   CanType substType) {
-    return Conversion(OrigToSubst, origType, substType);
+                                   CanType substType,
+                                   SILType loweredResultTy) {
+    return Conversion(OrigToSubst, origType, substType, loweredResultTy);
   }
 
   static Conversion getSubstToOrig(AbstractionPattern origType,
-                                   CanType substType) {
-    return Conversion(SubstToOrig, origType, substType);
+                                   CanType substType,
+                                   SILType loweredResultTy) {
+    return Conversion(SubstToOrig, origType, substType, loweredResultTy);
   }
 
   static Conversion getBridging(KindTy kind, CanType origType,
@@ -141,6 +146,10 @@ public:
 
   CanType getReabstractionSubstType() const {
     return Types.get<ReabstractionTypes>(Kind).SubstType;
+  }
+
+  SILType getReabstractionLoweredResultType() const {
+    return Types.get<ReabstractionTypes>(Kind).LoweredResultType;
   }
 
   bool isBridgingExplicit() const {

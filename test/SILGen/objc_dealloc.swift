@@ -44,7 +44,7 @@ class SwiftGizmo : Gizmo {
     // CHECK-NOT: ref_element_addr
 
     // Call super -dealloc.
-    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = objc_super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.1.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
+    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = objc_super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   [[SUPER:%[0-9]+]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
     // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   end_lifetime [[SUPER]]
@@ -82,7 +82,9 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: debug_value [[SELF]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT: [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF_BORROW]] : $SwiftGizmo, #SwiftGizmo.x
-  // CHECK-NEXT: destroy_addr [[X]] : $*X
+  // CHECK-NEXT: [[X_ACCESS:%.*]] = begin_access [deinit] [static] [[X]]
+  // CHECK-NEXT: destroy_addr [[X_ACCESS]]
+  // CHECK-NEXT: end_access [[X_ACCESS]]
   // CHECK-NEXT: end_borrow [[SELF_BORROW]]
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()

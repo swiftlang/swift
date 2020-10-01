@@ -10,6 +10,9 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 add_swift_host_library(libSwiftSyntaxParser SHARED
   c-include-check.c
   libSwiftSyntaxParser.cpp)
+if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  add_dependencies(libSwiftSyntaxParser clang)
+endif()
 target_link_libraries(libSwiftSyntaxParser PRIVATE
   swiftParse)
 set_target_properties(libSwiftSyntaxParser
@@ -42,14 +45,15 @@ endif()
 
 set_property(TARGET libSwiftSyntaxParser APPEND_STRING PROPERTY
   COMPILE_FLAGS " -fblocks")
-if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
-  target_link_libraries(libSwiftSyntaxParser PRIVATE BlocksRuntime)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  target_link_libraries(libSwiftSyntaxParser PRIVATE
+    BlocksRuntime)
 endif()
 
-swift_install_in_component(parser-lib
-  FILES "${SWIFT_LIBRARY_OUTPUT_INTDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${SYNTAX_PARSER_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}"
-  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-swift_install_in_component(parser-lib
-  DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/SyntaxParser/"
-  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SYNTAX_PARSER_LIB_NAME}")
+add_dependencies(parser-lib libSwiftSyntaxParser)
+swift_install_in_component(PROGRAMS "${SWIFT_LIBRARY_OUTPUT_INTDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${SYNTAX_PARSER_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+                           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
+                           COMPONENT parser-lib)
+swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/SyntaxParser/"
+                           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SYNTAX_PARSER_LIB_NAME}"
+                           COMPONENT parser-lib)

@@ -10,16 +10,41 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] [extern_c] {
+module WinSDK [system] {
   module WinSock2 {
     header "WinSock2.h"
     header "WS2tcpip.h"
+    header "MSWSock.h"
+    header "../shared/afunix.h"
     export *
+
+    link "WS2_32.Lib"
+  }
+
+  module WinSock {
+    header "winsock.h"
   }
 
   module core {
     module acl {
       header "AclAPI.h"
+      export *
+    }
+
+    module com {
+      header "combaseapi.h"
+      export *
+    }
+
+    module compress {
+      header "compressapi.h"
+      export *
+    }
+
+    module console {
+      header "consoleapi.h"
+      header "consoleapi2.h"
+      header "consoleapi3.h"
       export *
     }
 
@@ -53,9 +78,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // iphlpapi.dll
     module iphlp {
       header "iphlpapi.h"
       export *
+
+      link "iphlpapi.lib"
     }
 
     // api-ms-win-core-libloader-l1-1-0.dll
@@ -99,11 +127,35 @@ module WinSDK [system] [extern_c] {
       header "timezoneapi.h"
       export *
     }
+
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "winver.h"
+      export *
+
+      link "Version.Lib"
+    }
   }
 
-  module CommCtrl {
-    header "CommCtrl.h"
+  module AuthZ {
+    header "AuthZ.h"
     export *
+
+    link "AuthZ.Lib"
+  }
+
+  module Controls {
+    module CommCtrl {
+      header "CommCtrl.h"
+      export *
+    }
+
+    module CommDlg {
+      header "commdlg.h"
+      export *
+
+      link "ComDlg32.Lib"
+    }
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
@@ -112,9 +164,71 @@ module WinSDK [system] [extern_c] {
     export *
   }
 
+  module DFS {
+    header "LMDFS.h"
+    header "LM.h"
+    export *
+
+    link "NetAPI32.Lib"
+  }
+
   module DbgHelp {
     header "DbgHelp.h"
     export *
+
+    link "DbgHelp.Lib"
+  }
+
+  module DWM {
+    header "dwmapi.h"
+    export *
+
+    link "dwmapi.lib"
+  }
+
+  module FCI {
+    header "fci.h"
+    export *
+
+    link "Cabinet.Lib"
+  }
+
+  module Internationalization {
+    module WinNLS {
+      header "winnls.h"
+      export *
+    }
+
+    module IMM {
+      header "immdev.h"
+      export *
+
+      link "Imm32.lib"
+    }
+  }
+
+  module Multimedia {
+    module DigitalVideo {
+      header "Digitalv.h"
+      export *
+    }
+
+    module Video {
+      header "Vfw.h"
+      export *
+
+      link "Vfw32.Lib"
+    }
+
+    header "mmeapi.h"
+    header "mmddk.h"
+    header "mmsystem.h"
+    header "mmiscapi.h"
+    header "timeapi.h"
+    header "joystickapi.h"
+    export *
+
+    link "WinMM.Lib"
   }
 
   module Shell {
@@ -123,7 +237,56 @@ module WinSDK [system] [extern_c] {
   }
 
   module ShellAPI {
+    header "shellapi.h"
     header "Shlwapi.h"
+    export *
+
+    link "shell32.lib"
+    link "ShLwApi.Lib"
+  }
+
+  module ShellCore {
+    header "ShellScalingApi.h"
+    export *
+
+    link "shcore.lib"
+  }
+
+  module OLE32 {
+    header "oaidl.h"
+    export *
+
+    link "OleAut32.Lib"
+  }
+
+  module Performance {
+    module PerfLib {
+      header "perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    header "winperf.h"
+    export *
+  }
+
+  module Printing {
+    header "winspool.h"
+    export *
+
+    link "WinSpool.Lib"
+  }
+
+  module RichEdit {
+    header "Richedit.h"
     export *
   }
 
@@ -132,9 +295,52 @@ module WinSDK [system] [extern_c] {
     export *
   }
 
+  module WinBase {
+    header "winbase.h"
+    export *
+  }
+
   module WinCrypt {
     header "wincrypt.h"
     export *
+
+    link "Crypt32.Lib"
+  }
+
+  module WinDNS {
+    header "WinDNS.h"
+    export *
+
+    link "DnsAPI.Lib"
+  }
+
+  module WinGDI {
+    header "wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
+  }
+
+  module WinReg {
+    header "winreg.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+
+  module WinRPC {
+    header "../shared/rpc.h"
+    header "../shared/rpcndr.h"
+    export *
+
+    link "RpcRT4.Lib"
+  }
+
+  module WinSVC {
+    header "winsvc.h"
+    export *
+
+    link "AdvAPI32.Lib"
   }
 }
 

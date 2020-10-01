@@ -2,8 +2,8 @@
 
 class C {}
 var c = C()
-if c as C { // expected-error{{'C' is not convertible to 'Bool'}}
+if c as C { // expected-error{{cannot convert value of type 'C' to expected condition type 'Bool'}}
 }
 
-if ({1} as () -> Int) { // expected-error{{'() -> Int' is not convertible to 'Bool'}}
+if ({1} as () -> Int) { // expected-error{{cannot convert value of type '() -> Int' to expected condition type 'Bool'}}
 }

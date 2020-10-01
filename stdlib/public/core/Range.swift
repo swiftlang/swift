@@ -74,6 +74,25 @@ public protocol RangeExpression {
 }
 
 extension RangeExpression {
+
+  /// Returns a Boolean value indicating whether a value is included in a
+  /// range.
+  ///
+  /// You can use the pattern-matching operator (`~=`) to test whether a value
+  /// is included in a range. The pattern-matching operator is used
+  /// internally in `case` statements for pattern matching. The following
+  /// example uses the `~=` operator to test whether an integer is included in
+  /// a range of single-digit numbers:
+  ///
+  ///     let chosenNumber = 3
+  ///     if 0..<10 ~= chosenNumber {
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// - Parameters:
+  ///   - pattern: A range.
+  ///   - bound: A value to match against `pattern`.
   @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
@@ -125,8 +144,8 @@ extension RangeExpression {
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:to:by:)` function.
-@_fixed_layout
-public struct Range<Bound : Comparable> {
+@frozen
+public struct Range<Bound: Comparable> {
   /// The range's lower bound.
   ///
   /// In an empty range, `lowerBound` is equal to `upperBound`.
@@ -181,13 +200,13 @@ public struct Range<Bound : Comparable> {
 }
 
 extension Range: Sequence
-where Bound: Strideable, Bound.Stride : SignedInteger {
+where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<Range<Bound>>
 }
 
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
-where Bound : Strideable, Bound.Stride : SignedInteger
+where Bound: Strideable, Bound.Stride: SignedInteger
 {
   /// A type that represents a position in the range.
   public typealias Index = Bound
@@ -278,7 +297,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 }
 
-extension Range where Bound: Strideable, Bound.Stride : SignedInteger {  
+extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Creates an instance equivalent to the given `ClosedRange`.
   ///
   /// - Parameter other: A closed range to convert to a `Range` instance.
@@ -344,7 +363,7 @@ extension Range {
   }
 }
 
-extension Range : CustomStringConvertible {
+extension Range: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation
   public var description: String {
@@ -352,7 +371,7 @@ extension Range : CustomStringConvertible {
   }
 }
 
-extension Range : CustomDebugStringConvertible {
+extension Range: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
@@ -360,7 +379,7 @@ extension Range : CustomDebugStringConvertible {
   }
 }
 
-extension Range : CustomReflectable {
+extension Range: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -449,7 +468,7 @@ extension Range: Encodable where Bound: Encodable {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[..<3])
 ///     // Prints "[10, 20, 30]"
-@_fixed_layout
+@frozen
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
   
@@ -505,7 +524,7 @@ extension PartialRangeUpTo: Encodable where Bound: Encodable {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
-@_fixed_layout
+@frozen
 public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
   
@@ -620,7 +639,7 @@ extension PartialRangeThrough: Encodable where Bound: Encodable {
 /// `Bound`. For example, iterating over an instance of
 /// `PartialRangeFrom<Int>` traps when the sequence's next value would be
 /// above `Int.max`.
-@_fixed_layout
+@frozen
 public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
@@ -642,12 +661,12 @@ extension PartialRangeFrom: RangeExpression {
 }
 
 extension PartialRangeFrom: Sequence
-  where Bound : Strideable, Bound.Stride : SignedInteger
+  where Bound: Strideable, Bound.Stride: SignedInteger
 {
   public typealias Element = Bound
 
   /// The iterator for a `PartialRangeFrom` instance.
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _current: Bound
@@ -704,10 +723,12 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `minimum <= maximum`.
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
-      "Can't form Range with upperBound < lowerBound")
+      "Range requires lowerBound <= upperBound")
     return Range(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 
@@ -733,8 +754,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeUpTo(maximum)
   }
 
@@ -760,8 +785,12 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
+  ///
+  /// - Precondition: `maximum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
+    _precondition(maximum == maximum,
+      "Range cannot have an unordered upper bound.")
     return PartialRangeThrough(maximum)
   }
 
@@ -787,8 +816,12 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
+  ///
+  /// - Precondition: `minimum` must compare equal to itself (i.e. cannot be NaN).
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
+    _precondition(minimum == minimum,
+      "Range cannot have an unordered lower bound.")
     return PartialRangeFrom(minimum)
   }
 }
@@ -827,7 +860,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // namespace
+@frozen // namespace
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.
@@ -943,23 +976,35 @@ extension Range {
   ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
-    return (!other.isEmpty && self.contains(other.lowerBound))
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally either `Range` (unlike a `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound <= self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty || other.isEmpty
+    return !isDisjoint
   }
 
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound)
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally the `Range` (unlike the `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty
+    return !isDisjoint
   }
 }
 
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountableRange<Bound: Strideable> = Range<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger
 
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger

@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
@@ -65,12 +64,15 @@
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
     "CollectionAlgorithms.swift",
+    "EitherSequence.swift",
     "EmptyCollection.swift",
     "Stride.swift",
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetStorage.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
@@ -97,6 +99,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
@@ -144,7 +147,6 @@
     "VarArgs.swift",
     "CTypes.swift",
     "MemoryLayout.swift",
-    "SmallBuffer.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift"
@@ -167,7 +169,8 @@
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"],
+      "FloatingPointTypes.swift",
+      "FloatingPointRandom.swift"],
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
@@ -200,6 +203,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",
@@ -207,6 +211,7 @@
     "OptionSet.swift",
     "OutputStream.swift",
     "Policy.swift",
+    "Prespecialize.swift",
     "Print.swift",
     "REPL.swift",
     "Random.swift",
@@ -223,7 +228,9 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
-    "MigrationSupport.swift"
+    "LegacyABI.swift",
+    "MigrationSupport.swift",
+    "PtrAuth.swift"
   ],
   "Result": [
     "Result.swift"

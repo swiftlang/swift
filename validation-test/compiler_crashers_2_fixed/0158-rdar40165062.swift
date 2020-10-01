@@ -1,15 +1,14 @@
 // RUN: %target-typecheck-verify-swift
 
-struct Foo<T, U> { // expected-note {{'U' declared as parameter to type 'Foo'}}
+struct Foo<T, U> {
   var value: U
   func bar() -> Foo<T, U> {
     return Foo(value)
-    // expected-error@-1 {{generic parameter 'U' could not be inferred}}
-    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+    // expected-error@-1 {{referencing initializer 'init(_:)' on 'Foo' requires the types 'T' and 'U' be equivalent}}
   }
 }
 
-extension Foo where T == U {
+extension Foo where T == U { // expected-note {{where 'T' = 'T', 'U' = 'U'}}
   init(_ value: U)  {
     self.value = value
   }

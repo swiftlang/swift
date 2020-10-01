@@ -1,0 +1,27 @@
+//===--- ParseTypeIDZone.def ------------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the requests in the parser's zone.
+//
+//===----------------------------------------------------------------------===//
+
+SWIFT_REQUEST(Parse, CodeCompletionSecondPassRequest,
+              bool (SourceFile *, CodeCompletionCallbacksFactory *),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(Parse, ParseMembersRequest,
+              FingerprintAndMembers(IterableDeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
+              BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(Parse, ParseSourceFileRequest,
+              SourceFileParsingResult(SourceFile *), SeparatelyCached,
+              NoLocationInfo)

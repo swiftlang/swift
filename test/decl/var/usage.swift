@@ -12,7 +12,7 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{'var' as a parameter attribute is not allowed}}
+func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' in this position is interpreted as an argument label}} {{43-46=`var`}}
   i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
   var j = j
   swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
@@ -96,8 +96,24 @@ func testInOut(_ x : inout Int) {  // Ok.
 
 struct TestStruct {
   var property = 42
-}
 
+  var mutatingProperty: Int {
+    mutating get { return 0 }
+    mutating set {}
+  }
+  var nonmutatingProperty: Int {
+    nonmutating get { return 0 }
+    nonmutating set {}
+  }
+  subscript(mutating index: Int) -> Int {
+    mutating get { return 0 }
+    mutating set {}
+  }
+  subscript(nonmutating index: Int) -> Int {
+    nonmutating get { return 0 }
+    nonmutating set {}
+  }
+}
 
 func testStructMember() -> TestStruct {
   var x = TestStruct()  // ok
@@ -105,6 +121,53 @@ func testStructMember() -> TestStruct {
   return x
 }
 
+func testMutatingProperty_get() -> TestStruct {
+  var x = TestStruct()  // ok
+  _ = x.mutatingProperty
+  return x
+}
+
+func testMutatingProperty_set() -> TestStruct {
+  var x = TestStruct()  // ok
+  x.mutatingProperty = 17
+  return x
+}
+
+func testNonmutatingProperty_get() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x.nonmutatingProperty
+  return x
+}
+
+func testNonmutatingProperty_set() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x.nonmutatingProperty = 17
+  return x
+}
+
+func testMutatingSubscript_get() -> TestStruct {
+  var x = TestStruct()  // ok
+  _ = x[mutating: 4]
+  return x
+}
+
+func testMutatingSubscript_set() -> TestStruct {
+  var x = TestStruct()  // ok
+  x[mutating: 4] = 17
+  return x
+}
+
+func testNonmutatingSubscript_get() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x[nonmutating: 4]
+  return x
+}
+
+func testNonmutatingSubscript_set() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x[nonmutating: 4] = 17
+  return x
+}
 
 func testSubscript() -> [Int] {
   var x = [1,2,3] // ok
@@ -112,6 +175,11 @@ func testSubscript() -> [Int] {
   return x
 }
 
+func testSubscriptNeverMutated() -> [Int] {
+  var x = [1,2,3] // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x[1]
+  return x
+}
 
 func testTuple(_ x : Int) -> Int {
   var x = x
@@ -178,7 +246,10 @@ func testBuildConfigs() {
 protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
+  var mutatingProperty: Int { mutating get mutating set }
+  var nonmutatingProperty: Int { nonmutating get nonmutating set }
 }
+
 func testOpenExistential(_ x: Fooable,
                          y: Fooable) {
   var x = x
@@ -187,6 +258,25 @@ func testOpenExistential(_ x: Fooable,
   y.immutFoo()
 }
 
+func testOpenExistential_mutatingProperty_get(p: Fooable) {
+  var x = p
+  _ = x.mutatingProperty
+}
+
+func testOpenExistential_mutatingProperty_set(p: Fooable) {
+  var x = p
+  x.mutatingProperty = 4
+}
+
+func testOpenExistential_nonmutatingProperty_get(p: Fooable) {
+  var x = p // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x.nonmutatingProperty
+}
+
+func testOpenExistential_nonmutatingProperty_set(p: Fooable) {
+  var x = p // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x.nonmutatingProperty = 4
+}
 
 func couldThrow() throws {}
 
@@ -214,9 +304,9 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 
 // <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
 func test(_ a : Int?, b : Any) {
-  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{24-25=_}}
+  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{20-25=_}}
   }
-  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
     _ = y
   }
 
@@ -328,5 +418,80 @@ extension MemberGetterExtension {
     set {
       print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
     }
+  }
+}
+
+func testLocalFunc() {
+  var unusedVar = 0
+  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
+
+  var notMutatedVar = 0
+  // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
+
+  var mutatedVar = 0
+  // expected-warning@-1 {{variable 'mutatedVar' was written to, but never read}}
+
+  func localFunc() {
+    _ = notMutatedVar
+    mutatedVar = 1
+  }
+}
+
+// False positive "'var' was never mutated" warning - rdar://60563962
+func testForwardReferenceCapture() {
+  func innerFunc() {
+    x = 10
+  }
+
+  var x: Int = 1
+  innerFunc()
+  print(x)
+}
+
+// rdar://47240768 Expand the definition of "simple" pattern to variables bound in patterns
+func testVariablesBoundInPatterns() {
+  enum StringB {
+    case simple(b: Bool)
+    case tuple(b: (Bool, Bool))
+    case optional(b: Bool?)
+  }
+
+  // Because Swift enables all kinds of creative binding forms, make sure that
+  // variable patterns occuring directly under a `let` or `var` have that
+  // introducer stripped by the fixit. All other cases are currently too
+  // complicated for the VarDeclUsageChecker.
+  switch StringB.simple(b: true) {
+  case .simple(b: let b) where false: // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    break
+  case .simple(b: var b) where false: // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    break
+  case var .simple(b: b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
+    break
+  case .tuple(b: let (b1, b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    break
+  case .tuple(b: (let b1, let b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    break
+  case .tuple(b: (var b1, var b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    break
+  case var .tuple(b: (b1, b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    break
+  case .tuple(b: let b): // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
+    break
+  case .optional(b: let x?) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    break
+  case .optional(b: let .some(x)) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
+    break
+  case let .optional(b: x?): // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    break
+  case let .optional(b: .none): // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
+    break
   }
 }

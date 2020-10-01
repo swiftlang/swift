@@ -17,20 +17,72 @@
 #ifndef SWIFT_AST_ASTTYPEIDS_H
 #define SWIFT_AST_ASTTYPEIDS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
+
 namespace swift {
 
+class AbstractFunctionDecl;
+class ActorIsolation;
+class ApplyExpr;
+enum class BodyInitKind;
+struct BodyInitKindAndExpr;
+class BraceStmt;
+class ClosureExpr;
+class CodeCompletionCallbacksFactory;
+class ConstructorDecl;
+class CustomAttr;
+class Decl;
+class EnumDecl;
+class FuncDecl;
+enum class FunctionBuilderBodyPreCheck : uint8_t;
+class GenericParamList;
+class GenericSignature;
+class GenericTypeParamType;
+class InfixOperatorDecl;
+class IterableDeclContext;
+class ModuleDecl;
+struct ImplicitImport;
+class NamedPattern;
 class NominalTypeDecl;
-struct PropertyBehaviorTypeInfo;
+class OperatorDecl;
+class OpaqueTypeDecl;
+class PatternBindingEntry;
+class ParamDecl;
+enum class ParamSpecifier : uint8_t;
+class PostfixOperatorDecl;
+class PrecedenceGroupDecl;
+class PrefixOperatorDecl;
+struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperTypeInfo;
+enum class CtorInitializerKind;
+struct PropertyWrapperLValueness;
+struct PropertyWrapperMutability;
+class ProtocolConformance;
+class ProtocolDecl;
+class Requirement;
+enum class ResilienceExpansion : unsigned;
+struct FragileFunctionKind;
+class SourceFile;
+class SymbolSourceMap;
+struct TangentPropertyInfo;
+class Type;
+class TypeAliasDecl;
+struct TypePair;
+struct TypeWitnessAndDecl;
+class ValueDecl;
 class VarDecl;
-
-#define SWIFT_AST_TYPEID_ZONE 1
+class Witness;
+enum class AncestryFlags : uint8_t;
+enum class ImplicitMemberAction : uint8_t;
+struct FingerprintAndMembers;
+class Identifier;
 
 // Define the AST type zone (zone 1)
-#define SWIFT_TYPEID_ZONE SWIFT_AST_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AST
 #define SWIFT_TYPEID_HEADER "swift/AST/ASTTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_ASTTYPEIDS_H */
+#endif // SWIFT_AST_ASTTYPEIDS_H

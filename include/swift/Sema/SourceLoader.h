@@ -13,6 +13,7 @@
 #ifndef SWIFT_SEMA_SOURCELOADER_H
 #define SWIFT_SEMA_SOURCELOADER_H
 
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 
 namespace swift {
@@ -24,22 +25,20 @@ class ModuleDecl;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
-  bool SkipBodies;
   bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
-                        bool skipBodies,
                         bool enableResilience,
                         DependencyTracker *tracker)
     : ModuleLoader(tracker), Ctx(ctx),
-      SkipBodies(skipBodies), EnableLibraryEvolution(enableResilience) {}
+      EnableLibraryEvolution(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool skipBodies, bool enableResilience,
+  create(ASTContext &ctx, bool enableResilience,
          DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, skipBodies, enableResilience, tracker)
+      new SourceLoader(ctx, enableResilience, tracker)
     };
   }
 
@@ -48,12 +47,17 @@ public:
   SourceLoader &operator=(const SourceLoader &) = delete;
   SourceLoader &operator=(SourceLoader &&) = delete;
 
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  virtual bool canImportModule(ImportPath::Element named) override;
 
   /// Import a module with the given module path.
   ///
@@ -66,7 +70,7 @@ public:
   /// returns NULL.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+             ImportPath::Module path) override;
 
   /// Load extensions to the given nominal type.
   ///
@@ -86,6 +90,13 @@ public:
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override
   {
     // Parsing populates the Objective-C method tables.
+  }
+
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate) override {
+    // FIXME: Implement?
+    return None;
   }
 };
 

@@ -14,7 +14,7 @@
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `Dictionary`.
-@_fixed_layout
+@frozen
 public // SPI(Foundation)
 struct _DictionaryBuilder<Key: Hashable, Value> {
   @usableFromInline
@@ -72,16 +72,14 @@ extension Dictionary {
   ///     closure must return the count of the initialized elements, starting at
   ///     the beginning of the buffer.
   @_alwaysEmitIntoClient // Introduced in 5.1
-  @inlinable
   public // SPI(Foundation)
   init(
     _unsafeUninitializedCapacity capacity: Int,
     allowingDuplicates: Bool,
     initializingWith initializer: (
       _ keys: UnsafeMutableBufferPointer<Key>,
-      _ values: UnsafeMutableBufferPointer<Value>,
-      _ initializedCount: inout Int
-    ) -> Void
+      _ values: UnsafeMutableBufferPointer<Value>
+    ) -> Int
   ) {
     self.init(_native: _NativeDictionary(
         _unsafeUninitializedCapacity: capacity,
@@ -92,23 +90,19 @@ extension Dictionary {
 
 extension _NativeDictionary {
   @_alwaysEmitIntoClient // Introduced in 5.1
-  @inlinable
   internal init(
     _unsafeUninitializedCapacity capacity: Int,
     allowingDuplicates: Bool,
     initializingWith initializer: (
       _ keys: UnsafeMutableBufferPointer<Key>,
-      _ values: UnsafeMutableBufferPointer<Value>,
-      _ initializedCount: inout Int
-    ) -> Void
+      _ values: UnsafeMutableBufferPointer<Value>
+    ) -> Int
   ) {
     self.init(capacity: capacity)
-    var initializedCount = 0
-    initializer(
+    let initializedCount = initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
-      UnsafeMutableBufferPointer(start: _values, count: capacity),
-      &initializedCount)
-    _precondition(count >= 0 && count <= capacity)
+      UnsafeMutableBufferPointer(start: _values, count: capacity))
+    _precondition(initializedCount >= 0 && initializedCount <= capacity)
     _storage._count = initializedCount
 
     // Hash initialized elements and move each of them into their correct

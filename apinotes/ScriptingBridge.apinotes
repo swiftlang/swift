@@ -1,5 +1,0 @@
----
-Name: ScriptingBridge
-Classes:
-- Name: SBElementArray
-  SwiftImportAsNonGeneric: true

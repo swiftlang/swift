@@ -95,14 +95,14 @@ bb0(%0 : $@thick Foo2.Type):
 sil hidden @_TF4test4mainFCS_3FooS0_ : $@convention(thin) (@owned Foo) -> @owned Foo {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo                           // id: %1
-  %2 = class_method %0 : $Foo, #Foo.doSomething!1 : (Foo) -> () -> Foo, $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %3
+  %2 = class_method %0 : $Foo, #Foo.doSomething : (Foo) -> () -> Foo, $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %3
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %5
   strong_release %0 : $Foo                        // id: %4
   return %3 : $Foo                                // id: %5
 }
 
 sil_vtable Foo2 {
-  #Foo.doSomething!1: @_TFC4test4Foo211doSomethingfS0_FT_CS_3Foo	// test.Foo2.doSomething (test.Foo2)() -> test.Foo
-  #Foo.init!initializer.1: @_TFC4test4Foo2cfMS0_FT_S0_	// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
-  #Foo2.deinit!deallocator.1: @_TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
+  #Foo.doSomething: @_TFC4test4Foo211doSomethingfS0_FT_CS_3Foo	// test.Foo2.doSomething (test.Foo2)() -> test.Foo
+  #Foo.init!initializer: @_TFC4test4Foo2cfMS0_FT_S0_	// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
+  #Foo2.deinit!deallocator: @_TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
 }

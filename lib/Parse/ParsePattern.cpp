@@ -19,6 +19,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -42,16 +44,9 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
     return DefaultArgumentKind::Normal;
 
   switch (magic->getKind()) {
-  case MagicIdentifierLiteralExpr::Column:
-    return DefaultArgumentKind::Column;
-  case MagicIdentifierLiteralExpr::File:
-    return DefaultArgumentKind::File;
-  case MagicIdentifierLiteralExpr::Line:
-    return DefaultArgumentKind::Line;
-  case MagicIdentifierLiteralExpr::Function:
-    return DefaultArgumentKind::Function;
-  case MagicIdentifierLiteralExpr::DSOHandle:
-    return DefaultArgumentKind::DSOHandle;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME: return DefaultArgumentKind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
   }
 
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
@@ -66,10 +61,31 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
 
 static ParserStatus parseDefaultArgument(
     Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
-    Expr *&init, Parser::ParameterContextKind paramContext) {
+    Expr *&init, bool &hasInheritedDefaultArg,
+    Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
-  SourceLoc equalLoc = P.consumeToken(tok::equal);
+  assert(P.Tok.is(tok::equal) ||
+       (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
+  SourceLoc equalLoc = P.consumeToken();
+
+  if (P.SF.Kind == SourceFileKind::Interface) {
+    // Swift module interfaces don't synthesize inherited intializers and
+    // instead include them explicitly in subclasses. Since the
+    // \c DefaultArgumentKind of these initializers is \c Inherited, this is
+    // represented textually as `= super` in the interface.
+
+    // If we're in a module interface and the default argument is exactly
+    // `super` (i.e. the token after that is `,` or `)` which end a parameter)
+    // report an inherited default argument to the caller and return.
+    if (P.Tok.is(tok::kw_super) && P.peekToken().isAny(tok::comma, tok::r_paren)) {
+      hasInheritedDefaultArg = true;
+      P.consumeToken(tok::kw_super);
+      P.SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
+      defaultArgs->HasDefaultArgument = true;
+      return ParserStatus();
+    }
+  }
 
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
@@ -92,12 +108,10 @@ static ParserStatus parseDefaultArgument(
   case Parser::ParameterContextKind::Operator:
   case Parser::ParameterContextKind::Initializer:
   case Parser::ParameterContextKind::EnumElement:
+  case Parser::ParameterContextKind::Subscript:
     break;
   case Parser::ParameterContextKind::Closure:
     diagID = diag::no_default_arg_closure;
-    break;
-  case Parser::ParameterContextKind::Subscript:
-    diagID = diag::no_default_arg_subscript;
     break;
   case Parser::ParameterContextKind::Curried:
     diagID = diag::no_default_arg_curried;
@@ -116,8 +130,10 @@ static ParserStatus parseDefaultArgument(
   
   defaultArgs->HasDefaultArgument = true;
 
-  if (initR.hasCodeCompletion())
+  if (initR.hasCodeCompletion()) {
+    init = initR.get();
     return makeParserCodeCompletionStatus();
+  }
 
   if (initR.isNull())
     return makeParserError();
@@ -141,6 +157,10 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
   const auto &nextTok = parser.peekToken();
   if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
+
+  if (parser.isOptionalToken(nextTok)
+      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+    return false;
 
   // The identifier could be a name or it could be a type. In a closure, we
   // assume it's a name, because the type can be inferred. Elsewhere, we
@@ -181,9 +201,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(leftParenLoc, diagnostic)
         .highlight({leftParenLoc, rightParenLoc});
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_delete)
-        .fixItRemoveChars(leftParenLoc, rightParenLoc);
+        .fixItRemoveChars(leftParenLoc,
+                          Lexer::getLocForEndOfToken(SourceMgr, rightParenLoc));
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_add_void)
-        .fixItInsert(leftParenLoc, "Void");
+        .fixItInsertAfter(leftParenLoc, "Void");
     }
     return ParserStatus();
   }
@@ -202,20 +223,18 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    bool FoundCCToken = false;
-    if (paramContext != ParameterContextKind::EnumElement)
-      parseDeclAttributeList(param.Attrs, FoundCCToken);
-    if (FoundCCToken) {
-      if (CodeCompletion) {
-        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), true);
-      } else {
-        status |= makeParserCodeCompletionStatus();
+    if (paramContext != ParameterContextKind::EnumElement) {
+      auto AttrStatus = parseDeclAttributeList(param.Attrs);
+      if (AttrStatus.hasCodeCompletion()) {
+        if (CodeCompletion)
+          CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
+        status.setHasCodeCompletionAndIsError();
       }
     }
     
-    // ('inout' | 'let' | 'var' | '__shared' | '__owned')?
+    // ('inout' | '__shared' | '__owned')?
     bool hasSpecifier = false;
-    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var) ||
+    while (Tok.is(tok::kw_inout) ||
            (Tok.is(tok::identifier) &&
             (Tok.getRawText().equals("__shared") ||
              Tok.getRawText().equals("__owned")))) {
@@ -223,24 +242,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
-          param.SpecifierKind = VarDecl::Specifier::InOut;
+          param.SpecifierKind = ParamDecl::Specifier::InOut;
           param.SpecifierLoc = consumeToken();
         } else if (Tok.is(tok::identifier) &&
                    Tok.getRawText().equals("__shared")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
-          param.SpecifierKind = VarDecl::Specifier::Shared;
+          param.SpecifierKind = ParamDecl::Specifier::Shared;
           param.SpecifierLoc = consumeToken();
         } else if (Tok.is(tok::identifier) &&
                    Tok.getRawText().equals("__owned")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
-          param.SpecifierKind = VarDecl::Specifier::Owned;
+          param.SpecifierKind = ParamDecl::Specifier::Owned;
           param.SpecifierLoc = consumeToken();
-        } else {
-          diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
-            .fixItRemove(Tok.getLoc());
-          consumeToken();
         }
         hasSpecifier = true;
       } else {
@@ -251,7 +266,14 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         consumeToken();
       }
     }
-
+    
+    // If let or var is being used as an argument label, allow it but
+    // generate a warning.
+    if (!isClosure && Tok.isAny(tok::kw_let, tok::kw_var)) {
+      diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
+        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
+    }
+    
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
@@ -303,8 +325,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
-        if (type.isParseError() && !type.hasCodeCompletion())
+        if (type.isNull() && !type.hasCodeCompletion())
           param.isInvalid = true;
+      } else if (paramContext != Parser::ParameterContextKind::Closure) {
+        diagnose(Tok, diag::expected_parameter_colon);
+        param.isInvalid = true;
       }
     } else {
       // Otherwise, we have invalid code.  Check to see if this looks like a
@@ -336,13 +361,28 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // on is most likely argument destructuring, we are going
         // to diagnose that after all of the parameters are parsed.
         if (param.Type) {
-          // Mark current parameter as invalid so it is possible
+          // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
-          param.isInvalid = true;
+          param.isPotentiallyDestructured = true;
           if (!isClosure) {
             // Unnamed parameters must be written as "_: Type".
             diagnose(typeStartLoc, diag::parameter_unnamed)
                 .fixItInsert(typeStartLoc, "_: ");
+          } else {
+            // Unnamed parameters were accidentally possibly accepted after
+            // SE-110 depending on the kind of declaration.  We now need to
+            // warn about the misuse of this syntax and offer to
+            // fix it.
+            // An exception to this rule is when the type is declared with type sugar
+            // Reference: SR-11724
+            if (isa<OptionalTypeRepr>(param.Type)
+                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .fixItInsert(typeStartLoc, "_: ");
+            } else {
+                diagnose(typeStartLoc, diag::parameter_unnamed_warn)
+                    .fixItInsert(typeStartLoc, "_: ");
+            }
           }
         }
       } else {
@@ -363,11 +403,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.EllipsisLoc = consumeToken();
     }
 
-    // ('=' expr)?
-    if (Tok.is(tok::equal)) {
+    // ('=' expr) or ('==' expr)?
+    bool isEqualBinaryOperator =
+        Tok.isBinaryOperator() && Tok.getText() == "==";
+    if (Tok.is(tok::equal) || isEqualBinaryOperator) {
       SourceLoc EqualLoc = Tok.getLoc();
-      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg, paramContext);
+
+      if (isEqualBinaryOperator) {
+        diagnose(Tok, diag::expected_assignment_instead_of_comparison_operator)
+            .fixItReplace(EqualLoc, "=");
+      }
+
+      status |= parseDefaultArgument(
+          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
+          param.hasInheritedDefaultArg, paramContext);
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
@@ -387,7 +436,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (Tok.getLoc() == StartLoc) {
       // If we took a default argument index for this parameter, but didn't add
       // one, then give it back.
-      if (defaultArgs) defaultArgs->NextIndex--;
+      if (defaultArgs) --defaultArgs->NextIndex;
       return status;
     }
 
@@ -441,19 +490,11 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default,
-                                     paramInfo.SpecifierLoc,
+    auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName,
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
-
-    auto setInvalid = [&]{
-      if (param->isInvalid())
-        return;
-      param->getTypeLoc().setInvalidType(ctx);
-      param->setInvalid();
-    };
 
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
@@ -464,25 +505,31 @@ mapParsedParameters(Parser &parser,
     
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
-      setInvalid();
-    
+      param->setInvalid();
+
+    // If we need to diagnose this parameter as a destructuring, propagate that
+    // to the decl.
+    // FIXME: This is a terrible way to catch this.
+    if (paramInfo.isPotentiallyDestructured)
+      param->setDestructured(true);
+
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (paramInfo.SpecifierKind == VarDecl::Specifier::InOut) {
+      if (paramInfo.SpecifierKind == ParamDecl::Specifier::InOut) {
         type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
                                                              "inout",
                                                              parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Shared) {
+      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Shared) {
         type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
                                                               "__shared",
                                                               parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == VarDecl::Specifier::Owned) {
+      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Owned) {
         type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
                                                              "__owned",
                                                              parsingEnumElt);
       }
-      param->getTypeLoc() = TypeLoc(type);
+      param->setTypeRepr(type);
 
       // If there is `@autoclosure` attribute associated with the type
       // let's mark that in the declaration as well, because it
@@ -495,41 +542,38 @@ mapParsedParameters(Parser &parser,
         // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
-    } else if (paramContext != Parser::ParameterContextKind::Closure) {
-      // Non-closure parameters require a type.
-      if (!param->isInvalid())
-        parser.diagnose(param->getLoc(), diag::missing_parameter_type);
-      
-      setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
       switch (paramInfo.SpecifierKind) {
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         specifier = "'inout'";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         specifier = "'shared'";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         specifier = "'owned'";
         break;
-      case VarDecl::Specifier::Let:
-      case VarDecl::Specifier::Var:
-        llvm_unreachable("can't have let or var here");
+      case ParamDecl::Specifier::Default:
+        llvm_unreachable("can't have default here");
         break;
       }
       parser.diagnose(paramInfo.SpecifierLoc, diag::specifier_must_have_type,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
-      paramInfo.SpecifierKind = VarDecl::Specifier::Default;
+      paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
+
+      param->setSpecifier(ParamSpecifier::Default);
+    } else {
+      param->setSpecifier(ParamSpecifier::Default);
     }
+
     return param;
   };
 
   // Collect the elements of the tuple patterns for argument and body
   // parameters.
   SmallVector<ParamDecl*, 4> elements;
-  SourceLoc ellipsisLoc;
 
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
@@ -580,40 +624,45 @@ mapParsedParameters(Parser &parser,
     }
 
     // Warn when an unlabeled parameter follows a variadic parameter
-    if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
-        param.FirstName.empty()) {
-      parser.diagnose(param.FirstNameLoc,
-                      diag::unlabeled_parameter_following_variadic_parameter);
+    if (!elements.empty() && elements.back()->isVariadic() && argName.empty()) {
+      // Closure parameters can't have external labels, so use a more specific
+      // diagnostic.
+      if (paramContext == Parser::ParameterContextKind::Closure)
+        parser.diagnose(
+            param.FirstNameLoc,
+            diag::closure_unlabeled_parameter_following_variadic_parameter);
+      else
+        parser.diagnose(param.FirstNameLoc,
+                        diag::unlabeled_parameter_following_variadic_parameter);
     }
-    
-    // If this parameter had an ellipsis, check whether it's the last parameter.
-    if (param.EllipsisLoc.isValid()) {
-      if (ellipsisLoc.isValid()) {
-        parser.diagnose(param.EllipsisLoc, diag::multiple_parameter_ellipsis)
-          .highlight(ellipsisLoc)
-          .fixItRemove(param.EllipsisLoc);
 
-        param.EllipsisLoc = SourceLoc();
-      } else if (!result->getTypeLoc().getTypeRepr()) {
+    // If this parameter had an ellipsis, check it has a TypeRepr.
+    if (param.EllipsisLoc.isValid()) {
+      if (!result->getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result->getSourceRange());
 
         param.EllipsisLoc = SourceLoc();
       } else {
-        ellipsisLoc = param.EllipsisLoc;
         result->setVariadic();
       }
     }
 
+    assert (((!param.DefaultArg &&
+              !param.hasInheritedDefaultArg) ||
+             paramContext == Parser::ParameterContextKind::Function ||
+             paramContext == Parser::ParameterContextKind::Operator ||
+             paramContext == Parser::ParameterContextKind::Initializer ||
+             paramContext == Parser::ParameterContextKind::EnumElement ||
+             paramContext == Parser::ParameterContextKind::Subscript) &&
+            "Default arguments are only permitted on the first param clause");
+
     if (param.DefaultArg) {
-      assert((paramContext == Parser::ParameterContextKind::Function ||
-              paramContext == Parser::ParameterContextKind::Operator ||
-              paramContext == Parser::ParameterContextKind::Initializer ||
-              paramContext == Parser::ParameterContextKind::EnumElement) &&
-             "Default arguments are only permitted on the first param clause");
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
-      result->setDefaultValue(param.DefaultArg);
+      result->setDefaultExpr(param.DefaultArg, /*isTypeChecked*/ false);
+    } else if (param.hasInheritedDefaultArg) {
+      result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
     }
 
     elements.push_back(result);
@@ -668,7 +717,7 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
                                  defaultArgs, paramContext);
-  
+
   // Turn the parameter clause into argument and body patterns.
   auto paramList = mapParsedParameters(*this, leftParenLoc, params,
                                        rightParenLoc, namePieces, paramContext);
@@ -712,7 +761,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments func-throws? func-signature-result?
+///     func-arguments 'async'? func-throws? func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -722,6 +771,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
+                               SourceLoc &asyncLoc,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
@@ -734,42 +784,13 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);
-  
-  // Check for the 'throws' keyword.
+
+  // Check for the 'async' and 'throws' keywords.
   rethrows = false;
-  if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeToken();
-  } else if (Tok.is(tok::kw_rethrows)) {
-    throwsLoc = consumeToken();
-    rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
-    throwsLoc = consumeToken();
-    diagnose(throwsLoc, diag::throw_in_function_type)
-      .fixItReplace(throwsLoc, "throws");
-  }
-
-  SourceLoc arrowLoc;
-
-  auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
-    if (throwsLoc.isValid())
-      return None;
-
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
-      rethrows = true;
-    }
-
-    if (!throwsLoc.isValid())
-      return None;
-
-    auto diag = rethrows ? diag::rethrows_in_wrong_position
-                         : diag::throws_in_wrong_position;
-    return diagnose(Tok, diag);
-  };
+  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
+  SourceLoc arrowLoc;
   if (Tok.isAny(tok::arrow, tok::colon)) {
     SyntaxParsingContext ReturnCtx(SyntaxContext, SyntaxKind::ReturnClause);
     if (!consumeIf(tok::arrow, arrowLoc)) {
@@ -781,41 +802,72 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Check for 'throws' and 'rethrows' after the arrow, but
     // before the type, and correct it.
-    if (auto diagOpt = diagnoseInvalidThrows()) {
-      assert(arrowLoc.isValid());
-      assert(throwsLoc.isValid());
-      (*diagOpt).fixItExchange(SourceRange(arrowLoc),
-                               SourceRange(throwsLoc));
-    }
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
-      parseType(diag::expected_type_function_result);
-    if (ResultType.hasCodeCompletion())
-      return ResultType;
+        parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();
-    if (!retType) {
-      Status.setIsParseError();
+    Status |= ResultType;
+    if (Status.isErrorOrHasCompletion())
       return Status;
-    }
+
+    // Check for 'throws' and 'rethrows' after the type and correct it.
+    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
   }
 
-  // Check for 'throws' and 'rethrows' after the type and correct it.
-  if (auto diagOpt = diagnoseInvalidThrows()) {
-    assert(arrowLoc.isValid());
-    assert(retType);
-    SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                      retType->getEndLoc());
-    SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
-    (*diagOpt).fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
-              .fixItRemoveChars(typeEndLoc, throwsEndLoc);
-  }
-
   return Status;
 }
 
+void Parser::parseAsyncThrows(
+    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    bool *rethrows) {
+  if (shouldParseExperimentalConcurrency() &&
+      Tok.isContextualKeyword("async")) {
+    asyncLoc = consumeToken();
+
+    if (existingArrowLoc.isValid()) {
+      diagnose(asyncLoc, diag::async_or_throws_in_wrong_position, 2)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(existingArrowLoc, "async ");
+    }
+  }
+
+  if (Tok.isAny(tok::kw_throws, tok::kw_throw, tok::kw_try) ||
+      (rethrows && Tok.is(tok::kw_rethrows))) {
+    // If we allowed parsing rethrows, record whether we did in fact parse it.
+    if (rethrows)
+      *rethrows = Tok.is(tok::kw_rethrows);
+
+    // Replace 'throw' or 'try' with 'throws'.
+    if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
+      diagnose(Tok, diag::throw_in_function_type)
+        .fixItReplace(Tok.getLoc(), "throws");
+    }
+
+    StringRef keyword = Tok.getText();
+    throwsLoc = consumeToken();
+
+    if (existingArrowLoc.isValid()) {
+      diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
+               rethrows ? (*rethrows ? 1 : 0) : 0)
+        .fixItRemove(throwsLoc)
+        .fixItInsert(existingArrowLoc, (keyword + " ").str());
+    }
+
+    if (shouldParseExperimentalConcurrency() &&
+        Tok.isContextualKeyword("async")) {
+      asyncLoc = consumeToken();
+
+      diagnose(asyncLoc, diag::async_after_throws, rethrows && *rethrows)
+        .fixItRemove(asyncLoc)
+        .fixItInsert(
+          existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
+    }
+  }
+}
 
 /// Parse a pattern with an optional type annotation.
 ///
@@ -829,10 +881,15 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     SyntaxParsingContext TypeAnnoCtx(SyntaxContext, SyntaxKind::TypeAnnotation);
     SourceLoc colonLoc = consumeToken(tok::colon);
     
-    if (result.isNull())  // Recover by creating AnyPattern.
-      result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
-    
-    ParserResult<TypeRepr> Ty = parseType();
+    if (result.isNull()) {
+      // Recover by creating AnyPattern.
+      auto *AP = new (Context) AnyPattern(colonLoc);
+      if (colonLoc.isInvalid())
+        AP->setImplicit();
+      result = makeParserErrorResult(AP);
+    }
+
+    ParserResult<TypeRepr> Ty = parseDeclResultType(diag::expected_type);
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (!Ty.isNull()) {
@@ -854,15 +911,15 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         SmallVector<Expr *, 2> args;
         SmallVector<Identifier, 2> argLabels;
         SmallVector<SourceLoc, 2> argLabelLocs;
-        Expr *trailingClosure;
+        SmallVector<TrailingClosure, 2> trailingClosures;
         ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                             /*isPostfix=*/true,
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure,
+                                            trailingClosures,
                                             SyntaxKind::Unknown);
-        if (status.isSuccess()) {
+        if (status.isSuccess() && !status.hasCodeCompletion()) {
           backtrack.cancelBacktrack();
           
           // Suggest replacing ':' with '='
@@ -892,10 +949,9 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///
 ParserResult<Pattern> Parser::parsePattern() {
   SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
-  bool isLet = (InVarOrLetPattern != IVOLP_InVar);
-  auto specifier = isLet
-    ? VarDecl::Specifier::Let
-    : VarDecl::Specifier::Var;
+  auto introducer = (InVarOrLetPattern != IVOLP_InVar
+                     ? VarDecl::Introducer::Let
+                     : VarDecl::Introducer::Var);
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
@@ -909,9 +965,9 @@ ParserResult<Pattern> Parser::parsePattern() {
         SF.Kind == SourceFileKind::Interface) {
       PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
       auto VD = new (Context) VarDecl(
-        /*IsStatic*/false, specifier, /*IsCaptureList*/false,
+        /*IsStatic*/false, introducer,
         consumeToken(tok::kw__), Identifier(), CurDeclContext);
-      return makeParserResult(new (Context) NamedPattern(VD, /*implicit*/true));
+      return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
@@ -921,9 +977,11 @@ ParserResult<Pattern> Parser::parsePattern() {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
-      diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
+      diagnoseConsecutiveIDs(name.str(), loc,
+                             introducer == VarDecl::Introducer::Let
+                             ? "constant" : "variable");
 
-    return makeParserResult(createBindingFromPattern(loc, name, specifier));
+    return makeParserResult(createBindingFromPattern(loc, name, introducer));
   }
     
   case tok::code_complete:
@@ -958,8 +1016,8 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                     subPattern.get()));
+    return makeParserResult(
+        new (Context) BindingPattern(varLoc, isLet, subPattern.get()));
   }
       
   default:
@@ -978,10 +1036,9 @@ ParserResult<Pattern> Parser::parsePattern() {
 }
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
-                                          VarDecl::Specifier specifier) {
-  auto var = new (Context) VarDecl(/*IsStatic*/false, specifier,
-                                   /*IsCaptureList*/false, loc, name,
-                                   CurDeclContext);
+                                          VarDecl::Introducer introducer) {
+  auto var = new (Context) VarDecl(/*IsStatic*/false, introducer,
+                                   loc, name, CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
@@ -1060,8 +1117,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 ///  pattern-type-annotation ::= (':' type)?
 ///
 ParserResult<Pattern> Parser::
-parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
-                                   bool isOptional) {
+parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   if (!Tok.is(tok::colon))
     return result;
 
@@ -1076,22 +1132,17 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   Pattern *P = result.get();
   ParserStatus status;
   if (result.hasCodeCompletion())
-    status.setHasCodeCompletion();
+    status.setHasCodeCompletionAndIsError();
 
   ParserResult<TypeRepr> Ty = parseType();
   if (Ty.hasCodeCompletion()) {
-    result.setHasCodeCompletion();
+    result.setHasCodeCompletionAndIsError();
     return result;
   }
 
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
     repr = new (Context) ErrorTypeRepr(PreviousLoc);
-
-  // In an if-let, the actual type of the expression is Optional of whatever
-  // was written.
-  if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
   return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }
@@ -1126,9 +1177,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
       return nullptr;
-    return makeParserResult(new (Context) IsPattern(isLoc, castType.get(),
-                                                    nullptr,
-                                                    CheckedCastKind::Unresolved));
+    auto *CastTE = new (Context) TypeExpr(castType.get());
+    return makeParserResult(new (Context) IsPattern(
+        isLoc, CastTE, nullptr, CheckedCastKind::Unresolved));
   }
 
   // matching-pattern ::= expr
@@ -1175,7 +1226,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
-  auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
+  auto *varP = new (Context) BindingPattern(varLoc, isLet, subPattern.get());
   return makeParserResult(ParserStatus(subPattern), varP);
 }
 

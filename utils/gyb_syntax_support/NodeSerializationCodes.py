@@ -1,4 +1,4 @@
-from Node import error
+from .Node import error
 
 
 SYNTAX_NODE_SERIALIZATION_CODES = {
@@ -30,6 +30,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InOutExpr': 25,
     'PoundColumnExpr': 26,
     'TryExpr': 27,
+    'AwaitExpr': 249,
     'IdentifierExpr': 28,
     'SuperRefExpr': 29,
     'NilLiteralExpr': 30,
@@ -66,7 +67,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'ForcedValueExpr': 61,
     'PostfixUnaryExpr': 62,
     'SpecializeExpr': 63,
-    'StringInterpolationExpr': 64,
     'KeyPathExpr': 65,
     'KeyPathBaseExpr': 66,
     'ObjcKeyPathExpr': 67,
@@ -98,8 +98,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CodeBlock': 93,
     'DeclNameArgument': 94,
     'DeclNameArguments': 95,
-    'FunctionCallArgument': 96,
-    'TupleElement': 97,
+    # removed: 'FunctionCallArgument': 96,
+    'TupleExprElement': 97,
     'ArrayElement': 98,
     'DictionaryElement': 99,
     'ClosureCaptureItem': 100,
@@ -166,11 +166,11 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AvailabilityVersionRestriction': 161,
     'VersionTuple': 162,
     'CodeBlockItemList': 163,
-    'FunctionCallArgumentList': 164,
-    'TupleElementList': 165,
+    # removed: 'FunctionCallArgumentList': 164,
+    'TupleExprElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
-    'StringInterpolationSegments': 168,
+    'StringLiteralSegments': 168,
     'DeclNameArgumentList': 169,
     'ExprList': 170,
     'ClosureCaptureItemList': 171,
@@ -232,6 +232,24 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
+    'SomeType': 230,
+    'CustomAttribute': 231,
+    'GenericRequirement': 232,
+    'DifferentiableAttributeArguments': 233,
+    'DifferentiabilityParamsClause': 234,
+    'DifferentiabilityParams': 235,
+    'DifferentiabilityParamList': 236,
+    'DifferentiabilityParam': 237,
+    # removed: 'DifferentiableAttributeFuncSpecifier': 238,
+    'FunctionDeclName': 239,
+    'PoundFilePathExpr': 240,
+    'DerivativeRegistrationAttributeArguments': 241,
+    'QualifiedDeclName': 242,
+    'CatchItem': 243,
+    'CatchItemList': 244,
+    'MultipleTrailingClosureElementList': 245,
+    'MultipleTrailingClosureElement': 246,
+    'PoundFileIDExpr': 247,
 }
 
 

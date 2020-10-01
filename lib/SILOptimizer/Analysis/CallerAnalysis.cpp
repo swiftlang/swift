@@ -14,7 +14,8 @@
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -32,7 +33,10 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
     : callerStates(),
       // TODO: Make this more aggressive by considering
       // final/visibility/etc.
-      mayHaveIndirectCallers(canBeCalledIndirectly(f->getRepresentation())) {}
+      mayHaveIndirectCallers(f->getDynamicallyReplacedFunction() ||
+                             canBeCalledIndirectly(f->getRepresentation())),
+      mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
+                             f->isAvailableExternally()) {}
 
 //===----------------------------------------------------------------------===//
 //                   CallerAnalysis::ApplySiteFinderVisitor
@@ -113,7 +117,7 @@ CallerAnalysis::ApplySiteFinderVisitor::~ApplySiteFinderVisitor() {
 bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
     FunctionRefBaseInst *fri) {
   auto optResult = findLocalApplySites(fri);
-  auto *calleeFn = fri->getReferencedFunction();
+  auto *calleeFn = fri->getInitiallyReferencedFunction();
   FunctionInfo &calleeInfo = analysis->unsafeGetFunctionInfo(calleeFn);
 
   // First make an edge from our callerInfo to our calleeState for invalidation

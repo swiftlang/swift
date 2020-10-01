@@ -1,6 +1,6 @@
-from Classification import classification_by_name
-from Node import error  # noqa: I201
-from kinds import lowercase_first_word  # noqa: I201
+from .Classification import classification_by_name
+from .Node import error  # noqa: I201
+from .kinds import lowercase_first_word  # noqa: I201
 
 
 class Token(object):
@@ -249,6 +249,8 @@ SYNTAX_TOKENS = [
 
     Punctuator('StringQuote', 'string_quote', text='\\\"',
                classification='StringLiteral', serialization_code=102),
+    Punctuator('SingleQuote', 'single_quote', text='\\\'',
+               classification='StringLiteral', serialization_code=120),
     Punctuator('MultilineStringQuote', 'multiline_string_quote',
                text='\\\"\\\"\\\"', classification='StringLiteral',
                serialization_code=103),
@@ -263,6 +265,10 @@ SYNTAX_TOKENS = [
                  serialization_code=73),
     PoundKeyword('PoundFile', 'file', text='#file',
                  serialization_code=68),
+    PoundKeyword('PoundFileID', 'fileID', text='#fileID',
+                 serialization_code=122),
+    PoundKeyword('PoundFilePath', 'filePath', text='#filePath',
+                 serialization_code=121),
     PoundKeyword('PoundColumn', 'column', text='#column',
                  serialization_code=70),
     PoundKeyword('PoundFunction', 'function', text='#function',
@@ -312,7 +318,7 @@ SYNTAX_TOKENS = [
             classification='StringLiteral', serialization_code=113),
 
     Misc('Unknown', 'unknown', serialization_code=115),
-    Misc('Identifier', 'identifier', classification=None,
+    Misc('Identifier', 'identifier', classification='Identifier',
          serialization_code=105),
     Misc('UnspacedBinaryOperator', 'oper_binary_unspaced',
          serialization_code=107),
@@ -324,6 +330,7 @@ SYNTAX_TOKENS = [
 
     Misc('ContextualKeyword', 'contextual_keyword', classification='Keyword',
          serialization_code=114),
+    Misc('RawStringDelimiter', 'raw_string_delimiter', serialization_code=119),
     Misc('StringSegment', 'string_segment', classification='StringLiteral',
          serialization_code=104),
     Misc('StringInterpolationAnchor', 'string_interpolation_anchor',

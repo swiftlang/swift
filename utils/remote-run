@@ -41,19 +41,19 @@ class CommandRunner(object):
     def send(self, local_to_remote_files):
         # Prepare the remote directory structure.
         # FIXME: This could be folded into the sftp connection below.
-        dirs_to_make = self._dirnames(local_to_remote_files.viewvalues())
+        dirs_to_make = self._dirnames(local_to_remote_files.values())
         self.run_remote(['/bin/mkdir', '-p'] + dirs_to_make)
 
         # Send the local files.
         sftp_commands = ("-put {0} {1}".format(quote(local_file), 
                                                quote(remote_file))
                          for local_file, remote_file
-                         in local_to_remote_files.viewitems())
+                         in local_to_remote_files.items())
         self.run_sftp(sftp_commands)
 
     def fetch(self, local_to_remote_files):
         # Prepare the local directory structure.
-        dirs_to_make = self._dirnames(local_to_remote_files.viewkeys())
+        dirs_to_make = self._dirnames(local_to_remote_files.keys())
         mkdir_command = ['/bin/mkdir', '-p'] + dirs_to_make
         if self.verbose:
             print(' '.join(mkdir_command), file=sys.stderr)
@@ -64,11 +64,11 @@ class CommandRunner(object):
         sftp_commands = ("-get {0} {1}".format(quote(remote_file), 
                                                quote(local_file))
                          for local_file, remote_file
-                         in local_to_remote_files.viewitems())
+                         in local_to_remote_files.items())
         self.run_sftp(sftp_commands)
 
     def run_remote(self, command, remote_env={}):
-        env_strings = ['{0}={1}'.format(k,v) for k,v in remote_env.viewitems()]
+        env_strings = ['{0}={1}'.format(k,v) for k,v in sorted(remote_env.items())]
         remote_invocation = self.remote_invocation(
             ['/usr/bin/env'] + env_strings + command)
         remote_proc = self.popen(remote_invocation, stdin=subprocess.PIPE,
@@ -89,12 +89,12 @@ class CommandRunner(object):
             print(concatenated_commands, file=sys.stderr)
         if self.dry_run:
             return
-        _, _ = sftp_proc.communicate(concatenated_commands)
+        _, _ = sftp_proc.communicate(concatenated_commands.encode('utf-8'))
         if sftp_proc.returncode:
             sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
-    def __init__(self, host, identity_path, ssh_options):
+    def __init__(self, host, identity_path, ssh_options, config_file):
         if ':' in host:
             (self.remote_host, self.port) = host.rsplit(':', 1)
         else:
@@ -102,9 +102,11 @@ class RemoteCommandRunner(CommandRunner):
             self.port = None
         self.identity_path = identity_path
         self.ssh_options = ssh_options
+        self.config_file = config_file
 
     def common_options(self, port_flag):
         port_option = [port_flag, self.port] if self.port else []
+        config_option = ['-F', self.config_file] if self.config_file else []
         identity_option = (
             ['-i', self.identity_path] if self.identity_path else [])
         # Interleave '-o' with each custom option.
@@ -113,7 +115,7 @@ class RemoteCommandRunner(CommandRunner):
         # https://spapas.github.io/2016/04/27/python-nested-list-comprehensions/
         extra_options = [arg for option in self.ssh_options
                              for arg in ["-o", option]]
-        return port_option + identity_option + extra_options
+        return port_option + identity_option + config_option + extra_options
 
     def remote_invocation(self, command):
         return (['/usr/bin/ssh', '-n'] +
@@ -122,7 +124,7 @@ class RemoteCommandRunner(CommandRunner):
                 [quote(arg) for arg in command])
 
     def sftp_invocation(self):
-        return (['/usr/bin/sftp', '-b', '-', '-q'] +
+        return (['/usr/bin/sftp', '-b', '-', '-q', '-r'] +
                 self.common_options(port_flag='-P') +
                 [self.remote_host])
 
@@ -172,6 +174,8 @@ def main():
 
     parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
                         help='an SSH identity file (private key) to use')
+    parser.add_argument('-F', '--config-file', dest='config_file', metavar='FILE',
+                        help='an SSH configuration file')
     parser.add_argument('-o', '--ssh-option', action='append', default=[],
                         dest='ssh_options', metavar='OPTION',
                         help='extra SSH config options (man ssh_config)')
@@ -192,7 +196,10 @@ def main():
         args.command.insert(0, args.host)
         del args.host
     else:
-        runner = RemoteCommandRunner(args.host, args.identity, args.ssh_options)
+        runner = RemoteCommandRunner(args.host,
+                                     args.identity,
+                                     args.ssh_options,
+                                     args.config_file)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
 
@@ -206,16 +213,16 @@ def main():
         remote_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
         input_files = find_transfers(args.command, args.input_prefix, 
                                      remote_dir)
-        assert not any(upload_files.has_key(f) for f in input_files)
+        assert not any(f in upload_files for f in input_files)
         upload_files.update(input_files)
     if args.output_prefix:
         assert not args.remote_output_prefix.startswith("..")
         remote_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
         test_files = find_transfers(args.command, args.output_prefix, 
                                     remote_dir)
-        assert not any(upload_files.has_key(f) for f in test_files)
+        assert not any(f in upload_files for f in test_files)
         upload_files.update(test_files)
-        assert not any(download_files.has_key(f) for f in test_files)
+        assert not any(f in download_files for f in test_files)
         download_files.update(test_files)
         remote_test_specific_dir = remote_dir
 

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked -Xllvm -sil-print-generic-specialization-loops -Xllvm -sil-print-generic-specialization-info %s 2>&1 | %FileCheck --check-prefix=CHECK %s
 
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+
 // Check that the generic specializer does not hang a compiler by
 // creating and infinite loop of generic specializations.
 

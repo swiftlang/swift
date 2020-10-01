@@ -34,7 +34,7 @@
 #ifndef SWIFT_BASIC_PREFIXMAP_H
 #define SWIFT_BASIC_PREFIXMAP_H
 
-#include "swift/Basic/Algorithm.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -52,8 +52,8 @@ template <class KeyElementType> class PrefixMapKeyPrinter;
 /// A map whose keys are sequences of comparable values, optimized for
 /// finding a mapped value for the longest matching initial subsequence.
 template <class KeyElementType, class ValueType,
-          size_t InlineKeyCapacity
-             = max<size_t>((sizeof(void*) - 1) / sizeof(KeyElementType), 1)>
+          size_t InlineKeyCapacity = std::max(
+              (sizeof(void *) - 1) / sizeof(KeyElementType), size_t(1))>
 class PrefixMap {
 public:
   using KeyType = ArrayRef<KeyElementType>;
@@ -66,8 +66,7 @@ public:
 private:
   template <typename T>
   union UninitializedStorage {
-    LLVM_ALIGNAS(alignof(T))
-    char Storage[sizeof(T)];
+    alignas(T) char Storage[sizeof(T)];
 
     template <typename... A>
     void emplace(A && ...value) {
@@ -642,7 +641,7 @@ public:
                          [&]() -> const ValueType & { return value; });
   }
 
-  void dump() const { print(llvm::errs()); }
+  SWIFT_DEBUG_DUMP { print(llvm::errs()); }
   void print(raw_ostream &out) const {
     printOpaquePrefixMap(out, Root,
                          [](raw_ostream &out, void *_node) {

@@ -1,3 +1,5 @@
+
+#if __has_include(<Foundation/Foundation.h>)
 #include <Foundation/Foundation.h>
 
 void slurpFastEnumerationOfArrayFromObjCImpl(id Array, id<NSFastEnumeration> FE,
@@ -16,4 +18,5 @@ void slurpFastEnumerationOfDictionaryFromObjCImpl(
     [KeyValuePairs addObject: NSD[Key]];
   }
 }
+#endif
 

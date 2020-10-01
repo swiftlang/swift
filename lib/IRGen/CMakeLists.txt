@@ -16,6 +16,8 @@ add_swift_host_library(swiftIRGen STATIC
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
+  GenDiffFunc.cpp
+  GenDiffWitness.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp
@@ -26,6 +28,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenMeta.cpp
   GenObjC.cpp
   GenOpaque.cpp
+  GenPointerAuth.cpp
   GenPoly.cpp
   GenProto.cpp
   GenReflection.cpp
@@ -39,6 +42,8 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenFunction.cpp
   IRGenMangler.cpp
   IRGenModule.cpp
+  IRGenSILPasses.cpp
+  IRGenRequests.cpp
   IRGenSIL.cpp
   Linking.cpp
   LoadableByAddress.cpp
@@ -48,22 +53,21 @@ add_swift_host_library(swiftIRGen STATIC
   Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TypeLayout.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
 
-  INTERFACE_LINK_LIBRARIES
-    # Clang dependencies.
-    # FIXME: Clang should really export these in some reasonable manner.
-    clangCodeGen
-    clangAST
-
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
     target
     transformutils
 )
+target_link_libraries(swiftIRGen INTERFACE
+  clangCodeGen
+  clangAST)
 target_link_libraries(swiftIRGen PRIVATE
   swiftAST
   swiftLLVMPasses
   swiftSIL
   swiftSILGen
-  swiftSILOptimizer)
+  swiftSILOptimizer
+  swiftTBDGen)

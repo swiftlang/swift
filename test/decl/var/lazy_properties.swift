@@ -29,7 +29,7 @@ class TestClass {
 
   lazy var d : Int  // expected-error {{lazy properties must have an initializer}} {{3-8=}}
 
-  lazy var (e, f) = (1,2)  // expected-error {{'lazy' cannot destructure an initializer}} {{3-8=}}
+  lazy var (e, f) = (1,2)  // expected-error 2{{'lazy' cannot destructure an initializer}} {{3-8=}}
 
   lazy var g = { 0 }()   // single-expr closure
 
@@ -41,9 +41,17 @@ class TestClass {
 
   lazy var k : Int = { () -> Int in return 0 }()+1  // multi-stmt closure
 
-  lazy var l : Int = 42 {  // expected-error {{lazy properties must not have observers}} {{3-8=}}
-    didSet {
-    }
+  lazy var l : Int = 42 {  // Okay
+    didSet {}
+    willSet {}
+  }
+
+  lazy var m : Int = 42 { // Okay
+    didSet {}
+  }
+
+  lazy var n : Int = 42 {
+    willSet {} // Okay
   }
 
   init() {
@@ -112,7 +120,7 @@ struct Outer {
 
     lazy var y = {_ = 3}()
     // expected-warning@-1 {{variable 'y' inferred to have type '()', which may be unexpected}}
-    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
   }
 }
 
@@ -180,4 +188,33 @@ class ReferenceStaticInLazyProperty {
 
   static var i = 42
   static func f() -> Int { return 0 }
+}
+
+// Explicit access to the lazy variable storage
+class LazyVarContainer {
+  lazy var foo: Int = {
+    return 0
+  }()
+
+  func accessLazyStorage() {
+    $__lazy_storage_$_foo = nil // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+    print($__lazy_storage_$_foo!) // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+    _ = $__lazy_storage_$_foo == nil // expected-error {{access to the underlying storage of a lazy property is not allowed}}
+  }
+}
+
+// Make sure we can still access a synthesized variable with the same name as a lazy storage variable
+// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
+// '__lazy_storage_$_{property_name}'.
+@propertyWrapper
+struct Wrapper {
+  var wrappedValue: Int { 1 }
+  var projectedValue: Int { 1 }
+}
+
+struct PropertyWrapperContainer {
+  @Wrapper var __lazy_storage_$_foo
+  func test() {
+    _ = $__lazy_storage_$_foo  // This is okay.
+  }
 }

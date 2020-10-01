@@ -11,8 +11,8 @@ func blackHole<T>(_ t: T) { }
 
 // CHECK-DAG: @"OBJC_CLASS_$_NSNumber" = external global %struct._class_t
 // CHECK-DAG: @"OBJC_CLASS_$_NSString" = external global %struct._class_t
-// CHECK-DAG: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* @"OBJC_CLASS_$_NSNumber", section "__DATA,__objc_classrefs,regular,no_dead_strip"
-// CHECK-DAG: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* @"OBJC_CLASS_$_NSString", section "__DATA,__objc_classrefs,regular,no_dead_strip"
+// CHECK-DAG: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = internal global %struct._class_t* @"OBJC_CLASS_$_NSNumber", section "__DATA,__objc_classrefs,regular,no_dead_strip"
+// CHECK-DAG: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = internal global %struct._class_t* @"OBJC_CLASS_$_NSString", section "__DATA,__objc_classrefs,regular,no_dead_strip"
 
 public func testLiterals() {
   blackHole(gadget.giveMeASelector())

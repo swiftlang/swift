@@ -16,7 +16,7 @@ import SwiftShims
 // StringGuts is a parameterization over String's representations. It provides
 // functionality and guidance for efficiently working with Strings.
 //
-@_fixed_layout
+@frozen
 public // SPI(corelibs-foundation)
 struct _StringGuts {
   @usableFromInline
@@ -37,9 +37,9 @@ struct _StringGuts {
 
 // Raw
 extension _StringGuts {
-  @inlinable
+  @inlinable @inline(__always)
   internal var rawBits: _StringObject.RawBitPattern {
-    @inline(__always) get { return _object.rawBits }
+    return _object.rawBits
   }
 }
 
@@ -78,34 +78,33 @@ extension _StringGuts {
 // Queries
 extension _StringGuts {
   // The number of code units
-  @inlinable
-  internal var count: Int { @inline(__always) get { return _object.count } }
+  @inlinable @inline(__always)
+  internal var count: Int { return _object.count }
 
-  @inlinable
-  internal var isEmpty: Bool { @inline(__always) get { return count == 0 } }
+  @inlinable @inline(__always)
+  internal var isEmpty: Bool { return count == 0 }
 
-  @inlinable
-  internal var isSmall: Bool {
-    @inline(__always) get { return _object.isSmall }
-  }
+  @inlinable @inline(__always)
+  internal var isSmall: Bool { return _object.isSmall }
 
+  @inline(__always)
   internal var isSmallASCII: Bool {
-    @inline(__always) get { return _object.isSmall && _object.smallIsASCII }
+    return _object.isSmall && _object.smallIsASCII
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var asSmall: _SmallString {
-    @inline(__always) get { return _SmallString(_object) }
+    return _SmallString(_object)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isASCII: Bool  {
-    @inline(__always) get { return _object.isASCII }
+    return _object.isASCII
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isFastASCII: Bool  {
-    @inline(__always) get { return isFastUTF8 && _object.isASCII }
+    return isFastUTF8 && _object.isASCII
   }
 
   @inline(__always)
@@ -121,8 +120,10 @@ extension _StringGuts {
 
   internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
 
+  // Whether this string has breadcrumbs
   internal var hasBreadcrumbs: Bool {
-    return hasNativeStorage || hasSharedStorage
+    return hasSharedStorage
+      || (hasNativeStorage && _object.nativeStorage.hasBreadcrumbs)
   }
 }
 
@@ -134,9 +135,9 @@ extension _StringGuts {
   internal var isFastUTF8: Bool { return _fastPath(_object.providesFastUTF8) }
 
   // A String which does not provide fast access to contiguous UTF-8 code units
-  @inlinable
+  @inlinable @inline(__always)
   internal var isForeign: Bool {
-    @inline(__always) get { return _slowPath(_object.isForeign) }
+     return _slowPath(_object.isForeign)
   }
 
   @inlinable @inline(__always)
@@ -179,7 +180,7 @@ extension _StringGuts {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if arch(i386) || arch(arm)
+    #if arch(i386) || arch(arm) || arch(wasm32)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
@@ -247,6 +248,15 @@ extension _StringGuts {
   internal func _foreignCopyUTF8(
     into mbp: UnsafeMutableBufferPointer<UInt8>
   ) -> Int? {
+    #if _runtime(_ObjC)
+    // Currently, foreign  means NSString
+    if let res = _cocoaStringCopyUTF8(_object.cocoaObject, into: mbp) {
+      return res
+    }
+    
+    // If the NSString contains invalid UTF8 (e.g. unpaired surrogates), we
+    // can get nil from cocoaStringCopyUTF8 in situations where a character by
+    // character loop would get something more useful like repaired contents
     var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
     var numWritten = 0
     for cu in String(self).utf8 {
@@ -255,15 +265,17 @@ extension _StringGuts {
       ptr += 1
       numWritten += 1
     }
-
+    
     return numWritten
+    #else
+    fatalError("No foreign strings on Linux in this version of Swift")
+    #endif
   }
 
+  @inline(__always)
   internal var utf8Count: Int {
-    @inline(__always) get {
-      if _fastPath(self.isFastUTF8) { return count }
-      return String(self).utf8.count
-    }
+    if _fastPath(self.isFastUTF8) { return count }
+    return String(self).utf8.count
   }
 }
 
@@ -272,13 +284,13 @@ extension _StringGuts {
   @usableFromInline
   internal typealias Index = String.Index
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var startIndex: String.Index {
-    @inline(__always) get { return Index(_encodedOffset: 0) }
+   return Index(_encodedOffset: 0)._scalarAligned
   }
-  @inlinable
+  @inlinable @inline(__always)
   internal var endIndex: String.Index {
-    @inline(__always) get { return Index(_encodedOffset: self.count) }
+    return Index(_encodedOffset: self.count)._scalarAligned
   }
 }
 
@@ -313,10 +325,10 @@ extension _StringGuts {
 public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
-  let count = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](repeating: 0, count: count + 1)
-  for i in 0..<count {
-    result[i] = s[i]
+  let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
+  let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
+    buf.baseAddress!.assign(from: s, count: bytesToCopy)
+    initedCount = bytesToCopy
   }
   return result
 }

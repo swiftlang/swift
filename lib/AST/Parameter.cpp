@@ -59,19 +59,17 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
-  bool withTypes = !options.contains(ParameterList::WithoutTypes);
   for (auto &decl : params) {
     bool hadDefaultArgument =
         decl->getDefaultArgumentKind() == DefaultArgumentKind::Normal;
 
-    decl = new (C) ParamDecl(decl, withTypes);
+    decl = ParamDecl::cloneWithoutType(C, decl);
     if (options & Implicit)
       decl->setImplicit();
 
-    // If the argument isn't named, and we're cloning for an inherited
-    // constructor, give the parameter a name so that silgen will produce a
-    // value for it.
-    if (decl->getName().empty() && (options & Inherited))
+    // If the argument isn't named, give the parameter a name so that
+    // silgen will produce a value for it.
+    if (decl->getName().empty() && (options & NamedArguments))
       decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
@@ -89,29 +87,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 
 void ParameterList::getParams(
                         SmallVectorImpl<AnyFunctionType::Param> &params) const {
-  getParams(params,
-            [](ParamDecl *decl) { return decl->getInterfaceType(); });
-}
-
-void ParameterList::getParams(
-                          SmallVectorImpl<AnyFunctionType::Param> &params,
-                          llvm::function_ref<Type(ParamDecl *)> getType) const {
-  if (size() == 0)
-    return;
-
-  for (auto P : *this) {
-    auto type = getType(P);
-
-    if (P->isVariadic())
-      type = ParamDecl::getVarargBaseTy(type);
-
-    auto label = P->getArgumentName();
-    auto flags = ParameterTypeFlags::fromParameterType(type,
-                                                       P->isVariadic(),
-                                                       P->isAutoClosure(),
-                                                       P->getValueOwnership());
-    params.emplace_back(type, label, flags);
-  }
+  for (auto P : *this)
+    params.push_back(P->toFunctionParam());
 }
 
 

@@ -11,27 +11,44 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/BlotMapVector.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
-//===----------------------------------------------------------------------===//
+// MaxLocalApplyRecurDepth limits the recursive analysis depth while
+// checking if a box can be promoted to stack. This is currently set to 4, a
+// limit assumed to be sufficient to handle typical call chain of local
+// functions through which a box can be passed.
+static llvm::cl::opt<unsigned> MaxLocalApplyRecurDepth(
+    "max-local-apply-recur-depth", llvm::cl::init(4),
+    llvm::cl::desc("Max recursive depth for analyzing local functions"));
+
+static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
+    "allocbox-to-stack-analyze-apply", llvm::cl::init(true),
+    llvm::cl::desc("Analyze functions into while alloc_box is passed"));
+
+//===-----------------------------------------------------------------------===//
 //                 SIL Utilities for alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
@@ -69,7 +86,7 @@ static bool useCaptured(Operand *UI) {
 
 // Is any successor of BB in the LiveIn set?
 static bool successorHasLiveIn(SILBasicBlock *BB,
-                               llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
+                               SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
   for (auto &Succ : BB->getSuccessors())
     if (LiveIn.count(Succ))
       return true;
@@ -79,11 +96,11 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
-static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
+static void propagateLiveness(SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
                               SILBasicBlock *DefBB) {
 
   // First populate a worklist of predecessors.
-  llvm::SmallVector<SILBasicBlock*, 64> Worklist;
+  SmallVector<SILBasicBlock *, 64> Worklist;
   for (auto *BB : LiveIn)
     for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
@@ -105,7 +122,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
 // Walk backwards in BB looking for strong_release, destroy_value, or
 // dealloc_box of the given value, and add it to releases.
 static bool addLastRelease(SILValue V, SILBasicBlock *BB,
-                           llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+                           SmallVectorImpl<SILInstruction *> &Releases) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I) ||
         isa<DestroyValueInst>(*I)) {
@@ -123,11 +140,10 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
 // Find the final releases of the alloc_box along any given path.
 // These can include paths from a release back to the alloc_box in a
 // loop.
-static bool
-getFinalReleases(SILValue Box,
-                 llvm::SmallVectorImpl<SILInstruction *> &Releases) {
-  llvm::SmallPtrSet<SILBasicBlock*, 16> LiveIn;
-  llvm::SmallPtrSet<SILBasicBlock*, 16> UseBlocks;
+static bool getFinalReleases(SILValue Box,
+                             SmallVectorImpl<SILInstruction *> &Releases) {
+  SmallPtrSet<SILBasicBlock *, 16> LiveIn;
+  SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
 
   auto *DefBB = Box->getParentBlock();
 
@@ -137,7 +153,7 @@ getFinalReleases(SILValue Box,
   // We'll treat this like a liveness problem where the alloc_box is
   // the def. Each block that has a use of the owning pointer has the
   // value live-in unless it is the block with the alloc_box.
-  llvm::SmallVector<Operand *, 32> Worklist(Box->use_begin(), Box->use_end());
+  SmallVector<Operand *, 32> Worklist(Box->use_begin(), Box->use_end());
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
@@ -155,8 +171,8 @@ getFinalReleases(SILValue Box,
     // If we have a copy value or a mark_uninitialized, add its uses to the work
     // list and continue.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
@@ -199,14 +215,14 @@ getFinalReleases(SILValue Box,
 /// sorting, uniquing at the appropriate time. The reason why it makes sense to
 /// just use a sorted vector with std::count is because generally functions do
 /// not have that many arguments and even fewer promoted arguments.
-using ArgIndexList = llvm::SmallVector<unsigned, 8>;
+using ArgIndexList = SmallVector<unsigned, 8>;
 
 static bool partialApplyEscapes(SILValue V, bool examineApply);
 
 /// Could this operand to an apply escape that function by being
 /// stored or returned?
 static bool applyArgumentEscapes(FullApplySite Apply, Operand *O) {
-  SILFunction *F = Apply.getReferencedFunction();
+  SILFunction *F = Apply.getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return true;
@@ -219,7 +235,7 @@ static bool applyArgumentEscapes(FullApplySite Apply, Operand *O) {
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
   SILModuleConventions ModConv(*V->getModule());
-  llvm::SmallVector<Operand *, 32> Worklist(V->use_begin(), V->use_end());
+  SmallVector<Operand *, 32> Worklist(V->use_begin(), V->use_end());
   while (!Worklist.empty()) {
     Operand *Op = Worklist.pop_back_val();
 
@@ -233,7 +249,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
     if (auto CVI = dyn_cast<CopyValueInst>(User)) {
-      copy(CVI->getUses(), std::back_inserter(Worklist));
+      llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -273,49 +289,91 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   return false;
 }
 
-static SILInstruction *findUnexpectedBoxUse(SILValue Box,
-                                            bool examinePartialApply,
-                                            bool inAppliedFunction,
-                                            llvm::SmallVectorImpl<Operand *> &);
+static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
+    SILValue Box, bool inAppliedFunction, SmallVectorImpl<Operand *> &,
+    SmallPtrSetImpl<SILFunction *> &, unsigned CurrentRecurDepth);
 
-/// checkPartialApplyBody - Check the body of a partial apply to see
+/// checkLocalApplyBody - Check the body of an apply's callee to see
 /// if the box pointer argument passed to it has uses that would
 /// disqualify it from being promoted to a stack location.  Return
-/// true if this partial apply will not block our promoting the box.
-static bool checkPartialApplyBody(Operand *O) {
-  SILFunction *F = ApplySite(O->getUser()).getReferencedFunction();
+/// true if this apply will not block our promoting the box.
+static bool checkLocalApplyBody(Operand *O,
+                                SmallVectorImpl<Operand *> &PromotedOperands,
+                                SmallPtrSetImpl<SILFunction *> &VisitedCallees,
+                                unsigned CurrentRecurDepth) {
+  SILFunction *F = ApplySite(O->getUser()).getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return false;
 
-  // We don't actually use these because we're not recursively
-  // rewriting the partial applies we find.
-  llvm::SmallVector<Operand *, 1> PromotedOperands;
+  // Since this function can be called recursively while analyzing the same box,
+  // mark the callee as visited, so that we don't end up in a recursive cycle.
+  auto iter = VisitedCallees.insert(F);
+  if (!iter.second)
+    return false;
+
   auto calleeArg = F->getArgument(ApplySite(O->getUser()).getCalleeArgIndex(*O));
-  return !findUnexpectedBoxUse(calleeArg, /* examinePartialApply = */ false,
-                               /* inAppliedFunction = */ true,
-                               PromotedOperands);
+  auto res = !recursivelyFindBoxOperandsPromotableToAddress(
+      calleeArg,
+      /* inAppliedFunction = */ true, PromotedOperands, VisitedCallees,
+      CurrentRecurDepth + 1);
+  return res;
+}
+
+// Returns true if a callee is eligible to be cloned and rewritten for
+// AllocBoxToStack opt. We don't want to increase code size, so this is
+// restricted only for private local functions currently.
+static bool isOptimizableApplySite(ApplySite Apply) {
+  if (!AllocBoxToStackAnalyzeApply) {
+    // turned off explicitly
+    return false;
+  }
+  auto callee = Apply.getReferencedFunctionOrNull();
+  if (!callee) {
+    return false;
+  }
+
+  // Callee should be optimizable.
+  if (!callee->shouldOptimize())
+    return false;
+
+  // External function definitions.
+  if (!callee->isDefinition())
+    return false;
+
+  // Do not optimize always_inlinable functions.
+  if (callee->getInlineStrategy() == Inline_t::AlwaysInline)
+    return false;
+
+  if (callee->getLinkage() != SILLinkage::Private)
+    return false;
+
+  return true;
 }
 
 /// Validate that the uses of a pointer to a box do not eliminate it from
-/// consideration for promotion to a stack element. Optionally examine the body
-/// of partial_apply to see if there is an unexpected use inside.  Return the
-/// instruction with the unexpected use if we find one.
-static SILInstruction *
-findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
-                     bool inAppliedFunction,
-                     llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
+/// consideration for promotion to a stack element. Return the instruction with
+/// the unexpected use if we find one.
+/// If a box has ApplySite users, we recursively examine the callees to check
+/// for unexpected use of the box argument. If all the callees through which the
+/// box is passed don't have any unexpected uses, `PromotedOperands` will be
+/// populated with the box arguments in DFS order.
+static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
+    SILValue Box, bool inAppliedFunction,
+    SmallVectorImpl<Operand *> &PromotedOperands,
+    SmallPtrSetImpl<SILFunction *> &VisitedCallees,
+    unsigned CurrentRecurDepth = 0) {
   assert((Box->getType().is<SILBoxType>()
           || Box->getType()
                  == SILType::getNativeObjectType(Box->getType().getASTContext()))
          && "Expected an object pointer!");
 
-  llvm::SmallVector<Operand *, 4> LocalPromotedOperands;
+  SmallVector<Operand *, 4> LocalPromotedOperands;
 
   // Scan all of the uses of the retain count value, collecting all
   // the releases and validating that we don't have an unexpected
   // user.
-  llvm::SmallVector<Operand *, 32> Worklist(Box->use_begin(), Box->use_end());
+  SmallVector<Operand *, 32> Worklist(Box->use_begin(), Box->use_end());
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     auto *User = Op->getUser();
@@ -328,23 +386,40 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
         (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
-    // If our user instruction is a copy_value or a marked_uninitialized, visit
+    // If our user instruction is a copy_value or a mark_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
-    // For partial_apply, if we've been asked to examine the body, the
-    // uses of the argument are okay there, and the partial_apply
-    // itself cannot escape, then everything is fine.
-    if (auto *PAI = dyn_cast<PartialApplyInst>(User))
-      if (examinePartialApply && checkPartialApplyBody(Op) &&
-          !partialApplyEscapes(PAI, /* examineApply = */ true)) {
-        LocalPromotedOperands.push_back(Op);
-        continue;
+    if (auto Apply = ApplySite::isa(User)) {
+      if (CurrentRecurDepth > MaxLocalApplyRecurDepth) {
+        return User;
       }
+      switch (Apply.getKind()) {
+      case ApplySiteKind::PartialApplyInst: {
+        if (checkLocalApplyBody(Op, LocalPromotedOperands, VisitedCallees,
+                                CurrentRecurDepth) &&
+            !partialApplyEscapes(cast<PartialApplyInst>(User),
+                                 /* examineApply = */ true)) {
+          LocalPromotedOperands.push_back(Op);
+          continue;
+        }
+        break;
+      }
+      case ApplySiteKind::ApplyInst:
+      case ApplySiteKind::BeginApplyInst:
+      case ApplySiteKind::TryApplyInst:
+        if (isOptimizableApplySite(Apply) &&
+            checkLocalApplyBody(Op, LocalPromotedOperands, VisitedCallees,
+                                CurrentRecurDepth)) {
+          LocalPromotedOperands.push_back(Op);
+          continue;
+        }
+      }
+    }
 
     return User;
   }
@@ -354,20 +429,42 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
   return nullptr;
 }
 
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
-                             llvm::SmallVectorImpl<Operand *> &PromotedOperands){
+                               SmallVectorImpl<Operand *> &PromotedOperands) {
+  SmallPtrSet<SILFunction *, 8> VisitedCallees;
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
-  if (auto *User = findUnexpectedBoxUse(ABI,
-                                        /* examinePartialApply = */ true,
-                                        /* inAppliedFunction = */ false,
-                                        PromotedOperands)) {
+  if (auto *User = recursivelyFindBoxOperandsPromotableToAddress(
+          ABI,
+          /* inAppliedFunction = */ false, PromotedOperands, VisitedCallees,
+          /* CurrentRecurDepth = */ 0)) {
     (void)User;
     // Otherwise, we have an unexpected use.
     LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
                << ABI->getFunction()->getName() << ": " << *ABI
                << "    Due to user: " << *User << "\n");
+
+    // Check if the vardecl has a "boxtostack.mustbeonstack" attribute. If so,
+    // emit a diagnostic.
+    if (auto *decl = ABI->getDecl()) {
+      if (decl->hasSemanticsAttr("boxtostack.mustbeonstack")) {
+        auto allocDiag =
+            diag::box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc;
+        diagnose(ABI->getModule().getASTContext(), ABI->getLoc().getSourceLoc(),
+                 allocDiag);
+        auto escapeNote = diag::
+            box_to_stack_cannot_promote_box_to_stack_due_to_escape_location;
+        diagnose(ABI->getModule().getASTContext(),
+                 User->getLoc().getSourceLoc(), escapeNote);
+      }
+    }
 
     return false;
   }
@@ -386,16 +483,15 @@ struct AllocBoxToStackState {
   SILFunctionTransform *T;
   bool CFGChanged = false;
 
-  llvm::SmallVector<AllocBoxInst *, 8> Promotable;
-  llvm::SmallVector<Operand *, 8> PromotedOperands;
+  SmallVector<AllocBoxInst *, 8> Promotable;
+  SmallVector<Operand *, 8> PromotedOperands;
 
   AllocBoxToStackState(SILFunctionTransform *T) : T(T) {}
 };
 } // anonymous namespace
 
 static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
-  llvm::SmallVector<Operand *, 8> Worklist(HeapBox->use_begin(),
-                                           HeapBox->use_end());
+  SmallVector<Operand *, 8> Worklist(HeapBox->use_begin(), HeapBox->use_end());
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
@@ -407,7 +503,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
     auto *CVI = dyn_cast<CopyValueInst>(Op->getUser());
     if (!CVI)
       continue;
-    copy(CVI->getUses(), std::back_inserter(Worklist));
+    llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
   }
 }
 
@@ -426,7 +522,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     }
   }
 
-  llvm::SmallVector<SILInstruction *, 4> FinalReleases;
+  SmallVector<SILInstruction *, 4> FinalReleases;
   if (!getFinalReleases(HeapBox, FinalReleases))
     return false;
 
@@ -436,8 +532,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
-      ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
-      ABI->getVarInfo());
+      ABI->getLoc(),
+      getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
+                         ABI->getBoxType(), ABI->getModule().Types, 0),
+      ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;
@@ -452,8 +550,9 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
-  auto &Lowering = ABI->getFunction()
-    ->getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
+  auto &Lowering = ABI->getFunction()->getTypeLowering(
+      getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
+                         ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
@@ -469,7 +568,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   // Remove any retain and release instructions.  Since all uses of project_box
   // are gone, this only walks through uses of the box itself (the retain count
   // pointer).
-  llvm::SmallVector<SILInstruction *, 8> Worklist;
+  SmallVector<SILInstruction *, 8> Worklist;
   std::transform(ABI->use_begin(), ABI->use_end(), std::back_inserter(Worklist),
                  [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
   while (!Worklist.empty()) {
@@ -478,8 +577,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     // Look through any mark_uninitialized, copy_values.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
       auto Inst = cast<SingleValueInstruction>(User);
-      transform(Inst->getUses(), std::back_inserter(Worklist),
-                [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
+      llvm::transform(Inst->getUses(), std::back_inserter(Worklist),
+                      [](Operand *Op) -> SILInstruction * {
+        return Op->getUser();
+      });
       Inst->replaceAllUsesWithUndef();
       Inst->eraseFromParent();
       continue;
@@ -509,12 +610,12 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 
   // The values in the original function that are promoted to stack
   // references.
-  llvm::SmallSet<SILValue, 4> OrigPromotedParameters;
+  SmallPtrSet<SILValue, 4> OrigPromotedParameters;
 
 public:
-  PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig, IsSerialized_t Serialized,
-                      ArgIndexList &PromotedArgIndices,
-                      llvm::StringRef ClonedName);
+  PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
+                      IsSerialized_t Serialized,
+                      ArgIndexList &PromotedArgIndices, StringRef ClonedName);
 
   void populateCloned();
 
@@ -524,13 +625,16 @@ private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
                                  SILFunction *Orig, IsSerialized_t Serialized,
                                  ArgIndexList &PromotedArgIndices,
-                                 llvm::StringRef ClonedName);
+                                 StringRef ClonedName);
 
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
   void visitDestroyValueInst(DestroyValueInst *Inst);
   void visitStrongRetainInst(StrongRetainInst *Inst);
   void visitCopyValueInst(CopyValueInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
+  void checkNoPromotedBoxInApply(ApplySite Apply);
+#define APPLYSITE_INST(Name, Parent) void visit##Name(Name *Inst);
+#include "swift/SIL/SILNodes.def"
 };
 } // end anonymous namespace
 
@@ -538,10 +642,9 @@ PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
                                          SILFunction *Orig,
                                          IsSerialized_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
-                                         llvm::StringRef ClonedName)
-    : SILClonerWithScopes<PromotedParamCloner>(
-          *initCloned(FuncBuilder, Orig, Serialized, PromotedArgIndices,
-                      ClonedName)),
+                                         StringRef ClonedName)
+    : SILClonerWithScopes<PromotedParamCloner>(*initCloned(
+          FuncBuilder, Orig, Serialized, PromotedArgIndices, ClonedName)),
       Orig(Orig), PromotedArgIndices(PromotedArgIndices) {
   NewPromotedArgs.reserve(PromotedArgIndices.size());
   assert(Orig->getDebugScope()->getParentFunction() !=
@@ -561,10 +664,11 @@ static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
 /// Create the function corresponding to the clone of the
 /// original closure with the signature modified to reflect promoted
 /// parameters (which are specified by PromotedArgIndices).
-SILFunction *PromotedParamCloner::
-initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
-           IsSerialized_t Serialized, ArgIndexList &PromotedArgIndices,
-           llvm::StringRef ClonedName) {
+SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
+                                             SILFunction *Orig,
+                                             IsSerialized_t Serialized,
+                                             ArgIndexList &PromotedArgIndices,
+                                             StringRef ClonedName) {
   SILModule &M = Orig->getModule();
 
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
@@ -574,14 +678,13 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
   unsigned Index = Orig->getConventions().getSILArgIndexOfFirstParam();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedArgIndices, Index)) {
-      auto boxTy = param.getSILStorageType().castTo<SILBoxType>();
+      auto boxTy = param.getSILStorageInterfaceType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
       SILType paramTy;
       {
-        Lowering::GenericContextScope scope(Orig->getModule().Types,
-                                            OrigFTI->getGenericSignature());
-        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+        auto &TC = Orig->getModule().Types;
+        paramTy = getSILBoxFieldType(TypeExpansionContext(*Orig), boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
@@ -595,11 +698,12 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
   // Create the new function type for the cloned function with some of
   // the parameters promoted.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), OrigFTI->getPatternSubstitutions(),
+      OrigFTI->getInvocationSubstitutions(), M.getASTContext(),
+      OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -607,11 +711,12 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = FuncBuilder.createFunction(
-      SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
-      Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      swift::getSpecializedLinkage(Orig, Orig->getLinkage()), ClonedName,
+      ClonedTy, Orig->getGenericEnvironment(), Orig->getLocation(),
+      Orig->isBare(), Orig->isTransparent(), Serialized, IsNotDynamic,
+      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
@@ -645,15 +750,19 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
+      auto promotedTy = getSILBoxFieldType(TypeExpansionContext(*Cloned), boxTy,
+                                           Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       OrigPromotedParameters.insert(*I);
 
       NewPromotedArgs[ArgNo] = promotedArg;
-
-      // All uses of the promoted box should either be projections, which are
-      // folded when visited, or copy/destroy operations which are ignored.
+      // We only promote boxes used in apply or projections or copy/destroy
+      // value operations.
+      // We should never see an apply user of the box, because we rewrite the
+      // applies and specialize the callees in dfs order.
+      // Projection users are folded when visited and copy/destroy operations
+      // are ignored.
       entryArgs.push_back(SILValue());
     } else {
       // Create a new argument which copies the original argument.
@@ -733,34 +842,63 @@ void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
   SILCloner<PromotedParamCloner>::visitProjectBoxInst(Inst);
 }
 
-/// Specialize a partial_apply by promoting the parameters indicated by
+// While cloning during specialization, make sure apply instructions do not have
+// box arguments that need to be promoted.
+// This is an assertion in debug builds only. The reason why this should never
+// be true is that we have cloned our callees in DFS order meaning that any of
+// our callees that had a promotable box will have already have been promoted
+// away by the time this runs.
+void PromotedParamCloner::checkNoPromotedBoxInApply(ApplySite Apply) {
+#ifndef NDEBUG
+  for (auto &O : Apply.getArgumentOperands()) {
+    assert(OrigPromotedParameters.count(O.get()) == 0);
+  }
+#endif
+}
+void PromotedParamCloner::visitApplyInst(ApplyInst *Inst) {
+  checkNoPromotedBoxInApply(Inst);
+  SILCloner<PromotedParamCloner>::visitApplyInst(Inst);
+}
+void PromotedParamCloner::visitBeginApplyInst(BeginApplyInst *Inst) {
+  checkNoPromotedBoxInApply(Inst);
+  SILCloner<PromotedParamCloner>::visitBeginApplyInst(Inst);
+}
+void PromotedParamCloner::visitPartialApplyInst(PartialApplyInst *Inst) {
+  checkNoPromotedBoxInApply(Inst);
+  SILCloner<PromotedParamCloner>::visitPartialApplyInst(Inst);
+}
+void PromotedParamCloner::visitTryApplyInst(TryApplyInst *Inst) {
+  checkNoPromotedBoxInApply(Inst);
+  SILCloner<PromotedParamCloner>::visitTryApplyInst(Inst);
+}
+
+/// Specialize ApplySite by promoting the parameters indicated by
 /// indices. We expect these parameters to be replaced by stack address
 /// references.
-static PartialApplyInst *
-specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
-                       PartialApplyInst *PartialApply,
-                       ArgIndexList &PromotedCalleeArgIndices,
-                       AllocBoxToStackState &pass) {
-  auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
-  assert(FRI && "Expected a direct partial_apply!");
-  auto *F = FRI->getReferencedFunction();
+static SILInstruction *
+specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
+                    ArgIndexList &PromotedCalleeArgIndices,
+                    AllocBoxToStackState &pass) {
+  auto *FRI = cast<FunctionRefInst>(Apply.getCallee());
+  assert(FRI && "Expected a direct ApplySite");
+  auto *F = FRI->getReferencedFunctionOrNull();
   assert(F && "Expected a referenced function!");
 
   IsSerialized_t Serialized = IsNotSerialized;
-  if (PartialApply->getFunction()->isSerialized())
+  if (Apply.getFunction()->isSerialized())
     Serialized = IsSerializable;
 
   std::string ClonedName =
     getClonedName(F, Serialized, PromotedCalleeArgIndices);
 
-  auto &M = PartialApply->getModule();
+  auto &M = Apply.getModule();
 
   SILFunction *ClonedFn;
   if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
     assert(PrevFn->isSerialized() == Serialized);
     ClonedFn = PrevFn;
   } else {
-    // Clone the function the existing partial_apply references.
+    // Clone the function the existing ApplySite references.
     PromotedParamCloner Cloner(FuncBuilder, F, Serialized,
                                PromotedCalleeArgIndices,
                                ClonedName);
@@ -769,95 +907,142 @@ specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
     pass.T->addFunctionToPassManagerWorklist(ClonedFn, F);
   }
 
-  // Now create the new partial_apply using the cloned function.
-  llvm::SmallVector<SILValue, 16> Args;
+  // Now create the new ApplySite using the cloned function.
+  SmallVector<SILValue, 16> Args;
 
   ValueLifetimeAnalysis::Frontier PAFrontier;
 
   // Promote the arguments that need promotion.
-  for (auto &O : PartialApply->getArgumentOperands()) {
+  for (auto &O : Apply.getArgumentOperands()) {
     auto CalleeArgIndex = ApplySite(O.getUser()).getCalleeArgIndex(O);
     if (!count(PromotedCalleeArgIndices, CalleeArgIndex)) {
       Args.push_back(O.get());
       continue;
     }
 
-    // If this argument is promoted, it is a box that we're turning into an
-    // address because we've proven we can keep this value on the stack. The
-    // partial_apply had ownership of this box so we must now release it
-    // explicitly when the partial_apply is released.
-    auto *Box = cast<SingleValueInstruction>(O.get());
-    assert((isa<AllocBoxInst>(Box) || isa<CopyValueInst>(Box)) &&
-           "Expected either an alloc box or a copy of an alloc box");
-    SILBuilder B(Box);
-    Args.push_back(B.createProjectBox(Box->getLoc(), Box, 0));
+    auto Box = O.get();
+    assert(((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
+             isa<CopyValueInst>(Box)) ||
+            isa<SILFunctionArgument>(Box)) &&
+           "Expected either an alloc box or a copy of an alloc box or a "
+           "function argument");
+    auto InsertPt = Box->getDefiningInsertionPoint();
+    assert(InsertPt);
+    SILBuilderWithScope B(InsertPt);
+    Args.push_back(B.createProjectBox(Box.getLoc(), Box, 0));
 
-    if (PAFrontier.empty()) {
-      ValueLifetimeAnalysis VLA(PartialApply);
-      pass.CFGChanged |= !VLA.computeFrontier(
-          PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
-      assert(!PAFrontier.empty() && "partial_apply must have at least one use "
-                                    "to release the returned function");
-    }
+    // For a partial_apply, if this argument is promoted, it is a box that we're
+    // turning into an address because we've proven we can keep this value on
+    // the stack. The partial_apply had ownership of this box so we must now
+    // release it explicitly when the partial_apply is released.
+    if (Apply.getKind() == ApplySiteKind::PartialApplyInst) {
+      if (PAFrontier.empty()) {
+        ValueLifetimeAnalysis VLA(cast<PartialApplyInst>(Apply));
+        pass.CFGChanged |= !VLA.computeFrontier(
+            PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
+        assert(!PAFrontier.empty() &&
+               "partial_apply must have at least one use "
+               "to release the returned function");
+      }
 
-    // Insert destroys of the box at each point where the partial_apply becomes
-    // dead.
-    for (SILInstruction *FrontierInst : PAFrontier) {
-      SILBuilderWithScope Builder(FrontierInst);
-      Builder.createDestroyValue(PartialApply->getLoc(), Box);
+      // Insert destroys of the box at each point where the partial_apply
+      // becomes dead.
+      for (SILInstruction *FrontierInst : PAFrontier) {
+        SILBuilderWithScope Builder(FrontierInst);
+        Builder.createDestroyValue(Apply.getLoc(), Box);
+      }
     }
   }
 
-  SILBuilderWithScope Builder(PartialApply);
+  auto ApplyInst = Apply.getInstruction();
+  SILBuilderWithScope Builder(ApplyInst);
 
-  // Build the function_ref and partial_apply.
-  SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
-                                                   ClonedFn);
-  return Builder.createPartialApply(
-      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutionMap(),
-      Args,
-      PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
+  // Build the function_ref and ApplySite.
+  SILValue FunctionRef = Builder.createFunctionRef(Apply.getLoc(), ClonedFn);
+  switch (Apply.getKind()) {
+  case ApplySiteKind::PartialApplyInst: {
+    auto *PAI = cast<PartialApplyInst>(ApplyInst);
+    return Builder.createPartialApply(
+        Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->isOnStack(),
+        GenericSpecializationInformation::create(ApplyInst, Builder));
+  }
+  case ApplySiteKind::ApplyInst:
+    return Builder.createApply(
+        Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        GenericSpecializationInformation::create(ApplyInst, Builder));
+  case ApplySiteKind::BeginApplyInst:
+    return Builder.createBeginApply(
+        Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        GenericSpecializationInformation::create(ApplyInst, Builder));
+  case ApplySiteKind::TryApplyInst: {
+    auto TAI = cast<TryApplyInst>(Apply);
+    return Builder.createTryApply(
+        Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        TAI->getNormalBB(), TAI->getErrorBB(),
+        GenericSpecializationInformation::create(ApplyInst, Builder));
+  }
+  }
 }
 
-static void rewritePartialApplies(AllocBoxToStackState &pass) {
-  llvm::DenseMap<PartialApplyInst *, ArgIndexList> IndexMap;
+static void rewriteApplySites(AllocBoxToStackState &pass) {
+  swift::SmallBlotMapVector<ApplySite, ArgIndexList, 8> AppliesToSpecialize;
   ArgIndexList Indices;
 
-  // Build a map from partial_apply to the indices of the operands
+  // Build a map from the ApplySite to the indices of the operands
   // that will be promoted in our rewritten version.
   for (auto *O : pass.PromotedOperands) {
-    auto CalleeArgIndexNumber = ApplySite(O->getUser()).getCalleeArgIndex(*O);
+    auto User = O->getUser();
+    auto Apply = ApplySite(User);
+
+    auto CalleeArgIndexNumber = Apply.getCalleeArgIndex(*O);
 
     Indices.clear();
     Indices.push_back(CalleeArgIndexNumber);
 
-    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    llvm::DenseMap<PartialApplyInst *, ArgIndexList>::iterator It;
-    bool Inserted;
-    std::tie(It, Inserted) = IndexMap.insert(std::make_pair(PartialApply,
-                                                            Indices));
-    if (!Inserted)
-      It->second.push_back(CalleeArgIndexNumber);
+    // AllocBoxStack opt promotes boxes passed to a chain of applies when it is
+    // safe to do so. All such applies have to be specialized to take pointer
+    // arguments instead of box arguments. This has to be done in dfs order.
+
+    // PromotedOperands is already populated in dfs order by
+    // `recursivelyFindBoxOperandsPromotableToAddress` w.r.t a single alloc_box.
+    // AppliesToSpecialize is then populated in the order of PromotedOperands.
+    // If multiple alloc_boxes are passed to the same apply instruction, then
+    // the apply instruction can appear multiple times in AppliesToSpecialize.
+    // Only its last appearance is maintained and previous appearances are
+    // blotted.
+    auto iterAndSuccess =
+        AppliesToSpecialize.insert(std::make_pair(Apply, Indices));
+    if (!iterAndSuccess.second) {
+      // Blot the previously inserted apply and insert at the end with updated
+      // indices
+      auto OldIndices = iterAndSuccess.first->getValue().second;
+      OldIndices.push_back(CalleeArgIndexNumber);
+      AppliesToSpecialize.erase(iterAndSuccess.first);
+      AppliesToSpecialize.insert(std::make_pair(Apply, OldIndices));
+    }
   }
 
-  // Clone the referenced function of each partial_apply, removing the
+  // Clone the referenced function of each ApplySite, removing the
   // operands that we will not need, and remove the existing
-  // partial_apply.
+  // ApplySite.
   SILOptFunctionBuilder FuncBuilder(*pass.T);
-  for (auto &It : IndexMap) {
-    auto *PartialApply = It.first;
-    auto &Indices = It.second;
-
+  for (auto &It : AppliesToSpecialize) {
+    if (!It.hasValue()) {
+      continue;
+    }
+    auto Apply = It.getValue().first;
+    auto Indices = It.getValue().second;
     // Sort the indices and unique them.
-    std::sort(Indices.begin(), Indices.end());
-    Indices.erase(std::unique(Indices.begin(), Indices.end()), Indices.end());
+    sortUnique(Indices);
 
-    PartialApplyInst *Replacement =
-      specializePartialApply(FuncBuilder, PartialApply, Indices, pass);
-    PartialApply->replaceAllUsesWith(Replacement);
+    auto *Replacement = specializeApplySite(FuncBuilder, Apply, Indices, pass);
+    assert(Apply.getKind() == ApplySite(Replacement).getKind());
+    Apply.getInstruction()->replaceAllUsesPairwiseWith(Replacement);
 
-    auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
-    PartialApply->eraseFromParent();
+    auto *FRI = cast<FunctionRefInst>(Apply.getCallee());
+    Apply.getInstruction()->eraseFromParent();
 
     // TODO: Erase from module if there are no more uses.
     if (FRI->use_empty())
@@ -868,9 +1053,9 @@ static void rewritePartialApplies(AllocBoxToStackState &pass) {
 /// Clone closure bodies and rewrite partial applies. Returns the number of
 /// alloc_box allocations promoted.
 static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
-  // First we'll rewrite any partial applies that we can to remove the
-  // box container pointer from the operands.
-  rewritePartialApplies(pass);
+  // First we'll rewrite any ApplySite that we can to remove
+  // the box container pointer from the operands.
+  rewriteApplySites(pass);
 
   unsigned Count = 0;
   auto rend = pass.Promotable.rend();

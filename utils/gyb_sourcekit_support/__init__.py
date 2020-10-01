@@ -14,9 +14,9 @@
 # utils/gyb_sourcekit_support/ directory as a module.
 #
 # ----------------------------------------------------------------------------
-from UIDs import UID_KEYS
-from UIDs import UID_KINDS
-from UIDs import UID_REQUESTS
+from .UIDs import UID_KEYS
+from .UIDs import UID_KINDS
+from .UIDs import UID_REQUESTS
 
 
 def check_uid_duplication():

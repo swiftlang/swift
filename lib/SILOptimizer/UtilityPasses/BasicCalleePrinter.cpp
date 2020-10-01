@@ -40,12 +40,7 @@ class BasicCalleePrinterPass : public SILModuleTransform {
     llvm::outs() << *FAS.getInstruction();
 
     auto Callees = BCA->getCalleeList(FAS);
-    llvm::outs() << "Incomplete callee list? : "
-                 << (Callees.isIncomplete() ? "Yes" : "No") << "\n";
-    llvm::outs() << "Known callees:\n";
-    for (auto *CalleeFn : Callees)
-      llvm::outs() << CalleeFn->getName() << "\n";
-    llvm::outs() << "\n";
+    Callees.print(llvm::outs());
   }
 
   /// The entry point to the transformation.

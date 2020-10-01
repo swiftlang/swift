@@ -11,7 +11,7 @@ static std::string replaceFromString(const std::string &S,
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(S, "");
 
   Buf = ide::replacePlaceholders(std::move(Buf), HadPH);
-  return Buf->getBuffer();
+  return Buf->getBuffer().str();
 }
 
 TEST(Placeholders, Replace) {
@@ -83,6 +83,6 @@ TEST(Placeholders, TooShort) {
     Source += "<##>\n";
   }
   std::string Out = replaceFromString(Source);
-  std::string Last = StringRef(Out).substr(Out.size()-15);
+  std::string Last(StringRef(Out).substr(Out.size()-15));
   EXPECT_EQ("$_99\n$___\n$___\n", Last);
 }

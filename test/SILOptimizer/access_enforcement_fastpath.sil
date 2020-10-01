@@ -1,0 +1,111 @@
+// RUN: %target-sil-opt -access-enforcement-opts -debug-only=access-enforcement-opts -verify %s -o /dev/null 2>&1 | %FileCheck %s
+//
+// REQUIRES: asserts
+//
+// This tests four kinds of AccessEnforcementOpts fast paths:
+//
+// 1. During identifyAccess, determine if there are either any
+// identical accesses or an accesses that aren't already marked
+// no_nested_storage. If there are neither, then skip the subsequent
+// data flow analysis.
+//
+// 2. In StorageSet, indicate whether identical storage was seen
+// elsewhere in the function. During dataflow, only add an access to
+// the out-of-scope access set if was marked as having identical
+// storage with another access.
+//
+// 3. If no access pairs can be merged, avoid analyzing SCC regions in
+// the control flow graph.
+//
+// 4. During data flow, don't track in scope conflicts for
+// instructions already marked [no_nested_conflict].
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class TestEarlyBail {
+  @_hasStorage var prop1: Int { get set }
+  @_hasStorage var prop2: Int { get set }
+}
+
+// All accesses are no_nested_conflict, and none are identical. Bail.
+// (1) Skipping AccessConflictAndMergeAnalysis...
+//
+// CHECK-LABEL: Running local AccessEnforcementOpts on testEarlyBail
+// CHECK-NOT: Processing
+// CHECK-NOT: No conflict on one path
+// CHECK-NOT: Folding
+// CHECK-NOT: Merging
+// CHECK: Skipping AccessConflictAndMergeAnalysis...
+sil @testEarlyBail : $@convention(method) (@owned TestEarlyBail) -> @owned TestEarlyBail {
+bb0(%0 : $TestEarlyBail):
+  %adr1 = ref_element_addr %0 : $TestEarlyBail, #TestEarlyBail.prop1
+  %a1 = begin_access [modify] [dynamic] [no_nested_conflict] %adr1 : $*Int
+  %v1 = load %a1 : $*Int
+  end_access %a1 : $*Int
+  %adr2 = ref_element_addr %0 : $TestEarlyBail, #TestEarlyBail.prop2
+  %a2 = begin_access [modify] [dynamic] [no_nested_conflict] %adr2 : $*Int
+  %v2 = load %a2 : $*Int
+  end_access %a2 : $*Int
+  return %0 : $TestEarlyBail
+}
+
+// An access is not marked no_nested_conflict. Need to run analysis.
+// NOT (1) Skipping AccessConflictAndMergeAnalysis...
+// (2) Ignoring unique access...
+// (3) Skipping SCC analysis...
+//
+// CHECK-LABEL: Running local AccessEnforcementOpts on testEarlyBailNeedsFolding
+// CHECK: Processing Function: testEarlyBailNeedsFolding
+// CHECK: No conflict on one path from   [[ACCESS:%.*]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK-NEXT:  to   end_access [[ACCESS]] : $*Int
+// CHECK: Ignoring unmergeable access: [[ACCESS]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK: Folding   [[ACCESS]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK: Skipping SCC Analysis...
+sil @testEarlyBailNeedsFolding : $@convention(method) (@owned TestEarlyBail) -> @owned TestEarlyBail {
+bb0(%0 : $TestEarlyBail):
+  %adr1 = ref_element_addr %0 : $TestEarlyBail, #TestEarlyBail.prop1
+  %a1 = begin_access [modify] [dynamic] %adr1 : $*Int
+  %v1 = load %a1 : $*Int
+  end_access %a1 : $*Int
+  return %0 : $TestEarlyBail
+}
+
+// Two accesses have the same storage. Need to run analysis.
+// NOT (1) Skipping AccessConflictAndMergeAnalysis...
+// NOT (2) Ignoring unique access...
+// (4) No Conflict On Path
+// (4) NOT No Conflict On Path
+// NOT (3) Skipping SCC analysis...
+//
+// CHECK-LABEL: Running local AccessEnforcementOpts on testEarlyBailMayMerge
+// CHECK: Processing Function: testEarlyBailMayMerge
+// CHECK: No conflict on one path from   [[ACCESS1:%.*]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK:  to end_access [[ACCESS1]] : $*Int
+// CHECK: Found mergable pair: [[ACCESS1]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK-NEXT: with [[ACCESS2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK-NOT: No conflict on one path from [[ACCESS2]]
+// CHECK: Ignoring unmergeable access: [[ACCESS2]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK-NOT: No conflict on one path from [[ACCESS2]]
+//
+// Note: The order that accesses with no nested conflicts are "Folded" is nondeterministic.
+// CHECK-DAG: Folding [[ACCESS1]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK-DAG: Folding [[ACCESS2]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK: Merging [[ACCESS2]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK-NEXT:  into [[ACCESS1]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
+// CHECK-NOT: Skipping SCC Analysis...
+sil @testEarlyBailMayMerge : $@convention(method) (@owned TestEarlyBail) -> @owned TestEarlyBail {
+bb0(%0 : $TestEarlyBail):
+  %adr1 = ref_element_addr %0 : $TestEarlyBail, #TestEarlyBail.prop1
+  %a1 = begin_access [modify] [dynamic] %adr1 : $*Int
+  %v1 = load %a1 : $*Int
+  end_access %a1 : $*Int
+  %adr2 = ref_element_addr %0 : $TestEarlyBail, #TestEarlyBail.prop1
+  %a2 = begin_access [modify] [dynamic] [no_nested_conflict] %adr2 : $*Int
+  %v2 = load %a2 : $*Int
+  end_access %a2 : $*Int
+  return %0 : $TestEarlyBail
+}

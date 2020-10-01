@@ -8,7 +8,7 @@ using llvm::SmallString;
 using namespace swift;
 using namespace swift::syntax;
 
-FunctionCallArgumentSyntax getCannedArgument() {
+TupleExprElementSyntax getCannedArgument() {
   auto X = SyntaxFactory::makeIdentifier("x", {}, {});
   auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
@@ -16,23 +16,23 @@ FunctionCallArgumentSyntax getCannedArgument() {
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
   auto NoComma = RawSyntax::missing(tok::comma, ",");
 
-  return SyntaxFactory::makeFunctionCallArgument(X, Colon, SymbolicRef, Comma);
+  return SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef, Comma);
 }
 
 TEST(SyntaxCollectionTests, empty) {
-  auto Empty = SyntaxFactory::makeBlankFunctionCallArgumentList();
+  auto Empty = SyntaxFactory::makeBlankTupleExprElementList();
   ASSERT_TRUE(Empty.empty());
   ASSERT_FALSE(Empty.appending(getCannedArgument()).empty());
 }
 
 TEST(SyntaxCollectionTests, size) {
-  auto Empty = SyntaxFactory::makeBlankFunctionCallArgumentList();
+  auto Empty = SyntaxFactory::makeBlankTupleExprElementList();
   ASSERT_EQ(Empty.size(), size_t(0));
   ASSERT_EQ(Empty.appending(getCannedArgument()).size(), size_t(1));
 }
 
 TEST(SyntaxCollectionTests, subscript) {
-  auto Empty = SyntaxFactory::makeBlankFunctionCallArgumentList();
+  auto Empty = SyntaxFactory::makeBlankTupleExprElementList();
 #ifndef NDEBUG
   ASSERT_DEATH({ Empty[0]; }, "");
 #endif
@@ -58,7 +58,7 @@ TEST(SyntaxCollectionTests, subscript) {
 TEST(SyntaxCollectionTests, appending) {
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg)
     .appending(Arg)
     .appending(Arg.withTrailingComma(NoComma));
@@ -86,11 +86,11 @@ TEST(SyntaxCollectionTests, appending) {
 
 TEST(SyntaxCollectionTests, removingLast) {
   ASSERT_DEATH({
-    SyntaxFactory::makeBlankFunctionCallArgumentList().removingLast();
+    SyntaxFactory::makeBlankTupleExprElementList().removingLast();
   }, "");
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg)
     .appending(Arg)
     .appending(Arg.withTrailingComma(NoComma))
@@ -104,7 +104,7 @@ TEST(SyntaxCollectionTests, removingLast) {
 TEST(SyntaxCollectionTests, prepending) {
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .prepending(Arg.withTrailingComma(NoComma))
     .prepending(Arg
                   .withLabel(SyntaxFactory::makeIdentifier("schwifty", {}, {})))
@@ -133,11 +133,11 @@ TEST(SyntaxCollectionTests, prepending) {
 
 TEST(SyntaxCollectionTests, removingFirst) {
   ASSERT_DEATH({
-    SyntaxFactory::makeBlankFunctionCallArgumentList().removingFirst();
+    SyntaxFactory::makeBlankTupleExprElementList().removingFirst();
   }, "");
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg
                  .withLabel(SyntaxFactory::makeIdentifier("schwifty", {}, {})))
     .appending(Arg)
@@ -154,14 +154,14 @@ TEST(SyntaxCollectionTests, inserting) {
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 #ifndef NDEBUG
   ASSERT_DEATH({
-    SyntaxFactory::makeBlankFunctionCallArgumentList().inserting(1, Arg);
+    SyntaxFactory::makeBlankTupleExprElementList().inserting(1, Arg);
   }, "");
 #endif
 
   {
     SmallString<48> InsertedScratch;
     llvm::raw_svector_ostream InsertedOS(InsertedScratch);
-    SyntaxFactory::makeBlankFunctionCallArgumentList()
+    SyntaxFactory::makeBlankTupleExprElementList()
       .inserting(0, Arg)
       .inserting(0, Arg)
       .inserting(0, Arg)
@@ -169,7 +169,7 @@ TEST(SyntaxCollectionTests, inserting) {
 
     SmallString<48> PrependedScratch;
     llvm::raw_svector_ostream PrependedOS(PrependedScratch);
-    SyntaxFactory::makeBlankFunctionCallArgumentList()
+    SyntaxFactory::makeBlankTupleExprElementList()
       .prepending(Arg)
       .prepending(Arg)
       .prepending(Arg)
@@ -180,7 +180,7 @@ TEST(SyntaxCollectionTests, inserting) {
   {
     SmallString<48> InsertedScratch;
     llvm::raw_svector_ostream InsertedOS(InsertedScratch);
-    SyntaxFactory::makeBlankFunctionCallArgumentList()
+    SyntaxFactory::makeBlankTupleExprElementList()
       .inserting(0, Arg)
       .inserting(1, Arg)
       .inserting(2, Arg)
@@ -188,7 +188,7 @@ TEST(SyntaxCollectionTests, inserting) {
 
     SmallString<48> AppendedScratch;
     llvm::raw_svector_ostream AppendedOS(AppendedScratch);
-    SyntaxFactory::makeBlankFunctionCallArgumentList()
+    SyntaxFactory::makeBlankTupleExprElementList()
       .appending(Arg)
       .appending(Arg)
       .appending(Arg)
@@ -199,7 +199,7 @@ TEST(SyntaxCollectionTests, inserting) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankFunctionCallArgumentList()
+    SyntaxFactory::makeBlankTupleExprElementList()
       .appending(Arg)
       .appending(Arg)
       .inserting(1,
@@ -214,7 +214,7 @@ TEST(SyntaxCollectionTests, cleared) {
   auto Arg = getCannedArgument();
   SmallString<1> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg)
     .appending(Arg)
     .appending(Arg)
@@ -228,7 +228,7 @@ TEST(SyntaxCollectionTests, cleared) {
 
 TEST(SyntaxCollectionTests, Iteration) {
   auto Arg = getCannedArgument();
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg)
     .appending(Arg)
     .appending(Arg);
@@ -260,7 +260,7 @@ TEST(SyntaxCollectionTests, Iteration) {
 
 TEST(SyntaxCollectionTests, Removing) {
   auto Arg = getCannedArgument();
-  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+  auto List = SyntaxFactory::makeBlankTupleExprElementList()
     .appending(Arg)
     .appending(Arg.withLabel(SyntaxFactory::makeIdentifier("first", {}, {})))
     .appending(Arg)
