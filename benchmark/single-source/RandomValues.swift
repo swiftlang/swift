@@ -19,18 +19,35 @@ import TestsUtils
 //
 
 public let RandomValues = [
-  BenchmarkInfo(name: "RandomIntegersDef", runFunction: run_RandomIntegersDef,
-    tags: [.api], legacyFactor: 100),
-  BenchmarkInfo(name: "RandomIntegersLCG", runFunction: run_RandomIntegersLCG,
-    tags: [.api]),
-  BenchmarkInfo(name: "RandomDoubleDef", runFunction: run_RandomDoubleDef,
-    tags: [.api], legacyFactor: 100),
-  BenchmarkInfo(name: "RandomDoubleLCG", runFunction: run_RandomDoubleLCG,
-    tags: [.api], legacyFactor: 2),
-  BenchmarkInfo(name: "RandomDoubleUnitDef", runFunction: run_RandomDoubleUnitDef,
-    tags: [.api], legacyFactor: 100),
-  BenchmarkInfo(name: "RandomDoubleUnitLCG", runFunction: run_RandomDoubleUnitLCG,
-    tags: [.api], legacyFactor: 2),
+  BenchmarkInfo(name: "RandomIntegersDef",
+    runFunction: run_RandomIntegersDef, tags: [.api], legacyFactor: 100),
+  
+  BenchmarkInfo(name: "RandomIntegersLCG",
+    runFunction: run_RandomIntegersLCG, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleDef",
+    runFunction: run_RandomDoubleDef, tags: [.api], legacyFactor: 100),
+  
+  BenchmarkInfo(name: "RandomDoubleLCG",
+    runFunction: run_RandomDoubleLCG, tags: [.api], legacyFactor: 2),
+  
+  BenchmarkInfo(name: "RandomDoubleUnitDef",
+    runFunction: run_RandomDoubleUnitDef, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleUnitLCG",
+    runFunction: run_RandomDoubleUnitLCG, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleBinadeDef",
+    runFunction: run_RandomDoubleBinadeDef, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleBinadeLCG",
+    runFunction: run_RandomDoubleBinadeLCG, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleAsymDef",
+    runFunction: run_RandomDoubleAsymDef, tags: [.api]),
+  
+  BenchmarkInfo(name: "RandomDoubleAsymLCG",
+    runFunction: run_RandomDoubleAsymLCG, tags: [.api]),
 ]
 
 /// A linear congruential PRNG.
@@ -112,6 +129,54 @@ public func run_RandomDoubleUnitLCG(_ N: Int) {
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 50_000 {
       x += Double.random(in: 0..<1, using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleBinadeDef(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    for _ in 0 ..< 1_000 {
+      x += Double.random(in: 1..<2)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleBinadeLCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    var generator = LCRNG(seed: 0)
+    for _ in 0 ..< 50_000 {
+      x += Double.random(in: 1..<2, using: &generator)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleAsymDef(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    let range = -(1.0.nextDown) ..< 0.126
+    for _ in 0 ..< 1_000 {
+      x += Double.random(in: range)
+    }
+    blackHole(x)
+  }
+}
+
+@inline(never)
+public func run_RandomDoubleAsymLCG(_ N: Int) {
+  for _ in 0 ..< N {
+    var x = 0.0
+    var generator = LCRNG(seed: 0)
+    let range = -(1.0.nextDown) ..< 0.126
+    for _ in 0 ..< 50_000 {
+      x += Double.random(in: range, using: &generator)
     }
     blackHole(x)
   }
