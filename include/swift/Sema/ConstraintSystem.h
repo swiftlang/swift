@@ -4706,7 +4706,7 @@ private:
     SmallVector<PotentialBinding, 4> Bindings;
 
     /// The set of protocol requirements placed on this type variable.
-    llvm::TinyPtrVector<Constraint *> Protocols;
+    llvm::SmallVector<Constraint *, 4> Protocols;
 
     /// The set of constraints which would be used to infer default types.
     llvm::TinyPtrVector<Constraint *> Defaults;

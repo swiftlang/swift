@@ -986,8 +986,13 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-    return false;
+  case ConstraintKind::SelfObjectOfProtocol: {
+    auto protocolTy = constraint->getSecondType();
+    if (!protocolTy->is<ProtocolType>())
+      return false;
+
+    LLVM_FALLTHROUGH;
+  }
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
