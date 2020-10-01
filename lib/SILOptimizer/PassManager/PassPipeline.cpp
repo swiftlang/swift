@@ -289,16 +289,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Split up operations on stack-allocated aggregates (struct, tuple).
   if (OpLevel == OptimizationLevelKind::HighLevel) {
     P.addEarlySROA();
   } else {
     P.addSROA();
   }
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Promote stack allocations to values.
   P.addMem2Reg();
