@@ -1466,6 +1466,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
 
 bool TermInst::isFunctionExiting() const {
   switch (getTermKind()) {
+  case TermKind::AwaitAsyncContinuationInst:
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchValueInst:
@@ -1490,6 +1491,7 @@ bool TermInst::isFunctionExiting() const {
 
 bool TermInst::isProgramTerminating() const {
   switch (getTermKind()) {
+  case TermKind::AwaitAsyncContinuationInst:
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchValueInst:
@@ -2920,3 +2922,44 @@ DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
   return ::new (Buffer)
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
+
+CanType GetAsyncContinuationInst::getFormalResumeType() const {
+  // The resume type is the type argument to the continuation type.
+  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
+}
+
+SILType GetAsyncContinuationInst::getLoweredResumeType() const {
+  // The lowered resume type is the maximally-abstracted lowering of the
+  // formal resume type.
+  auto formalType = getFormalResumeType();
+  auto &M = getFunction()->getModule();
+  auto c = getFunction()->getTypeExpansionContext();
+  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
+}
+
+bool GetAsyncContinuationInst::throws() const {
+  // The continuation throws if it's an UnsafeThrowingContinuation
+  return getType().castTo<BoundGenericType>()->getDecl()
+    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
+}
+
+CanType GetAsyncContinuationAddrInst::getFormalResumeType() const {
+  // The resume type is the type argument to the continuation type.
+  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
+}
+
+SILType GetAsyncContinuationAddrInst::getLoweredResumeType() const {
+  // The lowered resume type is the maximally-abstracted lowering of the
+  // formal resume type.
+  auto formalType = getFormalResumeType();
+  auto &M = getFunction()->getModule();
+  auto c = getFunction()->getTypeExpansionContext();
+  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
+}
+
+bool GetAsyncContinuationAddrInst::throws() const {
+  // The continuation throws if it's an UnsafeThrowingContinuation
+  return getType().castTo<BoundGenericType>()->getDecl()
+    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
+}
+

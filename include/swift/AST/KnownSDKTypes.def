@@ -1,0 +1,43 @@
+//===--- KnownSDKTypes.def - Common SDK types -----------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This xmacro generates code for common SDK types the
+//  compiler has special knowledge of.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef KNOWN_SDK_TYPE_DECL
+/// KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_ARGS)
+///
+/// The macro is expanded for each known SDK type. MODULE is
+/// bound to the name of the module the type comes from. NAME is bound to the
+/// unqualified name of the type. DECL_CLASS is bound to the Decl subclass it
+/// is expected to be an instance of. NUM_GENERIC_ARGS is the number of generic
+/// parameters the decl ought to have.
+#define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_ARGS)
+#endif
+
+KNOWN_SDK_TYPE_DECL(Foundation, NSCopying, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Foundation, NSError, ClassDecl, 0)
+KNOWN_SDK_TYPE_DECL(Foundation, NSNumber, ClassDecl, 0)
+KNOWN_SDK_TYPE_DECL(Foundation, NSValue, ClassDecl, 0)
+
+KNOWN_SDK_TYPE_DECL(ObjectiveC, NSObject, ClassDecl, 0)
+KNOWN_SDK_TYPE_DECL(ObjectiveC, Selector, StructDecl, 0)
+KNOWN_SDK_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl, 0)
+
+// TODO(async): These might move to the stdlib module when concurrency is
+// standardized
+KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 1)
+KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeThrowingContinuation, NominalTypeDecl, 1)
+
+#undef KNOWN_SDK_TYPE_DECL

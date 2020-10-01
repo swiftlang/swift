@@ -5239,6 +5239,81 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, witnessKind, witness, functionType);
       break;
     }
+    case SILInstructionKind::AwaitAsyncContinuationInst: {
+      // 'await_async_continuation' operand, 'resume' bb, 'error' bb
+      Identifier ResumeBBName, ErrorBBName{};
+      SourceLoc ResumeNameLoc, ErrorNameLoc{};
+      if (parseTypedValueRef(Val, B)
+          || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+          || P.parseSpecificIdentifier("resume", diag::expected_tok_in_sil_instr, "resume")
+          || parseSILIdentifier(ResumeBBName, ResumeNameLoc, diag::expected_sil_block_name)) {
+        return true;
+      }
+      
+      if (P.consumeIf(tok::comma)) {
+          if (P.parseSpecificIdentifier("error", diag::expected_tok_in_sil_instr, "error")
+              || parseSILIdentifier(ErrorBBName, ErrorNameLoc, diag::expected_sil_block_name)
+              || parseSILDebugLocation(InstLoc, B)) {
+            return true;
+          }
+      }
+      
+      SILBasicBlock *resumeBB, *errorBB = nullptr;
+      resumeBB = getBBForReference(ResumeBBName, ResumeNameLoc);
+      if (!ErrorBBName.empty()) {
+        errorBB = getBBForReference(ErrorBBName, ErrorNameLoc);
+      }
+      ResultVal = B.createAwaitAsyncContinuation(InstLoc, Val, resumeBB, errorBB);
+      break;
+    }
+    case SILInstructionKind::GetAsyncContinuationInst:
+    case SILInstructionKind::GetAsyncContinuationAddrInst: {
+      // 'get_async_continuation'      '[throws]'? type
+      // 'get_async_continuation_addr' '[throws]'? type ',' operand
+      bool throws = false;
+      if (P.consumeIf(tok::l_square)) {
+        if (P.parseToken(tok::kw_throws, diag::expected_tok_in_sil_instr, "throws")
+            || P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+          return true;
+        
+        throws = true;
+      }
+      
+      SILType resumeTy;
+      if (parseSILType(resumeTy)) {
+        return true;
+      }
+      
+      SILValue resumeBuffer;
+      if (Opcode == SILInstructionKind::GetAsyncContinuationAddrInst) {
+        if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+            || parseTypedValueRef(resumeBuffer, B)) {
+          return true;
+        }
+      }
+      
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      
+      auto &M = B.getModule();
+      NominalTypeDecl *continuationDecl = throws
+        ? M.getASTContext().getUnsafeThrowingContinuationDecl()
+        : M.getASTContext().getUnsafeContinuationDecl();
+      
+      auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
+                                                  resumeTy.getASTType());
+      auto continuationSILTy
+        = SILType::getPrimitiveObjectType(continuationTy->getCanonicalType());
+      
+      if (Opcode == SILInstructionKind::GetAsyncContinuationAddrInst) {
+        ResultVal = B.createGetAsyncContinuationAddr(InstLoc, resumeBuffer,
+                                                     continuationSILTy);
+      } else {
+        ResultVal = B.createGetAsyncContinuation(InstLoc, continuationSILTy);
+      }
+      break;
+    }
+
     }
 
     return false;

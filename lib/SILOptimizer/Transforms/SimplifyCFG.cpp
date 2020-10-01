@@ -2688,6 +2688,9 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;
+    case TermKind::AwaitAsyncContinuationInst:
+      // TODO(async): Simplify AwaitAsyncContinuationInst
+      break;
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);
