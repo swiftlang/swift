@@ -891,115 +891,6 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   return !fromContext.isContainedIn(containingContext);
 }
 
-
-SourceRange RequirementRepr::getSourceRange() const {
-  if (getKind() == RequirementReprKind::LayoutConstraint)
-    return SourceRange(FirstType->getSourceRange().Start,
-                       SecondLayout.getSourceRange().End);
-  return SourceRange(FirstType->getSourceRange().Start,
-                     SecondType->getSourceRange().End);
-}
-
-GenericParamList::GenericParamList(SourceLoc LAngleLoc,
-                                   ArrayRef<GenericTypeParamDecl *> Params,
-                                   SourceLoc WhereLoc,
-                                   MutableArrayRef<RequirementRepr> Requirements,
-                                   SourceLoc RAngleLoc)
-  : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
-    WhereLoc(WhereLoc), Requirements(Requirements),
-    OuterParameters(nullptr)
-{
-  std::uninitialized_copy(Params.begin(), Params.end(),
-                          getTrailingObjects<GenericTypeParamDecl *>());
-}
-
-GenericParamList *
-GenericParamList::create(ASTContext &Context,
-                         SourceLoc LAngleLoc,
-                         ArrayRef<GenericTypeParamDecl *> Params,
-                         SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
-  void *Mem = Context.Allocate(Size, alignof(GenericParamList));
-  return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
-                                    MutableArrayRef<RequirementRepr>(),
-                                    RAngleLoc);
-}
-
-GenericParamList *
-GenericParamList::create(const ASTContext &Context,
-                         SourceLoc LAngleLoc,
-                         ArrayRef<GenericTypeParamDecl *> Params,
-                         SourceLoc WhereLoc,
-                         ArrayRef<RequirementRepr> Requirements,
-                         SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
-  void *Mem = Context.Allocate(Size, alignof(GenericParamList));
-  return new (Mem) GenericParamList(LAngleLoc, Params,
-                                    WhereLoc,
-                                    Context.AllocateCopy(Requirements),
-                                    RAngleLoc);
-}
-
-GenericParamList *
-GenericParamList::clone(DeclContext *dc) const {
-  auto &ctx = dc->getASTContext();
-  SmallVector<GenericTypeParamDecl *, 2> params;
-  for (auto param : getParams()) {
-    auto *newParam = new (ctx) GenericTypeParamDecl(
-      dc, param->getName(), SourceLoc(),
-      GenericTypeParamDecl::InvalidDepth,
-      param->getIndex());
-    newParam->setImplicit(true);
-    params.push_back(newParam);
-  }
-
-  return GenericParamList::create(ctx, SourceLoc(), params, SourceLoc());
-}
-
-void GenericParamList::setDepth(unsigned depth) {
-  for (auto param : *this)
-    param->setDepth(depth);
-}
-
-void GenericParamList::setDeclContext(DeclContext *dc) {
-  for (auto param : *this)
-    param->setDeclContext(dc);
-}
-
-GenericTypeParamDecl *GenericParamList::lookUpGenericParam(
-    Identifier name) const {
-  for (const auto *innerParams = this;
-       innerParams != nullptr;
-       innerParams = innerParams->getOuterParameters()) {
-    for (auto *paramDecl : *innerParams) {
-      if (name == paramDecl->getName()) {
-        return const_cast<GenericTypeParamDecl *>(paramDecl);
-      }
-    }
-  }
-
-  return nullptr;
-}
-
-TrailingWhereClause::TrailingWhereClause(
-                       SourceLoc whereLoc,
-                       ArrayRef<RequirementRepr> requirements)
-  : WhereLoc(whereLoc),
-    NumRequirements(requirements.size())
-{
-  std::uninitialized_copy(requirements.begin(), requirements.end(),
-                          getTrailingObjects<RequirementRepr>());
-}
-
-TrailingWhereClause *TrailingWhereClause::create(
-                       ASTContext &ctx,
-                       SourceLoc whereLoc,
-                       ArrayRef<RequirementRepr> requirements) {
-  unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
-  void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
-  return new (mem) TrailingWhereClause(whereLoc, requirements);
-}
-
 GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
                                GenericParamList *Params)
     : _GenericContext(), DeclContext(Kind, Parent) {
@@ -5031,7 +4922,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
-      !module->getName().is("_Differentiation")) {
+      !module->getName().is("_Differentiation") &&
+      !module->getName().is("_Concurrency")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5077,6 +4969,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  case KnownProtocolKind::Actor:
+    return KnownDerivableProtocolKind::Actor;
   default: return None;
   }
 }
@@ -7487,6 +7381,56 @@ bool FuncDecl::isMainTypeMainMethod() const {
   return (getBaseIdentifier() == getASTContext().Id_main) &&
          !isInstanceMember() && getResultInterfaceType()->isVoid() &&
          getParameters()->size() == 0;
+}
+
+bool FuncDecl::isEnqueuePartialTaskName(ASTContext &ctx, DeclName name) {
+  if (name.isCompoundName() && name.getBaseName() == ctx.Id_enqueue) {
+    auto argumentNames = name.getArgumentNames();
+    return argumentNames.size() == 1 && argumentNames[0] == ctx.Id_partialTask;
+  }
+
+  return false;
+}
+
+bool FuncDecl::isActorEnqueuePartialTaskWitness() const {
+  if (!isEnqueuePartialTaskName(getASTContext(), getName()))
+    return false;
+
+  auto classDecl = getDeclContext()->getSelfClassDecl();
+  if (!classDecl)
+    return false;
+
+  if (!classDecl->isActor())
+    return false;
+
+  ASTContext &ctx = getASTContext();
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  if (!actorProto)
+    return false;
+
+  FuncDecl *requirement = nullptr;
+  for (auto protoMember : actorProto->getParsedMembers()) {
+    if (auto protoFunc = dyn_cast<FuncDecl>(protoMember)) {
+      if (isEnqueuePartialTaskName(ctx, protoFunc->getName())) {
+        requirement = protoFunc;
+        break;
+      }
+    }
+  }
+
+  if (!requirement)
+    return false;
+
+  SmallVector<ProtocolConformance *, 1> conformances;
+  classDecl->lookupConformance(
+      classDecl->getModuleContext(), actorProto, conformances);
+  for (auto conformance : conformances) {
+    auto witness = conformance->getWitnessDecl(requirement);
+    if (witness == this)
+      return true;
+  }
+
+  return false;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

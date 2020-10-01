@@ -1177,6 +1177,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
+
+  /// Actor enqueue(partialTask:).
+  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
 }
 
 /// The number of arguments that will be passed directly to a generic

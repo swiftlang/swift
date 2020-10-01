@@ -283,10 +283,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // splits up copy_addr.
   P.addCopyForwarding();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Optimize copies from a temporary (an "l-value") to a destination.
   P.addTempLValueOpt();
 
@@ -299,6 +295,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   } else {
     P.addSROA();
   }
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Promote stack allocations to values.
   P.addMem2Reg();

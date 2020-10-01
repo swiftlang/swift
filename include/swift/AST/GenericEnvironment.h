@@ -18,8 +18,9 @@
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/GenericParamList.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
