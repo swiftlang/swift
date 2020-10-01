@@ -2382,6 +2382,13 @@ createExtensionGenericParams(ASTContext &ctx,
                              NominalTypeDecl *nominal) {
   // Collect generic parameters from all outer contexts.
   SmallVector<GenericParamList *, 2> allGenericParams;
+
+  // If this is a parameterized extension, set those generic params as innermost
+  // parameters.
+  if (auto gpList = ext->getParsedGenericParams()) {
+    allGenericParams.push_back(gpList);
+  }
+
   nominal->forEachGenericContext([&](GenericParamList *gpList) {
     allGenericParams.push_back(gpList->clone(ext));
   });
@@ -2405,6 +2412,12 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     if (!nominal) {
       return nullptr;
     }
+
+    bool isParameterized = false;
+    if (ext->getParsedGenericParams()) {
+      isParameterized = true;
+    }
+
     auto *genericParams = createExtensionGenericParams(ctx, ext, nominal);
 
     // Protocol extensions need an inheritance clause due to how name lookup
@@ -2412,12 +2425,23 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     if (auto *proto = ext->getExtendedProtocolDecl()) {
       auto protoType = proto->getDeclaredInterfaceType();
       TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-      genericParams->getParams().front()->setInherited(
+      auto protoParams = genericParams;
+
+      if (isParameterized) {
+        protoParams = protoParams->getOuterParameters();
+      }
+
+      protoParams->getParams().front()->setInherited(
         ctx.AllocateCopy(selfInherited));
     }
 
     // Set the depth of every generic parameter.
     unsigned depth = nominal->getGenericContextDepth();
+
+    if (isParameterized) {
+      depth += 1;
+    }
+
     for (auto *outerParams = genericParams;
          outerParams != nullptr;
          outerParams = outerParams->getOuterParameters())

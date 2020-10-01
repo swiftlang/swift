@@ -2408,6 +2408,18 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    // First, if this extension is parameterized and isn't invalid, go ahead and
+    // compute the generic signature. This is important because the interface
+    // type could contain a generic parameter and we need to set depths of each
+    // parameter.
+    if (ED->isParameterized()) {
+      if (!ED->isInvalid()) {
+        (void) ED->getGenericSignature();
+      } else {
+        return;
+      }
+    }
+
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 

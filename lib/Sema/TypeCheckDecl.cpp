@@ -2769,14 +2769,6 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                     });
 }
 
-static bool isNonGenericTypeAliasType(Type type) {
-  // A non-generic typealias can extend a specialized type.
-  if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
-    return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
-
-  return false;
-}
-
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
@@ -2840,16 +2832,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-         .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // Cannot extend a bound generic type, unless it's referenced via a
-  // non-generic typealias type.
-  if (extendedType->isSpecialized() &&
-      !isNonGenericTypeAliasType(extendedType)) {
-    diags.diagnose(ext->getLoc(), diag::extension_specialization,
-                   extendedType->getAnyNominal()->getName())
          .highlight(extendedRepr->getSourceRange());
     return error();
   }

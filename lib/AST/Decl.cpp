@@ -1231,6 +1231,20 @@ bool ExtensionDecl::isEquivalentToExtendedContext() const {
     && !getDeclaredInterfaceType()->isExistentialType();
 }
 
+bool ExtensionDecl::isParameterized() const {
+  if (!hasBeenBound())
+    return getParsedGenericParams();
+
+  auto nominal = getExtendedNominal();
+  if (!nominal && getParsedGenericParams())
+    return true;
+
+  if (!nominal)
+    return false;
+
+  return getGenericContextDepth() != nominal->getGenericContextDepth();
+}
+
 AccessLevel ExtensionDecl::getDefaultAccessLevel() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
