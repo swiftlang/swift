@@ -367,12 +367,12 @@ issue noted in the prior section is that this constraint does not give
 the solver enough information to determine ``T0`` without
 guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
-
+```swift
   enum Optional<T> {
     case none
     case some(T)
   }
-
+```
 The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
 ``Optional<T>.some`` is ``(T) -> Optional<T>``. In fact, the
 type of an enum element can have one of two forms: it can be ``T0``,
@@ -388,12 +388,12 @@ The Swift language includes generics, a system of constrained
 parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
-
+```swift
   func min<T : Comparable>(x: T, y: T) -> T {
     if y < x { return y }
     return x
   }
-
+```
 Here, ``T`` is a generic parameter that can be replaced with any
 concrete type, so long as that type conforms to the protocol
 ``Comparable``. The type of ``min`` is (internally) written as ``<T :
@@ -424,11 +424,11 @@ cannot declare a variable of type ``<T> T -> T``.
 
 Uses of generic types are also immediately opened by the constraint
 solver. For example, consider the following generic dictionary type::
-
+```swift
   class Dictionary<Key : Hashable, Value> {
     // ...
   }
-
+```
 When the constraint solver encounters the expression ``Dictionary()``,
 it opens up the type ``Dictionary``---which has not
 been provided with any specific generic arguments---to the type
@@ -496,9 +496,9 @@ relationship constraints proceeds by comparing the structure of the
 two types and applying the typing rules of the Swift language to
 generate additional constraints. For example, if the constraint is a
 conversion constraint::
-
+```
   A -> B <c C -> D
-
+```
 then both types are function types, and we can break down this
 constraint into two smaller constraints ``C < A`` and ``B < D`` by
 applying the conversion rule for function types. Similarly, one can
@@ -715,7 +715,7 @@ well as during diagnostics emission, it is important to track the
 relationship between the constraints and the actual AST nodes from
 which they originally came. For example, consider the following type
 checking problem::
-```
+```swift
   struct X {
     // user-defined conversions
     func [conversion] __conversion () -> String { /* ... */ }
@@ -827,7 +827,7 @@ Simplification does not always exhaust the complete path. For example,
 consider a slight modification to our example, so that the argument to
 ``f`` is provided by another call, we get a different result
 entirely::
-```
+```swift
   func f(_ i : Int, s : String) { }
   func g() -> (f : Float, x : X) { }
 
@@ -844,9 +844,9 @@ argument" derivation step takes us to the argument expression
 element of ``g()``, because it's simple part of the tuple returned
 from ``g``. At this point, simplification ceases, and creates the
 simplified locator::
-
+```
   function application of g -> tuple element #0
-
+```
 ### Performance
 
 The performance of the type checker is dependent on a number of
