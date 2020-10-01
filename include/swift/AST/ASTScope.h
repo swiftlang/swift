@@ -29,7 +29,7 @@
 #define SWIFT_AST_AST_SCOPE_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/NameLookup.h" // for DeclVisibilityKind
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -1023,10 +1023,10 @@ class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
-  const DeclVisibilityKind vis;
+  const bool isLocalBinding;
 
   AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
-                            DeclVisibilityKind);
+                            bool);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -1043,8 +1043,8 @@ public:
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        DeclVisibilityKind vis)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
+                        bool isLocalBinding)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding) {}
   virtual ~PatternEntryDeclScope() {}
 
 protected:
@@ -1071,8 +1071,8 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 
 public:
   PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                               DeclVisibilityKind vis)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
+                               bool isLocalBinding)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding),
         initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 

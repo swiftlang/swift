@@ -293,8 +293,8 @@ bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool PatternEntryDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (vis != DeclVisibilityKind::LocalVariable)
-    return false; // look in self type will find this later
+  if (!isLocalBinding)
+    return false;
   return lookupLocalBindingsInPattern(getPattern(), consumer);
 }
 
