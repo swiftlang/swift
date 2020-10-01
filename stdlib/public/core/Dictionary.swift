@@ -866,7 +866,7 @@ extension Dictionary {
   ///     }
   ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
   ///
-  /// When `letterCounts[letter, defaultValue: 0] += 1` is executed with a
+  /// When `letterCounts[letter, default: 0] += 1` is executed with a
   /// value of `letter` that isn't already a key in `letterCounts`, the
   /// specified default value (`0`) is returned from the subscript,
   /// incremented, and then added to the dictionary under that key.
