@@ -5,7 +5,7 @@ struct S0<T> {
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
+  func foo(_ other: Self) { } // expected-error{{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 enum E0<T> {
@@ -47,7 +47,7 @@ final class FinalMario : Mario {
 
 class A<T> {
   typealias _Self = Self
-  // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
+  // expected-error@-1 {{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'A'?}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
@@ -55,7 +55,7 @@ class A<T> {
     b = a
   }
   static func z(n: Self? = nil) {
-    // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
+    // expected-error@-1 {{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'A'?}}
     print("\(Self.self).\(#function)")
   }
   class func y() {
