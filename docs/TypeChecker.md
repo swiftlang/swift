@@ -1,8 +1,7 @@
-Type Checker Design and Implementation
-========================================
+# Type Checker Design and Implementation
 
-Purpose
------------------
+
+## Purpose
 
 This document describes the design and implementation of the Swift
 type checker. It is intended for developers who wish to modify,
@@ -10,29 +9,28 @@ extend, or improve on the type checker, or simply to understand in
 greater depth how the Swift type system works. Familiarity with the
 Swift programming language is assumed.
 
-Approach
--------------------
+## Approach
 
 The Swift language and its type system incorporate a number of popular
 language features, including object-oriented programming via classes,
 function and operator overloading, subtyping, and constrained
 parametric polymorphism. Swift makes extensive use of type inference,
 allowing one to omit the types of many variables and expressions. For
-example::
-
+example:
+```swift
   func round(_ x: Double) -> Int { /* ... */ }
   var pi: Double = 3.14159
   var three = round(pi) // 'three' has type 'Int'
 
   func identity<T>(_ x: T) -> T { return x }
   var eFloat: Float = -identity(2.71828)  // numeric literal gets type 'Float'
-
+```
 Swift's type inference allows type information to flow in two
 directions. As in most mainstream languages, type information can flow
-from the leaves of the expression tree (e.g., the expression 'pi',
+from the leaves of the expression tree (e.g., the expression `pi`,
 which refers to a double) up to the root (the type of the variable
-'three'). However, Swift also allows type information to flow from the
-context (e.g., the fixed type of the variable 'eFloat') at the root of
+`three`). However, Swift also allows type information to flow from the
+context (e.g., the fixed type of the variable `eFloat`) at the root of
 the expression tree down to the leaves (the type of the numeric
 literal 2.71828). This bi-directional type inference is common in
 languages that use ML-like type systems, but is not present in
@@ -57,20 +55,20 @@ and vastly better diagnostics when the problem is limited in scope.
 
 Type checking proceeds in three main stages:
 
-`Constraint Generation`_
+[Constraint Generation](#Constraint-Generation)
   Given an input expression and (possibly) additional contextual
   information, generate a set of type constraints that describes the
   relationships among the types of the various subexpressions. The
   generated constraints may contain unknown types, represented by type
   variables, which will be determined by the solver.
 
-`Constraint Solving`_
+[Constraint Solving](#Constraint-Generation)
   Solve the system of constraints by assigning concrete types to each
   of the type variables in the constraint system. The constraint
   solver should provide the most specific solution possible among
   different alternatives.
 
-`Solution Application`_
+[Solution Application](#Solution-Application)
   Given the input expression, the set of type constraints generated
   from that expression, and the set of assignments of concrete types
   to each of the type variables, produce a well-typed expression that
@@ -80,8 +78,8 @@ Type checking proceeds in three main stages:
 The following sections describe these three stages of type checking,
 as well as matters of performance and diagnostics.
 
-Constraints
-----------------
+## Constraints
+
 A constraint system consists of a set of type constraints. Each type
 constraint either places a requirement on a single type (e.g., it is
 an integer literal type) or relates two types (e.g., one is a subtype
@@ -103,14 +101,14 @@ the Swift type system:
   ``T1`` get the same concrete type binding. There are two different
   flavors of equality constraints:
 
-    - Exact equality constraints, or  "binding", written ``T0 := X``
-      for some type variable ``T0`` and type ``X``, which requires
-      that ``T0`` be exactly identical to ``X``;
-    - Equality constraints, written ``X == Y`` for types ``X`` and
-      ``Y``, which require ``X`` and ``Y`` to have the same type,
-      ignoring lvalue types in the process. For example, the
-      constraint ``T0 == X`` would be satisfied by assigning ``T0``
-      the type ``X`` and by assigning ``T0`` the type ``@lvalue X``.
+  - Exact equality constraints, or  "binding", written ``T0 := X``
+    for some type variable ``T0`` and type ``X``, which requires
+    that ``T0`` be exactly identical to ``X``;
+  - Equality constraints, written ``X == Y`` for types ``X`` and
+    ``Y``, which require ``X`` and ``Y`` to have the same type,
+    ignoring lvalue types in the process. For example, the
+    constraint ``T0 == X`` would be satisfied by assigning ``T0``
+    the type ``X`` and by assigning ``T0`` the type ``@lvalue X``.
 
 **Subtyping**
   A subtype constraint requires the first type to be equivalent to or
@@ -193,8 +191,8 @@ the Swift type system:
   A constraint that requires that the constrained type be
   DynamicLookup or an lvalue thereof.
 
-Constraint Generation
-``````````````````````````
+### Constraint Generation
+
 The process of constraint generation produces a constraint system
 that relates the types of the various subexpressions within an
 expression. Programmatically, constraint generation walks an
@@ -218,10 +216,10 @@ and types generated from the primary expression kinds are:
 
   When a name refers to a set of overloaded declarations, the
   selection of the appropriate declaration is handled by the
-  solver. This particular issue is discussed in the `Overloading`_
+  solver. This particular issue is discussed in the [Overloading](#Overloading)
   section. Additionally, when the name refers to a generic function or
   a generic type, the declaration reference may introduce new type
-  variables; see the `Polymorphic Types`_ section for more information.
+  variables; see the [Polymorphic Types](#Polymorphic-Types) section for more information.
 
 **Member reference**
   A member reference expression ``a.b`` is assigned the type ``T0``
@@ -233,7 +231,7 @@ and types generated from the primary expression kinds are:
 
   Note that resolution of the member constraint can refer to a set of
   overloaded declarations; this is described further in the
-  `Overloading`_ section.
+  [Overloading](#Overloading) section.
 
 **Unresolved member reference**
   An unresolved member reference ``.name`` refers to a member of a
@@ -249,7 +247,7 @@ and types generated from the primary expression kinds are:
 
   Note that the constraint system above actually has insufficient
   information to determine the type ``T0`` without additional
-  contextual information. The `Overloading`_ section describes how the
+  contextual information. The [Overloading](#Overloading) section describes how the
   overload-selection mechanism is used to resolve this problem.
 
 **Function application**
@@ -327,8 +325,7 @@ and types generated from the primary expression kinds are:
 There are a number of other expression kinds within the language; see
 the constraint generator for their mapping to constraints.
 
-Overloading
-''''''''''''''''''''''''''
+#### Overloading
 
 Overloading is the process of giving multiple, different definitions
 to the same name. For example, we might overload a ``negate`` function
@@ -351,10 +348,12 @@ in which each term binds that type variable (via an exact equality
 constraint) to the type produced by one of the overloads in the
 overload set. In our negate example, the disjunction is
 ``T0 := (Int) -> Int or T0 := (Double) -> Double``. The constraint
-solver, discussed in the later section on `Constraint Solving`_,
+solver, discussed in the later section on [Constraint Solving](#Constraint-Solving),
 explores both possible bindings, and the overloaded reference resolves
 to whichever binding results in a solution that satisfies all
-constraints [#]_.
+constraints. It is possible that both overloads will result in a solution,
+in which case the solutions will be ranked based on the rules
+discussed in the section [Comparing Solutions](#Comparing-Solutions).
 
 Overloading can be introduced both by expressions that refer to sets
 of overloaded declarations and by member constraints that end up
@@ -368,12 +367,12 @@ issue noted in the prior section is that this constraint does not give
 the solver enough information to determine ``T0`` without
 guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
-
+```swift
   enum Optional<T> {
     case none
     case some(T)
   }
-
+```
 The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
 ``Optional<T>.some`` is ``(T) -> Optional<T>``. In fact, the
 type of an enum element can have one of two forms: it can be ``T0``,
@@ -383,19 +382,18 @@ latter case, the actual arguments are parsed as part of the unresolved
 member reference, so that a function application constraint describes
 their conversion to the input type ``T2``.
 
-Polymorphic Types
-''''''''''''''''''''''''''''''''''''''''''''''
+#### Polymorphic Types
 
 The Swift language includes generics, a system of constrained
 parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
-
+```swift
   func min<T : Comparable>(x: T, y: T) -> T {
     if y < x { return y }
     return x
   }
-
+```
 Here, ``T`` is a generic parameter that can be replaced with any
 concrete type, so long as that type conforms to the protocol
 ``Comparable``. The type of ``min`` is (internally) written as ``<T :
@@ -426,11 +424,11 @@ cannot declare a variable of type ``<T> T -> T``.
 
 Uses of generic types are also immediately opened by the constraint
 solver. For example, consider the following generic dictionary type::
-
+```swift
   class Dictionary<Key : Hashable, Value> {
     // ...
   }
-
+```
 When the constraint solver encounters the expression ``Dictionary()``,
 it opens up the type ``Dictionary``---which has not
 been provided with any specific generic arguments---to the type
@@ -443,8 +441,8 @@ unbound generic type, i.e., one that does not have specified generic
 arguments, cannot be used except where the generic arguments can be
 inferred.
 
-Constraint Solving
------------------------------
+### Constraint Solving
+
 The primary purpose of the constraint solver is to take a given set of
 constraints and determine the most specific type binding for each of the type
 variables in the constraint system. As part of this determination, the
@@ -465,8 +463,8 @@ going forward.
 This section will focus on the basic ideas behind the design of the
 solver, as well as the type rules that it applies.
 
-Simplification
-```````````````````
+#### Simplification
+
 The constraint generation process introduces a number of constraints
 that can be immediately solved, either directly (because the solution
 is obvious and trivial) or by breaking the constraint down into a
@@ -489,8 +487,7 @@ type properties, conjunctions, and disjunctions. Only the first three
 kinds of constraints have interesting simplification rules, and are
 discussed in the following sections.
 
-Relational Constraints
-''''''''''''''''''''''''''''''''''''''''''''''''
+##### Relational Constraints
 
 Relational constraints describe a relationship between two types. This
 category covers the equality, subtyping, and conversion constraints,
@@ -499,28 +496,27 @@ relationship constraints proceeds by comparing the structure of the
 two types and applying the typing rules of the Swift language to
 generate additional constraints. For example, if the constraint is a
 conversion constraint::
-
+```
   A -> B <c C -> D
-
+```
 then both types are function types, and we can break down this
 constraint into two smaller constraints ``C < A`` and ``B < D`` by
 applying the conversion rule for function types. Similarly, one can
 destroy all of the various type constructors---tuple types, generic
 type specializations, lvalue types, etc.---to produce simpler
-requirements, based on the type rules of the language [#]_.
+requirements, based on the type rules of the language [1].
 
 Relational constraints involving a type variable on one or both sides
 generally cannot be solved directly. Rather, these constraints inform
 the solving process later by providing possible type bindings,
-described in the `Type Variable Bindings`_ section. The exception is
+described in the [Type Variable Bindings](#Type-Variable-Bindings) section. The exception is
 an equality constraint between two type variables, e.g., ``T0 ==
 T1``. These constraints are simplified by unifying the equivalence
 classes of ``T0`` and ``T1`` (using a basic union-find algorithm),
 such that the solver need only determine a binding for one of the type
 variables (and the other gets the same binding).
 
-Member Constraints
-'''''''''''''''''''''''''''''''''''''''''''
+##### Member Constraints
 
 Member constraints specify that a certain type has a member of a given
 name and provide a binding for the type of that member. A member
@@ -544,8 +540,8 @@ value, and ``C`` is the type of a reference to that entity. For a
 reference to a type, ``C`` will be a metatype of the declared type.
 
 
-Strategies
-```````````````````````````````
+#### Strategies
+
 The basic approach to constraint solving is to simplify the
 constraints until they can no longer be simplified, then produce (and
 check) educated guesses about which declaration from an overload set
@@ -567,8 +563,8 @@ away) or represent sets of assumptions that do not lead to a solution.
 The following sections describe the techniques used by the solver to
 produce derived constraint systems that explore the solution space.
 
-Overload Selection
-'''''''''''''''''''''''''''''''''''''''''''''''''''''
+##### Overload Selection
+
 Overload selection is the simplest way to make an assumption. For an
 overload set that introduced a disjunction constraint
 ``T0 := A1 or T0 := A2 or ... or T0 := AN`` into the constraint
@@ -576,8 +572,8 @@ system, each term in the disjunction will be visited separately. Each
 solver state binds the type variable ``T0`` and explores
 whether the selected overload leads to a suitable solution.
 
-Type Variable Bindings
-'''''''''''''''''''''''''''''''''''''''''''''''''''''
+##### Type Variable Bindings
+
 A second way in which the solver makes assumptions is to guess at the
 concrete type to which a given type variable should be bound. That
 type binding is then introduced in a new, derived constraint system to
@@ -588,8 +584,8 @@ does it perform an exhaustive search. Rather, it uses the constraints
 placed on that type variable to produce potential candidate
 types. There are several strategies employed by the solver.
 
-Meets and Joins
-..........................................
+###### Meets and Joins
+
 A given type variable ``T0`` often has relational constraints
 placed on it that relate it to concrete types, e.g., ``T0 <c Int`` or
 ``Float <c T0``. In these cases, we can use the concrete types as a
@@ -610,14 +606,13 @@ of the lattice is the element to which all types can be converted,
 
 The concrete types "above" and "below" a given type variable provide
 bounds on the possible concrete types that can be assigned to that
-type variable. The solver computes [#]_ the join of the types "below"
+type variable. The solver computes [2] the join of the types "below"
 the type variable, i.e., the most specific (lowest) type to which all
 of the types "below" can be converted, and uses that join as a
 starting guess.
 
+###### Supertype Fallback
 
-Supertype Fallback
-..........................................
 The join of the "below" types computed as a starting point may be too
 specific, due to constraints that involve the type variable but
 weren't simple enough to consider as part of the join. To cope with
@@ -630,11 +625,10 @@ from which ``Derived`` directly inherits. This fallback process
 continues until the types produced are no longer convertible to the
 meet of types "above" the type variable, i.e., the least specific
 (highest) type from which all of the types "above" the type variable
-can be converted [#]_.
+can be converted [3].
 
+###### Default Literal Types
 
-Default Literal Types
-..........................................
 If a type variable is bound by a conformance constraint to one of the
 literal protocols, "``T0`` conforms to ``ExpressibleByIntegerLiteral``",
 then the constraint solver will guess that the type variable can be
@@ -643,8 +637,8 @@ bound to the default literal type for that protocol. For example,
 one to type-check expressions with too little type information to
 determine the types of these literals, e.g., ``-1``.
 
-Comparing Solutions
-`````````````````````````
+##### Comparing Solutions
+
 The solver explores a potentially large solution space, and it is
 possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
@@ -674,8 +668,8 @@ choices of the two systems are compared to produce a relative score:
 The solution with the greater relative score is considered to be
 better than the other solution.
 
-Solution Application
--------------------------
+### Solution Application
+
 Once the solver has produced a solution to the constraint system, that
 solution must be applied to the original expression to produce a fully
 type-checked expression that makes all implicit conversions and
@@ -713,15 +707,15 @@ modeled by the constraint system. However, there are some failures
 that are intentionally left to the solution application phase, such as
 a postfix '!' applied to a non-optional type.
 
-Locators
-```````````
+#### Locators
+
 During constraint generation and solving, numerous constraints are
 created, broken apart, and solved. During constraint application as
 well as during diagnostics emission, it is important to track the
 relationship between the constraints and the actual AST nodes from
 which they originally came. For example, consider the following type
 checking problem::
-
+```swift
   struct X {
     // user-defined conversions
     func [conversion] __conversion () -> String { /* ... */ }
@@ -732,7 +726,7 @@ checking problem::
 
   var x : X
   f(10.5, x)
-
+```
 This constraint system generates the constraints "``T(f)`` ==Fn ``T0
 -> T1``" (for fresh variables ``T0`` and ``T1``), "``(T2, X) <c
 T0``" (for fresh variable ``T2``) and "``T2`` conforms to
@@ -780,8 +774,8 @@ different derivation step kinds (called "path elements" in the source)
 that describe the various ways in which larger constraints can be
 broken down into smaller ones.
 
-Overload Choices
-'''''''''''''''''''''''''''''
+##### Overload Choices
+
 Whenever the solver creates a new overload set, that overload set is
 associated with a particular locator. Continuing the example from the
 parent section, the solver will create an overload set containing the
@@ -789,9 +783,9 @@ two user-defined conversions. This overload set is created while
 simplifying the constraint ``X <c String``, so it uses the locator
 from that constraint extended by a "conversion member" derivation
 step. The complete locator for this overload set is, therefore::
-
+```
   function application -> apply argument -> tuple element #1 -> conversion member
-
+```
 When the solver selects a particular overload from the overload set,
 it records the selected overload based on the locator of the overload
 set. When it comes time to perform constraint application, the locator
@@ -806,8 +800,8 @@ choices made in each solution. Naturally, all of these operations
 require locators to be unique, which occurs in the constraint system
 itself.
 
-Simplifying Locators
-'''''''''''''''''''''''''''''
+##### Simplifying Locators
+
 Locators provide the derivation of location information that follows
 the path of the solver, and can be used to query and recover the
 important decisions made by the solver. However, the locators
@@ -816,9 +810,9 @@ AST node for the purposes of identifying the corresponding source
 location. For example, the failed constraint "``Int`` conforms to
 ``ExpressibleByFloatLiteral``" can most specifically by centered on the
 floating-point literal ``10.5``, but its locator is::
-
+```
   function application -> apply argument -> tuple element #0
-
+```
 The process of locator simplification maps a locator to its most
 specific AST node. Essentially, it starts at the anchor of the
 locator (in this case, the application ``f(10.5, x)``) and then walks
@@ -833,28 +827,28 @@ Simplification does not always exhaust the complete path. For example,
 consider a slight modification to our example, so that the argument to
 ``f`` is provided by another call, we get a different result
 entirely::
-
+```swift
   func f(_ i : Int, s : String) { }
   func g() -> (f : Float, x : X) { }
 
   f(g())
-
+```
 Here, the failing constraint is ``Float <c Int``, with the same
 locator::
-
+```
   function application -> apply argument -> tuple element #0
-
+```
 When we simplify this locator, we start with ``f(g())``. The "apply
 argument" derivation step takes us to the argument expression
 ``g()``. Here, however, there is no subexpression for the first tuple
 element of ``g()``, because it's simple part of the tuple returned
 from ``g``. At this point, simplification ceases, and creates the
 simplified locator::
-
+```
   function application of g -> tuple element #0
+```
+### Performance
 
-Performance
------------------
 The performance of the type checker is dependent on a number of
 factors, but the chief concerns are the size of the solution space
 (which is exponential in the worst case) and the effectiveness of the
@@ -862,8 +856,8 @@ solver in exploring that solution space. This section describes some
 of the techniques used to improve solver performance, many of which
 can doubtless be improved.
 
-Constraint Graph
-````````````````
+#### Constraint Graph
+
 The constraint graph describes the relationships among type variables
 in the constraint system. Each vertex in the constraint graph
 corresponds to a single type variable. The edges of the graph
@@ -885,8 +879,8 @@ the connected components are then combined into a complete
 solution. Additionally, the constraint graph is used to direct
 simplification, described below.
 
-Simplification Worklist
-```````````````````````
+#### Simplification Worklist
+
 When the solver has attempted a type variable binding, that binding
 often leads to additional simplifications in the constraint
 system. The solver will query the constraint graph to determine which
@@ -898,8 +892,8 @@ is exhausted, simplification has completed. The use of the worklist
 eliminates the need to reprocess constraints that could not have
 changed because the type variables they mention have not changed.
 
-Solver Scopes
-`````````````
+#### Solver Scopes
+
 The solver proceeds through the solution space in a depth-first
 manner. Whenever the solver is about to make a guess---such as a
 speculative type variable binding or the selection of a term from a
@@ -920,8 +914,8 @@ solver scope stores a marker to the current top of the stack, and
 popping that solver scope reverses all of the operations on that stack
 until it hits the marker.
 
-Online Scoring
-``````````````
+#### Online Scoring
+
 As the solver evaluates potential solutions, it keeps track of the
 score of the current solution and of the best complete solution found
 thus far. If the score of the current solution is ever greater than
@@ -935,8 +929,8 @@ literal types over other literal types, and prefer cheaper conversions
 to more expensive conversions. However, some of the rules are fairly
 ad hoc, and could benefit from more study.
 
-Arena Memory Management
-```````````````````````
+#### Arena Memory Management
+
 Each constraint system introduces its own memory allocation arena,
 making allocations cheap and deallocation essentially free. The
 allocation arena extends all the way into the AST context, so that
@@ -945,36 +939,24 @@ allocated within the constraint system's arena rather than the
 permanent arena. Most data structures involved in constraint solving
 use this same arena.
 
-Diagnostics
------------------
-The diagnostics produced by the type checker are currently
-terrible. We plan to do something about this, eventually. We also
-believe that we can implement some heroics, such as spell-checking
-that takes into account the surrounding expression to only provide
-well-typed suggestions.
+## Diagnostics
 
-.. [#] It is possible that both overloads will result in a solution,
-   in which case the solutions will be ranked based on the rules
-   discussed in the section `Comparing Solutions`_.
+Swift 5.2 introduced a new diagnostic framework, which is described 
+in detail in this 
+[blog post](https://swift.org/blog/new-diagnostic-arch-overview/).
 
-.. [#] As of the time of this writing, the type rules of Swift have
+## Footnotes
+
+[1]: As of the time of this writing, the type rules of Swift have
   not specifically been documented outside of the source code. The
   constraints-based type checker contains a function ``matchTypes``
   that documents and implements each of these rules. A future revision
   of this document will provide a more readily-accessible version.
 
-.. [#] More accurately, as of this writing, "will compute". The solver
+[2]: More accurately, as of this writing, "will compute". The solver
   doesn't current compute meets and joins properly. Rather, it
   arbitrarily picks one of the constraints "below" to start with.
 
-.. [#] Again, as of this writing, the solver doesn't actually compute
+[3]: Again, as of this writing, the solver doesn't actually compute
   meets and joins, so the solver continues until it runs out of
   supertypes to enumerate.
-
-New Diagnostic Architecture
----------------------------
-
-We are currently working on porting type-check based diagnostics over
-to the new diagnostic framework, which is described in detail in this
-`blog post
-<https://swift.org/blog/new-diagnostic-arch-overview/>`_.
