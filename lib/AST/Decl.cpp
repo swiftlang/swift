@@ -1447,8 +1447,7 @@ void PatternBindingEntry::setInit(Expr *E) {
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   SmallVector<VarDecl *, 8> variables;
   getPattern()->collectVariables(variables);
-  if (variables.empty())
-    return nullptr;
+  assert(!variables.empty());
   return variables[0];
 }
 

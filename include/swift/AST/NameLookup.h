@@ -603,7 +603,7 @@ public:
   /// of type -vs- instance lookup results.
   ///
   /// \return true if the lookup should be stopped at this point.
-  virtual bool consume(ArrayRef<ValueDecl *> values,
+  virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
   /// Look for members of a nominal type or extension scope.
@@ -612,14 +612,6 @@ public:
   virtual bool
   lookInMembers(DeclContext *const scopeDC,
                 NominalTypeDecl *const nominal) = 0;
-
-  /// Called for local VarDecls that might not yet be in scope.
-  ///
-  /// Note that the set of VarDecls visited here are going to be a
-  /// superset of those visited in consume().
-  virtual bool consumePossiblyNotInScope(ArrayRef<VarDecl *> values) {
-    return false;
-  }
 
   /// Called right before looking at the parent scope of a BraceStmt.
   ///
@@ -644,7 +636,7 @@ class ASTScopeDeclGatherer : public AbstractASTScopeDeclConsumer {
 public:
   virtual ~ASTScopeDeclGatherer() = default;
 
-  bool consume(ArrayRef<ValueDecl *> values,
+  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup

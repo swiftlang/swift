@@ -667,30 +667,10 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
-    SmallVector<ValueDecl *, 2> localFuncsAndTypes;
-    SmallVector<VarDecl *, 2> localVars;
-
-    // All types and functions are visible anywhere within a brace statement
-    // scope. When ordering matters (i.e. var decl) we will have split the brace
-    // statement into nested scopes.
-    for (auto braceElement : bs->getElements()) {
-      if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-        if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
-          if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
-            localFuncsAndTypes.push_back(vd);
-          } else if (auto *var = dyn_cast<VarDecl>(localBinding)) {
-            localVars.push_back(var);
-          }
-        }
-      }
-    }
-
     auto maybeBraceScope =
-        scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(
-            p, bs, std::move(localFuncsAndTypes), std::move(localVars));
+        scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(p, bs);
     if (auto *s = scopeCreator.getASTContext().Stats)
       ++s->getFrontendCounters().NumBraceStmtASTScopes;
-
     return maybeBraceScope.getPtrOr(p);
   }
 
@@ -701,23 +681,23 @@ public:
     if (auto *var = patternBinding->getSingleVar())
       scopeCreator.addChildrenForKnownAttributes(var, parentScope);
 
+    const bool isLocalBinding = patternBinding->getDeclContext()->isLocalContext();
+
+    const DeclVisibilityKind vis =
+        isLocalBinding ? DeclVisibilityKind::LocalVariable
+                       : DeclVisibilityKind::MemberOfCurrentNominal;
     auto *insertionPoint = parentScope;
     for (auto i : range(patternBinding->getNumPatternEntries())) {
-      bool isLocalBinding = false;
-      if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
-        isLocalBinding = varDecl->getDeclContext()->isLocalContext();
-      }
-
       insertionPoint =
           scopeCreator
               .ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(
-                  insertionPoint, patternBinding, i, isLocalBinding)
+                  insertionPoint, patternBinding, i, vis)
               .getPtrOr(insertionPoint);
-
-      ASTScopeAssert(isLocalBinding || insertionPoint == parentScope,
-                     "Bindings at the top-level or members of types should "
-                     "not change the insertion point");
     }
+
+    ASTScopeAssert(isLocalBinding || insertionPoint == parentScope,
+                   "Bindings at the top-level or members of types should "
+                   "not change the insertion point");
 
     return insertionPoint;
   }
@@ -991,7 +971,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         "Original inits are always after the '='");
     scopeCreator
         .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex, isLocalBinding);
+            this, decl, patternEntryIndex, vis);
   }
 
   // Add accessors for the variables in this pattern.
@@ -1002,7 +982,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // In local context, the PatternEntryDeclScope becomes the insertion point, so
   // that all any bindings introduecd by the pattern are in scope for subsequent
   // lookups.
-  if (isLocalBinding)
+  if (vis == DeclVisibilityKind::LocalVariable)
     return {this, "All code that follows is inside this scope"};
 
   return {getParent().get(), "Global and type members do not introduce scopes"};
@@ -1378,9 +1358,8 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
     PatternBindingDecl *declBeingScoped, unsigned entryIndex,
-    bool isLocalBinding)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex),
-      isLocalBinding(isLocalBinding) {
+    DeclVisibilityKind vis)
+    : decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
 }

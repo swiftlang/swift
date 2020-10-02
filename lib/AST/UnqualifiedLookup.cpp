@@ -134,12 +134,7 @@ namespace {
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
     bool isFirstResultEnough() const;
-
-    /// Do we want precise scoping of VarDecls? If IncludeOuterResults is on,
-    /// this is true, which allows us to resolve forward references to
-    /// local VarDecls from inside local function and closure bodies.
-    bool hasPreciseScopingOfVarDecls() const;
-
+    
     /// Every time lookup finishes searching a scope, call me
     /// to record the dividing line between results from first fruitful scope and
     /// the result.
@@ -212,10 +207,8 @@ public:
 
   void maybeUpdateSelfDC(VarDecl *var);
 
-  bool consume(ArrayRef<ValueDecl *> values,
+  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
-
-  bool consumePossiblyNotInScope(ArrayRef<VarDecl *> vars) override;
 
   /// returns true if finished
   bool lookInMembers(DeclContext *const scopeDC,
@@ -470,10 +463,6 @@ bool UnqualifiedLookupFactory::isFirstResultEnough() const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
-bool UnqualifiedLookupFactory::hasPreciseScopingOfVarDecls() const {
-  return !options.contains(Flags::IncludeOuterResults);
-}
-
 void UnqualifiedLookupFactory::recordCompletionOfAScope() {
   // OK to call (NOOP) if there are more inner results and Results is empty
   if (IndexOfFirstOuterResult == 0)
@@ -562,23 +551,18 @@ void ASTScopeDeclConsumerForUnqualifiedLookup::maybeUpdateSelfDC(
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
-    ArrayRef<ValueDecl *> values, NullablePtr<DeclContext> baseDC) {
+    ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+    NullablePtr<DeclContext> baseDC) {
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
 
+    // Try to resolve the base for unqualified instance member
+    // references. This is used by lookInMembers().
     if (auto *var = dyn_cast<VarDecl>(value)) {
-      // Try to resolve the base for unqualified instance member
-      // references. This is used by lookInMembers().
       if (var->getName() == factory.Ctx.Id_self) {
         maybeUpdateSelfDC(var);
       }
-
-      // Local VarDecls with a pattern binding are visited as part of their
-      // BraceStmt when hasPreciseScopingOfVarDecls() is off.
-      if (var->getParentPatternBinding() &&
-          !factory.hasPreciseScopingOfVarDecls())
-        continue;
     }
 
     auto fullName = factory.Name.getFullName();
@@ -598,6 +582,17 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
         continue;
     }
 
+    // In order to preserve the behavior of the existing context-based lookup,
+    // which finds all results for non-local variables at the top level instead
+    // of stopping at the first one, ignore results at the top level that are
+    // not local variables. The caller \c lookInASTScopes will
+    // then do the appropriate work when the scope lookup fails. In
+    // FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
+    // so a VarDecl at top level would not be found by the context-based lookup.
+    if (isa<SourceFile>(value->getDeclContext()) &&
+        (vis != DeclVisibilityKind::LocalVariable || isa<VarDecl>(value)))
+      return false;
+
     factory.Results.push_back(LookupResultEntry(value));
 #ifndef NDEBUG
     factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
@@ -607,22 +602,8 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   return factory.isFirstResultEnough();
 }
 
-bool ASTScopeDeclConsumerForUnqualifiedLookup::consumePossiblyNotInScope(
-    ArrayRef<VarDecl *> vars) {
-  if (factory.hasPreciseScopingOfVarDecls())
-    return false;
-
-  for (auto *var : vars) {
-    if (!factory.Name.getFullName().isSimpleName(var->getName()))
-      continue;
-
-    factory.Results.push_back(LookupResultEntry(var));
-  }
-
-  return false;
-}
-
 bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
+                                   DeclVisibilityKind,
                                    NullablePtr<DeclContext>) {
   for (auto *v: valuesArg)
     values.push_back(v);
@@ -781,7 +762,7 @@ public:
     : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
       results(results) {}
 
-  bool consume(ArrayRef<ValueDecl *> values,
+  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC) override {
     for (auto *value: values) {
       if (!value->getName().matchesRef(name))

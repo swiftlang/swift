@@ -222,7 +222,7 @@ bool ASTScopeImpl::lookInGenericParametersOf(
   SmallVector<ValueDecl *, 32> bindings;
   for (auto *param : paramList.get()->getParams())
     bindings.push_back(param);
-  if (consumer.consume(bindings))
+  if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter))
     return true;
   return false;
 }
@@ -289,26 +289,28 @@ PatternEntryInitializerScope::getLookupParent() const {
 
 bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   auto *param = paramList->getParams()[index];
-  return consumer.consume({param});
+  return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
 }
 
 bool PatternEntryDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (!isLocalBinding)
-    return false;
-  return lookupLocalBindingsInPattern(getPattern(), consumer);
+  if (vis != DeclVisibilityKind::LocalVariable)
+    return false; // look in self type will find this later
+  return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
 }
 
 bool ForEachPatternScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(stmt->getPattern(), consumer);
+  return lookupLocalBindingsInPattern(
+      stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(item.getPattern(), consumer);
+  return lookupLocalBindingsInPattern(
+      item.getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
-    if (consumer.consume({var}))
+    if (consumer.consume({var}, DeclVisibilityKind::LocalVariable))
         return true;
 
   return false;
@@ -318,12 +320,13 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   if (auto *paramList = decl->getParameters()) {
     for (auto *paramDecl : *paramList)
-      if (consumer.consume({paramDecl}))
+      if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter))
         return true;
   }
 
   if (decl->getDeclContext()->isTypeContext()) {
-    return consumer.consume({decl->getImplicitSelfDecl()});
+    return consumer.consume({decl->getImplicitSelfDecl()},
+                            DeclVisibilityKind::FunctionParameter);
   }
 
   // Consider \c var t: T { (did/will/)get/set { ... t }}
@@ -332,7 +335,7 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
   // then t needs to be found as a local binding:
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     if (auto *storage = accessor->getStorage())
-      if (consumer.consume({storage}))
+      if (consumer.consume({storage}, DeclVisibilityKind::LocalVariable))
         return true;
   }
 
@@ -343,7 +346,7 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   if (auto *params = whatWasSpecialized->getGenericParams())
     for (auto *param : params->getParams())
-      if (consumer.consume({param}))
+      if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
         return true;
   return false;
 }
@@ -353,7 +356,7 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
   auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
     if (auto *params = afd->getGenericParams())
       for (auto *param : params->getParams())
-        if (consumer.consume({param}))
+        if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
           return true;
     return false;
   };
@@ -368,10 +371,20 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
 }
 
 bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (consumer.consume(localFuncsAndTypes))
-    return true;
-
-  if (consumer.consumePossiblyNotInScope(localVars))
+  // All types and functions are visible anywhere within a brace statement
+  // scope. When ordering matters (i.e. var decl) we will have split the brace
+  // statement into nested scopes.
+  //
+  // Don't stop at the first one, there may be local funcs with same base name
+  // and want them all.
+  SmallVector<ValueDecl *, 32> localBindings;
+  for (auto braceElement : stmt->getElements()) {
+    if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
+      if (auto *vd = dyn_cast<ValueDecl>(localBinding))
+        localBindings.push_back(vd);
+    }
+  }
+  if (consumer.consume(localBindings, DeclVisibilityKind::LocalVariable))
     return true;
 
   if (consumer.finishLookupInBraceStmt(stmt))
@@ -387,7 +400,8 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
       decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
-      return consumer.consume({selfParam});
+      return consumer.consume({selfParam},
+                              DeclVisibilityKind::FunctionParameter);
     }
   }
   return false;
@@ -395,7 +409,9 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
 
 bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto &e : expr->getCaptureList()) {
-    if (consumer.consume({e.Var}))
+    if (consumer.consume(
+            {e.Var},
+            DeclVisibilityKind::LocalVariable)) // or FunctionParameter??
       return true;
   }
   return false;
@@ -404,24 +420,26 @@ bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 bool ClosureParametersScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   for (auto param : *closureExpr->getParameters())
-    if (consumer.consume({param}))
+    if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter))
       return true;
   return false;
 }
 
 bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(pattern, consumer);
+  return lookupLocalBindingsInPattern(
+      pattern, DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
+                                                DeclVisibilityKind vis,
                                                 DeclConsumer consumer) {
   if (!p)
     return false;
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
     if (!isDone)
-      isDone = consumer.consume({var});
+      isDone = consumer.consume({var}, vis);
   });
   return isDone;
 }

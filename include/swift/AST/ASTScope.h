@@ -29,7 +29,7 @@
 #define SWIFT_AST_AST_SCOPE_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookup.h" // for DeclVisibilityKind
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -444,6 +444,7 @@ protected:
   // It is not an instance variable or inherited type.
 
   static bool lookupLocalBindingsInPattern(const Pattern *p,
+                                           DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
   /// When lookup must stop before the outermost scope, return the scope to stop
@@ -1023,10 +1024,10 @@ class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
-  const bool isLocalBinding;
+  const DeclVisibilityKind vis;
 
   AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
-                            bool);
+                            DeclVisibilityKind);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -1043,8 +1044,8 @@ public:
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding) {}
+                        DeclVisibilityKind vis)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryDeclScope() {}
 
 protected:
@@ -1071,8 +1072,8 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 
 public:
   PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                               bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding),
+                               DeclVisibilityKind vis)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
         initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
@@ -1657,22 +1658,10 @@ protected:
 };
 
 class BraceStmtScope final : public AbstractStmtScope {
-  BraceStmt *const stmt;
-
-  /// Declarations which are in scope from the beginning of the statement.
-  SmallVector<ValueDecl *, 2> localFuncsAndTypes;
-
-  /// Declarations that are normally in scope only after their
-  /// definition.
-  SmallVector<VarDecl *, 2> localVars;
 
 public:
-  BraceStmtScope(BraceStmt *e,
-                 SmallVector<ValueDecl *, 2> localFuncsAndTypes,
-                 SmallVector<VarDecl *, 2> localVars)
-      : stmt(e),
-        localFuncsAndTypes(localFuncsAndTypes),
-        localVars(localVars) {}
+  BraceStmt *const stmt;
+  BraceStmtScope(BraceStmt *e) : stmt(e) {}
   virtual ~BraceStmtScope() {}
 
 protected:
