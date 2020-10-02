@@ -308,7 +308,7 @@ func HasLabeledDo() {
 // CHECK-EXPANDED-NEXT:           |-BraceStmtScope {{.*}}, [69:53 - 72:3]
 // CHECK-EXPANDED-NEXT:             `-PatternEntryDeclScope {{.*}}, [70:9 - 70:13] entry 0 'c'
 // CHECK-EXPANDED-NEXT:               `-PatternEntryInitializerScope {{.*}}, [70:13 - 70:13] entry 0 'c'
-// CHECK-EXPANDED-NEXT:           `-LookupParentDiversionScope, [72:3 - 100:38]
+// CHECK-EXPANDED-NEXT:           `-GuardStmtBodyScope, [72:3 - 100:38]
 // CHECK-EXPANDED-NEXT:             |-WhileStmtScope {{.*}}, [74:3 - 76:3]
 // CHECK-EXPANDED-NEXT:               `-ConditionalClauseScope, [74:9 - 76:3] index 0
 // CHECK-EXPANDED-NEXT:                 `-ConditionalClausePatternUseScope, [74:21 - 76:3] let b3

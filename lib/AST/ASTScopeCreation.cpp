@@ -687,6 +687,9 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
+    if (bs->empty())
+      return p;
+
     SmallVector<ValueDecl *, 2> localFuncsAndTypes;
     SmallVector<VarDecl *, 2> localVars;
 
@@ -941,17 +944,18 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   ASTScopeImpl *Scope::expandSpecifically(ScopeCreator &) { return this; }
 
 CREATES_NEW_INSERTION_POINT(ASTSourceFileScope)
-CREATES_NEW_INSERTION_POINT(ConditionalClauseScope)
 CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
+CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
 
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
+NO_NEW_INSERTION_POINT(GuardStmtBodyScope)
 NO_NEW_INSERTION_POINT(ParameterListScope)
 NO_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 
@@ -959,6 +963,7 @@ NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(CaseLabelItemScope)
 NO_NEW_INSERTION_POINT(CaseStmtBodyScope)
+NO_NEW_INSERTION_POINT(ConditionalClauseInitializerScope)
 NO_NEW_INSERTION_POINT(ClosureParametersScope)
 NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
 NO_NEW_INSERTION_POINT(DoStmtScope)
@@ -974,8 +979,6 @@ NO_NEW_INSERTION_POINT(WhileStmtScope)
 NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(SpecializeAttributeScope)
 NO_EXPANSION(DifferentiableAttributeScope)
-NO_EXPANSION(ConditionalClausePatternUseScope)
-NO_EXPANSION(LookupParentDiversionScope)
 
 #undef CREATES_NEW_INSERTION_POINT
 #undef NO_NEW_INSERTION_POINT
@@ -1057,42 +1060,49 @@ PatternEntryInitializerScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
                               this);
 }
 
+
 AnnotatedInsertionPoint
-ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
+ConditionalClausePatternUseScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  const StmtConditionElement &sec = getStmtConditionElement();
-  switch (sec.getKind()) {
-  case StmtConditionElement::CK_Availability:
-    return {this, "No introduced variables"};
-  case StmtConditionElement::CK_Boolean:
-    scopeCreator.addToScopeTree(sec.getBoolean(), this);
-    return {this, "No introduced variables"};
-  case StmtConditionElement::CK_PatternBinding:
-    scopeCreator.addToScopeTree(sec.getInitializer(), this);
-    auto *const ccPatternUseScope =
-        scopeCreator.constructExpandAndInsertUncheckable<
-            ConditionalClausePatternUseScope>(this, sec.getPattern(), endLoc);
-    return {ccPatternUseScope,
-            "Succeeding code must be in scope of conditional variables"};
-  }
-  ASTScope_unreachable("Unhandled StmtConditionKind in switch");
+  auto *initializer = sec.getInitializer();
+  if (!isa<ErrorExpr>(initializer)) {
+    scopeCreator
+      .constructExpandAndInsertUncheckable<ConditionalClauseInitializerScope>(
+        this, initializer);
+    }
+
+  return {this,
+          "Succeeding code must be in scope of conditional clause pattern bindings"};
+}
+
+void
+ConditionalClauseInitializerScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(ASTNode(initializer), this);
+}
+
+void
+GuardStmtBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &
+                                                                    scopeCreator) {
+  scopeCreator.addToScopeTree(ASTNode(body), this);
 }
 
 AnnotatedInsertionPoint
 GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
                                                           scopeCreator) {
-
   ASTScopeImpl *conditionLookupParent =
-      createNestedConditionalClauseScopes(scopeCreator, stmt->getBody());
-  // Add a child for the 'guard' body, which always exits.
-  // Parent is whole guard stmt scope, NOT the cond scopes
-  scopeCreator.addToScopeTree(stmt->getBody(), this);
+      createNestedConditionalClauseScopes(scopeCreator, endLoc);
 
-  auto *const lookupParentDiversionScope =
-      scopeCreator
-          .constructExpandAndInsertUncheckable<LookupParentDiversionScope>(
-              this, conditionLookupParent, stmt->getEndLoc(), endLoc);
-  return {lookupParentDiversionScope,
+  // Add a child for the 'guard' body, which always exits.
+  // The lookup parent is whole guard stmt scope, NOT the cond scopes
+  auto *body = stmt->getBody();
+  if (!body->empty()) {
+    scopeCreator
+        .constructExpandAndInsertUncheckable<GuardStmtBodyScope>(
+            conditionLookupParent, this, stmt->getBody());
+  }
+
+  return {conditionLookupParent,
           "Succeeding code must be in scope of guard variables"};
 }
 
@@ -1188,20 +1198,34 @@ void FunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
+  auto *thenStmt = stmt->getThenStmt();
+  auto *elseStmt = stmt->getElseStmt();
+
+  SourceLoc endLoc = thenStmt->getEndLoc();
   ASTScopeImpl *insertionPoint =
-      createNestedConditionalClauseScopes(scopeCreator, stmt->getThenStmt());
+      createNestedConditionalClauseScopes(scopeCreator, endLoc);
 
   // The 'then' branch
-  scopeCreator.addToScopeTree(stmt->getThenStmt(), insertionPoint);
+  scopeCreator.addToScopeTree(thenStmt, insertionPoint);
+
+  // Result builders can add an 'else' block consisting entirely of
+  // implicit expressions. In this case, the end location of the
+  // 'then' block is equal to the start location of the 'else'
+  // block, and the 'else' block source range is empty.
+  if (elseStmt &&
+      thenStmt->getEndLoc() == elseStmt->getStartLoc() &&
+      elseStmt->getStartLoc() == elseStmt->getEndLoc())
+    return;
 
   // Add the 'else' branch, if needed.
-  scopeCreator.addToScopeTree(stmt->getElseStmt(), this);
+  scopeCreator.addToScopeTree(elseStmt, this);
 }
 
 void WhileStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
+  SourceLoc endLoc = stmt->getBody()->getEndLoc();
   ASTScopeImpl *insertionPoint =
-      createNestedConditionalClauseScopes(scopeCreator, stmt->getBody());
+      createNestedConditionalClauseScopes(scopeCreator, endLoc);
   scopeCreator.addToScopeTree(stmt->getBody(), insertionPoint);
 }
 
@@ -1266,8 +1290,10 @@ void CaseStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     }
   }
 
-  scopeCreator.constructExpandAndInsertUncheckable<CaseStmtBodyScope>(
-      this, stmt);
+  if (!stmt->getBody()->empty()) {
+    scopeCreator.constructExpandAndInsertUncheckable<CaseStmtBodyScope>(
+        this, stmt);
+  }
 }
 
 void CaseLabelItemScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -1409,14 +1435,23 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
 #pragma mark misc
 
 ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
-    ScopeCreator &scopeCreator, const Stmt *const afterConds) {
+    ScopeCreator &scopeCreator, SourceLoc endLoc) {
   auto *stmt = getLabeledConditionalStmt();
   ASTScopeImpl *insertionPoint = this;
-  for (unsigned i = 0; i < stmt->getCond().size(); ++i) {
-    insertionPoint =
-        scopeCreator
-            .constructExpandAndInsertUncheckable<ConditionalClauseScope>(
-                insertionPoint, stmt, i, afterConds->getStartLoc());
+  for (auto &sec : stmt->getCond()) {
+    switch (sec.getKind()) {
+    case StmtConditionElement::CK_Availability:
+      break;
+    case StmtConditionElement::CK_Boolean:
+      scopeCreator.addToScopeTree(sec.getBoolean(), insertionPoint);
+      break;
+    case StmtConditionElement::CK_PatternBinding:
+      insertionPoint =
+          scopeCreator.constructExpandAndInsertUncheckable<
+              ConditionalClausePatternUseScope>(
+                  insertionPoint, sec, endLoc);
+      break;
+    }
   }
   return insertionPoint;
 }

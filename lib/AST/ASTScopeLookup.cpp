@@ -272,7 +272,8 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 NullablePtr<const ASTScopeImpl>
 PatternEntryInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  assert(parent->getClassName() == "PatternEntryDeclScope");
+  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+                 "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
   // scope that introduces bindings bound by the pattern, since we
@@ -280,6 +281,23 @@ PatternEntryInitializerScope::getLookupParent() const {
   //
   // func f(x: Int) {
   //   let x = x
+  //   print(x)
+  // }
+  return parent->getLookupParent();
+}
+
+NullablePtr<const ASTScopeImpl>
+ConditionalClauseInitializerScope::getLookupParent() const {
+  auto parent = getParent().get();
+  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+                 "ConditionalClauseInitializerScope in unexpected place");
+
+  // Lookups from inside a conditional clause initializer skip the parent
+  // scope that introduces bindings bound by the pattern, since we
+  // want this to work:
+  //
+  // func f(x: Int?) {
+  //   guard let x = x else { return }
   //   print(x)
   // }
   return parent->getLookupParent();
@@ -411,7 +429,7 @@ bool ClosureParametersScope::lookupLocalsOrMembers(
 
 bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(pattern, consumer);
+  return lookupLocalBindingsInPattern(sec.getPattern(), consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
@@ -488,11 +506,7 @@ bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
   return true;
 }
 
-bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
-  return false;
-}
-
-bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+bool GuardStmtBodyScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 

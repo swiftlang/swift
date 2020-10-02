@@ -267,20 +267,14 @@ SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  auto nOrE = holder;
-  // A protocol's generic parameter list is not written in source, and
-  // is visible from the start of the body.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(nOrE))
-    return SourceRange(protoDecl->getBraces().Start, protoDecl->getEndLoc());
-  const auto startLoc = paramList->getSourceRange().Start;
-  const auto validStartLoc =
-      startLoc.isValid() ? startLoc : holder->getStartLoc();
-  // Since ExtensionScope (whole portion) range doesn't start till after the
-  // extended nominal, the range here must be pushed back, too.
+  // We want to ensure the extended type is not part of the generic
+  // parameter scope.
   if (auto const *const ext = dyn_cast<ExtensionDecl>(holder)) {
     return SourceRange(getLocAfterExtendedNominal(ext), ext->getEndLoc());
   }
-  return SourceRange(validStartLoc, holder->getEndLoc());
+
+  // For all other declarations, generic parameters are visible everywhere.
+  return holder->getSourceRange();
 }
 
 SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
@@ -412,21 +406,14 @@ BraceStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return stmt->getSourceRange();
 }
 
-SourceRange ConditionalClauseScope::getSourceRangeOfThisASTNode(
+SourceRange ConditionalClauseInitializerScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // From the start of this particular condition to the start of the
-  // then/body part.
-  const auto startLoc = getStmtConditionElement().getStartLoc();
-  return startLoc.isValid()
-         ? SourceRange(startLoc, endLoc)
-         : SourceRange(endLoc);
+  return initializer->getSourceRange();
 }
 
 SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // For a guard continuation, the scope extends from the end of the 'else'
-  // to the end of the continuation.
-  return SourceRange(startLoc);
+  return SourceRange(sec.getInitializer()->getStartLoc(), endLoc);
 }
 
 SourceRange
@@ -456,9 +443,9 @@ SourceRange GuardStmtScope::getSourceRangeOfThisASTNode(
   return SourceRange(getStmt()->getStartLoc(), endLoc);
 }
 
-SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
+SourceRange GuardStmtBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return SourceRange(startLoc, endLoc);
+  return body->getSourceRange();
 }
 
 #pragma mark source range caching
