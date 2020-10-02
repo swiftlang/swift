@@ -98,8 +98,7 @@ std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,
                                                       StringRef interfacePath) {
-  return static_cast<SerializedModuleLoaderBase*>(ctx
-    .getModuleInterfaceLoader())->getCompiledModuleCandidatesForInterface(
+  return ctx.getModuleInterfaceChecker()->getCompiledModuleCandidatesForInterface(
       moduleName.str(), interfacePath);
 }
 

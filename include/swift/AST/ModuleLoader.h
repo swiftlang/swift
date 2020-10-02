@@ -116,6 +116,23 @@ struct SubCompilerInstanceInfo {
   ArrayRef<StringRef> ExtraPCMArgs;
 };
 
+/// Abstract interface for a checker of module interfaces and prebuilt modules.
+class ModuleInterfaceChecker {
+public:
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) = 0;
+
+  /// Given a list of potential ready-to-use compiled modules for \p interfacePath,
+  /// check if any one of them is up-to-date. If so, emit a forwarding module
+  /// to the candidate binary module to \p outPath.
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                               StringRef interfacePath,
+                               ArrayRef<std::string> candidates,
+                               StringRef outPath) = 0;
+  virtual ~ModuleInterfaceChecker() = default;
+};
+
 /// Abstract interface to run an action in a sub ASTContext.
 struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,

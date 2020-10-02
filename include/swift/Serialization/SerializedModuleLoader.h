@@ -201,18 +201,6 @@ public:
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
-
-  virtual std::vector<std::string>
-  getCompiledModuleCandidatesForInterface(StringRef moduleName,
-                                          StringRef interfacePath) {
-    return std::vector<std::string>();
-  }
-  virtual bool tryEmitForwardingModule(StringRef moduleName,
-                                       StringRef interfacePath,
-                                       ArrayRef<std::string> candidates,
-                                       StringRef outPath) {
-    return false;
-  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
