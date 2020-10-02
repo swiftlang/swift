@@ -291,6 +291,16 @@ function(_add_host_variant_c_compile_flags target)
       target_compile_options(${target} PRIVATE -march=core2)
     endif()
   endif()
+
+  # The LLVM backend is built with these defines on most 32-bit platforms,
+  # llvm/llvm-project@66395c9, which can cause incompatibilities with the Swift
+  # frontend if not built the same way.
+  if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686" AND
+     NOT (SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID AND SWIFT_ANDROID_API_LEVEL LESS 24))
+    target_compile_definitions(${target} PRIVATE
+      _LARGEFILE_SOURCE
+      _FILE_OFFSET_BITS=64)
+  endif()
 endfunction()
 
 function(_add_host_variant_link_flags target)
