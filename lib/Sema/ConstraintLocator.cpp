@@ -97,12 +97,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   llvm_unreachable("Unhandled PathElementKind in switch.");
 }
 
-bool LocatorPathElt::isResultOfSingleExprFunction() const {
-  if (auto elt = getAs<ContextualType>())
-    return elt->isForSingleExprFunction();
-  return false;
-}
-
 /// Determine whether given locator points to the subscript reference
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
@@ -412,10 +406,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       break;
 
     case ContextualType:
-      if (elt.isResultOfSingleExprFunction())
-        out << "expected result type of the function with a single expression";
-      else
-        out << "contextual type";
+      out << "contextual type";
       break;
 
     case SynthesizedArgument: {
