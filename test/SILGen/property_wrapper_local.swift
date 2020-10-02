@@ -51,6 +51,20 @@ func testLocalWrapper() {
   // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> () {
 }
 
+func testInitialValue() {
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local16testInitialValueyyF : $@convention(thin) () -> () {
+
+  @Wrapper var value: Int = 10
+  // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+
+  value = 15
+  // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
+  // CHECK-NOT: assign_by_wrapper
+  // CHECK: return
+
+  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testInitialValueyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int> {
+}
+
 @propertyWrapper
 enum Lazy<Value> {
   case uninitialized(() -> Value)

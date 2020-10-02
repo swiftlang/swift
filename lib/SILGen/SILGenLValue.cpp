@@ -1319,6 +1319,12 @@ namespace {
         if (!(isAssignmentToSelfParamInInit || VD->getDeclContext()->isLocalContext()))
           return false;
 
+        // If this var isn't in a type context, assignment will always use the setter
+        // if there is an initial value.
+        if (!VD->getDeclContext()->isTypeContext() &&
+            wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue())
+          return false;
+
         // If we have a nonmutating setter on a value type, the call
         // captures all of 'self' and we cannot rewrite an assignment
         // into an initialization.
