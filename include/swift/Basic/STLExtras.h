@@ -217,6 +217,47 @@ inline Iterator prev_or_begin(Iterator it, Iterator begin) {
 
 /// @}
 
+/// An iterator that walks a linked list of objects until it reaches
+/// a null pointer.
+template <class T, T* (&getNext)(T*)>
+class LinkedListIterator {
+  T *Pointer;
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = T *;
+  using reference = T *;
+  using pointer = void;
+
+  /// Returns an iterator range starting from the given pointer and
+  /// running until it reaches a null pointer.
+  static llvm::iterator_range<LinkedListIterator> rangeBeginning(T *pointer) {
+    return {pointer, nullptr};
+  }
+
+  constexpr LinkedListIterator(T *pointer) : Pointer(pointer) {}
+
+  T *operator*() const {
+    assert(Pointer && "dereferencing a null iterator");
+    return Pointer;
+  }
+
+  LinkedListIterator &operator++() {
+    Pointer = getNext(Pointer);
+    return *this;
+  }
+  LinkedListIterator operator++(int) {
+    auto copy = *this;
+    Pointer = getNext(Pointer);
+    return copy;
+  }
+
+  friend bool operator==(LinkedListIterator lhs, LinkedListIterator rhs) {
+    return lhs.Pointer == rhs.Pointer;
+  }
+  friend bool operator!=(LinkedListIterator lhs, LinkedListIterator rhs) {
+    return lhs.Pointer != rhs.Pointer;
+  }
+};
 
 /// An iterator that transforms the result of an underlying bidirectional
 /// iterator with a given operation.
