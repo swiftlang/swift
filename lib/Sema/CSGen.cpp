@@ -3784,9 +3784,8 @@ bool ConstraintSystem::generateConstraints(
 
       // Substitute type variables in for unresolved types.
       if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
-        auto *convertTypeLocator = getConstraintLocator(
-            expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+        auto *convertTypeLocator =
+            getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
         convertType = convertType.transform([&](Type type) -> Type {
           if (type->is<UnresolvedType>()) {
