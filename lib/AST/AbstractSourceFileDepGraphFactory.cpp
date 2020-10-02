@@ -33,11 +33,10 @@ using namespace fine_grained_dependencies;
 //==============================================================================
 
 AbstractSourceFileDepGraphFactory::AbstractSourceFileDepGraphFactory(
-    bool includePrivateDeps, bool hadCompilationError, StringRef swiftDeps,
+    bool hadCompilationError, StringRef swiftDeps,
     StringRef fileFingerprint, bool emitDotFileAfterConstruction,
     DiagnosticEngine &diags)
-    : includePrivateDeps(includePrivateDeps),
-      hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
+    : hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
       fileFingerprint(fileFingerprint.str()),
       emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
 }

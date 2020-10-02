@@ -933,7 +933,7 @@ bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
   // corresponding to the fingerprinted nominal dependency node.
   if (isa<ExtensionDecl>(this))
     return false;
-  return getASTContext().LangOpts.EnableTypeFingerprints;
+  return true;
 }
 
 /// Return the DeclContext to compare when checking private access in

@@ -24,10 +24,6 @@ namespace fine_grained_dependencies {
 /// \c SourceFile or a unit test
 class AbstractSourceFileDepGraphFactory {
 protected:
-  /// To match the existing system, set this to false.
-  /// To include even private entities and get intra-file info, set to true.
-  const bool includePrivateDeps;
-
   /// If there was an error, cannot get accurate info.
   const bool hadCompilationError;
 
@@ -48,8 +44,7 @@ protected:
 public:
   /// Expose this layer to enable faking up a constructor for testing.
   /// See the instance variable comments for explanation.
-  AbstractSourceFileDepGraphFactory(bool includePrivateDeps,
-                                    bool hadCompilationError,
+  AbstractSourceFileDepGraphFactory(bool hadCompilationError,
                                     StringRef swiftDeps,
                                     StringRef fileFingerprint,
                                     bool emitDotFileAfterConstruction,
