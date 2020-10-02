@@ -335,6 +335,7 @@ struct ModuleRebuildInfo {
 /// a module that we'll build from a module interface.
 class ModuleInterfaceLoaderImpl {
   friend class swift::ModuleInterfaceLoader;
+  friend class swift::ModuleInterfaceCheckerImpl;
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
@@ -907,10 +908,6 @@ class ModuleInterfaceLoaderImpl {
 
       return std::move(module.moduleBuffer);
     }
-    // If implicit module is disabled, we are done.
-    if (Opts.disableImplicitSwiftModule) {
-      return std::make_error_code(std::errc::not_supported);
-    }
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
@@ -942,10 +939,14 @@ class ModuleInterfaceLoaderImpl {
 
 } // end anonymous namespace
 
-bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
+bool ModuleInterfaceCheckerImpl::isCached(StringRef DepPath) {
   if (!CacheDir.empty() && DepPath.startswith(CacheDir))
     return true;
   return !PrebuiltCacheDir.empty() && DepPath.startswith(PrebuiltCacheDir);
+}
+
+bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
+  return InterfaceChecker.isCached(DepPath);
 }
 
 /// Load a .swiftmodule associated with a .swiftinterface either from a
@@ -990,8 +991,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
-                CacheDir, PrebuiltCacheDir, ModuleID.Loc,
-                Opts,
+                InterfaceChecker.CacheDir, InterfaceChecker.PrebuiltCacheDir,
+                ModuleID.Loc, InterfaceChecker.Opts,
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
@@ -1024,8 +1025,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 }
 
 std::vector<std::string>
-ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleName,
-                                                               StringRef interfacePath) {
+ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
+    StringRef moduleName, StringRef interfacePath) {
   // Derive .swiftmodule path from the .swiftinterface path.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = interfacePath;
@@ -1034,9 +1035,8 @@ ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleN
                 Ctx, modulePath, interfacePath, moduleName,
                 CacheDir, PrebuiltCacheDir, SourceLoc(),
                 Opts,
-                dependencyTracker,
-                llvm::is_contained(PreferInterfaceForModules, moduleName) ?
-                  ModuleLoadingMode::PreferInterface : LoadMode);
+                nullptr,
+                ModuleLoadingMode::PreferSerialized);
   std::vector<std::string> results;
   auto pair = Impl.getCompiledModuleCandidates();
   // Add compiled module candidates only when they are non-empty.
@@ -1047,7 +1047,7 @@ ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleN
   return results;
 }
 
-bool ModuleInterfaceLoader::tryEmitForwardingModule(StringRef moduleName,
+bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(StringRef moduleName,
                                                     StringRef interfacePath,
                                                     ArrayRef<std::string> candidates,
                                                     StringRef outputPath) {
@@ -1059,9 +1059,8 @@ bool ModuleInterfaceLoader::tryEmitForwardingModule(StringRef moduleName,
                 Ctx, modulePath, interfacePath, moduleName,
                 CacheDir, PrebuiltCacheDir, SourceLoc(),
                 Opts,
-                dependencyTracker,
-                llvm::is_contained(PreferInterfaceForModules, moduleName) ?
-                  ModuleLoadingMode::PreferInterface : LoadMode);
+                nullptr,
+                ModuleLoadingMode::PreferSerialized);
   SmallVector<FileDependency, 16> deps;
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   for (auto mod: candidates) {
