@@ -34,6 +34,7 @@ add_swift_host_library(swiftSema STATIC
   MiscDiagnostics.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
+  PreCheckExpr.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   TypeCheckAccess.cpp
