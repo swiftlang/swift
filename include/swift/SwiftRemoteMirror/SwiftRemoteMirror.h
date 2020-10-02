@@ -80,6 +80,11 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
+/// Add reflection sections from a loaded Swift image.
+SWIFT_REMOTE_MIRROR_LINKAGE
+void swift_reflection_addReflectionMappingInfo(
+    SwiftReflectionContextRef ContextRef, swift_reflection_mapping_info_t Info);
+
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -158,6 +163,11 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForTypeRef(
   SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForProtocolDescriptor(
+  SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -282,6 +292,85 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
 SWIFT_REMOTE_MIRROR_LINKAGE
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
+
+/// Iterate over the process's protocol conformance cache.
+///
+/// Calls the passed in Call function for each protocol conformance found in
+/// the conformance cache. The function is passed the type which conforms and
+/// the protocol it conforms to. The ContextPtr is passed through unchanged.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateConformanceCache(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_reflection_ptr_t Type,
+               swift_reflection_ptr_t Proto,
+               void *ContextPtr),
+  void *ContextPtr);
+
+/// Iterate over the process's metadata allocations.
+///
+/// Calls the passed in Call function for each metadata allocation. The function
+/// is passed a structure that describes the allocation. The ContextPtr is
+/// passed through unchanged.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateMetadataAllocations(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_metadata_allocation_t Allocation,
+               void *ContextPtr),
+  void *ContextPtr);
+
+/// Given a metadata allocation, return the metadata it points to. Returns NULL
+/// on failure. Despite the name, not all allocations point to metadata.
+/// Currently, this will return a metadata only for allocations with tag
+/// GenericMetadataCache. Support for additional tags may be added in the
+/// future. The caller must gracefully handle failure.
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
+  SwiftReflectionContextRef ContextRef,
+  swift_metadata_allocation_t Allocation);
+
+/// Return the name of a metadata allocation tag, or NULL if the tag is unknown.
+/// This pointer remains valid until the next swift_reflection call on the given
+/// context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *
+swift_reflection_metadataAllocationTagName(SwiftReflectionContextRef ContextRef,
+                                           swift_metadata_allocation_tag_t Tag);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode);
+
+/// Backtrace iterator callback passed to
+/// swift_reflection_iterateMetadataAllocationBacktraces
+typedef void (*swift_metadataAllocationBacktraceIterator)(
+    swift_reflection_ptr_t AllocationPtr, size_t Count,
+    const swift_reflection_ptr_t Ptrs[], void *ContextPtr);
+
+/// Iterate over all recorded metadata allocation backtraces in the process.
+///
+/// Calls the passed in Call function for each recorded backtrace. The function
+/// is passed the number of backtrace entries and an array of those entries, as
+/// pointers. The array is stored from deepest to shallowest, so main() will be
+/// somewhere near the end. This array is valid only for the duration of the
+/// call.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateMetadataAllocationBacktraces(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadataAllocationBacktraceIterator Call, void *ContextPtr);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class SILModule;
@@ -25,7 +24,7 @@ class SILInstruction;
 class DominanceAnalysis : public FunctionAnalysisBase<DominanceInfo> {
 protected:
   virtual void verify(DominanceInfo *DI) const override {
-    if (DI->getRoots().empty())
+    if (DI->roots().empty())
       return;
     DI->verify();
   }
@@ -53,7 +52,7 @@ public:
 class PostDominanceAnalysis : public FunctionAnalysisBase<PostDominanceInfo> {
 protected:
   virtual void verify(PostDominanceInfo *PDI) const override {
-    if (PDI->getRoots().empty())
+    if (PDI->roots().empty())
       return;
     PDI->verify();
   }

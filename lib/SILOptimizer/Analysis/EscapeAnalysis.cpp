@@ -1022,8 +1022,8 @@ EscapeAnalysis::ConnectionGraph::getValueContent(SILValue ptrVal) {
 
 CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
   if (!ReturnNode) {
-    SILType resultTy =
-        F->mapTypeIntoContext(F->getConventions().getSILResultType());
+    SILType resultTy = F->mapTypeIntoContext(
+        F->getConventions().getSILResultType(F->getTypeExpansionContext()));
     bool hasReferenceOnly = EA->hasReferenceOnly(resultTy, *F);
     ReturnNode = allocNode(nullptr, NodeType::Return, false, hasReferenceOnly);
   }
@@ -1623,6 +1623,13 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
       if (auto ai = dyn_cast<ApplyInst>(&i)) {
         if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
           continue;
+        // Ignore checking CGNode mapping for result of apply to a no return
+        // function that will have a null ReturnNode
+        if (auto *callee = ai->getReferencedFunctionOrNull()) {
+          if (EA->getFunctionInfo(callee)->isValid())
+            if (!EA->getConnectionGraph(callee)->getReturnNodeOrNull())
+              continue;
+        }
       }
       for (auto result : i.getResults()) {
         if (EA->getPointerBase(result))
@@ -1864,11 +1871,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   // uses must be mapped to ConnectionGraph nodes by the client of this API.
   for (Operand *use : getNonDebugUses(ai)) {
     if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser())) {
-      if (tei->getFieldNo() == 0 && !call.arrayStruct) {
+      if (tei->getFieldIndex() == 0 && !call.arrayStruct) {
         call.arrayStruct = tei;
         continue;
       }
-      if (tei->getFieldNo() == 1 && !call.arrayElementPtr) {
+      if (tei->getFieldIndex() == 1 && !call.arrayElementPtr) {
         call.arrayElementPtr = tei;
         continue;
       }
@@ -2079,6 +2086,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
   }
 
+  // Incidental uses produce no values and have no effect on their operands.
+  if (isIncidentalUse(I))
+    return;
+
   // Instructions which return the address of non-writable memory cannot have
   // an effect on escaping.
   if (isNonWritableMemoryAddress(I))
@@ -2285,6 +2296,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SelectValueInst:
       analyzeSelectInst(cast<SelectValueInst>(I), ConGraph);
       return;
+    case SILInstructionKind::EndCOWMutationInst:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::EnumInst: {
@@ -2487,7 +2499,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         }
       }
     }
-    Iteration++;
+    ++Iteration;
   } while (NeedAnotherIteration);
 
   for (FunctionInfo *FInfo : BottomUpOrder) {

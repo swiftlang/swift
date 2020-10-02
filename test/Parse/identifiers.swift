@@ -17,7 +17,7 @@ class 你好 {
 你好.שלום.வணக்கம்.Γειά.привет()
 
 // Identifiers cannot start with combining chars.
-_ = .́duh() // expected-error {{use of unresolved operator '.́'}} // expected-error{{use of unresolved identifier 'duh'}}
+_ = .́duh() // expected-error {{cannot find operator '.́' in scope}} // expected-error{{cannot find 'duh' in scope}}
 
 // Combining characters can be used within identifiers.
 func s̈pin̈al_tap̈() {}
@@ -38,12 +38,12 @@ protocol test {
 func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}} // expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-7=`_`}}
 
 // SIL keywords are tokenized as normal identifiers in non-SIL mode.
-_ = undef // expected-error {{use of unresolved identifier 'undef'}}
-_ = sil // expected-error {{use of unresolved identifier 'sil'}}
-_ = sil_stage // expected-error {{use of unresolved identifier 'sil_stage'}}
-_ = sil_vtable // expected-error {{use of unresolved identifier 'sil_vtable'}}
-_ = sil_global // expected-error {{use of unresolved identifier 'sil_global'}}
-_ = sil_witness_table // expected-error {{use of unresolved identifier 'sil_witness_table'}}
-_ = sil_default_witness_table // expected-error {{use of unresolved identifier 'sil_default_witness_table'}}
-_ = sil_coverage_map // expected-error {{use of unresolved identifier 'sil_coverage_map'}}
-_ = sil_scope // expected-error {{use of unresolved identifier 'sil_scope'}}
+_ = undef // expected-error {{cannot find 'undef' in scope}}
+_ = sil // expected-error {{cannot find 'sil' in scope}}
+_ = sil_stage // expected-error {{cannot find 'sil_stage' in scope}}
+_ = sil_vtable // expected-error {{cannot find 'sil_vtable' in scope}}
+_ = sil_global // expected-error {{cannot find 'sil_global' in scope}}
+_ = sil_witness_table // expected-error {{cannot find 'sil_witness_table' in scope}}
+_ = sil_default_witness_table // expected-error {{cannot find 'sil_default_witness_table' in scope}}
+_ = sil_coverage_map // expected-error {{cannot find 'sil_coverage_map' in scope}}
+_ = sil_scope // expected-error {{cannot find 'sil_scope' in scope}}

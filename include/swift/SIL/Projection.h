@@ -33,7 +33,6 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
@@ -153,13 +152,13 @@ struct ProjectionIndex {
     }
     case ValueKind::StructElementAddrInst: {
       StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::RefElementAddrInst: {
       RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
-      Index = REA->getFieldNo();
+      Index = REA->getFieldIndex();
       Aggregate = REA->getOperand();
       break;
     }
@@ -178,19 +177,19 @@ struct ProjectionIndex {
     }
     case ValueKind::TupleElementAddrInst: {
       TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
     case ValueKind::StructExtractInst: {
       StructExtractInst *SEA = cast<StructExtractInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::TupleExtractInst: {
       TupleExtractInst *TEA = cast<TupleExtractInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
@@ -248,7 +247,8 @@ public:
 
   Projection &operator=(Projection &&P) = default;
 
-  bool isValid() const { return Value.isValid(); }
+  bool isValid() const { return bool(*this); }
+  operator bool() const { return Value.isValid(); }
 
   /// Convenience method for getting the underlying index. Assumes that this
   /// projection is valid. Otherwise it asserts.
@@ -302,10 +302,9 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    assert(BaseType.getNominalOrBoundGenericNominal() &&
-           "This should only be called with a nominal type");
-    auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    return NDecl->getStoredProperties()[getIndex()];
+    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    assert(nominalDecl && "This should only be called with a nominal type");
+    return getIndexedField(nominalDecl, getIndex());
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
@@ -463,7 +462,7 @@ public:
   static NullablePtr<SingleValueInstruction>
   createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                      SILType BaseType,
-                                     llvm::SmallVectorImpl<SILValue> &Values);
+                                     ArrayRef<SILValue> Values);
 
   void print(raw_ostream &os, SILType baseType) const;
 private:

@@ -6,9 +6,12 @@ class Person {
   var avgHeight = 175
   let line = #line, file = #file, handle = #dsohandle
   lazy var idea: Idea = { fatalError() }()
+  var location: () -> Place = { fatalError() }
+  var secondLocation: (() -> Place)!
 }
 
 struct Place {
+  typealias Callback = () -> ()
   let person: Person
   let street: String
   let apartment: Optional<String>
@@ -16,6 +19,7 @@ struct Place {
   let state: String
   let postalCode: Int
   let plusFour: Int?
+  let callback: Callback
 }
 
 protocol Thing {
@@ -30,7 +34,7 @@ enum Idea {
 // RUN: %refactor -memberwise-init -source-filename %s -pos=1:8 > %t.result/generate_memberwise.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/class_members.swift.expected %t.result/generate_memberwise.swift
 
-// RUN: %refactor -memberwise-init -source-filename %s -pos=11:8 > %t.result/struct_members.swift
+// RUN: %refactor -memberwise-init -source-filename %s -pos=13:8 > %t.result/struct_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/struct_members.swift.expected %t.result/struct_members.swift
 
 // RUN: not %refactor -memberwise-init -source-filename %s -pos=21:10 > %t.result/protocol_members.swift

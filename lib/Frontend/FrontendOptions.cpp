@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -41,8 +42,8 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpPCM:
-    return false;
   case ActionType::EmitPCH:
+    return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
@@ -50,9 +51,11 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
     return true;
   case ActionType::Immediate:
   case ActionType::REPL:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
@@ -61,60 +64,152 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
-  }
-  llvm_unreachable("Unknown ActionType");
-}
-
-bool FrontendOptions::isActionImmediate(ActionType action) {
-  switch (action) {
-  case ActionType::NoneAction:
-  case ActionType::Parse:
-  case ActionType::ResolveImports:
-  case ActionType::Typecheck:
-  case ActionType::DumpParse:
-  case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
-  case ActionType::DumpInterfaceHash:
-  case ActionType::PrintAST:
-  case ActionType::DumpScopeMaps:
-  case ActionType::DumpTypeRefinementContexts:
-  case ActionType::EmitPCH:
-  case ActionType::EmitSILGen:
-  case ActionType::EmitSIL:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::EmitModuleOnly:
-  case ActionType::MergeModules:
-  case ActionType::CompileModuleFromInterface:
-    return false;
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return true;
-  case ActionType::EmitAssembly:
-  case ActionType::EmitIR:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
-  case ActionType::EmitImportedModules:
-  case ActionType::DumpTypeInfo:
-  case ActionType::EmitPCM:
-  case ActionType::DumpPCM:
-    return false;
   }
   llvm_unreachable("Unknown ActionType");
 }
 
 bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   switch (action) {
-  case FrontendOptions::ActionType::Parse:
-  case FrontendOptions::ActionType::DumpParse:
-  case FrontendOptions::ActionType::EmitSyntax:
-  case FrontendOptions::ActionType::DumpInterfaceHash:
-  case FrontendOptions::ActionType::EmitImportedModules:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return true;
   default:
     return false;
   }
+}
+
+bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+    return false;
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    assert(!FrontendOptions::shouldActionOnlyParse(action) &&
+           "Parse-only actions should not load modules!");
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
+bool FrontendOptions::doesActionRequireInputs(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::PrintVersion:
+    return false;
+  case ActionType::REPL:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
+bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::PrintVersion:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+    return false;
+  case ActionType::REPL:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
 }
 
 void FrontendOptions::forAllOutputPaths(
@@ -151,6 +246,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::Parse:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -160,6 +256,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::DumpPCM:
+  case ActionType::PrintVersion:
     return TY_Nothing;
 
   case ActionType::EmitPCH:
@@ -204,6 +301,10 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
 
   case ActionType::EmitPCM:
     return TY_ClangModuleFile;
+
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+    return TY_JSONDependencies;
   }
   llvm_unreachable("unhandled action");
 }
@@ -221,9 +322,11 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::DumpPCM:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -240,6 +343,8 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -259,10 +364,14 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -290,6 +399,47 @@ bool FrontendOptions::canActionEmitCompiledSource(ActionType action) {
   return canActionEmitReferenceDependencies(action);
 }
 
+bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::PrintVersion:
+    return false;
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+    return true;
+  }
+  llvm_unreachable("unhandled action");
+}
+
 bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -305,10 +455,14 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -340,10 +494,14 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -381,10 +539,14 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -423,10 +585,13 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -437,6 +602,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
   case ActionType::EmitObject:
+  case ActionType::PrintVersion:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -467,14 +633,18 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::MergeModules:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
     return true;
 
   case ActionType::NoneAction:
   case ActionType::Immediate:
   case ActionType::REPL:
+  case ActionType::PrintVersion:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -499,6 +669,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::Parse:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -513,6 +684,9 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitIR:
   case ActionType::DumpTypeInfo:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -534,8 +708,12 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCH:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
@@ -568,6 +746,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Typecheck:
   case ActionType::ResolveImports:
   case ActionType::MergeModules:
@@ -580,6 +759,9 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::ScanClangDependencies:
+  case ActionType::PrintVersion:
     return false;
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -601,4 +783,9 @@ FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
+}
+
+bool FrontendOptions::shouldTrackSystemDependencies() const {
+  return IntermoduleDependencyTracking ==
+         IntermoduleDepTrackingMode::IncludeSystem;
 }

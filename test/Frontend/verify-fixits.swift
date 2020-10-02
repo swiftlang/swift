@@ -5,29 +5,29 @@
 func labeledFunc(aa: Int, bb: Int) {}
 
 func testNoneMarkerCheck() {
-  // CHECK: [[@LINE+1]]:95: error: A second {{{{}}none}} was found. It may only appear once in an expectation.
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}} {{none}}
+  // CHECK: [[@LINE+1]]:87: error: A second {{{{}}none}} was found. It may only appear once in an expectation.
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{none}} {{none}}
 
   // CHECK: [[@LINE+1]]:134: error: {{{{}}none}} must be at the end.
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{none}} {{23-26=bb}}
 }
 
 func test0Fixits() {
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
-  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}}
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}}
 
-  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}}
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{none}}
 
-  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{none}}
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{none}}
 
-  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}} {{none}}
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}} {{none}}
 }
 
 func test1Fixits() {

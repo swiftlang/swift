@@ -25,5 +25,15 @@ func test(obj: C) {
   let _ = obj.foo(x: 
 }
 
-// RUN: %sourcekitd-test -req=typecontextinfo -pos=25:22 %s -- %s > %t.response
+// RUN: %sourcekitd-test \
+// RUN:   -req=typecontextinfo -repeat-request=2 -pos=25:22 %s -- %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// RUN: %sourcekitd-test \
+// RUN:   -req=global-config -req-opts=completion_max_astcontext_reuse_count=0 == \
+// RUN:   -req=typecontextinfo -repeat-request=2 -pos=25:22 %s -- %s | %FileCheck %s --check-prefix=DISABLED
+
+// DISABLED-NOT: key.reuseastcontext
+// DISABLED: key.results: [
+// DISABLED-NOT: key.reuseastcontext
+// DISABLED: key.results: [
+// DISABLED-NOT: key.reuseastcontext

@@ -97,6 +97,11 @@ public:
     return mangleTypeSymbol(type, "Ma");
   }
 
+  std::string
+  mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(Type type) {
+    return mangleTypeSymbol(type, "Mb");
+  }
+
   std::string mangleTypeMetadataLazyCacheVariable(Type type) {
     return mangleTypeSymbol(type, "ML");
   }
@@ -113,12 +118,24 @@ public:
     return mangleTypeSymbol(type, "N");
   }
 
+  std::string mangleNoncanonicalTypeMetadata(Type type) {
+    return mangleTypeSymbol(type, "MN");
+  }
+
+  std::string mangleNoncanonicalSpecializedGenericTypeMetadataCache(Type type) {
+    return mangleTypeSymbol(type, "MJ");
+  }
+
   std::string mangleTypeMetadataPattern(const NominalTypeDecl *decl) {
     return mangleNominalTypeSymbol(decl, "MP");
   }
 
   std::string mangleClassMetaClass(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mm");
+  }
+
+  std::string mangleSpecializedGenericClassMetaClass(const CanType theType) {
+    return mangleTypeSymbol(theType, "MM");
   }
 
   std::string mangleObjCMetadataUpdateFunction(const ClassDecl *Decl) {
@@ -306,8 +323,10 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                   const RootProtocolConformance *conformance);
-  
+                                    const RootProtocolConformance *conformance);
+  std::string mangleProtocolConformanceInstantiationCache(
+                                    const RootProtocolConformance *conformance);
+
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
     appendEntity(storage);

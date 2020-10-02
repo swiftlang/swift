@@ -554,3 +554,8 @@ struct FreeWhere<T> {
   // CHECK: <kw>typealias</kw> Alias = <type>Int</type> <kw>where</kw> <type>T</type> == <type>Int</type>
   typealias Alias = Int where T == Int
 }
+
+// Renamed attribute ('fixed' to @available by the parser after emitting an error, so not treated as a custom attribute)
+// CHECK: @availability(<kw>macOS</kw> <float>10.11</float>, *)
+@availability(macOS 10.11, *)
+class HasMisspelledAttr {}

@@ -36,6 +36,7 @@ namespace options {
     SwiftIndentOption = (1 << 11),
     ArgumentIsPath = (1 << 12),
     ModuleInterfaceOption = (1 << 13),
+    SupplementaryOutput = (1 << 14),
   };
 
   enum ID {

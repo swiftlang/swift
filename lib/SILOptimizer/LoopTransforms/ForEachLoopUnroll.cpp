@@ -323,8 +323,15 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // as the array itself is not modified (which is possible with reference
     // types).
     ArraySemanticsCall arrayOp(user);
-    if (!arrayOp.doesNotChangeArray())
-      mayBeWritten = true;
+    if (arrayOp.doesNotChangeArray())
+      continue;
+    
+    if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      classifyUsesOfArray((ApplyInst *)arrayOp);
+      continue;
+    }
+    
+    mayBeWritten = true;
   }
 }
 
@@ -446,7 +453,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   // than needed as the unrolled code have many branches (due to try applies)
   // all of which joins later into a single path eventually.
   SmallVector<SILValue, 4> elementCopies;
-  for (uint64_t i = 0; i < arrayInfo.getNumElements(); i++) {
+  for (uint64_t i = 0; i < arrayInfo.getNumElements(); ++i) {
     StoreInst *elementStore = arrayInfo.getElementStore(i);
     // Insert the copy just before the store of the element into the array.
     SILValue copy = SILBuilderWithScope(elementStore)
@@ -516,7 +523,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   //     it is `normalBB`. (The normal target is captured by `nextNormalBB`.)
   //     Jump to a new error block: err_i in the error case. Note that all
   //     error blocks jump to the error target of the original forEach call.
-  for (uint64_t num = arrayInfo.getNumElements(); num > 0; num--) {
+  for (uint64_t num = arrayInfo.getNumElements(); num > 0; --num) {
     SILValue elementCopy = elementCopies[num - 1];
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
                                        : forEachCall->getParentBlock();
@@ -604,14 +611,14 @@ class ForEachLoopUnroller : public SILFunctionTransform {
         SILInstruction *inst = &*instIter;
         ApplyInst *apply = dyn_cast<ApplyInst>(inst);
         if (!apply) {
-          instIter++;
+          ++instIter;
           continue;
         }
         // Note that the following operation may delete a forEach call but
         // would not delete this apply instruction, which is an array
         // initializer. Therefore, the iterator should be valid here.
         changed |= tryUnrollForEachCallsOverArrayLiteral(apply, deleter);
-        instIter++;
+        ++instIter;
       }
     }
 

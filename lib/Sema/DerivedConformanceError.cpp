@@ -42,8 +42,9 @@ deriveBodyBridgedNSError_enum_nsErrorDomain(AbstractFunctionDecl *domainDecl,
   auto self = domainDecl->getImplicitSelfDecl();
 
   auto selfRef = new (C) DeclRefExpr(self, DeclNameLoc(), /*implicit*/ true);
-  auto stringType = TypeExpr::createForDecl(DeclNameLoc(), C.getStringDecl(),
-                                            domainDecl, /*implicit*/ true);
+  auto stringType = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), C.getStringDecl(), domainDecl,
+      C.getStringDecl()->getInterfaceType());
   auto initReflectingCall =
     CallExpr::createImplicit(C, stringType,
                              { selfRef }, { C.getIdentifier("reflecting") });
@@ -90,7 +91,7 @@ deriveBridgedNSError_enum_nsErrorDomain(
   //   }
   // }
 
-  auto stringTy = derived.Context.getStringDecl()->getDeclaredType();
+  auto stringTy = derived.Context.getStringDecl()->getDeclaredInterfaceType();
 
   // Define the property.
   VarDecl *propDecl;

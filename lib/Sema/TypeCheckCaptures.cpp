@@ -296,7 +296,7 @@ public:
             NTD->diagnose(diag::kind_declared_here,
                           DescriptiveDeclKind::Type);
 
-            D->diagnose(diag::decl_declared_here, D->getFullName());
+            D->diagnose(diag::decl_declared_here, D->getName());
             return { false, DRE };
           }
         }
@@ -525,12 +525,11 @@ public:
     if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
       // If we failed to resolve the written type, we've emitted an
       // earlier diagnostic and should bail.
-      auto toTy = cast->getCastTypeLoc().getType();
+      const auto toTy = cast->getCastType();
       if (!toTy || toTy->hasError())
         return false;
 
-      if (auto clas = dyn_cast_or_null<ClassDecl>(
-                         cast->getCastTypeLoc().getType()->getAnyNominal())) {
+      if (auto clas = dyn_cast_or_null<ClassDecl>(toTy->getAnyNominal())) {
         if (clas->usesObjCGenericsModel()) {
           return false;
         }
@@ -558,7 +557,7 @@ public:
     }
 
     if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      checkType(ECE->getCastTypeLoc().getType(), ECE->getLoc());
+      checkType(ECE->getCastType(), ECE->getLoc());
       return { true, E };
     }
 
@@ -573,8 +572,10 @@ public:
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
-      if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-        addCapture(CapturedValue(superE->getSelf(), 0, superE->getLoc()));
+      if (auto *selfDecl = superE->getSelf()) {
+        if (CurDC->isChildContextOf(selfDecl->getDeclContext()))
+          addCapture(CapturedValue(selfDecl, 0, superE->getLoc()));
+      }
       return { false, superE };
     }
 
@@ -661,10 +662,11 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
 
         // If it's possible, suggest adding @objc.
+        Optional<ForeignAsyncConvention> asyncConvention;
         Optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
             isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
-                                  errorConvention)) {
+                                  asyncConvention, errorConvention)) {
           AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");

@@ -46,21 +46,6 @@ public func _autorelease(_ x: AnyObject) {
 }
 #endif
 
-/// Invoke `body` with an allocated, but uninitialized memory suitable for a
-/// `String` value.
-///
-/// This function is primarily useful to call various runtime functions
-/// written in C++.
-internal func _withUninitializedString<R>(
-  _ body: (UnsafeMutablePointer<String>) -> R
-) -> (R, String) {
-  let stringPtr = UnsafeMutablePointer<String>.allocate(capacity: 1)
-  let bodyResult = body(stringPtr)
-  let stringResult = stringPtr.move()
-  stringPtr.deallocate()
-  return (bodyResult, stringResult)
-}
-
 // FIXME(ABI)#51 : this API should allow controlling different kinds of
 // qualification separately: qualification with module names and qualification
 // with type names that we are nested in.
@@ -71,6 +56,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
+@_semantics("typeName")
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
@@ -78,13 +64,13 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 @_silgen_name("swift_getMangledTypeName")
 public func _getMangledTypeName(_ type: Any.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public // SPI
 func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
@@ -132,3 +118,17 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+@_silgen_name("swift_getMetadataSection")
+public func _getMetadataSection(
+  _ index: UInt)
+  -> UnsafeRawPointer?
+
+@_silgen_name("swift_getMetadataSectionCount")
+public func _getMetadataSectionCount()
+  -> UInt
+
+@_silgen_name("swift_getMetadataSectionName")
+public func _getMetadataSectionName(
+  _ metadata_section: UnsafeRawPointer)
+  -> UnsafePointer<CChar>

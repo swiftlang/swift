@@ -31,7 +31,7 @@
 
 import has_xref // expected-error {{missing required modules: 'has_alias', 'struct_with_operators'}}
 
-numeric(42) // expected-error {{use of unresolved identifier 'numeric'}}
+numeric(42) // expected-error {{cannot find 'numeric' in scope}}
 
 // CHECK: <INPUT_BLOCK
 // CHECK-NOT: /secret'

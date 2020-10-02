@@ -134,8 +134,52 @@ private:
     if (!isRef) {
       uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
+      if (auto *VD = dyn_cast<ValueDecl>(symbol.decl)) {
+        if (shouldOutputEffectiveAccessOfValueSymbol(symbol.symInfo)) {
+          AccessScope accessScope = VD->getFormalAccessScope();
+          UIdent AttrUID = SwiftLangSupport::getUIDForFormalAccessScope(accessScope);
+          info.EffectiveAccess = AttrUID;
+        }
+      }
     }
     return func(info);
+  }
+
+  bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
+    SymbolKind Kind = Info.Kind;
+    SymbolSubKind SubKind = Info.SubKind;
+    switch (SubKind) {
+      case SymbolSubKind::AccessorGetter:
+      case SymbolSubKind::AccessorSetter:
+      case SymbolSubKind::SwiftAccessorWillSet:
+      case SymbolSubKind::SwiftAccessorDidSet:
+      case SymbolSubKind::SwiftAccessorAddressor:
+      case SymbolSubKind::SwiftAccessorMutableAddressor:
+      case SymbolSubKind::SwiftGenericTypeParam:
+        return false;
+      default:
+        break;
+    }
+    switch (Kind) {
+      case SymbolKind::Enum:
+      case SymbolKind::Struct:
+      case SymbolKind::Class:
+      case SymbolKind::Protocol:
+      case SymbolKind::Constructor:
+      case SymbolKind::EnumConstant:
+      case SymbolKind::Function:
+      case SymbolKind::StaticMethod:
+      case SymbolKind::Variable:
+      case SymbolKind::InstanceMethod:
+      case SymbolKind::ClassMethod:
+      case SymbolKind::InstanceProperty:
+      case SymbolKind::ClassProperty:
+      case SymbolKind::StaticProperty:
+      case SymbolKind::TypeAlias:
+        return true;
+     default:
+        return false;
+    }
   }
 
   template <typename F>
@@ -167,12 +211,12 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
   ASTContext &Ctx = CI.getASTContext();
-  std::unique_ptr<SerializedModuleLoader> Loader;
+  std::unique_ptr<ImplicitSerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
-    Mod = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+    Mod = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   } else {
-    Loader = SerializedModuleLoader::create(Ctx);
+    Loader = ImplicitSerializedModuleLoader::create(Ctx);
     auto Buf = std::unique_ptr<llvm::MemoryBuffer>(
         llvm::MemoryBuffer::getMemBuffer(Input->getBuffer(),
                                          Input->getBufferIdentifier()));
@@ -186,8 +230,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // correct filename here.
     auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
                                  std::move(Buf), nullptr, nullptr,
-                                 /*isFramework*/false,
-                                 /*treatAsPartialModule*/false);
+                                 /*isFramework*/false);
 
     // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
     // more modular, rather than emitting diagnostics itself.
@@ -196,6 +239,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
       return;
     }
 
+    Mod->addFile(*FUnit);
     Mod->setHasResolvedImports();
   }
 

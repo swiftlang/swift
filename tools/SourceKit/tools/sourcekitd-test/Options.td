@@ -140,9 +140,6 @@ def vfs_files : CommaJoined<["-"], "vfs-files=">,
 def vfs_name : Separate<["-"], "vfs-name">,
   HelpText<"Specify a virtual filesystem name">;
 
-def optimize_for_ide : Joined<["-"], "for-ide=">,
-  HelpText<"Value for the OptimizeForIde global configuration setting">;
-
 def suppress_config_request : Flag<["-"], "suppress-config-request">,
   HelpText<"Suppress the default global configuration request, that is otherwise sent before any other request (except for the global-config request itself)">;
 

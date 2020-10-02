@@ -225,10 +225,7 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     let p = Point(x: 21, y: 30)
 ///     print(String(reflecting: p))
-///     // Prints "p: Point = {
-///     //           x = 21
-///     //           y = 30
-///     //         }"
+///     // Prints "Point(x: 21, y: 30)"
 ///
 /// After adding `CustomDebugStringConvertible` conformance by implementing the
 /// `debugDescription` property, `Point` provides its own custom debugging
@@ -236,12 +233,12 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     extension Point: CustomDebugStringConvertible {
 ///         var debugDescription: String {
-///             return "Point(x: \(x), y: \(y))"
+///             return "(\(x), \(y))"
 ///         }
 ///     }
 ///
 ///     print(String(reflecting: p))
-///     // Prints "Point(x: 21, y: 30)"
+///     // Prints "(21, 30)"
 public protocol CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   ///
@@ -293,7 +290,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
       case .optional:
-        if let child = mirror.children.first {
+        if let child = mirror._children.first {
           _debugPrint_unlocked(child.1, &target)
         } else {
           _debugPrint_unlocked("nil", &target)
@@ -301,7 +298,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
       case .tuple:
         target.write("(")
         var first = true
-        for (label, value) in mirror.children {
+        for (label, value) in mirror._children {
           if first {
             first = false
           } else {
@@ -322,7 +319,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
         printTypeName(mirror.subjectType)
         target.write("(")
         var first = true
-        for (label, value) in mirror.children {
+        for (label, value) in mirror._children {
           if let label = label {
             if first {
               first = false
@@ -348,7 +345,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
           // If the case name is garbage, just print the type name.
           printTypeName(mirror.subjectType)
         }
-        if let (_, value) = mirror.children.first {
+        if let (_, value) = mirror._children.first {
           if Mirror(reflecting: value).displayStyle == .tuple {
             _debugPrint_unlocked(value, &target)
           } else {
@@ -453,19 +450,19 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     // count
     switch displayStyle {
     case .tuple:
-      let count = mirror.children.count
+      let count = mirror._children.count
       target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
       return
     case .collection:
-      let count = mirror.children.count
+      let count = mirror._children.count
       target.write(count == 1 ? "1 element" : "\(count) elements")
       return
     case .dictionary:
-      let count = mirror.children.count
+      let count = mirror._children.count
       target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
       return
     case .`set`:
-      let count = mirror.children.count
+      let count = mirror._children.count
       target.write(count == 1 ? "1 member" : "\(count) members")
       return
     default:
@@ -557,6 +554,7 @@ extension String: TextOutputStreamable {
   /// Writes the string into the given output stream.
   ///
   /// - Parameter target: An output stream.
+  @inlinable
   public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(self)
   }

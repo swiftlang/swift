@@ -141,7 +141,7 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   void visitTypedPattern(TypedPattern *P) {
     return visit(P->getSubPattern());
   }
-  void visitVarPattern(VarPattern *P) {
+  void visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
   void visitTuplePattern(TuplePattern *P) {
@@ -178,20 +178,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                 ->areAllParamsConcrete());
   }
 
-  // Emit the lazy initialization token for the initialization expression.
-  auto counter = anonymousSymbolCounter++;
-
-  // Pick one variable of the pattern. Usually it's only one variable, but it
-  // can also be something like: var (a, b) = ...
-  Pattern *pattern = pd->getPattern(pbdEntry);
-  VarDecl *varDecl = nullptr;
-  pattern->forEachVariable([&](VarDecl *D) {
-    varDecl = D;
-  });
-  assert(varDecl);
-
   Mangle::ASTMangler TokenMangler;
-  std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(varDecl, counter,
+  std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(pd, pbdEntry,
                                                               false);
   
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
@@ -207,7 +195,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
 
   // Emit the initialization code into a function.
   Mangle::ASTMangler FuncMangler;
-  std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(varDecl, counter,
+  std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(pd, pbdEntry,
                                                             true);
   
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,

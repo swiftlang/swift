@@ -30,14 +30,15 @@ class FileCollector;
 namespace swift {
 
 DependencyTracker::DependencyTracker(
-    bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector)
+    IntermoduleDepTrackingMode Mode,
+    std::shared_ptr<llvm::FileCollector> FileCollector)
     // NB: The ClangImporter believes it's responsible for the construction of
     // this instance, and it static_cast<>s the instance pointer to its own
     // subclass based on that belief. If you change this to be some other
     // instance, you will need to change ClangImporter's code to handle the
     // difference.
-    : clangCollector(ClangImporter::createDependencyCollector(TrackSystemDeps,
-                                                              FileCollector)) {}
+    : clangCollector(
+          ClangImporter::createDependencyCollector(Mode, FileCollector)) {}
 
 void
 DependencyTracker::addDependency(StringRef File, bool IsSystem) {
@@ -49,9 +50,20 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
                                      /*IsMissing=*/false);
 }
 
+void DependencyTracker::addIncrementalDependency(StringRef File) {
+  if (incrementalDepsUniquer.insert(File).second) {
+    incrementalDeps.emplace_back(File.str());
+  }
+}
+
 ArrayRef<std::string>
 DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
+}
+
+ArrayRef<std::string>
+DependencyTracker::getIncrementalDependencies() const {
+  return incrementalDeps;
 }
 
 std::shared_ptr<clang::DependencyCollector>
@@ -59,13 +71,13 @@ DependencyTracker::getClangCollector() {
   return clangCollector;
 }
 
-static bool findOverlayFilesInDirectory(SourceLoc diagLoc, StringRef path,
-                                        ModuleDecl *module,
-                                        DependencyTracker * const tracker) {
+static bool findOverlayFilesInDirectory(ASTContext &ctx, StringRef path,
+                                        StringRef moduleName,
+                                        SourceLoc diagLoc,
+                                        llvm::function_ref<void(StringRef)> callback) {
   using namespace llvm::sys;
   using namespace file_types;
 
-  ASTContext &ctx = module->getASTContext();
   auto fs = ctx.SourceMgr.getFileSystem();
 
   std::error_code error;
@@ -76,27 +88,23 @@ static bool findOverlayFilesInDirectory(SourceLoc diagLoc, StringRef path,
     if (lookupTypeForExtension(path::extension(file)) != TY_SwiftOverlayFile)
       continue;
 
-    module->addCrossImportOverlayFile(file);
-
-    // FIXME: Better to add it only if we load it.
-    if (tracker)
-      tracker->addDependency(file, module->isSystemModule());
+    callback(file);
   }
 
   if (error && error != std::errc::no_such_file_or_directory) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_list_swiftcrossimport_dir,
-                       module->getName(), error.message(), path);
+                       moduleName, error.message(), path);
   }
   return !error;
 }
 
-void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
-                                    FileUnit *file) {
+static void findOverlayFilesInternal(ASTContext &ctx, StringRef moduleDefiningPath,
+                             StringRef moduleName,
+                             SourceLoc diagLoc,
+                             llvm::function_ref<void(StringRef)> callback) {
   using namespace llvm::sys;
   using namespace file_types;
-
-  auto &langOpts = module->getASTContext().LangOpts;
-
+  auto &langOpts = ctx.LangOpts;
   // This method constructs several paths to directories near the module and
   // scans them for .swiftoverlay files. These paths can be in various
   // directories and have a few different filenames at the end, but I'll
@@ -106,19 +114,17 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
   // /usr/lib/swift/FooKit.swiftmodule/x86_64-apple-macos.swiftinterface
 
   // dirPath = /usr/lib/swift/FooKit.swiftmodule
-  SmallString<64> dirPath{file->getModuleDefiningPath()};
-  if (dirPath.empty())
-    return;
+  SmallString<64> dirPath{moduleDefiningPath};
 
   // dirPath = /usr/lib/swift/
   path::remove_filename(dirPath);
 
   // dirPath = /usr/lib/swift/FooKit.swiftcrossimport
-  path::append(dirPath, file->getExportedModuleName());
+  path::append(dirPath, moduleName);
   path::replace_extension(dirPath, getExtension(TY_SwiftCrossImportDir));
 
   // Search for swiftoverlays that apply to all platforms.
-  if (!findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker))
+  if (!findOverlayFilesInDirectory(ctx, dirPath, moduleName, diagLoc, callback))
     // If we diagnosed an error, or we didn't find the directory at all, don't
     // bother trying the target-specific directories.
     return;
@@ -128,7 +134,7 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
   path::append(dirPath, moduleTriple.str());
 
   // Search for swiftoverlays specific to the target triple's platform.
-  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
+  findOverlayFilesInDirectory(ctx, dirPath, moduleName, diagLoc, callback);
 
   // The rest of this handles target variant triples, which are only used for
   // certain MacCatalyst builds.
@@ -142,7 +148,61 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
   path::append(dirPath, moduleVariantTriple.str());
 
   // Search for swiftoverlays specific to the target variant's platform.
-  findOverlayFilesInDirectory(diagLoc, dirPath, module, dependencyTracker);
+  findOverlayFilesInDirectory(ctx, dirPath, moduleName, diagLoc, callback);
 }
 
+void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
+                                    FileUnit *file) {
+  using namespace llvm::sys;
+  using namespace file_types;
+
+  if (file->getModuleDefiningPath().empty())
+    return;
+  findOverlayFilesInternal(module->getASTContext(),
+                           file->getModuleDefiningPath(),
+                           module->getName().str(),
+                           diagLoc,
+                           [&](StringRef file) {
+    module->addCrossImportOverlayFile(file);
+    // FIXME: Better to add it only if we load it.
+    if (dependencyTracker)
+      dependencyTracker->addDependency(file, module->isSystemModule());
+  });
+}
+
+llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
+ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
+                                                   StringRef moduleName) {
+  using namespace llvm::sys;
+  using namespace file_types;
+  Optional<std::string> modulePath;
+  // A map from secondary module name to a vector of overlay names.
+  llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
+  // Mimic getModuleDefiningPath() for Swift and Clang module.
+  if (auto *swiftDep = dyn_cast<SwiftModuleDependenciesStorage>(storage.get())) {
+    // Prefer interface path to binary module path if we have it.
+    modulePath = swiftDep->swiftInterfaceFile;
+    if (!modulePath.hasValue())
+      modulePath = swiftDep->compiledModulePath;
+    assert(modulePath.hasValue());
+    StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
+    if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
+      modulePath = parentDir.str();
+    }
+  } else if (auto *clangDep = dyn_cast<ClangModuleDependenciesStorage>(storage.get())){
+    modulePath = clangDep->moduleMapFile;
+    assert(modulePath.hasValue());
+  } else { // PlaceholderSwiftModuleDependencies
+    return result;
+  }
+  findOverlayFilesInternal(ctx, *modulePath, moduleName, SourceLoc(),
+                           [&](StringRef file) {
+    StringRef bystandingModule;
+    auto overlayNames =
+      ModuleDecl::collectCrossImportOverlay(ctx, file, moduleName,
+                                            bystandingModule);
+    result[bystandingModule] = std::move(overlayNames);
+  });
+  return result;
+}
 } // namespace swift

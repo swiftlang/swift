@@ -249,6 +249,7 @@ NODE(AssociatedConformanceDescriptor)
 NODE(DefaultAssociatedConformanceAccessor)
 NODE(BaseConformanceDescriptor)
 NODE(AssociatedTypeDescriptor)
+NODE(AsyncAnnotation)
 NODE(ThrowsAnnotation)
 NODE(EmptyList)
 NODE(FirstElementMarker)
@@ -286,6 +287,16 @@ NODE(OpaqueTypeDescriptorAccessorKey)
 NODE(OpaqueTypeDescriptorAccessorVar)
 NODE(OpaqueReturnType)
 CONTEXT_NODE(OpaqueReturnTypeOf)
+
+// Added in Swift 5.4
+NODE(CanonicalSpecializedGenericMetaclass)
+NODE(CanonicalSpecializedGenericTypeMetadataAccessFunction)
+NODE(MetadataInstantiationCache)
+NODE(NoncanonicalSpecializedGenericTypeMetadata)
+NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
+NODE(GlobalVariableOnceFunction)
+NODE(GlobalVariableOnceToken)
+NODE(GlobalVariableOnceDeclList)
 
 #undef CONTEXT_NODE
 #undef NODE

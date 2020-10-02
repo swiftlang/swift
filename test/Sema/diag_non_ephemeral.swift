@@ -23,11 +23,11 @@ var optionalArr: [Int8]?
 // We cannot use array-to-pointer and string-to-pointer conversions with
 // non-ephemeral parameters.
 
-takesMutableRaw(&arr, 5) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}}
+takesMutableRaw(&arr, 5) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}} {{educational-notes=temporary-pointers}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesConst(str, 5) // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'takesConst'}}
+takesConst(str, 5) // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'takesConst'}} {{educational-notes=temporary-pointers}}
 // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesConst'}}
 // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 

@@ -726,8 +726,9 @@ public:
     return getSubregionData().RPONumOfHeaderBlock;
   }
 
-  void dump() const;
-  void print(llvm::raw_ostream &os, bool insertSpaces = false) const;
+  void dump(bool isVerbose = false) const;
+  void print(llvm::raw_ostream &os, bool isShort = false,
+             bool isVerbose = false) const;
   void dumpName() const;
   void printName(llvm::raw_ostream &os) const;
 

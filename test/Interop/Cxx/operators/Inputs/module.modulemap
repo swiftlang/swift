@@ -1,0 +1,15 @@
+module MemberInline {
+  header "member-inline.h"
+}
+
+module MemberOutOfLine {
+  header "member-out-of-line.h"
+}
+
+module NonMemberInline {
+  header "non-member-inline.h"
+}
+
+module NonMemberOutOfLine {
+  header "non-member-out-of-line.h"
+}

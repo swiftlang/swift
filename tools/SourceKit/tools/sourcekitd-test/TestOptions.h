@@ -114,6 +114,7 @@ struct TestOptions {
   bool timeRequest = false;
   llvm::Optional<bool> OptimizeForIde;
   bool SuppressDefaultConfigRequest = false;
+  llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {
     std::string path;

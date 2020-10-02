@@ -26,15 +26,21 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static void
+translateConformingMethodListOptions(OptionsDictionary &from,
+                                     ConformingMethodList::Options &to) {
+  // ConformingMethodList doesn't receive any options at this point.
+}
+
 static bool swiftConformingMethodListImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ArrayRef<const char *> Args,
     ArrayRef<const char *> ExpectedTypeNames,
     ide::ConformingMethodListConsumer &Consumer,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool EnableASTCaching, std::string &Error) {
+    std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -42,14 +48,16 @@ static bool swiftConformingMethodListImpl(
             ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
                                                           Consumer));
 
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
 void SwiftLangSupport::getConformingMethodList(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypeNames,
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypeNames,
     SourceKit::ConformingMethodListConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
@@ -60,6 +68,11 @@ void SwiftLangSupport::getConformingMethodList(
   if (!fileSystem)
     return SKConsumer.failed(error);
 
+  ConformingMethodList::Options options;
+  if (optionsDict) {
+    translateConformingMethodListOptions(*optionsDict, options);
+  }
+
   class Consumer : public ide::ConformingMethodListConsumer {
     SourceKit::ConformingMethodListConsumer &SKConsumer;
 
@@ -68,7 +81,7 @@ void SwiftLangSupport::getConformingMethodList(
         : SKConsumer(SKConsumer) {}
 
     /// Convert an IDE result to a SK result and send it to \c SKConsumer .
-    void handleResult(const ide::ConformingMethodListResult &Result) {
+    void handleResult(const ide::ConformingMethodListResult &Result) override {
       SmallString<512> SS;
       llvm::raw_svector_ostream OS(SS);
 
@@ -108,7 +121,7 @@ void SwiftLangSupport::getConformingMethodList(
 
         // Name.
         memberElem.DeclNameBegin = SS.size();
-        member->getFullName().print(OS);
+        member->getName().print(OS);
         memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Type name.
@@ -172,11 +185,15 @@ void SwiftLangSupport::getConformingMethodList(
 
       SKConsumer.handleResult(SKResult);
     }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
+    }
   } Consumer(SKConsumer);
 
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
                                      ExpectedTypeNames, Consumer, fileSystem,
-                                     /*EnableASTCaching=*/false, error)) {
+                                     error)) {
     SKConsumer.failed(error);
   }
 }

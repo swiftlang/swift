@@ -31,9 +31,10 @@ from __future__ import print_function
 
 import os
 import shutil
+import subprocess
 import sys
 
-assert sys.argv[1] == '-frontend'
+assert sys.argv[2] == '-frontend'
 
 # NB: The bitcode options automatically specify a -primary-file, even in cases
 #     where we do not wish to use a dependencies file in the test.
@@ -43,8 +44,13 @@ if '-primary-file' in sys.argv \
     depsFile = sys.argv[sys.argv.index(
         '-emit-reference-dependencies-path') + 1]
 
-    # Replace the dependencies file with the input file.
-    shutil.copyfile(primaryFile, depsFile)
+    returncode = subprocess.call([sys.argv[1], "--from-yaml",
+                                  "--input-filename=" + primaryFile,
+                                  "--output-filename=" + depsFile])
+    if returncode != 0:
+        # If the input is not valid YAML, just copy it over verbatim;
+        # we're testing a case where we produced a corrupted output file.
+        shutil.copyfile(primaryFile, depsFile)
 else:
     primaryFile = None
 

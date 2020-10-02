@@ -861,7 +861,7 @@ static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
   assert(witnessMethodInst);
   SILDeclRef witnessMember = witnessMethodInst->getMember();
   if (witnessMember.hasDecl()) {
-    witnessMember.getDecl()->getFullName().getString(methodName);
+    witnessMember.getDecl()->getName().getString(methodName);
   }
 }
 

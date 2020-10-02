@@ -114,7 +114,10 @@ struct StructWithoutExplicitConformance {
 }
 
 func structWithoutExplicitConformance() {
-  if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{binary operator '==' cannot be applied to two 'StructWithoutExplicitConformance' operands}}
+  // FIXME(rdar://problem/64844584) - on iOS simulator this diagnostic is flaky
+  // This diagnostic is about `Equatable` because it's considered the best possible solution among other ones for operator `==`.
+  if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { }
+  // expected-error@-1 {{requires that 'StructWithoutExplicitConformance' conform to 'Equatable'}}
 }
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
@@ -195,7 +198,7 @@ extension OtherFileNonconforming: Hashable {
   func hash(into hasher: inout Hasher) {}
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{extension outside of file declaring struct 'YetOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 
 // Verify that we can add Hashable conformance in an extension by only
 // implementing hash(into:)
@@ -252,7 +255,7 @@ extension UnusedGenericDeriveExtension: Hashable {}
 
 // Cross-file synthesis is still disallowed for conditional cases
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
-// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error@-1{{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 
 // rdar://problem/41852654
 

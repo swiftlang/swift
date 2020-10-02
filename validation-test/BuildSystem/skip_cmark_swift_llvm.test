@@ -1,0 +1,35 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-cmark 2>&1 | %FileCheck --check-prefix=SKIP-CMARK-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-llvm 2>&1 | %FileCheck --check-prefix=SKIP-LLVM-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-swift 2>&1 | %FileCheck --check-prefix=SKIP-SWIFT-CHECK %s
+
+# SKIP-CMARK-CHECK-NOT: cmake --build {{.*}}cmark-
+# SKIP-CMARK-CHECK: cmake --build {{.*}}llvm-
+# SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
+# SKIP-CMARK-CHECK-NOT: --- Installing cmark ---
+# SKIP-CMARK-CHECK: --- Installing llvm ---
+# SKIP-CMARK-CHECK: --- Installing swift ---
+
+# SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
+# SKIP-LLVM-CHECK: cmake --build {{.*}}llvm-tblgen
+# SKIP-LLVM-CHECK: cmake --build {{.*}}swift-
+# SKIP-LLVM-CHECK: --- Installing cmark ---
+# SKIP-LLVM-CHECK-NOT: --- Installing llvm ---
+# SKIP-LLVM-CHECK: --- Installing swift ---
+
+# SKIP-SWIFT-CHECK: cmake --build {{.*}}cmark-
+# SKIP-SWIFT-CHECK: cmake --build {{.*}}llvm-
+# SKIP-SWIFT-CHECK-NOT: cmake --build {{.*}}swift-
+# SKIP-SWIFT-CHECK: --- Installing cmark ---
+# SKIP-SWIFT-CHECK: --- Installing llvm ---
+# SKIP-SWIFT-CHECK-NOT: --- Installing swift ---
+

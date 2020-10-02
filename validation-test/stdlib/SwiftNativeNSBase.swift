@@ -47,7 +47,15 @@ func classChain(of cls: AnyClass) -> [String] {
 
 var SwiftNativeNSBaseTestSuite = TestSuite("SwiftNativeNSBase")
 
-SwiftNativeNSBaseTestSuite.test("UnwantedCdtors") {
+SwiftNativeNSBaseTestSuite.test("UnwantedCdtors")
+  .skip(.osxMinorRange(10, 0...15, reason: "lazy objc naming is not available on these OSes"))
+  .skip(.iOSMajorRange(0...13, reason: "lazy objc naming is not available on these OSes"))
+  .skip(.tvOSMajorRange(0...13, reason: "lazy objc naming is not available on these OSes"))
+  .skip(.watchOSMajorRange(0...6, reason: "lazy objc naming is not available on these OSes"))
+  .skip(.iOSSimulatorAny(/*Range(0...13), reason: */"lazy objc naming is not available on these OSes"))
+  .skip(.tvOSSimulatorAny(/*TODO: 0...13, reason: */"lazy objc naming is not available on these OSes"))
+  .skip(.watchOSSimulatorAny(/*TODO: 0...6, reason: */"lazy objc naming is not available on these OSes"))
+  .code {
   expectTrue(TestSwiftNativeNSBase_UnwantedCdtors())
 }
 

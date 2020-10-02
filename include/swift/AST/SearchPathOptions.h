@@ -82,6 +82,20 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
+  /// The paths to a set of explicitly built modules from interfaces.
+  std::vector<std::string> ExplicitSwiftModules;
+
+  /// A set of compiled modules that may be ready to use.
+  std::vector<std::string> CandidateCompiledModules;
+
+  /// A map of explict Swift module information.
+  std::string ExplicitSwiftModuleMap;
+
+  /// A map of placeholder Swift module dependency information.
+  std::string PlaceholderDependencyModuleMap;
+
+  /// A file containing modules we should perform batch scanning.
+  std::string BatchScanInputFilePath;
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {

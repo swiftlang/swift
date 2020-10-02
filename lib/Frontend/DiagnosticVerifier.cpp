@@ -447,9 +447,11 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
-      Expected.LineNo = SM.getLineAndColumn(
-          BufferStartLoc.getAdvancedLoc(MatchStart.data() - InputFile.data()),
-          BufferID).first;
+      Expected.LineNo = SM.getPresumedLineAndColumnForLoc(
+                              BufferStartLoc.getAdvancedLoc(MatchStart.data() -
+                                                            InputFile.data()),
+                              BufferID)
+                            .first;
     Expected.LineNo += LineOffset;
 
     // Check if the next expected diagnostic should be in the same line.
@@ -686,7 +688,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         ///                           ^ remove
         /// @endcode
         if (replStartLoc[-1] == ' ') {
-          replStartLoc--;
+          --replStartLoc;
         }
       } else {
         auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
@@ -794,7 +796,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }
 
     if (I == CapturedDiagnostics.end()) {
-      expectedDiagIter++;
+      ++expectedDiagIter;
       continue;
     }
 
@@ -875,7 +877,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
     if (CapturedDiagIter->FileName != BufferName) {
-      CapturedDiagIter++;
+      ++CapturedDiagIter;
       continue;
     }
 
@@ -961,7 +963,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   }
 
   if (Info.Loc.isValid()) {
-    const auto lineAndColumn = SM.getLineAndColumn(Info.Loc);
+    const auto lineAndColumn = SM.getPresumedLineAndColumnForLoc(Info.Loc);
     const auto fileName = SM.getDisplayNameForLoc(Info.Loc);
     CapturedDiagnostics.emplace_back(message, fileName, Info.Kind, Info.Loc,
                                      lineAndColumn.first, lineAndColumn.second,

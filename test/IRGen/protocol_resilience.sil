@@ -11,6 +11,24 @@ import SwiftShims
 
 import resilient_protocol
 
+// Protocol conformance descriptor for ResilientConformingType : OtherResilientProtocol
+
+// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
+
+// CHECK-SAME: i32 131072,
+
+// -- number of witness table entries
+// CHECK-SAME:   i16 0,
+
+// -- size of private area + 'requires instantiation' bit
+// CHECK-SAME:   i16 1,
+
+// -- instantiator function
+// CHECK-SAME:   i32 0
+
+// CHECK-SAME: }
+
+
 
 // Protocol descriptor for ResilientProtocol
 // CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [18 x i8] c"ResilientProtocol\00
@@ -87,23 +105,6 @@ protocol InternalProtocol {
 
 // CHECK-NOT: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWp" = {{(protected )?}}internal 
 
-
-// Protocol conformance descriptor for ResilientConformingType : OtherResilientProtocol
-
-// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
-
-// CHECK-SAME: i32 131072,
-
-// -- number of witness table entries
-// CHECK-SAME:   i16 0,
-
-// -- size of private area + 'requires instantiation' bit
-// CHECK-SAME:   i16 1,
-
-// -- instantiator function
-// CHECK-SAME:   i32 0
-
-// CHECK-SAME: }
 
 // ConformsWithRequirements protocol conformance descriptor
 

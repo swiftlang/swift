@@ -1,4 +1,4 @@
-sil_register_sources(
+target_sources(swiftSIL PRIVATE
   AbstractionPattern.cpp
   Bridging.cpp
   Linker.cpp
@@ -31,5 +31,4 @@ sil_register_sources(
   SILValue.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  ValueOwnership.cpp
-)
+  ValueOwnership.cpp)

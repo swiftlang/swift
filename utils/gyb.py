@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import io
 import os
 import re
 import sys
@@ -13,7 +14,7 @@ from bisect import bisect
 
 
 try:
-    from cStringIO import StringIO
+    from StringIO import StringIO
 except ImportError:
     from io import StringIO
 
@@ -51,7 +52,7 @@ def split_lines(s):
     If the lines are later concatenated, the result is s, possibly
     with a single appended newline.
     """
-    return [l + '\n' for l in s.split('\n')]
+    return [line + '\n' for line in s.split('\n')]
 
 
 # text on a line up to the first '$$', '${', or '%%'
@@ -399,9 +400,9 @@ class ParseContext(object):
     def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
         if sys.platform == 'win32':
-            self.filename = self.filename.replace('\\', '/')
+            self.filename = '/'.join(self.filename.split(os.sep))
         if template is None:
-            with open(filename) as f:
+            with io.open(os.path.normpath(filename), encoding='utf-8') as f:
                 self.template = f.read()
         else:
             self.template = template
@@ -736,8 +737,10 @@ class Code(ASTNode):
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):
                 result_string = repr(result)
-            else:
+            elif isinstance(result, Integral) or isinstance(result, list):
                 result_string = str(result)
+            else:
+                result_string = StringIO(result).read()
             context.append_text(
                 result_string, self.filename, self.start_line_number)
 
@@ -748,7 +751,7 @@ class Code(ASTNode):
             s = indent + 'Code: {' + source_lines[0] + '}'
         else:
             s = indent + 'Code:\n' + indent + '{\n' + '\n'.join(
-                indent + 4 * ' ' + l for l in source_lines
+                indent + 4 * ' ' + line for line in source_lines
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
 
@@ -763,8 +766,8 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> f = NamedTemporaryFile(delete=False)
-    >>> f.write(
-    ... r'''---
+    >>> _ = f.write(
+    ... br'''---
     ... % for i in range(int(x)):
     ... a pox on ${i} for epoxy
     ... % end
@@ -803,7 +806,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     >>> f.close()
     >>> os.remove(f.name)
     """
-    with open(filename) as f:
+    with io.open(filename, encoding='utf-8') as f:
         t = parse_template(filename, f.read())
         d = os.getcwd()
         os.chdir(os.path.dirname(os.path.abspath(filename)))
@@ -1208,12 +1211,12 @@ def main():
         help='''Bindings to be set in the template's execution context''')
 
     parser.add_argument(
-        'file', type=argparse.FileType(),
+        'file', type=str,
         help='Path to GYB template file (defaults to stdin)', nargs='?',
-        default=sys.stdin)
+        default='-')
     parser.add_argument(
-        '-o', dest='target', type=argparse.FileType('w'),
-        help='Output file (defaults to stdout)', default=sys.stdout)
+        '-o', dest='target', type=str,
+        help='Output file (defaults to stdout)', default='-')
     parser.add_argument(
         '--test', action='store_true',
         default=False, help='Run a self-test')
@@ -1245,15 +1248,23 @@ def main():
             sys.exit(1)
 
     bindings = dict(x.split('=', 1) for x in args.defines)
-    ast = parse_template(args.file.name, args.file.read())
+    if args.file == '-':
+        ast = parse_template('stdin', sys.stdin.read())
+    else:
+        with io.open(os.path.normpath(args.file), 'r', encoding='utf-8') as f:
+            ast = parse_template(args.file, f.read())
     if args.dump:
         print(ast)
     # Allow the template to open files and import .py files relative to its own
     # directory
-    os.chdir(os.path.dirname(os.path.abspath(args.file.name)))
+    os.chdir(os.path.dirname(os.path.abspath(args.file)))
     sys.path = ['.'] + sys.path
 
-    args.target.write(execute_template(ast, args.line_directive, **bindings))
+    if args.target == '-':
+        sys.stdout.write(execute_template(ast, args.line_directive, **bindings))
+    else:
+        with io.open(args.target, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(execute_template(ast, args.line_directive, **bindings))
 
 
 if __name__ == '__main__':

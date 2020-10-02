@@ -4,12 +4,14 @@
 // RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module-objc.swift -c -o %t/test.o
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o
 // RUN: %target-swiftc_driver %t/main.o %t/test.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // Check if it also works if the main module is compiled with -Onone:
 
 // RUN: %target-build-swift -Onone -wmo -module-name=Main -I%t %s -c -o %t/main-onone.o
 // RUN: %target-swiftc_driver %t/main-onone.o %t/test.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test

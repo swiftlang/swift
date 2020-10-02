@@ -193,7 +193,7 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
-    
+
     /// The descriptor for an opaque type.
     /// The pointer is an OpaqueTypeDecl*.
     OpaqueTypeDescriptor,
@@ -295,12 +295,12 @@ class LinkEntity {
     /// The descriptor for an extension.
     /// The pointer is an ExtensionDecl*.
     ExtensionDescriptor,
-    
+
     /// The descriptor for a runtime-anonymous context.
     /// The pointer is the DeclContext* of a child of the context that should
     /// be considered private.
     AnonymousDescriptor,
-    
+
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -384,6 +384,25 @@ class LinkEntity {
 
     /// A global function pointer for dynamically replaceable functions.
     DynamicallyReplaceableFunctionVariable,
+
+    /// A reference to a metaclass-stub for a statically specialized generic
+    /// class.
+    /// The pointer is a canonical TypeBase*.
+    CanonicalSpecializedGenericSwiftMetaclassStub,
+
+    /// An access function for prespecialized type metadata.
+    /// The pointer is a canonical TypeBase*.
+    CanonicalSpecializedGenericTypeMetadataAccessFunction,
+
+    /// Metadata for a specialized generic type which cannot be statically
+    /// guaranteed to be canonical and so must be canonicalized.
+    /// The pointer is a canonical TypeBase*.
+    NoncanonicalSpecializedGenericTypeMetadata,
+
+    /// A cache variable for noncanonical specialized type metadata, to be 
+    /// passed to swift_getCanonicalSpecializedMetadata.
+    /// The pointer is a canonical TypeBase*.
+    NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -556,7 +575,7 @@ class LinkEntity {
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
     if (declRef.isForeign)
       return false;
-
+    
     auto *decl = declRef.getDecl();
     return (isa<ClassDecl>(decl->getDeclContext()) ||
             isa<ProtocolDecl>(decl->getDeclContext()));
@@ -1020,6 +1039,40 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forSpecializedGenericSwiftMetaclassStub(CanType concreteType) {
+    LinkEntity entity;
+    entity.setForType(Kind::CanonicalSpecializedGenericSwiftMetaclassStub,
+                      concreteType);
+    return entity;
+  }
+
+  static LinkEntity
+  forPrespecializedTypeMetadataAccessFunction(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(
+        Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction, theType);
+    return entity;
+  }
+
+  static LinkEntity
+  forNoncanonicalSpecializedGenericTypeMetadata(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(Kind::NoncanonicalSpecializedGenericTypeMetadata,
+                      theType);
+    entity.Data |= LINKENTITY_SET_FIELD(
+        MetadataAddress, unsigned(TypeMetadataAddress::FullMetadata));
+    return entity;
+  }
+
+
+  static LinkEntity
+  forNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable, theType);
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
@@ -1127,6 +1180,7 @@ public:
   }
   TypeMetadataAddress getMetadataAddress() const {
     assert(getKind() == Kind::TypeMetadata ||
+           getKind() == Kind::NoncanonicalSpecializedGenericTypeMetadata ||
            getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
@@ -1177,7 +1231,7 @@ class ApplyIRLinkage {
   IRLinkage IRL;
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
-  void to(llvm::GlobalValue *GV) const {
+  void to(llvm::GlobalValue *GV, bool definition = true) const {
     llvm::Module *M = GV->getParent();
     const llvm::Triple Triple(M->getTargetTriple());
 
@@ -1190,11 +1244,14 @@ public:
     if (Triple.isOSBinFormatELF())
       return;
 
-    if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
-        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
-      if (Triple.supportsCOMDAT())
-        if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
-          GO->setComdat(M->getOrInsertComdat(GV->getName()));
+    // COMDATs cannot be applied to declarations.  If we have a definition,
+    // apply the COMDAT.
+    if (definition)
+      if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
+          IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
+        if (Triple.supportsCOMDAT())
+          if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
+            GO->setComdat(M->getOrInsertComdat(GV->getName()));
   }
 };
 

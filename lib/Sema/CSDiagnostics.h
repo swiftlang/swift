@@ -20,10 +20,12 @@
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -45,15 +47,15 @@ public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
       : S(solution), Locator(locator) {}
 
-  FailureDiagnostic(const Solution &solution, const Expr *anchor)
+  FailureDiagnostic(const Solution &solution, ASTNode anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
 
   virtual ~FailureDiagnostic();
 
-  virtual SourceLoc getLoc() const { return getLoc(getAnchor()); }
+  virtual SourceLoc getLoc() const { return constraints::getLoc(getAnchor()); }
 
   virtual SourceRange getSourceRange() const {
-    return getSourceRange(getAnchor());
+    return constraints::getSourceRange(getAnchor());
   }
 
   /// Try to diagnose a problem given affected expression,
@@ -77,31 +79,41 @@ public:
   /// e.g. ambiguity error.
   virtual bool diagnoseAsNote();
 
-  TypedNode getRawAnchor() const { return Locator->getAnchor(); }
+  ASTNode getRawAnchor() const { return Locator->getAnchor(); }
 
-  virtual TypedNode getAnchor() const;
+  virtual ASTNode getAnchor() const;
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(TypedNode node, bool wantRValue = true) const;
+  Type getType(ASTNode node, bool wantRValue = true) const;
+
+  /// Get type associated with a given ASTNode without resolving it,
+  /// which means that returned type would have type variables.
+  Type getRawType(ASTNode node) const;
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    if (!rawType->hasTypeVariable()) {
-      if (reconstituteSugar)
-        rawType = rawType->reconstituteSugar(/*recursive*/ true);
-      return wantRValue ? rawType->getRValueType() : rawType;
+    auto &cs = getConstraintSystem();
+
+    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+      rawType = rawType.transform([&](Type type) {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          auto resolvedType = S.simplifyType(typeVar);
+          Type GP = typeVar->getImpl().getGenericParameter();
+          return resolvedType->is<UnresolvedType>() && GP
+                     ? GP
+                     : resolvedType;
+        }
+
+        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
+                              : type;
+      });
     }
 
-    auto &cs = getConstraintSystem();
-    return cs.simplifyTypeImpl(rawType, [&](TypeVariableType *typeVar) -> Type {
-      auto fixed = S.simplifyType(typeVar);
-      auto *genericParam = typeVar->getImpl().getGenericParameter();
-      if (fixed->isHole() && genericParam)
-        return genericParam;
-      return resolveType(fixed, reconstituteSugar, wantRValue);
-    });
+    if (reconstituteSugar)
+      rawType = rawType->reconstituteSugar(/*recursive*/ true);
+    return wantRValue ? rawType->getRValueType() : rawType;
   }
 
   template <typename... ArgTypes>
@@ -117,19 +129,19 @@ protected:
     return S.getConstraintSystem();
   }
 
-  Type getContextualType(TypedNode anchor) const {
+  Type getContextualType(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor.get<const Expr *>());
+    return cs.getContextualType(anchor);
   }
 
-  TypeLoc getContextualTypeLoc(TypedNode anchor) const {
+  TypeLoc getContextualTypeLoc(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor.get<const Expr *>());
+    return cs.getContextualTypeLoc(anchor);
   }
 
-  ContextualTypePurpose getContextualTypePurpose(TypedNode anchor) const {
+  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor.get<const Expr *>());
+    return cs.getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -157,17 +169,17 @@ protected:
   }
 
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
+  getConstraintLocator(ASTNode anchor,
                        ConstraintLocator::PathElement element) const {
-    return S.getConstraintLocator(anchor.get<const Expr *>(), {element});
+    return S.getConstraintLocator(anchor, {element});
   }
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *getConstraintLocator(
-      TypedNode anchor,
+      ASTNode anchor,
       ArrayRef<ConstraintLocator::PathElement> path = {}) const {
-    return S.getConstraintLocator(anchor.get<const Expr *>(), path);
+    return S.getConstraintLocator(anchor, path);
   }
 
   ConstraintLocator *
@@ -202,23 +214,12 @@ protected:
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
 
-  static SourceLoc getLoc(TypedNode node);
-  static SourceRange getSourceRange(TypedNode node);
-
-  template <typename T> static const T *castToExpr(TypedNode node) {
-    return cast<T>(node.get<const Expr *>());
+  bool isArrayType(Type type) const {
+    auto &cs = getConstraintSystem();
+    return bool(cs.isArrayType(type));
   }
 
-  template <typename T> static T *getAsExpr(TypedNode node) {
-    if (const auto *E = node.dyn_cast<const Expr *>())
-      return dyn_cast<T>(const_cast<Expr *>(E));
-    return nullptr;
-  }
-
-  template <typename T> static bool isExpr(TypedNode node) {
-    auto *E = node.get<const Expr *>();
-    return isa<T>(E);
-  }
+  bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -265,8 +266,9 @@ public:
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
 
-    if (auto *parentExpr = findParentExpr(getRawAnchor().get<const Expr *>()))
-      Apply = dyn_cast<ApplyExpr>(parentExpr);
+    if (auto *expr = getAsExpr(getRawAnchor()))
+      if (auto *parentExpr = findParentExpr(expr))
+        Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
   unsigned getRequirementIndex() const {
@@ -479,16 +481,32 @@ public:
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   DeclNameRef Member;
+  Type MemberBaseType;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName, bool resultOptional)
+                                    DeclNameRef memberName,
+                                    Type memberBaseType,
+                                    bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
+        MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
+  
+  Type getMemberBaseType() const {
+    return MemberBaseType;
+  }
+  
+  SourceLoc getLoc() const override {
+    // The end location points to the dot in the member access.
+    return getSourceRange().End;
+  }
+  
+  SourceRange getSourceRange() const override;
+
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -508,7 +526,7 @@ class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
   ArrayRef<OverloadChoice> Choices;
 
 public:
-  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions, Expr *anchor,
+  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions, ASTNode anchor,
                                   ArrayRef<OverloadChoice> choices)
       : FailureDiagnostic(solutions.front(), anchor), Choices(choices) {}
 
@@ -521,16 +539,16 @@ public:
 /// trying to assign something to immutable value, or trying
 /// to access mutating member on immutable base.
 class AssignmentFailure final : public FailureDiagnostic {
-  const Expr *DestExpr;
+  Expr *DestExpr;
   SourceLoc Loc;
   Diag<StringRef> DeclDiagnostic;
   Diag<Type> TypeDiagnostic;
 
 public:
-  AssignmentFailure(const Expr *destExpr, const Solution &solution,
+  AssignmentFailure(Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc);
 
-  AssignmentFailure(const Expr *destExpr, const Solution &solution,
+  AssignmentFailure(Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
                     Diag<Type> typeDiag)
       : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
@@ -622,23 +640,6 @@ public:
 
   /// Attempts to add fix-its for these two mistakes:
   ///
-  /// - Passing an integer where a type conforming to RawRepresentable is
-  ///   expected, by wrapping the expression in a call to the contextual
-  ///   type's initializer
-  ///
-  /// - Passing a type conforming to RawRepresentable where an integer is
-  ///   expected, by wrapping the expression in a call to the rawValue
-  ///   accessor
-  ///
-  /// - Return true on the fixit is added, false otherwise.
-  ///
-  /// This helps migration with SDK changes.
-  bool
-  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
-                            KnownProtocolKind rawRepresentablePrococol) const;
-
-  /// Attempts to add fix-its for these two mistakes:
-  ///
   /// - Passing an integer with the right type but which is getting wrapped with
   ///   a different integer type unnecessarily. The fixit removes the cast.
   ///
@@ -675,8 +676,7 @@ private:
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
-        getConstraintSystem(), type,
-        KnownProtocolKind::ExpressibleByIntegerLiteral);
+        type, KnownProtocolKind::ExpressibleByIntegerLiteral);
   }
 
   /// Return true if the conversion from fromType to toType is
@@ -791,7 +791,7 @@ public:
       : ContextualFailure(solution, fromType, toType, locator) {
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->throws() != fnType2->throws());
+    assert(fnType1->isThrowing() != fnType2->isThrowing());
   }
 
   bool diagnoseAsError() override;
@@ -806,7 +806,7 @@ public:
                                    Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -814,7 +814,7 @@ private:
   bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
     return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
@@ -824,7 +824,7 @@ private:
   bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
 
@@ -967,27 +967,27 @@ public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
   VarDecl *Property;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
 
 public:
   PropertyWrapperReferenceFailure(const Solution &solution, VarDecl *property,
-                                  bool usingStorageWrapper, Type base,
+                                  bool usingProjection, Type base,
                                   Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
-        UsingStorageWrapper(usingStorageWrapper) {}
+        UsingProjection(usingProjection) {}
 
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
 
-  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+  bool usingProjection() const { return UsingProjection; }
 
   ValueDecl *getReferencedMember() const {
     auto *locator = getLocator();
@@ -1057,7 +1057,7 @@ protected:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public InvalidMemberRefFailure {
+class MissingMemberFailure : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(const Solution &solution, Type baseType,
                        DeclNameRef memberName, ConstraintLocator *locator)
@@ -1065,7 +1065,7 @@ public:
 
   SourceLoc getLoc() const override {
     // Diagnostic should point to the member instead of its base expression.
-    return FailureDiagnostic::getLoc(getRawAnchor());
+    return constraints::getLoc(getRawAnchor());
   }
 
   bool diagnoseAsError() override;
@@ -1076,10 +1076,38 @@ private:
   /// overload to be present, but a class marked as `@dynamicCallable`
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
+  
+  /// Tailored diagnostics for collection literal with unresolved member expression
+  /// that defaults the element type. e.g. _ = [.e]
+  bool diagnoseInLiteralCollectionContext() const;
+
+  /// Tailored diagnostics for missing subscript member on a tuple base type.
+  /// e.g
+  /// ```swift
+  ///   let tuple: (Int, Int) = (0, 0)
+  ///   _ = tuple[0] // -> tuple.0.
+  ///  ```
+  bool diagnoseForSubscriptMemberWithTupleBase() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+};
+
+class UnintendedExtraGenericParamMemberFailure final
+    : public MissingMemberFailure {
+  Identifier ParamName;
+
+public:
+  UnintendedExtraGenericParamMemberFailure(const Solution &solution,
+                                           Type baseType,
+                                           DeclNameRef memberName,
+                                           Identifier paramName,
+                                           ConstraintLocator *locator)
+      : MissingMemberFailure(solution, baseType, memberName, locator),
+        ParamName(paramName) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -1162,7 +1190,7 @@ protected:
   const ConstructorDecl *Init;
   SourceRange BaseRange;
 
-  TypedNode getAnchor() const override { return getRawAnchor(); }
+  ASTNode getAnchor() const override { return getRawAnchor(); }
 
   InvalidInitRefFailure(const Solution &solution, Type baseTy,
                         const ConstructorDecl *init, SourceRange baseRange,
@@ -1256,7 +1284,7 @@ public:
     assert(!SynthesizedArgs.empty() && "No missing arguments?!");
   }
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -1279,10 +1307,10 @@ private:
   bool isPropertyWrapperInitialization() const;
 
   /// Gather information associated with expression that represents
-  /// a call - function, arguments, # of arguments and whether it has
-  /// a trailing closure.
-  std::tuple<Expr *, Expr *, unsigned, bool>
-  getCallInfo(TypedNode anchor) const;
+  /// a call - function, arguments, # of arguments and the position of
+  /// the first trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, Optional<unsigned>>
+      getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`
@@ -1490,7 +1518,7 @@ public:
 
   DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
 
-  DeclName getName() const { return Member->getFullName(); }
+  DeclName getName() const { return Member->getName(); }
 
   bool diagnoseAsError() override = 0;
 
@@ -1517,6 +1545,25 @@ class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
 public:
   InvalidStaticMemberRefInKeyPath(const Solution &solution, ValueDecl *member,
                                   ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference an enum case as a key path component
+/// e.g.
+///
+/// ```swift
+/// enum E {
+///   case foo
+/// }
+///
+/// _ = \E.Type.foo
+/// ```
+class InvalidEnumCaseRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidEnumCaseRefInKeyPath(const Solution &solution, ValueDecl *member,
+                              ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {}
 
   bool diagnoseAsError() override;
@@ -1604,6 +1651,8 @@ public:
       : ContextualFailure(solution, eltType, contextualType, locator) {}
 
   bool diagnoseAsError() override;
+
+  bool diagnoseMergedLiteralElements();
 };
 
 class MissingContextualConformanceFailure final : public ContextualFailure {
@@ -1649,7 +1698,7 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, const Expr *>;
+  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
 
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
@@ -1783,6 +1832,10 @@ public:
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
 
+  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// closures being passed to non-closure parameters.
+  bool diagnoseTrailingClosureMismatch() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info.getArgPosition(); }
@@ -1834,7 +1887,7 @@ protected:
   /// \returns The full name of the callee, or a null decl name if there is no
   /// callee.
   DeclName getCalleeFullName() const {
-    return getCallee() ? getCallee()->getFullName() : DeclName();
+    return getCallee() ? getCallee()->getName() : DeclName();
   }
 
   /// Returns the type of the parameter involved in the mismatch, including any
@@ -1885,7 +1938,7 @@ public:
                                Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1966,7 +2019,16 @@ public:
                                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), MemberName(member) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
+};
+
+class UnableToInferClosureParameterType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureParameterType(const Solution &solution,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferClosureReturnType final : public FailureDiagnostic {
@@ -1975,7 +2037,7 @@ public:
                                  ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
@@ -2009,7 +2071,7 @@ public:
                                       ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 /// Emits a warning about an attempt to use the 'as' operator as the 'as!'
@@ -2036,6 +2098,189 @@ public:
   KeyPathRootTypeMismatchFailure(const Solution &solution, Type lhs, Type rhs,
                                  ConstraintLocator *locator)
       : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to use a KeyPath where a multi-argument function is expected
+///
+/// ```swift
+/// [Item].sorted(\Item.name)
+/// ```
+class MultiArgFuncKeyPathFailure final : public FailureDiagnostic {
+  Type functionType;
+public:
+  MultiArgFuncKeyPathFailure(const Solution &solution, Type functionType,
+                             ConstraintLocator *locator)
+  : FailureDiagnostic(solution, locator),
+  functionType(functionType) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a failure to infer a KeyPath type by context.
+///
+/// ```swift
+/// _ = \.x
+/// let _ : AnyKeyPath = \.x
+/// ```
+class UnableToInferKeyPathRootFailure final : public FailureDiagnostic {
+public:
+  UnableToInferKeyPathRootFailure(const Solution &solution,
+                                  ConstraintLocator *locator)
+  : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class AbstractRawRepresentableFailure : public FailureDiagnostic {
+protected:
+  Type RawReprType;
+  Type ExpectedType;
+
+  AbstractRawRepresentableFailure(const Solution &solution, Type rawReprType,
+                                  Type expectedType, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        RawReprType(resolveType(rawReprType)),
+        ExpectedType(resolveType(expectedType)) {}
+
+public:
+  virtual Type getFromType() const = 0;
+  virtual Type getToType() const = 0;
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+protected:
+  Optional<Diag<Type, Type>> getDiagnostic() const;
+
+  virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
+};
+
+/// Diagnose an attempt to initialize raw representable type or convert to it
+/// a value of some other type that matches its `RawValue` type.
+///
+/// ```swift
+/// enum E : Int {
+///   case a, b, c
+/// }
+///
+/// let _: E = 0
+/// ```
+///
+/// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
+/// force unwrapped to constitute a valid binding.
+class MissingRawRepresentableInitFailure final
+    : public AbstractRawRepresentableFailure {
+public:
+  MissingRawRepresentableInitFailure(const Solution &solution, Type rawReprType,
+                                     Type expectedType,
+                                     ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return ExpectedType; }
+  Type getToType() const override { return RawReprType; }
+
+protected:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose an attempt to pass raw representable type where its raw value
+/// is expected instead.
+///
+/// ```swift
+/// enum E : Int {
+///   case one = 1
+/// }
+///
+/// let _: Int = E.one
+/// ```
+///
+/// `E.one` has to use `.rawValue` to match `Int` expected by pattern binding.
+class MissingRawValueFailure final : public AbstractRawRepresentableFailure {
+public:
+  MissingRawValueFailure(const Solution &solution, Type rawReprType,
+                         Type expectedType, ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return RawReprType; }
+  Type getToType() const override { return ExpectedType; }
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose a key path optional base that should be unwraped in order to 
+/// apply key path subscript.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class MissingOptionalUnwrapKeyPathFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapKeyPathFailure(const Solution &solution, Type lhs,
+                                      Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+  SourceLoc getLoc() const override;
+};
+
+/// Diagnose situations when trailing closure has been matched to a specific
+/// parameter via a deprecated backward scan.
+///
+/// \code
+/// func multiple_trailing_with_defaults(
+///   duration: Int,
+///   animations: (() -> Void)? = nil,
+///   completion: (() -> Void)? = nil) {}
+///
+/// multiple_trailing_with_defaults(duration: 42) {} // picks `completion:`
+/// \endcode
+class TrailingClosureRequiresExplicitLabel final : public FailureDiagnostic {
+public:
+  TrailingClosureRequiresExplicitLabel(const Solution &solution,
+                                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic,
+             const FunctionArgApplyInfo &info) const;
+};
+
+/// Diagnose situations where we have a key path with no components.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class InvalidEmptyKeyPathFailure final : public FailureDiagnostic {
+public:
+  InvalidEmptyKeyPathFailure(const Solution &solution,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where there is no context to determine a
+/// type of `nil` literal e.g.
+///
+/// \code
+/// let _ = nil
+/// let _ = try nil
+/// let _ = nil!
+/// \endcode
+class MissingContextualTypeForNil final : public FailureDiagnostic {
+public:
+  MissingContextualTypeForNil(const Solution &solution,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
 };

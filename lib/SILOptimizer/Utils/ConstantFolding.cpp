@@ -1008,6 +1008,7 @@ IEEESemantics getFPSemantics(BuiltinFloatType *fpType) {
   case BuiltinFloatType::PPC128:
     llvm_unreachable("ppc128 is not supported");
   }
+  llvm_unreachable("invalid floating point kind");
 }
 
 /// This function, given the exponent and significand of a binary fraction
@@ -1394,7 +1395,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
   // Constant fold extraction of a constant element.
   if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
     if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand())) {
-      Results.push_back(TheTuple->getElement(TEI->getFieldNo()));
+      Results.push_back(TheTuple->getElement(TEI->getFieldIndex()));
       return true;
     }
   }
@@ -1506,46 +1507,6 @@ static bool isApplyOfStringConcat(SILInstruction &I) {
 static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I) ||
          isa<StringLiteralInst>(I);
-}
-
-bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
-  SILBuilder B(AI);
-  // Try to apply the string literal concatenation optimization.
-  auto *Concatenated = tryToConcatenateStrings(AI, B);
-  // Bail if string literal concatenation could not be performed.
-  if (!Concatenated)
-    return false;
-
-  // Replace all uses of the old instruction by a new instruction.
-  AI->replaceAllUsesWith(Concatenated);
-
-  auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
-  // Remove operands that are not used anymore.
-  // Even if they are apply_inst, it is safe to
-  // do so, because they can only be applies
-  // of functions annotated as string.utf16
-  // or string.utf16.
-  for (auto &Op : AI->getAllOperands()) {
-    SILValue Val = Op.get();
-    Op.drop();
-    if (Val->use_empty()) {
-      auto *DeadI = Val->getDefiningInstruction();
-      assert(DeadI);
-      recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
-                                                 RemoveCallback);
-    }
-  }
-  // Schedule users of the new instruction for constant folding.
-  // We only need to schedule the string.concat invocations.
-  for (auto AIUse : Concatenated->getUses()) {
-    if (isApplyOfStringConcat(*AIUse->getUser())) {
-      WorkList.insert(AIUse->getUser());
-    }
-  }
-  // Delete the old apply instruction.
-  recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true,
-                                             RemoveCallback);
-  return true;
 }
 
 /// Given a buitin instruction calling globalStringTablePointer, check whether
@@ -1770,16 +1731,6 @@ ConstantFolder::processWorkList() {
           continue;
         }
       }
-
-    if (auto *AI = dyn_cast<ApplyInst>(I)) {
-      // Apply may only come from a string.concat invocation.
-      if (constantFoldStringConcatenation(AI)) {
-        // Invalidate all analysis that's related to the call graph.
-        InvalidateInstructions = true;
-      }
-
-      continue;
-    }
 
     // If we have a cast instruction, try to optimize it.
     if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||

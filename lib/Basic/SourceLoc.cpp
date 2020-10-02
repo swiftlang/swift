@@ -152,9 +152,8 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
   return nullptr;
 }
 
-
-Optional<unsigned> SourceManager::getIDForBufferIdentifier(
-    StringRef BufIdentifier) {
+Optional<unsigned>
+SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   auto It = BufIdentIDMap.find(BufIdentifier);
   if (It == BufIdentIDMap.end())
     return None;
@@ -255,7 +254,7 @@ void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
     return;
   }
 
-  auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
+  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(*this, BufferID);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
 }
 
@@ -274,7 +273,7 @@ void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
     OS << "line";
   }
 
-  auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
+  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(*this, BufferID);
   OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
 }
 

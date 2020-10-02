@@ -10,17 +10,17 @@
 // RUN: echo 'import LeafModule' >%t/other.swift
 // RUN: echo 'public func OtherFunc() -> Int { return LeafFunc(); }' >>%t/other.swift
 //
-// Phase 1: build LeafModule into a .swiftinterface file with -target x86_64-macosx-10.9:
+// Phase 1: build LeafModule into a .swiftinterface file with -target %target-cpu-macosx-10.9:
 //
-// RUN: %swift -target x86_64-apple-macosx10.9 -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -typecheck
+// RUN: %swift -target %target-cpu-apple-macosx10.9 -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -typecheck
 //
-// Phase 2: build OtherModule into a .swiftinterface file with -target x86_64-macosx-10.10:
+// Phase 2: build OtherModule into a .swiftinterface file with -target %target-cpu-macosx-10.10:
 //
-// RUN: %swift -target x86_64-apple-macosx10.10 -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -typecheck
+// RUN: %swift -target %target-cpu-apple-macosx10.10 -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -typecheck
 //
-// Phase 3: build TestModule in -target x86_64-apple-macosx10.11 and import both of these:
+// Phase 3: build TestModule in -target %target-cpu-apple-macosx10.11 and import both of these:
 //
-// RUN: %swift -target x86_64-apple-macosx10.11  -I %t -module-cache-path %t/modulecache -module-name TestModule %s -typecheck
+// RUN: %swift -target %target-cpu-apple-macosx10.11  -I %t -module-cache-path %t/modulecache -module-name TestModule %s -typecheck
 //
 // Phase 4: make sure we only compiled LeafModule and OtherModule one time:
 //

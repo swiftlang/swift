@@ -18,8 +18,9 @@
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/GenericParamList.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -149,13 +150,6 @@ public:
   std::pair<Type, ProtocolConformanceRef>
   mapConformanceRefIntoContext(Type conformingType,
                                ProtocolConformanceRef conformance) const;
-          
-  /// Get the sugared form of a generic parameter type.
-  GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
-
-  /// Get the sugared form of a type by substituting any
-  /// generic parameter types by their sugared form.
-  Type getSugaredType(Type type) const;
 
   SubstitutionMap getForwardingSubstitutionMap() const;
 

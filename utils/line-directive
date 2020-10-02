@@ -13,6 +13,7 @@
 from __future__ import print_function
 
 import bisect
+import io
 import os
 import re
 import shlex
@@ -61,7 +62,10 @@ line_pattern = re.compile(
 
 def _make_line_map(target_filename, stream=None):
     """
-    >>> from StringIO import StringIO
+    >>> try:
+    ...     from StringIO import StringIO # py2
+    ... except ImportError:
+    ...     from io import StringIO # py3
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2
@@ -74,7 +78,7 @@ def _make_line_map(target_filename, stream=None):
     [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
     """
     result = [(0, target_filename, 1)]
-    input = stream or open(target_filename)
+    input = stream or io.open(target_filename, encoding='utf-8')
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
         if m:
@@ -101,7 +105,7 @@ def map_line_to_source_file(target_filename, target_line_num):
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> t = NamedTemporaryFile(delete=False)
-    >>> t.write('''line 1
+    >>> _ = t.write(b'''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
     ... line 4
@@ -139,7 +143,7 @@ def map_line_to_source_file(target_filename, target_line_num):
     map = fline_map(target_filename)
     index = bisect.bisect_left(map, (target_line_num, '', 0))
     base = map[index - 1]
-    return base[1], base[2] + (target_line_num - base[0] - 1)
+    return str(base[1]), base[2] + (target_line_num - base[0] - 1)
 
 
 def map_line_from_source_file(source_filename, source_line_num,
@@ -151,7 +155,7 @@ def map_line_from_source_file(source_filename, source_line_num,
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> t = NamedTemporaryFile(delete=False)
-    >>> t.write('''line 1
+    >>> _ = t.write(b'''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
     ... line 4
@@ -237,7 +241,7 @@ def run():
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> target1 = NamedTemporaryFile(delete=False)
-    >>> target1.write('''line 1
+    >>> _ = target1.write(b'''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
     ... line 4
@@ -252,7 +256,7 @@ def run():
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> target2 = NamedTemporaryFile(delete=False)
-    >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
+    >>> _ = target2.write(b'''// ###sourceLocation(file: "foo.bar", line: 7)
     ... line 2
     ... line 3
     ... // ###sourceLocation(file: "fox.box", line: 11)
@@ -269,21 +273,21 @@ def run():
     >>> # the file by its name across all platforms.
     >>> raw_output = NamedTemporaryFile(delete=False)
     >>> target1_name, target2_name = target1.name, target2.name
-    >>> raw_output.write('''A
-    ... %(target1_name)s:2:111: error one
+    >>> _ = raw_output.write('''A
+    ... {target1_name}:2:111: error one
     ... B
-    ... %(target1_name)s:4:222: error two
+    ... {target1_name}:4:222: error two
     ... C
-    ... %(target1_name)s:8:333: error three
+    ... {target1_name}:8:333: error three
     ... D
-    ... glitch in file %(target2_name)s:1 assert one
+    ... glitch in file {target2_name}:1 assert one
     ... E
-    ... glitch in file %(target2_name)s, line 2 assert two
-    ... glitch at %(target2_name)s, line 3 assert three
-    ... glitch at %(target2_name)s:4 assert four
-    ... glitch in [%(target2_name)s, line 5 assert five
-    ... glitch in [%(target2_name)s:22 assert six
-    ... ''' % locals())
+    ... glitch in file {target2_name}, line 2 assert two
+    ... glitch at {target2_name}, line 3 assert three
+    ... glitch at {target2_name}:4 assert four
+    ... glitch in [{target2_name}, line 5 assert five
+    ... glitch in [{target2_name}:22 assert six
+    ... '''.format(**locals()).encode('utf-8'))
     >>> raw_output.flush()
 
     Run this tool on the two targets, using a portable version of Unix 'cat' to
@@ -330,7 +334,7 @@ def run():
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> long_output = NamedTemporaryFile(delete=False)
-    >>> long_output.write('''
+    >>> _ = long_output.write(b'''
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 1)
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 1)
     ... //===--- Map.swift.gyb - Lazily map over a Sequence -----------*- swif
@@ -649,7 +653,8 @@ def run():
     >>> long_output.flush()
     >>> long_output_result = subprocess.check_output([sys.executable,
     ...    __file__, long_output.name, '--',
-    ...    'echo', long_output.name + ':112:27: error:']).rstrip()
+    ...    'echo', long_output.name + ':112:27: error:'
+    ... ]).rstrip().decode('ascii')
     >>> print(long_output_result)
     /public/core/Map.swift.gyb:117:27: error:
     >>> target1.close()
@@ -700,7 +705,7 @@ def run():
             ':(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*?)\n?$')
 
         assertion_pattern = re.compile(
-            '^(?P<head>.*( file | at |#[0-9]+: |[\[]))' +
+            '^(?P<head>.*( file | at |#[0-9]+: |[\\[]))' +
             sources +
             '(?P<middle>, line |:)(?P<line>[0-9]+)(?P<tail>.*?)\n?$')
 
@@ -710,8 +715,8 @@ def run():
                 break
             output = input
 
-            def decode_match(p, l):
-                m = p.match(l)
+            def decode_match(p, line):
+                m = p.match(line)
                 if m is None:
                     return ()
                 file, line_num = map_line_to_source_file(

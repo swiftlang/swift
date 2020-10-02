@@ -309,6 +309,9 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       case Special::TypeDescriptor:
       case Special::TypeDescriptorAsArgument:
         return SpecialPointerAuthDiscriminators::TypeDescriptor;
+      case Special::ProtocolConformanceDescriptor:
+      case Special::ProtocolConformanceDescriptorAsArgument:
+        return SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor;
       case Special::PartialApplyCapture:
         return PointerAuthDiscriminator_PartialApplyCapture;
       case Special::KeyPathDestroy:
@@ -397,6 +400,17 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
     assert(!constant.isForeign &&
            "discriminator for foreign declaration not supported yet!");
 
+    // Special case: methods that are witnesses to Actor.enqueue(partialTask:)
+    // have their own descriminator, which is shared across all actor classes.
+    if (constant.hasFuncDecl()) {
+      auto func = dyn_cast<FuncDecl>(constant.getFuncDecl());
+      if (func->isActorEnqueuePartialTaskWitness()) {
+        cache = IGM.getSize(
+            Size(SpecialPointerAuthDiscriminators::ActorEnqueuePartialTask));
+        return cache;
+      }
+    }
+
     auto mangling = constant.mangle();
     cache = getDiscriminatorForString(IGM, mangling);
     return cache;
@@ -457,7 +471,8 @@ static void hashStringForList(IRGenModule &IGM, const ArrayRef<T> &list,
       // Indirect params and return values have to be opaque.
       Out << "-indirect";
     } else {
-      CanType Ty = paramOrRetVal.getArgumentType(IGM.getSILModule(), fnType);
+      CanType Ty = paramOrRetVal.getArgumentType(
+          IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
         Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
@@ -475,7 +490,8 @@ static void hashStringForList(IRGenModule &IGM,
       // Indirect params and return values have to be opaque.
       Out << "-indirect";
     } else {
-      CanType Ty = paramOrRetVal.getReturnValueType(IGM.getSILModule(), fnType);
+      CanType Ty = paramOrRetVal.getReturnValueType(
+          IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
         Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
@@ -546,7 +562,8 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     } else if (yield.isFormalIndirect()) {
       out << "indirect";
     } else {
-      CanType Ty = yield.getArgumentType(IGM.getSILModule(), type);
+      CanType Ty = yield.getArgumentType(IGM.getSILModule(), type,
+                                         IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
         Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, out, genericEnv);
@@ -584,6 +601,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
       llvm_unreachable("not type discriminated");
     }
     }
+    llvm_unreachable("invalid representation");
   };
 
   auto getCoroutineYieldTypesDiscriminator = [&](CanSILFunctionType fnType) {

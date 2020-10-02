@@ -63,8 +63,8 @@ class NinjaBuilder(product.ProductBuilder):
                     "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
                 ).format(sysroot=sysroot, osx_version=osx_version_min),
                 "LDFLAGS": (
-                    "-mmacosx-version-min={osx_version}"
-                ).format(osx_version=osx_version_min),
+                    "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
+                ).format(sysroot=sysroot, osx_version=osx_version_min),
             }
         elif self.toolchain.cxx:
             env = {

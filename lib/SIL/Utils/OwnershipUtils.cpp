@@ -12,6 +12,7 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -34,6 +35,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::LinearFunctionInst:
   case SILNodeKind::OpenExistentialRefInst:
   case SILNodeKind::UpcastInst:
+  case SILNodeKind::UncheckedValueCastInst:
   case SILNodeKind::UncheckedRefCastInst:
   case SILNodeKind::ConvertFunctionInst:
   case SILNodeKind::RefToBridgeObjectInst:
@@ -265,6 +267,48 @@ void BorrowingOperand::visitUserResultConsumingUses(
   }
 }
 
+bool BorrowingOperand::getImplicitUses(
+    SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *errorFunction) const {
+  if (!areAnyUserResultsBorrowIntroducers()) {
+    visitEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
+    return false;
+  }
+
+  // Ok, we have an instruction that introduces a new borrow scope and its
+  // result is that borrow scope. In such a case, we need to not just add the
+  // end scope instructions of this scoped operand, but also look through any
+  // guaranteed phis and add their end_borrow to this list as well.
+  SmallVector<BorrowingOperand, 8> worklist;
+  SmallPtrSet<Operand *, 8> visitedValue;
+  worklist.push_back(*this);
+  visitedValue.insert(op);
+  bool foundError = false;
+  while (!worklist.empty()) {
+    auto scopedOperand = worklist.pop_back_val();
+    scopedOperand.visitConsumingUsesOfBorrowIntroducingUserResults(
+        [&](Operand *op) {
+          if (auto subSub = BorrowingOperand::get(op)) {
+            if (!visitedValue.insert(op).second) {
+              if (errorFunction) {
+                (*errorFunction)(op);
+              }
+              foundError = true;
+              return;
+            }
+
+            worklist.push_back(*subSub);
+            visitedValue.insert(subSub->op);
+            return;
+          }
+
+          foundUses.push_back(op);
+        });
+  }
+
+  return foundError;
+}
+
 //===----------------------------------------------------------------------===//
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
@@ -459,6 +503,113 @@ bool BorrowedValue::visitInteriorPointerOperands(
 }
 
 //===----------------------------------------------------------------------===//
+//                           InteriorPointerOperand
+//===----------------------------------------------------------------------===//
+
+bool InteriorPointerOperand::getImplicitUses(
+    SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *onError) {
+  SILValue projectedAddress = getProjectedAddress();
+  SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
+
+  bool foundError = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    // Skip type dependent operands.
+    if (op->isTypeDependent())
+      continue;
+
+    // Before we do anything, add this operand to our implicit regular user
+    // list.
+    foundUses.push_back(op);
+
+    // Then update the worklist with new things to find if we recognize this
+    // inst and then continue. If we fail, we emit an error at the bottom of the
+    // loop that we didn't recognize the user.
+    auto *user = op->getUser();
+
+    // First, eliminate "end point uses" that we just need to check liveness at
+    // and do not need to check transitive uses of.
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isIncidentalUse(user) || isa<StoreInst>(user) ||
+        isa<StoreBorrowInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<DestroyAddrInst>(user) || isa<AssignInst>(user) ||
+        isa<AddressToPointerInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user)) {
+      continue;
+    }
+
+    // Then handle users that we need to look at transitive uses of.
+    if (Projection::isAddressProjection(user) ||
+        isa<ProjectBlockStorageInst>(user) ||
+        isa<OpenExistentialAddrInst>(user) ||
+        isa<InitExistentialAddrInst>(user) || isa<BeginAccessInst>(user) ||
+        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user)) {
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *builtin = dyn_cast<BuiltinInst>(user)) {
+      if (auto kind = builtin->getBuiltinKind()) {
+        if (*kind == BuiltinValueKind::TSanInoutAccess) {
+          continue;
+        }
+      }
+    }
+
+    // If we have a load_borrow, add it's end scope to the liveness requirement.
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
+      transform(lbi->getEndBorrows(), std::back_inserter(foundUses),
+                [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+      continue;
+    }
+
+    // TODO: Merge this into the full apply site code below.
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      // TODO: Just add this to implicit regular user list?
+      llvm::copy(beginApply->getTokenResult()->getUses(),
+                 std::back_inserter(foundUses));
+      continue;
+    }
+
+    if (auto fas = FullApplySite::isa(user)) {
+      continue;
+    }
+
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      // If this is the base, just treat it as a liveness use.
+      if (op->get() == mdi->getBase()) {
+        continue;
+      }
+
+      // If we are the value use, look through it.
+      llvm::copy(mdi->getValue()->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // We were unable to recognize this user, so return true that we failed.
+    if (onError) {
+      (*onError)(op);
+    }
+    foundError = true;
+  }
+
+  // We were able to recognize all of the uses of the address, so return false
+  // that we did not find any errors.
+  return foundError;
+}
+
+//===----------------------------------------------------------------------===//
 //                          Owned Value Introducers
 //===----------------------------------------------------------------------===//
 
@@ -484,6 +635,12 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
     return;
   case OwnedValueIntroducerKind::Phi:
     os << "Phi";
+    return;
+  case OwnedValueIntroducerKind::Struct:
+    os << "Struct";
+    return;
+  case OwnedValueIntroducerKind::Tuple:
+    os << "Tuple";
     return;
   case OwnedValueIntroducerKind::FunctionArgument:
     os << "FunctionArgument";

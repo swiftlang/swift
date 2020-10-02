@@ -14,7 +14,6 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -242,6 +241,13 @@ public:
     }
   }
 
+  /// Precompute all analyses.
+  void forcePrecomputeAnalyses(SILFunction *F) {
+    for (auto *A : Analyses) {
+      A->forcePrecompute(F);
+    }
+  }
+
   /// Verify all analyses, limiting the verification to just this one function
   /// if possible.
   ///
@@ -254,16 +260,7 @@ public:
     }
   }
 
-  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
-    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
-      setStageName(Pipeline.Name);
-      resetAndRemoveTransformations();
-      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
-        addPass(Kind);
-      }
-      execute();
-    }
-  }
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
 private:
   void execute();
@@ -283,6 +280,11 @@ private:
 
   /// Run the passes in Transform from \p FromTransIdx to \p ToTransIdx.
   void runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx);
+
+  /// Helper function to check if the function pass should be run mandatorily
+  /// All passes in mandatory pass pipeline and ownership model elimination are
+  /// mandatory function passes.
+  bool isMandatoryFunctionPass(SILFunctionTransform *);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.

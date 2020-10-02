@@ -1,47 +1,66 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
-// rdar://20990451 is tracking the fix for compiling this test optimized.
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_size
-// XFAIL: swift_test_mode_optimize_unchecked
-
 import Foundation
+import StdlibUnittest
 
 protocol Fooable {
-  func foo()
+  func foo() -> String
 }
 
-func fooify<T>(_ x: T) {
+func fooify<T>(_ x: T) -> String {
   if let foo = x as? Fooable {
-    foo.foo()
+    return foo.foo()
   } else {
-    print("not fooable")
+    return "not fooable"
   }
 }
 
 extension NSRect: Fooable {
-  func foo() { print("NSRect") }
+  func foo() -> String { return "NSRect" }
 }
 
 extension CFSet: Fooable {
-  func foo() { print("CFSet") }
+  func foo() -> String { return "CFSet" }
 }
 
 extension NSString: Fooable {
-  func foo() { print("NSString") }
+  func foo() -> String { return "NSString" }
 }
 
-fooify(NSRect()) // CHECK: NSRect
-fooify(NSPoint()) // CHECK-NEXT: not fooable
-// FIXME: CF types get their ObjC class dynamically looked up during dynamic
-// casting.
-fooify(CFSetCreate(kCFAllocatorDefault, nil, 0, nil)!) // TODO-NEXT: CFSet CHECK-NEXT: not fooable
-fooify(CFArrayCreate(kCFAllocatorDefault, nil, 0, nil)!) // CHECK-NEXT: not fooable
-fooify(NSString()) // CHECK-NEXT: NSString
-fooify(NSMutableString()) // CHECK-NEXT: NSString
-fooify(NSSet()) // CHECK-NEXT: not fooable
+var ProtocolLookupForeign = TestSuite("ProtocolLookupForeign")
 
+ProtocolLookupForeign.test("NSRect") {
+  expectEqual("NSRect", fooify(NSRect()))
+}
+
+ProtocolLookupForeign.test("NSPoint") {
+  expectEqual("not fooable", fooify(NSPoint()))
+}
+
+ProtocolLookupForeign.test("CFSet") {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    expectEqual("CFSet", fooify(CFSetCreate(kCFAllocatorDefault, nil, 0, nil)!))
+  }
+}
+
+ProtocolLookupForeign.test("CFArray") {
+  expectEqual("not fooable", fooify(CFArrayCreate(kCFAllocatorDefault, nil, 0, nil)!))
+}
+
+ProtocolLookupForeign.test("NSString") {
+  expectEqual("NSString", fooify(NSString()))
+}
+
+ProtocolLookupForeign.test("NSMutableString") {
+  expectEqual("NSString", fooify(NSMutableString()))
+}
+
+ProtocolLookupForeign.test("NSSet") {
+  expectEqual("not fooable", fooify(NSSet()))
+}
+
+runAllTests()

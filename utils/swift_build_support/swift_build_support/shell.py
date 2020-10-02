@@ -137,7 +137,7 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         return str(out.decode())
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
-            return e.output
+            return str(e.output.decode())
         if optional:
             return None
         _fatal_error(
@@ -193,6 +193,15 @@ def copytree(src, dest, dry_run=None, echo=True):
     if dry_run:
         return
     shutil.copytree(src, dest)
+
+
+def symlink(source, dest, dry_run=None, echo=True):
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or echo:
+        _echo_command(dry_run, ['ln', '-s', source, dest])
+    if dry_run:
+        return
+    os.symlink(source, dest)
 
 
 # Initialized later

@@ -81,7 +81,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
   case PatternKind::Is:
     os << "is ";
-    cast<IsPattern>(p)->getCastTypeLoc().getType()->print(os);
+    cast<IsPattern>(p)->getCastType()->print(os);
     break;
   case PatternKind::EnumElement: {
     auto eep = cast<EnumElementPattern>(p);
@@ -99,7 +99,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("not semantic");
   }
 }
@@ -129,7 +129,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
   }  
   llvm_unreachable("bad pattern");
@@ -168,14 +168,14 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
-    n++;
+    ++n;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
     return n;
   }
   case PatternKind::EnumElement: {
     auto en = cast<EnumElementPattern>(p);
-    n++;
+    ++n;
     if (en->hasSubPattern())
       n = getNumSpecializationsRecursive(en->getSubPattern(), n);
     return n;
@@ -190,7 +190,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
   }  
   llvm_unreachable("bad pattern");
@@ -231,7 +231,7 @@ static bool isWildcardPattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
 
@@ -286,15 +286,14 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     auto pIs = cast<IsPattern>(p);
     // 'is' patterns are only similar to matches to the same type.
     if (auto firstIs = dyn_cast<IsPattern>(first)) {
-      if (firstIs->getCastTypeLoc().getType()
-            ->isEqual(pIs->getCastTypeLoc().getType()))
+      if (firstIs->getCastType()->isEqual(pIs->getCastType()))
         return p;
     }
     return nullptr;
   }
     
   case PatternKind::Paren:
-  case PatternKind::Var:
+  case PatternKind::Binding:
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
@@ -565,7 +564,7 @@ public:
     // AlwaysRefutable before decrementing because we only ever test
     // this value against zero.
     if (isDirectlyRefutablePattern(Columns[column]))
-      NumRemainingSpecializations--;
+      --NumRemainingSpecializations;
 
     if (newColumns.size() == 1) {
       Columns[column] = newColumns[0];
@@ -1039,20 +1038,35 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
         SGF.eraseBasicBlock(contBB);
         return;
       }
-      
+
       // Otherwise, if there is no fallthrough, then the next row is
-      // unreachable: emit a dead code diagnostic.
+      // unreachable: emit a dead code diagnostic if:
+      // 1) It's for a 'default' case (since Space Engine already handles
+      //    unreachable enum case patterns) or it's for a enum case which
+      //    has expression patterns since redundancy checking for such
+      //    patterns isn't sufficiently done by the Space Engine.
+      // 2) It's for a case statement in a do-catch.
       if (!clauses[firstRow].hasFallthroughTo()) {
         SourceLoc Loc;
         bool isDefault = false;
+        bool isParentDoCatch = false;
+        bool caseHasExprPattern = false;
         if (auto *S = clauses[firstRow].getClientData<Stmt>()) {
           Loc = S->getStartLoc();
-          if (auto *CS = dyn_cast<CaseStmt>(S))
+          if (auto *CS = dyn_cast<CaseStmt>(S)) {
+            caseHasExprPattern = llvm::any_of(
+                CS->getCaseLabelItems(), [&](const CaseLabelItem item) {
+                  return item.getPattern()->getKind() == PatternKind::Expr;
+                });
+            isParentDoCatch = CS->getParentKind() == CaseParentKind::DoCatch;
             isDefault = CS->isDefault();
+          }
         } else {
           Loc = clauses[firstRow].getCasePattern()->getStartLoc();
         }
-        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        if (isParentDoCatch || isDefault || caseHasExprPattern) {
+          SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+        }
       }
     }
   }
@@ -1193,6 +1207,17 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
+
+  // Do not emit debug descriptions at this stage.
+  //
+  // If there are multiple let bindings, the value is forwarded to the case
+  // block via a phi. Emitting duplicate debug values for the incoming values
+  // leads to bogus debug info -- we must emit the debug value only on the phi.
+  //
+  // If there's only one let binding, we still want to wait until we can nest
+  // the scope for the case body under the scope for the pattern match.
+  init->setEmitDebugValueOnInit(false);
+
   auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
     mv.forwardInto(SGF, pattern, init.get());
@@ -1338,7 +1363,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("non-semantic pattern kind!");
   
   case PatternKind::Tuple:
@@ -1581,7 +1606,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {
-  auto type = cast<IsPattern>(row.Pattern)->getCastTypeLoc().getType();
+  auto type = cast<IsPattern>(row.Pattern)->getCastType();
   return type->getCanonicalType();
 }
 
@@ -2441,7 +2466,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
     // the order of variables that are the incoming BB arguments. Setup the
     // VarLocs to point to the incoming args and setup initialization so any
     // args needing Cleanup will get that as well.
-    Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
+    LexicalScope scope(SGF, CleanupLocation(caseBlock));
     unsigned argIndex = 0;
     for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
@@ -2471,6 +2496,11 @@ void PatternMatchEmission::emitSharedCaseBlocks(
                arg.getOwnershipKind() == ValueOwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
+
+      // Emit a debug description of the incoming arg, nested within the scope
+      // for the pattern match.
+      SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
 
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
@@ -2608,6 +2638,10 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // If we don't have a fallthrough or a multi-pattern 'case', we can emit the
   // body inline. Emit the statement here and bail early.
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
+    // Debug values for case body variables must be nested within a scope for
+    // the case block to avoid name conflicts.
+    DebugScope scope(SGF, CleanupLocation(caseBlock));
+
     // If we have case body vars, set them up to point at the matching var
     // decls.
     if (caseBlock->hasCaseBodyVariables()) {
@@ -2628,6 +2662,11 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           // Ok, we found a match. Update the VarLocs for the case block.
           auto v = SGF.VarLocs[vd];
           SGF.VarLocs[expected] = v;
+
+          // Emit a debug description for the variable, nested within a scope
+          // for the pattern match.
+          SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+          SGF.B.emitDebugDescription(vd, v.value, dbgVar);
         }
       }
     }
@@ -2747,7 +2786,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
-  Scope switchScope(Cleanups, CleanupLocation(S));
+  LexicalScope switchScope(*this, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.

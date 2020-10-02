@@ -65,7 +65,7 @@ struct HeapObject {
   { }
 
 #ifndef NDEBUG
-  void dump() const LLVM_ATTRIBUTE_USED;
+  void dump() const SWIFT_USED;
 #endif
 
 #endif // __swift__

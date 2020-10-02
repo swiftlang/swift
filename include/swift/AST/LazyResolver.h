@@ -18,7 +18,6 @@
 #define SWIFT_AST_LAZYRESOLVER_H
 
 #include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {

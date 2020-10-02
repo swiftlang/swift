@@ -26,7 +26,6 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
 #define SWIFT_ENTRY_POINT_FUNCTION "main"
@@ -122,6 +121,7 @@ public:
   enum class Purpose : uint8_t {
     None,
     GlobalInit,
+    GlobalInitOnceFunction,
     LazyPropertyGetter
   };
 
@@ -141,11 +141,11 @@ private:
   CanSILFunctionType LoweredType;
 
   /// The context archetypes of the function.
-  GenericEnvironment *GenericEnv;
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// The information about specialization.
   /// Only set if this function is a specialization of another function.
-  const GenericSpecializationInformation *SpecializationInfo;
+  const GenericSpecializationInformation *SpecializationInfo = nullptr;
 
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
@@ -158,10 +158,10 @@ private:
   ValueDecl *ClangNodeOwner = nullptr;
 
   /// The source location and scope of the function.
-  const SILDebugScope *DebugScope;
+  const SILDebugScope *DebugScope = nullptr;
 
   /// The AST decl context of the function.
-  DeclContext *DeclCtxt;
+  DeclContext *DeclCtxt = nullptr;
 
   /// The profiler for instrumentation based profiling, or null if profiling is
   /// disabled.
@@ -315,8 +315,7 @@ private:
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
               ProfileCounter entryCount, IsThunk_t isThunk,
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, SILFunction *insertBefore,
-              const SILDebugScope *debugScope,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass);
 
@@ -333,6 +332,18 @@ private:
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
+
+  void init(SILLinkage Linkage, StringRef Name,
+                         CanSILFunctionType LoweredType,
+                         GenericEnvironment *genericEnv,
+                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
+                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                         ProfileCounter entryCount, IsThunk_t isThunk,
+                         SubclassScope classSubclassScope,
+                         Inline_t inlineStrategy, EffectsKind E,
+                         const SILDebugScope *DebugScope,
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -416,7 +427,7 @@ public:
 
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
-  bool isNoReturnFunction() const;
+  bool isNoReturnFunction(TypeExpansionContext context) const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///
@@ -501,6 +512,8 @@ public:
     assert(!val || isThunk() == IsReabstractionThunk);
     IsWithoutActuallyEscapingThunk = val;
   }
+
+  bool isAsync() const { return LoweredType->isAsync(); }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -831,6 +844,10 @@ public:
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
   bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
+    
+  bool isGlobalInitOnceFunction() const {
+    return specialPurpose == Purpose::GlobalInitOnceFunction;
+  }
 
   bool isLazyPropertyGetter() const {
     return specialPurpose == Purpose::LazyPropertyGetter;
@@ -1051,6 +1068,13 @@ public:
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(bool SingleFunction = true) const;
+
+  /// Run the SIL ownership verifier to check for ownership invariant failures.
+  ///
+  /// NOTE: The ownership verifier is always run when performing normal IR
+  /// verification, so this verification can be viewed as a subset of
+  /// SILFunction::verify.
+  void verifyOwnership(DeadEndBlocks *deadEndBlocks = nullptr) const;
 
   /// Verify that all non-cond-br critical edges have been split.
   ///

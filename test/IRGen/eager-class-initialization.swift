@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -target %target-pre-stable-abi-triple | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-OLD
 
 // REQUIRES: objc_interop
-// UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: swift_only_stable_abi
 
 // See also eager-class-initialization-stable-abi.swift, for the stable ABI
 // deployment target test.

@@ -36,7 +36,7 @@ using namespace incremental_ranges;
 
 SerializableSourceLocation::SerializableSourceLocation(
     const SourceLoc loc, const SourceManager &SM) {
-  auto lc = SM.getLineAndColumn(loc);
+  auto lc = SM.getPresumedLineAndColumnForLoc(loc);
   line = lc.first;
   column = lc.second;
 }
@@ -261,7 +261,7 @@ std::vector<CharSourceRange> SwiftRangesEmitter::coalesceSortedRanges(
 std::vector<SerializableSourceRange>
 SwiftRangesEmitter::serializeRanges(std::vector<CharSourceRange> ranges) const {
   std::vector<SerializableSourceRange> result;
-  for (const auto r : ranges)
+  for (const auto &r : ranges)
     result.push_back(SerializableSourceRange(r, sourceMgr));
   return result;
 }

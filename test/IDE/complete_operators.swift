@@ -168,7 +168,7 @@ func testInfix1(x: S2) {
 }
 // S2_INFIX: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
-// S2_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
+// S2_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:   + {#S2#}[#S2#]
 // S2_INFIX-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]; name=**
 // S2_INFIX: End completions
 // NEGATIVE_S2_INFIX-NOT: **=
@@ -184,7 +184,7 @@ func testInfix2(x: inout S2) {
 }
 // S2_INFIX_LVALUE: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
-// S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
+// S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:   + {#S2#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
 // S2_INFIX_LVALUE-DAG: BuiltinOperator/None:                             = {#S2#}[#Void#]
@@ -215,9 +215,9 @@ func testInfix7(x: S2?) {
   x#^INFIX_7^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#{{.*}}#}[#Bool#]
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#{{.*}}#}[#Bool#]
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ?? {#S2#}[#S2#]; name=?? S2
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#{{.*}}#}[#Bool#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#{{.*}}#}[#Bool#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ?? {#S2#}[#S2#]; name=?? S2
 // S2_INFIX_OPTIONAL: End completions
 // The equality operators don't come from equatable.
 // NEGATIVE_S2_INFIX_OPTIONAL-NOT: == {#S2
@@ -231,7 +231,7 @@ func testInfix8(x: S3?) {
 }
 // The equality operators come from equatable.
 // S3_INFIX_OPTIONAL: Begin completions
-// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#S3?#}[#Bool#]
+// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL: End completions
 
 infix operator **** {
@@ -301,12 +301,12 @@ func testInfix17(x: Void) {
 }
 
 // VOID_OPERATORS: Begin completions
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#()#}[#Bool#]; name=!= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#()#}[#Bool#]; name=== ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  <= {#()#}[#Bool#]; name=<= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  >= {#()#}[#Bool#]; name=>= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#()#}[#Bool#]; name=< ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  > {#()#}[#Bool#]; name=> ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#()#}[#Bool#]; name=!= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#()#}[#Bool#]; name=== ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  <= {#()#}[#Bool#]; name=<= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  >= {#()#}[#Bool#]; name=>= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  < {#()#}[#Bool#]; name=< ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  > {#()#}[#Bool#]; name=> ()
 // VOID_OPERATORS: End completions
 
 func testInfix18(x: (S2, S2) {
@@ -318,8 +318,8 @@ func testInfix19(x: EmptyClass) {
 }
 
 // EMPTYCLASS_INFIX: Begin completions
-// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#]
-// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#]
+// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: === {#AnyObject?#}[#Bool#]
+// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: !== {#AnyObject?#}[#Bool#]
 // EMPTYCLASS_INFIX: End completions
 
 enum E {
@@ -344,7 +344,7 @@ func testSpace(x: S2) {
 }
 // S2_INFIX_SPACE: Begin completions
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']** {#Int#}[#S2#]
-// S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
+// S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#S2#}[#S2#]
 // S2_INFIX_SPACE: End completions
 
 func testExtInfix1(x: inout S2) {
@@ -372,9 +372,9 @@ func testExtInfix2(x: S4) {
   x + x == x + x#^EXT_INFIX_2^#
 }
 // S4_EXT_INFIX: Begin completions
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#S4#}[#S4#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  && {#Bool#}[#Bool#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  || {#Bool#}[#Bool#]
 // S4_EXT_INFIX: End completions
 
 // S4_EXT_INFIX-NEG-NOT: !=
@@ -386,7 +386,7 @@ func testExtInfix3(x: S4) {
    x + x#^EXT_INFIX_3^#
 }
 // S4_EXT_INFIX_SIMPLE: Begin completions
-// S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
+// S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#S4#}[#S4#]
 // S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/CurrModule:  +++ {#S4#}[#S4#]
 // S4_EXT_INFIX_SIMPLE: End completions
 

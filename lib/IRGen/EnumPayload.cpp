@@ -446,7 +446,7 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
   assert(count == mask.PayloadValues.size());
 
   auto &DL = IGF.IGM.DataLayout;
-  for (unsigned i = 0; i < count; i++ ) {
+  for (unsigned i = 0; i < count; ++i) {
     auto payloadTy = getPayloadType(PayloadValues[i]);
     unsigned size = DL.getTypeSizeInBits(payloadTy);
 

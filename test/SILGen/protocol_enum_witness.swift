@@ -26,7 +26,7 @@ enum AnotherBar: AnotherFoo {
 // CHECK-NEXT: return [[TUPLE]] : $()
 // CHECK-END: }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s21protocol_enum_witness3BarO6buttonyA2CmF : $@convention(method) (@thin Bar.Type) -> Bar {
+// CHECK-LABEL: sil shared [transparent] [ossa] @$s21protocol_enum_witness3BarO6buttonyA2CmF : $@convention(method) (@thin Bar.Type) -> Bar {
 // CHECK: bb0({{%.*}} : $@thin Bar.Type):
 // CHECK-NEXT: [[CASE:%.*]] = enum $Bar, #Bar.button!enumelt
 // CHECK-NEXT: return [[CASE]] : $Bar

@@ -604,6 +604,8 @@ class Base {
   func old() {} // expected-note {{here}}
   @available(*, unavailable, renamed: "new", message: "it was smelly")
   func oldAndSmelly() {} // expected-note {{here}}
+  @available(*, unavailable)
+  func expendable() {}
 
   @available(*, unavailable)
   var badProp: Int { return 0 } // expected-note {{here}}
@@ -613,6 +615,8 @@ class Base {
   var oldProp: Int { return 0 } // expected-note {{here}}
   @available(*, unavailable, renamed: "new", message: "it was smelly")
   var oldAndSmellyProp: Int { return 0 } // expected-note {{here}}
+  @available(*, unavailable)
+  var expendableProp: Int { return 0 }
 
   @available(*, unavailable, renamed: "init")
   func nowAnInitializer() {} // expected-note {{here}}
@@ -670,43 +674,45 @@ class Base {
 }
 
 class Sub : Base {
-  override func bad() {} // expected-error {{cannot override 'bad' which has been marked unavailable}} {{none}}
-  override func smelly() {} // expected-error {{cannot override 'smelly' which has been marked unavailable: it was smelly}} {{none}}
-  override func old() {} // expected-error {{'old()' has been renamed to 'new'}} {{17-20=new}}
-  override func oldAndSmelly() {} // expected-error {{'oldAndSmelly()' has been renamed to 'new': it was smelly}} {{17-29=new}}
+  override func bad() {} // expected-error {{cannot override 'bad' which has been marked unavailable}} {{none}} expected-note {{remove 'override' modifier to declare a new 'bad'}} {{3-12=}}
+  override func smelly() {} // expected-error {{cannot override 'smelly' which has been marked unavailable: it was smelly}} {{none}} expected-note {{remove 'override' modifier to declare a new 'smelly'}} {{3-12=}}
+  override func old() {} // expected-error {{'old()' has been renamed to 'new'}} {{17-20=new}} expected-note {{remove 'override' modifier to declare a new 'old'}} {{3-12=}}
+  override func oldAndSmelly() {} // expected-error {{'oldAndSmelly()' has been renamed to 'new': it was smelly}} {{17-29=new}} expected-note {{remove 'override' modifier to declare a new 'oldAndSmelly'}} {{3-12=}}
+  func expendable() {} // no-error
 
-  override var badProp: Int { return 0 } // expected-error {{cannot override 'badProp' which has been marked unavailable}} {{none}}
-  override var smellyProp: Int { return 0 } // expected-error {{cannot override 'smellyProp' which has been marked unavailable: it was smelly}} {{none}}
-  override var oldProp: Int { return 0 } // expected-error {{'oldProp' has been renamed to 'new'}} {{16-23=new}}
-  override var oldAndSmellyProp: Int { return 0 } // expected-error {{'oldAndSmellyProp' has been renamed to 'new': it was smelly}} {{16-32=new}}
+  override var badProp: Int { return 0 } // expected-error {{cannot override 'badProp' which has been marked unavailable}} {{none}} expected-note {{remove 'override' modifier to declare a new 'badProp'}} {{3-12=}}
+  override var smellyProp: Int { return 0 } // expected-error {{cannot override 'smellyProp' which has been marked unavailable: it was smelly}} {{none}} expected-note {{remove 'override' modifier to declare a new 'smellyProp'}} {{3-12=}}
+  override var oldProp: Int { return 0 } // expected-error {{'oldProp' has been renamed to 'new'}} {{16-23=new}} expected-note {{remove 'override' modifier to declare a new 'oldProp'}} {{3-12=}}
+  override var oldAndSmellyProp: Int { return 0 } // expected-error {{'oldAndSmellyProp' has been renamed to 'new': it was smelly}} {{16-32=new}} expected-note {{remove 'override' modifier to declare a new 'oldAndSmellyProp'}} {{3-12=}}
+  var expendableProp: Int { return 0 } // no-error
 
-  override func nowAnInitializer() {} // expected-error {{'nowAnInitializer()' has been replaced by 'init'}} {{none}}
-  override func nowAnInitializer2() {} // expected-error {{'nowAnInitializer2()' has been replaced by 'init()'}} {{none}}
-  override init(nowAFunction: Int) {} // expected-error {{'init(nowAFunction:)' has been renamed to 'foo'}} {{none}}
-  override init(nowAFunction2: Int) {} // expected-error {{'init(nowAFunction2:)' has been renamed to 'foo(_:)'}} {{none}}
+  override func nowAnInitializer() {} // expected-error {{'nowAnInitializer()' has been replaced by 'init'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'nowAnInitializer'}} {{3-12=}}
+  override func nowAnInitializer2() {} // expected-error {{'nowAnInitializer2()' has been replaced by 'init()'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'nowAnInitializer2'}} {{3-12=}}
+  override init(nowAFunction: Int) {} // expected-error {{'init(nowAFunction:)' has been renamed to 'foo'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
+  override init(nowAFunction2: Int) {} // expected-error {{'init(nowAFunction2:)' has been renamed to 'foo(_:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
 
-  override func unavailableArgNames(a: Int) {} // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-36=shinyLabeledArguments}} {{37-37=example }}
-  override func unavailableArgRenamed(a param: Int) {} // expected-error {{'unavailableArgRenamed(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-38=shinyLabeledArguments}} {{39-40=example}}
-  override func unavailableNoArgs() {} // expected-error {{'unavailableNoArgs()' has been renamed to 'shinyLabeledArguments()'}} {{17-34=shinyLabeledArguments}}
-  override func unavailableSame(a: Int) {} // expected-error {{'unavailableSame(a:)' has been renamed to 'shinyLabeledArguments(a:)'}} {{17-32=shinyLabeledArguments}}
-  override func unavailableUnnamed(_ a: Int) {} // expected-error {{'unavailableUnnamed' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-35=shinyLabeledArguments}} {{36-37=example}}
-  override func unavailableUnnamedSame(_ a: Int) {} // expected-error {{'unavailableUnnamedSame' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-39=shinyLabeledArguments}}
-  override func unavailableNewlyUnnamed(a: Int) {} // expected-error {{'unavailableNewlyUnnamed(a:)' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-40=shinyLabeledArguments}} {{41-41=_ }}
-  override func unavailableMultiSame(a: Int, b: Int) {} // expected-error {{'unavailableMultiSame(a:b:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{17-37=shinyLabeledArguments}}
-  override func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{17-40=shinyLabeledArguments}} {{41-42=example}} {{51-52=another}}
-  override func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-44=shinyLabeledArguments}}
-  override func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-45=shinyLabeledArguments}} {{46-46=_ }} {{54-54=_ }}
+  override func unavailableArgNames(a: Int) {} // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-36=shinyLabeledArguments}} {{37-37=example }} expected-note {{remove 'override' modifier to declare a new 'unavailableArgNames'}} {{3-12=}}
+  override func unavailableArgRenamed(a param: Int) {} // expected-error {{'unavailableArgRenamed(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-38=shinyLabeledArguments}} {{39-40=example}} expected-note {{remove 'override' modifier to declare a new 'unavailableArgRenamed'}} {{3-12=}}
+  override func unavailableNoArgs() {} // expected-error {{'unavailableNoArgs()' has been renamed to 'shinyLabeledArguments()'}} {{17-34=shinyLabeledArguments}} expected-note {{remove 'override' modifier to declare a new 'unavailableNoArgs'}} {{3-12=}}
+  override func unavailableSame(a: Int) {} // expected-error {{'unavailableSame(a:)' has been renamed to 'shinyLabeledArguments(a:)'}} {{17-32=shinyLabeledArguments}} expected-note {{remove 'override' modifier to declare a new 'unavailableSame'}} {{3-12=}}
+  override func unavailableUnnamed(_ a: Int) {} // expected-error {{'unavailableUnnamed' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-35=shinyLabeledArguments}} {{36-37=example}} expected-note {{remove 'override' modifier to declare a new 'unavailableUnnamed'}} {{3-12=}}
+  override func unavailableUnnamedSame(_ a: Int) {} // expected-error {{'unavailableUnnamedSame' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-39=shinyLabeledArguments}} expected-note {{remove 'override' modifier to declare a new 'unavailableUnnamedSame'}} {{3-12=}}
+  override func unavailableNewlyUnnamed(a: Int) {} // expected-error {{'unavailableNewlyUnnamed(a:)' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-40=shinyLabeledArguments}} {{41-41=_ }} expected-note {{remove 'override' modifier to declare a new 'unavailableNewlyUnnamed'}} {{3-12=}}
+  override func unavailableMultiSame(a: Int, b: Int) {} // expected-error {{'unavailableMultiSame(a:b:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{17-37=shinyLabeledArguments}} expected-note {{remove 'override' modifier to declare a new 'unavailableMultiSame'}} {{3-12=}}
+  override func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{17-40=shinyLabeledArguments}} {{41-42=example}} {{51-52=another}} expected-note {{remove 'override' modifier to declare a new 'unavailableMultiUnnamed'}} {{3-12=}}
+  override func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-44=shinyLabeledArguments}} expected-note {{remove 'override' modifier to declare a new 'unavailableMultiUnnamedSame'}} {{3-12=}}
+  override func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-45=shinyLabeledArguments}} {{46-46=_ }} {{54-54=_ }} expected-note {{remove 'override' modifier to declare a new 'unavailableMultiNewlyUnnamed'}} {{3-12=}}
 
-  override init(unavailableArgNames: Int) {} // expected-error {{'init(unavailableArgNames:)' has been renamed to 'init(shinyNewName:)'}} {{17-17=shinyNewName }}
-  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init(_:)' has been renamed to 'init(a:)'}} {{17-18=a}}
-  override init(unavailableNewlyUnnamed: Int) {} // expected-error {{'init(unavailableNewlyUnnamed:)' has been renamed to 'init(_:)'}} {{17-17=_ }}
-  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init(_:_:)' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
-  override init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-error {{'init(unavailableMultiNewlyUnnamed:b:)' has been renamed to 'init(_:_:)'}} {{17-45=_}} {{54-54=_ }}
+  override init(unavailableArgNames: Int) {} // expected-error {{'init(unavailableArgNames:)' has been renamed to 'init(shinyNewName:)'}} {{17-17=shinyNewName }} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
+  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init(_:)' has been renamed to 'init(a:)'}} {{17-18=a}} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
+  override init(unavailableNewlyUnnamed: Int) {} // expected-error {{'init(unavailableNewlyUnnamed:)' has been renamed to 'init(_:)'}} {{17-17=_ }} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
+  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init(_:_:)' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
+  override init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-error {{'init(unavailableMultiNewlyUnnamed:b:)' has been renamed to 'init(_:_:)'}} {{17-45=_}} {{54-54=_ }} expected-note {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
 
-  override func unavailableTooFew(a: Int, b: Int) {} // expected-error {{'unavailableTooFew(a:b:)' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
-  override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}}
-  override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
-  override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}}
+  override func unavailableTooFew(a: Int, b: Int) {} // expected-error {{'unavailableTooFew(a:b:)' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableTooFew'}} {{3-12=}}
+  override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableTooMany'}} {{3-12=}}
+  override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableNoArgsTooMany'}} {{3-12=}}
+  override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableHasType'}} {{3-12=}}
 }
 
 // U: Unnamed, L: Labeled

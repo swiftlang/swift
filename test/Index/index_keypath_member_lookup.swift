@@ -137,3 +137,24 @@ func testExplicit(r: Lens<Rectangle>, a: Lens<[Int]>) {
 // CHECK: [[EA_LINE]]:8 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,RelCont | rel: 1
 // CHECK: [[EA_LINE]]:26 | instance-property/subscript/Swift | subscript(_:) | s:SayxSicip | Ref,Read,RelCont | rel: 1
 }
+
+// Don't crash: rdar63558609
+//
+@dynamicMemberLookup
+protocol Foo {
+  var prop: Bar {get}
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | prop | [[PROP_USR:.*]] | Def,RelChild | rel: 1
+}
+struct Bar {
+  let enabled = false
+}
+extension Foo {
+  subscript<T>(dynamicMember keyPath: KeyPath<Bar,T>) -> T {
+  // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB2_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-2]]:60 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | {{.*}} | Def,Dyn,RelChild,RelAcc | rel: 1
+  // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB2_USR]]
+
+    prop[keyPath: keyPath]
+    // CHECK: [[@LINE-1]]:5 | instance-property/Swift | prop | [[PROP_USR]] | Ref,Read,RelCont | rel: 1
+  }
+}

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -502,6 +503,66 @@ public final class Synchronized<Value> {
 }
 
 
+struct SR_12341 {
+  @Wrapper var wrapped: Int = 10
+  var str: String
+
+  init() {
+     wrapped = 42
+     str = ""
+     wrapped = 27
+  }
+
+  init(condition: Bool) {
+    wrapped = 42
+    wrapped = 27
+    str = ""
+  }
+}
+
+func testSR_12341() {
+  // CHECK: ## SR_12341
+  print("\n## SR_12341")
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. set 27
+  _ = SR_12341()
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. init 27
+  _ = SR_12341(condition: true)
+}
+
+@propertyWrapper
+struct NonMutatingSetterWrapper<Value> {
+    var value: Value
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+    var wrappedValue: Value {
+        get { value }
+        nonmutating set {
+            print("  .. nonmutatingSet \(newValue)")
+        }
+    }
+}
+
+struct NonMutatingWrapperTestStruct {
+    @NonMutatingSetterWrapper var SomeProp: Int
+    init(val: Int) {
+        SomeProp = val
+    }
+}
+
+func testNonMutatingSetterStruct() {
+  // CHECK: ## NonMutatingSetterWrapper
+  print("\n## NonMutatingSetterWrapper")
+  let A = NonMutatingWrapperTestStruct(val: 11)
+  // CHECK-NEXT:  .. nonmutatingSet 11
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -511,3 +572,5 @@ testOptIntStruct()
 testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
+testSR_12341()
+testNonMutatingSetterStruct()

@@ -49,3 +49,83 @@ bb5(%7 : $E2):
   return %7 : $E2
 }
 
+// CHECK-LABEL: sil @test_enum_addr
+sil @test_enum_addr : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %2 = alloc_stack $E
+  cond_br undef, bb1, bb2
+
+// CHECK:       bb1:
+// CHECK-NEXT:    inject_enum_addr
+// CHECK-NEXT:    switch_enum_addr
+bb1:
+  inject_enum_addr %2 : $*E, #E.A!enumelt
+  br bb3
+
+// CHECK:       bb2:
+// CHECK-NEXT:    inject_enum_addr
+// CHECK-NEXT:    switch_enum_addr
+bb2:
+  inject_enum_addr %2 : $*E, #E.B!enumelt
+  br bb3
+
+bb3:
+  switch_enum_addr %2 : $*E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  %10 = integer_literal $Builtin.Int32, 1
+  br bb6(%10 : $Builtin.Int32)
+
+bb5:
+  %11 = integer_literal $Builtin.Int32, 2
+  br bb6(%11 : $Builtin.Int32)
+
+bb6(%12 : $Builtin.Int32):
+  dealloc_stack %2 : $*E
+  return %12 : $Builtin.Int32
+// CHECK: } // end sil function 'test_enum_addr'
+}
+
+// CHECK-LABEL: sil @dont_jumpthread_enum_addr
+sil @dont_jumpthread_enum_addr : $@convention(thin) (E) -> Builtin.Int32 {
+bb0(%0 : $E):
+  %2 = alloc_stack $E
+  %3 = alloc_stack $E
+  cond_br undef, bb1, bb2
+
+// CHECK:       bb1:
+// CHECK-NEXT:    inject_enum_addr
+// CHECK-NEXT:    store
+// CHECK-NEXT:    br bb3
+bb1:
+  inject_enum_addr %2 : $*E, #E.A!enumelt
+  store %0 to %2 : $*E
+  br bb3
+
+// CHECK:       bb2:
+// CHECK-NEXT:    inject_enum_addr
+// CHECK-NEXT:    br bb3
+bb2:
+  inject_enum_addr %3 : $*E, #E.A!enumelt
+  br bb3
+
+// CHECK:       bb3:
+// CHECK-NEXT:    switch_enum_addr
+bb3:
+  switch_enum_addr %2 : $*E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  %10 = integer_literal $Builtin.Int32, 1
+  br bb6(%10 : $Builtin.Int32)
+
+bb5:
+  %11 = integer_literal $Builtin.Int32, 2
+  br bb6(%11 : $Builtin.Int32)
+
+bb6(%12 : $Builtin.Int32):
+  dealloc_stack %3 : $*E
+  dealloc_stack %2 : $*E
+  return %12 : $Builtin.Int32
+// CHECK: } // end sil function 'dont_jumpthread_enum_addr'
+}
+

@@ -17,6 +17,8 @@ public let SubstringTest = [
   BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringSubstringGenericEquatable", runFunction: run_EqualSubstringSubstringGenericEquatable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringRemoveFirst1", runFunction: run_SubstringRemoveFirst1, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringRemoveLast1", runFunction: run_SubstringRemoveLast1, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "LessSubstringSubstring", runFunction: run_LessSubstringSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
@@ -33,6 +35,8 @@ public let SubstringTest = [
 let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢliὢsdὢjøὢslὢdiὢalὢiὢ"
 let (s1, ss1) = equivalentWithDistinctBuffers()
 let (s2, ss2) = equivalentWithDistinctBuffers()
+
+let quiteLong = String(repeating: "0", count: 10_000)[...]
 
 @inline(never)
 public func run_SubstringFromLongString(_ N: Int) {
@@ -123,6 +127,24 @@ public func run_EqualSubstringSubstringGenericEquatable(_ N: Int) {
   }
   for _ in 1...N*500 {
     check(a, b)
+  }
+}
+
+@inline(never)
+public func run_SubstringRemoveFirst1(_ N: Int) {
+  for _ in 1...N {
+    var s = quiteLong
+    s.removeFirst(1)
+    blackHole(s.first == "0")
+  }
+}
+
+@inline(never)
+public func run_SubstringRemoveLast1(_ N: Int) {
+  for _ in 1...N {
+    var s = quiteLong
+    s.removeLast(1)
+    blackHole(s.first == "0")
   }
 }
 

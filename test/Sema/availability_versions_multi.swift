@@ -8,54 +8,54 @@ callToEnsureNotInScriptMode() // expected-error {{expressions are not allowed at
 @available(OSX, introduced: 10.9)
 var globalAvailableOn10_9: Int = 9
 
-@available(OSX, introduced: 10.51)
-var globalAvailableOn10_51: Int = 10
+@available(OSX, introduced: 99.51)
+var globalAvailableOn99_51: Int = 10
 
-@available(OSX, introduced: 10.52)
-var globalAvailableOn10_52: Int = 11
+@available(OSX, introduced: 99.52)
+var globalAvailableOn99_52: Int = 11
 
 // Top level should reflect the minimum deployment target.
 let ignored1: Int = globalAvailableOn10_9
 
-let ignored2: Int = globalAvailableOn10_51 // expected-error {{'globalAvailableOn10_51' is only available in macOS 10.51 or newer}}
+let ignored2: Int = globalAvailableOn99_51 // expected-error {{'globalAvailableOn99_51' is only available in macOS 99.51 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing let}}
 
-let ignored3: Int = globalAvailableOn10_52 // expected-error {{'globalAvailableOn10_52' is only available in macOS 10.52 or newer}}
+let ignored3: Int = globalAvailableOn99_52 // expected-error {{'globalAvailableOn99_52' is only available in macOS 99.52 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing let}}
 
-@available(OSX, introduced: 10.51)
-func useFromOtherOn10_51() {
-  // This will trigger validation of OtherIntroduced10_51 in
+@available(OSX, introduced: 99.51)
+func useFromOtherOn99_51() {
+  // This will trigger validation of OtherIntroduced99_51 in
   // in availability_multi_other.swift
-  let o10_51 = OtherIntroduced10_51()
-  o10_51.extensionMethodOnOtherIntroduced10_51()
+  let o99_51 = OtherIntroduced99_51()
+  o99_51.extensionMethodOnOtherIntroduced99_51()
 
   let o10_9 = OtherIntroduced10_9()
-  o10_9.extensionMethodOnOtherIntroduced10_9AvailableOn10_51(o10_51)
-  _ = o10_51.returns10_52Introduced10_52() // expected-error {{'returns10_52Introduced10_52()' is only available in macOS 10.52 or newer}}
+  o10_9.extensionMethodOnOtherIntroduced10_9AvailableOn99_51(o99_51)
+  _ = o99_51.returns99_52Introduced99_52() // expected-error {{'returns99_52Introduced99_52()' is only available in macOS 99.52 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
-  _ = OtherIntroduced10_52()
-      // expected-error@-1 {{'OtherIntroduced10_52' is only available in macOS 10.52 or newer}}
+  _ = OtherIntroduced99_52()
+      // expected-error@-1 {{'OtherIntroduced99_52' is only available in macOS 99.52 or newer}}
       // expected-note@-2 {{add 'if #available' version check}}
 
-  o10_51.extensionMethodOnOtherIntroduced10_51AvailableOn10_52() // expected-error {{'extensionMethodOnOtherIntroduced10_51AvailableOn10_52()' is only available in macOS 10.52 or newer}}
+  o99_51.extensionMethodOnOtherIntroduced99_51AvailableOn99_52() // expected-error {{'extensionMethodOnOtherIntroduced99_51AvailableOn99_52()' is only available in macOS 99.52 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
-  _ = OtherIntroduced10_51.NestedIntroduced10_52()
-      // expected-error@-1 {{'NestedIntroduced10_52' is only available in macOS 10.52 or newer}}
+  _ = OtherIntroduced99_51.NestedIntroduced99_52()
+      // expected-error@-1 {{'NestedIntroduced99_52' is only available in macOS 99.52 or newer}}
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-@available(OSX, introduced: 10.52)
-func useFromOtherOn10_52() {
-  _ = OtherIntroduced10_52()
+@available(OSX, introduced: 99.52)
+func useFromOtherOn99_52() {
+  _ = OtherIntroduced99_52()
 
-  let n10_52 = OtherIntroduced10_51.NestedIntroduced10_52()
-  _ = n10_52.returns10_52()
-  _ = n10_52.returns10_53() // expected-error {{'returns10_53()' is only available in macOS 10.53 or newer}}
+  let n99_52 = OtherIntroduced99_51.NestedIntroduced99_52()
+  _ = n99_52.returns99_52()
+  _ = n99_52.returns99_53() // expected-error {{'returns99_53()' is only available in macOS 99.53 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
   // This will trigger validation of the global in availability_in_multi_other.swift
-  _ = globalFromOtherOn10_52
+  _ = globalFromOtherOn99_52
 }

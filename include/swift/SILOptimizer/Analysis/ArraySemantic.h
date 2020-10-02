@@ -31,6 +31,7 @@ enum class ArrayCallKind {
   kGetElement,
   kGetElementAddress,
   kMakeMutable,
+  kEndMutation,
   kMutateUnknown,
   kReserveCapacityForAppend,
   kWithUnsafeMutableBufferPointer,
@@ -42,7 +43,8 @@ enum class ArrayCallKind {
   // before this comment.
   kArrayInit,
   kArrayUninitialized,
-  kArrayUninitializedIntrinsic
+  kArrayUninitializedIntrinsic,
+  kArrayFinalizeIntrinsic
 };
 
 /// Return true is the given function is an array semantics call.
@@ -77,6 +79,8 @@ public:
   /// Match array semantic calls.
   ArraySemanticsCall(SILValue V, StringRef semanticName,
                      bool matchPartialName);
+
+  ArraySemanticsCall() : SemanticsCall(nullptr) {}
 
   /// Can we hoist this call.
   bool canHoist(SILInstruction *To, DominanceInfo *DT) const;

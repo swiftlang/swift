@@ -359,6 +359,18 @@ public struct String {
     _invariantCheck()
   }
 
+  // This is intentionally a static function and not an initializer, because
+  // an initializer would conflict with the Int-parsing initializer, when used
+  // as function name, e.g.
+  //   [1, 2, 3].map(String.init)
+  @_alwaysEmitIntoClient
+  @_semantics("string.init_empty_with_capacity")
+  @_semantics("inline_late")
+  @inlinable
+  internal static func _createEmpty(withInitialCapacity: Int) -> String {
+    return String(_StringGuts(_initialCapacity: withInitialCapacity))
+  }
+
   /// Creates an empty string.
   ///
   /// Using this initializer is equivalent to initializing a string with an
@@ -501,7 +513,7 @@ extension String {
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
   @inline(__always)
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -838,31 +850,32 @@ extension String {
     // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var result = Array<UInt16>(repeating: 0, count: uChars.count)
-      let len = result.withUnsafeMutableBufferPointer {
-        (output) -> Int in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        return Int(truncatingIfNeeded:
+      var length: Int = 0
+      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
+        buffer, initializedCount in
+        var error = __swift_stdlib_U_ZERO_ERROR
+        length = Int(truncatingIfNeeded:
           __swift_stdlib_u_strToLower(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
-            &err))
+            &error))
+        initializedCount = min(length, uChars.count)
       }
-      if len > uChars.count {
-        var err = __swift_stdlib_U_ZERO_ERROR
-        result = Array<UInt16>(repeating: 0, count: len)
-        result.withUnsafeMutableBufferPointer {
-          output -> Void in
+      if length > uChars.count {
+        var error = __swift_stdlib_U_ZERO_ERROR
+        return Array<UInt16>(unsafeUninitializedCapacity: length) {
+          buffer, initializedCount in
           __swift_stdlib_u_strToLower(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
-            &err)
+            &error)
+          initializedCount = length
         }
       }
       return result
@@ -898,31 +911,32 @@ extension String {
     // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var result = Array<UInt16>(repeating: 0, count: uChars.count)
-      let len = result.withUnsafeMutableBufferPointer {
-        (output) -> Int in
+      var length: Int = 0
+      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
+        buffer, initializedCount in
         var err = __swift_stdlib_U_ZERO_ERROR
-        return Int(truncatingIfNeeded:
+        length = Int(truncatingIfNeeded:
           __swift_stdlib_u_strToUpper(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
             &err))
+        initializedCount = min(length, uChars.count)
       }
-      if len > uChars.count {
+      if length > uChars.count {
         var err = __swift_stdlib_U_ZERO_ERROR
-        result = Array<UInt16>(repeating: 0, count: len)
-        result.withUnsafeMutableBufferPointer {
-          output -> Void in
+        return Array<UInt16>(unsafeUninitializedCapacity: length) {
+          buffer, initializedCount in
           __swift_stdlib_u_strToUpper(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
             &err)
+          initializedCount = length
         }
       }
       return result

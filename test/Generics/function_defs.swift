@@ -78,9 +78,9 @@ protocol Overload {
   func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
-  func f3(_: Int) -> Int // expected-note {{found this candidate}}
-  func f3(_: Float) -> Float // expected-note {{found this candidate}}
-  func f3(_: Self) -> Self // expected-note {{found this candidate}}
+  func f3(_: Int) -> Int // expected-note {{found candidate with type '(Int) -> Int'}}
+  func f3(_: Float) -> Float // expected-note {{found candidate with type '(Float) -> Float'}}
+  func f3(_: Self) -> Self // expected-note {{found candidate with type '(OtherOvl) -> OtherOvl'}}
 
   var prop : Self { get }
 }
@@ -112,7 +112,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   var f3f : (Float) -> Float = ovl.f3
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no exact matches in reference to instance method 'f3'}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no 'f3' candidates produce the expected contextual result type '(Ovl) -> Ovl'}}
 
   var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
   var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3
@@ -131,7 +131,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set }
+  subscript (index : Index) -> Value { get set } // expected-note {{found this candidate}}
 }
 
 protocol IntSubscriptable {
@@ -139,7 +139,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  }
+  subscript (index : Int) -> ElementType { get  } // expected-note {{found this candidate}}
 }
 
 func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
@@ -152,9 +152,7 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
-  t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot assign value of type 'Int' to subscript of type 'T.ElementType'}}
+  t[value] = 17 // expected-error{{no exact matches in call to subscript}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -282,11 +280,11 @@ func beginsWith3<S0: P2, S1: P2>(_ seq1: S0, _ seq2: S1) -> Bool
 //===----------------------------------------------------------------------===//
 // Bogus requirements
 //===----------------------------------------------------------------------===//
-func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
+func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{cannot find type 'Wibble' in scope}}
 func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
-func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
-func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
+func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{cannot find type 'Wibble' in scope}}
+func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{cannot find type 'Wibble' in scope}}
 func sameTypeEq<T>(_: T) where T = T {} // expected-error{{use '==' for same-type requirements rather than '='}} {{34-35===}}
 // expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
 

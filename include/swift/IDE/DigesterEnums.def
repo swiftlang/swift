@@ -132,6 +132,7 @@ KEY_BOOL(HasStorage, hasStorage)
 KEY_BOOL(ReqNewWitnessTableEntry, reqNewWitnessTableEntry)
 KEY_BOOL(IsABIPlaceholder, isABIPlaceholder)
 KEY_BOOL(IsExternal, isExternal)
+KEY_BOOL(IsEnumExhaustive, isEnumExhaustive)
 KEY_BOOL(HasMissingDesignatedInitializers, hasMissingDesignatedInitializers)
 KEY_BOOL(InheritsConvenienceInitializers, inheritsConvenienceInitializers)
 

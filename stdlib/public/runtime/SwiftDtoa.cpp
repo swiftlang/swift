@@ -1426,7 +1426,7 @@ size_t swift_format_exponential(char *dest, size_t length,
     exponent -= 1;
     if (digit_count > 1) {
         *p++ = '.';
-        for (int i = 1; i < digit_count; i++) {
+        for (int i = 1; i < digit_count; ++i) {
             *p++ = digits[i] + '0';
         }
     }
@@ -1520,7 +1520,7 @@ size_t swift_format_decimal(char *dest, size_t length,
             *p++ = digits[i] + '0';
         }
     } else if (exponent < digit_count) {
-        for (int i = 0; i < digit_count; i++) {
+        for (int i = 0; i < digit_count; ++i) {
             if (exponent == 0) {
                 *p++ = '.';
             }
@@ -1528,7 +1528,7 @@ size_t swift_format_decimal(char *dest, size_t length,
             exponent -= 1;
         }
     } else {
-        for (int i = 0; i < digit_count; i++) {
+        for (int i = 0; i < digit_count; ++i) {
             *p++ = digits[i] + '0';
             exponent -= 1;
         }

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift | %FileCheck %s -DINT=i%target-ptrsize
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios

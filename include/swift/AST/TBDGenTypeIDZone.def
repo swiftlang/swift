@@ -14,5 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(TBDGen, GenerateTBDRequest, TBDFileAndSymbols(TBDGenDescriptor),
+SWIFT_REQUEST(TBDGen, GenerateTBDRequest, TBDFile(TBDGenDescriptor),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TBDGen, PublicSymbolsRequest,
+              std::vector<std::string>(TBDGenDescriptor),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(TBDGen, SymbolSourceMapRequest,
+              SymbolSourceMap(TBDGenDescriptor),
+              Cached, NoLocationInfo)

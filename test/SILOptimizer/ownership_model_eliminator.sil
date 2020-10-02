@@ -342,3 +342,14 @@ bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Just make sure that we do not crash on this function.
+//
+// CHECK-LABEL: sil @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK: unchecked_bitwise_cast
+// CHECK: } // end sil function 'lower_unchecked_value_cast_to_unchecked_bitwise_cast'
+sil [ossa] @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0a : $Builtin.Int32):
+  %0b = unchecked_value_cast %0a : $Builtin.Int32 to $Builtin.Int32
+  return %0b : $Builtin.Int32
+}

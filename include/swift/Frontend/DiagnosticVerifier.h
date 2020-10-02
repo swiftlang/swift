@@ -30,10 +30,8 @@ class SourceFile;
 
 // MARK: - DependencyVerifier
 
-bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                        ArrayRef<FileUnit *> SFs);
-bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                        ArrayRef<SourceFile *> SFs);
+bool verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs);
+bool verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs);
 
 // MARK: - DiagnosticVerifier
 struct ExpectedFixIt;

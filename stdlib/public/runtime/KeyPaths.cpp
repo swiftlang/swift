@@ -68,7 +68,7 @@ namespace {
 }
 
 // These functions are all implemented in the stdlib.  Their type
-// parameters are passed impliictly in the isa of the key path.
+// parameters are passed implicitly in the isa of the key path.
 
 extern "C"
 SWIFT_CC(swift) void
@@ -119,9 +119,6 @@ void _destroy_temporary_continuation(YieldOnceBuffer *buffer, bool forUnwind) {
   YieldOnceTemporary::destroyAndDeallocateIn(buffer);
 }
 
-// The resilient offset to the start of KeyPath's class-specific data.
-extern "C" size_t MANGLE_SYM(s7KeyPathCMo);
-
 YieldOnceResult<const OpaqueValue*>
 swift::swift_readAtKeyPath(YieldOnceBuffer *buffer,
                            const OpaqueValue *root, void *keyPath) {
@@ -129,17 +126,7 @@ swift::swift_readAtKeyPath(YieldOnceBuffer *buffer,
   // KeyPath is a native class, so we can just load its metadata directly
   // even on ObjC-interop targets.
   const Metadata *keyPathType = static_cast<HeapObject*>(keyPath)->metadata;
-
-  // To find the generic arguments, we just have to find the class-specific
-  // data section of the class; the generic arguments are always at the start
-  // of that.
-  //
-  // We use the resilient access pattern because it's easy; since we're within
-  // KeyPath's resilience domain, that's not really necessary, and it would
-  // be totally valid to hard-code an offset.
-  auto keyPathGenericArgs =
-    reinterpret_cast<const Metadata * const *>(
-      reinterpret_cast<const char*>(keyPathType) + MANGLE_SYM(s7KeyPathCMo));
+  auto keyPathGenericArgs = keyPathType->getGenericArgs();
   const Metadata *valueTy = keyPathGenericArgs[1];
 
   // Allocate the buffer.

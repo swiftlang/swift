@@ -63,7 +63,7 @@ var evenOrOdd : (Int) -> String = {$0 % 2 == 0 ? "even" : "odd"}
 
 // <rdar://problem/15367882>
 func foo() {
-  not_declared({ $0 + 1 }) // expected-error{{use of unresolved identifier 'not_declared'}}
+  not_declared({ $0 + 1 }) // expected-error{{cannot find 'not_declared' in scope}}
 }
 
 // <rdar://problem/15536725>
@@ -456,13 +456,7 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
-  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
-  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
-  // (since both arguments are literal they are ranked lower than contextual type).
-  //
-  // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}} // expected-note {{did you mean to add a return type?}}
     _ in true
   }
 }
@@ -504,7 +498,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{generic parameter 'T' could not be inferred}}
+// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -562,7 +556,6 @@ r32432145 { _,_ in
 // rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
 [1, 2].first { $0.foo = 3 }
 // expected-error@-1 {{value of type 'Int' has no member 'foo'}}
-// expected-error@-2 {{cannot convert value of type '()' to closure result type 'Bool'}}
 
 // rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
 protocol A_SR_5030 {
@@ -588,7 +581,7 @@ extension A_SR_5030 {
 }
 
 // rdar://problem/33296619
-let u = rdar33296619().element //expected-error {{use of unresolved identifier 'rdar33296619'}}
+let u = rdar33296619().element //expected-error {{cannot find 'rdar33296619' in scope}}
 
 [1].forEach { _ in
   _ = "\(u)"
@@ -614,7 +607,7 @@ _ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
 
 // rdar://problem/34077439 - Crash when pre-checking bails out and
 // leaves us with unfolded SequenceExprs inside closure body.
-_ = { (offset) -> T in // expected-error {{use of undeclared type 'T'}}
+_ = { (offset) -> T in // expected-error {{cannot find type 'T' in scope}}
   return offset ? 0 : 0
 }
 
@@ -827,7 +820,7 @@ func rdar_40537960() {
   }
 
   var arr: [S] = []
-  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<P>'}}
+  _ = A(arr, fn: { L($0.v) })
   // expected-error@-1 {{generic parameter 'P' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
 }
@@ -972,6 +965,7 @@ func test_correct_inference_of_closure_result_in_presence_of_optionals() {
   }
 }
 
+
 // rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
 func rdar_59741308() {
   class Base {
@@ -1005,14 +999,46 @@ func rdar52204414() {
   // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
 }
 
-// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
-func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
-func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
+// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter.
+// Note that this was accepted prior to Swift 5.3. SE-0286 changed the
+// order of argument resolution and made it ambiguous.
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found this candidate}}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found this candidate}}
 
-overloaded_with_default { 0 } // Ok (could be ambiguous if trailing was allowed to match `a:` in first overload)
+overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'}}
 
 func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
 func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
 
 overloaded_with_default_and_autoclosure { 42 } // Ok
 overloaded_with_default_and_autoclosure(42) // Ok
+
+// SR-12815 - `error: type of expression is ambiguous without more context` in many cases where methods are missing
+func sr12815() {
+  let _ = { a, b in }
+  // expected-error@-1 {{unable to infer type of a closure parameter 'a' in the current context}}
+  // expected-error@-2 {{unable to infer type of a closure parameter 'b' in the current context}}
+
+  _ = .a { b in } // expected-error {{cannot infer contextual base in reference to member 'a'}}
+
+  struct S {}
+
+  func test(s: S) {
+    S.doesntExist { b in } // expected-error {{type 'S' has no member 'doesntExist'}}
+    s.doesntExist { b in } // expected-error {{value of type 'S' has no member 'doesntExist'}}
+    s.doesntExist1 { v in } // expected-error {{value of type 'S' has no member 'doesntExist1'}}
+     .doesntExist2() { $0 }
+  }
+}
+
+// Make sure we can infer generic arguments in an explicit result type.
+let explicitUnboundResult1 = { () -> Array in [0] }
+let explicitUnboundResult2: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [0]
+}
+// FIXME: Should we prioritize the contextual result type and infer Array<Int>
+// rather than using a type variable in these cases?
+// expected-error@+1 {{unable to infer closure type in the current context}}
+let explicitUnboundResult3: (Array<Bool>) -> Array<Int> = {
+  (arr: Array) -> Array in [true]
+}

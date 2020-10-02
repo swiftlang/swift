@@ -155,6 +155,58 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");
   }
+  llvm_unreachable("invalid representation");
+}
+
+const clang::Type *ClangTypeConverter::getFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation repr) {
+
+  // Using the interface type is sufficient as type parameters get mapped to
+  // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)
+  auto resultClangTy = result.hasValue()
+                     ? convert(result.getValue().getInterfaceType())
+                     : ClangASTContext.VoidTy;
+
+  if (resultClangTy.isNull())
+    return nullptr;
+
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
+  SmallVector<clang::QualType, 4> paramsClangTy;
+  bool someParamIsConsumed = false;
+  for (auto &p : params) {
+    auto pc = convert(p.getInterfaceType());
+    if (pc.isNull())
+      return nullptr;
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+    if (p.isConsumed()) {
+      someParamIsConsumed = true;
+      extParamInfo = extParamInfo.withIsConsumed(true);
+    }
+    extParamInfos.push_back(extParamInfo);
+    paramsClangTy.push_back(pc);
+  }
+
+  clang::FunctionProtoType::ExtProtoInfo info(clang::CallingConv::CC_C);
+  if (someParamIsConsumed)
+    info.ExtParameterInfos = extParamInfos.begin();
+  auto fn = ClangASTContext.getFunctionType(resultClangTy, paramsClangTy, info);
+  if (fn.isNull())
+    return nullptr;
+
+  switch (repr) {
+  case SILFunctionType::Representation::CFunctionPointer:
+    return ClangASTContext.getPointerType(fn).getTypePtr();
+  case SILFunctionType::Representation::Block:
+    return ClangASTContext.getBlockPointerType(fn).getTypePtr();
+  case SILFunctionType::Representation::Thick:
+  case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::WitnessMethod:
+  case SILFunctionType::Representation::Closure:
+    llvm_unreachable("Expected a C-compatible representation.");
+  }
 }
 
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
@@ -358,7 +410,7 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
     return ClangASTContext.VoidTy;
 
   Type eltTy = type->getElementType(0);
-  for (unsigned i = 1; i < tupleNumElements; i++) {
+  for (unsigned i = 1; i < tupleNumElements; ++i) {
     if (!eltTy->isEqual(type->getElementType(i)))
       // Only tuples where all element types are equal map to fixed-size
       // arrays.
@@ -571,16 +623,23 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 
 clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
   // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangFunctionType(), 0);
+  return clang::QualType(type->getClangTypeInfo().getType(), 0);
 }
 
 clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
-  llvm::report_fatal_error("Expected only AST types but found a SIL function.");
+  // We must've already computed it before if applicable.
+  return clang::QualType(type->getClangTypeInfo().getType(), 0);
 }
 
 clang::QualType
 ClangTypeConverter::visitSILBlockStorageType(SILBlockStorageType *type) {
-  llvm::report_fatal_error("Expected only AST types but found a SIL block.");
+  // We'll select (void)(^)(). This isn't correct for all blocks, but block
+  // storage type should only be converted for function signature lowering,
+  // where the parameter types do not matter.
+  auto &clangCtx = ClangASTContext;
+  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  auto blockTy = clangCtx.getBlockPointerType(fnTy);
+  return clangCtx.getCanonicalType(blockTy);
 }
 
 clang::QualType

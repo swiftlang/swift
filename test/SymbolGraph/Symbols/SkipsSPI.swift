@@ -57,3 +57,10 @@ extension StructShouldntAppear.InnerStructShouldntAppear {
   @_spi(OtherModule)
   public func extendedFunctionShouldntAppear() {}
 }
+
+@_spi(OtherModule)
+extension StructShouldAppear {
+  // Although StructShouldAppear is fair to include, this extension is
+  // tagged as SPI, so everything inside it should be considered SPI as well.
+  public func functionInSPIExtensionShouldntAppear() {}
+}

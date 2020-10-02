@@ -29,8 +29,6 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/Optional.h"
 #include <algorithm>
 
@@ -41,41 +39,72 @@ enum IsSerialized_t : unsigned char;
 class SILFunction;
 class SILModule;
 
+// TODO: Entry should include substitutions needed to invoke an overridden
+// generic base class method.
+class SILVTableEntry {
+  /// The declaration reference to the least-derived method visible through
+  /// the class.
+  SILDeclRef Method;
+
+  /// The function which implements the method for the class and the entry kind.
+  llvm::PointerIntPair<SILFunction *, 2, unsigned> ImplAndKind;
+
+  bool IsNonOverridden;
+
+public:
+  enum Kind : uint8_t {
+    /// The vtable entry is for a method defined directly in this class.
+    Normal,
+    /// The vtable entry is inherited from the superclass.
+    Inherited,
+    /// The vtable entry is inherited from the superclass, and overridden
+    /// in this class.
+    Override,
+
+    // Please update the PointerIntPair above if you add/remove enums.
+  };
+
+  SILVTableEntry() : ImplAndKind(nullptr, Kind::Normal),
+                     IsNonOverridden(false) {}
+
+  SILVTableEntry(SILDeclRef Method, SILFunction *Implementation, Kind TheKind,
+                 bool NonOverridden)
+      : Method(Method), ImplAndKind(Implementation, TheKind),
+        IsNonOverridden(NonOverridden) {}
+
+  SILDeclRef getMethod() const { return Method; }
+
+  Kind getKind() const { return Kind(ImplAndKind.getInt()); }
+  void setKind(Kind kind) { ImplAndKind.setInt(kind); }
+
+  bool isNonOverridden() const { return IsNonOverridden; }
+  void setNonOverridden(bool value) { IsNonOverridden = value; }
+
+  SILFunction *getImplementation() const { return ImplAndKind.getPointer(); }
+  
+  void print(llvm::raw_ostream &os) const;
+  
+  bool operator==(const SILVTableEntry &e) const {
+    return Method == e.Method
+      && getImplementation() == e.getImplementation()
+      && getKind() == e.getKind()
+      && isNonOverridden() == e.isNonOverridden();
+  }
+  
+  bool operator!=(const SILVTableEntry &e) const {
+    return !(*this == e);
+  }
+};
+
 /// A mapping from each dynamically-dispatchable method of a class to the
 /// SILFunction that implements the method for that class.
 /// Note that dead methods are completely removed from the vtable.
-class SILVTable : public llvm::ilist_node<SILVTable>,
-                  public SILAllocated<SILVTable> {
+class SILVTable final : public SILAllocated<SILVTable>,
+                        llvm::TrailingObjects<SILVTable, SILVTableEntry> {
+  friend TrailingObjects;
+
 public:
-  // TODO: Entry should include substitutions needed to invoke an overridden
-  // generic base class method.
-  struct Entry {
-    enum Kind : uint8_t {
-      /// The vtable entry is for a method defined directly in this class.
-      Normal,
-      /// The vtable entry is inherited from the superclass.
-      Inherited,
-      /// The vtable entry is inherited from the superclass, and overridden
-      /// in this class.
-      Override,
-    };
-
-    Entry()
-      : Implementation(nullptr), TheKind(Kind::Normal) { }
-
-    Entry(SILDeclRef Method, SILFunction *Implementation, Kind TheKind)
-      : Method(Method), Implementation(Implementation), TheKind(TheKind) { }
-
-    /// The declaration reference to the least-derived method visible through
-    /// the class.
-    SILDeclRef Method;
-
-    /// The function which implements the method for the class.
-    SILFunction *Implementation;
-
-    /// The entry kind.
-    Kind TheKind;
-  };
+  using Entry = SILVTableEntry;
 
   // Disallow copying into temporary objects.
   SILVTable(const SILVTable &other) = delete;
@@ -91,9 +120,6 @@ private:
 
   /// The number of SILVTables entries.
   unsigned NumEntries : 31;
-
-  /// Tail-allocated SILVTable entries.
-  Entry Entries[1];
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
   SILVTable(ClassDecl *c, IsSerialized_t serialized, ArrayRef<Entry> entries);
@@ -123,7 +149,18 @@ public:
   }
 
   /// Return all of the method entries.
-  ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
+  ArrayRef<Entry> getEntries() const {
+    return {getTrailingObjects<SILVTableEntry>(), NumEntries};
+  }
+
+  /// Return all of the method entries mutably.
+  /// If you do modify entries, make sure to invoke `updateVTableCache` to update the
+  /// SILModule's cache entry.
+  MutableArrayRef<Entry> getMutableEntries() {
+    return {getTrailingObjects<SILVTableEntry>(), NumEntries};
+  }
+                          
+  void updateVTableCache(const Entry &entry);
 
   /// Look up the implementation function for the given method.
   Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
@@ -131,18 +168,19 @@ public:
   /// Removes entries from the vtable.
   /// \p predicate Returns true if the passed entry should be removed.
   template <typename Predicate> void removeEntries_if(Predicate predicate) {
-    Entry *end = std::remove_if(Entries, Entries + NumEntries,
-                                [&](Entry &entry) -> bool {
-      if (predicate(entry)) {
-        entry.Implementation->decrementRefCount();
-        removeFromVTableCache(entry);
-        return true;
-      }
-      return false;
-    });
-    NumEntries = end - Entries;
+    auto Entries = getMutableEntries();
+    Entry *end = std::remove_if(
+        Entries.begin(), Entries.end(), [&](Entry &entry) -> bool {
+          if (predicate(entry)) {
+            entry.getImplementation()->decrementRefCount();
+            removeFromVTableCache(entry);
+            return true;
+          }
+          return false;
+        });
+    NumEntries = std::distance(Entries.begin(), end);
   }
-                    
+
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;
 

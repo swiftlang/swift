@@ -579,3 +579,97 @@ bb0:
   %2 = tuple()
   return %2 : $()
 }
+
+struct TwoInts {
+  var a: Int
+  var b: Int
+}
+
+struct StructWithOptional {
+  var i: Optional<TwoInts>
+}
+
+// CHECK-LABEL: @init_enum_data_addr
+// CHECK:      PAIR #3.
+// CHECK-NEXT: %0 = argument of bb0 : $*StructWithOptional
+// CHECK-NEXT:   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
+// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #4.
+// CHECK-NEXT: %0 = argument of bb0 : $*StructWithOptional
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT: %0 = argument of bb0 : $*StructWithOptional
+// CHECK-NEXT:   %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #14.
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*StructWithOptional, #StructWithOptional.i
+// CHECK-NEXT:   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #15.
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*StructWithOptional, #StructWithOptional.i
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #16.
+// CHECK-NEXT:   %2 = struct_element_addr %1 : $*StructWithOptional, #StructWithOptional.i
+// CHECK-NEXT:   %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #19.
+// CHECK-NEXT:   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT: PartialAlias
+// CHECK:      PAIR #20.
+// CHECK-NEXT:   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
+// CHECK-NEXT:   %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT: PartialAlias
+// CHECK:      PAIR #23.
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT:   %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT: NoAlias
+sil @init_enum_data_addr : $@convention(thin) (@in_guaranteed StructWithOptional) -> () {
+bb0(%0 : $*StructWithOptional):
+  %1 = alloc_stack $StructWithOptional
+  %2 = struct_element_addr %1 : $*StructWithOptional, #StructWithOptional.i
+  %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
+  %4 = struct_element_addr %3 : $*TwoInts, #TwoInts.a
+  %5 = struct_element_addr %3 : $*TwoInts, #TwoInts.b
+  dealloc_stack %1 : $*StructWithOptional
+  %6 = tuple ()
+  return %6 : $()
+}
+
+protocol P {}
+
+struct S : P {
+  var i: Int
+}
+
+// CHECK-LABEL: @init_existential_addr
+// CHECK:      PAIR #3.
+// CHECK-NEXT:   %0 = argument of bb0 : $P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #12.
+// CHECK-NEXT:   %2 = alloc_stack $P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #13.
+// CHECK-NEXT:   %2 = alloc_stack $P
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #16.
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
+// CHECK-NEXT: PartialAlias
+sil @init_existential_addr : $@convention(thin) (P) -> () {
+bb0(%0 : $P):
+  %1 = alloc_stack $S
+  %2 = alloc_stack $P
+  %3 = init_existential_addr %2 : $*P, $S
+  %4 = struct_element_addr %3 : $*S, #S.i
+  dealloc_stack %2 : $*P
+  dealloc_stack %1 : $*S
+  %6 = tuple ()
+  return %6 : $()
+}
+

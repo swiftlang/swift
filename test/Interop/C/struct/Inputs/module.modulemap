@@ -1,0 +1,4 @@
+module StructDeclContext {
+  header "struct-decl-context.h"
+  export *
+}

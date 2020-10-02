@@ -114,6 +114,7 @@ FRONTEND_STATISTIC(AST, NumASTBytesAllocated)
 /// Number of file-level dependencies of this frontend job, as tracked in the
 /// AST context's dependency collector.
 FRONTEND_STATISTIC(AST, NumDependencies)
+FRONTEND_STATISTIC(AST, NumIncrementalDependencies)
 
 /// Number of top-level, dynamic, and member names referenced in this frontend
 /// job's source file, as tracked by the AST context's referenced-name tracker.
@@ -246,9 +247,6 @@ FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
 
 /// Number of types deserialized.
 FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
-
-/// Number of types validated.
-FRONTEND_STATISTIC(Sema, NumTypesValidated)
 
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)

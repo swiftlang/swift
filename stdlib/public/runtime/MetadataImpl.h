@@ -40,7 +40,6 @@
 #ifndef SWIFT_RUNTIME_METADATAIMPL_H
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
@@ -137,7 +136,7 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-#ifdef SWIFT_STDLIB_USE_NONATOMIC_RC
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
   static constexpr bool isAtomic = false;
 #else
   static constexpr bool isAtomic = true;

@@ -7,6 +7,7 @@ public protocol PublicProtocol {}
 
 // CHECK-NOT: precise:{{.*}}_ProtocolShouldntAppear
 // CHECK-NOT: precise:{{.*}}PublicProtocol
+@_show_in_interface
 public protocol _ProtocolShouldntAppear {}
 
 // CHECK-NOT: _ShouldntAppear

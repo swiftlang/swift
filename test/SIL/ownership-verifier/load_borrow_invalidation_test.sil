@@ -1,0 +1,397 @@
+// RUN: %target-sil-opt -o /dev/null %s 
+
+sil_stage canonical
+
+import Builtin
+
+// These are patterns that we should never consider as broken. For positive
+// patterns look next door for verifier error checks.
+
+sil @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+sil @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+//////////////////////////
+// InOut Argument Tests //
+//////////////////////////
+
+sil [ossa] @inout_earlier_user_same_block : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %inout_user = function_ref @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  apply %inout_user(%0) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  %2 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @inout_earlier_user_different_block : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %inout_user = function_ref @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  apply %inout_user(%0) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %2 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @inout_later_user_same_block : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %inout_user = function_ref @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  %2 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  apply %inout_user(%0) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @inout_later_user_different_block : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %inout_user = function_ref @inoutCallee : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  %2 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  apply %inout_user(%0) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+////////////////////////
+// Begin Access Tests //
+////////////////////////
+
+// Read tests
+
+sil [ossa] @begin_access_read_write_before_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  %3 = begin_access [read] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @begin_access_read_write_after_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [read] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Modify tests
+
+sil [ossa] @begin_access_modify_write_before_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+sil [ossa] @begin_access_modify_write_before_different_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @begin_access_modify_write_after_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @begin_access_modify_write_after_different_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// [modify] Writes in scope
+
+sil [ossa] @begin_access_modify_same_scope_write_before_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  store %1 to [assign] %3 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+sil [ossa] @begin_access_modify_same_scope_write_before_different_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  store %1 to [assign] %3 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @begin_access_modify_same_scope_write_after_same_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  store %1 to [assign] %3 : $*Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @begin_access_modify_same_scope_write_after_different_block : $@convention(thin) (@inout Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [unsafe] %0 : $*Builtin.NativeObject
+  %2 = load_borrow %3 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  store %1 to [assign] %3 : $*Builtin.NativeObject
+  end_access %3 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//////////////////////////////
+// pointer_to_address tests //
+//////////////////////////////
+
+sil [ossa] @pointer_to_address_test : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+////////////////////////
+// Address Cast Tests //
+////////////////////////
+
+sil [ossa] @unconditional_checked_cast_addr_test : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  unconditional_checked_cast_addr Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_always_take : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br take_always Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_take_on_success : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br take_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_copyonsuccess_1 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_copyonsuccess_2 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @pointer_to_address_is_assumed_to_be_safe : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  %gUser = function_ref @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUser(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %3 = address_to_pointer %1 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %4 = mark_dependence %3 : $Builtin.RawPointer on %1 : $*Builtin.NativeObject
+  %rawPointerUser = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %rawPointerUser(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

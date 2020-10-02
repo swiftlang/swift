@@ -13,7 +13,9 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
@@ -24,8 +26,8 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Lex/PreprocessorOptions.h"
-#include "clang/Serialization/ASTReader.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -186,6 +188,190 @@ SourceCompleteResult
 ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
                                     SFKind);
+}
+
+static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
+    FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  assert(FileSystem);
+
+  llvm::SmallString<128> PrimaryFile;
+  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
+    PrimaryFile = UnresolvedPrimaryFile;
+
+  unsigned primaryCount = 0;
+  // FIXME: The frontend should be dealing with symlinks, maybe similar to
+  // clang's FileManager ?
+  FrontendInputsAndOutputs replacementInputsAndOutputs;
+  for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
+    llvm::SmallString<128> newFilename;
+    if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
+      newFilename = input.getFileName();
+    llvm::sys::path::native(newFilename);
+    bool newIsPrimary = input.isPrimary() ||
+                        (!PrimaryFile.empty() && PrimaryFile == newFilename);
+    if (newIsPrimary) {
+      ++primaryCount;
+    }
+    assert(primaryCount < 2 && "cannot handle multiple primaries");
+    replacementInputsAndOutputs.addInput(
+        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
+  }
+
+  if (PrimaryFile.empty() || primaryCount == 1) {
+    return replacementInputsAndOutputs;
+  }
+
+  llvm::SmallString<64> Err;
+  llvm::raw_svector_ostream OS(Err);
+  OS << "'" << PrimaryFile << "' is not part of the input files";
+  Error = std::string(OS.str());
+  return replacementInputsAndOutputs;
+}
+
+static void disableExpensiveSILOptions(SILOptions &Opts) {
+  // Disable the sanitizers.
+  Opts.Sanitizers = {};
+
+  // Disable PGO and code coverage.
+  Opts.GenerateProfile = false;
+  Opts.EmitProfileCoverageMapping = false;
+  Opts.UseProfile = "";
+}
+
+namespace {
+class StreamDiagConsumer : public DiagnosticConsumer {
+  llvm::raw_ostream &OS;
+
+public:
+  StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    // FIXME: Print location info if available.
+    switch (Info.Kind) {
+    case DiagnosticKind::Error:
+      OS << "error: ";
+      break;
+    case DiagnosticKind::Warning:
+      OS << "warning: ";
+      break;
+    case DiagnosticKind::Note:
+      OS << "note: ";
+      break;
+    case DiagnosticKind::Remark:
+      OS << "remark: ";
+      break;
+    }
+    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+};
+} // end anonymous namespace
+
+bool ide::initCompilerInvocation(
+    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    const std::string &runtimeResourcePath,
+    const std::string &diagnosticDocumentationPath,
+    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error) {
+  SmallVector<const char *, 16> Args;
+  // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
+  // the top to allow overriding them with the passed in arguments.
+  Args.push_back("-resource-dir");
+  Args.push_back(runtimeResourcePath.c_str());
+  Args.push_back("-Xfrontend");
+  Args.push_back("-diagnostic-documentation-path");
+  Args.push_back("-Xfrontend");
+  Args.push_back(diagnosticDocumentationPath.c_str());
+  Args.append(OrigArgs.begin(), OrigArgs.end());
+
+  SmallString<32> ErrStr;
+  llvm::raw_svector_ostream ErrOS(ErrStr);
+  StreamDiagConsumer DiagConsumer(ErrOS);
+  Diags.addConsumer(DiagConsumer);
+
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return Invocation.parseArgs(FrontendArgs, Diags);
+  }, /*ForceNoOutputs=*/true);
+
+  // Remove the StreamDiagConsumer as it's no longer needed.
+  Diags.removeConsumer(DiagConsumer);
+
+  if (HadError) {
+    Error = std::string(ErrOS.str());
+    return true;
+  }
+
+  Invocation.getFrontendOptions().InputsAndOutputs =
+      resolveSymbolicLinksInInputs(
+          Invocation.getFrontendOptions().InputsAndOutputs,
+          UnresolvedPrimaryFile, FileSystem, Error);
+  if (!Error.empty())
+    return true;
+
+  ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
+  ImporterOpts.DetailedPreprocessingRecord = true;
+
+  assert(!Invocation.getModuleName().empty());
+
+  auto &LangOpts = Invocation.getLangOptions();
+  LangOpts.AttachCommentsToDecls = true;
+  LangOpts.DiagnosticsEditorMode = true;
+  LangOpts.CollectParsedToken = true;
+  if (LangOpts.PlaygroundTransform) {
+    // The playground instrumenter changes the AST in ways that disrupt the
+    // SourceKit functionality. Since we don't need the instrumenter, and all we
+    // actually need is the playground semantics visible to the user, like
+    // silencing the "expression resolves to an unused l-value" error, disable it.
+    LangOpts.PlaygroundTransform = false;
+  }
+
+  // Disable the index-store functionality for the sourcekitd requests.
+  auto &FrontendOpts = Invocation.getFrontendOptions();
+  FrontendOpts.IndexStorePath.clear();
+  ImporterOpts.IndexStorePath.clear();
+
+  // Force the action type to be -typecheck. This affects importing the
+  // SwiftONoneSupport module.
+  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
+
+  // We don't care about LLVMArgs
+  FrontendOpts.LLVMArgs.clear();
+
+  // SwiftSourceInfo files provide source location information for decls coming
+  // from loaded modules. For most IDE use cases it either has an undesirable
+  // impact on performance with no benefit (code completion), results in stale
+  // locations being used instead of more up-to-date indexer locations (cursor
+  // info), or has no observable effect (diagnostics, which are filtered to just
+  // those with a location in the primary file, and everything else).
+  if (shouldOptimizeForIDE)
+    FrontendOpts.IgnoreSwiftSourceInfo = true;
+
+  // To save the time for module validation, consider the lifetime of ASTManager
+  // as a single build session.
+  // NOTE: Do this only if '-disable-modules-validate-system-headers' is *not*
+  //       explicitly enabled.
+  auto &SearchPathOpts = Invocation.getSearchPathOptions();
+  if (!SearchPathOpts.DisableModulesValidateSystemDependencies) {
+    // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
+    //       cause unnecessary validations if they happens within one second
+    //       from the SourceKit startup.
+    ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
+                                     std::to_string(sessionTimestamp - 1));
+    ImporterOpts.ExtraArgs.push_back(
+        "-fmodules-validate-once-per-build-session");
+
+    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
+  }
+
+  // Disable expensive SIL options to reduce time spent in SILGen.
+  disableExpensiveSILOptions(Invocation.getSILOptions());
+
+  return false;
 }
 
 // Adjust the cc1 triple string we got from clang, to make sure it will be
@@ -477,46 +663,6 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
     if (HadPlaceholder)
       *HadPlaceholder = true;
   });
-}
-
-static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
-  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
-  if (!BufOrErr) {
-    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
-    return {};
-  }
-
-  std::string Key = "<key>";
-  Key += KeyName;
-  Key += "</key>";
-
-  StringRef Lines = BufOrErr.get()->getBuffer();
-  while (!Lines.empty()) {
-    StringRef CurLine;
-    std::tie(CurLine, Lines) = Lines.split('\n');
-    if (CurLine.find(Key) != StringRef::npos) {
-      std::tie(CurLine, Lines) = Lines.split('\n');
-      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
-      unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End - Begin).str();
-    }
-  }
-
-  return {};
-}
-
-std::string ide::getSDKName(StringRef Path) {
-  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
-                                   "CanonicalName");
-  if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
-  }
-  return Name;
-}
-
-std::string ide::getSDKVersion(StringRef Path) {
-  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/"
-                       "SystemVersion.plist", "ProductBuildVersion");
 }
 
 // Modules failing to load are commented-out.
@@ -812,7 +958,7 @@ unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {
   unsigned Len = std::min(args().size(), Other.args().size());
   for (unsigned I = 0; I < Len; ++ I) {
     if (args()[I] == Other.args()[I])
-      Result ++;
+      ++Result;
     else
       return Result;
   }

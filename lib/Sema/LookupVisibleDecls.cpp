@@ -61,10 +61,13 @@ private:
   /// This option is only for override completion lookup.
   unsigned IncludeDerivedRequirements : 1;
 
+  /// Should protocol extension members be included?
+  unsigned IncludeProtocolExtensionMembers : 1;
+
   LookupState()
       : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0),
         InheritsSuperclassInitializers(0), IncludeInstanceMembers(0),
-        IncludeDerivedRequirements(0) {}
+        IncludeDerivedRequirements(0), IncludeProtocolExtensionMembers(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -90,6 +93,9 @@ public:
   bool isIncludingInstanceMembers() const { return IncludeInstanceMembers; }
   bool isIncludingDerivedRequirements() const {
     return IncludeDerivedRequirements;
+  }
+  bool isIncludingProtocolExtensionMembers() const {
+    return IncludeProtocolExtensionMembers;
   }
 
   LookupState withOnMetatype() const {
@@ -125,6 +131,12 @@ public:
   LookupState withIncludedDerivedRequirements() const {
     auto Result = *this;
     Result.IncludeDerivedRequirements = 1;
+    return Result;
+  }
+
+  LookupState withIncludeProtocolExtensionMembers() const {
+    auto Result = *this;
+    Result.IncludeProtocolExtensionMembers = 1;
     return Result;
   }
 };
@@ -222,7 +234,7 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
 }
 
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC);
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC);
 
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
@@ -241,7 +253,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                                        extension)), false))
       continue;
 
-    synthesizePropertyWrapperStorageWrapperProperties(extension);
+    synthesizePropertyWrapperVariables(extension);
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
@@ -383,7 +395,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC);
 
   for (auto Import : namelookup::getAllImports(CurrDC)) {
-    Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+    Import.importedModule->lookupClassMembers(Import.accessPath,
+                                              ConsumerWrapper);
   }
 }
 
@@ -463,13 +476,20 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           };
           DeclVisibilityKind ReasonForThisDecl = ReasonForThisProtocol;
           if (const auto Witness = NormalConformance->getWitness(VD)) {
-            if (Witness.getDecl()->getFullName() == VD->getFullName()) {
+            auto *WD = Witness.getDecl();
+            if (WD->getName() == VD->getName()) {
               if (LS.isIncludingDerivedRequirements() &&
                   Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
-                  isDerivedRequirement(Witness.getDecl())) {
+                  isDerivedRequirement(WD)) {
                 ReasonForThisDecl =
                     DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal;
+              } else if (!LS.isIncludingProtocolExtensionMembers() &&
+                         WD->getDeclContext()->getExtendedProtocolDecl()) {
+                // Don't skip this requiement.
+                // Witnesses in protocol extensions aren't reported.
               } else {
+                // lookupVisibleMemberDecls() generally prefers witness members
+                // over requirements.
                 continue;
               }
             }
@@ -481,11 +501,14 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     }
 
     // Add members from any extensions.
-    SmallVector<ValueDecl *, 2> FoundDecls;
-    doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
-                            FromContext, LS, ReasonForThisProtocol);
-    for (auto *VD : FoundDecls)
-      Consumer.foundDecl(VD, ReasonForThisProtocol);
+    if (LS.isIncludingProtocolExtensionMembers()) {
+      SmallVector<ValueDecl *, 2> FoundDecls;
+      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredInterfaceType(),
+                              FoundDecls, FromContext, LS,
+                              ReasonForThisProtocol);
+      for (auto *VD : FoundDecls)
+        Consumer.foundDecl(VD, ReasonForThisProtocol);
+    }
   }
 }
 
@@ -497,27 +520,29 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              VisitedSet &Visited);
 
 static void
-  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolType *PT,
+  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolDecl *PD,
                                    VisibleDeclConsumer &Consumer,
                                    const DeclContext *CurrDC, LookupState LS,
                                    DeclVisibilityKind Reason,
                                    GenericSignatureBuilder *GSB,
                                    VisitedSet &Visited) {
-  if (!Visited.insert(PT->getDecl()).second)
+  if (!Visited.insert(PD).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols())
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
-                                     LS, getReasonForSuper(Reason),
+  for (auto Proto : PD->getInheritedProtocols())
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto,
+                                     Consumer, CurrDC, LS,
+                                     getReasonForSuper(Reason),
                                      GSB, Visited);
-  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
+  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(),
+                    Consumer, CurrDC, LS, Reason);
 }
 
-// Generate '$' and '_' prefixed variables that have attached property
+// Generate '$' and '_' prefixed variables for members that have attached property
 // wrappers.
 static void
-synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
-  auto SF = IDC->getDecl()->getDeclContext()->getParentSourceFile();
+synthesizePropertyWrapperVariables(IterableDeclContext *IDC) {
+  auto SF = IDC->getAsGenericContext()->getParentSourceFile();
   if (!SF || SF->Kind == SourceFileKind::Interface)
     return;
 
@@ -553,7 +578,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            /*useResolver=*/true);
   }
 
-  synthesizePropertyWrapperStorageWrapperProperties(NTD);
+  synthesizePropertyWrapperVariables(NTD);
 }
 
 static void lookupVisibleMemberDeclsImpl(
@@ -582,6 +607,9 @@ static void lookupVisibleMemberDeclsImpl(
     if (LS.isIncludingDerivedRequirements()) {
       subLS = subLS.withIncludedDerivedRequirements();
     }
+    if (LS.isIncludingProtocolExtensionMembers()) {
+      subLS = subLS.withIncludeProtocolExtensionMembers();
+    }
 
     // Just perform normal dot lookup on the type see if we find extensions or
     // anything else.  For example, type SomeTy.SomeMember can look up static
@@ -596,7 +624,7 @@ static void lookupVisibleMemberDeclsImpl(
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
-    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ImportPath::Access(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
@@ -610,7 +638,8 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
+    lookupVisibleProtocolMemberDecls(BaseTy, PT->getDecl(),
+                                     Consumer, CurrDC, LS, Reason,
                                      GSB, Visited);
     return;
   }
@@ -627,7 +656,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
-          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
+          BaseTy, Proto, Consumer, CurrDC, LS,
           Reason, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
@@ -650,7 +679,7 @@ static void lookupVisibleMemberDeclsImpl(
       // Conformances
       for (const auto &Conforms : EquivClass->conformsTo) {
         lookupVisibleProtocolMemberDecls(
-            BaseTy, Conforms.first->getDeclaredType(), Consumer, CurrDC,
+            BaseTy, Conforms.first, Consumer, CurrDC,
             LS, getReasonForSuper(Reason), GSB, Visited);
       }
 
@@ -664,11 +693,13 @@ static void lookupVisibleMemberDeclsImpl(
     }
   }
 
+  auto lookupTy = BaseTy;
+
   const auto synthesizeAndLookupTypeMembers = [&](NominalTypeDecl *NTD) {
     synthesizeMemberDeclsForLookup(NTD, CurrDC);
 
     // Look in for members of a nominal type.
-    lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
+    lookupTypeMembers(BaseTy, lookupTy, Consumer, CurrDC, LS, Reason);
   };
 
   llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
@@ -696,7 +727,7 @@ static void lookupVisibleMemberDeclsImpl(
     Ancestors.insert(CD);
 
     Reason = getReasonForSuper(Reason);
-    BaseTy = CD->getSuperclass();
+    lookupTy = CD->getSuperclass();
 
     LS = LS.withOnSuperclass();
     if (CD->inheritsSuperclassInitializers())
@@ -705,7 +736,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   // Look into the inheritance chain.
   do {
-    const auto CurClass = BaseTy->getClassOrBoundGenericClass();
+    const auto CurClass = lookupTy->getClassOrBoundGenericClass();
 
     // FIXME: This path is no substitute for an actual circularity check.
     // The real fix is to check that the superclass doesn't introduce a
@@ -715,10 +746,10 @@ static void lookupVisibleMemberDeclsImpl(
 
     synthesizeAndLookupTypeMembers(CurClass);
 
-    BaseTy = CurClass->getSuperclass();
+    lookupTy = CurClass->getSuperclass();
     if (!CurClass->inheritsSuperclassInitializers())
       LS = LS.withoutInheritsSuperclassInitializers();
-  } while (BaseTy);
+  } while (lookupTy);
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
@@ -833,13 +864,13 @@ public:
     removeShadowedDecls(Decls, DC);
 
     size_t index = 0;
-    for (const auto DeclAndReason : Results) {
+    for (const auto &DeclAndReason : Results) {
       if (index >= Decls.size())
         break;
       if (DeclAndReason.D != Decls[index])
         continue;
 
-      index++;
+      ++index;
 
       auto *const VD = DeclAndReason.D;
       const auto Reason = DeclAndReason.Reason;
@@ -917,17 +948,22 @@ public:
                         /*wouldConflictInSwift5*/nullptr,
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
-          // Prefer derived requirements over their witnesses.
-          if (Reason ==
-                DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal ||
-              VD->getFormalAccess() > OtherVD->getFormalAccess() ||
-              //Prefer available one.
-              (!AvailableAttr::isUnavailable(VD) &&
-               AvailableAttr::isUnavailable(OtherVD))) {
-            FilteredResults.remove(
-                FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
-            FilteredResults.insert(DeclAndReason);
-            *I = VD;
+
+          if (!AvailableAttr::isUnavailable(VD)) {
+            bool preferVD = (
+                // Prefer derived requirements over their witnesses.
+                Reason == DeclVisibilityKind::
+                              MemberOfProtocolDerivedByCurrentNominal ||
+                // Prefer available one.
+                AvailableAttr::isUnavailable(OtherVD) ||
+                // Prefer more accessible one.
+                VD->getFormalAccess() > OtherVD->getFormalAccess());
+            if (preferVD) {
+              FilteredResults.remove(
+                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+              FilteredResults.insert(DeclAndReason);
+              *I = VD;
+            }
           }
         }
       }
@@ -1111,6 +1147,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
+    LS = LS.withIncludeProtocolExtensionMembers();
 
     // Skip initializer contexts, we will not find any declarations there.
     if (isa<Initializer>(DC)) {
@@ -1308,6 +1345,7 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
                                      bool includeInstanceMembers,
                                      bool includeDerivedRequirements,
+                                     bool includeProtocolExtensionMembers,
                                      GenericSignatureBuilder *GSB) {
   assert(CurrDC);
   LookupState ls = LookupState::makeQualified();
@@ -1316,6 +1354,9 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   }
   if (includeDerivedRequirements) {
     ls = ls.withIncludedDerivedRequirements();
+  }
+  if (includeProtocolExtensionMembers) {
+    ls = ls.withIncludeProtocolExtensionMembers();
   }
 
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, ls,

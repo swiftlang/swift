@@ -123,23 +123,6 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   llvm_unreachable("Unsupported Darwin platform");
 }
 
-DarwinPlatformKind swift::getNonSimulatorPlatform(DarwinPlatformKind platform) {
-  switch (platform) {
-  case DarwinPlatformKind::MacOS:
-    return DarwinPlatformKind::MacOS;
-  case DarwinPlatformKind::IPhoneOS:
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    return DarwinPlatformKind::IPhoneOS;
-  case DarwinPlatformKind::TvOS:
-  case DarwinPlatformKind::TvOSSimulator:
-    return DarwinPlatformKind::TvOS;
-  case DarwinPlatformKind::WatchOS:
-  case DarwinPlatformKind::WatchOSSimulator:
-    return DarwinPlatformKind::WatchOS;
-  }
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
 static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
   switch (platform) {
   case DarwinPlatformKind::MacOS:
@@ -387,6 +370,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {
+      if (Triple.isAArch64() && Minor <= 16)
+        return llvm::VersionTuple(5, 3);
+
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {
@@ -396,9 +382,18 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
           return llvm::VersionTuple(5, 2);
         }
       }
+    } else if (Major == 11) {
+      return llvm::VersionTuple(5, 3);
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
+
+    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+    // with Swift 5.3
+    if (Triple.isAArch64() && Major <= 14 &&
+        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
+      return llvm::VersionTuple(5, 3);
+
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {
@@ -422,4 +417,103 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   }
 
   return None;
+}
+
+
+/// Remap the given version number via the version map, or produce \c None if
+/// there is no mapping for this version.
+static Optional<llvm::VersionTuple> remapVersion(
+    const llvm::StringMap<llvm::VersionTuple> &versionMap,
+    llvm::VersionTuple version) {
+  // The build number is never used in the lookup.
+  version = version.withoutBuild();
+
+  // Look for this specific version.
+  auto known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If an extra ".0" was specified (in the subminor version), drop that
+  // and look again.
+  if (!version.getSubminor() || *version.getSubminor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If another extra ".0" wa specified (in the minor version), drop that
+  // and look again.
+  if (!version.getMinor() || *version.getMinor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  return None;
+}
+
+llvm::VersionTuple
+swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                           const llvm::Triple &triple) {
+  // Retrieve the SDK version.
+  auto SDKVersion = SDKInfo.getVersion();
+
+  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
+  // SDK version. Map that to the corresponding iOS version number to pass
+  // down to the linker.
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    return remapVersion(
+        SDKInfo.getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
+  }
+
+  return SDKVersion;
+}
+
+static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
+  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!BufOrErr) {
+    // FIXME: diagnose properly
+    return {};
+  }
+
+  std::string Key = "<key>";
+  Key += KeyName;
+  Key += "</key>";
+
+  StringRef Lines = BufOrErr.get()->getBuffer();
+  while (!Lines.empty()) {
+    StringRef CurLine;
+    std::tie(CurLine, Lines) = Lines.split('\n');
+    if (CurLine.find(Key) != StringRef::npos) {
+      std::tie(CurLine, Lines) = Lines.split('\n');
+      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
+      unsigned End = CurLine.find("</string>");
+      return CurLine.substr(Begin, End - Begin).str();
+    }
+  }
+
+  return {};
+}
+
+std::string swift::getSDKBuildVersionFromPlist(StringRef Path) {
+  return getPlistEntry(Path, "ProductBuildVersion");
+}
+
+std::string swift::getSDKBuildVersion(StringRef Path) {
+  return getSDKBuildVersionFromPlist((llvm::Twine(Path) +
+    "/System/Library/CoreServices/SystemVersion.plist").str());
+}
+
+std::string swift::getSDKName(StringRef Path) {
+  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
+                                   "CanonicalName");
+  if (Name.empty() && Path.endswith(".sdk")) {
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
+  }
+  return Name;
 }

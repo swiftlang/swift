@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays(mock-sdk-directory: %S/../Inputs)
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs -I %t) -prespecialize-generic-metadata -target %module-target-future -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // UNSUPPORTED: CPU=i386 && OS=ios

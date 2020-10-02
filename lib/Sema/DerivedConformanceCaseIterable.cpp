@@ -48,9 +48,9 @@ deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
 
   SmallVector<Expr *, 8> elExprs;
   for (EnumElementDecl *elt : parentEnum->getAllElements()) {
-    auto *ref = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto *base = TypeExpr::createImplicit(enumTy, C);
-    auto *apply = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base);
+    auto *apply = new (C) MemberRefExpr(base, SourceLoc(),
+                                        elt, DeclNameLoc(), /*implicit*/true);
     elExprs.push_back(apply);
   }
   auto *arrayExpr = ArrayExpr::create(C, SourceLoc(), elExprs, {}, SourceLoc());
@@ -113,9 +113,6 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  if (checkAndDiagnoseDisallowedContext(assocType))
-    return nullptr;
-
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(Nominal))
     return nullptr;

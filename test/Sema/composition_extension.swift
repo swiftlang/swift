@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -primary-file %s %S/Inputs/composition_extension_usage.swift -emit-module-path %t/P-partial.swiftmodule -module-name SR11227 -enable-testing
 // RUN: %target-swift-frontend -primary-file %S/Inputs/composition_extension_usage.swift %s -emit-module-path %t/S-partial.swiftmodule -module-name SR11227 -enable-testing
-// RUN: %target-swift-frontend -sil-merge-partial-modules %t/P-partial.swiftmodule %t/S-partial.swiftmodule -emit-module -o %t/SR11227.swiftmodule
+// RUN: %target-swift-frontend -merge-modules -emit-module %t/P-partial.swiftmodule %t/S-partial.swiftmodule -o %t/SR11227.swiftmodule
 
 protocol P1 {}
 

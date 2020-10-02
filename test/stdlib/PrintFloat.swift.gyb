@@ -10,9 +10,9 @@
 // REQUIRES: optimized_stdlib
 
 import StdlibUnittest
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -345,7 +345,9 @@ let PrintTests = TestSuite("FloatingPointPrinting")
 
 % for FloatType in ['Float16', 'Float', 'Double', 'Float80']:
 % if FloatType == 'Float16':
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 % end
 % if FloatType == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -383,7 +385,9 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
 % if FloatType == 'Float16':
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 % end
 fileprivate func expectAccurateDescription(_ object: ${FloatType},
   _ message: @autoclosure () -> String = "",
@@ -438,21 +442,20 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T,
     message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
-  // debugDescription prints full details about NaNs, which is tricky to test
-  // because NaNs often get truncated: various implementations force all NaNs
-  // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
-  // NaN into a function (via an FP register) is enough to mangle the value.
+  // debugDescription tries to print details about NaNs, which is tricky to test.
 
-#if arch(x86_64)
-  // Verify the exact debugDescription value only on x86_64, where we
-  // know the exact expected String:
+/*
+  // We cannot reliably test the exact expected string, because various
+  // implementations force all NaNs quiet, discard payloads, or clear sign bits.
+  // In some cases, just passing a NaN into a function (via an FP register) is
+  // enough to mangle the value.
   expectEqual(expected, object.debugDescription,
     message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-#endif
+*/
 
-  // On all platforms, we verify that the generated debugDescription text
-  // follows the expected format, even when we can't verify the exact value.
+  // We can verify that the generated debugDescription text
+  // follows the expected general format, even when we can't verify the exact value.
   var actual = object.debugDescription
 
   // Optional leading "-"
@@ -584,7 +587,8 @@ PrintTests.test("Printable_CDouble") {
   expectDescription("-1.0", CDouble(-1.0))
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+if #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 PrintTests.test("Printable_Float16") {
   func asFloat16(_ f: Float16) -> Float16 { return f }
 
@@ -727,6 +731,7 @@ PrintTests.test("Printable_Float16") {
   expectDescription("0.0", asFloat16(0.0000000125))
 }
 }
+#endif
 
 PrintTests.test("Printable_Float") {
   func asFloat32(_ f: Float32) -> Float32 { return f }

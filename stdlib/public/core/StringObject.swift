@@ -293,7 +293,7 @@ extension _StringObject.CountAndFlags {
  on arm64.
 */
 extension _StringObject.Nibbles {
-  // The canonical empty sting is an empty small string
+  // The canonical empty string is an empty small string
   @inlinable @inline(__always)
   internal static var emptyString: UInt64 {
     return _StringObject.Nibbles.small(isASCII: true)
@@ -855,6 +855,14 @@ extension _StringObject {
     _internalInvariant(largeIsCocoa && !isImmortal)
     return Builtin.reinterpretCast(largeAddressBits)
 #endif
+  }
+
+  @_alwaysEmitIntoClient
+  @inlinable
+  @inline(__always)
+  internal var owner: AnyObject? {
+    guard self.isMortal else { return nil }
+    return Builtin.reinterpretCast(largeAddressBits)
   }
 }
 

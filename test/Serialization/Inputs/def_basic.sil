@@ -498,6 +498,15 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: @base_addr : $@convention(thin) () -> ()
+sil [transparent] [serialized] @base_addr : $@convention(thin) () -> () {
+bb0:
+  // CHECK: base_addr_for_offset $*Int
+  %0 = base_addr_for_offset $*Int
+  %1 = tuple ()
+  return %1 : $()
+}
+
 class GlobalObject { }
 
 sil_global @static_global_object : $GlobalObject = {
@@ -704,6 +713,24 @@ bb0(%0 : $Class1, %1 : $Builtin.Word):
   %2 = ref_tail_addr %0 : $Class1, $Val
   // CHECK: tail_addr [[T]] : $*Val, %1 : $Builtin.Word, $Aleph
   %3 = tail_addr %2 : $*Val, %1 : $Builtin.Word, $Aleph
+  return %0 : $Class1
+}
+
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_cow_mutation
+sil [transparent] [serialized] @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1 {
+bb0(%0 : $Class1):
+  // CHECK: (%1, %2) = begin_cow_mutation %0 : $Class1
+  (%1, %2) = begin_cow_mutation %0 : $Class1
+  // CHECK: %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  // CHECK: (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  // CHECK: %6 = end_cow_mutation %5 : $Class1
+  %6 = end_cow_mutation %5 : $Class1
+  // CHECK: [[T:%[0-9]+]] = ref_tail_addr [immutable] %3 : $Class1, $Val
+  %7 = ref_tail_addr [immutable] %3 : $Class1, $Val
+  // CHECK: ref_element_addr [immutable] %3 : $Class1, #Class1.a
+  %8 = ref_element_addr [immutable] %3 : $Class1, #Class1.a
   return %0 : $Class1
 }
 
@@ -1473,7 +1500,8 @@ bb0:
   %57 = function_ref @$s7literal8literalsyyF : $@convention(thin) () -> ()
   %59 = function_ref @$s5index5gep641p1iBpBp_Bi64_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
-  %61 = function_ref @global_object : $@convention(thin) () -> GlobalObject
+  %61 = function_ref @base_addr : $@convention(thin) () -> ()
+  %62 = function_ref @global_object : $@convention(thin) () -> GlobalObject
   %63 = function_ref @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type)
   %67 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
   %69 = function_ref @test_unreachable : $@convention(thin) () -> ()
@@ -1489,7 +1517,8 @@ bb0:
   %87 = function_ref @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> ()
   %88 = function_ref @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> ()
   %89 = function_ref @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1
-  %90 = function_ref @closure_test : $@convention(thin) () -> ()
+  %90 = function_ref @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1
+  %91 = function_ref @closure_test : $@convention(thin) () -> ()
   %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
   %99 = function_ref @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
   %101 = function_ref @test_switch_value : $@convention(thin) (Builtin.Word) -> ()

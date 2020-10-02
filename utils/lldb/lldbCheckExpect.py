@@ -21,6 +21,7 @@ this, e.g:
       Expected value  : 98
       Actual value    : ...
 '''
+from __future__ import print_function
 
 
 def unwrap(s):
@@ -55,7 +56,7 @@ def unwrap(s):
 def on_check_expect(frame, bp_loc, session):
     parent_frame = frame.get_parent_frame()
     parent_name = parent_frame.GetFunctionName()
-    print "Evaluating check-expect in", parent_name
+    print("Evaluating check-expect in", parent_name)
 
     # Note: If we fail to stringify the arguments in the check-expect frame,
     # the standard library has probably not been compiled with debug info.
@@ -69,25 +70,25 @@ def on_check_expect(frame, bp_loc, session):
     expr_result = parent_frame.FindVariable(var_name).GetObjectDescription()
     eval_result = unwrap(str(expr_result))
 
-    print "  Checked variable:", var_name
-    print "  Expected value  :", expected_value
-    print "  Actual value    :", eval_result
+    print("  Checked variable:", var_name)
+    print("  Expected value  :", expected_value)
+    print("  Actual value    :", eval_result)
 
     if eval_result == expected_value:
         # Do not stop execution.
         return False
 
-    print "Found a possible expression evaluation failure."
+    print("Found a possible expression evaluation failure.")
 
     for i, (c1, c2) in enumerate(zip(expected_value, eval_result)):
         if c1 == c2:
             continue
-        print " -> Character difference at index", i
-        print " -> Expected", c1, "but found", c2
+        print(" -> Character difference at index", i)
+        print(" -> Expected", c1, "but found", c2)
         break
     else:
-        print " -> Expected string has length", len(expected_value)
-        print " -> Actual string has length", len(eval_result)
+        print(" -> Expected string has length", len(expected_value))
+        print(" -> Actual string has length", len(eval_result))
     return True
 
 

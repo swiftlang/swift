@@ -21,8 +21,10 @@
 
 namespace swift {
 class ModuleFile;
+class ModuleFileSharedCore;
 
 StringRef getNameOfModule(const ModuleFile *);
+StringRef getNameOfModule(const ModuleFileSharedCore *);
 
 namespace serialization {
 
@@ -350,6 +352,13 @@ public:
     this->numVTableEntries = numVTableEntries;
   }
 
+  template <typename UnderlyingErrorT>
+  bool underlyingReasonIsA() const {
+    if (!underlyingReason)
+      return false;
+    return underlyingReason->isA<UnderlyingErrorT>();
+  }
+
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize type for '" << name << "'";
     if (underlyingReason) {
@@ -453,6 +462,17 @@ public:
 
   void print(raw_ostream &os) const override {
     os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+  }
+};
+
+class PrettyStackTraceModuleFileCore : public llvm::PrettyStackTraceEntry {
+  const ModuleFileSharedCore &MF;
+public:
+  explicit PrettyStackTraceModuleFileCore(ModuleFileSharedCore &module)
+      : MF(module) {}
+
+  void print(raw_ostream &os) const override {
+    os << "While reading from \'" << getNameOfModule(&MF) << "'\n";
   }
 };
 

@@ -20,6 +20,7 @@
 #include "../SwiftShims/Random.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include <stdlib.h>
 
 namespace swift {
@@ -113,13 +114,12 @@ static swift::_SwiftHashingParameters initializeHashingParameters() {
   // results are repeatable, e.g., in certain test environments.  (Note that
   // even if the seed override is enabled, hash values aren't guaranteed to
   // remain stable across even minor stdlib releases.)
-  auto determinism = getenv("SWIFT_DETERMINISTIC_HASHING");
-  if (determinism && 0 == strcmp(determinism, "1")) {
+  if (swift::runtime::environment::SWIFT_DETERMINISTIC_HASHING()) {
     return { 0, 0, true };
   }
   __swift_uint64_t seed0 = 0, seed1 = 0;
-  swift::swift_stdlib_random(&seed0, sizeof(seed0));
-  swift::swift_stdlib_random(&seed1, sizeof(seed1));
+  swift_stdlib_random(&seed0, sizeof(seed0));
+  swift_stdlib_random(&seed1, sizeof(seed1));
   return { seed0, seed1, false };
 }
 
@@ -134,16 +134,3 @@ void swift::_swift_instantiateInertHeapObject(void *address,
                                               const HeapMetadata *metadata) {
   ::new (address) HeapObject{metadata};
 }
-
-namespace llvm { namespace hashing { namespace detail {
-  // An extern variable expected by LLVM's hashing templates. We don't link any
-  // LLVM libs into the runtime, so define it as a weak symbol.
-  //
-  // Systems that compile this code into a dynamic library will do so with
-  // hidden visibility, making this all internal to the dynamic library.
-  // Systems that statically link the Swift runtime into applications (e.g. on
-  // Linux) need this to handle the case when the app already uses LLVM.
-  uint64_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
-} // namespace detail
-} // namespace hashing
-} // namespace llvm

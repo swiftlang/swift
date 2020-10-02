@@ -14,13 +14,15 @@ infix operator ^^^ : DeclaredAcrossFiles
 func ^^^ (lhs: Int, rhs: Int) -> Int { 0 }
 func &&& (lhs: Int, rhs: Int) -> Int { 0 }
 
-// FIXME(SR-12132): The operator decl >>> is declared in module A, which we
-// should be able to see through ExportsAC.
-prefix func >>> (rhs: Double) {} // expected-error {{operator implementation without matching operator declaration}}
+// The operator decl >>> is declared in module A, which we should be able to
+// see through ExportsAC. Note that this is possible even with the compatibility
+// behavior as we can use the new lookup logic when the result is unambiguous.
+prefix func >>> (rhs: Double) {}
 
-// FIXME(SR-12132): We should also see precedencegroups in module A through
-// ExportsAC.
-infix operator ^^^^ : DeclaredInModuleA // expected-error {{unknown precedence group 'DeclaredInModuleA'}}
+// Make sure we can also see precedencegroups in module A through ExportsAC.
+// Note that this is possible even with the compatibility behavior as we can use
+// the new lookup logic when the result is unambiguous.
+infix operator ^^^^ : DeclaredInModuleA
 
 // The operator decl for ??? is declared in both modules A and B, but has the
 // same default precedence group in both, so there's no ambiguity.
@@ -38,9 +40,7 @@ func ???? (lhs: Int, rhs: Int) {}
 
 // The operator decl for ????! is declared in both modules ExportsAC and B, and
 // has a different precedence group in each. Therefore ambiguous.
-// FIXME: We shouldn't emit the unknown operator decl error.
 func ????! (lhs: Int, rhs: Int) {} // expected-error {{ambiguous operator declarations found for operator}}
-// expected-error@-1 {{operator implementation without matching operator declaration}}
 
 // Same as ????, the precedencegroup is declared in both modules A and B, but
 // we don't look into module A for compatibility.
@@ -48,9 +48,7 @@ infix operator <?> : DeclaredInModulesAB
 
 // The precedencegroup is declared in both modules ExportsAC and B, therefore
 // ambiguous.
-// FIXME: We shouldn't emit the 'unknown precedence group' error.
 infix operator <!> : DeclaredInModulesBExportsAC // expected-error {{multiple precedence groups found}}
-// expected-error@-1 {{unknown precedence group 'DeclaredInModulesBExportsAC'}}
 
 // This precedencegroup is declared in this module as well as in both modules A
 // and B. The decl in this module should shadow the imported ones, but for
@@ -82,10 +80,9 @@ func ????? (lhs: Int, rhs: Int) {}
 // precedencegroups.
 func ?????? (lhs: Int, rhs: Int) {}
 
-// FIXME: Module D is imported through exports in both lookup_other and
-// lookup_other2, but we fail to detect the fact that we're visiting the same
-// thing twice.
-infix operator <> : DeclaredInModuleD // expected-error {{unknown precedence group 'DeclaredInModuleD'}}
+// Module D is imported through exports in both lookup_other and lookup_other2.
+// Make sure we correctly handle visiting the same module twice.
+infix operator <> : DeclaredInModuleD
 
 // Also declared in lookup_other. To preserve compatibility, we allow an
 // unambiguous lookup that will favor this declaration over lookup_other.
@@ -109,9 +106,9 @@ func testOperatorLookup() {
   >>>1
 
   // We've been evil and overriden TernaryPrecedence in both modules A and B.
-  // FIXME: We shouldn't emit the 'broken stdlib' error.
+  // Make sure we emit an ambiguity error without emitting a 'broken stdlib'
+  // error.
   true ? () : () // expected-error {{multiple precedence groups found}}
-  // expected-error@-1 {{broken standard library: missing builtin precedence group 'TernaryPrecedence'}}
 }
 
 precedencegroup CastingPrecedence {

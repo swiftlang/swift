@@ -309,11 +309,25 @@ struct WrapperWithNonEscapingAutoclosure<V> {
 }
 
 struct UseWrapperWithNonEscapingAutoclosure {
-  @WrapperWithNonEscapingAutoclosure var foo: Int
+  @WrapperWithNonEscapingAutoclosure var p1: Int
+  @WrapperWithNonEscapingAutoclosure var p2: UInt = 10
 
-  // Memberwise init should take an Int arg, not a closure
-  // CHECK: // UseWrapperWithNonEscapingAutoclosure.init(foo:)
-  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSi_tcfC : $@convention(method) (Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
+  // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p1
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p1SivpfP : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> WrapperWithNonEscapingAutoclosure<Int>
+
+  // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p2
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p2SuvpfP : $@convention(thin) (@noescape @callee_guaranteed () -> UInt) -> WrapperWithNonEscapingAutoclosure<UInt>
+
+  // variable initialization expression of UseWrapperWithNonEscapingAutoclosure._p2
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3_p233_F728088E0028E14D18C6A10CF68512E8LLAA0defgH0VySuGvpfi : $@convention(thin) () -> @owned @callee_guaranteed () -> UInt
+  // CHECK: return %1 : $@callee_guaranteed () -> UInt
+
+  // default argument 1 of UseWrapperWithNonEscapingAutoclosure.init(p1:p2:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfcfA0_ : $@convention(thin) () -> @owned @callee_guaranteed () -> UInt
+  // CHECK: return %1 : $@callee_guaranteed () -> UInt
+
+  // UseWrapperWithNonEscapingAutoclosure.init(p1:p2:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfC : $@convention(method) (@noescape @callee_guaranteed () -> Int, @noescape @callee_guaranteed () -> UInt, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
 }
 
 struct UseStatic {
@@ -423,6 +437,21 @@ struct CompositionWithAutoclosure {
   // In the memberwise init, only p1 should be a closure - p2 and p3 should be just Int
   // CompositionWithAutoclosure.init(p1:p2:p3:)
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26CompositionWithAutoclosureV2p12p22p3ACSiyXA_S2itcfC : $@convention(method) (@owned @callee_guaranteed () -> Int, Int, Int, @thin CompositionWithAutoclosure.Type) -> CompositionWithAutoclosure
+}
+
+@propertyWrapper
+struct WrapperWithAutoclosureAndExtraArgs<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure @escaping () -> V, key: String) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct UseAutoclosureWrapperWithExtraArgs {
+  @WrapperWithAutoclosureAndExtraArgs(key: "")
+  var value = 10
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers34UseAutoclosureWrapperWithExtraArgsV5valueSivpfP : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> WrapperWithAutoclosureAndExtraArgs<Int>
 }
 
 // Observers with non-default mutatingness.
@@ -651,7 +680,8 @@ struct WithTuples {
 class TestResilientDI {
   @MyPublished var data: Int? = nil
 
-	// CHECK: assign_by_wrapper {{%.*}} : $Optional<Int> to {{%.*}} : $*MyPublished<Optional<Int>>, init {{%.*}} : $@callee_guaranteed (Optional<Int>) -> @out MyPublished<Optional<Int>>, set {{%.*}} : $@callee_guaranteed (Optional<Int>) -> ()
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers15TestResilientDIC11doSomethingyyF : $@convention(method) (@guaranteed TestResilientDI) -> () {
+  // CHECK: class_method %0 : $TestResilientDI, #TestResilientDI.data!setter : (TestResilientDI) -> (Int?) -> (), $@convention(method) (Optional<Int>, @guaranteed TestResilientDI) -> ()
 
   func doSomething() {
     self.data = Int()
@@ -844,6 +874,38 @@ struct ObservedObject<ObjectType : AnyObject > {
     self.wrappedValue = wrappedValue
   }
 }
+
+
+
+// rdar://problem/60600911
+// Ensure assign_by_wrapper is emitted for initialization
+// of a property wrapper with a nonmutating set. Even though such setters
+// take `self` by-value.
+@propertyWrapper
+struct NonMutatingSetterWrapper<Value> {
+    var value: Value
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+    var wrappedValue: Value {
+        get { value }
+        nonmutating set {
+            print("  .. nonmutatingSet \(newValue)")
+        }
+    }
+}
+
+struct NonMutatingWrapperTestStruct {
+    // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers28NonMutatingWrapperTestStructV3valACSi_tcfC : $@convention(method) (Int, @thin NonMutatingWrapperTestStruct.Type) -> NonMutatingWrapperTestStruct {
+    // CHECK: %[[LOAD:[0-9]+]] = load [trivial] %[[SRC:[0-9]+]] : $*NonMutatingWrapperTestStruct
+    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
+    // CHECK-NEXT: assign_by_wrapper %[[SETVAL:[0-9]+]] : $Int to %[[ADDR:[0-9]+]] : $*NonMutatingSetterWrapper<Int>, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@callee_guaranteed (Int) -> ()
+    @NonMutatingSetterWrapper var SomeProp: Int
+    init(val: Int) {
+        SomeProp = val
+    }
+}
+
 
 // SR-12443: Crash on property with wrapper override that adds observer.
 @propertyWrapper

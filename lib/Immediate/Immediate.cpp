@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
+#include "llvm/ExecutionEngine/Orc/DebugUtils.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/LLVMContext.h"
@@ -73,6 +74,18 @@ static void *loadRuntimeLib(StringRef sharedLibName,
       return handle;
   }
   return nullptr;
+}
+
+static void DumpLLVMIR(const llvm::Module &M) {
+  std::string path = (M.getName() + ".ll").str();
+  for (size_t count = 0; llvm::sys::fs::exists(path); )
+    path = (M.getName() + llvm::utostr(count++) + ".ll").str();
+
+  std::error_code error;
+  llvm::raw_fd_ostream stream(path, error);
+  if (error)
+    return;
+  M.print(stream, /*AssemblyAnnotationWriter=*/nullptr);
 }
 
 void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
@@ -196,19 +209,28 @@ int swift::RunImmediately(CompilerInstance &CI,
                           const IRGenOptions &IRGenOpts,
                           const SILOptions &SILOpts,
                           std::unique_ptr<SILModule> &&SM) {
+  // TODO: Use OptimizedIRRequest for this.
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
+  const auto &TBDOpts = CI.getInvocation().getTBDGenOptions();
   auto GenModule = performIRGeneration(
-      IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
-      PSPs, ArrayRef<std::string>());
+      swiftModule, IRGenOpts, TBDOpts, std::move(SM),
+      swiftModule->getName().str(), PSPs, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
 
   assert(GenModule && "Emitted no diagnostics but IR generation failed?");
+
+  performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr, /*hash*/ nullptr,
+              GenModule.getModule(), GenModule.getTargetMachine(),
+              PSPs.OutputFilename, Context.Stats);
+
+  if (Context.hadError())
+    return -1;
 
   // Load libSwiftCore to setup process arguments.
   //
@@ -281,6 +303,18 @@ int swift::RunImmediately(CompilerInstance &CI,
   }
 
   auto Module = GenModule.getModule();
+
+  switch (IRGenOpts.DumpJIT) {
+  case JITDebugArtifact::None:
+    break;
+  case JITDebugArtifact::LLVMIR:
+    DumpLLVMIR(*Module);
+    break;
+  case JITDebugArtifact::Object:
+    JIT->getObjTransformLayer().setTransform(llvm::orc::DumpObjects());
+    break;
+  }
+
   {
     // Get a generator for the process symbols and attach it to the main
     // JITDylib.
@@ -305,7 +339,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   using MainFnTy = int(*)(int, char*[]);
 
   LLVM_DEBUG(llvm::dbgs() << "Running static constructors\n");
-  if (auto Err = JIT->runConstructors()) {
+  if (auto Err = JIT->initialize(JIT->getMainJITDylib())) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }
@@ -322,7 +356,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   int Result = llvm::orc::runAsMain(JITMain, CmdLine);
 
   LLVM_DEBUG(llvm::dbgs() << "Running static destructors\n");
-  if (auto Err = JIT->runDestructors()) {
+  if (auto Err = JIT->deinitialize(JIT->getMainJITDylib())) {
     logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return -1;
   }

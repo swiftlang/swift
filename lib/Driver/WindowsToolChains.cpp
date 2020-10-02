@@ -76,6 +76,24 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
   }
+
+  switch (context.OI.LTOVariant) {
+  case OutputInfo::LTOKind::LLVMThin:
+    Arguments.push_back("-flto=thin");
+    break;
+  case OutputInfo::LTOKind::LLVMFull:
+    Arguments.push_back("-flto=full");
+    break;
+  case OutputInfo::LTOKind::None:
+    break;
+  }
+
+  if (Linker.empty() && context.OI.LTOVariant != OutputInfo::LTOKind::None) {
+    // Force to use lld for LTO on Windows because we don't support link LTO or
+    // something else except for lld LTO at this time.
+    Linker = "lld";
+  }
+
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
@@ -84,35 +102,9 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
       Arguments.push_back("/DEBUG");
   }
 
-  // Configure the toolchain.
-  //
-  // By default use the system `clang` to perform the link.  We use `clang` for
-  // the driver here because we do not wish to select a particular C++ runtime.
-  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
-  // C++ code from pure Swift code.  If linked libraries are C++ based, they
-  // should properly link C++.  In the case of static linking, the user can
-  // explicitly specify the C++ runtime to link against.  This is particularly
-  // important for platforms like android where as it is a Linux platform, the
-  // default C++ runtime is `libstdc++` which is unsupported on the target but
-  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
-  // be present.  This results in linking the wrong version of libstdc++
-  // generating invalid binaries.  It is also possible to use different C++
-  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
-  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
-  // surface this via a driver flag.  For now, opt for the simpler approach of
-  // just using `clang` and avoid a dependency on the C++ runtime.
-  const char *Clang = "clang";
-  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
-    StringRef toolchainPath(A->getValue());
-
-    // If there is a clang in the toolchain folder, use that instead.
-    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath}))
-      Clang = context.Args.MakeArgString(tool.get());
-  }
-
   // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use
   // `-nostartfiles` as that limits the difference to just the
-  // `-defaultlib:libcmt` which is passed unconditionally with the `clang++`
+  // `-defaultlib:libcmt` which is passed unconditionally with the `clang`
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
@@ -143,7 +135,10 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
@@ -157,6 +152,13 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("-I");
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
+  }
+
+  // Link against the desired C++ standard library.
+  if (const Arg *A =
+      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-stdlib=") + A->getValue()));
   }
 
   if (job.getKind() == LinkKind::Executable) {
@@ -186,7 +188,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
-  // Run clang++ in verbose mode if "-v" is set
+  // Run clang in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {
     Arguments.push_back("-v");
   }
@@ -196,7 +198,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  InvocationInfo II{Clang, Arguments};
+  InvocationInfo II{getClangLinkerDriver(context.Args), Arguments};
   II.allowsResponseFiles = true;
 
   return II;

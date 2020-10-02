@@ -115,6 +115,11 @@ enum class CaptureEmission {
   /// Captures are being emitted for partial application to form a closure
   /// value.
   PartialApplication,
+  /// Captures are being emitted for partial application of a local property
+  /// wrapper setter for assign_by_wrapper. Captures are guaranteed to not
+  /// escape, because assign_by_wrapper will not use the setter if the captured
+  /// variable is not initialized.
+  AssignByWrapper,
 };
 
 /// Different ways in which an l-value can be emitted.
@@ -324,7 +329,7 @@ public:
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
-  std::vector<SILDebugScope*> DebugScopeStack;
+  std::vector<const SILDebugScope *> DebugScopeStack;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -490,12 +495,13 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  const SILFunction &getFunction() const { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   const SILOptions &getOptions() { return getModule().getOptions(); }
 
   // Returns the type expansion context for types in this function.
-  TypeExpansionContext getTypeExpansionContext() {
+  TypeExpansionContext getTypeExpansionContext() const {
     return TypeExpansionContext(getFunction());
   }
 
@@ -531,17 +537,19 @@ public:
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
-    return silConv.getSILType(param, CanSILFunctionType());
+    return silConv.getSILType(param, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
   SILType getSILInterfaceType(SILResultInfo result) const {
-    return silConv.getSILType(result, CanSILFunctionType());
+    return silConv.getSILType(result, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
 
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(param, fnTy);
+    return silConv.getSILType(param, fnTy, getTypeExpansionContext());
   }
   SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(result, fnTy);
+    return silConv.getSILType(result, fnTy, getTypeExpansionContext());
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
@@ -564,16 +572,19 @@ public:
   Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
-  std::string getMagicFileString(SourceLoc loc);
+  std::string getMagicFileIDString(SourceLoc loc);
   StringRef getMagicFilePathString(SourceLoc loc);
   StringRef getMagicFunctionString();
 
-  /// Push a new debug scope and set its parent pointer.
+  /// Enter the debug scope for \p Loc, creating it if necessary.
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M)
-        SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
+    auto *DS = Parent;
+    // Don't nest a scope for Loc under Parent unless it's actually different.
+    if (Parent->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation())
+      DS = DS = new (SGM.M)
+          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
@@ -1184,10 +1195,14 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+  ManagedValue emitUninitializedArrayFinalization(SILLocation loc,
+                                                  ManagedValue array);
 
-  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
-                                                      SILValue address,
-                                                      SILValue newValue);
+  /// Emit a cleanup for an owned value that should be written back at end of
+  /// scope if the value is not forwarded.
+  CleanupHandle enterOwnedValueWritebackCleanup(SILLocation loc,
+                                                SILValue address,
+                                                SILValue newValue);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);

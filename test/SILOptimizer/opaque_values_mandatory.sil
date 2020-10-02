@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values %s | \
+// RUN:     %target-sil-opt -Onone-performance -enable-sil-opaque-values -emit-sorted-sil | \
+// RUN:     %FileCheck %s
 
 import Builtin
 
@@ -6,8 +8,6 @@ sil_stage raw
 
 typealias Int = Builtin.Int64
 
-// Test trivial, guaranteed copyforwarding.
-// ----
 // CHECK-LABEL: sil hidden @f010_diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0(%0 : $T):
 // CHECK: return %0 : $T
@@ -65,8 +65,10 @@ bb0(%0 : $Int):
 // CHECK: bb0(%0 : $T):
 // CHECK:   %1 = copy_value %0 : $T
 // CHECK:   %2 = copy_value %0 : $T
-// CHECK:   %3 = tuple (%1 : $T, %2 : $T, %0 : $T)
-// CHECK:   return %3 : $(T, T, T)
+// CHECK:   %3 = copy_value %0 : $T
+// CHECK:   destroy_value %0
+// CHECK:   %5 = tuple (%1 : $T, %2 : $T, %3 : $T)
+// CHECK:   return %5 : $(T, T, T)
 // CHECK-LABEL: } // end sil function 'f040_multiResult'
 sil hidden [noinline] @f040_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 bb0(%0 : $T):

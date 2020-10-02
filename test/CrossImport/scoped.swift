@@ -20,4 +20,4 @@ import struct DeclaringLibrary.DeclaringLibraryTy
 
 func fn1(_: OverlayLibraryTy) {} // no-error
 func fn2(_: DeclaringLibraryTy) {} // no-error
-func fn3(_: ShadowTy) {} // expected-error {{use of undeclared type 'ShadowTy'}}
+func fn3(_: ShadowTy) {} // expected-error {{cannot find type 'ShadowTy' in scope}}

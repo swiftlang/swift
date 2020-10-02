@@ -37,6 +37,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
@@ -45,7 +47,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   # interfaces.
   target_compile_definitions(SwiftRuntimeLongTests
                              PRIVATE
-                               swiftCore_EXPORTS)
+                               swiftCore_EXPORTS
+                               SWIFT_INLINE_NAMESPACE=__runtime)
 
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeLongTests

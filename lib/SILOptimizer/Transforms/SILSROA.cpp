@@ -67,8 +67,6 @@ public:
 private:
   SILValue createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
                      ArrayRef<SILValue> Elements);
-  SILValue createAggProjection(SILBuilder &B, SILLocation Loc,
-                               SILValue Operand, unsigned EltNo);
   unsigned getEltNoForProjection(SILInstruction *Inst);
   void createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations);
 };
@@ -87,27 +85,9 @@ SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
   return B.createStruct(Loc, Ty, Elements);
 }
 
-SILValue
-SROAMemoryUseAnalyzer::createAggProjection(SILBuilder &B, SILLocation Loc,
-                                           SILValue Operand,
-                                           unsigned EltNo) {
-  if (TT)
-    return B.createTupleExtract(Loc, Operand, EltNo);
-
-  assert(SD && "SD should not be null since either it or TT must be set at "
-         "this point.");
-
-  auto Properties = SD->getStoredProperties();
-  unsigned Counter = 0;
-  for (auto *D : Properties)
-    if (Counter++ == EltNo)
-      return B.createStructExtract(Loc, Operand, D);
-  llvm_unreachable("Unknown field.");
-}
-
 unsigned SROAMemoryUseAnalyzer::getEltNoForProjection(SILInstruction *Inst) {
   if (TT)
-    return cast<TupleElementAddrInst>(Inst)->getFieldNo();
+    return cast<TupleElementAddrInst>(Inst)->getFieldIndex();
 
   assert(SD && "SD should not be null since either it or TT must be set at "
          "this point.");
@@ -169,7 +149,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
       LLVM_DEBUG(llvm::dbgs() << "        Found a load of the projection.\n");
       Loads.push_back(LI);
       for (auto useIter = LI->use_begin(), End = LI->use_end();
-           !hasBenefit && useIter != End; useIter++) {
+           !hasBenefit && useIter != End; ++useIter) {
         hasBenefit = (isa<StructExtractInst>(useIter->get()) ||
                       isa<TupleExtractInst>(useIter->get()));
       }
@@ -249,9 +229,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   for (auto *LI : Loads) {
     SILBuilderWithScope B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
-    for (auto *NewAI : NewAllocations)
-      Elements.push_back(B.createLoad(LI->getLoc(), NewAI,
-                                      LoadOwnershipQualifier::Unqualified));
+    for (auto *NewAI : NewAllocations) {
+      Elements.push_back(B.emitLoadValueOperation(LI->getLoc(), NewAI,
+                                                  LI->getOwnershipQualifier()));
+    }
     SILValue Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                              Elements);
     LI->replaceAllUsesWith(Agg);
@@ -260,12 +241,15 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate stores into extracts + field stores.
   for (auto *SI : Stores) {
-    SILBuilderWithScope B(SI);
-    for (unsigned EltNo : indices(NewAllocations))
-      B.createStore(SI->getLoc(),
-                    createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
-                    NewAllocations[EltNo],
-                    StoreOwnershipQualifier::Unqualified);
+    SILBuilderWithScope builder(SI);
+    SmallVector<SILValue, 8> destructured;
+    builder.emitDestructureValueOperation(SI->getLoc(), SI->getSrc(),
+                                          destructured);
+    for (unsigned eltNo : indices(NewAllocations)) {
+      builder.emitStoreValueOperation(SI->getLoc(), destructured[eltNo],
+                                      NewAllocations[eltNo],
+                                      StoreOwnershipQualifier::Init);
+    }
     SI->eraseFromParent();
   }
 
@@ -301,18 +285,33 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   eraseFromParentWithDebugInsts(AI);
 }
 
-static bool runSROAOnFunction(SILFunction &Fn) {
+/// Returns true, if values of \ty should be ignored, because \p ty is known
+/// by a high-level SIL optimization. Values of that type must not be split
+/// so that those high-level optimizations can analyze the code.
+static bool isSemanticType(ASTContext &ctxt, SILType ty) {
+  NominalTypeDecl *stringDecl = ctxt.getStringDecl();
+  if (ty.getStructOrBoundGenericStruct() == stringDecl)
+    return true;
+  return false;
+}
+
+static bool runSROAOnFunction(SILFunction &Fn, bool splitSemanticTypes) {
   std::vector<AllocStackInst *> Worklist;
   bool Changed = false;
+  ASTContext &ctxt = Fn.getModule().getASTContext();
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
     // For each instruction in BB...
     for (auto &I : BB)
       // If the instruction is an alloc stack inst, add it to the worklist.
-      if (auto *AI = dyn_cast<AllocStackInst>(&I))
+      if (auto *AI = dyn_cast<AllocStackInst>(&I)) {
+        if (!splitSemanticTypes && isSemanticType(ctxt, AI->getElementType()))
+          continue;
+
         if (shouldExpand(Fn.getModule(), AI->getElementType()))
           Worklist.push_back(AI);
+      }
 
   while (!Worklist.empty()) {
     AllocStackInst *AI = Worklist.back();
@@ -332,18 +331,19 @@ static bool runSROAOnFunction(SILFunction &Fn) {
 namespace {
 class SILSROA : public SILFunctionTransform {
 
+  bool splitSemanticTypes;
+  
+public:
+  SILSROA(bool splitSemanticTypes) : splitSemanticTypes(splitSemanticTypes) { }
+
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
 
-    // FIXME: We should be able to handle ownership.
-    if (F->hasOwnership())
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
                             << " *****\n");
 
-    if (runSROAOnFunction(*F))
+    if (runSROAOnFunction(*F, splitSemanticTypes))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
@@ -352,5 +352,9 @@ class SILSROA : public SILFunctionTransform {
 
 
 SILTransform *swift::createSROA() {
-  return new SILSROA();
+  return new SILSROA(/*splitSemanticTypes*/ true);
+}
+
+SILTransform *swift::createEarlySROA() {
+  return new SILSROA(/*splitSemanticTypes*/ false);
 }

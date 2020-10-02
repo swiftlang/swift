@@ -81,8 +81,13 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
       return Str;
 
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+      Str += " {";
+      Str += C.getText();
+      break;
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
       Str += " {";
       break;
@@ -104,7 +109,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       OS << C.getText();
       continue;
     }
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) {
+    if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
+        C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
       if (Result->getKind() == CodeCompletionResult::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
@@ -146,7 +152,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       } else {
         OS << ": ";
       }
-      OS << C.getText();
+      if (C.hasText())
+        OS << C.getText();
     }
   }
 }
@@ -220,9 +227,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Carry over the private imports from the last module.
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   lastModule->getImportedModules(imports,
-                                 ModuleDecl::ImportFilterKind::Private);
+                                 ModuleDecl::ImportFilterKind::Default);
   for (auto &import : imports) {
-    implicitImports.AdditionalModules.emplace_back(import.second,
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
                                                    /*exported*/ false);
   }
 
@@ -231,11 +238,11 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   auto *newModule = ModuleDecl::create(
       Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
   auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID);
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
   newModule->addFile(newSF);
 
   performImportResolution(newSF);
-  bindExtensions(newSF);
+  bindExtensions(*newModule);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
@@ -251,8 +258,6 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
   CompletionStrings.clear();
   CookedResults.clear();
-
-  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,
@@ -321,7 +326,7 @@ REPLCompletions::CookedResult REPLCompletions::getNextStem() {
   if (CookedResults.empty())
     return {};
 
-  CurrentCompletionIdx++;
+  ++CurrentCompletionIdx;
   if (CurrentCompletionIdx >= CookedResults.size())
     CurrentCompletionIdx = 0;
 

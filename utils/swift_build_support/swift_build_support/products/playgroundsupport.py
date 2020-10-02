@@ -13,7 +13,18 @@
 import os
 import re
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import lldb
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import xctest
 from .. import shell
 from .. import targets
 
@@ -110,3 +121,17 @@ class PlaygroundSupport(product.Product):
                 "TOOLCHAIN_INSTALL_DIR={}".format(toolchain_prefix),
                 "BUILD_PLAYGROUND_LOGGER_TESTS=NO",
             ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                lldb.LLDB,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM]

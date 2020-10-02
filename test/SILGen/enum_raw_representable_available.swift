@@ -1,10 +1,10 @@
-// RUN: %target-typecheck-verify-swift -target x86_64-apple-macosx10.52
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.52
 
-// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.52 -emit-sorted-sil -o %t.fragile.sil %s
+// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil -o %t.fragile.sil %s
 // RUN: %FileCheck %s < %t.fragile.sil
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.fragile.sil
 
-// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.52 -emit-sorted-sil -enable-library-evolution -o %t.resilient.sil %s
+// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil -enable-library-evolution -o %t.resilient.sil %s
 // RUN: %FileCheck %s < %t.resilient.sil
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.resilient.sil
 

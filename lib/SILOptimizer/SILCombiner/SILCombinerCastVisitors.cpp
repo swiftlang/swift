@@ -264,6 +264,26 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
+
+  // Remove a cast if it's only used by an end_cow_mutation.
+  //
+  // (end_cow_mutation (upcast X)) -> (end_cow_mutation X)
+  // (end_cow_mutation (unchecked_ref_cast X)) -> (end_cow_mutation X)
+  SILValue op = ECM->getOperand();
+  if (!isa<UncheckedRefCastInst>(op) && !isa<UpcastInst>(op))
+    return nullptr;
+  if (!op->hasOneUse())
+    return nullptr;
+
+  SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
+  auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
+                                              refCast->getOperand(0));
+  ECM->replaceAllUsesWith(refCast);
+  refCast->setOperand(0, newECM);
+  refCast->moveAfter(newECM);
+  return eraseInstFromFunction(*ECM);
+}
 
 SILInstruction *
 SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
@@ -317,12 +337,53 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   return eraseInstFromFunction(*URCI);
 }
 
+template <class CastInst>
+static bool canBeUsedAsCastDestination(SILValue value, CastInst *castInst,
+                                       DominanceAnalysis *DA) {
+  return value &&
+         value->getType() == castInst->getTargetLoweredType().getObjectType() &&
+         DA->get(castInst->getFunction())->properlyDominates(value, castInst);
+}
+
+
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
   if (UCCAI->getFunction()->hasOwnership())
     return nullptr;
 
+  // Optimize the unconditional_checked_cast_addr in this pattern:
+  //
+  //   %box = alloc_existential_box $Error, $ConcreteError
+  //   %a = project_existential_box $ConcreteError in %b : $Error
+  //   store %value to %a : $*ConcreteError
+  //   %err = alloc_stack $Error
+  //   store %box to %err : $*Error
+  //   %dest = alloc_stack $ConcreteError
+  //   unconditional_checked_cast_addr Error in %err : $*Error to
+  //                                ConcreteError in %dest : $*ConcreteError
+  //
+  // to:
+  //   ...
+  //   retain_value %value : $ConcreteError
+  //   destroy_addr %err : $*Error
+  //   store %value to %dest $*ConcreteError
+  //
+  // This lets the alloc_existential_box become dead and it can be removed in
+  // following optimizations.
+  SILValue val = getConcreteValueOfExistentialBoxAddr(UCCAI->getSrc(), UCCAI);
+  if (canBeUsedAsCastDestination(val, UCCAI, DA)) {
+    SILBuilderContext builderCtx(Builder.getModule(), Builder.getTrackingList());
+    SILBuilderWithScope builder(UCCAI, builderCtx);
+    SILLocation loc = UCCAI->getLoc();
+    builder.createRetainValue(loc, val, builder.getDefaultAtomicity());
+    builder.createDestroyAddr(loc, UCCAI->getSrc());
+    builder.createStore(loc, val, UCCAI->getDest(),
+                        StoreOwnershipQualifier::Unqualified);
+    return eraseInstFromFunction(*UCCAI);
+  }
+
+  // Perform the purly type-based cast optimization.
   if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI))
     MadeChange = true;
 
@@ -440,6 +501,11 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   if (TTOCMI->getFunction()->hasOwnership())
     return nullptr;
 
+  if (auto *OCTTMI = dyn_cast<ObjCToThickMetatypeInst>(TTOCMI->getOperand())) {
+    TTOCMI->replaceAllUsesWith(OCTTMI->getOperand());
+    return eraseInstFromFunction(*TTOCMI);
+  }
+
   // Perform the following transformations:
   // (thick_to_objc_metatype (metatype @thick)) ->
   // (metatype @objc_metatype)
@@ -459,6 +525,11 @@ SILInstruction *
 SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   if (OCTTMI->getFunction()->hasOwnership())
     return nullptr;
+
+  if (auto *TTOCMI = dyn_cast<ThickToObjCMetatypeInst>(OCTTMI->getOperand())) {
+    OCTTMI->replaceAllUsesWith(TTOCMI->getOperand());
+    return eraseInstFromFunction(*OCTTMI);
+  }
 
   // Perform the following transformations:
   // (objc_to_thick_metatype (metatype @objc_metatype)) ->
@@ -492,6 +563,62 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   if (CCABI->getFunction()->hasOwnership())
     return nullptr;
 
+  // Optimize the checked_cast_addr_br in this pattern:
+  //
+  //   %box = alloc_existential_box $Error, $ConcreteError
+  //   %a = project_existential_box $ConcreteError in %b : $Error
+  //   store %value to %a : $*ConcreteError
+  //   %err = alloc_stack $Error
+  //   store %box to %err : $*Error
+  //   %dest = alloc_stack $ConcreteError
+  //   checked_cast_addr_br <consumption-kind> Error in %err : $*Error to
+  //        ConcreteError in %dest : $*ConcreteError, success_bb, failing_bb
+  //
+  // to:
+  //   ...
+  //   retain_value %value : $ConcreteError
+  //   destroy_addr %err : $*Error           // if consumption-kind is take
+  //   store %value to %dest $*ConcreteError
+  //   br success_bb
+  //
+  // This lets the alloc_existential_box become dead and it can be removed in
+  // following optimizations.
+  //
+  // TODO: Also handle the WillFail case.
+  SILValue val = getConcreteValueOfExistentialBoxAddr(CCABI->getSrc(), CCABI);
+  if (canBeUsedAsCastDestination(val, CCABI, DA)) {
+    SILBuilderContext builderCtx(Builder.getModule(), Builder.getTrackingList());
+    SILBuilderWithScope builder(CCABI, builderCtx);
+    SILLocation loc = CCABI->getLoc();
+    builder.createRetainValue(loc, val, builder.getDefaultAtomicity());
+    switch (CCABI->getConsumptionKind()) {
+      case CastConsumptionKind::TakeAlways:
+      case CastConsumptionKind::TakeOnSuccess:
+        builder.createDestroyAddr(loc, CCABI->getSrc());
+        break;
+      case CastConsumptionKind::CopyOnSuccess:
+        break;
+      case CastConsumptionKind::BorrowAlways:
+        llvm_unreachable("BorrowAlways is not supported on addresses");
+    }
+    builder.createStore(loc, val, CCABI->getDest(),
+                        StoreOwnershipQualifier::Unqualified);
+                        
+    // Replace the cast with a constant conditional branch.
+    // Don't just create an unconditional branch to not change the CFG in
+    // SILCombine. SimplifyCFG will clean that up.
+    //
+    // Another possibility would be to run this optimization in SimplifyCFG.
+    // But this has other problems, like it's more difficult to reason about a
+    // consistent dominator tree in SimplifyCFG.
+    SILType boolTy = SILType::getBuiltinIntegerType(1, builder.getASTContext());
+    auto *trueVal = builder.createIntegerLiteral(loc, boolTy, 1);
+    builder.createCondBranch(loc, trueVal, CCABI->getSuccessBB(),
+                             CCABI->getFailureBB());
+    return eraseInstFromFunction(*CCABI);
+  }
+
+  // Perform the purly type-based cast optimization.
   if (CastOpt.optimizeCheckedCastAddrBranchInst(CCABI))
     MadeChange = true;
 

@@ -44,15 +44,15 @@ func test() {
 
 // CHECK_SYSTEM_2-LABEL: ## THREE
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooSubFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperSubFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperExplicitFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperExplicitFunc' in scope",
 
 // -----------------------------------------------------------------------------
 // Test that modifications for frameworks in '-F' are immidiately propagated
@@ -78,9 +78,9 @@ func test() {
 // CHECK_USER-LABEL: ## TWO
 // CHECK_USER-NOT: key.severity: 
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
-// CHECK_USER-NEXT: key.description: "use of unresolved identifier 'fooFunc'",
+// CHECK_USER-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
-// CHECK_USER-NEXT: key.description: "use of unresolved identifier 'fooSubFunc'",
+// CHECK_USER-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_USER-NOT: key.severity: 
 
 // -----------------------------------------------------------------------------

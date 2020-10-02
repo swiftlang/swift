@@ -1,0 +1,101 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name UnderscoredProto
+
+public protocol _UnderscoredProto {}
+public protocol _UnderscoredProto2 {
+    associatedtype Elem
+}
+
+public extension _UnderscoredProto {
+    func fromProtoExtension()
+}
+
+public extension _UnderscoredProto2 {
+    func fromProto2Extension(takesElem: Elem)
+}
+
+@available(*, deprecated, message: "")
+public extension _UnderscoredProto {
+    func fromDeprecatedProtoExtension(){}
+}
+
+public extension _UnderscoredProto2 where Elem == String {
+    func fromConditionalProto2Extension(takesElemIfString: Elem)
+}
+
+@available(*, deprecated, message: "")
+public extension _UnderscoredProto2 where Elem == Int {
+    func fromDeprecatedConditionalProto2Extension(takesElemInt: Elem)
+}
+
+public struct A<T> {
+    public func fromA(takesT: T)
+}
+
+extension A {
+    public func fromAExtension(takesT: T)
+}
+
+extension A : _UnderscoredProto {}
+
+extension A : _UnderscoredProto2 where T == String {
+    public typealias Elem = Int
+    public func fromAConditionalExtension(takesTIfString: T)
+}
+
+public class B<T>: _UnderscoredProto {
+    public func fromB(takesT: T)
+}
+
+extension B: _UnderscoredProto2 {
+    public typealias Elem = String
+}
+
+public class C<U,V>: B<String> where U: Equatable {
+    public func fromC(takesUIfEquatable: U)
+}
+
+public protocol _UnderscoredProto3 {
+    associatedtype Elem1
+    associatedtype Elem2
+}
+extension _UnderscoredProto3 {
+    public func fromProto3Extension(takesElem1: Elem1)
+    public func fromProto3Extension(takesElem2: Elem2)
+}
+
+public protocol _UnderscoredProto4: _UnderscoredProto3 where Elem2: Equatable {}
+extension _UnderscoredProto4 {
+    public func fromProto4Extension(takesElem2IfEquatable: Elem2)
+}
+
+extension _UnderscoredProto4 where Elem2: Hashable {
+    public func fromProto4Extension(takesElem2IfHashable: Elem2)
+}
+
+extension C: _UnderscoredProto4 {
+    public typealias Elem1 = V
+    public typealias Elem2 = U
+    public func fromCConditionlExtension(takesU: U)
+}
+
+
+public struct D<T, U> {
+    public func fromD(takesT: T, takesU: U)
+}
+
+public protocol Other1 {}
+public protocol _SomeProto {
+    associatedtype Item
+}
+
+extension _SomeProto where Item: Other1 {
+    public func fromSomeProtoExtensionSplitConditions(takesItemIfOther1: Item)
+}
+
+extension D: _SomeProto where T: Equatable {
+    public typealias Item = T
+    
+}
+
+

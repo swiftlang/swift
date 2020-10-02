@@ -223,7 +223,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
     // If the element type is empty, it adds nothing.
-    NextNonFixedOffsetIndex++;
+    ++NextNonFixedOffsetIndex;
     return false;
   }
   // TODO: consider using different layout rules.
@@ -238,7 +238,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   } else {
     addNonFixedSizeElement(elt);
   }
-  NextNonFixedOffsetIndex++;
+  ++NextNonFixedOffsetIndex;
   return true;
 }
 
@@ -312,7 +312,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  auto byteOffset = isFixedLayout() ? CurSize : Size(0);
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), byteOffset);
 }
 
 /// Add an element at the fixed offset of the current end of the

@@ -26,17 +26,14 @@ using namespace swift;
 SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
                              IsSerialized_t Serialized,
                              ArrayRef<Entry> Entries) {
-  // SILVTable contains one element declared in Entries.  We must allocate
-  // space for it, because its default ctor will write to it.
-  unsigned NumTailElements = std::max((unsigned)Entries.size(), 1U)-1;
-  void *buf = M.allocate(sizeof(SILVTable) + sizeof(Entry) * NumTailElements,
-                         alignof(SILVTable));
+  auto size = totalSizeToAlloc<Entry>(Entries.size());
+  auto buf = M.allocate(size, alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, Serialized, Entries);
   M.vtables.push_back(vt);
   M.VTableMap[Class] = vt;
   // Update the Module's cache with new vtable + vtable entries:
   for (const Entry &entry : Entries) {
-    M.VTableEntryCache.insert({{vt, entry.Method}, entry});
+    M.VTableEntryCache.insert({{vt, entry.getMethod()}, entry});
   }
   return vt;
 }
@@ -54,24 +51,30 @@ SILVTable::getEntry(SILModule &M, SILDeclRef method) const {
 }
 
 void SILVTable::removeFromVTableCache(Entry &entry) {
-  SILModule &M = entry.Implementation->getModule();
-  M.VTableEntryCache.erase({this, entry.Method});
+  SILModule &M = entry.getImplementation()->getModule();
+  M.VTableEntryCache.erase({this, entry.getMethod()});
+}
+
+void SILVTable::updateVTableCache(const Entry &entry) {
+  SILModule &M = entry.getImplementation()->getModule();
+  M.VTableEntryCache[{this, entry.getMethod()}] = entry;
 }
 
 SILVTable::SILVTable(ClassDecl *c, IsSerialized_t serialized,
                      ArrayRef<Entry> entries)
   : Class(c), Serialized(serialized), NumEntries(entries.size()) {
-  memcpy(Entries, entries.begin(), sizeof(Entry) * NumEntries);
-  
+  std::uninitialized_copy(entries.begin(), entries.end(),
+                          getTrailingObjects<Entry>());
+
   // Bump the reference count of functions referenced by this table.
   for (const Entry &entry : getEntries()) {
-    entry.Implementation->incrementRefCount();
+    entry.getImplementation()->incrementRefCount();
   }
 }
 
 SILVTable::~SILVTable() {
   // Drop the reference count of functions referenced by this table.
   for (const Entry &entry : getEntries()) {
-    entry.Implementation->decrementRefCount();
+    entry.getImplementation()->decrementRefCount();
   }
 }

@@ -21,7 +21,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 /// Report a fatal error to system console, stderr, and crash logs.
@@ -69,7 +69,7 @@ void _swift_stdlib_reportUnimplementedInitializer(
     __swift_uint32_t flags);
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #if __has_feature(nullability)

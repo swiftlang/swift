@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -783,6 +784,35 @@ SwiftLookupTable::lookupObjCMembers(SerializedSwiftName baseName) {
     case ContextKind::ObjCProtocol:
     case ContextKind::Typedef:
       break;
+    }
+
+    // Map each of the declarations.
+    for (auto &stored : entry.DeclsOrMacros) {
+      assert(isDeclEntry(stored) && "Not a declaration?");
+      result.push_back(mapStoredDecl(stored));
+    }
+  }
+
+  return result;
+}
+
+SmallVector<clang::NamedDecl *, 4>
+SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
+  SmallVector<clang::NamedDecl *, 4> result;
+
+  // Find the lookup table entry for this base name.
+  auto known = findOrCreate(LookupTable, baseName,
+                            [](auto &results, auto &Reader, auto Name) {
+                              return (void)Reader.lookup(Name, results);
+                            });
+  if (known == LookupTable.end())
+    return result;
+
+  // Walk each of the entries.
+  for (auto &entry : known->second) {
+    // We're only looking for C++ operators
+    if (entry.Context.first != ContextKind::Tag) {
+      continue;
     }
 
     // Map each of the declarations.
@@ -1827,6 +1857,7 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             inferImportAsMember,
+                            swiftCtx.LangOpts.EnableExperimentalConcurrency,
                             version::getSwiftFullVersion());
 }
 
@@ -1851,10 +1882,16 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // struct names when relevant, not just pointer names. That way we can check
   // both CFDatabase.def and the objc_bridge attribute and cover all our bases.
   if (auto *tagDecl = dyn_cast<clang::TagDecl>(named)) {
-    if (!tagDecl->getDefinition())
+    // We add entries for ClassTemplateSpecializations that don't have
+    // definition. It's possible that the decl will be instantiated by
+    // SwiftDeclConverter later on. We cannot force instantiating
+    // ClassTemplateSPecializations here because we're currently writing the
+    // AST, so we cannot modify it.
+    if (!isa<clang::ClassTemplateSpecializationDecl>(named) &&
+        !tagDecl->getDefinition()) {
       return;
+    }
   }
-
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
@@ -2047,6 +2084,19 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
+  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
+    if (auto typedefType = dyn_cast<clang::TemplateSpecializationType>(
+            typedefDecl->getUnderlyingType())) {
+      if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+              typedefType->getAsTagDecl())) {
+        // Adding template instantiation behind typedef as a top-level entry
+        // so the instantiation appears in the API.
+        assert(!isa<clang::ClassTemplatePartialSpecializationDecl>(CTSD) &&
+            "Class template partial specialization cannot appear behind typedef");
+        addEntryToLookupTable(table, CTSD, nameImporter);
+      }
+    }
+  }
 }
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,

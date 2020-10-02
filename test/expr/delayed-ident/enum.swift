@@ -25,3 +25,13 @@ e2a = .Second(5)
 var e2b: E2 = .Second(5)
 e2b = .First
 var e2c: E2 = .First // expected-error{{generic parameter 'T' could not be inferred}}
+
+// SR-13357
+struct SR13357 {}
+extension Optional where Wrapped == SR13357 {
+    static var sr13357: Self { .none }
+}
+
+func f_sr13357<T>(_: T?) { }
+
+f_sr13357(.sr13357)

@@ -110,8 +110,7 @@ class T {
     func m1() {
       // <rdar://problem/17741575>
       let l = self.m2!.prop1
-      // expected-error@-1 {{cannot force unwrap value of non-optional type '() -> U?'}} {{22-23=}}
-      // expected-error@-2 {{method 'm2' was used as a property; add () to call it}}  {{22-22=()}}
+      // expected-error@-1 {{method 'm2' was used as a property; add () to call it}}  {{22-22=()}}
     }
 
     func m2() -> U! {
@@ -179,7 +178,7 @@ struct S1116 {
 
 let a1116: [S1116] = []
 var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{53-53= ?? <#default value#>}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
 
 func makeArray<T>(_ x: T) -> [T] { [x] }
@@ -358,8 +357,6 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 }
 
 func sr12426(a: Any, _ str: String?) {
-  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
-  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (CodingUserInfoKey, CodingUserInfoKey), (String, String)}}
 }

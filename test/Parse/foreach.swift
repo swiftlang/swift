@@ -16,7 +16,7 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{'r' declar
     sum = sum + i
   }
   // Check scoping of variable introduced with foreach loop
-  i = 0 // expected-error{{use of unresolved identifier 'i'; did you mean 'r'?}}
+  i = 0 // expected-error{{cannot find 'i' in scope; did you mean 'r'?}}
 
   // For-each loops with two variables and varying degrees of typedness
   for (i, j) in iir {

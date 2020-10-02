@@ -327,7 +327,7 @@ CommandOutput::dump() const {
 
 void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
   SmallVector<StringRef, 4> inputs;
-  for (const CommandInputPair IP : Inputs) {
+  for (const CommandInputPair &IP : Inputs) {
     assert(IP.Base == IP.Primary && !IP.Base.empty() &&
            "output file maps won't work if these differ");
     inputs.push_back(IP.Primary);

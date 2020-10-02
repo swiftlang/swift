@@ -10,13 +10,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN-DISABLED: %target-run-simple-swift | %FileCheck %s
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/NewArray.swift
 // RUN: %line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- %FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
-// XFAIL: *
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -40,15 +39,14 @@ protocol MyArrayProtocol
   : RandomAccessCollection,
     RangeReplaceableCollection,
     MutableCollection,
-    ArrayLiteralConvertible {
-
-  associatedtype Iterator : IteratorProtocol
-
+    ExpressibleByArrayLiteral
+  where ArrayLiteralElement == Element
+{
   var _owner: AnyObject? { get }
 
   var capacity: Int { get }
 
-  func += <
+  static func += <
     S : Sequence
   >(lhs: inout Self, rhs: S)
   where S.Iterator.Element == Iterator.Element
@@ -89,8 +87,7 @@ func test<
   T : MyArrayProtocol
 >(_: T.Type, _ label: String)
 where
-T.Iterator.Element == LifetimeTracked,
-T.Iterator.Element == T.Element,
+T.Element == LifetimeTracked,
 T.Index == Int {
   print("test: \(label)...", terminator: "")
 
@@ -113,15 +110,15 @@ T.Index == Int {
   x += LifetimeTracked(0)..<LifetimeTracked(2)
   let bufferId1 = checkReallocation(x, bufferId0, false)
 
-  for i in x.count..<(x.capacity + 1) {
-    let bufferId1a = checkReallocation(x, bufferId1, false)
+  for _ in x.count..<(x.capacity + 1) {
+    _ = checkReallocation(x, bufferId1, false)
     x.append(LifetimeTracked(13))
   }
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
   let y = x
   x[x.index(before: x.endIndex)] = LifetimeTracked(17)
-  let bufferId3 = checkReallocation(x, bufferId2, true)
+  _ = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
 
   func checkReallocations(
@@ -200,7 +197,7 @@ func testAsArray() {
   // CHECK-NEXT: true
 
   let zz = y[0..<2]
-  print(zz._bufferID)
+  print(zz._bufferID!)
   // CHECK-NEXT: 0x
 }
 testAsArray()
@@ -208,23 +205,26 @@ testAsArray()
 #if _runtime(_ObjC)
 import Foundation
 
-func nsArrayOfStrings() -> Array<NSString> {
+func nsArrayOfStrings() -> NSArray {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(
+    return NSArray(
       objects: unsafeBitCast($0.baseAddress!,
         to: UnsafeMutablePointer<AnyObject>.self),
       count: $0.count)
-    return ns as! [NSString]
   }
+}
+
+func swiftArrayWithNSArrayOfStrings() -> Array<NSString> {
+  return nsArrayOfStrings() as! [NSString]
 }
 
 func testCocoa() {
   print("== Cocoa ==")
   // CHECK-objc: == Cocoa ==
 
-  var a = nsArrayOfStrings()
+  var a = swiftArrayWithNSArrayOfStrings()
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
 
@@ -232,7 +232,7 @@ func testCocoa() {
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz, qux]
 
-  a = nsArrayOfStrings()
+  a = swiftArrayWithNSArrayOfStrings()
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
 
@@ -246,12 +246,12 @@ func testCocoa() {
   printSequence(b)
   // CHECK-objc-NEXT: [foo, bar, baz]
 
-  a = nsArrayOfStrings()
+  a = swiftArrayWithNSArrayOfStrings()
   a.insert("bag", at: 2)
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, bag, baz]
 
-  a = nsArrayOfStrings()
+  a = swiftArrayWithNSArrayOfStrings()
   a.reserveCapacity(30)
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
@@ -268,12 +268,6 @@ func testCocoa() {
 }
 testCocoa()
 #endif // _runtime(_ObjC)
-
-extension ArraySlice {
-  mutating func qsort(_ compare: @escaping (Element, Element) -> Bool) {
-    _introSort(&self, subRange: Range(self.indices), by: compare)
-  }
-}
 
 func testSlice() {
   print("== ArraySlice ==")
@@ -301,14 +295,13 @@ func testSlice() {
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
   let c = b
-  b[b.startIndex..<b.endIndex].qsort(<)
+  b[b.startIndex..<b.endIndex].sort(by: <)
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
   printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
 #if _runtime(_ObjC)
   // Now a bridged slice
-  var a = Array<NSString>(
-    _ArrayBuffer(nsArray: nsArrayOfStrings()._buffer._asCocoaArray()))
+  let a = Array<NSString>(_buffer: _ArrayBuffer(nsArray: nsArrayOfStrings()))
 
   printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
 
@@ -456,8 +449,8 @@ func testIsEmptyFirstLast${A}() {
   print("<\(${A}(3..<43).first!)>")  // CHECK-NEXT: <3>
   print("<\(${A}(3..<43).last!)>")   // CHECK-NEXT: <42>
 
-  print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
-  print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
+  print("<\(String(describing: ${A}<Int>().first))>")    // CHECK-NEXT: nil
+  print("<\(String(describing:${A}<Int>().last))>")     // CHECK-NEXT: nil
 
   var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9

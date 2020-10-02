@@ -1,0 +1,39 @@
+module ClassTemplateWithPrimitiveArgument {
+  header "class-template-with-primitive-argument.h"
+}
+
+module NotPreDefinedClassTemplate {
+  header "not-pre-defined-class-template.h"
+}
+
+module PartiallyPreDefinedClassTemplate {
+  header "partially-pre-defined-class-template.h"
+}
+
+module FullyPreDefinedClassTemplate {
+  header "fully-pre-defined-class-template.h"
+}
+
+module CanonicalTypes {
+  header "canonical-types.h"
+}
+
+module ExplicitClassSpecialization {
+  header "explicit-class-specialization.h"
+}
+
+module UsingDirective {
+  header "using-directive.h"
+}
+
+module ClassTemplateEagerInstantiationProblems {
+  header "class-template-eager-instantiation-problems.h"
+}
+
+module Mangling {
+  header "mangling.h"
+}
+
+module LinkageOfSwiftSymbolsForImportedTypes {
+  header "linkage-of-swift-symbols-for-imported-types.h"
+}

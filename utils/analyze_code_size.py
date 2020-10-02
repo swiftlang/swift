@@ -7,6 +7,8 @@ import sys
 
 
 useCSV = False
+groupSpecializations = False
+listGroupSpecializations = False
 
 
 def main(arguments):
@@ -19,6 +21,10 @@ def main(arguments):
                         default=False)
     parser.add_argument('-list-category', type=str,
                         help='list symbols in category')
+    parser.add_argument('-group-specializations', action='store_true',
+                        help='group specializations')
+    parser.add_argument('-list-group-specializations', action='store_true',
+                        help='list group specializations')
     parser.add_argument('-csv', dest='use_csv', action='store_true',
                         help='print results as csv')
     parser.add_argument('-uncategorized', action='store_true',
@@ -33,6 +39,14 @@ def main(arguments):
         global useCSV
         useCSV = True
         print("Using csv")
+
+    if args.group_specializations:
+        global groupSpecializations
+        groupSpecializations = True
+
+    if args.list_group_specializations:
+        global listGroupSpecializations
+        listGroupSpecializations = True
 
     segments = parse_segments(args.bin, args.arch)
 
@@ -82,14 +96,53 @@ class Category(object):
         self.size += symbol.size
 
 
+class GenericSpecializationGroupKey(object):
+    def __init__(self, module_name, type_name, specialization):
+        self.module_name = module_name
+        self.type_name = type_name
+        self.specialization = specialization
+
+    def __hash__(self):
+        return hash((self.module_name, self.type_name, self.specialization))
+
+    def __eq__(self, other):
+        return (self.module_name == other.module_name
+                and self.type_name == other.type_name
+                and self.specialization == other.specialization)
+
+
+class GenericSpecialization(object):
+    def __init__(self, module_name, type_name, specialization):
+        self.module_name = module_name
+        self.type_name = type_name
+        self.specialization = specialization
+        self.size = 0
+        self.symbols = []
+
+    def add(self, symbol):
+        self.symbols.append(symbol)
+        self.size += symbol.size
+
+    def list_symbols(self):
+        sorted_symbols = []
+        for symbol in self.symbols:
+            sorted_symbols.append((symbol.name, symbol.size))
+        sorted_symbols.sort(key=lambda entry: entry[1], reverse=True)
+        for symbol in sorted_symbols:
+            print("%9d %s" % (symbol[1], symbol[0]))
+
+
 class Categories(object):
     def __init__(self):
         self.category_matching = [
             ['Objective-C function', re.compile(r'.*[+-]\[')],
             ['C++', re.compile(r'_+swift')],
-            ['Generic specialization of stdlib', 
-                re.compile(r'.*generic specialization.* of Swift\.')],
-            ['Generic specialization', 
+            ['Generic specialization of stdlib',
+                re.compile(
+                    r'.*generic specialization.* of ' +
+                    r'(static )?(\(extension in Swift\):)?Swift\.'
+                )],
+            ['Generic specialization',
                 re.compile(r'.*generic specialization')],
             ['Merged function', re.compile(r'merged ')],
             ['Key path', re.compile(r'key path')],
@@ -178,6 +231,44 @@ class Categories(object):
             ['Swift unknown', re.compile(r'^_\$s.*')],
         ]
         self.categories = {}
+        self.specializations = {}
+        self.specialization_matcher = re.compile(
+            r'.*generic specialization <(?P<spec_list>.*)> of' +
+            r' (static )?(\(extension in Swift\):)?(?P<module_name>[^.]*)\.' +
+            r'(?:(?P<first_type>[^.^(^<]*)\.){0,1}' +
+            r'(?:(?P<last_type>[^.^(^<]*)\.)*(?P<function_name>[^(^<]*)'
+        )
+        self.single_stdlib_specialized_type_matcher = re.compile(
+            r'(Swift\.)?[^,^.]*$'
+        )
+        self.two_specialized_stdlib_types_matcher = re.compile(
+            r'(Swift\.)?[^,^.]*, (Swift\.)?[^,^.]*$'
+        )
+        self.single_specialized_foundation_type_matcher = re.compile(
+            r'(Foundation\.)?[^,^.]*$'
+        )
+        self.two_specialized_foundation_types_matcher = re.compile(
+            r'(Swift\.)?[^,^.]*, (Foundation\.)?[^,^.]*$'
+        )
+        self.two_specialized_foundation_types_matcher2 = re.compile(
+            r'(Foundation\.)?[^,^.]*, (Foundation\.)?[^,^.]*$'
+        )
+        self.two_specialized_foundation_types_matcher3 = re.compile(
+            r'(Foundation\.)?[^,^.]*, (Swift\.)?[^,^.]*$'
+        )
+        self.array_type_matcher = re.compile(r'Array')
+        self.dictionary = re.compile(r'Array')
+        self.single_specialized_types_matcher = re.compile(
+            r'(?P<module_name>[^,^.]*)\.([^,^.]*\.)*(?P<type_name>[^,^.]*)$'
+        )
+        self.is_class_type_dict = {}
+        self.stdlib_and_other_type_matcher = re.compile(
+            r'(Swift\.)?[^,^.]*, (?P<module_name>[^,^.]*)\.(?P<type_name>[^,^.]*)$'
+        )
+        self.foundation_and_other_type_matcher = re.compile(
+            r'(Foundation\.)?[^,^.]*, (?P<module_name>[^,^.]*)\.' +
+            r'(?P<type_name>[^,^.]*)$'
+        )
 
     def categorize_by_name(self, symbol):
         for c in self.category_matching:
@@ -204,12 +295,121 @@ class Categories(object):
         category_name = self.categorize_by_name(symbol)
         if category_name:
             self.add_symbol(category_name, symbol)
+            if (groupSpecializations and
+                    category_name == 'Generic specialization of stdlib'):
+                self.add_specialization(symbol)
             return
         category_name = self.categorize_by_mangled_name(symbol)
         if category_name:
             self.add_symbol(category_name, symbol)
         else:
             self.add_symbol('Unknown', symbol)
+        if (groupSpecializations and
+                category_name == 'Generic specialization of stdlib'):
+            self.add_specialization(symbol)
+
+    def is_class_type_(self, type_name, mangled_name):
+        match_class_name = str(len(type_name)) + type_name + 'C'
+        if match_class_name in mangled_name:
+            return True
+        return False
+
+    def is_class_type(self, type_name, mangled_name):
+        existing_categorization = self.is_class_type_dict.get(type_name, 3)
+        if existing_categorization == 3:
+            is_class = self.is_class_type_(type_name, mangled_name)
+            self.is_class_type_dict[type_name] = is_class
+            return is_class
+        else:
+            return existing_categorization
+
+    def is_dictionary_like_type(self, type_name):
+        if 'Dictionary' in type_name:
+            return True
+        if 'Set' in type_name:
+            return True
+        return False
+
+    def group_library_types(self, module, type_name, specialization, mangled_name):
+        if module != 'Swift':
+            return module, type_name, specialization
+        if self.single_stdlib_specialized_type_matcher.match(specialization):
+            return module, 'stdlib', 'stdlib'
+        if self.two_specialized_stdlib_types_matcher.match(specialization):
+            return module, 'stdlib', 'stdlib'
+        if self.single_specialized_foundation_type_matcher.match(specialization):
+            return module, 'stdlib', 'foundation'
+        if self.two_specialized_foundation_types_matcher.match(specialization):
+            return module, 'stdlib', 'foundation'
+        if self.two_specialized_foundation_types_matcher2.match(specialization):
+            return module, 'stdlib', 'foundation'
+        if self.two_specialized_foundation_types_matcher3.match(specialization):
+            return module, 'stdlib', 'foundation'
+        single_spec = self.single_specialized_types_matcher.match(specialization)
+        if single_spec:
+            is_class = self.is_class_type(single_spec.group('type_name'), mangled_name)
+            is_dict = type_name is not None and self.is_dictionary_like_type(type_name)
+            if not is_dict and is_class:
+                return module, 'stdlib', 'class'
+            if is_dict and is_class:
+                return module, 'stdlib', 'class(dict)'
+        stdlib_other_spec = self.stdlib_and_other_type_matcher.match(specialization)
+        if stdlib_other_spec:
+            is_class = self.is_class_type(stdlib_other_spec.group('type_name'),
+                                          mangled_name)
+            if is_class:
+                return module, 'stdlib', 'stdlib, class'
+        foundation_other_spec = self.foundation_and_other_type_matcher.match(
+            specialization)
+        if foundation_other_spec:
+            is_class = self.is_class_type(foundation_other_spec.group('type_name'),
+                                          mangled_name)
+            if is_class:
+                return module, 'stdlib', 'foundation, class'
+        return module, 'stdlib', 'other'
+
+    def add_specialization(self, symbol):
+        specialization_match = self.specialization_matcher.match(symbol.name)
+        if specialization_match:
+            module = specialization_match.group('module_name')
+            type_name = specialization_match.group('first_type')
+            specialization = specialization_match.group('spec_list')
+            module, type_name, specialization = self.group_library_types(
+                module, type_name, specialization, symbol.mangled_name)
+            key = GenericSpecializationGroupKey(module, type_name, specialization)
+            existing_specialization = self.specializations.get(key)
+            if existing_specialization:
+                existing_specialization.add(symbol)
+            else:
+                new_specialization = GenericSpecialization(module, type_name,
+                                                           specialization)
+                new_specialization.add(symbol)
+                self.specializations[key] = new_specialization
+        else:
+            print(symbol.name)
+            print('not matched')
+        return
+
+    def print_specializations(self):
+        values = self.specializations.values()
+        sorted_specializations = []
+        for v in values:
+            sorted_specializations.append(v)
+
+        if not sorted_specializations:
+            return None
+        else:
+            sorted_specializations.sort(key=lambda entry: entry.specialization)
+            sorted_specializations.sort(key=lambda entry: entry.type_name)
+            sorted_specializations.sort(key=lambda entry: entry.module_name)
+            print("Specialization info")
+            for spec in sorted_specializations:
+                print("%20s.%s %20s %8d" % (spec.module_name, spec.type_name,
+                                            spec.specialization, spec.size))
+                if listGroupSpecializations:
+                    spec.list_symbols()
+            print("")
+            return None
 
     def categorize(self, symbols):
         for sym in symbols:
@@ -361,6 +561,8 @@ def categorize(segments):
             categories.categorize(symbols)
             categories.print_summary(section.size)
             print('')
+            if groupSpecializations:
+                categories.print_specializations()
 
 
 def uncategorized(segments):
@@ -382,6 +584,9 @@ def list_category(segments, category):
                 print('Section %22s: %8d' %
                       (segment.name + ';' + section.name, section.size))
                 categories.print_category(category)
+                print('')
+                if groupSpecializations:
+                    categories.print_specializations()
 
 
 if __name__ == '__main__':

@@ -340,7 +340,7 @@ sil_vtable private_base {
 }
 
 sil_vtable private_derived {
-  #private_base.foo: @private_derived_foo
+  #private_base.foo: @private_derived_foo [override]
 }
 
 sil_vtable internal_base {
@@ -349,8 +349,8 @@ sil_vtable internal_base {
 }
 
 sil_vtable internal_derived {
-  #internal_base.foo: @internal_derived_foo
-  #internal_base.bar: @internal_derived_bar
+  #internal_base.foo: @internal_derived_foo [override]
+  #internal_base.bar: @internal_derived_bar [override]
 }
 
 sil_vtable public_base {
@@ -360,9 +360,9 @@ sil_vtable public_base {
 }
 
 sil_vtable public_derived {
-  #public_base.foo: @public_derived_foo
-  #public_base.bar: @public_derived_bar
-  #public_base.baz: @public_derived_baz
+  #public_base.foo: @public_derived_foo [override]
+  #public_base.bar: @public_derived_bar [override]
+  #public_base.baz: @public_derived_baz [override]
 }
 
 private protocol private_proto_1 {
@@ -659,8 +659,8 @@ sil_vtable SomeItem {
 }
 
 sil_vtable SomeChildItem {
-  #SomeItem.init!allocator: @SomeChildItem_allocator
-  #SomeItem.init!initializer: @SomeChildItem_initializer
+  #SomeItem.init!allocator: @SomeChildItem_allocator [override]
+  #SomeItem.init!initializer: @SomeChildItem_initializer [override]
   #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
 }
 

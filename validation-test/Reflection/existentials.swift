@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
 // RUN: %target-codesign %t/existentials
-// RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
-// REQUIRES: objc_interop
+// REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
@@ -281,17 +281,17 @@ protocol Composition : P, Q {}
 struct S : Composition {}
 func getComposition() -> P & Q { return S() }
 reflect(any: getComposition())
-// CHECK-64: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
 // CHECK-64: Demangled name: existentials.P & existentials.Q
-// CHECK-32: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
 // CHECK-32: Demangled name: existentials.P & existentials.Q
 
 // Metatype:
 reflect(any: Int.self)
-// CHECK-64: Mangled name: $sSim
-// CHECK-64: Demangled name: Swift.Int.Type
-// CHECK-32: Mangled name: $sSim
-// CHECK-32: Demangled name: Swift.Int.Type
+// CHECK-64: Mangled name: $sSiXMt
+// CHECK-64: Demangled name: @thin Swift.Int.Type
+// CHECK-32: Mangled name: $sSiXMt
+// CHECK-32: Demangled name: @thin Swift.Int.Type
 
 protocol WithType {
   associatedtype T
@@ -318,27 +318,27 @@ reflect(any: he)
 // CHECK-64:        Type info:
 // CHECK-64:        (struct size=144 alignment=8 stride=144
 // CHECK-64-NEXT:   (field name=singleError offset=0
-// CHECK-64-NEXT:     (error_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (error_existential size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=error offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-64-NEXT:   (field name=errorInComposition offset=8
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=customError offset=56
-// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=customErrorInComposition offset=96
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40

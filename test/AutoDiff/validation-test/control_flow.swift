@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// FIXME(SR-12741): Enable test for all platforms after debugging
+// iphonesimulator-i386-specific failures.
+// REQUIRES: CPU=x86_64
+
 import _Differentiation
 import StdlibUnittest
 
@@ -709,6 +713,108 @@ ControlFlowTests.test("Loops") {
   expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
   expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
   expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
+}
+
+ControlFlowTests.test("BranchingCastInstructions") {
+  // checked_cast_br
+  func typeCheckOperator<T>(_ x: Float, _ metatype: T.Type) -> Float {
+    if metatype is Int.Type {
+      return x + x
+    }
+    return x * x
+  }
+  expectEqual((6, 2), valueWithGradient(at: 3, in: { typeCheckOperator($0, Int.self) }))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: { typeCheckOperator($0, Float.self) }))
+
+  // checked_cast_addr_br
+  func conditionalCast<T: Differentiable>(_ x: T) -> T {
+    if let _ = x as? Float {
+      // Do nothing with `y: Float?` value.
+    }
+    return x
+  }
+  expectEqual((3, 1), valueWithGradient(at: Float(3), in: conditionalCast))
+}
+
+ControlFlowTests.test("ThrowingCalls") {
+   // TF-433: Test non-active `try_apply` differentiation.
+  func throwing() throws -> Void {}
+
+  @differentiable
+  func testThrowing(_ x: Float) -> Float {
+    try! throwing()
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testThrowing)(10))
+
+  @differentiable
+  func testThrowingGeneric<T: Differentiable>(_ x: T) -> T {
+    try! throwing()
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testThrowingGeneric)(10))
+
+  func rethrowing(_ body: () throws -> Void) rethrows -> Void {}
+
+  @differentiable
+  func testRethrowingIdentity(_ x: Float) -> Float {
+    rethrowing({}) // non-active `try_apply`
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testRethrowingIdentity)(10))
+
+  @differentiable
+  func testRethrowingIdentityGeneric<T: Differentiable>(_ x: T) -> T {
+    rethrowing({}) // non-active `try_apply`
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testRethrowingIdentityGeneric)(10))
+
+  @differentiable
+  func testComplexControlFlow(_ x: Float) -> Float {
+    rethrowing({})
+    for _ in 0..<Int(x) {
+      if true {
+        rethrowing({})
+      }
+      rethrowing({}) // non-active `try_apply`
+    }
+    rethrowing({})
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testComplexControlFlow)(10))
+
+  @differentiable
+  func testComplexControlFlowGeneric<T: Differentiable>(_ x: T) -> T {
+    rethrowing({})
+    for _ in 0..<10 {
+      if true {
+        rethrowing({})
+      }
+      rethrowing({}) // non-active `try_apply`
+    }
+    rethrowing({})
+    return x
+  }
+  expectEqual(10, pullback(at: 3, in: testComplexControlFlowGeneric)(10))
+
+  // Test `Array.map(_:)`, which is rethrowing.
+  func testArrayMap(_ x: [Float]) -> [Float] {
+    let max = x.map { $0 }.max()! // non-active `try_apply`
+    _blackHole(max)
+    return x
+  }
+  expectEqual([10, 10], pullback(at: [2, 3], in: testArrayMap)([10, 10]))
+
+  // Test `Bool.&&(_:)`, which is rethrowing.
+  func testBooleanShortCircuitingOperations(_ x: Float, bool: Bool) -> Float {
+    if bool && bool || bool { // non-active `try_apply`
+      return x * x
+    }
+    return x + x
+  }
+  expectEqual(6, gradient(at: 3, in: { x in testBooleanShortCircuitingOperations(x, bool: true) }))
+  expectEqual(2, gradient(at: 3, in: { x in testBooleanShortCircuitingOperations(x, bool: false) }))
 }
 
 runAllTests()

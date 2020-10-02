@@ -1,25 +1,25 @@
 // RUN: %target-typecheck-verify-swift
 
-extension extension_for_invalid_type_1 { // expected-error {{use of undeclared type 'extension_for_invalid_type_1'}}
+extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
 }
-extension extension_for_invalid_type_2 { // expected-error {{use of undeclared type 'extension_for_invalid_type_2'}}
+extension extension_for_invalid_type_2 { // expected-error {{cannot find type 'extension_for_invalid_type_2' in scope}}
   static func f() { }
 }
-extension extension_for_invalid_type_3 { // expected-error {{use of undeclared type 'extension_for_invalid_type_3'}}
+extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'extension_for_invalid_type_3' in scope}}
   init() {}
 }
-extension extension_for_invalid_type_4 { // expected-error {{use of undeclared type 'extension_for_invalid_type_4'}}
+extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
-extension extension_for_invalid_type_5 { // expected-error {{use of undeclared type 'extension_for_invalid_type_5'}}
+extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
 }
 
 //===--- Test that we only allow extensions at file scope.
 struct Foo { }
 
-extension NestingTest1 { // expected-error {{use of undeclared type 'NestingTest1'}}
+extension NestingTest1 { // expected-error {{cannot find type 'NestingTest1' in scope}}
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
 struct NestingTest2 {
@@ -267,14 +267,14 @@ extension ImposeClassReq1 where Self: AnyObject {
 
   var wrappingProperty2: Int {
     get { return someProperty }
-    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+    mutating set { someProperty = newValue } // expected-error {{'mutating' is not valid on setters in class-bound protocols}}
   }
 
-  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating func foo() { // expected-error {{mutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 1
   }
 
-  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  nonmutating func bar() { // expected-error {{'nonmutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 2
   }
 
@@ -309,14 +309,14 @@ extension ImposeClassReq2 {
 
   var wrappingProperty2: Int {
     get { return someProperty }
-    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+    mutating set { someProperty = newValue } // expected-error {{'mutating' is not valid on setters in class-bound protocols}}
   }
 
-  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating func foo() { // expected-error {{mutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 1
   }
 
-  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  nonmutating func bar() { // expected-error {{'nonmutating' is not valid on instance methods in class-bound protocols}}
     someProperty = 2
   }
 
@@ -349,3 +349,10 @@ struct SR_10466<T> {
 extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
   typealias A = Int
 }
+
+#if true
+protocol Rdar66943328 {
+  associatedtype Assoc
+}
+extension Rdar66943328 where Assoc == Int // expected-error {{expected '{' in extension}}
+#endif

@@ -20,7 +20,7 @@ var importedunion: unionSearchFlags = .backwards
 
 
 // This shouldn't be imported from data.
-var notimported : MaybeInt // expected-error {{use of undeclared type 'MaybeInt'}}
+var notimported : MaybeInt // expected-error {{cannot find type 'MaybeInt' in scope}}
 
 //===----------------------------------------------------------------------===//
 // Name lookup stress test
@@ -94,7 +94,7 @@ func func2() {
 }
 
 func func3() {
-  undefined_func() // expected-error {{use of unresolved identifier 'undefined_func'}}
+  undefined_func() // expected-error {{cannot find 'undefined_func' in scope}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -165,7 +165,7 @@ func localtest() {
   }
 }
 
-func f0() -> ThisTypeDoesNotExist { return 1 } // expected-error {{use of undeclared type 'ThisTypeDoesNotExist'}}
+func f0() -> ThisTypeDoesNotExist { return 1 } // expected-error {{cannot find type 'ThisTypeDoesNotExist' in scope}}
 
 for _ in [1] { }
 

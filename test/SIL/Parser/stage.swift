@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -O -parse-stdlib -parse-as-library -emit-module -o %t/stage.swiftmodule
-// RUN: %target-sil-opt %t/stage.swiftmodule -disable-sil-linking -sil-disable-ast-dump -o %t/stage.sil
+// RUN: %target-sil-opt %t/stage.swiftmodule -sil-disable-ast-dump -o %t/stage.sil
 // RUN: %target-sil-opt %t/stage.sil -o - | %FileCheck %s
 
 // FIXME: We create all SIL modules in the 'raw' stage regardless of the input

@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 
 namespace llvm {
   class Triple;
@@ -71,11 +72,6 @@ namespace swift {
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
 
-  /// Maps an arbitrary platform to its non-simulator equivalent.
-  ///
-  /// If \p platform is not a simulator platform, it will be returned as is.
-  DarwinPlatformKind getNonSimulatorPlatform(DarwinPlatformKind platform);
-
   /// Returns the architecture component of the path for a given target triple.
   ///
   /// Typically this is used for mapping the architecture component of the
@@ -106,6 +102,17 @@ namespace swift {
   /// LLVM target triple.
   Optional<llvm::VersionTuple>
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
+
+  /// Retrieve the target SDK version for the given SDKInfo and target triple.
+  llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+                                         const llvm::Triple &triple);
+
+  /// Get SDK build version.
+  std::string getSDKBuildVersion(StringRef SDKPath);
+  std::string getSDKBuildVersionFromPlist(StringRef Path);
+
+  /// Get SDK name.
+  std::string getSDKName(StringRef SDKPath);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

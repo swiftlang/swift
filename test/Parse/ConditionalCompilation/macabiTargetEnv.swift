@@ -5,7 +5,7 @@
 
 #if targetEnvironment(macabi) // expected-warning {{'macabi' has been renamed to 'macCatalyst'}} {{23-29=macCatalyst}}
 func underMacABI() {
-  foo() // expected-error {{use of unresolved identifier 'foo'}}
+  foo() // expected-error {{cannot find 'foo' in scope}}
 }
 #endif
 
@@ -17,7 +17,7 @@ let i: SomeType = "SomeString" // no-error
 
 #if targetEnvironment(macCatalyst)
 func underTargetEnvironmentMacCatalyst() {
-  foo() // expected-error {{use of unresolved identifier 'foo'}}
+  foo() // expected-error {{cannot find 'foo' in scope}}
 }
 #endif
 

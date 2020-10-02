@@ -1,0 +1,86 @@
+// RUN: %target-sil-opt -sil-opt-remark-ignore-always-infer -optremarkgen-declless-debugvalue-use-sildebugvar-info -sil-opt-remark-generator -sil-remarks-missed=sil-opt-remark-gen -verify %s -o /dev/null
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+enum TrivialState {
+case first
+case second
+case third
+}
+
+struct StructWithOwner {
+  var owner: Klass
+  var state: TrivialState
+}
+
+struct KlassPair {
+  var lhs: Klass
+  var rhs: Klass
+}
+
+struct StructWithOwnerAndState {
+  var structWithOwner: StructWithOwner
+  var state: TrivialState
+}
+
+///////////
+// Tests //
+///////////
+
+sil @simple : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  debug_value %0 : $Builtin.NativeObject, let, name "arg"
+  strong_retain %0 : $Builtin.NativeObject  // expected-remark {{retain of type 'Builtin.NativeObject'}}
+                                            // expected-note @-2 {{of 'arg'}}
+  retain_value %0 : $Builtin.NativeObject   // expected-remark {{retain of type 'Builtin.NativeObject'}}
+                                            // expected-note @-4 {{of 'arg'}}
+  strong_release %0 : $Builtin.NativeObject // expected-remark {{release of type 'Builtin.NativeObject'}}
+                                            // expected-note @-6 {{of 'arg'}}
+  release_value %0 : $Builtin.NativeObject  // expected-remark {{release of type 'Builtin.NativeObject'}}
+                                            // expected-note @-8 {{of 'arg'}}
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @extract_out_singleobj_struct_subfield_1 : $@convention(thin) (@guaranteed StructWithOwner) -> Klass {
+bb0(%0 : $StructWithOwner):
+  debug_value %0 : $StructWithOwner, let, name "x"
+  %1 = struct_extract %0 : $StructWithOwner, #StructWithOwner.owner
+  strong_retain %1 : $Klass // expected-remark {{retain of type 'Klass'}}
+                                           // expected-note @-3 {{of 'x.owner'}}
+  return %1 : $Klass
+}
+
+// This case should never actually happen like this, but we should handle it in
+// a sane way by printing both notes for y and x and also make sure that we do
+// not infer .owner on y since y is on owner itself.
+sil @extract_out_singleobj_struct_subfield_multiple_debugvalue : $@convention(thin) (@guaranteed StructWithOwner) -> Klass {
+bb0(%0 : $StructWithOwner):
+  debug_value %0 : $StructWithOwner, let, name "x"
+  %1 = struct_extract %0 : $StructWithOwner, #StructWithOwner.owner
+  debug_value %1 : $Klass, let, name "y"
+  strong_retain %1 : $Klass // expected-remark {{retain of type 'Klass'}}
+                            // expected-note @-4 {{of 'x.owner'}}
+                            // expected-note @-3 {{of 'y'}}
+  return %1 : $Klass
+}
+
+// In this case, we emit the remark for x since its operand %2 is rc-identical
+// to %0 the value we found while traversing our access path.
+sil @rcidentity_based_use : $@convention(thin) (@guaranteed StructWithOwner, TrivialState) -> @owned Klass {
+bb0(%0 : $StructWithOwner, %1 : $TrivialState):
+  %2 = struct $StructWithOwnerAndState(%0 : $StructWithOwner, %1 : $TrivialState)
+  debug_value %2 : $StructWithOwnerAndState, let, name "x"
+  %3 = struct_extract %0 : $StructWithOwner, #StructWithOwner.owner
+  strong_retain %3 : $Klass // expected-remark {{retain of type 'Klass'}}
+                            // expected-note @-3 {{of 'x'}}
+  return %3 : $Klass
+}

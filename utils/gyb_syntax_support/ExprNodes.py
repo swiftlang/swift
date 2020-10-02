@@ -1,5 +1,5 @@
-from Child import Child
-from Node import Node  # noqa: I201
+from .Child import Child
+from .Node import Node  # noqa: I201
 
 EXPR_NODES = [
     # An inout expression.
@@ -42,6 +42,16 @@ EXPR_NODES = [
                        'PostfixQuestionMarkToken',
                        'ExclamationMarkToken',
                    ]),
+             Child('Expression', kind='Expr'),
+         ]),
+
+    # The await operator.
+    # await foo()
+    Node('AwaitExpr', kind='Expr',
+         children=[
+             Child('AwaitKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['await']),
              Child('Expression', kind='Expr'),
          ]),
 
@@ -130,6 +140,12 @@ EXPR_NODES = [
              Child('PoundFile', kind='PoundFileToken'),
          ]),
 
+    # A #fileID expression.
+    Node('PoundFileIDExpr', kind='Expr',
+         children=[
+             Child('PoundFileID', kind='PoundFileIDToken'),
+         ]),
+
     # A #filePath expression.
     Node('PoundFilePathExpr', kind='Expr',
          children=[
@@ -173,10 +189,13 @@ EXPR_NODES = [
              Child('OperatorToken', kind='BinaryOperatorToken'),
          ]),
 
-    # arrow-expr -> 'throws'? '->'
+    # arrow-expr -> 'async'? 'throws'? '->'
     # NOTE: This appears only in SequenceExpr.
     Node('ArrowExpr', kind='Expr',
          children=[
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsToken', kind='ThrowsToken',
                    is_optional=True),
              Child('ArrowToken', kind='ArrowToken'),
@@ -189,7 +208,8 @@ EXPR_NODES = [
     Node('FloatLiteralExpr', kind='Expr',
          children=[
              Child('FloatingDigits', kind='FloatingLiteralToken'),
-         ]),
+         ],
+         must_uphold_invariant=True),
 
     Node('TupleExpr', kind='Expr',
          traits=['Parenthesized'],
@@ -263,7 +283,8 @@ EXPR_NODES = [
     Node('IntegerLiteralExpr', kind='Expr',
          children=[
              Child('Digits', kind='IntegerLiteralToken'),
-         ]),
+         ],
+         must_uphold_invariant=True),
 
     # true or false
     Node('BooleanLiteralExpr', kind='Expr',
@@ -373,6 +394,9 @@ EXPR_NODES = [
                        Child('SimpleInput', kind='ClosureParamList'),
                        Child('Input', kind='ParameterClause'),
                    ]),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),
@@ -394,6 +418,21 @@ EXPR_NODES = [
              Child('Pattern', kind='Pattern'),
          ]),
 
+    # trailing-closure-element -> identifier ':' closure-expression
+    Node('MultipleTrailingClosureElement', kind='Syntax',
+         children=[
+             Child('Label', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
+             Child('Colon', kind='ColonToken'),
+             Child('Closure', kind='ClosureExpr'),
+         ]),
+
+    Node('MultipleTrailingClosureElementList', kind='SyntaxCollection',
+         element='MultipleTrailingClosureElement'),
+
     # call-expr -> expr '(' call-argument-list ')' closure-expr?
     #            | expr closure-expr
     Node('FunctionCallExpr', kind='Expr',
@@ -407,6 +446,10 @@ EXPR_NODES = [
                    is_optional=True),
              Child('TrailingClosure', kind='ClosureExpr',
                    is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTrailingClosure',
+                   is_optional=True),
          ]),
 
     # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
@@ -418,6 +461,10 @@ EXPR_NODES = [
                    collection_element_name='Argument'),
              Child('RightBracket', kind='RightSquareBracketToken'),
              Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 

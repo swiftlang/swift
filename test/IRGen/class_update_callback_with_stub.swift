@@ -63,38 +63,38 @@ import resilient_objc_class
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub17ResilientSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub17ResilientSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMt" =
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMt" =
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 
 // -- Categories reference the stubs
 
-// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub17ResilientSubclass_$_class_update_callback_with_stub" = private constant
+// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub17ResilientSubclass_$_class_update_callback_with_stub" = internal constant
 // CHECK-SAME:  @"$s31class_update_callback_with_stub17ResilientSubclassCMs"
 
-// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass_$_class_update_callback_with_stub" = private constant
+// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass_$_class_update_callback_with_stub" = internal constant
 // CHECK-SAME:  @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
 
-// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub" = private constant
+// CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub" = internal constant
 // CHECK-SAME:  @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
 
 // -- But not if the entire inheritance chain is in a single module
 
-// CHECK-LABEL: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub" = private constant
+// CHECK-LABEL: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub" = internal constant
 // CHECK-SAME:  @"$s15resilient_class22ResilientOutsideParentCN"
 
 

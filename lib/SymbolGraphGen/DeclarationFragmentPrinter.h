@@ -59,6 +59,9 @@ public:
     Text,
   };
 private:
+  /// The symbol graph for which a declaration is being printed.
+  const SymbolGraph *SG;
+
   /// The output stream to print fragment objects to.
   llvm::json::OStream &OS;
 
@@ -81,9 +84,11 @@ private:
   unsigned NumFragments;
 
 public:
-  DeclarationFragmentPrinter(llvm::json::OStream &OS,
+  DeclarationFragmentPrinter(const SymbolGraph *SG,
+                             llvm::json::OStream &OS,
                              Optional<StringRef> Key = None)
-    : OS(OS),
+    : SG(SG),
+      OS(OS),
       Kind(FragmentKind::None),
       NumFragments(0) {
     if (Key) {
@@ -99,7 +104,10 @@ public:
   ///
   /// Subheadings for types don't include the complete declaration line
   /// including generics and inheritance.
-  void printAbridgedType(const GenericTypeDecl *TD);
+  ///
+  /// \param TD The type declaration to print.
+  /// \param PrintKeyword Print the corresponding keyword introducer if `true`.
+  void printAbridgedType(const GenericTypeDecl *TD, bool PrintKeyword);
 
   void printDeclLoc(const Decl *D) override;
 

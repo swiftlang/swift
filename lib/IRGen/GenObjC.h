@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENOBJC_H
 #define SWIFT_IRGEN_GENOBJC_H
 
+#include "swift/SIL/SILDeclRef.h"
 
 namespace llvm {
   class Type;

@@ -14,18 +14,20 @@
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
 #include "ModuleFormat.h"
+#include "ModuleFileSharedCore.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/TypeLoc.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Error.h"
@@ -56,16 +58,15 @@ class ModuleFile
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
 
+  /// The core data of a serialized module file. This is accessed as immutable
+  /// and thread-safe.
+  const std::shared_ptr<const ModuleFileSharedCore> Core;
+
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
   /// The module that this module is an overlay of, if any.
   ModuleDecl *UnderlyingModule = nullptr;
-
-  /// The module file data.
-  std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
-  std::unique_ptr<llvm::MemoryBuffer> ModuleDocInputBuffer;
-  std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoInputBuffer;
 
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
@@ -74,118 +75,45 @@ class ModuleFile
   llvm::BitstreamCursor SILIndexCursor;
   llvm::BitstreamCursor DeclMemberTablesCursor;
 
-  /// The name of the module.
-  StringRef Name;
   friend StringRef getNameOfModule(const ModuleFile *);
-
-  /// The target the module was built for.
-  StringRef TargetTriple;
-
-  /// The name of the module interface this module was compiled from.
-  ///
-  /// Empty if this module didn't come from an interface file.
-  StringRef ModuleInterfacePath;
-
-  /// The Swift compatibility version in use when this module was built.
-  version::Version CompatibilityVersion;
-
-  /// The data blob containing all of the module's identifiers.
-  StringRef IdentifierData;
 
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
-  /// Is this module file actually a .sib file? .sib files are serialized SIL at
-  /// arbitrary granularity and arbitrary stage; unlike serialized Swift
-  /// modules, which are assumed to contain canonical SIL for an entire module.
-  bool IsSIB = false;
-
-  // Full blob from the misc. version field of the metadata block. This should
-  // include the version string of the compiler that built the module.
-  StringRef MiscVersion;
-
 public:
+  static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
+                                                           StringRef modulePath,
+                                                           std::string &Name);
+
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
-    ModuleDecl::ImportedModule Import = {};
-    const StringRef RawPath;
-    const StringRef RawSPIs;
+    const ModuleFileSharedCore::Dependency &Core;
+
+    llvm::Optional<ModuleDecl::ImportedModule> Import = llvm::None;
     SmallVector<Identifier, 4> spiGroups;
 
-  private:
-    using ImportFilterKind = ModuleDecl::ImportFilterKind;
-    const unsigned RawImportControl : 2;
-    const unsigned IsHeader : 1;
-    const unsigned IsScoped : 1;
-
-    static unsigned rawControlFromKind(ImportFilterKind importKind) {
-      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
-    }
-    ImportFilterKind getImportControl() const {
-      return static_cast<ImportFilterKind>(1 << RawImportControl);
-    }
-
-    Dependency(StringRef path, StringRef spiGroups, bool isHeader, ImportFilterKind importControl,
-               bool isScoped)
-      : RawPath(path), RawSPIs(spiGroups), RawImportControl(rawControlFromKind(importControl)),
-        IsHeader(isHeader), IsScoped(isScoped) {
-      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
-             "must be a particular filter option, not a bitset");
-      assert(getImportControl() == importControl && "not enough bits");
-    }
-
-  public:
-    Dependency(StringRef path, StringRef spiGroups, ImportFilterKind importControl, bool isScoped)
-      : Dependency(path, spiGroups, false, importControl, isScoped) {}
-
-    static Dependency forHeader(StringRef headerPath, bool exported) {
-      auto importControl = exported ? ImportFilterKind::Public
-                                    : ImportFilterKind::Private;
-      return Dependency(headerPath, StringRef(), true, importControl, false);
-    }
+    Dependency(const ModuleFileSharedCore::Dependency &coreDependency)
+      : Core(coreDependency) {}
 
     bool isLoaded() const {
-      return Import.second != nullptr;
+      return Import.hasValue() && Import->importedModule != nullptr;
     }
 
     bool isExported() const {
-      return getImportControl() == ImportFilterKind::Public;
+      return Core.isExported();
     }
     bool isImplementationOnly() const {
-      return getImportControl() == ImportFilterKind::ImplementationOnly;
+      return Core.isImplementationOnly();
     }
 
-    bool isHeader() const { return IsHeader; }
-    bool isScoped() const { return IsScoped; }
-
-    std::string getPrettyPrintedPath() const;
+    bool isHeader() const { return Core.isHeader(); }
+    bool isScoped() const { return Core.isScoped(); }
   };
 
 private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
-
-  struct SearchPath {
-    StringRef Path;
-    bool IsFramework;
-    bool IsSystem;
-  };
-  /// Search paths this module may provide.
-  ///
-  /// This is not intended for use by frameworks, but may show up in debug
-  /// modules.
-  std::vector<SearchPath> SearchPaths;
-
-  /// Info for the (lone) imported header for this module.
-  struct {
-    off_t fileSize;
-    time_t fileModTime;
-    StringRef contents;
-  } importedHeaderInfo = {};
-
-  /// All of this module's link-time dependencies.
-  SmallVector<LinkLibrary, 8> LinkLibraries;
 
 public:
   template <typename T>
@@ -352,103 +280,23 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
-  class DeclTableInfo;
-  using SerializedDeclTable =
-      llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
-
-  class ExtensionTableInfo;
-  using SerializedExtensionTable =
-      llvm::OnDiskIterableChainedHashTable<ExtensionTableInfo>;
-
-  class LocalDeclTableInfo;
-  using SerializedLocalDeclTable =
-      llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
-      
-  using OpaqueReturnTypeDeclTableInfo = LocalDeclTableInfo;
-  using SerializedOpaqueReturnTypeDeclTable =
-      llvm::OnDiskIterableChainedHashTable<OpaqueReturnTypeDeclTableInfo>;
-
-  class NestedTypeDeclsTableInfo;
-  using SerializedNestedTypeDeclsTable =
-      llvm::OnDiskIterableChainedHashTable<NestedTypeDeclsTableInfo>;
-
-  class DeclMemberNamesTableInfo;
-  using SerializedDeclMemberNamesTable =
-      llvm::OnDiskIterableChainedHashTable<DeclMemberNamesTableInfo>;
-
-  class DeclMembersTableInfo;
   using SerializedDeclMembersTable =
-      llvm::OnDiskIterableChainedHashTable<DeclMembersTableInfo>;
-
-  std::unique_ptr<SerializedDeclTable> TopLevelDecls;
-  std::unique_ptr<SerializedDeclTable> OperatorDecls;
-  std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
-  std::unique_ptr<SerializedDeclTable> ClassMembersForDynamicLookup;
-  std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
-  std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
-  std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
-  std::unique_ptr<SerializedOpaqueReturnTypeDeclTable> OpaqueReturnTypeDecls;
-  std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
-  std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
+      ModuleFileSharedCore::SerializedDeclMembersTable;
 
   llvm::DenseMap<uint32_t,
            std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
-
-  class ObjCMethodTableInfo;
-  using SerializedObjCMethodTable =
-    llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
-
-  std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
   llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
-  ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
-
-  class DeclCommentTableInfo;
-  using SerializedDeclCommentTable =
-      llvm::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
-
-  using GroupNameTable = llvm::DenseMap<unsigned, StringRef>;
-
-  std::unique_ptr<GroupNameTable> GroupNamesMap;
-  std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
-
-  class DeclUSRTableInfo;
-  using SerializedDeclUSRTable =
-      llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
-  std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
-
-  class DerivativeFunctionConfigTableInfo;
-  using SerializedDerivativeFunctionConfigTable =
-      llvm::OnDiskIterableChainedHashTable<DerivativeFunctionConfigTableInfo>;
-  std::unique_ptr<SerializedDerivativeFunctionConfigTable>
-      DerivativeFunctionConfigurations;
-
-  /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
-  StringRef SourceLocsTextData;
-
-  /// An array of fixed size source location data for each USR appearing in
-  /// \c DeclUSRsTable.
-  StringRef BasicDeclLocsData;
-
-  /// An array of fixed-size location data for each `SingleRawComment` piece
-  /// of declaration's documentation `RawComment`s.
-  StringRef DocRangesData;
+  /// Maps USRs to their deserialized comment object.
+  mutable llvm::StringMap<
+      std::unique_ptr<ModuleFileSharedCore::DeserializedCommentInfo>>
+      CommentsCache;
 
   struct ModuleBits {
-    /// The decl ID of the main class in this module file, if it has one.
-    unsigned EntryPointDeclID : 31;
-
-    /// Whether or not this module file comes from a context that had a main
-    /// entry point.
-    unsigned HasEntryPoint : 1;
-
-    /// Whether this module file comes from a framework.
-    unsigned IsFramework : 1;
-
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;
 
@@ -461,25 +309,22 @@ private:
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
   bool hasError() const {
-    return Bits.HasError;
+    return Bits.HasError || Core->hasError();
   }
 
-  void setEntryPointClassID(serialization::DeclID DID) {
-    Bits.HasEntryPoint = true;
-    Bits.EntryPointDeclID = DID;
-    assert(Bits.EntryPointDeclID == DID && "not enough bits for DeclID");
+  /// Whether or not this module file comes from a context that had a main entry point.
+  bool hasEntryPoint() const {
+    return Core->Bits.HasEntryPoint;
+  }
+
+  /// The decl ID of the main class in this module file, if it has one.
+  unsigned getEntryPointDeclID() const {
+    return Core->Bits.EntryPointDeclID;
   }
 
   /// Creates a new AST node to represent a deserialized decl.
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
-
-  /// Constructs a new module and validates it.
-  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-             std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-             std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-             bool isFramework, serialization::ValidationInfo &info,
-             serialization::ExtendedValidationInfo *extInfo);
 
 public:
   /// Change the status of the current module.
@@ -525,85 +370,6 @@ public:
   }
 
 private:
-  /// Read an on-disk decl hash table stored in index_block::DeclListLayout
-  /// format.
-  std::unique_ptr<SerializedDeclTable>
-  readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl hash table stored in
-  /// index_block::DeclListLayout format.
-  std::unique_ptr<SerializedLocalDeclTable>
-  readLocalDeclTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk Objective-C method table stored in
-  /// index_block::ObjCMethodTableLayout format.
-  std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
-  readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl hash table stored in
-  /// index_block::ExtensionTableLayout format.
-  std::unique_ptr<SerializedExtensionTable>
-  readExtensionTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl hash table stored in
-  /// index_block::NestedTypeDeclsLayout format.
-  std::unique_ptr<SerializedNestedTypeDeclsTable>
-  readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl-name hash table stored in
-  /// index_block::DeclMemberNamesLayout format.
-  std::unique_ptr<SerializedDeclMemberNamesTable>
-  readDeclMemberNamesTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk local decl-members hash table stored in
-  /// index_block::DeclMembersLayout format.
-  std::unique_ptr<SerializedDeclMembersTable>
-  readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Read an on-disk derivative function configuration table stored in
-  /// index_block::DerivativeFunctionConfigTableLayout format.
-  std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
-  readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
-                                    StringRef blobData);
-
-  /// Reads the index block, which contains global tables.
-  ///
-  /// Returns false if there was an error.
-  bool readIndexBlock(llvm::BitstreamCursor &cursor);
-
-  /// Read an on-disk decl hash table stored in
-  /// \c comment_block::DeclCommentListLayout format.
-  std::unique_ptr<SerializedDeclCommentTable>
-  readDeclCommentTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  std::unique_ptr<GroupNameTable>
-  readGroupTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Reads the comment block, which contains USR to comment mappings.
-  ///
-  /// Returns false if there was an error.
-  bool readCommentBlock(llvm::BitstreamCursor &cursor);
-
-  /// Loads data from #ModuleDocInputBuffer.
-  ///
-  /// Returns false if there was an error.
-  bool readModuleDocIfPresent();
-
-  /// Reads the source loc block, which contains USR to decl location mapping.
-  ///
-  /// Returns false if there was an error.
-  bool readDeclLocsBlock(llvm::BitstreamCursor &cursor);
-
-  /// Loads data from #ModuleSourceInfoInputBuffer.
-  ///
-  /// Returns false if there was an error.
-  bool readModuleSourceInfoIfPresent();
-
-  /// Read an on-disk decl hash table stored in
-  /// \c sourceinfo_block::DeclUSRSLayout format.
-  std::unique_ptr<SerializedDeclUSRTable>
-  readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
@@ -643,9 +409,6 @@ private:
   llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
                                                uint32_t pathLen);
 
-  /// Populates TopLevelIDs for name lookup.
-  void buildTopLevelDeclMap();
-
   struct AccessorRecord {
     SmallVector<serialization::DeclID, 8> IDs;
   };
@@ -659,39 +422,51 @@ private:
                         AccessorRecord &accessors);
 
 public:
-  /// Loads a module from the given memory buffer.
-  ///
-  /// \param moduleInputBuffer A memory buffer containing the serialized module
-  /// data. The created ModuleFile takes ownership of the buffer, even if
-  /// there's an error in loading.
-  /// \param moduleDocInputBuffer An optional memory buffer containing
-  /// documentation data for the module. The created ModuleFile takes ownership
-  /// of the buffer, even if there's an error in loading.
-  /// \param isFramework If true, this is treated as a framework module for
-  /// linking purposes.
-  /// \param[out] theModule The loaded module.
-  /// \param[out] extInfo Optionally, extra info serialized about the module.
-  /// \returns Whether the module was successfully loaded, or what went wrong
-  ///          if it was not.
-  static serialization::ValidationInfo
-  load(StringRef moduleInterfacePath,
-       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, std::unique_ptr<ModuleFile> &theModule,
-       serialization::ExtendedValidationInfo *extInfo = nullptr) {
-    serialization::ValidationInfo info;
-    theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
-                                   std::move(moduleDocInputBuffer),
-                                   std::move(moduleSourceInfoInputBuffer),
-                                   isFramework, info, extInfo));
-    if (!moduleInterfacePath.empty())
-      theModule->ModuleInterfacePath = moduleInterfacePath;
-    return info;
-  }
+  /// Constructs a new module.
+  explicit ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core);
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
+
+  /// The name of the module.
+  StringRef getName() const {
+    return Core->Name;
+  }
+
+  /// The Swift compatibility version in use when this module was built.
+  const version::Version &getCompatibilityVersion() const {
+    return Core->CompatibilityVersion;
+  }
+
+  /// Whether this module is compiled with `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Core->Bits.ArePrivateImportsEnabled;
+  }
+
+  /// Is this module file actually a .sib file? .sib files are serialized SIL at
+  /// arbitrary granularity and arbitrary stage; unlike serialized Swift
+  /// modules, which are assumed to contain canonical SIL for an entire module.
+  bool isSIB() const {
+    return Core->Bits.IsSIB;
+  }
+
+  /// Whether this module file is compiled with '-enable-testing'.
+  bool isTestable() const {
+    return Core->Bits.IsTestable;
+  }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Core->Bits.ResilienceStrategy);
+  }
+
+  /// Whether this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Core->Bits.IsImplicitDynamicEnabled;
+  }
+
+  /// \c true if this module has incremental dependency information.
+  bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -705,22 +480,18 @@ public:
   /// This does not include diagnostics about \e this file failing to load,
   /// but rather other things that might be imported as part of bringing the
   /// file into the AST.
-  /// \param treatAsPartialModule If true, processes implementation-only
-  /// information instead of assuming the client won't need it and shouldn't
-  /// see it.
   ///
   /// \returns any error that occurred during association, such as being
   /// compiled for a different OS.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
-                                  bool treatAsPartialModule);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
-  /// Transfers ownership of a buffer that might contain source code where
-  /// other parts of the compiler could have emitted diagnostics, to keep them
-  /// alive even if the ModuleFile is destroyed.
+  /// Returns `true` if there is a buffer that might contain source code where
+  /// other parts of the compiler could have emitted diagnostics, to indicate
+  /// that the object must be kept alive as long as the diagnostics exist.
   ///
   /// Should only be called when a failure has been reported from
   /// ModuleFile::load or ModuleFile::associateWithFileContext.
-  std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
+  bool mayHaveDiagnosticsPointingAtBuffer() const;
 
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
@@ -762,7 +533,7 @@ public:
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
   /// Reports all visible top-level members in this module.
-  void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
+  void lookupVisibleDecls(ImportPath::Access accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind);
 
@@ -799,13 +570,13 @@ public:
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
-  void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+  void lookupClassMembers(ImportPath::Access accessPath,
                           VisibleDeclConsumer &consumer);
 
   /// Adds class members in the module with the given name to the given vector.
   ///
   /// This is intended for use with id-style lookup.
-  void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+  void lookupClassMember(ImportPath::Access accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
@@ -816,8 +587,9 @@ public:
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
-  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                              SmallVectorImpl<Identifier> &spiGroups) const;
+  void lookupImportedSPIGroups(
+                         const ModuleDecl *importedModule,
+                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
@@ -853,14 +625,14 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 
   StringRef getModuleFilename() const {
-    if (!ModuleInterfacePath.empty())
-      return ModuleInterfacePath;
+    if (!Core->ModuleInterfacePath.empty())
+      return Core->ModuleInterfacePath;
     // FIXME: This seems fragile, maybe store the filename separately ?
-    return ModuleInputBuffer->getBufferIdentifier();
+    return Core->ModuleInputBuffer->getBufferIdentifier();
   }
 
   StringRef getTargetTriple() const {
-    return TargetTriple;
+    return Core->TargetTriple;
   }
 
   /// AST-verify imported decls.
@@ -982,7 +754,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  ModuleDecl *getModule(ArrayRef<Identifier> name, bool allowLoading = false);
+  ModuleDecl *getModule(ImportPath::Module name, bool allowLoading = false);
 
   /// Returns the generic signature for the given ID.
   GenericSignature getGenericSignature(serialization::GenericSignatureID ID);

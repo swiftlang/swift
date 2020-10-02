@@ -1,0 +1,4 @@
+module SymbolicationShims {
+  header "SymbolicationShims.h"
+  export *
+}

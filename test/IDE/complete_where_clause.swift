@@ -38,6 +38,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1_EXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_1 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
 
 class A1<T1, T2, T3> {}
 
@@ -138,7 +141,7 @@ enum E2<T> where T.#^ENUM_2^# {}
 // ANYTYPE: Begin completions
 // ANYTYPE-DAG: Decl[GenericTypeParam]/Local: T[#T#];
 // ANYTYPE-DAG: Decl[Class]/CurrModule: A1[#A1#];
-// ANYTYPE-DAG: Decl[Struct]/OtherModule[Swift]: Int[#Int#];
+// ANYTYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 // ANYTYPE: End completions
 
 protocol P2 {
@@ -226,3 +229,20 @@ extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT: End completions
+
+protocol WithAssoc {
+  associatedtype T: Assoc
+}
+extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^# 
+// EXT_ASSOC_MEMBER: Begin completions, 2 items
+// EXT_ASSOC_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   Q;
+// EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Self.T.Type#];
+// EXT_ASSOC_MEMBER: End completions
+
+extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^# 
+// Same as EXT_ASSOC_MEMBER
+
+extension WithAssoc where Int == #^EXT_SECONDTYPE^# 
+// EXT_SECONDTYPE: Begin completions
+// EXT_SECONDTYPE-DAG: Decl[AssociatedType]/CurrNominal:   T;
+// EXT_SECONDTYPE: End completions

@@ -551,9 +551,9 @@ class TestComparator(object):
 
         comparisons = list(map(compare, comparable_tests))
 
-        def partition(l, p):
+        def partition(items, p):
             return functools.reduce(
-                lambda x, y: x[not p(y)].append(y) or x, l, ([], [])
+                lambda x, y: x[not p(y)].append(y) or x, items, ([], [])
             )
 
         decreased, not_decreased = partition(

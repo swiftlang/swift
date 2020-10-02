@@ -14,4 +14,4 @@
 mainBridgingHeaderLoaded() // ok, expected
 appBridgingHeaderLoaded() // ok, accidentally loaded
 CNCTest() // error, accidentally shadowed
-// expected-error@-1 {{use of unresolved identifier 'CNCTest'}}
+// expected-error@-1 {{cannot find 'CNCTest' in scope}}

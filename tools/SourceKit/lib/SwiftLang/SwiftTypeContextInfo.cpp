@@ -25,31 +25,42 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static void translateTypeContextInfoOptions(OptionsDictionary &from,
+                                            TypeContextInfo::Options &to) {
+  // TypeContextInfo doesn't receive any options at this point.
+}
+
 static bool swiftTypeContextInfoImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool EnableASTCaching, std::string &Error) {
+    std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
     SourceKit::TypeContextInfoConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
+
+  TypeContextInfo::Options options;
+  if (optionsDict) {
+    translateTypeContextInfoOptions(*optionsDict, options);
+  }
 
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
@@ -91,7 +102,7 @@ void SwiftLangSupport::getExpressionContextInfo(
 
         // Name.
         memberElem.DeclNameBegin = SS.size();
-        member->getFullName().print(OS);
+        member->getName().print(OS);
         memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Description.
@@ -144,15 +155,18 @@ void SwiftLangSupport::getExpressionContextInfo(
     Consumer(SourceKit::TypeContextInfoConsumer &SKConsumer)
         : SKConsumer(SKConsumer){};
 
-    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) {
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
       for (auto &Item : Results)
         handleSingleResult(Item);
+    }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
   if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, /*EnableASTCaching=*/false,
-                                error)) {
+                                Args, fileSystem, error)) {
     SKConsumer.failed(error);
   }
 }

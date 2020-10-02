@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ImageInspectionELF.h"
+#include "ImageInspectionCommon.h"
+#include "../SwiftShims/MetadataSections.h"
 
 #include <cstddef>
 

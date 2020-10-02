@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-objc-interop | %FileCheck %s --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-interop | %FileCheck %s --check-prefixes=CHECK,CHECK-native
 
 // REQUIRES: CPU=x86_64
 
@@ -31,13 +32,16 @@ sil hidden_external @use_all : $@convention(thin) <T, U where T : P, U : P> () -
 // CHECK:      [[T0:%.*]] = bitcast %T11fulfillment1BC* %0 to %swift.type**
 // CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-objc-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-native-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 7
 // CHECK-NEXT:  %T = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 11
+// CHECK-objc-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 11
+// CHECK-native-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 8
 // CHECK-NEXT:  %U = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 12
+// CHECK-objc-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 12
+// CHECK-native-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 9
 // CHECK-NEXT:  %U.P = load i8**, i8*** [[T1]], align 8
 sil hidden @class_pointer : $@convention(thin) <T, U where T : P, U : P> (@guaranteed B<T, U>) -> () {
 bb0(%0 : $B<T, U>):
@@ -73,7 +77,8 @@ sil @callee : $@convention(method) <τ_0_0 where τ_0_0 : A2, τ_0_0.AssocTy : C
 // CHECK-LABEL: define{{.*}} swiftcc void @caller(%T11fulfillment1KC** {{.*}}, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK: entry:
 // CHECK:   %1 = bitcast %swift.type* %Self to i8***
-// CHECK:   %2 = getelementptr inbounds i8**, i8*** %1, i64 11
+// CHECK-objc:   %2 = getelementptr inbounds i8**, i8*** %1, i64 11
+// CHECK-native:   %2 = getelementptr inbounds i8**, i8*** %1, i64 8
 // CHECK:   %"\CF\84_1_0.C" = load i8**, i8*** %2
 // CHECK:   call swiftcc void @callee(%swift.type* %Self, i8** %SelfWitnessTable, i8** %"\CF\84_1_0.C"
 sil @caller : $@convention(witness_method: A2) <τ_0_0><τ_1_0 where τ_0_0 : K<τ_1_0>, τ_1_0 : C> (@in_guaranteed τ_0_0) -> () {

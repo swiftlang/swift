@@ -37,7 +37,7 @@ var nestedClosuresWithBrokenInference = { f: Int in {} }
     // expected-error@-1 {{closure expression is unused}} expected-note@-1 {{did you mean to use a 'do' statement?}} {{53-53=do }}
     // expected-error@-2 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
     // expected-error@-3 {{expected expression}}
-    // expected-error@-4 {{use of unresolved identifier 'f'}}
+    // expected-error@-4 {{cannot find 'f' in scope}}
 
 // SR-11540
 
@@ -73,3 +73,8 @@ let cc = SR8563 { (_: (Int)) in }
 
 cc((1)) // Ok
 cc(1) // Ok
+
+// SR-12955
+func SR12955() {
+  let f: @convention(c) (T) -> Void // expected-error {{cannot find type 'T' in scope}}
+}

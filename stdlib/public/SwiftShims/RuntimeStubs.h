@@ -22,7 +22,7 @@
 #include "LibcShims.h"
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
@@ -42,7 +42,7 @@ _swift_stdlib_overrideUnsafeArgvArgc(char * _Nullable * _Nonnull argv, int argc)
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_

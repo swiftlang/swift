@@ -539,6 +539,18 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
   assert(arrayAllocateFun);
 
+  SILFunction *arrayFinalizeFun = nullptr;
+  if (numElements != 0) {
+    if (FuncDecl *arrayFinalizeDecl = astContext.getFinalizeUninitializedArray()) {
+      std::string finalizeMangledName =
+          SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
+      arrayFinalizeFun =
+          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+      assert(arrayFinalizeFun);
+      module.linkFunction(arrayFinalizeFun);
+    }
+  }
+
   // Call the _allocateUninitializedArray function with numElementsSIL. The
   // call returns a two-element tuple, where the first element is the newly
   // created array and the second element is a pointer to the internal storage
@@ -594,7 +606,13 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
     // element.
     elementTypeLowering.emitStore(builder, loc, elementSIL, currentStorageAddr,
                                   StoreOwnershipQualifier::Init);
-    elementIndex++;
+    ++elementIndex;
+  }
+  if (arrayFinalizeFun) {
+    FunctionRefInst *arrayFinalizeRef =
+        builder.createFunctionRef(loc, arrayFinalizeFun);
+    arraySIL = builder.createApply(loc, arrayFinalizeRef, subMap,
+                                   ArrayRef<SILValue>(arraySIL));
   }
   return arraySIL;
 }

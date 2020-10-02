@@ -474,6 +474,10 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
       // FIXME: this is overly conservative. It should return true only of the
       // RC identity of the single operand matches Ptr.
       return true;
+    case SILInstructionKind::BeginCOWMutationInst:
+      // begin_cow_mutation takes the argument as owned and produces a new
+      // owned result.
+      return false;
     default:
       llvm_unreachable("Unexpected check-ref-count instruction.");
     }
@@ -1080,11 +1084,11 @@ swift::getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
     if (!TE || TE->getOperand() != BI)
       return Failed;
 
-    if (TE->getFieldNo() == 0 && !GuaranteedValue) {
+    if (TE->getFieldIndex() == 0 && !GuaranteedValue) {
       GuaranteedValue = TE;
       continue;
     }
-    if (TE->getFieldNo() == 1 && !Token) {
+    if (TE->getFieldIndex() == 1 && !Token) {
       Token = TE;
       continue;
     }

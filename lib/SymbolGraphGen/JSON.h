@@ -45,11 +45,19 @@ void serialize(const swift::GenericTypeParamType *Param,
                llvm::json::OStream &OS);
 
 
-/// Filter generic requirements that aren't relevant for documentation.
+/// Filter generic requirements on an extension that aren't relevant
+/// for documentation.
 void
 filterGenericRequirements(ArrayRef<Requirement> Requirements,
                           const NominalTypeDecl *Self,
                           SmallVectorImpl<Requirement> &FilteredRequirements);
+
+/// Filter generic requirements on an extension that aren't relevant
+/// for documentation.
+void
+filterGenericRequirements(const ExtensionDecl *Extension,
+                          SmallVectorImpl<Requirement> &FilteredRequirements);
+
 } // end namespace symbolgraphgen
 } // end namespace swift
 

@@ -63,7 +63,7 @@ func testQualifyingModulesSuggested() -> #^QUALIFYING_MODULE^# {
   let x = #^QUALIFYING_MODULE_2^#
   // QUALIFYING_MODULE: Begin completions
   // QUALIFYING_MODULE-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
-  // QUALIFYING_MODULE-DAG: Decl[Module]/None: Swift[#Module#]; name=Swift
+  // QUALIFYING_MODULE-DAG: Decl[Module]/None/IsSystem: Swift[#Module#]; name=Swift
   // QUALIFYING_MODULE-DAG: Decl[Module]/None: foo_swift_module[#Module#]; name=foo_swift_module
   // QUALIFYING_MODULE: End completions
 }
@@ -141,15 +141,15 @@ func testPostfixOperator1(x: Int) {
 
 struct Foo: Swift.Array.#^STDLIB_TYPE_QUALIFIED_NESTED^# {}
 // STDLIB_TYPE_QUALIFIED_NESTED: Begin completions
-// STDLIB_TYPE_QUALIFIED_NESTED: Decl[TypeAlias]/CurrNominal: Index[#Int#]; name=Index
-// STDLIB_TYPE_QUALIFIED_NESTED: Decl[TypeAlias]/CurrNominal: Element[#Element#]; name=Element
+// STDLIB_TYPE_QUALIFIED_NESTED: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
+// STDLIB_TYPE_QUALIFIED_NESTED: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#Element#]; name=Element
 // STDLIB_TYPE_QUALIFIED_NESTED: Keyword/None: Type[#Array.Type#]; name=Type
 // STDLIB_TYPE_QUALIFIED_NESTED: End completions
 
 struct Bar: Swift.#^STDLIB_TYPE_QUALIFIED^# {}
 // STDLIB_TYPE_QUALIFIED: Begin completions
 // STDLIB_TYPE_QUALIFIED-NOT: Decl[Module]
-// STDLIB_TYPE_QUALIFIED: Decl[Struct]/OtherModule[Swift]:    AnyCollection[#AnyCollection#]; name=AnyCollection
+// STDLIB_TYPE_QUALIFIED: Decl[Struct]/OtherModule[Swift]/IsSystem: AnyCollection[#AnyCollection#]; name=AnyCollection
 // STDLIB_TYPE_QUALIFIED-NOT: Decl[Module]
 // STDLIB_TYPE_QUALIFIED: End completions
 

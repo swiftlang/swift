@@ -8,7 +8,7 @@ The "Complete Generics" goal for Swift 3 has been fairly ill-defined thus far, w
 
 This message expands upon the notion of "completing generics". It is not a plan for Swift 3, nor an official core team communication, but it collects the results of numerous discussions among the core team and Swift developers, both of the compiler and the standard library. I hope to achieve several things:
 
-* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/master/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
+* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/main/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
 
 * **Establish some terminology** that the Swift developers have been using for these features, so our discussions can be more productive ("oh, you're proposing what we refer to as 'conditional conformances'; go look over at this thread").
 
@@ -694,9 +694,9 @@ foo(X())
 
 Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems--none of which is an acceptable result.
 
-### Conditional conformances via protocol extensions
+### Retroactive protocol refinement
 
-We often get requests to make a protocol conform to another protocol. This is, effectively, the expansion of the notion of "Conditional conformances" to protocol extensions. For example:
+We often get requests to make protocols retroactively refine other protocols. For example:
 
 ```Swift
 protocol P {
@@ -707,8 +707,8 @@ protocol Q {
   func bar()
 }
 
-extension Q : P { // every type that conforms to Q also conforms to P
-  func foo() {    // implement "foo" requirement in terms of "bar"
+extension Q : P { // Make every type that conforms to Q also conforms to P
+  func foo() {    // Implement `P.foo` requirement in terms of `Q.bar`
     bar()
   }
 }

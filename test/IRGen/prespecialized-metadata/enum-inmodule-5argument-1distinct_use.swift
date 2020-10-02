@@ -1,6 +1,6 @@
 // RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
@@ -86,54 +86,6 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, i8** %1) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK:   [[ERASED_BUFFER:%[0-9]+]] = bitcast i8** %1 to i8*
-// CHECK:   br label %[[TYPE_COMPARISON_1:[0-9]+]]
-// CHECK: [[TYPE_COMPARISON_1]]:
-// CHECK:   [[ERASED_TYPE_ADDRESS_1:%[0-9]+]] = getelementptr i8*, i8** %1, i64 0
-// CHECK:   [[ERASED_TYPE_1:%\".*\"]] = load i8*, i8** [[ERASED_TYPE_ADDRESS_1]]
-// CHECK:   [[EQUAL_TYPE_1_1:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_1]]
-// CHECK:   [[EQUAL_TYPES_1_1:%[0-9]+]] = and i1 true, [[EQUAL_TYPE_1_1]]
-// CHECK:   [[ERASED_TYPE_ADDRESS_2:%[0-9]+]] = getelementptr i8*, i8** %1, i64 1
-// CHECK:   [[ERASED_TYPE_2:%\".*\"]] = load i8*, i8** [[ERASED_TYPE_ADDRESS_2]]
-// CHECK:   [[EQUAL_TYPE_1_2:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_2]]
-// CHECK:   [[EQUAL_TYPES_1_2:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_1]], [[EQUAL_TYPE_1_2]]
-// CHECK:   [[ERASED_TYPE_ADDRESS_3:%[0-9]+]] = getelementptr i8*, i8** %1, i64 2
-// CHECK:   [[ERASED_TYPE_3:%\".*\"]] = load i8*, i8** [[ERASED_TYPE_ADDRESS_3]]
-// CHECK:   [[EQUAL_TYPE_1_3:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_3]]
-// CHECK:   [[EQUAL_TYPES_1_3:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_2]], [[EQUAL_TYPE_1_3]]
-// CHECK:   [[ERASED_TYPE_ADDRESS_4:%[0-9]+]] = getelementptr i8*, i8** %1, i64 3
-// CHECK:   [[ERASED_TYPE_4:%\".*\"]] = load i8*, i8** [[ERASED_TYPE_ADDRESS_4]]
-// CHECK:   [[EQUAL_TYPE_1_4:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_4]]
-// CHECK:   [[EQUAL_TYPES_1_4:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_3]], [[EQUAL_TYPE_1_4]]
-// CHECK:   [[ERASED_TYPE_ADDRESS_5:%[0-9]+]] = getelementptr i8*, i8** %1, i64 4
-// CHECK:   [[ERASED_TYPE_5:%\".*\"]] = load i8*, i8** [[ERASED_TYPE_ADDRESS_5]]
-// CHECK:   [[EQUAL_TYPE_1_5:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_5]]
-// CHECK:   [[EQUAL_TYPES_1_5:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_4]], [[EQUAL_TYPE_1_5]]
-// CHECK:   br i1 [[EQUAL_TYPES_1_5]], label %[[EXIT_PRESPECIALIZED_1:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
-// CHECK: [[EXIT_PRESPECIALIZED_1]]:
-// CHECK:   ret %swift.metadata_response { 
-// CHECK-SAME:     %swift.type* getelementptr inbounds (
-// CHECK-SAME:       %swift.full_type, 
-// CHECK-SAME:       %swift.full_type* bitcast (
-// CHECK-SAME:         <{ 
-// CHECK-SAME:           i8**, 
-// CHECK-SAME:           [[INT]], 
-// CHECK-SAME:           %swift.type_descriptor*, 
-// CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           [[INT]], 
-// CHECK-SAME:           i64 
-// CHECK-SAME:         }>* @"$s4main5ValueOyS5iGMf" 
-// CHECK-SAME:         to %swift.full_type*
-// CHECK-SAME:       ), 
-// CHECK-SAME:       i32 0, 
-// CHECK-SAME:       i32 1
-// CHECK-SAME:     ), 
-// CHECK-SAME:     [[INT]] 0 
-// CHECK-SAME:   }
-// CHECK: [[EXIT_NORMAL]]:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @swift_getGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 
 // CHECK-SAME:     i8* [[ERASED_BUFFER]], 

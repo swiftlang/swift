@@ -53,6 +53,7 @@ TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
+TYPE_ATTR(async)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -126,7 +127,7 @@ DECL_ATTR(available, Available,
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
   OnClass | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier |
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   2)
 DECL_ATTR(objc, ObjC,
   OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar |
@@ -244,7 +245,7 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   30)
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-  OnVar | OnClass | OnStruct |
+  OnVar | OnClass | OnStruct | OnProtocol |
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIStableToRemove,
   31)
@@ -494,7 +495,7 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   87)
 SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
-  OnNominalType |
+  OnNominalType | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   88)
 DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
@@ -559,6 +560,23 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   OnAbstractFunction | OnVar | OnSubscript |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
+
+SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
+  OnFunc | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  101)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
+  DeclModifier | OnClass | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  102)
+
+SIMPLE_DECL_ATTR(actorIndependent, ActorIndependent,
+  OnFunc | OnVar | OnSubscript | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  103)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

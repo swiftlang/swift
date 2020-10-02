@@ -179,15 +179,26 @@ class AbstractionPattern {
     /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
     /// error index.
     ObjCMethodType,
-    /// The uncurried imported type of a C++ method. OrigType is valid and is a
-    /// function type. CXXMethod is valid.
+    /// The uncurried imported type of a C++ non-operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CXXMethodType,
-    /// The curried imported type of a C++ method. OrigType is valid and is a
-    /// function type. CXXMethod is valid.
+    /// The curried imported type of a C++ non-operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CurriedCXXMethodType,
-    /// The partially-applied curried imported type of a C++ method. OrigType is
-    /// valid and is a function type. CXXMethod is valid.
+    /// The partially-applied curried imported type of a C++ non-operator
+    /// non-static member function. OrigType is valid and is a function type.
+    /// CXXMethod is valid.
     PartialCurriedCXXMethodType,
+    /// The uncurried imported type of a C++ operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
+    CXXOperatorMethodType,
+    /// The curried imported type of a C++ operator non-static member function.
+    /// OrigType is valid and is a function type. CXXMethod is valid.
+    CurriedCXXOperatorMethodType,
+    /// The partially-applied curried imported type of a C++ operator non-static
+    /// member function. OrigType is valid and is a function type. CXXMethod is
+    /// valid.
+    PartialCurriedCXXOperatorMethodType,
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is
     /// unspecified.
@@ -341,6 +352,9 @@ class AbstractionPattern {
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
 
     default:
@@ -465,6 +479,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
     case Kind::Invalid:
     case Kind::Opaque:
@@ -541,6 +558,10 @@ public:
   static AbstractionPattern
   getCurriedCXXMethod(CanType origType, const AbstractFunctionDecl *function);
 
+  static AbstractionPattern
+  getCurriedCXXOperatorMethod(CanType origType,
+                              const AbstractFunctionDecl *function);
+
   /// Return an abstraction pattern for the uncurried type of a C++ method.
   ///
   /// For example, if the original function is:
@@ -553,6 +574,15 @@ public:
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method, Kind::CXXMethodType);
+    return pattern;
+  }
+
+  static AbstractionPattern
+  getCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(nullptr, origType, method,
+                          Kind::CXXOperatorMethodType);
     return pattern;
   }
 
@@ -569,6 +599,16 @@ public:
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
                           Kind::CurriedCXXMethodType);
+    return pattern;
+  }
+
+  static AbstractionPattern
+  getCurriedCXXOperatorMethod(CanType origType,
+                              const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(nullptr, origType, method,
+                          Kind::CurriedCXXOperatorMethodType);
     return pattern;
   }
 
@@ -675,6 +715,17 @@ private:
     AbstractionPattern pattern;
     pattern.initCXXMethod(signature, origType, method,
                           Kind::PartialCurriedCXXMethodType);
+    return pattern;
+  }
+
+  static AbstractionPattern
+  getPartialCurriedCXXOperatorMethod(CanGenericSignature signature,
+                                     CanType origType,
+                                     const clang::CXXMethodDecl *method) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCXXMethod(signature, origType, method,
+                          Kind::PartialCurriedCXXOperatorMethodType);
     return pattern;
   }
 
@@ -813,6 +864,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
@@ -849,6 +903,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
       assert(signature || !type->hasTypeParameter());
@@ -886,6 +943,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
     }
     llvm_unreachable("bad kind");
@@ -923,7 +983,9 @@ public:
   /// If so, it is legal to call getCXXMethod().
   bool isCXXMethod() const {
     return (getKind() == Kind::CXXMethodType ||
-            getKind() == Kind::CurriedCXXMethodType);
+            getKind() == Kind::CurriedCXXMethodType ||
+            getKind() == Kind::CXXOperatorMethodType ||
+            getKind() == Kind::CurriedCXXOperatorMethodType);
   }
 
   const clang::CXXMethodDecl *getCXXMethod() const {
@@ -958,6 +1020,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
@@ -994,6 +1059,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
       return dyn_cast<TYPE>(getType());
@@ -1022,6 +1090,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       // We assume that the Clang type might provide additional structure.
@@ -1051,6 +1122,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
@@ -1078,6 +1152,9 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("pattern is not a tuple");      

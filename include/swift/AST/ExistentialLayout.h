@@ -20,7 +20,6 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   class ProtocolDecl;

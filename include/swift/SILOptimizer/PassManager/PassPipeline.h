@@ -26,7 +26,6 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PASSPIPELINE_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/Hashing.h"
 #include <vector>
@@ -88,7 +87,7 @@ public:
 
   void print(llvm::raw_ostream &os);
 
-  void startPipeline(StringRef Name = "");
+  void startPipeline(StringRef Name = "", bool isFunctionPassPipeline = false);
   using PipelineKindIterator = decltype(Kinds)::const_iterator;
   using PipelineKindRange = iterator_range<PipelineKindIterator>;
   iterator_range<PipelineKindIterator>
@@ -128,6 +127,7 @@ struct SILPassPipeline final {
   unsigned ID;
   StringRef Name;
   unsigned KindOffset;
+  bool isFunctionPassPipeline;
 
   friend bool operator==(const SILPassPipeline &lhs,
                          const SILPassPipeline &rhs) {
@@ -145,9 +145,11 @@ struct SILPassPipeline final {
   }
 };
 
-inline void SILPassPipelinePlan::startPipeline(StringRef Name) {
+inline void SILPassPipelinePlan::
+startPipeline(StringRef Name, bool isFunctionPassPipeline) {
   PipelineStages.push_back(SILPassPipeline{
-      unsigned(PipelineStages.size()), Name, unsigned(Kinds.size())});
+      unsigned(PipelineStages.size()), Name, unsigned(Kinds.size()),
+      isFunctionPassPipeline});
 }
 
 inline SILPassPipelinePlan::PipelineKindRange

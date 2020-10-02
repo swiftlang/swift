@@ -14,7 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../public/runtime/CompatibilityOverride.h"
+#include "CompatibilityOverride.h"
+#include "Overrides.h"
 
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
@@ -26,12 +27,13 @@ struct OverrideSection {
   uintptr_t version;
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include "../../public/runtime/CompatibilityOverride.def"
+#include "CompatibilityOverride.def"
 };
   
 OverrideSection Swift51Overrides
 __attribute__((used, section("__DATA,__swift51_hooks"))) = {
   .version = 0,
+  .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
 
 // Allow this library to get force-loaded by autolinking

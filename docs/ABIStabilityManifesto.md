@@ -44,7 +44,7 @@ As noted earlier, ABI stability is necessary, though not sufficient, for binary 
 
 ### Library Evolution
 
-Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/apple/swift/blob/master/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI. 
+Expressive and performance-focused languages which have binary interfaces tend to exhibit the [fragile binary interface problem](https://en.wikipedia.org/wiki/Fragile_binary_interface_problem), which makes it difficult for any library or component to change over time without requiring every user to recompile with new versions of that library. A major push in Swift currently is the plan for [Library Evolution](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst), which aims to grant flexibility for library authors to maintain backwards and forwards binary compatibility. Many implementation concerns therein could have an impact on ABI. 
 
 One of the goals of rolling out ABI stability is to remain flexible enough to accommodate library evolution changes without limiting the design space. Library evolution concerns will be addressed in each individual section, though a common refrain will be that the details are still undecided.
 
@@ -112,7 +112,7 @@ In practice, layout might be partially-known at compilation time. An example is 
 
 Library evolution introduces *resilient* layouts of public types by default and provides new annotations that freeze the layout for performance. A resilient layout avoids many of the pitfalls of the fragile binary problem by making the layout opaque. Resilient types have far more freedom to change and evolve without breaking binary compatibility: public data members can be rearranged, added, and even removed (by providing a computed getter/setter instead). The new annotations provide the ability to relinquish these freedoms by making stricter guarantees about their layout in order to be more efficiently compiled and accessed. 
 
-In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/apple/swift/blob/master/docs/LibraryEvolution.rst#resilience-domains) for more details. 
+In order to allow for cross-module optimizations for modules that are distributed together, there is the concept of a *resilience domain*. A resilience domain is a grouping of modules which are version-locked with each other and thus do not have binary compatibility across multiple version requirements with each other. See [Resilience Domains](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst#resilience-domains) for more details. 
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
@@ -213,7 +213,7 @@ ABI stability means nailing down type layout and making decisions about how to h
 
 For all of the areas discussed above, more aggressive layout improvements may be invented in the post-ABI stability future. For example, we may want to explore rearranging and packing nested type data members with outer type data members. Such improvements would have to be done in an ABI-additive fashion through deployment target and/or min-version checking. This may mean that the module file will need to track per-type ABI versioning information.
 
-A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/apple/swift/blob/master/docs/ABI/TypeLayout.rst).
+A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/apple/swift/blob/main/docs/ABI/TypeLayout.rst).
 
 
 ## <a name="metadata"></a>Type Metadata
@@ -230,7 +230,7 @@ Metadata has many historical artifacts in its representation that we want to cle
 
 Stabilizing the ABI means producing a precise technical specification for the fixed part of the metadata layout of all language constructs so that future compilers and tools can continue to read and write them. A prose description is not necessarily needed, though explanations are useful. We will also want to carve out extra space for areas where it is likely to be needed for future functionality [[SR-3731](https://bugs.swift.org/browse/SR-3731)].
 
-For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/apple/swift/blob/master/docs/ABI/TypeMetadata.rst).
+For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/apple/swift/blob/main/docs/ABI/TypeMetadata.rst).
 
 ### Generic Parameters
 
@@ -284,7 +284,7 @@ In addition to common metadata entries, function type metadata stores informatio
 
 Mangling is used to produce unique symbols. It applies to both external (public) symbols as well as internal or hidden symbols. Only the mangling scheme for external symbols is part of ABI.
 
-ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/apple/swift/blob/master/docs/ABI/Mangling.rst).
+ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/apple/swift/blob/main/docs/ABI/Mangling.rst).
 
 There are some corner cases currently in the mangling scheme that should be fixed before declaring ABI stability. We need to come up with a canonicalization of generic and protocol requirements to allow for order-agnostic mangling [[SR-3733](https://bugs.swift.org/browse/SR-3733)]. We also may decide to more carefully mangle variadicity of function parameters, etc [[SR-3734](https://bugs.swift.org/browse/SR-3734)]. Most often, though, mangling improvements focus on reducing symbol size.
 
@@ -310,7 +310,7 @@ For the purposes of this document, "standard calling convention" refers to the C
 
 Calling convention stability pertains to public interfaces. The Swift compiler is free to choose any convention for internal (intra-module) functions and calls.
 
-For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/apple/swift/blob/master/docs/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
+For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
 
 ### Register convention
 
@@ -337,13 +337,13 @@ Having the call context register be callee-saved is advantageous. It keeps the r
 
 Throwing functions communicate error values to their callers through the *error* register on some platforms. The error register holds a pointer to the error value if an error occurred, otherwise 0. The caller of a throwing function is expected to quickly check for 0 before continuing on with non-error code, otherwise branching to code to handle or propagate the error. Using a callee-saved register for the error register enables free conversion from non-throwing to throwing functions, which is required to honor the subtyping relationship.
 
-The specific registers used in these roles are documented in [another document on register usage](https://github.com/apple/swift/blob/master/docs/ABI/RegisterUsage.md).
+The specific registers used in these roles are documented in [another document on register usage](https://github.com/apple/swift/blob/main/docs/ABI/RegisterUsage.md).
 
 ### <a name="function-signature-lowering"></a>Function Signature Lowering
 
 Function signature lowering is the mapping of a function's source-language type, which includes formal parameters and results, all the way down to a physical convention, which dictates what values are stored in what registers and what values to pass on the stack.
 
-ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[SR-4349](https://bugs.swift.org/browse/SR-4349)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/master/docs/CallingConvention.rst#function-signature-lowering).
+ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[SR-4349](https://bugs.swift.org/browse/SR-4349)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst#function-signature-lowering).
 
 Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[SR-3946](https://bugs.swift.org/browse/SR-3946)].
 
@@ -392,7 +392,7 @@ The runtime is also responsible for lazily creating new type metadata entries at
 
 There are many potential future directions to open up the ABI and operate on less-opaque data directly, as well as techniques such as call-site caching. These are ABI-additive, and will be interesting to explore in the future.
 
-For a potentially-out-of-date listing of runtime symbols and some details, see the [Runtime docs](https://github.com/apple/swift/blob/master/docs/Runtime.md).
+For a potentially-out-of-date listing of runtime symbols and some details, see the [Runtime docs](https://github.com/apple/swift/blob/main/docs/Runtime.md).
 
 ## <a name="standard-library"></a>Standard Library
 
@@ -408,7 +408,7 @@ Any standard library API shipped post-ABI-stability must be supported into the f
 
 Inlineable code that calls internal functions makes those internal functions ABI, as the client code will be making external calls to them. Thus, many internal interfaces in the standard library will need to be locked down if called from inlineable code. Whether to mark code inlineable will have to carefully weigh performance requirements against keeping flexibility for future changes.
 
-This tradeoff between performance and flexibility also affects the ability to deploy bug fixes and performance improvements to users. Users that have inlined code from the standard library will not be able to get bug fixes and performance improvements in an OS update without performing a recompilation with the new library. For more information on this topic, see [Inlineable Functions](https://github.com/apple/swift/blob/master/docs/LibraryEvolution.rst#inlineable-functions).
+This tradeoff between performance and flexibility also affects the ability to deploy bug fixes and performance improvements to users. Users that have inlined code from the standard library will not be able to get bug fixes and performance improvements in an OS update without performing a recompilation with the new library. For more information on this topic, see [Inlineable Functions](https://github.com/apple/swift/blob/main/docs/LibraryEvolution.rst#inlineable-functions).
 
 ### Upcoming Changes
 

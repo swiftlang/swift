@@ -7,7 +7,6 @@ func test() {
 
 }
 
-// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0,sort.byname=0 -pos=7:1 %s -- %s > %t.orig.off
 // RUN: %FileCheck -check-prefix=NAME_SORTED %s < %t.orig
@@ -200,7 +199,6 @@ func test6() {
 // VOID_1_RAW-NEXT: key.typename: "Void",
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
-// VOID_1_RAW-NEXT: key.not_recommended: 1,
 
 
 

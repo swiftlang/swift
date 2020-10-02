@@ -17,7 +17,6 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
   class DominanceInfo;

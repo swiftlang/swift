@@ -14,7 +14,6 @@
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 
 #include <string>
 
@@ -77,7 +76,7 @@ struct SupplementaryOutputPaths {
   /// visibility" within a module, that becomes very important for any sort of
   /// incremental build. These files are consumed by the Swift driver to decide
   /// whether a source file needs to be recompiled during a build. See
-  /// docs/DependencyAnalysis.rst for more information.
+  /// docs/DependencyAnalysis.md for more information.
   ///
   /// \sa swift::emitReferenceDependencies
   /// \sa DependencyGraph
@@ -165,6 +164,9 @@ struct SupplementaryOutputPaths {
   /// This is a walk-around that linker directives cannot specify other install
   /// name per symbol, we should eventually remove this.
   std::string LdAddCFilePath;
+
+  /// The path to which we should emit module summary file.
+  std::string ModuleSummaryOutputPath;
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;

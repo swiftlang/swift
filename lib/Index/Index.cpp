@@ -41,16 +41,16 @@ static bool
 printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm::raw_ostream &OS) {
   switch (AK) {
   case AccessorKind::Get:
-    OS << "getter:" << ASD->getFullName();
+    OS << "getter:" << ASD->getName();
     return false;
   case AccessorKind::Set:
-    OS << "setter:" << ASD->getFullName();
+    OS << "setter:" << ASD->getName();
     return false;
   case AccessorKind::DidSet:
-    OS << "didSet:" << ASD->getFullName();
+    OS << "didSet:" << ASD->getName();
     return false;
   case AccessorKind::WillSet:
-    OS << "willSet:" << ASD->getFullName() ;
+    OS << "willSet:" << ASD->getName() ;
     return false;
 
   case AccessorKind::Address:
@@ -71,7 +71,7 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
     return printArtificialName(FD->getStorage(), FD->getAccessorKind(), OS);
   }
 
-  OS << D->getFullName();
+  OS << D->getName();
   return false;
 }
 
@@ -125,10 +125,10 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
-    ModuleDecl::ImportFilter ImportFilter;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    constexpr ModuleDecl::ImportFilter ImportFilter = {
+        ModuleDecl::ImportFilterKind::Exported,
+        ModuleDecl::ImportFilterKind::Default,
+        ModuleDecl::ImportFilterKind::ImplementationOnly};
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
@@ -343,13 +343,13 @@ private:
       if (customAttr->isImplicit())
         continue;
 
-      auto &Loc = customAttr->getTypeLoc();
       if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
         if (auto *CD = semanticInit->getCalledValue()) {
           if (!shouldIndex(CD, /*IsRef*/true))
             continue;
           IndexSymbol Info;
-          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+          const auto reprLoc = customAttr->getTypeRepr()->getLoc();
+          if (initIndexSymbol(CD, reprLoc, /*IsRef=*/true, Info))
             continue;
           Info.roles |= (unsigned)SymbolRole::Call;
           if (semanticInit->isImplicit())
@@ -381,7 +381,7 @@ private:
       while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
-      Labels = MemberwiseInit->getFullName().getArgumentNames();
+      Labels = MemberwiseInit->getName().getArgumentNames();
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
       LabelLocs = CallParent->getArgumentLabelLocs();
       Labels = CallParent->getArgumentLabels();
@@ -602,7 +602,7 @@ private:
   getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
       return std::make_tuple(0, 0, None);
-    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    auto lineAndColumn = SrcMgr.getPresumedLineAndColumnForLoc(Loc, BufferID);
     unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
     return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
@@ -720,7 +720,7 @@ bool IndexSwiftASTWalker::visitImports(
 
   llvm::SmallPtrSet<ModuleDecl *, 8> Reported;
   for (auto Import : Imports) {
-    ModuleDecl *Mod = Import.second;
+    ModuleDecl *Mod = Import.importedModule;
     bool NewReport = Reported.insert(Mod).second;
     if (!NewReport)
       continue;
@@ -777,11 +777,12 @@ bool IndexSwiftASTWalker::visitImports(
 }
 
 bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses) {
-  auto DC = dyn_cast<DeclContext>(D);
-  if (!DC)
+  const auto *const IDC = dyn_cast<IterableDeclContext>(D);
+  if (!IDC)
     return true;
 
-  for (auto *conf : DC->getLocalConformances()) {
+  const auto DC = IDC->getAsGenericContext();
+  for (auto *conf : IDC->getLocalConformances()) {
     if (conf->isInvalid())
       continue;
 
@@ -1598,14 +1599,14 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   }
 
   ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+  ImportFilter |= ModuleDecl::ImportFilterKind::Exported;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Default;
+  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
-    collectRecursiveModuleImports(*Import.second, Visited);
+    collectRecursiveModuleImports(*Import.importedModule, Visited);
   }
 }
 

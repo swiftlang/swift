@@ -39,6 +39,7 @@ function(_report_sdk prefix)
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS "  ${arch} triple: ${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
+    message(STATUS "  Module triple: ${SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE}")
   endforeach()
   if("${prefix}" STREQUAL "WINDOWS")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
@@ -84,6 +85,38 @@ function(_report_sdk prefix)
   message(STATUS "")
 endfunction()
 
+# Remove architectures not supported by the SDK from the given list.
+function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
+  execute_process(COMMAND
+      /usr/libexec/PlistBuddy -c "Print :SupportedTargets:${os}:Archs" ${sdk_path}/SDKSettings.plist
+    OUTPUT_VARIABLE sdk_supported_archs
+    RESULT_VARIABLE plist_error)
+
+  if (NOT plist_error EQUAL 0)
+    message(STATUS "${os} SDK at ${sdk_path} does not publish its supported architectures")
+    return()
+  endif()
+
+  set(architectures)
+  foreach(arch ${${architectures_var}})
+    if(sdk_supported_archs MATCHES "${arch}\n")
+      list(APPEND architectures ${arch})
+    elseif(arch MATCHES "^armv7(s)?$" AND os STREQUAL "iphoneos")
+      # 32-bit iOS is not listed explicitly in SDK settings.
+      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
+      list(APPEND architectures ${arch})
+    elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
+      # 32-bit iOS simulatoris not listed explicitly in SDK settings.
+      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
+      list(APPEND architectures ${arch})
+    else()
+      message(STATUS "${name} SDK at ${sdk_path} does not support architecture ${arch}")
+    endif()
+  endforeach()
+
+  set("${architectures_var}" ${architectures} PARENT_SCOPE)
+endfunction()
+
 # Configure an SDK
 #
 # Usage:
@@ -112,12 +145,15 @@ endfunction()
 #   SWIFT_SDK_${prefix}_LIB_SUBDIR          Library subdir for this SDK
 #   SWIFT_SDK_${prefix}_VERSION_MIN_NAME    Version min name for this SDK
 #   SWIFT_SDK_${prefix}_TRIPLE_NAME         Triple name for this SDK
+#   SWIFT_SDK_${prefix}_OBJECT_FORMAT       The object file format (e.g. MACHO)
+#   SWIFT_SDK_${prefix}_USE_ISYSROOT        Whether to use -isysroot
 #   SWIFT_SDK_${prefix}_ARCHITECTURES       Architectures (as a list)
 #   SWIFT_SDK_${prefix}_IS_SIMULATOR        Whether this is a simulator target.
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE Triple name
+#   SWIFT_SDK_${prefix}_ARCH_${ARCH}_MODULE Module triple name for this SDK
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    version_min_name triple_name architectures)
+    version_min_name triple_name module_name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -153,6 +189,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT TRUE)
 
   set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
   if(SWIFT_DARWIN_SUPPORTED_ARCHS)
@@ -161,6 +198,9 @@ macro(configure_sdk_darwin
       "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
       SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
   endif()
+
+  # Remove any architectures not supported by the SDK.
+  remove_sdk_unsupported_archs(${name} ${xcrun_name} ${SWIFT_SDK_${prefix}_PATH} SWIFT_SDK_${prefix}_ARCHITECTURES)
 
   list_intersect(
     "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
@@ -190,6 +230,9 @@ macro(configure_sdk_darwin
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
         "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
 
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE
+        "${arch}-apple-${module_name}")
+
     # If this is a simulator target, append -simulator.
     if (SWIFT_SDK_${prefix}_IS_SIMULATOR)
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
@@ -198,12 +241,8 @@ macro(configure_sdk_darwin
 
     if(SWIFT_ENABLE_MACCATALYST AND "${prefix}" STREQUAL "OSX")
       # For macCatalyst append the '-macabi' environment to the target triple.
-      set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_TRIPLE
-        "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}-macabi")
-
-      # macCatalyst triple
-      set(SWIFT_MACCATALYST_TRIPLE
-        "x86_64-apple-ios${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}-macabi")
+      set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_TRIPLE "${arch}-apple-ios-macabi")
+      set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_MODULE "${arch}-apple-ios-macabi")
 
       # For macCatalyst, the xcrun_name is "macosx" since it uses that sdk.
       # Hard code the library subdirectory to "maccatalyst" in that case.
@@ -229,9 +268,12 @@ macro(configure_sdk_unix name architectures)
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+  elseif("${prefix}" STREQUAL "WASI")
+    set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "WASM")
   else()
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
   endif()
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
@@ -256,6 +298,8 @@ macro(configure_sdk_unix name architectures)
           message(SEND_ERROR "Couldn't find SWIFT_SDK_ANDROID_ARCH_armv7_PATH")
         endif()
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "armv7-none-linux-androideabi")
+        # The Android ABI isn't part of the module triple.
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_MODULE "armv7-none-linux-android")
       elseif("${arch}" STREQUAL "aarch64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "aarch64-linux-android")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "aarch64")
@@ -354,9 +398,22 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unsupported arch for Haiku: ${arch}")
         endif()
         set(SWIFT_SDK_HAIKU_ARCH_x86_64_TRIPLE "x86_64-unknown-haiku")
+      elseif("${prefix}" STREQUAL "WASI")
+        if(NOT arch STREQUAL wasm32)
+          message(FATAL_ERROR "unsupported arch for WebAssembly: ${arch}")
+        endif()
+        set(SWIFT_SDK_WASI_ARCH_wasm32_PATH "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot")
+        set(SWIFT_SDK_WASI_ARCH_wasm32_TRIPLE "wasm32-unknown-wasi")
+        set(SWIFT_SDK_WASI_ARCH_wasm32_LIBC_INCLUDE_DIRECTORY "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot/include")
+        set(SWIFT_SDK_WASI_ARCH_wasm32_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_WASI_SDK_PATH}/share/wasi-sysroot/include")
       else()
         message(FATAL_ERROR "unknown Unix OS: ${prefix}")
       endif()
+    endif()
+
+    # If the module triple wasn't set explicitly, it's the same as the triple.
+    if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE)
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
     endif()
   endforeach()
 
@@ -379,6 +436,7 @@ macro(configure_sdk_windows name environment architectures)
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
   foreach(arch ${architectures})
     if(arch STREQUAL armv7)
@@ -388,6 +446,9 @@ macro(configure_sdk_windows name environment architectures)
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
           "${arch}-unknown-windows-${environment}")
     endif()
+
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
+
     # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
     # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
     # instead.

@@ -18,15 +18,31 @@
 #ifndef SWIFT_SEMA_DERIVEDCONFORMANCES_H
 #define SWIFT_SEMA_DERIVEDCONFORMANCES_H
 
+#include "swift/Basic/LLVM.h"
 #include <utility>
 
 namespace swift {
-class Decl;
-class DeclRefExpr;
+class AbstractFunctionDecl;
 class AccessorDecl;
+class AssociatedTypeDecl;
+class ASTContext;
+struct ASTNode;
+class Decl;
+class DeclContext;
+class DeclRefExpr;
+class EnumDecl;
+class EnumElementDecl;
+class Expr;
+class GuardStmt;
+class Identifier;
 class NominalTypeDecl;
+class ParamDecl;
+class Pattern;
 class PatternBindingDecl;
+class ProtocolDecl;
+class StructDecl;
 class Type;
+class TypeDecl;
 class ValueDecl;
 class VarDecl;
 
@@ -49,6 +65,14 @@ public:
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
+
+  /// Returns the VarDecl of each stored property in the given struct whose type
+  /// does not conform to a protocol.
+  /// \p theStruct The struct whose stored properties should be checked.
+  /// \p protocol The protocol being requested.
+  /// \return The VarDecl of each stored property whose type does not conform.
+  static SmallVector<VarDecl *, 3> storedPropertiesNotConformingToProtocol(
+      DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol);
 
   /// True if the type can implicitly derive a conformance for the given
   /// protocol.
@@ -80,6 +104,30 @@ public:
                                           NominalTypeDecl *nominal,
                                           ProtocolDecl *protocol);
 
+  /// Diagnose any members which do not conform to the protocol for which
+  /// we were trying to synthesize the conformance to.
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void diagnoseAnyNonConformingMemberTypes(DeclContext *DC,
+                                                  NominalTypeDecl *nominal,
+                                                  ProtocolDecl *protocol);
+
+  /// Diagnose the declaration for which we were trying to synthesize
+  /// the conformance for, if the synthesis is not supported for that
+  /// declaration.
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void diagnoseIfSynthesisUnsupportedForDecl(NominalTypeDecl *nominal,
+                                                    ProtocolDecl *protocol);
+
   /// Determine the derivable requirement that would satisfy the given
   /// requirement, if there is one.
   ///
@@ -107,10 +155,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
-  /// Determine if a Differentiable requirement can be derived for a type.
+  /// Determine if a Differentiable requirement can be derived for a nominal
+  /// type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC);
+  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC,
+                                      ValueDecl *requirement);
 
   /// Derive a Differentiable requirement for a nominal type.
   ///
@@ -120,7 +170,8 @@ public:
   /// Derive a Differentiable type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+  std::pair<Type, TypeDecl *>
+  deriveDifferentiable(AssociatedTypeDecl *assocType);
 
   /// Derive a CaseIterable requirement for an enum if it has no associated
   /// values for any of its cases.
@@ -165,6 +216,14 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveComparable(ValueDecl *requirement);
+
+  /// Diagnose problems, if any, preventing automatic derivation of Comparable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedComparableDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
 
   /// Determine if an Equatable requirement can be derived for a type.
   ///
@@ -233,6 +292,14 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
+
+  /// Whether we can derive the given Actor requirement in the given context.
+  static bool canDeriveActor(NominalTypeDecl *nominal, DeclContext *dc);
+
+  /// Derive an Actor requirement for an actor class.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveActor(ValueDecl *requirement);
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

@@ -74,10 +74,10 @@ getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
   case FunctionTypeRepresentation::Block: {
     // C and block function parameters and results are implicitly
     // bridged to a foreign type.
-    auto bridgedType =
-      SGF.SGM.Types.getBridgedFunctionType(pattern, fnType,
-                                           fnType->getExtInfo(),
-                                           Bridgeability::Full);
+    auto silRep =
+        SILFunctionTypeRepresentation(fnType->getExtInfo().getRepresentation());
+    auto bridgedType = SGF.SGM.Types.getBridgedFunctionType(
+        pattern, fnType, Bridgeability::Full, silRep);
     pattern.rewriteType(CanGenericSignature(), bridgedType);
     return pattern;
   }
@@ -131,8 +131,11 @@ getDynamicMethodLoweredType(SILModule &M,
                             SILDeclRef constant,
                             CanAnyFunctionType substMemberTy) {
   assert(constant.isForeign);
-  auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
-             .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
+  auto objcFormalTy = substMemberTy.withExtInfo(
+      substMemberTy->getExtInfo()
+          .intoBuilder()
+          .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod)
+          .build());
   return SILType::getPrimitiveObjectType(
       M.Types.getUncachedSILFunctionTypeForConstant(
           TypeExpansionContext::minimal(), constant, objcFormalTy));
@@ -315,7 +318,8 @@ private:
   CanFunctionType SubstFormalInterfaceType;
 
   /// The substitutions applied to OrigFormalInterfaceType to produce
-  /// SubstFormalInterfaceType.
+  /// SubstFormalInterfaceType, substituted into the current type expansion
+  /// context.
   SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
@@ -351,14 +355,14 @@ private:
   /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
-         SubstitutionMap subs, SILLocation l,
+         SubstitutionMap subs, SubstitutionMap formalSubs, SILLocation l,
          bool callDynamicallyReplaceableImpl = false)
       : kind(callDynamicallyReplaceableImpl
                  ? Kind::StandaloneFunctionDynamicallyReplaceableImpl
                  : Kind::StandaloneFunction),
         Constant(standaloneFunction), OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
-            getSubstFormalInterfaceType(substFormalType, subs)),
+            getSubstFormalInterfaceType(substFormalType, formalSubs)),
         Substitutions(subs), Loc(l) {}
 
   /// Constructor called by all for* factory methods except forDirect and
@@ -387,7 +391,9 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l,
+        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()),
+        subs,
+        l,
         callPreviousDynamicReplaceableImpl);
   }
 
@@ -1005,7 +1011,7 @@ public:
       // @objc dynamic initializers are statically dispatched (we're
       // calling the allocating entry point, which is a thunk that
       // does the dynamic dispatch for us).
-      if (ctor->isObjCDynamic())
+      if (ctor->shouldUseObjCDispatch())
         return false;
 
       // Required constructors are statically dispatched when the 'self'
@@ -1243,7 +1249,7 @@ public:
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
-        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+        CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
@@ -1340,8 +1346,8 @@ public:
           && loweredResultTy.getASTType()->hasDynamicSelfType()) {
         assert(selfMetaTy);
         selfValue = SGF.emitManagedRValueWithCleanup(
-          SGF.B.createUncheckedBitCast(loc, selfValue.forward(SGF),
-                                       loweredResultTy));
+            SGF.B.createUncheckedReinterpretCast(loc, selfValue.forward(SGF),
+                                                 loweredResultTy));
       } else {
         selfValue = SGF.emitManagedRValueWithCleanup(
             SGF.B.createUpcast(loc, selfValue.forward(SGF), loweredResultTy));
@@ -1614,13 +1620,7 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
-  bool isASCII = true;
-  for (unsigned char c : Str) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
+  bool isASCII = SGF.getASTContext().isASCIIString(Str);
   StringLiteralInst::Encoding instEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
@@ -1628,11 +1628,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
     Length = Str.size();
     break;
 
-  case StringLiteralExpr::UTF16: {
-    instEncoding = StringLiteralInst::Encoding::UTF16;
-    Length = unicode::getUTF16Length(Str);
-    break;
-  }
   case StringLiteralExpr::OneUnicodeScalar: {
     SILType Int32Ty = SILType::getBuiltinIntegerType(32, SGF.getASTContext());
     SILValue UnicodeScalarValue =
@@ -1674,11 +1669,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
   ArrayRef<ManagedValue> Elts;
   ArrayRef<AnyFunctionType::Param> TypeElts;
   switch (instEncoding) {
-  case StringLiteralInst::Encoding::UTF16:
-    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
-    TypeElts = llvm::makeArrayRef(TypeEltsArray).slice(0, 2);
-    break;
-
   case StringLiteralInst::Encoding::UTF8:
     Elts = EltsArray;
     TypeElts = TypeEltsArray;
@@ -1722,7 +1712,8 @@ static void emitRawApply(SILGenFunction &SGF,
 #ifndef NDEBUG
   assert(indirectResultAddrs.size() == substFnConv.getNumIndirectSILResults());
   unsigned resultIdx = 0;
-  for (auto indResultTy : substFnConv.getIndirectSILResultTypes()) {
+  for (auto indResultTy :
+       substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
     assert(indResultTy == indirectResultAddrs[resultIdx++]->getType());
   }
 #endif
@@ -1736,7 +1727,8 @@ static void emitRawApply(SILGenFunction &SGF,
     auto argValue = (inputParams[i].isConsumed() ? args[i].forward(SGF)
                                                  : args[i].getValue());
 #ifndef NDEBUG
-    auto inputTy = substFnConv.getSILType(inputParams[i]);
+    auto inputTy =
+        substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
     if (argValue->getType() != inputTy) {
       auto &out = llvm::errs();
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
@@ -1752,7 +1744,7 @@ static void emitRawApply(SILGenFunction &SGF,
     argValues.push_back(argValue);
   }
 
-  auto resultType = substFnConv.getSILResultType();
+  auto resultType = substFnConv.getSILResultType(SGF.getTypeExpansionContext());
 
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
@@ -3337,11 +3329,12 @@ struct ParamLowering {
   unsigned ClaimedForeignSelf = -1;
   SILFunctionTypeRepresentation Rep;
   SILFunctionConventions fnConv;
+  TypeExpansionContext typeExpansionContext;
 
   ParamLowering(CanSILFunctionType fnType, SILGenFunction &SGF)
       : Params(fnType->getUnsubstitutedType(SGF.SGM.M)->getParameters()),
-        Rep(fnType->getRepresentation()),
-        fnConv(fnType, SGF.SGM.M) {}
+        Rep(fnType->getRepresentation()), fnConv(fnType, SGF.SGM.M),
+        typeExpansionContext(SGF.getTypeExpansionContext()) {}
 
   ClaimedParamsRef
   claimParams(AbstractionPattern origFormalType,
@@ -3364,7 +3357,7 @@ struct ParamLowering {
     }
 
     if (foreignError)
-      count++;
+      ++count;
 
     if (foreignSelf.isImportAsMember()) {
       // Claim only the self parameter.
@@ -3399,8 +3392,8 @@ struct ParamLowering {
 #ifndef NDEBUG
     assert(Params.size() >= captures.size() && "more captures than params?!");
     for (unsigned i = 0; i < captures.size(); ++i) {
-      assert(fnConv.getSILType(Params[i + firstCapture]) ==
-                 captures[i].getType() &&
+      assert(fnConv.getSILType(Params[i + firstCapture],
+                               typeExpansionContext) == captures[i].getType() &&
              "capture doesn't match param type");
     }
 #endif
@@ -3821,7 +3814,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
-    payload = ArgumentSource(element, std::move(arg));
+    payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();
     origFormalType = origFormalType.getFunctionResultType();
   } else {
@@ -3860,7 +3853,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     auto emitter = specializedEmitter.getEarlyEmitter();
 
     assert(uncurriedSites.size() == 1);
-    assert(!formalType->getExtInfo().throws());
+    assert(!formalType->getExtInfo().isThrowing());
     SILLocation uncurriedLoc = uncurriedSites[0].Loc;
 
     // We should be able to enforce that these arguments are
@@ -3932,9 +3925,10 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     rawArgs.push_back(maybePlusOne.forward(SGF));
   }
 
-  SILValue rawResult =
-      SGF.B.createBuiltin(loc, builtinName, substConv.getSILResultType(),
-                          callee.getSubstitutions(), rawArgs);
+  SILValue rawResult = SGF.B.createBuiltin(
+      loc, builtinName,
+      substConv.getSILResultType(SGF.getTypeExpansionContext()),
+      callee.getSubstitutions(), rawArgs);
 
   if (argScope.hasValue())
     std::move(argScope)->pop();
@@ -4213,7 +4207,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // Pop the argument scope.
   argScope.pop();
 
-  if (substFnType->isNoReturnFunction(SGM.M))
+  if (substFnType->isNoReturnFunction(SGM.M, getTypeExpansionContext()))
     loc.markAutoGenerated();
 
   // Explode the direct results.
@@ -4221,8 +4215,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   SmallVector<ManagedValue, 4> directResults;
   auto addManagedDirectResult = [&](SILValue result,
                                     const SILResultInfo &resultInfo) {
-    auto &resultTL =
-      getTypeLowering(resultInfo.getReturnValueType(SGM.M, substFnType));
+    auto &resultTL = getTypeLowering(resultInfo.getReturnValueType(
+        SGM.M, substFnType, getTypeExpansionContext()));
 
     switch (resultInfo.getConvention()) {
     case ResultConvention::Indirect:
@@ -4320,7 +4314,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                               ArrayRef<SILValue> args) {
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
-  SILType resultType = fnConv.getSILResultType();
+  SILType resultType = fnConv.getSILResultType(getTypeExpansionContext());
 
   if (!silFnType->hasErrorResult()) {
     return B.createApply(loc, fn, subs, args);
@@ -4333,8 +4327,9 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-    SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(),
-                                                ValueOwnershipKind::Owned);
+    SILValue error = errorBB->createPhiArgument(
+        fnConv.getSILErrorType(getTypeExpansionContext()),
+        ValueOwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
     B.createThrow(loc, error);
@@ -4390,11 +4385,11 @@ void SILGenFunction::emitYield(SILLocation loc,
     ->getUnsubstitutedType(SGM.M);
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
-    substYieldTys.push_back({
-      F.mapTypeIntoContext(origYield.getArgumentType(SGM.M, fnType))
-       ->getCanonicalType(),
-      origYield.getConvention()
-    });
+    substYieldTys.push_back(
+        {F.mapTypeIntoContext(origYield.getArgumentType(
+                                  SGM.M, fnType, getTypeExpansionContext()))
+             ->getCanonicalType(),
+         origYield.getConvention()});
   }
 
   ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
@@ -4611,11 +4606,11 @@ StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   return getSourceManager().getDisplayNameForLoc(loc);
 }
 
-std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
+std::string SILGenFunction::getMagicFileIDString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
-  auto result = SGM.MagicFileStringsByFilePath.find(path);
-  if (result != SGM.MagicFileStringsByFilePath.end())
+  auto result = SGM.FileIDsByFilePath.find(path);
+  if (result != SGM.FileIDsByFilePath.end())
     return std::get<0>(result->second);
 
   return path.str();
@@ -4645,8 +4640,8 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
     // Determine the self metatype type.
     CanSILFunctionType substFnType = initConstant.SILFnType->substGenericArgs(
         SGM.M, subs, getTypeExpansionContext());
-    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter(),
-                                         substFnType);
+    SILType selfParamMetaTy =
+        getSILType(substFnType->getSelfParameter(), substFnType);
 
     if (overriddenSelfType) {
       // If the 'self' type has been overridden, form a metatype to the
@@ -4747,8 +4742,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
     CanSILFunctionType substFnType =
         declRefConstant.SILFnType->substGenericArgs(SGM.M, subs,
                                                     getTypeExpansionContext());
-    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter(),
-                                         substFnType);
+    SILType selfParamMetaTy =
+        getSILType(substFnType->getSelfParameter(), substFnType);
     selfMetaTy = selfParamMetaTy;
   }
 
@@ -4849,8 +4844,9 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
-    case MagicIdentifierLiteralExpr::File: {
-      std::string value = loc.isValid() ? getMagicFileString(loc) : "";
+    case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+    case MagicIdentifierLiteralExpr::FileID: {
+      std::string value = loc.isValid() ? getMagicFileIDString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
@@ -4858,6 +4854,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       break;
     }
 
+    case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
     case MagicIdentifierLiteralExpr::FilePath: {
       StringRef value = loc.isValid() ? getMagicFilePathString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
@@ -4882,8 +4879,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       unsigned Value = 0;
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
-                    ? ctx.SourceMgr.getLineAndColumn(Loc).first
-                    : ctx.SourceMgr.getLineAndColumn(Loc).second;
+                    ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
+                    : ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
       }
 
       auto silTy = SILType::getBuiltinIntegerLiteralType(ctx);
@@ -4961,6 +4958,31 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
+}
+
+ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
+                                                      ManagedValue array) {
+  auto &Ctx = getASTContext();
+  FuncDecl *finalize = Ctx.getFinalizeUninitializedArray();
+  
+  // The _finalizeUninitializedArray function only needs to be called if the
+  // library contains it.
+  // The Array implementation in the stdlib <= 5.3 does not use SIL COW
+  // support yet and therefore does not provide the _finalizeUninitializedArray
+  // intrinsic function.
+  if (!finalize)
+    return array;
+
+  SILValue arrayVal = array.forward(*this);
+  CanType arrayTy = arrayVal->getType().getASTType();
+
+  // Invoke the intrinsic.
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
+                              ManagedValue::forUnmanaged(arrayVal),
+                              SGFContext());
+  return std::move(result).getScalarValue();
 }
 
 namespace {
@@ -5412,7 +5434,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // T
   return emission.apply(c);
@@ -5454,8 +5476,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     }
   }
   assert(values.isValid());
-  emission.addCallSite(loc, std::move(values),
-                       accessType->throws());
+  emission.addCallSite(loc, std::move(values), accessType->isThrowing());
   // ()
   emission.apply();
 }
@@ -5489,7 +5510,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5551,7 +5572,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->throws());
+                       accessType->isThrowing());
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

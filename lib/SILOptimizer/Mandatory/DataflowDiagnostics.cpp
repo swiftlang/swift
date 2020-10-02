@@ -73,8 +73,9 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
       }
     }
   }
-  auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
-                                        : diag::missing_return;
+  auto diagID = F->isNoReturnFunction(F->getTypeExpansionContext())
+                    ? diag::missing_never_call
+                    : diag::missing_return;
   diagnose(Context,
            L.getEndSourceLoc(),
            diagID, ResTy,

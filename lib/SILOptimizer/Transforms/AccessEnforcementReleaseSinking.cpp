@@ -138,6 +138,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TypePtrAuthDiscriminator:
     case BuiltinValueKind::GlobalStringTablePointer:
+    case BuiltinValueKind::COWBufferForReading:
+    case BuiltinValueKind::IntInstrprofIncrement:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

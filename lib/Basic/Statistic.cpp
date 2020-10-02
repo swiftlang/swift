@@ -14,11 +14,8 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/Timer.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
@@ -148,9 +145,8 @@ auxName(StringRef ModuleName,
 }
 
 class UnifiedStatsReporter::RecursionSafeTimers {
-
   struct RecursionSafeTimer {
-    llvm::Optional<SharedTimer> Timer;
+    llvm::Optional<llvm::NamedRegionTimer> Timer;
     size_t RecursionDepth;
   };
 
@@ -161,9 +157,9 @@ public:
   void beginTimer(StringRef Name) {
     RecursionSafeTimer &T = Timers[Name];
     if (T.RecursionDepth == 0) {
-      T.Timer.emplace(Name);
+      T.Timer.emplace(Name, Name, "swift", "Swift compilation");
     }
-    T.RecursionDepth++;
+    ++T.RecursionDepth;
   }
 
   void endTimer(StringRef Name) {
@@ -171,7 +167,7 @@ public:
     assert(I != Timers.end());
     RecursionSafeTimer &T = I->getValue();
     assert(T.RecursionDepth != 0);
-    T.RecursionDepth--;
+    --T.RecursionDepth;
     if (T.RecursionDepth == 0) {
       T.Timer.reset();
     }
@@ -356,7 +352,6 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
   path::append(ProfileDirname, makeProfileDirName(ProgramName, AuxName));
   EnableStatistics(/*PrintOnExit=*/false);
-  SharedTimer::enableCompilationTimers();
   if (TraceEvents || ProfileEvents || ProfileEntities)
     LastTracedFrontendCounters.emplace();
   if (TraceEvents)
@@ -652,10 +647,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   if (currentProcessExitStatus != EXIT_SUCCESS) {
     if (FrontendCounters) {
       auto &C = getFrontendCounters();
-      C.NumProcessFailures++;
+      ++C.NumProcessFailures;
     } else {
       auto &C = getDriverCounters();
-      C.NumProcessFailures++;
+      ++C.NumProcessFailures;
     }
   }
 

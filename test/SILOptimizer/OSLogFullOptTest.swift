@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -swift-version 5 -O -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 //
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate
@@ -126,6 +126,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: bitcast %TSo7NSArrayC* %0 to i8*
     // CHECK-NEXT: tail call i8* @llvm.objc.retain
     // CHECK-NEXT: [[NSARRAY_ARG:%.+]] = tail call i8* @llvm.objc.retain
+    // CHECK: tail call %swift.refcounted* @swift_retain
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
 
@@ -136,6 +137,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
 
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
+    // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:

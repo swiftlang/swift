@@ -25,5 +25,5 @@ let _: ctypes.Color?
 
 // Error: "bits" should not be a valid name in this scope.
 #if !NO_ERRORS
-let _: bits.DWORD = 0 // expected-error {{use of undeclared type 'bits'}}
+let _: bits.DWORD = 0 // expected-error {{cannot find type 'bits' in scope}}
 #endif

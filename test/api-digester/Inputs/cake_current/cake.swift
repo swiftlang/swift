@@ -40,6 +40,11 @@ public struct C6 {}
 
 public enum IceKind {}
 
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public enum FutureKind {
+  case FineToAdd
+}
+
 public protocol P1 {}
 
 public protocol P2 {}
@@ -245,3 +250,5 @@ open class AddingNewDesignatedInit {
 public extension Float {
   func floatHigher() {}
 }
+
+infix operator <==> : AssignmentPrecedence

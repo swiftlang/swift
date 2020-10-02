@@ -18,23 +18,28 @@
 #include "IRGenModule.h"
 #include "SwiftTargetInfo.h"
 
+#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/Coverage/CoverageMappingWriter.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
+
+// This selects the coverage mapping format defined when `InstrProfData.inc`
+// is textually included.
+#define COVMAP_V3
 
 using namespace swift;
 using namespace irgen;
 
-using llvm::coverage::CovMapVersion;
 using llvm::coverage::CounterMappingRegion;
+using llvm::coverage::CovMapVersion;
 
-static std::string getCoverageSection(IRGenModule &IGM) {
-  return llvm::getInstrProfSectionName(llvm::IPSK_covmap,
-                                       IGM.Triple.getObjectFormat());
+static std::string getInstrProfSection(IRGenModule &IGM,
+                                       llvm::InstrProfSectKind SK) {
+  return llvm::getInstrProfSectionName(SK, IGM.Triple.getObjectFormat());
 }
 
 void IRGenModule::emitCoverageMapping() {
@@ -60,45 +65,42 @@ void IRGenModule::emitCoverageMapping() {
     if (std::find(Files.begin(), Files.end(), M->getFile()) == Files.end())
       Files.push_back(M->getFile());
 
+  auto remapper = getOptions().CoveragePrefixMap;
   // Awkwardly munge absolute filenames into a vector of StringRefs.
-  // TODO: This is heinous - the same thing is happening in clang, but the API
-  // really needs to be cleaned up for both.
   llvm::SmallVector<std::string, 8> FilenameStrs;
   llvm::SmallVector<StringRef, 8> FilenameRefs;
   for (StringRef Name : Files) {
     llvm::SmallString<256> Path(Name);
     llvm::sys::fs::make_absolute(Path);
-    FilenameStrs.push_back(std::string(Path.begin(), Path.end()));
+    FilenameStrs.push_back(remapper.remapPath(Path));
     FilenameRefs.push_back(FilenameStrs.back());
   }
 
-  // Encode the filenames first.
-  std::string FilenamesAndCoverageMappings;
-  llvm::raw_string_ostream OS(FilenamesAndCoverageMappings);
-  llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
-  size_t FilenamesSize = OS.str().size();
-  size_t CurrentSize, PrevSize = FilenamesSize;
-
-  // Now we need to build up the list of function records.
+  // Encode the filenames.
+  std::string Filenames;
   llvm::LLVMContext &Ctx = getLLVMContext();
+  {
+    llvm::raw_string_ostream OS(Filenames);
+    llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
+  }
+  auto *FilenamesVal =
+      llvm::ConstantDataArray::getString(Ctx, Filenames, false);
+  const int64_t FilenamesRef = llvm::IndexedInstrProf::ComputeHash(Filenames);
+  const size_t FilenamesSize = Filenames.size();
+
+  // Emit the function records.
   auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
-
-  llvm::Type *FunctionRecordTypes[] = {
-#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
-#include "llvm/ProfileData/InstrProfData.inc"
-#undef COVMAP_FUNC_RECORD
-  };
-
-  auto FunctionRecordTy =
-      llvm::StructType::get(Ctx, llvm::makeArrayRef(FunctionRecordTypes),
-                            /*isPacked=*/true);
-
-  std::vector<llvm::Constant *> FunctionRecords;
-  std::vector<CounterMappingRegion> Regions;
   for (const auto &M : Mappings) {
+    StringRef NameValue = M->getPGOFuncName();
+    assert(!NameValue.empty() && "Expected a named record");
+    uint64_t FuncHash = M->getHash();
+
+    const uint64_t NameHash = llvm::IndexedInstrProf::ComputeHash(NameValue);
+    std::string FuncRecordName = "__covrec_" + llvm::utohexstr(NameHash);
+
     unsigned FileID =
         std::find(Files.begin(), Files.end(), M->getFile()) - Files.begin();
-    Regions.clear();
+    std::vector<CounterMappingRegion> Regions;
     for (const auto &MR : M->getMappedRegions())
       Regions.emplace_back(CounterMappingRegion::makeRegion(
           MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
@@ -107,73 +109,70 @@ void IRGenModule::emitCoverageMapping() {
     ArrayRef<unsigned> VirtualFileMapping(FileID);
     llvm::coverage::CoverageMappingWriter W(VirtualFileMapping,
                                             M->getExpressions(), Regions);
-    W.write(OS);
+    std::string CoverageMapping;
+    {
+      llvm::raw_string_ostream OS(CoverageMapping);
+      W.write(OS);
+    }
 
-    CurrentSize = OS.str().size();
-    unsigned MappingLen = CurrentSize - PrevSize;
-    StringRef CoverageMapping(OS.str().c_str() + PrevSize, MappingLen);
-
-    StringRef NameValue = M->getPGOFuncName();
-    assert(!NameValue.empty() && "Expected a named record");
-    uint64_t FuncHash = M->getHash();
-
-    // Create a record for this function.
-    llvm::Constant *FunctionRecordVals[] = {
-#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) Init,
+#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
+    llvm::Type *FunctionRecordTypes[] = {
 #include "llvm/ProfileData/InstrProfData.inc"
-#undef COVMAP_FUNC_RECORD
     };
+    auto *FunctionRecordTy =
+        llvm::StructType::get(Ctx, makeArrayRef(FunctionRecordTypes),
+                              /*isPacked=*/true);
 
-    FunctionRecords.push_back(llvm::ConstantStruct::get(
-        FunctionRecordTy, makeArrayRef(FunctionRecordVals)));
-    PrevSize = CurrentSize;
+    // Create the function record constant.
+#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) Init,
+    llvm::Constant *FunctionRecordVals[] = {
+#include "llvm/ProfileData/InstrProfData.inc"
+    };
+    auto *FuncRecordConstant = llvm::ConstantStruct::get(
+        FunctionRecordTy, makeArrayRef(FunctionRecordVals));
+
+    // Create the function record global.
+    auto *FuncRecord = new llvm::GlobalVariable(
+        *getModule(), FunctionRecordTy, /*isConstant=*/true,
+        llvm::GlobalValue::LinkOnceODRLinkage, FuncRecordConstant,
+        FuncRecordName);
+    FuncRecord->setVisibility(llvm::GlobalValue::HiddenVisibility);
+    FuncRecord->setSection(getInstrProfSection(*this, llvm::IPSK_covfun));
+    FuncRecord->setAlignment(llvm::Align(8));
+    if (Triple.supportsCOMDAT())
+      FuncRecord->setComdat(getModule()->getOrInsertComdat(FuncRecordName));
+
+    // Make sure the data doesn't get deleted.
+    addUsedGlobal(FuncRecord);
   }
-  size_t CoverageMappingSize = PrevSize - FilenamesSize;
-
-  // Append extra zeroes if necessary to ensure that the size of the filenames
-  // and coverage mappings is a multiple of 8.
-  if (size_t Rem = OS.str().size() % 8) {
-    CoverageMappingSize += 8 - Rem;
-    for (size_t I = 0, S = 8 - Rem; I < S; ++I)
-      OS << '\0';
-  }
-  auto *FilenamesAndMappingsVal =
-      llvm::ConstantDataArray::getString(Ctx, OS.str(), false);
-
-  auto *RecordsTy =
-      llvm::ArrayType::get(FunctionRecordTy, FunctionRecords.size());
-  auto *RecordsVal = llvm::ConstantArray::get(RecordsTy, FunctionRecords);
 
   // Create the coverage data header.
+  const unsigned NRecords = 0;
+  const unsigned CoverageMappingSize = 0;
   llvm::Type *CovDataHeaderTypes[] = {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) LLVMType,
 #include "llvm/ProfileData/InstrProfData.inc"
-#undef COVMAP_HEADER
   };
-  auto *CovDataHeaderTy =
+  auto CovDataHeaderTy =
       llvm::StructType::get(Ctx, makeArrayRef(CovDataHeaderTypes));
   llvm::Constant *CovDataHeaderVals[] = {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) Init,
 #include "llvm/ProfileData/InstrProfData.inc"
-#undef COVMAP_HEADER
   };
-  auto *CovDataHeaderVal = llvm::ConstantStruct::get(
+  auto CovDataHeaderVal = llvm::ConstantStruct::get(
       CovDataHeaderTy, makeArrayRef(CovDataHeaderVals));
 
-  // Combine the header, function records, and mappings together.
-  llvm::Type *CovDataTypes[] = {CovDataHeaderTy, RecordsTy,
-                                FilenamesAndMappingsVal->getType()};
-  auto *CovDataTy = llvm::StructType::get(Ctx, makeArrayRef(CovDataTypes));
-  llvm::Constant *TUDataVals[] = {CovDataHeaderVal, RecordsVal,
-                                  FilenamesAndMappingsVal};
-  auto *CovDataVal =
+  // Create the coverage data record
+  llvm::Type *CovDataTypes[] = {CovDataHeaderTy, FilenamesVal->getType()};
+  auto CovDataTy = llvm::StructType::get(Ctx, makeArrayRef(CovDataTypes));
+  llvm::Constant *TUDataVals[] = {CovDataHeaderVal, FilenamesVal};
+  auto CovDataVal =
       llvm::ConstantStruct::get(CovDataTy, makeArrayRef(TUDataVals));
-
   auto CovData = new llvm::GlobalVariable(
-      *getModule(), CovDataTy, true, llvm::GlobalValue::InternalLinkage,
+      *getModule(), CovDataTy, true, llvm::GlobalValue::PrivateLinkage,
       CovDataVal, llvm::getCoverageMappingVarName());
-  std::string CovSection = getCoverageSection(*this);
-  CovData->setSection(CovSection);
-  CovData->setAlignment(llvm::MaybeAlign(8));
+
+  CovData->setSection(getInstrProfSection(*this, llvm::IPSK_covmap));
+  CovData->setAlignment(llvm::Align(8));
   addUsedGlobal(CovData);
 }

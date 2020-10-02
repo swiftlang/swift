@@ -14,7 +14,6 @@
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
@@ -49,6 +48,7 @@ using namespace swift;
   int fmtResult = asprintf(&str, "<%s %p depth = %u>", clsName,
                                                        (void*)self,
                                                        self->depth);
+  (void)fmtResult;
   assert(fmtResult != -1 && "unable to format description of null");
   id result = swift_stdlib_NSStringFromUTF8(str, strlen(str));
   free(str);

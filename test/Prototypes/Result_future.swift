@@ -12,7 +12,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -prespecialize-generic-metadata -target %module-target-future)
 // REQUIRES: executable_test
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios

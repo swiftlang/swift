@@ -20,11 +20,11 @@ namespace swift {
 
   /// Interface between the Parse and ParseSIL libraries, to avoid circular
   /// dependencies.
-  class SILParserTUStateBase {
+  class SILParserStateBase {
     virtual void anchor();
   protected:
-    SILParserTUStateBase() = default;
-    virtual ~SILParserTUStateBase() = default;
+    SILParserStateBase() = default;
+    virtual ~SILParserStateBase() = default;
   public:
     virtual bool parseDeclSIL(Parser &P) = 0;
     virtual bool parseDeclSILStage(Parser &P) = 0;

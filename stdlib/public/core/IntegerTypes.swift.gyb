@@ -14,10 +14,10 @@
 # Utility code for later in this template
 #
 
+from __future__ import division
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 
-from string import maketrans, capitalize
 from itertools import chain
 
 # Number of bits in the Builtin.Word type
@@ -1152,7 +1152,9 @@ public struct ${Self}
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
 %     if FloatType == 'Float16':
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
 %     end
   @_transparent
   public init(_ source: ${FloatType}) {
@@ -1182,7 +1184,9 @@ public struct ${Self}
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
 %     if FloatType == 'Float16':
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
 %     end
   @_transparent
   public init?(exactly source: ${FloatType}) {
@@ -1191,9 +1195,11 @@ public struct ${Self}
     // undefined if it overflows.
 %     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+%     else:
+    guard source.isFinite else {
+%     end
       return nil
     }
-%     end
     guard source == source.rounded(.towardZero) else {
       return nil
     }
@@ -1658,7 +1664,7 @@ extension ${Self}: Hashable {
     return Hasher._hash(
       seed: seed,
       bytes: UInt64(truncatingIfNeeded: ${U}${Self}(_value)),
-      count: ${bits / 8})
+      count: ${bits // 8})
     % end
   }
 }

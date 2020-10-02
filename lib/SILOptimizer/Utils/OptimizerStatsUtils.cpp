@@ -141,7 +141,7 @@ public:
       unsigned index = getIndexForKind(kind);
       if (!ShouldComputeInstCounts[index]) {
         ShouldComputeInstCounts[index] = true;
-        NumInstCounts++;
+        ++NumInstCounts;
       }
     }
   }

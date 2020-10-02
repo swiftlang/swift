@@ -43,10 +43,23 @@ function(get_test_dependencies SDK result_var_name)
 
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
-      swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
-      sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
-      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
-      swift-api-digester swift-refactor swift-demangle-yamldump)
+      lldb-moduleimport-test
+      sil-func-extractor
+      sil-llvm-gen
+      sil-nm
+      sil-opt
+      sil-passpipeline-dumper
+      swift-frontend
+      swift-api-digester
+      swift-demangle
+      swift-demangle-yamldump
+      swift-dependency-tool
+      swift-ide-test
+      swift-llvm-opt
+      swift-refactor
+      swift-reflection-dump
+      swift-remoteast-test
+      swift-syntax-test)
 
     if(SWIFT_BUILD_SYNTAXPARSERLIB)
       list(APPEND deps_binaries swift-syntax-parser-test)
@@ -89,6 +102,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
@@ -101,15 +115,10 @@ function(get_test_dependencies SDK result_var_name)
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
   endif()
 
-  if(XCODE)
-    # Xcode's build paths have a configuration variable in them,
-    # so CMake can't match them at compile time. Just use target names.
-    list(APPEND deps ${deps_binaries})
-  else()
-    foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
-    endforeach()
-  endif()
+  # Just use target names for dependency generation. This works for both Xcode
+  # and non-Xcode build systems. In the case of Xcode, its build paths have a
+  # configuration variable in them, so CMake can't match them at compile time.
+  list(APPEND deps ${deps_binaries})
 
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()
@@ -120,26 +129,26 @@ set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 # instead of by the path, which is good for CI. In this mode lit also updates
 # the mtime on the failed tests, which makes them run first on the
 # consecutive execution, which makes local builds fail faster.
-set(SWIFT_TEST_EXTRA_ARGS "--incremental")
+set(SWIFT_LIT_ARGS "--incremental" CACHE STRING "Arguments to pass to lit")
 
 if(NOT SWIFT_INCLUDE_TOOLS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_TEST_EXTRA_ARGS
+    list(APPEND SWIFT_LIT_ARGS
          "--param" "test_resource_dir=${SWIFTLIB_DIR}")
   endif()
 endif()
 
 option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
 if (SWIFT_TEST_USE_LEAKS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS "--param" "leaks-all")
+  list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
@@ -155,6 +164,7 @@ normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -218,7 +228,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(validation_test_bin_dir
         "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-    if(LibXml2_FOUND)
+    if(LLVM_ENABLE_LIBXML2)
       set(SWIFT_HAVE_LIBXML2 TRUE)
     else()
       set(SWIFT_HAVE_LIBXML2 FALSE)
@@ -332,7 +342,7 @@ _Block_release(void) { }\n")
         COMMENT "Uploading stdlib")
 
     foreach(test_mode ${TEST_MODES})
-      set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
+      set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
       separate_arguments(LIT_ARGS)
 
       if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
@@ -341,7 +351,7 @@ _Block_release(void) { }\n")
       endif()
 
       execute_process(COMMAND
-          $<TARGET_FILE:Python2::Interpreter> "-c" "import psutil"
+          $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
           TIMEOUT 1 # second
           ERROR_QUIET)
@@ -353,6 +363,10 @@ _Block_release(void) { }\n")
 
       if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
         list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+        list(APPEND LIT_ARGS "--param" "concurrency")
       endif()
 
       foreach(test_subset ${TEST_SUBSETS})
@@ -401,7 +415,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -420,7 +434,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"

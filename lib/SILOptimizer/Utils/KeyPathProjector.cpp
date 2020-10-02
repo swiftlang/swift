@@ -656,14 +656,19 @@ private:
   }
 };
 
+KeyPathInst *
+KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
+  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
+    keyPath = upCast->getOperand();
+  // TODO: Look through other conversions, copies, etc.?
+  return dyn_cast<KeyPathInst>(keyPath);
+}
+
 std::unique_ptr<KeyPathProjector>
 KeyPathProjector::create(SILValue keyPath, SILValue root,
                          SILLocation loc, SILBuilder &builder) {
-  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
-    keyPath = upCast->getOperand();
-  
   // Is it a keypath instruction at all?
-  auto *kpInst = dyn_cast<KeyPathInst>(keyPath);
+  auto *kpInst = getLiteralKeyPath(keyPath);
   if (!kpInst || !kpInst->hasPattern())
     return nullptr;
   

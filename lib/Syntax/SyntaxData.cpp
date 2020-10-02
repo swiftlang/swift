@@ -57,7 +57,7 @@ void SyntaxData::dump() const { dump(llvm::errs()); }
 RC<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
     if (hasParent()) {
-      for (size_t I = N - 1; ; I--) {
+      for (size_t I = N - 1; ; --I) {
         if (auto C = getParent()->getChild(I)) {
           if (C->getRaw()->isPresent() && C->getFirstToken())
             return C;
@@ -73,7 +73,7 @@ RC<SyntaxData> SyntaxData::getPreviousNode() const {
 RC<SyntaxData> SyntaxData::getNextNode() const {
   if (hasParent()) {
     for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
-         I != N; I++) {
+         I != N; ++I) {
       if (auto C = getParent()->getChild(I)) {
         if (C->getRaw()->isPresent() && C->getFirstToken())
           return C;

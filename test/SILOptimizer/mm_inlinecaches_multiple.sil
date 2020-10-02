@@ -53,6 +53,6 @@ sil_vtable Foo {
 }
 
 sil_vtable Bar {
-  #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
-  #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+  #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_ [inherited]
+  #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_ [inherited]
 }

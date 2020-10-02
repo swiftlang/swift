@@ -29,7 +29,7 @@ extension Unicode {
   /// You can also create Unicode scalar values directly from their numeric
   /// representation.
   ///
-  ///     let airplane = Unicode.Scalar(9992)
+  ///     let airplane = Unicode.Scalar(9992)!
   ///     print(airplane)
   ///     // Prints "✈︎"
   @frozen
@@ -171,7 +171,7 @@ extension Unicode.Scalar :
   /// Scalar values representing characters that are normally unprintable or
   /// that otherwise require escaping are escaped with a backslash.
   ///
-  ///     let tab = Unicode.Scalar(9)
+  ///     let tab = Unicode.Scalar(9)!
   ///     print(tab)
   ///     // Prints " "
   ///     print(tab.escaped(asASCII: false))
@@ -182,7 +182,7 @@ extension Unicode.Scalar :
   /// value; otherwise, non-ASCII characters are represented using their
   /// typical string value.
   ///
-  ///     let bap = Unicode.Scalar(48165)
+  ///     let bap = Unicode.Scalar(48165)!
   ///     print(bap.escaped(asASCII: false))
   ///     // Prints "밥"
   ///     print(bap.escaped(asASCII: true))
@@ -323,7 +323,7 @@ extension Unicode.Scalar {
   /// with a value of an emoji character:
   ///
   ///     let codepoint = 127881
-  ///     let emoji = Unicode.Scalar(codepoint)
+  ///     let emoji = Unicode.Scalar(codepoint)!
   ///     print(emoji)
   ///     // Prints "🎉"
   ///

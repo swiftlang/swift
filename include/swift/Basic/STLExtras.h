@@ -69,49 +69,6 @@ struct function_traits<R (T::*)(Args...) const> {
   using argument_types = std::tuple<Args...>;
 };
 
-} // end namespace swift
-
-namespace llvm {
-
-/// @{
-
-/// An STL-style algorithm similar to std::for_each that applies a second
-/// functor between every pair of elements.
-///
-/// This provides the control flow logic to, for example, print a
-/// comma-separated list:
-/// \code
-///   interleave(names.begin(), names.end(),
-///              [&](StringRef name) { OS << name; },
-///              [&] { OS << ", "; });
-/// \endcode
-template <typename ForwardIterator, typename UnaryFunctor,
-          typename NullaryFunctor>
-inline void interleave(ForwardIterator begin, ForwardIterator end,
-                       UnaryFunctor each_fn,
-                       NullaryFunctor between_fn) {
-  if (begin == end)
-    return;
-  each_fn(*begin);
-  ++begin;
-  for (; begin != end; ++begin) {
-    between_fn();
-    each_fn(*begin);
-  }
-}
-
-template <typename Container, typename UnaryFunctor, typename NullaryFunctor>
-inline void interleave(const Container &c, UnaryFunctor each_fn,
-                       NullaryFunctor between_fn) {
-  interleave(c.begin(), c.end(), each_fn, between_fn);
-}
-
-/// @}
-
-} // end namespace llvm
-
-namespace swift {
-
 /// @{
 
 /// The equivalent of std::for_each, but for two lists at once.
@@ -260,6 +217,47 @@ inline Iterator prev_or_begin(Iterator it, Iterator begin) {
 
 /// @}
 
+/// An iterator that walks a linked list of objects until it reaches
+/// a null pointer.
+template <class T, T* (&getNext)(T*)>
+class LinkedListIterator {
+  T *Pointer;
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = T *;
+  using reference = T *;
+  using pointer = void;
+
+  /// Returns an iterator range starting from the given pointer and
+  /// running until it reaches a null pointer.
+  static llvm::iterator_range<LinkedListIterator> rangeBeginning(T *pointer) {
+    return {pointer, nullptr};
+  }
+
+  constexpr LinkedListIterator(T *pointer) : Pointer(pointer) {}
+
+  T *operator*() const {
+    assert(Pointer && "dereferencing a null iterator");
+    return Pointer;
+  }
+
+  LinkedListIterator &operator++() {
+    Pointer = getNext(Pointer);
+    return *this;
+  }
+  LinkedListIterator operator++(int) {
+    auto copy = *this;
+    Pointer = getNext(Pointer);
+    return copy;
+  }
+
+  friend bool operator==(LinkedListIterator lhs, LinkedListIterator rhs) {
+    return lhs.Pointer == rhs.Pointer;
+  }
+  friend bool operator!=(LinkedListIterator lhs, LinkedListIterator rhs) {
+    return lhs.Pointer != rhs.Pointer;
+  }
+};
 
 /// An iterator that transforms the result of an underlying bidirectional
 /// iterator with a given operation.
@@ -526,19 +524,18 @@ makeOptionalTransformRange(Range range, OptionalTransform op) {
 /// the result in an optional to indicate success or failure.
 template<typename Subclass>
 struct DowncastAsOptional {
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))> {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
     return None;
   }
 
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(const Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))>
-  {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 

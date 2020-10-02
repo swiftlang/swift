@@ -63,6 +63,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILCloner.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -173,7 +174,7 @@ public:
         if (!canHoistArrayPropsInst(ArrayPropsInst))
           return false;
 
-        LoopInstCount++;
+        ++LoopInstCount;
         FoundHoistable = true;
       }
     }
@@ -518,13 +519,13 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.Initialize(V->getType());
-    SSAUp.AddAvailableValue(OrigBB, V);
+    SSAUp.initialize(V->getType());
+    SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
-    SSAUp.AddAvailableValue(getOpBasicBlock(OrigBB), NewVal);
+    SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
     for (auto U : UseList) {
       Operand *Use = U;
-      SSAUp.RewriteUse(*Use);
+      SSAUp.rewriteUse(*Use);
     }
   }
 

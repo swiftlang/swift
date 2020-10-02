@@ -136,6 +136,20 @@ namespace swift {
     out << "}";
   }
 
+  template<typename T>
+  void simple_display(llvm::raw_ostream &out,
+                      const std::vector<T> &vec) {
+    out << "{";
+    bool first = true;
+    for (const T &value : vec) {
+      if (first) first = false;
+      else out << ", ";
+
+      simple_display(out, value);
+    }
+    out << "}";
+  }
+
   template<typename T, typename U>
   void simple_display(llvm::raw_ostream &out,
                       const llvm::PointerUnion<T, U> &ptrUnion) {

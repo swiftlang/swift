@@ -47,5 +47,5 @@ func test_ospeed(_ a: A) -> Int {
 }
 
 
-// CHECK-IR: attributes [[SIZE_ATTR]] = { minsize "
+// CHECK-IR: attributes [[SIZE_ATTR]] = { minsize optsize "
 // CHECK-IR: attributes [[NOSIZE_ATTR]] = { "

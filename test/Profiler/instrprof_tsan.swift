@@ -1,3 +1,4 @@
+// REQUIRES: tsan_runtime
 // RUN: %target-swift-frontend -emit-ir -profile-generate -sanitize=thread %s | %FileCheck %s
 
 // TSan is only supported on 64 bit.

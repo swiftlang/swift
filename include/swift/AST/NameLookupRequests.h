@@ -51,8 +51,8 @@ enum class ResolutionKind;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
-       llvm::raw_ostream &out,
-       const llvm::PointerUnion<TypeDecl *, ExtensionDecl *> &value);
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
 
 /// Describes a set of type declarations that are "direct" referenced by
 /// a particular type in the AST.
@@ -76,12 +76,13 @@ using DirectlyReferencedTypeDecls = llvm::TinyPtrVector<TypeDecl *>;
 ///
 /// The inherited declaration of \c D at index 0 is the class declaration C.
 /// The inherited declaration of \c D at index 1 is the typealias Alias.
-class InheritedDeclsReferencedRequest :
-  public SimpleRequest<InheritedDeclsReferencedRequest,
-                       DirectlyReferencedTypeDecls(
-                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *>,
-                         unsigned),
-                       RequestFlags::Uncached> // FIXME: Cache these
+class InheritedDeclsReferencedRequest
+    : public SimpleRequest<
+          InheritedDeclsReferencedRequest,
+          DirectlyReferencedTypeDecls(
+              llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>,
+              unsigned),
+          RequestFlags::Uncached> // FIXME: Cache these
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -90,10 +91,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  DirectlyReferencedTypeDecls evaluate(
-      Evaluator &evaluator,
-      llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-      unsigned index) const;
+  DirectlyReferencedTypeDecls
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+           unsigned index) const;
 
 public:
   // Caching
@@ -159,6 +160,10 @@ private:
   evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
   // Caching
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
@@ -168,8 +173,7 @@ public:
 class InheritedProtocolsRequest
     : public SimpleRequest<
           InheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySink |
-              RequestFlags::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -188,8 +192,7 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
@@ -239,7 +242,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            NominalTypeDecl *result) const;
 };
 
@@ -250,11 +253,11 @@ struct SelfBounds {
 
 /// Request the nominal types that occur as the right-hand side of "Self: Foo"
 /// constraints in the "where" clause of a protocol extension.
-class SelfBoundsFromWhereClauseRequest :
-    public SimpleRequest<SelfBoundsFromWhereClauseRequest,
-                         SelfBounds(llvm::PointerUnion<TypeDecl *,
-                                                       ExtensionDecl *>),
-                         RequestFlags::Uncached> {
+class SelfBoundsFromWhereClauseRequest
+    : public SimpleRequest<SelfBoundsFromWhereClauseRequest,
+                           SelfBounds(llvm::PointerUnion<
+                                      const TypeDecl *, const ExtensionDecl *>),
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -262,10 +265,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SelfBounds evaluate(Evaluator &evaluator,
-                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *>) const;
+  SelfBounds
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *>) const;
 };
-
 
 /// Request all type aliases and nominal types that appear in the "where"
 /// clause of an extension.
@@ -308,8 +311,7 @@ public:
 /// Finds or synthesizes a destructor for the given class.
 class GetDestructorRequest
     : public SimpleRequest<GetDestructorRequest, DestructorDecl *(ClassDecl *),
-                           RequestFlags::SeparatelyCached |
-                               RequestFlags::DependencySource> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -325,10 +327,6 @@ public:
   bool isCached() const { return true; }
   Optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 class GenericParamListRequest :
@@ -417,7 +415,7 @@ SourceLoc extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc);
 class UnqualifiedLookupRequest
     : public SimpleRequest<UnqualifiedLookupRequest,
                            LookupResult(UnqualifiedLookupDescriptor),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                                RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -431,8 +429,7 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
 
@@ -444,7 +441,7 @@ class LookupInModuleRequest
                            QualifiedLookupResult(
                                const DeclContext *, DeclName, NLKind,
                                namelookup::ResolutionKind, const DeclContext *),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -456,6 +453,11 @@ private:
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
            NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext) const;
+
+public:
+  // Incremental dependencies
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           QualifiedLookupResult l) const;
 };
 
 /// Perform \c AnyObject lookup for a given member.
@@ -477,7 +479,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult l) const;
 };
 
@@ -486,7 +488,7 @@ class ModuleQualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  ModuleDecl *, DeclNameRef,
                                                  NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -502,8 +504,7 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
 
@@ -512,7 +513,7 @@ class QualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  SmallVector<NominalTypeDecl *, 4>,
                                                  DeclNameRef, NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -525,10 +526,6 @@ private:
            SmallVector<NominalTypeDecl *, 4> decls,
            DeclNameRef name,
            NLOptions opts) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// The input type for a direct lookup request.
@@ -580,7 +577,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            TinyPtrVector<ValueDecl *> result) const;
 };
 
@@ -589,14 +586,10 @@ public:
   using Storage = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
   Storage fileOrModule;
   Identifier name;
-  bool isCascading;
-  SourceLoc diagLoc;
 
 private:
-  OperatorLookupDescriptor(Storage fileOrModule, Identifier name,
-                           bool isCascading, SourceLoc diagLoc)
-      : fileOrModule(fileOrModule), name(name), isCascading(isCascading),
-        diagLoc(diagLoc) {}
+  OperatorLookupDescriptor(Storage fileOrModule, Identifier name)
+      : fileOrModule(fileOrModule), name(name) {}
 
 public:
   /// Retrieves the files to perform lookup in.
@@ -608,14 +601,20 @@ public:
     return fileOrModule.dyn_cast<ModuleDecl *>();
   }
 
+  /// Retrieve the file or module for the lookup, as a DeclContext.
+  DeclContext *getDC() const {
+    if (auto *module = getModule())
+      return module;
+    return fileOrModule.get<FileUnit *>();
+  }
+
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.fileOrModule, desc.name, desc.isCascading);
+    return llvm::hash_combine(desc.fileOrModule, desc.name);
   }
 
   friend bool operator==(const OperatorLookupDescriptor &lhs,
                          const OperatorLookupDescriptor &rhs) {
-    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name &&
-           lhs.isCascading == rhs.isCascading;
+    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name;
   }
 
   friend bool operator!=(const OperatorLookupDescriptor &lhs,
@@ -623,16 +622,15 @@ public:
     return !(lhs == rhs);
   }
 
-  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name,
-                                          bool isCascading, SourceLoc diagLoc) {
-    return OperatorLookupDescriptor(file, name, isCascading, diagLoc);
+  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name) {
+    return OperatorLookupDescriptor(file, name);
   }
 
-  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name,
-                                            bool isCascading,
-                                            SourceLoc diagLoc) {
-    return OperatorLookupDescriptor(mod, name, isCascading, diagLoc);
+  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name) {
+    return OperatorLookupDescriptor(mod, name);
   }
+
+  static OperatorLookupDescriptor forDC(const DeclContext *DC, Identifier name);
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -640,47 +638,14 @@ void simple_display(llvm::raw_ostream &out,
 
 SourceLoc extractNearestSourceLoc(const OperatorLookupDescriptor &desc);
 
-template <typename OperatorType>
-class LookupOperatorRequest
-    : public SimpleRequest<LookupOperatorRequest<OperatorType>,
-                           OperatorType *(OperatorLookupDescriptor),
-                           RequestFlags::Cached|RequestFlags::DependencySink> {
-  using SimpleRequest<LookupOperatorRequest<OperatorType>,
-                      OperatorType *(OperatorLookupDescriptor),
-                      RequestFlags::Cached |
-                          RequestFlags::DependencySink>::SimpleRequest;
-
-private:
-  friend SimpleRequest<LookupOperatorRequest<OperatorType>,
-                       OperatorType *(OperatorLookupDescriptor),
-                       RequestFlags::Cached|RequestFlags::DependencySink>;
-
-  // Evaluation.
-  OperatorType *evaluate(Evaluator &evaluator,
-                         OperatorLookupDescriptor desc) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-
-public:
-  // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
-                           OperatorType *o) const;
-};
-
-using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
-using LookupInfixOperatorRequest = LookupOperatorRequest<InfixOperatorDecl>;
-using LookupPostfixOperatorRequest = LookupOperatorRequest<PostfixOperatorDecl>;
-using LookupPrecedenceGroupRequest = LookupOperatorRequest<PrecedenceGroupDecl>;
-
 /// Looks up an operator in a given file or module without looking through
 /// imports.
 class DirectOperatorLookupRequest
     : public SimpleRequest<DirectOperatorLookupRequest,
                            TinyPtrVector<OperatorDecl *>(
                                OperatorLookupDescriptor, OperatorFixity),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -690,6 +655,11 @@ private:
   TinyPtrVector<OperatorDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor,
            OperatorFixity fixity) const;
+
+public:
+  // Incremental dependencies.
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           TinyPtrVector<OperatorDecl *> ops) const;
 };
 
 /// Looks up an precedencegroup in a given file or module without looking
@@ -698,7 +668,8 @@ class DirectPrecedenceGroupLookupRequest
     : public SimpleRequest<DirectPrecedenceGroupLookupRequest,
                            TinyPtrVector<PrecedenceGroupDecl *>(
                                OperatorLookupDescriptor),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -707,6 +678,11 @@ private:
 
   TinyPtrVector<PrecedenceGroupDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+
+public:
+  // Incremental dependencies.
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           TinyPtrVector<PrecedenceGroupDecl *> groups) const;
 };
 
 class LookupConformanceDescriptor final {
@@ -755,8 +731,86 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceRef result) const;
+};
+
+/// Look up an 'infix operator' decl by name.
+class LookupInfixOperatorRequest
+    : public SimpleRequest<LookupInfixOperatorRequest,
+                           TinyPtrVector<InfixOperatorDecl *>(
+                               OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TinyPtrVector<InfixOperatorDecl *>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'prefix operator' decl by name.
+class LookupPrefixOperatorRequest
+    : public SimpleRequest<LookupPrefixOperatorRequest,
+                           PrefixOperatorDecl *(OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  PrefixOperatorDecl *evaluate(Evaluator &evaluator,
+                               OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'postfix operator' decl by name.
+class LookupPostfixOperatorRequest
+    : public SimpleRequest<LookupPostfixOperatorRequest,
+                           PostfixOperatorDecl *(OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  PostfixOperatorDecl *evaluate(Evaluator &evaluator,
+                                OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up a precedencegroup decl by name.
+class LookupPrecedenceGroupRequest
+    : public SimpleRequest<LookupPrecedenceGroupRequest,
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TinyPtrVector<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

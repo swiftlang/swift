@@ -71,7 +71,8 @@ class C1 {
 class C2: C1, P {
     override func run(a: A) {}
     // expected-error@-1 {{circular reference}}
-    // expected-note@-2 2{{through reference here}}
+    // expected-note@-2 {{while resolving type 'A'}}
+    // expected-note@-3 2{{through reference here}}
 }
 
 // Another crash to the above
@@ -81,7 +82,7 @@ open class G1<A> {
 
 class C3: G1<A>, P {
     // expected-error@-1 {{type 'C3' does not conform to protocol 'P'}}
-    // expected-error@-2 {{use of undeclared type 'A'}}
+    // expected-error@-2 {{cannot find type 'A' in scope}}
     override func run(a: A) {}
     // expected-error@-1 {{method does not override any method from its superclass}}
 }
@@ -98,7 +99,8 @@ class C4 {
 
 class D4 : C4, P1 { // expected-note 2 {{through reference here}}
   required init(x: X) { // expected-error {{circular reference}}
-    // expected-note@-1 2{{through reference here}}
+    // expected-note@-1 {{while resolving type 'X'}}
+    // expected-note@-2 2{{through reference here}}
     super.init(x: x)
   }
 }

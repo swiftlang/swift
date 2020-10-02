@@ -43,10 +43,6 @@ struct PropertyWrapperTypeInfo {
     HasInitialValueInit
   } wrappedValueInit = NoWrappedValueInit;
 
-  /// Whether the init(wrappedValue:), if it exists, has the wrappedValue
-  /// argument as an escaping autoclosure.
-  bool isWrappedValueInitUsingEscapingAutoClosure = false;
-
   /// The initializer that will be called to default-initialize a
   /// value with an attached property wrapper.
   enum {
@@ -149,20 +145,9 @@ struct PropertyWrapperBackingPropertyInfo {
   /// The backing property.
   VarDecl *backingVar = nullptr;
 
-  /// The storage wrapper property, if any. When present, this takes the name
-  /// '$foo' from `backingVar`.
-  VarDecl *storageWrapperVar = nullptr;
-
-  /// When the original default value is specified in terms of an '='
-  /// initializer on the initial property, e.g.,
-  ///
-  /// \code
-  /// @Lazy var i = 17
-  /// \endcode
-  ///
-  /// This is the specified initial value (\c 17), which is suitable for
-  /// embedding in the expression \c initializeFromOriginal.
-  Expr *originalInitialValue = nullptr;
+  /// The synthesized projection property, if any. When present, this takes the name
+  /// of the original wrapped property prefixed with \c $
+  VarDecl *projectionVar = nullptr;
 
   /// An expression that initializes the backing property from a value of
   /// the original property's type (e.g., via `init(wrappedValue:)`), or
@@ -171,19 +156,17 @@ struct PropertyWrapperBackingPropertyInfo {
 
   /// When \c initializeFromOriginal is non-NULL, the opaque value that
   /// is used as a stand-in for a value of the original property's type.
-  OpaqueValueExpr *underlyingValue = nullptr;
+  PropertyWrapperValuePlaceholderExpr *wrappedValuePlaceholder = nullptr;
 
   PropertyWrapperBackingPropertyInfo() { }
   
   PropertyWrapperBackingPropertyInfo(VarDecl *backingVar,
-                                      VarDecl *storageWrapperVar,
-                                      Expr *originalInitialValue,
-                                      Expr *initializeFromOriginal,
-                                      OpaqueValueExpr *underlyingValue)
-    : backingVar(backingVar), storageWrapperVar(storageWrapperVar),
-      originalInitialValue(originalInitialValue),
+                                     VarDecl *projectionVar,
+                                     Expr *initializeFromOriginal,
+                                     PropertyWrapperValuePlaceholderExpr *placeholder)
+    : backingVar(backingVar), projectionVar(projectionVar),
       initializeFromOriginal(initializeFromOriginal),
-      underlyingValue(underlyingValue) { }
+      wrappedValuePlaceholder(placeholder) { }
 
   /// Whether this is a valid property wrapper.
   bool isValid() const {

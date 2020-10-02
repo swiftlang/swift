@@ -82,6 +82,11 @@ How to specify files:
                         action='store_true',
                         dest='all_sections',
                         default=False)
+    parser.add_argument('-z', '--additional-segments',
+                        help='Show sizes of additional segments.',
+                        action='store_true',
+                        dest='all_segments',
+                        default=False)
     parser.add_argument('-c', '--category',
                         help='Show functions by category.',
                         action='store_true',
@@ -138,9 +143,10 @@ How to specify files:
         # exclusivity among options, not among groups of options, so
         # we detect this case manually.
         assert (not parsed_arguments.all_sections and
+                not parsed_arguments.all_segments and
                 not parsed_arguments.list_categories), \
             'Incorrect usage: --list cannot be specified in conjunction ' + \
-            'with --additional-sections or --category.'
+            'with --additional-sections or --additional-segments or --category.'
         # A file must be specified when using --list.
         assert parsed_arguments.files, \
             'Incorrect usage: Must specify between one and two files when ' + \
@@ -219,6 +225,7 @@ How to specify files:
         if parsed_arguments.sum_sizes:
             compare_sizes_of_file(old_files, new_files,
                                   parsed_arguments.all_sections,
+                                  parsed_arguments.all_segments,
                                   parsed_arguments.list_categories,
                                   csv=csv_out)
         else:
@@ -231,6 +238,7 @@ How to specify files:
             for old_file, new_file in zip(old_files, new_files):
                 compare_sizes_of_file([old_file], [new_file],
                                       parsed_arguments.all_sections,
+                                      parsed_arguments.all_segments,
                                       parsed_arguments.list_categories,
                                       csv=csv_out)
 

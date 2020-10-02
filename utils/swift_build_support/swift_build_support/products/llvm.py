@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
 from . import product
 from ..cmake import CMakeOptions
 
@@ -34,6 +35,14 @@ class LLVM(product.Product):
         # Add the cmake options for compiler version information.
         self.cmake_options.extend(self._version_flags)
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
     @property
     def _compiler_vendor_flags(self):
         if self.args.compiler_vendor == "none":
@@ -57,3 +66,7 @@ class LLVM(product.Product):
                 'CLANG_REPOSITORY_STRING',
                 "clang-{}".format(self.args.clang_compiler_version))
         return result
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark]

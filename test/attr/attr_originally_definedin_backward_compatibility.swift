@@ -1,5 +1,10 @@
-// REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// REQUIRES: OS=macosx || OS=ios
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
+// rdar://problem/64298096
+// XFAIL: OS=ios && CPU=arm64
+// rdar://problem/65399527
+// XFAIL: OS=ios && CPU=armv7s
 //
 // RUN: %empty-directory(%t)
 //
@@ -16,10 +21,11 @@
 
 // --- Build an executable using the original high level framework
 // RUN: %target-build-swift -emit-executable %s -g -o %t/HighlevelRunner -F %t/SDK/Frameworks/ -framework HighLevel \
-// RUN: 	-Xlinker -rpath -Xlinker %t/SDK/Frameworks
+// RUN: 	%target-rpath(@executable_path/SDK/Frameworks)
 
 // --- Run the executable
-// RUN: %t/HighlevelRunner | %FileCheck %s -check-prefix=BEFORE_MOVE
+// RUN: %target-codesign %t/HighlevelRunner
+// RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel | %FileCheck %s -check-prefix=BEFORE_MOVE
 
 // --- Build low level framework.
 // RUN: mkdir -p %t/SDK/Frameworks/LowLevel.framework/Modules/LowLevel.swiftmodule
@@ -34,7 +40,8 @@
 // RUN:     %S/Inputs/SymbolMove/HighLevel.swift -F %t/SDK/Frameworks -Xlinker -reexport_framework -Xlinker LowLevel -enable-library-evolution
 
 // --- Run the executable
-// RUN: %t/HighlevelRunner | %FileCheck %s -check-prefix=AFTER_MOVE
+// RUN: %target-codesign %t/HighlevelRunner
+// RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel %t/SDK/Frameworks/LowLevel.framework/LowLevel | %FileCheck %s -check-prefix=AFTER_MOVE
 
 import HighLevel
 

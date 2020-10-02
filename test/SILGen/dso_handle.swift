@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
 
-// CHECK: sil_global [[DSO:@__dso_handle|@__ImageBase]] : $Builtin.RawPointer
+// CHECK: sil_global {{.*}}[[DSO:@__dso_handle|@__ImageBase]] : $Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @main : $@convention(c)
 // CHECK: bb0

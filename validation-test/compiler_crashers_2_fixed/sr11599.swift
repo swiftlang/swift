@@ -11,5 +11,5 @@ struct B {
 }
 
 struct C {
-  @A @B var foo: Int // expected-error{{extraneous argument label 'wrappedValue:' in call}}
+  @A @B var foo: Int // expected-error{{composed wrapper type 'B' does not match former 'wrappedValue' type 'Int'}}
 }

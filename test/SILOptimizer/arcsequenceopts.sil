@@ -395,6 +395,59 @@ bb0(%0 : $*Builtin.Int32):
   return %4: $()
 }
 
+struct Int {
+  var value : Builtin.Int64
+}
+
+sil @guaranteed_call : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> () {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK_LABEL: sil hidden [noinline] @$test_guaranteed_call :
+// CHECK: bb1{{.*}}:
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK_LABEL: } // end sil function '$test_guaranteed_call'
+sil hidden [noinline] @$test_guaranteed_call : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %proj = project_box %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = integer_literal $Builtin.Int64, 100
+  %funcref = function_ref @guaranteed_call : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> ()
+  %3 = struct $Int (%0 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.Int1, -1
+  br bb1(%0 : $Builtin.Int64)
+
+bb1(%8 : $Builtin.Int64):
+  %9 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %0 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %10 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 0
+  %11 = struct $Int (%10 : $Builtin.Int64)
+  %12 = builtin "cmp_eq_Int64"(%10 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  strong_retain %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  apply %funcref (%box) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> ()
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  cond_br %12, bb3, bb2
+
+bb2:
+  br bb1(%10 : $Builtin.Int64)
+
+bb3:
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %17 = tuple ()
+  return %17 : $()
+}
+
 // CHECK-LABEL: sil @silargument_retain_iterated : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref user
@@ -2108,6 +2161,30 @@ bb1(%3 : $()):
 bb2(%4 : $Error):
   strong_release %0 : $Builtin.NativeObject
   throw %4 : $Error
+}
+
+// CHECK_LABEL: sil hidden [noinline] @$try_apply_test_3 :
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK_LABEL: } // end sil function '$try_apply_test_3'
+sil hidden [noinline] @$try_apply_test_3 : $@convention(thin) () -> @error Error {
+bb0:
+  %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %proj = project_box %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %funcref = function_ref @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error
+  br bb1
+
+bb1:
+  strong_retain %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  try_apply %funcref (%box) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error, normal bbs, error bbe
+
+bbs(%s : $()):
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  return undef : $()
+
+bbe(%e : $Error):
+  strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  throw %e : $Error
 }
 
 // In this control flow, ARC runs multiple iterations to get rid of and move the retain and releases.

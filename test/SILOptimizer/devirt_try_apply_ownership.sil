@@ -800,11 +800,11 @@ sil_vtable A {
 }
 
 sil_vtable D1 {
-  #D1.f1: @_TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_// devirt_try_apply.D1.f1 () throws -> Swift.Optional<devirt_try_apply.A>
+  #D1.f1: @_TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_
 }
 
 sil_vtable D3 {
-  #D1.f1: @_TFC16devirt_try_apply2D32f1fzT_CS_1A// devirt_try_apply.D3.f1 () throws -> devirt_try_apply.A
+  #D1.f1: @_TFC16devirt_try_apply2D32f1fzT_CS_1A [override]
 }
 
 
@@ -812,35 +812,35 @@ sil_vtable Base {
   #Base.foo: @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_
   #Base.boo1: @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_
   #Base.boo2: @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__
-  #Base.deinit!deallocator: @_TFC16devirt_try_apply4BaseD
   #Base.init!initializer: @_TFC16devirt_try_apply4BasecfMS0_FT_S0_
+  #Base.deinit!deallocator: @_TFC16devirt_try_apply4BaseD
 }
 
 sil_vtable Derived1 {
-  #Base.foo: @_TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_
-  #Base.boo1: @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_
-  #Base.boo2: @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__
-  #Base.init!initializer: @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_
+  #Base.foo: @_TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_ [override]
+  #Base.boo1: @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_ [override]
+  #Base.boo2: @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__ [override]
+  #Base.init!initializer: @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_ [override]
   #Derived1.deinit!deallocator: @_TFC16devirt_try_apply8Derived1D
 }
 
 sil_vtable Derived2 {
-  #Base.foo: @_TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32
-  #Base.boo1: @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_
-  #Base.boo2: @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_
-  #Base.init!initializer: @_TFC16devirt_try_apply8Derived2cfMS0_FT_S0_
+  #Base.foo: @_TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 [override]
+  #Base.boo1: @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_ [override]
+  #Base.boo2: @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_ [override]
+  #Base.init!initializer: @_TFC16devirt_try_apply8Derived2cfMS0_FT_S0_ [override]
   #Derived2.deinit!deallocator: @_TFC16devirt_try_apply8Derived2D
 }
 
 sil_vtable CP1 {
   #CP1.foo: @_TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32
-  #CP1.deinit!deallocator: @_TFC16devirt_try_apply3CP1D
   #CP1.init!initializer: @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_
+  #CP1.deinit!deallocator: @_TFC16devirt_try_apply3CP1D
 }
 
 sil_vtable CP2 {
-  #CP1.foo: @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32
-  #CP1.init!initializer: @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_
+  #CP1.foo: @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32 [override]
+  #CP1.init!initializer: @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_ [override]
   #CP2.deinit!deallocator: @_TFC16devirt_try_apply3CP2D
 }
 

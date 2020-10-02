@@ -56,6 +56,8 @@ public:
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc);
 
+  SILLocation getLoc() const { return Loc; }
+
   /// Return the function this scope originated from before being inlined.
   SILFunction *getInlinedFunction() const;
 
@@ -64,12 +66,32 @@ public:
   /// into.
   SILFunction *getParentFunction() const;
 
-#ifndef NDEBUG
-  SWIFT_DEBUG_DUMPER(dump(SourceManager &SM,
-                          llvm::raw_ostream &OS = llvm::errs(),
-                          unsigned Indent = 0));
-  SWIFT_DEBUG_DUMPER(dump(SILModule &Mod));
-#endif
+  /// If this is a debug scope associated with an inlined call site, return the
+  /// SILLocation associated with the call site resulting from the final
+  /// inlining.
+  ///
+  /// This allows one to emit diagnostics based off of inlined code's final
+  /// location in the function that was inlined into.
+  SILLocation getOutermostInlineLocation() const {
+    if (!InlinedCallSite)
+      return SILLocation::invalid();
+
+    auto *scope = this;
+    do {
+      scope = scope->InlinedCallSite;
+    } while (scope->InlinedCallSite);
+
+    SILLocation callSite = scope->Loc;
+    if (callSite.isNull() || !callSite.isASTNode())
+      return SILLocation::invalid();
+
+    return callSite;
+  }
+
+  void print(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
+             unsigned Indent = 0) const;
+
+  void print(SILModule &Mod) const;
 };
 
 /// Determine whether an instruction may not have a SILDebugScope.

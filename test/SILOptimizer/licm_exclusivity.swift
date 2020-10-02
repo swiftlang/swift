@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TESTLICMWMO
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSILWMO
 
-// REQUIRES: optimized_stdlib,asserts
+// REQUIRES: optimized_stdlib,asserts,swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
 
 // TESTLICM-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}

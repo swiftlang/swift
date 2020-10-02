@@ -2,7 +2,7 @@
 
 // The `-serialize-diagnostics-path` flag is not allowed for batch mode invoked by swiftc
 // RUN: not %target-swiftc_driver -serialize-diagnostics-path %t.notexpected.dia %s %S/Inputs/serialized-diagnostics-batch-mode-helper.swift -c -o %t.o 2>&1 | %FileCheck %s
-// CHECK: <unknown>:0: error: option '-serialize-diagnostics-path' is not supported by 'swiftc'; did you mean to use 'swift'?
+// CHECK: error: option '-serialize-diagnostics-path' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not ls %t.notexpected.dia > /dev/null
 // RUN: not ls %t.o > /dev/null
 
@@ -31,10 +31,10 @@
 // NEGATIVE-STDERR-NOT: invalid redeclaration of 'foo()'
 
 func test() {
-  nonexistent() // CHECK-MAIN-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE]]:3: error: use of unresolved identifier 'nonexistent'
-  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE-1]]:3: error: use of unresolved identifier 'nonexistent'
+  nonexistent() // CHECK-MAIN-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE]]:3: error: cannot find 'nonexistent' in scope
+  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE-1]]:3: error: cannot find 'nonexistent' in scope
 
   // The other file has a similar call.
-  // CHECK-HELPER-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: use of unresolved identifier 'nonexistent'
-  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: use of unresolved identifier 'nonexistent'
+  // CHECK-HELPER-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: cannot find 'nonexistent' in scope
+  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: cannot find 'nonexistent' in scope
 }

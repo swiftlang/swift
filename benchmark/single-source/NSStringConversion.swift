@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // <rdar://problem/19003201>
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 
 import TestsUtils
 import Foundation

@@ -72,6 +72,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
+           clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
                    "convert-to-computed-property", "Convert from field initialization to computed property"),
            clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
@@ -267,7 +268,7 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
-      CI.performParseOnly(/*EvaluateConditionals*/true);
+      // No type-checking required.
       break;
     default:
       CI.performSema();

@@ -231,14 +231,8 @@ protected:
     CS.filterSolutions(solutions, minimize);
   }
 
-  /// Check whether constraint solver is running in "debug" mode,
-  /// which should output diagnostic information.
-  bool isDebugMode() const {
-    return CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver;
-  }
-
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     return indent ? log.indent(CS.solverState->depth * 2) : log;
   }
 };
@@ -471,7 +465,7 @@ private:
     if (IsSingle)
       return;
 
-    if (isDebugMode())
+    if (CS.isDebugMode())
       getDebugLogger() << "(solving component #" << Index << '\n';
 
     ComponentScope = std::make_unique<Scope>(*this);
@@ -515,7 +509,7 @@ public:
       if (shouldStopAt(*choice))
         break;
 
-      if (isDebugMode()) {
+      if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
         choice->print(log, &CS.getASTContext().SourceMgr);
@@ -530,7 +524,7 @@ public:
         }
       }
 
-      if (isDebugMode())
+      if (CS.isDebugMode())
         getDebugLogger() << ")\n";
 
       // If this binding didn't match, let's check if we've attempted

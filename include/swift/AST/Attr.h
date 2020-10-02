@@ -35,8 +35,8 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/TrailingCallArguments.h"
-#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -56,6 +56,7 @@ class LazyConformanceLoader;
 class LazyMemberLoader;
 class PatternBindingInitializer;
 class TrailingWhereClause;
+class TypeExpr;
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
@@ -417,6 +418,9 @@ public:
 
     /// The opposite of ABIBreakingToRemove
     ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
+
+    /// Whether this attribute is only valid when concurrency is enabled.
+    ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
   };
 
   LLVM_READNONE
@@ -493,6 +497,10 @@ public:
 
   static bool isSilOnly(DeclAttrKind DK) {
     return getOptions(DK) & SILOnly;
+  }
+
+  static bool isConcurrencyOnly(DeclAttrKind DK) {
+    return getOptions(DK) & ConcurrencyOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
@@ -1110,22 +1118,22 @@ public:
 
 /// The \c @_typeEraser(TypeEraserType) attribute.
 class TypeEraserAttr final : public DeclAttribute {
-  TypeLoc TypeEraserLoc;
+  TypeExpr *TypeEraserExpr;
   LazyMemberLoader *Resolver;
   uint64_t ResolverContextData;
 
   friend class ResolveTypeEraserTypeRequest;
 
-  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc,
+  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeExpr *typeEraserExpr,
                  LazyMemberLoader *Resolver, uint64_t Data)
       : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
-        TypeEraserLoc(typeEraserLoc),
+        TypeEraserExpr(typeEraserExpr),
         Resolver(Resolver), ResolverContextData(Data) {}
 
 public:
   static TypeEraserAttr *create(ASTContext &ctx,
                                 SourceLoc atLoc, SourceRange range,
-                                TypeLoc typeEraserLoc);
+                                TypeExpr *typeEraserRepr);
 
   static TypeEraserAttr *create(ASTContext &ctx,
                                 LazyMemberLoader *Resolver,
@@ -1133,14 +1141,10 @@ public:
 
   /// Retrieve the parsed type repr for this attribute, if it
   /// was parsed. Else returns \c nullptr.
-  TypeRepr *getParsedTypeEraserTypeRepr() const {
-    return TypeEraserLoc.getTypeRepr();
-  }
+  TypeRepr *getParsedTypeEraserTypeRepr() const;
 
   /// Retrieve the parsed location for this attribute, if it was parsed.
-  SourceLoc getLoc() const {
-    return TypeEraserLoc.getLoc();
-  }
+  SourceLoc getLoc() const;
 
   /// Retrieve the resolved type of this attribute if it has been resolved by a
   /// successful call to \c getResolvedType(). Otherwise,
@@ -1148,9 +1152,7 @@ public:
   ///
   /// This entrypoint is only suitable for syntactic clients like the
   /// AST printer. Semantic clients should use \c getResolvedType() instead.
-  Type getTypeWithoutResolving() const {
-    return TypeEraserLoc.getType();
-  }
+  Type getTypeWithoutResolving() const;
 
   /// Returns \c true if the type eraser type has a valid implementation of the
   /// erasing initializer for the given protocol.
@@ -1432,7 +1434,7 @@ public:
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature getSpecializedSgnature() const {
+  GenericSignature getSpecializedSignature() const {
     return specializedSignature;
   }
 
@@ -1464,25 +1466,26 @@ public:
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
-
-  TypeLoc ProtocolType;
+  TypeExpr *ProtocolType;
   DeclName MemberName;
   DeclNameLoc MemberNameLoc;
 
 public:
   ImplementsAttr(SourceLoc atLoc, SourceRange Range,
-                 TypeLoc ProtocolType,
+                 TypeExpr *ProtocolType,
                  DeclName MemberName,
                  DeclNameLoc MemberNameLoc);
 
   static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range,
-                                TypeLoc ProtocolType,
+                                TypeExpr *ProtocolType,
                                 DeclName MemberName,
                                 DeclNameLoc MemberNameLoc);
 
-  TypeLoc getProtocolType() const;
-  TypeLoc &getProtocolType();
+  void setProtocolType(Type ty);
+  Type getProtocolType() const;
+  TypeRepr *getProtocolTypeRepr() const;
+
   DeclName getMemberName() const { return MemberName; }
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
 
@@ -1595,7 +1598,7 @@ public:
 /// Defines a custom attribute.
 class CustomAttr final : public DeclAttribute,
                          public TrailingCallArguments<CustomAttr> {
-  TypeLoc type;
+  TypeExpr *typeExpr;
   Expr *arg;
   PatternBindingInitializer *initContext;
   Expr *semanticInit = nullptr;
@@ -1603,19 +1606,19 @@ class CustomAttr final : public DeclAttribute,
   unsigned hasArgLabelLocs : 1;
   unsigned numArgLabels : 16;
 
-  CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+  CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
              PatternBindingInitializer *initContext, Expr *arg,
              ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
              bool implicit);
 
 public:
-  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
                             bool implicit = false) {
     return create(ctx, atLoc, type, false, nullptr, SourceLoc(), { }, { }, { },
                   SourceLoc(), implicit);
   }
 
-  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
                             bool hasInitializer,
                             PatternBindingInitializer *initContext,
                             SourceLoc lParenLoc,
@@ -1628,8 +1631,8 @@ public:
   unsigned getNumArguments() const { return numArgLabels; }
   bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
 
-  TypeLoc &getTypeLoc() { return type; }
-  const TypeLoc &getTypeLoc() const { return type; }
+  TypeRepr *getTypeRepr() const;
+  Type getType() const;
 
   Expr *getArg() const { return arg; }
   void setArg(Expr *newArg) { arg = newArg; }
@@ -1642,6 +1645,14 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Custom;
   }
+
+private:
+  friend class CustomAttrNominalRequest;
+  void resetTypeInformation(TypeExpr *repr);
+
+private:
+  friend class CustomAttrTypeRequest;
+  void setType(Type ty);
 };
 
 /// Relates a property to its projection value property, as described by a property wrapper. For
@@ -1709,12 +1720,6 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
-};
-
-/// A declaration name with location.
-struct DeclNameRefWithLoc {
-  DeclNameRef Name;
-  DeclNameLoc Loc;
 };
 
 /// Attribute that marks a function as differentiable.
@@ -1840,6 +1845,18 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
   }
+};
+
+/// A declaration name with location.
+struct DeclNameRefWithLoc {
+  /// The declaration name.
+  DeclNameRef Name;
+  /// The declaration name location.
+  DeclNameLoc Loc;
+  /// An optional accessor kind.
+  Optional<AccessorKind> AccessorKind;
+
+  void print(ASTPrinter &Printer) const;
 };
 
 /// The `@derivative(of:)` attribute registers a function as a derivative of
@@ -2207,6 +2224,19 @@ public:
   AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
     return AttributeKindRange<ATTR, AllowInvalid>(
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
+  }
+
+  /// Return the range of semantics attributes attached to this attribute set.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttributes<SemanticsAttr>()) {
+    return getAttributes<SemanticsAttr>();
+  }
+
+  /// Return whether this attribute set includes the given semantics attribute.
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
   }
 
   // Remove the given attribute from the list of attributes. Used when

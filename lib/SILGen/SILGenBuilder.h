@@ -34,6 +34,7 @@ namespace Lowering {
 
 class SILGenFunction;
 class SGFContext;
+class AssertingManualScope;
 
 /// A subclass of SILBuilder that wraps APIs to vend ManagedValues.
 /// APIs only vend ManagedValues.
@@ -278,7 +279,7 @@ public:
   ManagedValue createUncheckedAddrCast(SILLocation loc, ManagedValue op,
                                        SILType resultTy);
 
-  using SILBuilder::createUncheckedBitCast;
+  using SILBuilder::createUncheckedReinterpretCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
@@ -361,6 +362,9 @@ public:
 
   using SILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
+
+  ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue,
+                           AssertingManualScope &&functionLevelScope);
 
   using SILBuilder::emitDestructureValueOperation;
   /// Perform either a tuple or struct destructure and then pass its components

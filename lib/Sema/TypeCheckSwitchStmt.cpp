@@ -212,12 +212,6 @@ namespace {
         }
         return Space(T, H, SP);
       }
-      static Space forConstructor(Type T, DeclName H,
-                                  std::forward_list<Space> SP) {
-        // No need to filter SP here; this is only used to copy other
-        // Constructor spaces.
-        return Space(T, H, SP);
-      }
       static Space forBool(bool C) {
         return Space(C);
       }
@@ -418,6 +412,7 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
           return this->getBoolValue() == other.getBoolValue();
 
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::UnknownCase):
           return false;
 
@@ -716,7 +711,7 @@ namespace {
             if (args != argEnd) {
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(*args, param));
-              args++;
+              ++args;
             } else
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(Identifier(), param));
@@ -816,7 +811,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            return Space::forConstructor(tp, eed->getFullName(),
+            return Space::forConstructor(tp, eed->getName(),
                                          constElemSpaces);
           });
 
@@ -1342,7 +1337,7 @@ namespace {
 
             for (size_t rowIdx = 0, colIdx = 0; rowIdx < matrix.size(); ++rowIdx) {
               if (rowIdx != 0 && (rowIdx % stride) == 0) {
-                colIdx++;
+                ++colIdx;
               }
 
               matrix[rowIdx].push_back(columnVect[colIdx]);
@@ -1422,8 +1417,8 @@ namespace {
         llvm_unreachable("cannot appear in case patterns");
       case PatternKind::Expr:
         return Space();
-      case PatternKind::Var: {
-        auto *VP = cast<VarPattern>(item);
+      case PatternKind::Binding: {
+        auto *VP = cast<BindingPattern>(item);
         return projectPattern(VP->getSubPattern());
       }
       case PatternKind::Paren: {
@@ -1441,7 +1436,7 @@ namespace {
         if (subSpace.getKind() == SpaceKind::Constructor &&
             subSpace.getHead().getBaseIdentifier().empty()) {
           return Space::forConstructor(item->getType(), name,
-                                       std::move(subSpace.getSpaces()));
+                                       {subSpace});
         }
         return Space::forConstructor(item->getType(), name, subSpace);
       }

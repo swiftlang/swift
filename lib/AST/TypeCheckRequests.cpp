@@ -37,14 +37,14 @@ namespace swift {
 }
 
 void swift::simple_display(
-       llvm::raw_ostream &out,
-       const llvm::PointerUnion<TypeDecl *, ExtensionDecl *> &value) {
-  if (auto type = value.dyn_cast<TypeDecl *>()) {
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value) {
+  if (auto type = value.dyn_cast<const TypeDecl *>()) {
     type->dumpRef(out);
     return;
   }
 
-  auto ext = value.get<ExtensionDecl *>();
+  auto ext = value.get<const ExtensionDecl *>();
   simple_display(out, ext);
 }
 
@@ -116,7 +116,7 @@ void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
   auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
                                              std::get<1>(storage));
-  typeLoc.setType(value);
+  const_cast<TypeLoc &>(typeLoc).setType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -157,18 +157,8 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
-evaluator::DependencySource
-SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
-  const auto access = std::get<0>(getStorage())->getFormalAccess();
-  return {
-    e.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(access)
-  };
-}
-
-void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
-                                                ReferencedNameTracker &tracker,
-                                                Type value) const {
+void SuperclassTypeRequest::writeDependencySink(
+    evaluator::DependencyCollector &tracker, Type value) const {
   if (!value)
     return;
 
@@ -177,7 +167,7 @@ void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
   ClassDecl *Super = value->getClassOrBoundGenericClass();
   if (!Super)
     return;
-  tracker.addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+  tracker.addPotentialMember(Super);
 }
 
 //----------------------------------------------------------------------------//
@@ -458,60 +448,6 @@ RequirementRepr &RequirementRequest::getRequirement() const {
 
 bool RequirementRequest::isCached() const {
   return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-Optional<Requirement> RequirementRequest::getCachedResult() const {
-  auto &reqRepr = getRequirement();
-  switch (reqRepr.getKind()) {
-  case RequirementReprKind::TypeConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated() ||
-        !reqRepr.getConstraintLoc().wasValidated())
-      return None;
-
-    return Requirement(reqRepr.getConstraint()->getClassOrBoundGenericClass()
-                         ? RequirementKind::Superclass
-                         : RequirementKind::Conformance,
-                       reqRepr.getSubject(),
-                       reqRepr.getConstraint());
-
-  case RequirementReprKind::SameType:
-    if (!reqRepr.getFirstTypeLoc().wasValidated() ||
-        !reqRepr.getSecondTypeLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::SameType, reqRepr.getFirstType(),
-                       reqRepr.getSecondType());
-
-  case RequirementReprKind::LayoutConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::Layout, reqRepr.getSubject(),
-                       reqRepr.getLayoutConstraint());
-  }
-  llvm_unreachable("unhandled kind");
-}
-
-void RequirementRequest::cacheResult(Requirement value) const {
-  auto &reqRepr = getRequirement();
-  switch (value.getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getConstraintLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::SameType:
-    reqRepr.getFirstTypeLoc().setType(value.getFirstType());
-    reqRepr.getSecondTypeLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::Layout:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getLayoutConstraintLoc()
-      .setLayoutConstraint(value.getLayoutConstraint());
-    break;
-  }
 }
 
 //----------------------------------------------------------------------------//
@@ -839,23 +775,6 @@ void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
 }
 
 //----------------------------------------------------------------------------//
-// EmittedMembersRequest computation.
-//----------------------------------------------------------------------------//
-
-Optional<DeclRange>
-EmittedMembersRequest::getCachedResult() const {
-  auto *classDecl = std::get<0>(getStorage());
-  if (classDecl->hasForcedEmittedMembers())
-    return classDecl->getMembers();
-  return None;
-}
-
-void EmittedMembersRequest::cacheResult(DeclRange result) const {
-  auto *classDecl = std::get<0>(getStorage());
-  classDecl->setHasForcedEmittedMembers();
-}
-
-//----------------------------------------------------------------------------//
 // IsImplicitlyUnwrappedOptionalRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1007,23 +926,28 @@ void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
-  auto *decl = std::get<0>(getStorage());
-  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
-    return funcDecl->getBodyResultTypeLoc();
-  auto *subscriptDecl = cast<SubscriptDecl>(decl);
-  return subscriptDecl->getElementTypeLoc();
-}
-
 Optional<Type> ResultTypeRequest::getCachedResult() const {
-  if (auto type = getResultTypeLoc().getType())
-    return type;
+  Type type;
+  auto *const decl = std::get<0>(getStorage());
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    type = funcDecl->FnRetType.getType();
+  } else {
+    type = cast<SubscriptDecl>(decl)->ElementTy.getType();
+  }
 
-  return None;
+  if (type.isNull())
+    return None;
+
+  return type;
 }
 
 void ResultTypeRequest::cacheResult(Type type) const {
-  getResultTypeLoc().setType(type);
+  auto *const decl = std::get<0>(getStorage());
+  if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    funcDecl->FnRetType.setType(type);
+  } else {
+    cast<SubscriptDecl>(decl)->ElementTy.setType(type);
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -1080,6 +1004,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->hasHole() && "Type hole in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }
@@ -1212,23 +1137,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
-// HasCircularInheritanceRequest computation.
-//----------------------------------------------------------------------------//
-
-void HasCircularInheritanceRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
-}
-
-void HasCircularInheritanceRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
-}
-
-//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1349,19 +1257,14 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
   std::get<0>(getStorage())->setCheckedRedeclaration();
 }
 
-evaluator::DependencySource
-CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
-  auto *current = std::get<0>(getStorage());
-  auto *currentDC = current->getDeclContext();
-  return {
-    currentDC->getParentSourceFile(),
-    evaluator::getScopeForAccessLevel(current->getFormalAccess())
-  };
+evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
+    const evaluator::DependencyRecorder &eval) const {
+  auto *currentDC = std::get<0>(getStorage())->getDeclContext();
+  return currentDC->getParentSourceFile();
 }
 
 void CheckRedeclarationRequest::writeDependencySink(
-    Evaluator &eval, ReferencedNameTracker &tracker,
-    evaluator::SideEffect) const {
+    evaluator::DependencyCollector &tracker, evaluator::SideEffect) const {
   auto *current = std::get<0>(getStorage());
   if (!current->hasName())
     return;
@@ -1373,12 +1276,10 @@ void CheckRedeclarationRequest::writeDependencySink(
 
   if (currentDC->isTypeContext()) {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
-      tracker.addUsedMember({nominal, current->getBaseName()},
-                            eval.isActiveSourceCascading());
+      tracker.addUsedMember(nominal, current->getBaseName());
     }
   } else {
-    tracker.addTopLevelName(current->getBaseName(),
-                            eval.isActiveSourceCascading());
+    tracker.addTopLevelName(current->getBaseName());
   }
 }
 
@@ -1386,35 +1287,11 @@ void CheckRedeclarationRequest::writeDependencySink(
 // LookupAllConformancesInContextRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource
-LookupAllConformancesInContextRequest::readDependencySource(
-    Evaluator &eval) const {
-  auto *dc = std::get<0>(getStorage());
-  AccessLevel defaultAccess;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    const NominalTypeDecl *nominal = ext->getExtendedNominal();
-    if (!nominal) {
-      return {
-        eval.getActiveDependencySourceOrNull(),
-        evaluator::DependencyScope::Cascading
-      };
-    }
-    defaultAccess = nominal->getFormalAccess();
-  } else {
-    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
-  }
-  return {
-    eval.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(defaultAccess)
-  };
-}
-
 void LookupAllConformancesInContextRequest::writeDependencySink(
-    Evaluator &eval, ReferencedNameTracker &tracker,
+    evaluator::DependencyCollector &tracker,
     ProtocolConformanceLookupResult conformances) const {
   for (auto conformance : conformances) {
-    tracker.addUsedMember({conformance->getProtocol(), Identifier()},
-                          eval.isActiveSourceCascading());
+    tracker.addPotentialMember(conformance->getProtocol());
   }
 }
 
@@ -1423,25 +1300,31 @@ void LookupAllConformancesInContextRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 Optional<Type> ResolveTypeEraserTypeRequest::getCachedResult() const {
-  auto ty = std::get<1>(getStorage())->TypeEraserLoc.getType();
-  if (ty.isNull()) {
+  auto *TyExpr = std::get<1>(getStorage())->TypeEraserExpr;
+  if (!TyExpr || !TyExpr->getType()) {
     return None;
   }
-  return ty;
+  return TyExpr->getInstanceType();
 }
 
 void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
   assert(value && "Resolved type erasure type to null type!");
-  std::get<1>(getStorage())->TypeEraserLoc.setType(value);
+  auto *attr = std::get<1>(getStorage());
+  if (attr->TypeEraserExpr) {
+    attr->TypeEraserExpr->setType(MetatypeType::get(value));
+  } else {
+    attr->TypeEraserExpr = TypeExpr::createImplicit(value,
+                                                    value->getASTContext());
+  }
 }
 
 //----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource
-TypeCheckSourceFileRequest::readDependencySource(Evaluator &e) const {
-  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+    const evaluator::DependencyRecorder &e) const {
+  return std::get<0>(getStorage());
 }
 
 Optional<evaluator::SideEffect>
@@ -1464,40 +1347,44 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
     // Verify the SourceFile.
     swift::verify(*SF);
-
-    // Verify imported modules.
-    //
-    // Skip per-file verification in whole-module mode. Verifying imports
-    // between files could cause the importer to cache declarations without
-    // adding them to the ASTContext. This happens when the importer registers a
-    // declaration without a valid TypeChecker instance, as is the case during
-    // verification. A subsequent file may require that declaration to be fully
-    // imported (e.g. to synthesized a function body), but since it has already
-    // been cached, it will never be added to the ASTContext. The solution is to
-    // skip verification and avoid caching it.
-#ifndef NDEBUG
-    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF->Kind != SourceFileKind::REPL &&
-        SF->Kind != SourceFileKind::SIL &&
-        !Ctx.LangOpts.DebuggerSupport) {
-      Ctx.verifyAllLoadedModules();
-    }
-#endif
   }
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckFunctionBodyUntilRequest computation.
+// TypeCheckFunctionBodyRequest computation.
 //----------------------------------------------------------------------------//
 
+Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto *afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    // These cases don't have any body available.
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+    return afd->Body;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Parsed:
+  case BodyKind::Unparsed:
+    return None;
+  }
+  llvm_unreachable("Unhandled BodyKind in switch");
+}
+
+void TypeCheckFunctionBodyRequest::cacheResult(BraceStmt *body) const {
+  auto *afd = std::get<0>(getStorage());
+  afd->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+}
+
 evaluator::DependencySource
-TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
-  // We're going under a function body scope, unconditionally flip the scope
-  // to private.
-  return {
-    std::get<0>(getStorage())->getParentSourceFile(),
-    evaluator::DependencyScope::Private
-  };
+TypeCheckFunctionBodyRequest::readDependencySource(
+    const evaluator::DependencyRecorder &e) const {
+  return std::get<0>(getStorage())->getParentSourceFile();
 }
 
 //----------------------------------------------------------------------------//
@@ -1508,4 +1395,94 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const ImplicitImport &import) {
   out << "implicit import of ";
   simple_display(out, import.Module);
+}
+
+//----------------------------------------------------------------------------//
+// ResolveTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void ResolveTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *repr = std::get<1>(getStorage());
+  diags.diagnose(repr->getLoc(), diag::circular_type_resolution_note, repr);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolution *resolution) {
+  out << "while resolving type ";
+}
+
+SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
+  if (!repr)
+    return SourceLoc();
+  return repr->getLoc();
+}
+
+//----------------------------------------------------------------------------//
+// CustomAttrTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
+  switch (value) {
+  case CustomAttrTypeKind::NonGeneric:
+    out << "non-generic";
+    return;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    out << "property-delegate";
+    return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (auto ty = attr->getType()) {
+    return ty;
+  }
+  return None;
+}
+
+void CustomAttrTypeRequest::cacheResult(Type value) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->setType(value);
+}
+
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const ActorIsolation &state) {
+  switch (state) {
+    case ActorIsolation::ActorInstance:
+      out << "actor-isolated to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::ActorPrivileged:
+      out << "actor-privileged to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::Independent:
+      out << "actor-independent";
+      break;
+
+    case ActorIsolation::Unspecified:
+      out << "unspecified actor isolation";
+      break;
+  }
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, BodyInitKind initKind) {
+  switch (initKind) {
+  case BodyInitKind::None: out << "none"; return;
+  case BodyInitKind::Delegating: out << "delegating"; return;
+  case BodyInitKind::Chained: out << "chained"; return;
+  case BodyInitKind::ImplicitChained: out << "implicit_chained"; return;
+  }
+  llvm_unreachable("Bad body init kind");
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr) {
+  simple_display(out, initKindAndExpr.initKind);
+  out << " ";
+  simple_display(out, initKindAndExpr.initExpr);
 }

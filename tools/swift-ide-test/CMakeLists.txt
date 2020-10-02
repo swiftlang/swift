@@ -12,7 +12,7 @@ target_link_libraries(swift-ide-test
                         swiftIDE)
 
 # If libxml2 is available, make it available for swift-ide-test.
-if(LibXml2_FOUND)
+if(LLVM_ENABLE_LIBXML2)
   include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
   target_link_libraries(swift-ide-test PRIVATE ${LIBXML2_LIBRARIES})
   target_compile_definitions(swift-ide-test PRIVATE SWIFT_HAVE_LIBXML=1)

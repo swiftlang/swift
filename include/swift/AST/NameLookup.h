@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
@@ -216,18 +215,16 @@ public:
 };
 
 enum class UnqualifiedLookupFlags {
-  /// This lookup is known to not affect downstream files.
-  KnownPrivate = 0x01,
   /// This lookup should only return types.
-  TypeLookup = 0x02,
+  TypeLookup            = 1 << 0,
   /// This lookup should consider declarations within protocols to which the
   /// context type conforms.
-  AllowProtocolMembers = 0x04,
+  AllowProtocolMembers  = 1 << 2,
   /// Don't check access when doing lookup into a type.
-  IgnoreAccessControl = 0x08,
+  IgnoreAccessControl   = 1 << 3,
   /// This lookup should include results from outside the innermost scope with
   /// results.
-  IncludeOuterResults = 0x10,
+  IncludeOuterResults   = 1 << 4,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -376,7 +373,7 @@ class LambdaDeclConsumer : public VisibleDeclConsumer {
 public:
   LambdaDeclConsumer(Fn &&callback) : Callback(std::move(callback)) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason, DynamicLookupInfo) {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason, DynamicLookupInfo) override {
     Callback(VD, reason);
   }
 };
@@ -396,31 +393,6 @@ public:
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                          DynamicLookupInfo) override {
     results.push_back(VD);
-  }
-};
-
-/// A consumer that inserts found decls with a matching name into an
-/// externally-owned SmallVector.
-class NamedDeclConsumer : public VisibleDeclConsumer {
-  virtual void anchor() override;
-public:
-  DeclNameRef name;
-  SmallVectorImpl<LookupResultEntry> &results;
-  bool isTypeLookup;
-
-  NamedDeclConsumer(DeclNameRef name,
-                    SmallVectorImpl<LookupResultEntry> &results,
-                    bool isTypeLookup)
-    : name(name), results(results), isTypeLookup(isTypeLookup) {}
-
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
-                         DynamicLookupInfo dynamicLookupInfo = {}) override {
-    // Give clients an opportunity to filter out non-type declarations early,
-    // to avoid circular validation.
-    if (isTypeLookup && !isa<TypeDecl>(VD))
-      return;
-    if (VD->getFullName().matchesRef(name.getFullName()))
-      results.push_back(LookupResultEntry(VD));
   }
 };
 
@@ -455,6 +427,26 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                          const DeclContext *dc);
 
+/// Remove any operators in the given set that are shadowed by
+/// other operators in that set.
+///
+/// \param decls The set of operators being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                         const DeclContext *dc);
+
+/// Remove any precedence groups in the given set that are shadowed by
+/// other precedence groups in that set.
+///
+/// \param decls The set of precedence groups being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                         const DeclContext *dc);
+
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
 /// the SourceLoc is used to determine which declarations in that function
@@ -473,6 +465,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
+                              bool includeProtocolExtensionMembers,
                               GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
@@ -487,9 +480,6 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
-void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
-                                bool isCascading);
-
 } // end namespace namelookup
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -499,9 +489,8 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 /// Add anything we find to the \c result vector. If we come across the
 /// AnyObject type, set \c anyObject true.
 void getDirectlyInheritedNominalTypeDecls(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-    unsigned i,
-    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -509,26 +498,25 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<Located<NominalTypeDecl *>, 4>
-getDirectlyInheritedNominalTypeDecls(
-                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      bool &anyObject);
+SmallVector<Located<NominalTypeDecl *>, 4> getDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
 /// given protocol or protocol extension.
 SelfBounds getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
 
 /// Retrieve the TypeLoc at the given \c index from among the set of
 /// type declarations that are directly "inherited" by the given declaration.
-inline TypeLoc &
-getInheritedTypeLocAtIndex(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                           unsigned index) {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+inline const TypeLoc &getInheritedTypeLocAtIndex(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned index) {
+  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
     return typeDecl->getInherited()[index];
 
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
+  return decl.get<const ExtensionDecl *>()->getInherited()[index];
 }
 
 namespace namelookup {
@@ -606,18 +594,40 @@ public:
   virtual ~AbstractASTScopeDeclConsumer() = default;
 
   /// Called for every ValueDecl visible from the lookup.
-  /// Returns true if the lookup can be stopped at this point.
-  /// BaseDC is per legacy
+  ///
   /// Takes an array in order to batch the consumption before setting
   /// IndexOfFirstOuterResult when necessary.
-  virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  ///
+  /// \param baseDC either a type context or the local context of a
+  /// `self` parameter declaration. See LookupResult for a discussion
+  /// of type -vs- instance lookup results.
+  ///
+  /// \return true if the lookup should be stopped at this point.
+  virtual bool consume(ArrayRef<ValueDecl *> values,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
-  /// Eventually this functionality should move into ASTScopeLookup
+  /// Look for members of a nominal type or extension scope.
+  ///
+  /// \return true if the lookup should be stopped at this point.
   virtual bool
-  lookInMembers(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-                NominalTypeDecl *const nominal,
-                function_ref<bool(Optional<bool>)> calculateIsCascadingUse) = 0;
+  lookInMembers(DeclContext *const scopeDC,
+                NominalTypeDecl *const nominal) = 0;
+
+  /// Called for local VarDecls that might not yet be in scope.
+  ///
+  /// Note that the set of VarDecls visited here are going to be a
+  /// superset of those visited in consume().
+  virtual bool consumePossiblyNotInScope(ArrayRef<VarDecl *> values) {
+    return false;
+  }
+
+  /// Called right before looking at the parent scope of a BraceStmt.
+  ///
+  /// \return true if the lookup should be stopped at this point.
+  virtual bool
+  finishLookupInBraceStmt(BraceStmt *stmt) {
+    return false;
+  }
 
 #ifndef NDEBUG
   virtual void startingNextLookupStep() = 0;
@@ -634,13 +644,12 @@ class ASTScopeDeclGatherer : public AbstractASTScopeDeclConsumer {
 public:
   virtual ~ASTScopeDeclGatherer() = default;
 
-  bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+  bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  bool lookInMembers(NullablePtr<DeclContext>, DeclContext *const,
-                     NominalTypeDecl *const,
-                     function_ref<bool(Optional<bool>)>) override {
+  bool lookInMembers(DeclContext *const,
+                     NominalTypeDecl *const) override {
     return false;
   }
 
@@ -670,15 +679,45 @@ public:
   /// Flesh out the tree for dumping
   void buildFullyExpandedTree();
 
-  /// \return the scopes traversed
-  static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
-                    const DeclContext *startingContext,
-                    namelookup::AbstractASTScopeDeclConsumer &);
+  static void unqualifiedLookup(SourceFile *, SourceLoc,
+                                namelookup::AbstractASTScopeDeclConsumer &);
 
-  static Optional<bool>
-  computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
-                        Optional<bool> initialIsCascadingUse);
+  /// Lookup that only finds local declarations and does not trigger
+  /// interface type computation.
+  ///
+  /// \param stopAfterInnermostBraceStmt If lookup should consider
+  /// local declarations inside the innermost syntactic scope only.
+  static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
+                               bool stopAfterInnermostBraceStmt,
+                               SmallVectorImpl<ValueDecl *> &);
+
+  /// Returns the result if there is exactly one, nullptr otherwise.
+  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
+
+  /// Entry point to record the visible statement labels from the given
+  /// point.
+  ///
+  /// This lookup only considers labels that are visible within the current
+  /// function, so it will not return any labels from lexical scopes that
+  /// are not reachable via labeled control flow.
+  ///
+  /// \returns the set of labeled statements visible from the given source
+  /// location, with the innermost labeled statement first and proceeding
+  /// to the outermost labeled statement.
+  static llvm::SmallVector<LabeledStmt *, 4>
+  lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
+
+  /// Look for the directly enclosing case statement and the next case
+  /// statement, which together act as the source and destination for a
+  /// 'fallthrough' statement within a switch case.
+  ///
+  /// \returns a pair (fallthrough source, fallthrough dest). If the location
+  /// is not within the body of a case statement at all, the fallthrough
+  /// source will be \c nullptr. If there is a fallthrough source that case is
+  /// the last one, the fallthrough destination will be \c nullptr. A
+  /// well-formed 'fallthrough' statement has both a source and destination.
+  static std::pair<CaseStmt *, CaseStmt *>
+  lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
@@ -697,8 +736,6 @@ public:
     assert(Mem);
     return Mem;
   }
-
-  static bool areInactiveIfConfigClausesSupported();
 
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);

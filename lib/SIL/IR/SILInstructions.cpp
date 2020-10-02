@@ -422,7 +422,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
                                   : SILModuleConventions(F.getModule()));
-  SILType Result = Conv.getSILResultType();
+  SILType Result = Conv.getSILResultType(F.getTypeExpansionContext());
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -474,7 +474,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
 
   for (auto &yield : substCalleeType->getYields()) {
-    auto yieldType = conv.getSILType(yield);
+    auto yieldType = conv.getSILType(yield, F.getTypeExpansionContext());
     auto convention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(
@@ -608,10 +608,12 @@ TryApplyInst *TryApplyInst::create(
 }
 
 SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
-    SILValue OriginalFunction, IndexSubset *ParameterIndices) {
+    SILValue OriginalFunction, IndexSubset *ParameterIndices,
+    IndexSubset *ResultIndices) {
+  assert(!ResultIndices->isEmpty());
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
   auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Normal,
-                                               ParameterIndices);
+                                               ParameterIndices, ResultIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
@@ -625,22 +627,23 @@ ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
 
 DifferentiableFunctionInst::DifferentiableFunctionInst(
     SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
-    bool HasOwnership)
+    IndexSubset *ResultIndices, SILValue OriginalFunction,
+    ArrayRef<SILValue> DerivativeFunctions, bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
           OriginalFunction, DerivativeFunctions, Loc,
-          getDifferentiableFunctionType(OriginalFunction, ParameterIndices),
+          getDifferentiableFunctionType(OriginalFunction, ParameterIndices,
+                                        ResultIndices),
           HasOwnership
               ? getMergedOwnershipKind(OriginalFunction, DerivativeFunctions)
               : ValueOwnershipKind(ValueOwnershipKind::None)),
-      ParameterIndices(ParameterIndices),
+      ParameterIndices(ParameterIndices), ResultIndices(ResultIndices),
       HasDerivativeFunctions(!DerivativeFunctions.empty()) {
   assert(DerivativeFunctions.empty() || DerivativeFunctions.size() == 2);
 }
 
 DifferentiableFunctionInst *DifferentiableFunctionInst::create(
     SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction,
+    IndexSubset *ResultIndices, SILValue OriginalFunction,
     Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
     bool HasOwnership) {
   auto derivativeFunctions =
@@ -651,16 +654,18 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
           : ArrayRef<SILValue>();
   size_t size = totalSizeToAlloc<Operand>(1 + derivativeFunctions.size());
   void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
-  return ::new (buffer)
-      DifferentiableFunctionInst(Loc, ParameterIndices, OriginalFunction,
-                                 derivativeFunctions, HasOwnership);
+  return ::new (buffer) DifferentiableFunctionInst(
+      Loc, ParameterIndices, ResultIndices, OriginalFunction,
+      derivativeFunctions, HasOwnership);
 }
 
 SILType LinearFunctionInst::getLinearFunctionType(
     SILValue OriginalFunction, IndexSubset *ParameterIndices) {
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy = fnTy->getWithDifferentiability(
-      DifferentiabilityKind::Linear, ParameterIndices);
+  auto *resultIndices =
+      IndexSubset::get(fnTy->getASTContext(), /*capacity*/ 1, /*indices*/ {0});
+  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Linear,
+                                               ParameterIndices, resultIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
@@ -707,8 +712,9 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0, *kindOpt,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()));
+      fnTy->getDifferentiabilityParameterIndices(),
+      fnTy->getDifferentiabilityResultIndices(), *kindOpt, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
@@ -751,14 +757,15 @@ getExtracteeType(
         LookUpConformanceInModule(module.getSwiftModule()));
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
+  llvm_unreachable("invalid extractee");
 }
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
-    LinearDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
-    : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
+    LinearDifferentiableFunctionTypeComponent extractee, SILValue function)
+    : UnaryInstructionBase(debugLoc, function,
+                           getExtracteeType(function, extractee, module)),
+      extractee(extractee) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
@@ -773,9 +780,9 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     bool isReabstractionThunk =
         witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, *resultIndices->begin(), *derivativeKind,
-        module.Types, LookUpConformanceInModule(module.getSwiftModule()),
-        witnessCanGenSig, isReabstractionThunk);
+        parameterIndices, resultIndices, *derivativeKind, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig,
+        isReabstractionThunk);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
@@ -1036,9 +1043,6 @@ CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 uint64_t StringLiteralInst::getCodeUnitCount() {
-  auto E = unsigned(Encoding::UTF16);
-  if (SILInstruction::Bits.StringLiteralInst.TheEncoding == E)
-    return unicode::getUTF16Length(getValue());
   return SILInstruction::Bits.StringLiteralInst.Length;
 }
 
@@ -1254,7 +1258,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   // parent tuple has only one non-trivial field.
   bool FoundNonTrivialField = false;
   SILType OpTy = getOperand()->getType();
-  unsigned FieldNo = getFieldNo();
+  unsigned FieldNo = getFieldIndex();
 
   // For each element index of the tuple...
   for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
@@ -1296,7 +1300,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
   // we have no other non-trivial elts.
   SILType OpTy = getOperand()->getType();
-  unsigned FieldNo = getFieldNo();
+  unsigned FieldNo = getFieldIndex();
 
   // For each element index of the tuple...
   for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
@@ -1319,18 +1323,43 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   return true;
 }
 
-unsigned FieldIndexCacheBase::cacheFieldIndex() {
-  unsigned i = 0;
-  for (VarDecl *property : getParentDecl()->getStoredProperties()) {
-    if (field == property) {
-      SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = i;
-      return i;
+/// Get a unique index for a struct or class field in layout order.
+unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
+  unsigned index = 0;
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      index += superDecl->getStoredProperties().size();
     }
-    ++i;
+  }
+  for (VarDecl *property : decl->getStoredProperties()) {
+    if (field == property) {
+      return index;
+    }
+    ++index;
   }
   llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
-                   "or ref_element_addr must be an accessible stored property "
-                   "of the operand's type");
+                   "or ref_element_addr must be an accessible stored "
+                   "property of the operand type");
+}
+
+/// Get the property for a struct or class by its unique index.
+VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      assert(index >= superDecl->getStoredProperties().size()
+             && "field index cannot refer to a superclass field");
+      index -= superDecl->getStoredProperties().size();
+    }
+  }
+  return decl->getStoredProperties()[index];
+}
+
+unsigned FieldIndexCacheBase::cacheFieldIndex() {
+  unsigned index = ::getFieldIndex(getParentDecl(), getField());
+  SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = index;
+  return index;
 }
 
 // FIXME: this should be cached during cacheFieldIndex().
@@ -2165,6 +2194,36 @@ OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
                                                      SILType SelfTy)
     : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
 
+BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
+                               SILValue operand,
+                               ArrayRef<SILType> resultTypes,
+                               ArrayRef<ValueOwnershipKind> resultOwnerships,
+                               bool isNative)
+    : UnaryInstructionBase(loc, operand),
+      MultipleValueInstructionTrailingObjects(this, resultTypes,
+                                              resultOwnerships) {
+  assert(resultTypes.size() == 2 && resultOwnerships.size() == 2);
+  assert(operand->getType() == resultTypes[1]);
+  setNative(isNative);
+}
+
+BeginCOWMutationInst *
+BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
+                             SILType boolTy, SILFunction &F, bool isNative) {
+
+  SILType resultTypes[2] = { boolTy, operand->getType() };
+  ValueOwnershipKind ownerships[2] = { ValueOwnershipKind::None, ValueOwnershipKind::Owned };
+
+  void *buffer =
+    allocateTrailingInst<BeginCOWMutationInst,
+                         MultipleValueInstruction*, BeginCOWMutationResult>(
+      F, 1, 2);
+  return ::new(buffer) BeginCOWMutationInst(loc, operand,
+                                  ArrayRef<SILType>(resultTypes, 2),
+                                  ArrayRef<ValueOwnershipKind>(ownerships, 2),
+                                  isNative);
+}
+
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,
@@ -2178,6 +2237,21 @@ UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedRefCastInst));
   return ::new (Buffer) UncheckedRefCastInst(DebugLoc, Operand,
                                              TypeDependentOperands, Ty);
+}
+
+UncheckedValueCastInst *
+UncheckedValueCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                               SILType Ty, SILFunction &F,
+                               SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getASTType());
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(UncheckedValueCastInst));
+  return ::new (Buffer)
+      UncheckedValueCastInst(DebugLoc, Operand, TypeDependentOperands, Ty);
 }
 
 UncheckedAddrCastInst *

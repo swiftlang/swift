@@ -1,5 +1,5 @@
-from Child import Child
-from Node import Node  # noqa: I201
+from .Child import Child
+from .Node import Node  # noqa: I201
 
 ATTRIBUTE_NODES = [
     # token-list -> token? token-list?
@@ -292,6 +292,15 @@ ATTRIBUTE_NODES = [
                    '''),
              Child('OriginalDeclName', kind='QualifiedDeclName',
                    description='The referenced original declaration name.'),
+             Child('Period', kind='PeriodToken',
+                   description='''
+                   The period separating the original declaration name and the
+                   accessor name.
+                   ''', is_optional=True),
+             Child('AccessorKind', kind='IdentifierToken',
+                   description='The accessor name.',
+                   text_choices=['get', 'set'],
+                   is_optional=True),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiabilityParamsClause',
                    is_optional=True),

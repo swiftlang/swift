@@ -25,6 +25,22 @@ namespace swift {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+// Tags used to denote different kinds of allocations made with the metadata
+// allocator. This is encoded in a header on each allocation when metadata
+// iteration is enabled, and allows tools to know where each allocation came
+// from.
+enum MetadataAllocatorTags : uint16_t {
+#define TAG(name, value) name##Tag = value,
+#include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
+};
+
+template <typename Runtime> struct MetadataAllocationBacktraceHeader {
+  TargetPointer<Runtime, const void> Next;
+  TargetPointer<Runtime, void> Allocation;
+  uint32_t Count;
+  // Count backtrace pointers immediately follow.
+};
+
 /// The buffer used by a yield-once coroutine (such as the generalized
 /// accessors `read` and `modify`).
 struct YieldOnceBuffer {
@@ -278,6 +294,20 @@ const
 /// the same context.
 bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
 
+/// Determines whether two type context descriptors describe the same type
+/// context.
+///
+/// Runtime availability: Swift 5.4.
+///
+/// \param lhs The first type context descriptor to compare.
+/// \param rhs The second type context descriptor to compare.
+///
+/// \returns true if both describe the same type context, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
+                                         const TypeContextDescriptor *rhs);
+
 /// Compute the bounds of class metadata with a resilient superclass.
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
@@ -289,6 +319,26 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getSingletonMetadata(MetadataRequest request,
                            const TypeContextDescriptor *description);
+
+/// Fetch a uniqued metadata object for the generic nominal type described by
+/// the provided candidate metadata, using that candidate metadata if there is
+/// not already a canonical metadata.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param candidate A prespecialized metadata record for a type which is not
+///                  statically made to be canonical which will be canonicalized
+///                  if no other canonical metadata exists for the type.
+/// \param cache A pointer to a cache which will be set to the canonical 
+///              metadata record for the type described by the candidate 
+///              metadata record.  If the cache has already been populated, its
+///              contents will be returned.
+/// \returns The canonical metadata for the specialized generic type described
+///          by the provided candidate metadata.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) MetadataResponse
+    swift_getCanonicalSpecializedMetadata(MetadataRequest request,
+                                          const Metadata *candidate,
+                                          const Metadata **cache);
 
 /// Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -392,6 +442,21 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
+
+/// Determine whether two protocol conformance descriptors describe the same
+/// conformance of a type to a protocol.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param lhs The first protocol conformance descriptor to compare.
+/// \param rhs The second protocol conformance descriptor to compare.
+///
+/// \returns true if both describe the same conformance, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareProtocolConformanceDescriptors(
+    const ProtocolConformanceDescriptor *lhs,
+    const ProtocolConformanceDescriptor *rhs);
 
 /// Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT

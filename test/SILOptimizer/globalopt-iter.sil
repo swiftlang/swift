@@ -19,8 +19,9 @@ class E : B { }
 sil @patatino : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Word, 0
   %1 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $B
-  set_deallocating %1 : $B
-  dealloc_ref %1 : $B
+  %2 = end_cow_mutation %1 : $B
+  set_deallocating %2 : $B
+  dealloc_ref %2 : $B
   %45 = tuple ()
   return %45 : $()
 }

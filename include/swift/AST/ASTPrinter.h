@@ -17,6 +17,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/raw_ostream.h"
@@ -30,7 +31,7 @@ namespace swift {
   class TypeDecl;
   class EnumElementDecl;
   class Type;
-  struct TypeLoc;
+  class TypeLoc;
   class Pattern;
   class ExtensionDecl;
   class NominalTypeDecl;
@@ -203,7 +204,9 @@ public:
     return *this << StringRef(&c, 1);
   }
 
-  void printKeyword(StringRef name, PrintOptions Opts, StringRef Suffix = "") {
+  void printKeyword(StringRef name,
+                    const PrintOptions &Opts,
+                    StringRef Suffix = "") {
     if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
       return;
     assert(!name.empty() && "Tried to print empty keyword");
@@ -322,7 +325,7 @@ public:
   ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
   : StreamPrinter(out), ExtraIndent(extraIndent) { }
 
-  virtual void printIndent() {
+  virtual void printIndent() override {
     printText(ExtraIndent);
     StreamPrinter::printIndent();
   }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/DeclObjC.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -47,11 +48,11 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.FunctionDefinitions = false;
   Opts.ArgAndParamPrinting =
     PrintOptions::ArgAndParamPrintingMode::MatchSource;
-  Opts.PrintGetSetOnRWProperties = false;
-  Opts.PrintPropertyAccessors = false;
-  Opts.PrintSubscriptAccessors = false;
+  Opts.PrintGetSetOnRWProperties = true;
+  Opts.PrintPropertyAccessors = true;
+  Opts.PrintSubscriptAccessors = true;
   Opts.SkipUnderscoredKeywords = true;
-  Opts.SkipAttributes = true;
+  Opts.SkipAttributes = false;
   Opts.PrintOverrideKeyword = true;
   Opts.PrintImplicitAttrs = false;
   Opts.PrintFunctionRepresentationAttrs =
@@ -59,14 +60,78 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintUserInaccessibleAttrs = false;
   Opts.SkipPrivateStdlibDecls = true;
   Opts.SkipUnderscoredStdlibProtocols = true;
+  Opts.PrintGenericRequirements = true;
+  Opts.PrintInherited = false;
 
   Opts.ExclusiveAttrList.clear();
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) Opts.ExcludeAttrList.push_back(DAK_##CLASS);
-#define TYPE_ATTR(X) Opts.ExcludeAttrList.push_back(TAK_##X);
+  llvm::StringMap<AnyAttrKind> ExcludeAttrs;
+
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
+  if (StringRef(#SPELLING).startswith("_")) \
+    ExcludeAttrs.insert(std::make_pair("DAK_" #CLASS, DAK_##CLASS));
+#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
 
+  // Allow the following type attributes:
+  ExcludeAttrs.erase("TAK_autoclosure");
+  ExcludeAttrs.erase("TAK_convention");
+  ExcludeAttrs.erase("TAK_noescape");
+  ExcludeAttrs.erase("TAK_escaping");
+  ExcludeAttrs.erase("TAK_inout");
+
+  // Don't allow the following decl attributes:
+  // These can be large and are already included elsewhere in
+  // symbol graphs.
+  ExcludeAttrs.insert(std::make_pair("DAK_Available", DAK_Available));
+  ExcludeAttrs.insert(std::make_pair("DAK_Inline", DAK_Inline));
+  ExcludeAttrs.insert(std::make_pair("DAK_Inlinable", DAK_Inlinable));
+  ExcludeAttrs.insert(std::make_pair("DAK_Prefix", DAK_Prefix));
+  ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
+  ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
+
+  for (const auto &Entry : ExcludeAttrs) {
+    Opts.ExcludeAttrList.push_back(Entry.getValue());
+  }
+
   return Opts;
+}
+
+PrintOptions
+SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
+  auto Options = getDeclarationFragmentsPrintOptions();
+  Options.ArgAndParamPrinting =
+    PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+
+  //--------------------------------------------------------------------------//
+  // Although we want these in the full declaration presentation,
+  // particularly for protocol requirements,
+  // we don't want to show these in subheadings.
+  Options.PrintGetSetOnRWProperties = false;
+  Options.PrintPropertyAccessors = false;
+  Options.PrintSubscriptAccessors = false;
+  //--------------------------------------------------------------------------//
+
+  Options.SkipAttributes = true;
+  Options.VarInitializers = false;
+  Options.PrintDefaultArgumentValue = false;
+  Options.PrintEmptyArgumentNames = false;
+  Options.PrintOverrideKeyword = false;
+  Options.PrintGenericRequirements = false;
+
+  #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
+    Options.ExcludeAttrList.push_back(DAK_##CLASS);
+  #define TYPE_ATTR(X) \
+    Options.ExcludeAttrList.push_back(TAK_##X);
+  #include "swift/AST/Attr.def"
+
+  // Don't include these attributes in subheadings.
+  Options.ExcludeAttrList.push_back(DAK_Final);
+  Options.ExcludeAttrList.push_back(DAK_Mutating);
+  Options.ExcludeAttrList.push_back(DAK_NonMutating);
+  Options.ExcludeAttrList.push_back(TAK_escaping);
+
+  return Options;
 }
 
 bool
@@ -99,11 +164,11 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
     return false;
   };
 
-  if (FoundRequirementMemberNamed(VD->getFullName(), Proto)) {
+  if (FoundRequirementMemberNamed(VD->getName(), Proto)) {
     return true;
   }
   for (auto *Inherited : Proto->getInheritedProtocols()) {
-    if (FoundRequirementMemberNamed(VD->getFullName(), Inherited)) {
+    if (FoundRequirementMemberNamed(VD->getName(), Inherited)) {
       return true;
     }
   }
@@ -218,6 +283,28 @@ void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
   }
 }
 
+bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
+    const NominalTypeDecl *Owner) const {
+  const auto *FD = dyn_cast<FuncDecl>(VD);
+  if (!FD) {
+    return true;
+  }
+  auto *DC = const_cast<DeclContext*>(Owner->getDeclContext());
+
+  ResolvedMemberResult Result =
+    resolveValueMember(*DC, Owner->getSelfTypeInContext(),
+                       FD->getEffectiveFullName());
+
+  const auto ViableCandidates =
+    Result.getMemberDecls(InterestedMemberKind::All);
+
+  if (ViableCandidates.size() < 2) {
+    return true;
+  }
+
+  return !(Result.hasBestOverload() && Result.getBestOverload() != VD);
+}
+
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   if (!Walker.Options.EmitSynthesizedMembers) {
     return;
@@ -264,14 +351,22 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
             continue;
           }
 
+          const auto StdlibModule = OwningNominal->getASTContext()
+              .getStdlibModule(/*loadIfAbsent=*/true);
+
           // There can be synthesized members on effectively private protocols
           // or things that conform to them. We don't want to include those.
-          if (SynthMember->hasUnderscoredNaming()) {
+          if (isImplicitlyPrivate(SynthMember,
+              /*IgnoreContext =*/
+              SynthMember->getModuleContext() == StdlibModule)) {
             continue;
           }
 
-          auto ExtendedSG =
-              Walker.getModuleSymbolGraph(OwningNominal->getModuleContext());
+          if (!synthesizedMemberIsBestCandidate(SynthMember, OwningNominal)) {
+            continue;
+          }
+
+          auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
 
           Symbol Source(this, SynthMember, OwningNominal);
           Symbol Target(this, OwningNominal, nullptr);
@@ -315,7 +410,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
   auto HandleProtocol = [=](const ProtocolDecl *P) {
     for (const auto *Member : P->getMembers()) {
       if (const auto *MemberVD = dyn_cast<ValueDecl>(Member)) {
-        if (MemberVD->getFullName().compare(VD->getFullName()) == 0) {
+        if (MemberVD->getName().compare(VD->getName()) == 0) {
           recordEdge(Symbol(this, VD, nullptr),
                      Symbol(this, MemberVD, nullptr),
                      RelationshipKind::DefaultImplementationOf());
@@ -446,13 +541,13 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }
 
     OS.attributeArray("symbols", [&](){
-      for (const auto S: Nodes) {
+      for (const auto &S: Nodes) {
         S.serialize(OS);
       }
     });
 
     OS.attributeArray("relationships", [&](){
-      for (const auto Relationship : Edges) {
+      for (const auto &Relationship : Edges) {
         Relationship.serialize(OS);
       }
     });
@@ -463,7 +558,7 @@ void
 SymbolGraph::serializeDeclarationFragments(StringRef Key,
                                            const Symbol &S,
                                            llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
   if (S.getSynthesizedBaseType()) {
     Options.setBaseType(S.getSynthesizedBaseType());
@@ -472,21 +567,32 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
 }
 
 void
+SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
+                                                    const Symbol &S,
+                                                    llvm::json::OStream &OS) {
+  DeclarationFragmentPrinter Printer(this, OS, Key);
+
+  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+    Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
+  } else {
+    auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
+    if (S.getSynthesizedBaseType()) {
+      Options.setBaseType(S.getSynthesizedBaseType());
+    }
+    S.getSymbolDecl()->print(Printer, Options);
+  }
+}
+
+void
 SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      const Symbol &S,
                                                      llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
-    Printer.printAbridgedType(TD);
+    Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
-    auto Options = getDeclarationFragmentsPrintOptions();
-    Options.ArgAndParamPrinting =
-      PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-    Options.VarInitializers = false;
-    Options.PrintDefaultArgumentValue = false;
-    Options.PrintEmptyArgumentNames = false;
-    Options.PrintOverrideKeyword = false;
+    auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
     if (S.getSynthesizedBaseType()) {
       Options.setBaseType(S.getSynthesizedBaseType());
     }
@@ -497,70 +603,78 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
 void
 SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
                                             llvm::json::OStream &OS) {
-  DeclarationFragmentPrinter Printer(OS, Key);
+  DeclarationFragmentPrinter Printer(this, OS, Key);
   T->print(Printer, getDeclarationFragmentsPrintOptions());
 }
 
-bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD) const {
+bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
+                                      bool IgnoreContext) const {
   // Don't record unconditionally private declarations
-  if (VD->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
+  if (D->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
     return true;
   }
 
   // Don't record effectively internal declarations if specified
   if (Walker.Options.MinimumAccessLevel > AccessLevel::Internal &&
-      VD->hasUnderscoredNaming()) {
+      D->hasUnderscoredNaming()) {
     return true;
   }
 
-  // Don't include declarations with the @_spi attribute for now.
-  if (VD->getAttrs().getAttribute(DeclAttrKind::DAK_SPIAccessControl)) {
-    return true;
+  // Don't include declarations with the @_spi attribute unless the
+  // access control filter is internal or below.
+  if (D->isSPI()) {
+    return Walker.Options.MinimumAccessLevel > AccessLevel::Internal;
   }
 
-  // Symbols must meet the minimum access level to be included in the graph.
-  if (VD->getFormalAccess() < Walker.Options.MinimumAccessLevel) {
-    return true;
+  if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
+    if (const auto *Nominal = Extension->getExtendedNominal()) {
+      return isImplicitlyPrivate(Nominal, IgnoreContext);
+    }
   }
 
-  // Special cases below.
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    // Symbols must meet the minimum access level to be included in the graph.
+    if (VD->getFormalAccess() < Walker.Options.MinimumAccessLevel) {
+      return true;
+    }
 
-  auto BaseName = VD->getBaseName().userFacingName();
+    // Special cases below.
 
-  // ${MODULE}Version{Number,String} in ${Module}.h
-  SmallString<32> VersionNameIdentPrefix { M.getName().str() };
-  VersionNameIdentPrefix.append("Version");
-  if (BaseName.startswith(VersionNameIdentPrefix.str())) {
-    return true;
-  }
+    auto BaseName = VD->getBaseName().userFacingName();
 
-  // Automatically mapped SIMD types
-  auto IsGlobalSIMDType = llvm::StringSwitch<bool>(BaseName)
-#define MAP_SIMD_TYPE(C_TYPE, _, __) \
-.Case("swift_" #C_TYPE "2", true) \
-.Case("swift_" #C_TYPE "3", true) \
-.Case("swift_" #C_TYPE "4", true)
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-  .Case("SWIFT_TYPEDEFS", true)
-  .Case("char16_t", true)
-  .Case("char32_t", true)
-  .Default(false);
+    // ${MODULE}Version{Number,String} in ${Module}.h
+    SmallString<32> VersionNameIdentPrefix { M.getName().str() };
+    VersionNameIdentPrefix.append("Version");
+    if (BaseName.startswith(VersionNameIdentPrefix.str())) {
+      return true;
+    }
 
-  if (IsGlobalSIMDType) {
-    return true;
+    // Automatically mapped SIMD types
+    auto IsGlobalSIMDType = llvm::StringSwitch<bool>(BaseName)
+  #define MAP_SIMD_TYPE(C_TYPE, _, __) \
+  .Case("swift_" #C_TYPE "2", true) \
+  .Case("swift_" #C_TYPE "3", true) \
+  .Case("swift_" #C_TYPE "4", true)
+  #include "swift/ClangImporter/SIMDMappedTypes.def"
+    .Case("SWIFT_TYPEDEFS", true)
+    .Case("char16_t", true)
+    .Case("char32_t", true)
+    .Default(false);
+
+    if (IsGlobalSIMDType) {
+      return true;
+    }
+
+    if (IgnoreContext) {
+      return false;
+    }
   }
 
   // Check up the parent chain. Anything inside a privately named
   // thing is also private. We could be looking at the `B` of `_A.B`.
-  if (const auto *DC = VD->getDeclContext()) {
+  if (const auto *DC = D->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
-      if (const auto *ParentVD = dyn_cast<ValueDecl>(Parent)) {
-        return isImplicitlyPrivate(ParentVD);
-      } else if (const auto *Extension = dyn_cast<ExtensionDecl>(Parent)) {
-        if (const auto *Nominal = Extension->getExtendedNominal()) {
-          return isImplicitlyPrivate(Nominal);
-        }
-      }
+      return isImplicitlyPrivate(Parent, IgnoreContext);
     }
   }
   return false;

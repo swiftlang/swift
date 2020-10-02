@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <stdio.h>
-
 #include "swift/AST/FineGrainedDependencies.h"
 
 // may not all be needed
@@ -19,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
@@ -29,7 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/YAMLParser.h"
+
 
 // This file holds the definitions for the fine-grained dependency system
 // that are likely to be stable as it moves away from the status quo.
@@ -53,11 +52,18 @@ Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
 Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
   SourceFileDepGraph fg;
-  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
-  yamlReader >> fg;
-  if (yamlReader.error())
+  if (swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
+      buffer, fg))
     return None;
-  // return fg; compiles for Mac but not Linux, because it cannot be copied.
+  return Optional<SourceFileDepGraph>(std::move(fg));
+}
+
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromSwiftModuleBuffer(llvm::MemoryBuffer &buffer) {
+  SourceFileDepGraph fg;
+  if (swift::fine_grained_dependencies::
+          readFineGrainedDependencyGraphFromSwiftModule(buffer, fg))
+    return None;
   return Optional<SourceFileDepGraph>(std::move(fg));
 }
 
@@ -234,6 +240,7 @@ std::string DependencyKey::humanReadableName() const {
   switch (kind) {
   case NodeKind::member:
     return demangleTypeAsContext(context) + "." + name;
+  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     return llvm::sys::path::filename(name).str();
@@ -264,9 +271,12 @@ raw_ostream &fine_grained_dependencies::operator<<(raw_ostream &out,
 bool DependencyKey::verify() const {
   assert((getKind() != NodeKind::externalDepend || isInterface()) &&
          "All external dependencies must be interfaces.");
+  assert((getKind() != NodeKind::incrementalExternalDepend || isInterface()) &&
+         "All incremental external dependencies must be interfaces.");
   switch (getKind()) {
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
+  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     assert(context.empty() && !name.empty() && "Must only have a name");
@@ -297,6 +307,7 @@ void DependencyKey::verifyNodeKindNames() {
       CHECK_NAME(potentialMember)
       CHECK_NAME(member)
       CHECK_NAME(dynamicLookup)
+      CHECK_NAME(incrementalExternalDepend)
       CHECK_NAME(externalDepend)
       CHECK_NAME(sourceFileProvide)
     case NodeKind::kindCount:
@@ -333,6 +344,19 @@ void DepGraphNode::dump(raw_ostream &os) const {
     llvm::errs() << "no fingerprint";
 }
 
+void SourceFileDepGraphNode::dump() const {
+  dump(llvm::errs());
+}
+
+void SourceFileDepGraphNode::dump(raw_ostream &os) const {
+  DepGraphNode::dump(os);
+  os << " sequence number: " << sequenceNumber;
+  os << " is provides: " << isProvides;
+  os << " depends on:";
+  for (auto def : defsIDependUpon)
+    os << " " << def;
+}
+
 std::string DepGraphNode::humanReadableName(StringRef where) const {
 
   return getKey().humanReadableName() +
@@ -360,88 +384,3 @@ void SourceFileDepGraph::emitDotFile(StringRef outputPath,
     return false;
   });
 }
-
-//==============================================================================
-// MARK: SourceFileDepGraph YAML reading & writing
-//==============================================================================
-
-namespace llvm {
-namespace yaml {
-// This introduces a redefinition for Linux.
-#if !(defined(__linux__) || defined(_WIN64))
-void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
-  out << Val;
-}
-
-StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
-                                      size_t &value) {
-  return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
-}
-#endif
-
-void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
-    enumeration(IO &io, swift::fine_grained_dependencies::NodeKind &value) {
-  using NodeKind = swift::fine_grained_dependencies::NodeKind;
-  io.enumCase(value, "topLevel", NodeKind::topLevel);
-  io.enumCase(value, "nominal", NodeKind::nominal);
-  io.enumCase(value, "potentialMember", NodeKind::potentialMember);
-  io.enumCase(value, "member", NodeKind::member);
-  io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
-  io.enumCase(value, "externalDepend", NodeKind::externalDepend);
-  io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
-}
-
-void ScalarEnumerationTraits<DeclAspect>::enumeration(
-    IO &io, swift::fine_grained_dependencies::DeclAspect &value) {
-  using DeclAspect = swift::fine_grained_dependencies::DeclAspect;
-  io.enumCase(value, "interface", DeclAspect::interface);
-  io.enumCase(value, "implementation", DeclAspect::implementation);
-}
-
-void MappingTraits<DependencyKey>::mapping(
-    IO &io, swift::fine_grained_dependencies::DependencyKey &key) {
-  io.mapRequired("kind", key.kind);
-  io.mapRequired("aspect", key.aspect);
-  io.mapRequired("context", key.context);
-  io.mapRequired("name", key.name);
-}
-
-void MappingTraits<DepGraphNode>::mapping(
-    IO &io, swift::fine_grained_dependencies::DepGraphNode &node) {
-  io.mapRequired("key", node.key);
-  io.mapOptional("fingerprint", node.fingerprint);
-}
-
-void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
-    IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
-  MappingTraits<DepGraphNode>::mapping(io, node);
-  io.mapRequired("sequenceNumber", node.sequenceNumber);
-  std::vector<size_t> defsIDependUponVec(node.defsIDependUpon.begin(),
-                                         node.defsIDependUpon.end());
-  io.mapRequired("defsIDependUpon", defsIDependUponVec);
-  io.mapRequired("isProvides", node.isProvides);
-  if (!io.outputting()) {
-    for (size_t u : defsIDependUponVec)
-      node.defsIDependUpon.insert(u);
-  }
-  assert(g.getNode(node.sequenceNumber) && "Bad sequence number");
-}
-
-size_t SequenceTraits<std::vector<SourceFileDepGraphNode *>>::size(
-    IO &, std::vector<SourceFileDepGraphNode *> &vec) {
-  return vec.size();
-}
-
-SourceFileDepGraphNode &
-SequenceTraits<std::vector<SourceFileDepGraphNode *>>::element(
-    IO &, std::vector<SourceFileDepGraphNode *> &vec, size_t index) {
-  while (vec.size() <= index)
-    vec.push_back(new SourceFileDepGraphNode());
-  return *vec[index];
-}
-
-void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
-  io.mapRequired("allNodes", g.allNodes, g);
-}
-} // namespace yaml
-} // namespace llvm

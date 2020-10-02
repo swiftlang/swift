@@ -14,6 +14,10 @@ func _allocateUninitializedArray<T>(_: Builtin.Word)
   Builtin.int_trap()
 }
 
+func _finalizeUninitializedArray<T>(_ a: Array<T>) -> Array<T> {
+  return a
+}
+
 func _deallocateUninitializedArray<T>(_: Array<T>) {}
 
 var i:Int, f:Float, c:UnicodeScalar
@@ -77,6 +81,14 @@ variadic_arg_2(i, f, f, f)
 func variadic_arg_3(_ y: Float..., x: Int) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_3{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Int):
+
+func variadic_arg_4(_ y: Float..., x: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_4{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Array<Int>):
+
+func variadic_arg_5(a: Int, b: Float..., c: Int, d: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_5{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[A:%[0-9]+]] : $Int, [[B:%[0-9]+]] : $Array<Float>, [[C:%[0-9]+]] : $Int, [[D:%[0-9]+]] : $Array<Int>):
 
 variadic_arg_3(x: i)
 variadic_arg_3(f, x: i)

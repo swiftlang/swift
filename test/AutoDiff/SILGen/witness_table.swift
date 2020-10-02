@@ -36,28 +36,28 @@ struct Struct: Protocol {
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}method{{.*}}_jvp_SUU : $@convention(witness_method: Protocol) (Float, Double, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}method{{.*}} : $@convention(method) (Float, Double, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[DIFF_FN]]
   // CHECK: apply [[JVP_FN]]
   // CHECK: }
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}method{{.*}}_vjp_SUU : $@convention(witness_method: Protocol) (Float, Double, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}method{{.*}} : $@convention(method) (Float, Double, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]]
   // CHECK: apply [[VJP_FN]]
   // CHECK: }
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}method{{.*}}_jvp_SSS : $@convention(witness_method: Protocol) (Float, Double, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float, Double, @in_guaranteed τ_0_0) -> Float for <DummyTangentVector>) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}method{{.*}} : $@convention(method) (Float, Double, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0 1 2] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0 1 2] [results 0] [[ORIG_FN]]
   // CHECK: [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[DIFF_FN]]
   // CHECK: apply [[JVP_FN]]
   // CHECK: }
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}method{{.*}}_vjp_SSS : $@convention(witness_method: Protocol) (Float, Double, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> (Float, Double, @out τ_0_0) for <DummyTangentVector>) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}method{{.*}} : $@convention(method) (Float, Double, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0 1 2] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0 1 2] [results 0] [[ORIG_FN]]
   // CHECK: [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]]
   // CHECK: apply [[VJP_FN]]
   // CHECK: }
@@ -70,14 +70,14 @@ struct Struct: Protocol {
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}property{{.*}}_jvp_S : $@convention(witness_method: Protocol) (@in_guaranteed Struct) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Float for <DummyTangentVector>) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}property{{.*}} : $@convention(method) (Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[DIFF_FN]]
   // CHECK: apply [[JVP_FN]]
   // CHECK: }
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__${{.*}}property{{.*}}_vjp_S : $@convention(witness_method: Protocol) (@in_guaranteed Struct) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> @out τ_0_0 for <DummyTangentVector>) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref {{.*}}property{{.*}} : $@convention(method) (Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]]
   // CHECK: apply [[VJP_FN]]
   // CHECK: }
@@ -90,14 +90,14 @@ struct Struct: Protocol {
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcigTW_jvp_SUU : $@convention(witness_method: Protocol) (Float, Float, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref @$s13witness_table6StructVyS2f_Sftcig : $@convention(method) (Float, Float, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[DIFF_FN]]
   // CHECK: apply [[JVP_FN]]
   // CHECK: }
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcigTW_vjp_SUU : $@convention(witness_method: Protocol) (Float, Float, @in_guaranteed Struct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
   // CHECK: [[ORIG_FN:%.*]] = function_ref @$s13witness_table6StructVyS2f_Sftcig : $@convention(method) (Float, Float, Struct) -> Float
-  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [[ORIG_FN]]
+  // CHECK: [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]]
   // CHECK: [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]]
   // CHECK: apply [[VJP_FN]]
   // CHECK: }

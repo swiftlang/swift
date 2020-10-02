@@ -76,7 +76,7 @@ extension String {
   ///         let s = String(validatingUTF8: ptr.baseAddress!)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional(Café)"
+  ///     // Prints "Optional("Café")"
   ///
   ///     let invalidUTF8: [CChar] = [67, 97, 102, -61, 0]
   ///     invalidUTF8.withUnsafeBufferPointer { ptr in
@@ -114,7 +114,7 @@ extension String {
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional((Café, false))"
+  ///     // Prints "Optional((result: "Café", repairsMade: false))"
   ///
   ///     let invalidUTF8: [UInt8] = [67, 97, 102, 195, 0]
   ///     invalidUTF8.withUnsafeBufferPointer { ptr in
@@ -123,7 +123,7 @@ extension String {
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional((Caf�, true))"
+  ///     // Prints "Optional((result: "Caf�", repairsMade: true))"
   ///
   /// - Parameters:
   ///   - cString: A pointer to a null-terminated code sequence encoded in

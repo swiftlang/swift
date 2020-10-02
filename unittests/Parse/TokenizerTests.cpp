@@ -31,7 +31,7 @@ public:
     }
   }
 
-  static StringRef tokToString(swift::tok T) {
+  static std::string tokToString(swift::tok T) {
     switch (T) {
   #define KEYWORD(X) \
     case swift::tok::kw_##X: return "kw_" #X; break;

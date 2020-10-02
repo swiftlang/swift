@@ -27,6 +27,19 @@ void printCodeCompletionResultDescription(const CodeCompletionResult &Result,
 void printCodeCompletionResultDescriptionAnnotated(
     const CodeCompletionResult &Result, llvm::raw_ostream &OS,
     bool leadingPunctuation);
+
+void printCodeCompletionResultTypeName(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
+void printCodeCompletionResultTypeNameAnnotated(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
+void printCodeCompletionResultSourceText(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
+void printCodeCompletionResultFilterName(
+    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+
 } // namespace ide
 } // namespace swift
 

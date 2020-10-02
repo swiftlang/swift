@@ -46,9 +46,9 @@ public protocol P {
 public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'S' references itself}}
+// expected-note@-3 {{while resolving type 'S<A>'}}
   func f(a: A.T) {
-    g(a: id(t: a))
-    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<A>'}}
+    g(a: id(t: a)) // `a` has error type which is diagnosed as circular reference
     _ = A.T.self
   }
 
@@ -74,6 +74,7 @@ protocol PI {
 struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'SI' references itself}}
+// expected-note@-3 {{while resolving type 'SI<A>'}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }

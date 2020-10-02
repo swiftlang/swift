@@ -1,0 +1,4 @@
+func /*test:def*/<base>`foo`</base>(<arglabel index=0>`x`</arglabel><param index=0> `y`</param>: Int) {}
+/*test:call*/<base>`foo`</base>(<callarg index=0>`x`</callarg><callcolon index=0>: </callcolon>2)
+_ = /*test:ref*/<base>`foo`</base>(<sel index=0>`x`</sel>:)
+

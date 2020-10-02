@@ -14,7 +14,6 @@
 #define SWIFT_AST_GENERICPARAMKEY_H
 
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Type.h"
 
 namespace swift {

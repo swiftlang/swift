@@ -16,7 +16,7 @@ func foo() {
 }
 
 // COMPLETE-DAG: Decl[Module]/None:  swift_ide_test[#Module#]; name=swift_ide_test
-// COMPLETE-DAG: Decl[Module]/None:  Swift[#Module#]; name=Swift
+// COMPLETE-DAG: Decl[Module]/None/IsSystem:  Swift[#Module#]; name=Swift
 // COMPLETE-DAG: Decl[Module]/None:  B[#Module#]; name=B
 // COMPLETE-DAG: Decl[Module]/None:  D[#Module#]; name=D
 // COMPLETE-DAG: Decl[FreeFunction]/OtherModule[B]:  fromB()[#Void#]; name=fromB()

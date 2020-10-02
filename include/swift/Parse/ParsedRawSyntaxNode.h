@@ -18,7 +18,6 @@
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
-#include <vector>
 
 namespace swift {
 
@@ -99,8 +98,8 @@ class ParsedRawSyntaxNode {
     assert(DeferredToken.NumTrailingTrivia == numTrailingTrivia &&
            "numLeadingTrivia is too large value!");
   }
-  ParsedRawSyntaxNode(ParsedRawSyntaxNode &other) = delete;
-  ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) = delete;
 
 public:
   ParsedRawSyntaxNode()

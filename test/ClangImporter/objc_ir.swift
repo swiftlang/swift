@@ -34,7 +34,7 @@ func instanceMethods(_ b: B) {
 func extensionMethods(b b: B) {
   // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK-NEXT: [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK:      [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
   // CHECK-NOT:  [[T0]]
   // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)
@@ -49,10 +49,6 @@ func initCallToAllocInit(i i: CInt) {
 
 // CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfC"
 // CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
-
-// CHECK: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
-// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
 // Indexed subscripting
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir19indexedSubscripting1b3idx1aySo1BC_SiSo1ACtF"
@@ -357,16 +353,20 @@ func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
 }
 
 
+// CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
+// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
+// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
+
 // CHECK: attributes [[NOUNWIND]] = { nounwind }
 
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[LET_SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})

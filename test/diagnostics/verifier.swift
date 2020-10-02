@@ -25,7 +25,7 @@ let a: Bool = "hello, world!" as Any
 
 // Unexpected error
 _ = foo()
-// CHECK: unexpected error produced: use of unresolved identifier 'foo'
+// CHECK: unexpected error produced: cannot find 'foo' in scope
 
 func b() {
   let c = 2

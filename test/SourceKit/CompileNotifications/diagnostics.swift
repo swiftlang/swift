@@ -38,7 +38,7 @@
 // SEMA-NEXT:     key.column: 5
 // SEMA-NEXT:     key.filepath: "{{.*}}sema-error.swift"
 // SEMA-NEXT:     key.severity: source.diagnostic.severity.error
-// SEMA-NEXT:     key.description: "use of
+// SEMA-NEXT:     key.description: "cannot find '{{.*}}' in scope
 // SEMA-NEXT:     key.ranges: [
 
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -Xcc -include -Xcc /doesnotexist | %FileCheck %s -check-prefix=CLANG_IMPORTER

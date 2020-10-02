@@ -93,6 +93,16 @@ struct OwnershipModelEliminatorVisitor
   bool visitSwitchEnumInst(SwitchEnumInst *SWI);
   bool visitDestructureStructInst(DestructureStructInst *DSI);
   bool visitDestructureTupleInst(DestructureTupleInst *DTI);
+
+  // We lower this to unchecked_bitwise_cast losing our assumption of layout
+  // compatibility.
+  bool visitUncheckedValueCastInst(UncheckedValueCastInst *UVCI) {
+    auto *NewVal = B.createUncheckedBitwiseCast(
+        UVCI->getLoc(), UVCI->getOperand(), UVCI->getType());
+    UVCI->replaceAllUsesWith(NewVal);
+    UVCI->eraseFromParent();
+    return true;
+  }
 };
 
 } // end anonymous namespace
@@ -360,54 +370,59 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
 
 namespace {
 
-struct OwnershipModelEliminator : SILModuleTransform {
+struct OwnershipModelEliminator : SILFunctionTransform {
   bool SkipTransparent;
+  bool SkipStdlibModule;
 
-  OwnershipModelEliminator(bool SkipTransparent)
-      : SkipTransparent(SkipTransparent) {}
+  OwnershipModelEliminator(bool SkipTransparent, bool SkipStdlibModule)
+      : SkipTransparent(SkipTransparent), SkipStdlibModule(SkipStdlibModule) {}
 
   void run() override {
     if (DumpBefore.size()) {
-      getModule()->dump(DumpBefore.c_str());
+      getFunction()->dump(DumpBefore.c_str());
     }
 
-    auto &Mod = *getModule();
-    for (auto &F : Mod) {
-      // If F does not have ownership, skip it. We have no further work to do.
-      if (!F.hasOwnership())
-        continue;
+    auto *F = getFunction();
+    auto &Mod = getFunction()->getModule();
 
-      // If we were asked to not strip ownership from transparent functions in
-      // /our/ module, continue.
-      if (SkipTransparent && F.isTransparent())
-        continue;
+    // If we are supposed to skip the stdlib module and we are in the stdlib
+    // module bail.
+    if (SkipStdlibModule && Mod.isStdlibModule()) {
+      return;
+    }
 
-      // Verify here to make sure ownership is correct before we strip.
-      {
-        // Add a pretty stack trace entry to tell users who see a verification
-        // failure triggered by this verification check that they need to re-run
-        // with -sil-verify-all to actually find the pass that introduced the
-        // verification error.
-        //
-        // DISCUSSION: This occurs due to the crash from the verification
-        // failure happening in the pass itself. This causes us to dump the
-        // SILFunction and emit a msg that this pass (OME) is the culprit. This
-        // is generally correct for most passes, but not for OME since we are
-        // verifying before we have even modified the function to ensure that
-        // all ownership invariants have been respected before we lower
-        // ownership from the function.
-        llvm::PrettyStackTraceString silVerifyAllMsgOnFailure(
-            "Found verification error when verifying before lowering "
-            "ownership. Please re-run with -sil-verify-all to identify the "
-            "actual pass that introduced the verification error.");
-        F.verify();
-      }
+    if (!F->hasOwnership())
+      return;
 
-      if (stripOwnership(F)) {
-        auto InvalidKind =
-            SILAnalysis::InvalidationKind::BranchesAndInstructions;
-        invalidateAnalysis(&F, InvalidKind);
-      }
+    // If we were asked to not strip ownership from transparent functions in
+    // /our/ module, return.
+    if (SkipTransparent && F->isTransparent())
+      return;
+
+    // Verify here to make sure ownership is correct before we strip.
+    {
+      // Add a pretty stack trace entry to tell users who see a verification
+      // failure triggered by this verification check that they need to re-run
+      // with -sil-verify-all to actually find the pass that introduced the
+      // verification error.
+      //
+      // DISCUSSION: This occurs due to the crash from the verification
+      // failure happening in the pass itself. This causes us to dump the
+      // SILFunction and emit a msg that this pass (OME) is the culprit. This
+      // is generally correct for most passes, but not for OME since we are
+      // verifying before we have even modified the function to ensure that
+      // all ownership invariants have been respected before we lower
+      // ownership from the function.
+      llvm::PrettyStackTraceString silVerifyAllMsgOnFailure(
+          "Found verification error when verifying before lowering "
+          "ownership. Please re-run with -sil-verify-all to identify the "
+          "actual pass that introduced the verification error.");
+      F->verify();
+    }
+
+    if (stripOwnership(*F)) {
+      auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
+      invalidateAnalysis(InvalidKind);
     }
 
     // If we were asked to strip transparent, we are at the beginning of the
@@ -417,21 +432,36 @@ struct OwnershipModelEliminator : SILModuleTransform {
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
     if (SkipTransparent) {
-      ptr.reset(new NotificationHandlerTy(
-          prepareNonTransparentSILFunctionForOptimization));
+      if (!Mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
+        ptr.reset(new NotificationHandlerTy(
+            prepareNonTransparentSILFunctionForOptimization));
+        Mod.registerDeserializationNotificationHandler(std::move(ptr));
+        Mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
+      }
     } else {
-      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      if (!Mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+        ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+        Mod.registerDeserializationNotificationHandler(std::move(ptr));
+        Mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
+      }
     }
-    Mod.registerDeserializationNotificationHandler(std::move(ptr));
   }
 };
 
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/);
+  return new OwnershipModelEliminator(false /*skip transparent*/,
+                                      false /*ignore stdlib*/);
 }
 
 SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/);
+  return new OwnershipModelEliminator(true /*skip transparent*/,
+                                      false /*ignore stdlib*/);
+}
+
+SILTransform *
+swift::createNonStdlibNonTransparentFunctionOwnershipModelEliminator() {
+  return new OwnershipModelEliminator(true /*skip transparent*/,
+                                      true /*ignore stdlib*/);
 }

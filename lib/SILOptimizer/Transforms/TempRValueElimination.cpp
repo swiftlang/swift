@@ -352,7 +352,7 @@ bool TempRValueOptPass::checkNoSourceModification(
     SILInstruction *inst = &*iter;
 
     if (useInsts.count(inst))
-      numLoadsFound++;
+      ++numLoadsFound;
 
     // If this is the last use of the temp we are ok. After this point,
     // modifications to the source don't matter anymore.
@@ -419,7 +419,7 @@ bool TempRValueOptPass::checkTempObjectDestroy(
       return false;
 
     // Look for a known destroy point as described in the function level
-    // comment. This whitelist can be expanded as more cases are handled in
+    // comment. This allowlist can be expanded as more cases are handled in
     // tryOptimizeCopyIntoTemp during copy replacement.
     SILInstruction *lastUser = &*std::prev(pos);
     if (isa<DestroyAddrInst>(lastUser))
@@ -628,6 +628,16 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     // We pass in SILValue() since we do not have a source address.
     if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
       return {std::next(si->getIterator()), false};
+
+    // Bail if there is any kind of user which is not handled in the code below.
+    switch (user->getKind()) {
+      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::MarkDependenceInst:
+        continue;
+      default:
+        return {std::next(si->getIterator()), false};
+    }
   }
 
   // Since store is always a consuming operation, we do not need to worry about

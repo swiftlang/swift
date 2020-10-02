@@ -17,11 +17,12 @@
 #ifndef SWIFT_RUNTIME_DEBUG_HELPERS_H
 #define SWIFT_RUNTIME_DEBUG_HELPERS_H
 
-#include <cstdarg>
-#include <cstdio>
-#include <stdint.h>
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Unreachable.h"
+#include <atomic>
+#include <cstdarg>
+#include <functional>
+#include <stdint.h>
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -146,6 +147,9 @@ void dumpStackTraceEntry(unsigned index, void *framePC,
                          bool shortOutput = false);
 
 SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+bool withCurrentBacktrace(std::function<void(void **, int)> call);
+
+SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
 
 /// Debugger breakpoint ABI. This structure is passed to the debugger (and needs
@@ -231,39 +235,17 @@ bool _swift_reportFatalErrorsToDebugger;
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_shouldReportFatalErrorsToDebugger();
 
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_debug_metadataAllocationIterationEnabled;
 
-SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
-inline static int swift_asprintf(char **strp, const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-#if defined(_WIN32)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-  int len = _vscprintf(fmt, args);
-#pragma GCC diagnostic pop
-  if (len < 0) {
-    va_end(args);
-    return -1;
-  }
-  char *buffer = static_cast<char *>(malloc(len + 1));
-  if (!buffer) {
-    va_end(args);
-    return -1;
-  }
-  int result = vsprintf(buffer, fmt, args);
-  if (result < 0) {
-    va_end(args);
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-#else
-  int result = vasprintf(strp, fmt, args);
-#endif
-  va_end(args);
-  return result;
-}
+SWIFT_RUNTIME_STDLIB_SPI
+const void * const _swift_debug_allocationPoolPointer;
 
+SWIFT_RUNTIME_STDLIB_SPI
+std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
+
+SWIFT_RUNTIME_STDLIB_SPI
+const void * const _swift_debug_protocolConformanceStatePointer;
 
 // namespace swift
 }

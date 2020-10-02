@@ -111,7 +111,7 @@ public func >=(lhs: (), rhs: ()) -> Bool {
 %   equatableTypeParams = ", ".join(["{}: Equatable".format(c) for c in typeParams])
 
 %   originalTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity))))
-%   greaterTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity - 1) + [arity])))
+%   greaterTuple = "(\"a\", {})".format(", ".join(map(str, list(range(1, arity - 1)) + [arity])))
 
 /// Returns a Boolean value indicating whether the corresponding components of
 /// two tuples are equal.

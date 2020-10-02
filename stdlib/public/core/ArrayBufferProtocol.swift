@@ -150,7 +150,10 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
     let eraseCount = subrange.count
 
     let growth = newCount - eraseCount
-    self.count = oldCount + growth
+    // This check will prevent storing a 0 count to the empty array singleton.
+    if growth != 0 {
+      self.count = oldCount + growth
+    }
 
     let elements = self.subscriptBaseAddress
     let oldTailIndex = subrange.upperBound

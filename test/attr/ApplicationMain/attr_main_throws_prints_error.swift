@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library %s -o %t/main
 // RUN: %target-codesign %t/main
-// RUN: not --crash %t/main 2>&1 | %FileCheck %s
+// RUN: %target-run %t/main > %t/log 2>&1 || true
+// RUN: %FileCheck %s < %t/log
+
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=ios
 
 enum Err : Error { case or }
 

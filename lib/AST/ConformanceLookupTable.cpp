@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -464,8 +465,8 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
 }
 
 void ConformanceLookupTable::addInheritedProtocols(
-                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                          ConformanceSource source) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    ConformanceSource source) {
   // Find all of the protocols in the inheritance list.
   bool anyObject = false;
   for (const auto &found :

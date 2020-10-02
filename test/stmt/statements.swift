@@ -280,7 +280,7 @@ func RepeatWhileStmt4() {
 
 func brokenSwitch(_ x: Int) -> Int {
   switch x {
-  case .Blah(var rep): // expected-error{{pattern cannot match values of type 'Int'}}
+  case .Blah(var rep): // expected-error{{type 'Int' has no member 'Blah'}}
     return rep
   }
 }
@@ -556,6 +556,7 @@ func testThrowNil() throws {
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
   if let _ = b ?? b {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
+  // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Any'}}
 }
 
 
@@ -653,65 +654,65 @@ func bad_if() {
 
 // Typo correction for loop labels
 for _ in [1] {
-  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
 }
 while true {
-  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
 }
 repeat {
-  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
 } while true
 
 outerLoop: for _ in [1] { // expected-note {{'outerLoop' declared here}}
-  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
 }
 outerLoop: for _ in [1] { // expected-note {{'outerLoop' declared here}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
 }
 outerLoop: while true { // expected-note {{'outerLoop' declared here}}
-  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
 }
 outerLoop: while true { // expected-note {{'outerLoop' declared here}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
 }
 outerLoop: repeat { // expected-note {{'outerLoop' declared here}}
-  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+  break outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
 } while true
 outerLoop: repeat { // expected-note {{'outerLoop' declared here}}
-  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+  continue outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
 } while true
 
 outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
   outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
-    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
 outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
   outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
-    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
 outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
   outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
-    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
 outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
   outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
-    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
 outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
   outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
-    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   } while true
 } while true
 outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
   outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
-    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+    continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   } while true
 } while true
 

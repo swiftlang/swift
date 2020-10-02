@@ -1119,7 +1119,7 @@ enum UnavailableCaseOSSpecific {
   case a
   case b
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   @available(macOS, unavailable)
   @available(iOS, unavailable)
   @available(tvOS, unavailable)

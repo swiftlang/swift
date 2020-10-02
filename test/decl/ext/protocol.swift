@@ -270,7 +270,7 @@ protocol ExtendedProtocol {
 }
 
 extension ExtendedProtocol where Self : DerivedWithAlias {
-  func f0(x: T) {} // expected-error {{use of undeclared type 'T'}}
+  func f0(x: T) {} // expected-error {{cannot find type 'T' in scope}}
 
   func f1(x: ConcreteAlias) {
     let _: Int = x

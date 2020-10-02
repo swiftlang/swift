@@ -371,16 +371,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       VFSName = InputArg->getValue();
       break;
 
-    case OPT_optimize_for_ide: {
-      bool Value;
-      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
-        llvm::errs() << "error: expected 0 or 1 for 'for-ide'\n";
-        return true;
-      }
-      OptimizeForIde = Value;
-      break;
-    }
-
     case OPT_suppress_config_request:
       SuppressDefaultConfigRequest = true;
       break;

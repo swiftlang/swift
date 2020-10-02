@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -104,13 +104,6 @@ WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
         "unable to find Objective-C runtime support library 'arclite'; "
         "pass '-no-link-objc-runtime' to silence this warning", ())
 
-ERROR(error_two_files_same_name,none,
-      "filename \"%0\" used twice: '%1' and '%2'",
-      (StringRef, StringRef, StringRef))
-NOTE(note_explain_two_files_same_name,none,
-     "filenames are used to distinguish private declarations with the same "
-     "name", ())
-
 WARNING(warn_cannot_stat_input,none,
         "unable to determine when '%0' was last modified: %1",
         (StringRef, StringRef))
@@ -128,6 +121,9 @@ ERROR(error_conflicting_options, none,
       (StringRef, StringRef))
 ERROR(error_option_not_supported, none,
       "'%0' is not supported with '%1'",
+      (StringRef, StringRef))
+ERROR(error_requirement_not_met, none,
+      "'%0' requires '%1'",
       (StringRef, StringRef))
 
 WARNING(warn_ignore_embed_bitcode, none,
@@ -185,6 +181,10 @@ ERROR(cannot_find_migration_script, none,
 
 ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
+
+ERROR(error_darwin_only_supports_libcxx, none,
+      "The only C++ standard library supported on Apple platforms is libc++",
+      ())
 
 WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",

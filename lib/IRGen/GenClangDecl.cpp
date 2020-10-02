@@ -59,6 +59,10 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
 } // end anonymous namespace
 
 void IRGenModule::emitClangDecl(const clang::Decl *decl) {
+  // Ignore this decl if we've seen it before.
+  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
+    return;
+
   // Fast path for the case where `decl` doesn't contain executable code, so it
   // can't reference any other declarations that we would need to emit.
   if (getDeclWithExecutableCode(const_cast<clang::Decl *>(decl)) == nullptr) {
@@ -67,8 +71,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     return;
   }
 
-  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
-    return;
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
@@ -96,6 +98,11 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
         refFinder.TraverseDecl(executableDecl);
         next = executableDecl;
     }
+
+    if (auto var = dyn_cast<clang::VarDecl>(next))
+      if (!var->isFileVarDecl())
+	continue;
+
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
 }
@@ -111,6 +118,17 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
 }
 
 void IRGenModule::finalizeClangCodeGen() {
+  // Ensure that code is emitted for any `PragmaCommentDecl`s. (These are
+  // always guaranteed to be directly below the TranslationUnitDecl.)
+  // In Clang, this happens automatically during the Sema phase, but here we
+  // need to take care of it manually because our Clang CodeGenerator is not
+  // attached to Clang Sema as an ASTConsumer.
+  for (const auto *D : ClangASTContext->getTranslationUnitDecl()->decls()) {
+    if (const auto *PCD = dyn_cast<clang::PragmaCommentDecl>(D)) {
+      emitClangDecl(PCD);
+    }
+  }
+
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
 }

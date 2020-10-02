@@ -25,6 +25,7 @@
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Demangling/NamespaceMacros.h"
 
 namespace llvm {
   class raw_ostream;
@@ -32,6 +33,7 @@ namespace llvm {
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 enum class SymbolicReferenceKind : uint8_t;
 
@@ -42,7 +44,6 @@ std::string genericParameterName(uint64_t depth, uint64_t index);
 /// Display style options for the demangler.
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
-  bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
   bool DisplayExtensionContexts = true;
   bool DisplayUnmangledSuffix = true;
@@ -51,12 +52,21 @@ struct DemangleOptions {
   bool DisplayProtocolConformances = true;
   bool DisplayWhereClauses = true;
   bool DisplayEntityTypes = true;
+  bool DisplayLocalNameContexts = true;
   bool ShortenPartialApply = false;
   bool ShortenThunk = false;
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
+  bool DisplayDebuggerGeneratedModule = true;
+  bool DisplayStdlibModule = true;
+  bool DisplayObjCModule = true;
+  bool PrintForTypeName = false;
+
+  /// If this is nonempty, entities in this module name will not be qualified.
+  llvm::StringRef HidingCurrentModule;
+  /// A function to render generic parameter names.
   std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
       genericParameterName;
 
@@ -615,6 +625,7 @@ bool isFunctionAttr(Node::Kind kind);
 /// contain symbolic references.
 llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

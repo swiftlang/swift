@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckAccess.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
@@ -70,10 +71,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public non-SPI declarations are OK.
+  // Public declarations or SPI used from SPI are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
                               Kind.allowUsableFromInline).isPublic() &&
-      !D->isSPI())
+      !(D->isSPI() && !DC->getInnermostDeclarationDeclContext()->isSPI()))
     return false;
 
   auto &Context = DC->getASTContext();
@@ -81,7 +82,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->isObjCDynamic() && !Context.isSwiftVersionAtLeast(5) &&
+  if (D->shouldUseObjCDispatch() && !Context.isSwiftVersionAtLeast(5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
   }
@@ -104,7 +105,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
-  auto diagName = D->getFullName();
+  auto diagName = D->getName();
   bool isAccessor = false;
 
   // Swift 4.2 did not check accessor accessiblity.
@@ -116,7 +117,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
     // For accessors, diagnose with the name of the storage instead of the
     // implicit '_'.
-    diagName = accessor->getStorage()->getFullName();
+    diagName = accessor->getStorage()->getName();
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
@@ -148,30 +149,32 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
 static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
+                                      const DeclContext *userDC,
                                       FragileFunctionKind fragileKind) {
   assert(fragileKind.kind != FragileFunctionKind::None);
 
   auto definingModule = D->getModuleContext();
 
-  bool isImplementationOnly =
-    userSF.isImportedImplementationOnly(definingModule);
-  if (!isImplementationOnly && !userSF.isImportedAsSPI(D))
+  auto originKind = getDisallowedOriginKind(
+      D, userSF, userDC->getInnermostDeclarationDeclContext());
+  if (originKind == DisallowedOriginKind::None)
     return false;
 
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
   ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
-                     D->getDescriptiveKind(), D->getFullName(),
+                     D->getDescriptiveKind(), D->getName(),
                      static_cast<unsigned>(fragileKind.kind),
                      definingModule->getName(),
-                     static_cast<unsigned>(!isImplementationOnly));
+                     static_cast<unsigned>(originKind));
   return true;
 }
 
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
                                       SubstitutionMap subs,
-                                      const SourceFile &userSF) {
+                                      const SourceFile &userSF,
+                                      const DeclContext *userDC) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (!conformance.isConcrete())
@@ -180,18 +183,23 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
 
     SubstitutionMap subConformanceSubs =
         concreteConf->getSubstitutions(userSF.getParentModule());
-    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF);
+    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF, userDC);
 
     const RootProtocolConformance *rootConf =
         concreteConf->getRootConformance();
     ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
-    if (!userSF.isImportedImplementationOnly(M))
+
+    auto originKind = getDisallowedOriginKind(
+        rootConf->getDeclContext()->getAsDecl(),
+        userSF, userDC->getInnermostDeclarationDeclContext());
+    if (originKind == DisallowedOriginKind::None)
       continue;
 
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getFullName(), 0, M->getName());
+                       rootConf->getProtocol()->getName(), 0, M->getName(),
+                       static_cast<unsigned>(originKind));
     hadAnyIssues = true;
   }
   return hadAnyIssues;
@@ -209,10 +217,10 @@ void TypeChecker::diagnoseGenericTypeExportability(SourceLoc Loc, Type T,
   if (auto *BGT = dyn_cast<BoundGenericType>(T.getPointer())) {
     ModuleDecl *useModule = SF->getParentModule();
     auto subs = T->getContextSubstitutionMap(useModule, BGT->getDecl());
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
   } else if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer())) {
     auto subs = TAT->getSubstitutionMap();
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
   }
 }
 
@@ -226,19 +234,11 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   if (!userSF)
     return false;
 
-  // If the source file doesn't have any implementation-only imports,
-  // we can fast-path this.  In the current language design, we never
-  // need to consider the possibility of implementation-only imports
-  // from other source files in the module (or indirectly in other modules).
-  // TODO: maybe check whether D is from a bridging header?
-  if (!userSF->hasImplementationOnlyImports())
-    return false;
-
   const ValueDecl *D = declRef.getDecl();
-  if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
+  if (diagnoseDeclExportability(loc, D, *userSF, DC, fragileKind))
     return true;
   if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
-                                            *userSF)) {
+                                            *userSF, DC)) {
     return true;
   }
   return false;

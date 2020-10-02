@@ -15,7 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "Overrides.h"
-#include "../../public/runtime/CompatibilityOverride.h"
+#include "../Compatibility51/Overrides.h"
+#include "CompatibilityOverride.h"
 
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
@@ -27,13 +28,18 @@ struct OverrideSection {
   uintptr_t version;
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include "../../public/runtime/CompatibilityOverride.def"
+#include "CompatibilityOverride.def"
 };
   
 OverrideSection Swift50Overrides
 __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
   .conformsToProtocol = swift50override_conformsToProtocol,
+  // We use the same hook for conformsToSwiftProtocol as we do for a 5.1
+  // runtime, so reference the override from the Compatibility51 library.
+  // If we're back deploying to Swift 5.0, we also have to support 5.1, so
+  // the Compatibility51 library is always linked when the 50 library is.
+  .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
 
 // Allow this library to get force-loaded by autolinking

@@ -134,7 +134,7 @@ static unsigned computeSubelement(SILValue Pointer,
       SILType TT = TEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
-      for (unsigned i = 0, e = TEAI->getFieldNo(); i != e; ++i) {
+      for (unsigned i = 0, e = TEAI->getFieldIndex(); i != e; ++i) {
         SubElementNumber +=
             getNumSubElements(TT.getTupleElementType(i), M,
                               TypeExpansionContext(*RootInst->getFunction()));
@@ -686,7 +686,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // have multiple insertion points if we are storing exactly the same value
   // implying that we can just copy firstVal at each insertion point.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.Initialize(loadTy);
+  updater.initialize(loadTy);
 
   Optional<SILValue> singularValue;
   for (auto *insertPt : insertPts) {
@@ -707,7 +707,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     }
 
     // And then put the value into the SSA updater.
-    updater.AddAvailableValue(insertPt->getParent(), eltVal);
+    updater.addAvailableValue(insertPt->getParent(), eltVal);
   }
 
   // If we only are tracking a singular value, we do not need to construct
@@ -727,7 +727,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   }
 
   // Finally, grab the value from the SSA updater.
-  SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  SILValue result = updater.getValueInMiddleOfBlock(B.getInsertionBB());
   assert(result.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   if (isTake() || !B.hasOwnership()) {
     return result;
@@ -863,7 +863,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // never have the same value along all paths unless we have a trivial value
   // meaning the SSA updater given a non-trivial value must /always/ be used.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.Initialize(loadTy);
+  updater.initialize(loadTy);
 
   Optional<SILValue> singularValue;
   for (auto *i : insertPts) {
@@ -881,7 +881,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
       singularValue = SILValue();
     }
 
-    updater.AddAvailableValue(i->getParent(), eltVal);
+    updater.addAvailableValue(i->getParent(), eltVal);
   }
 
   SILBasicBlock *insertBlock = B.getInsertionBB();
@@ -902,7 +902,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   }
 
   // Finally, grab the value from the SSA updater.
-  SILValue eltVal = updater.GetValueInMiddleOfBlock(insertBlock);
+  SILValue eltVal = updater.getValueInMiddleOfBlock(insertBlock);
   assert(!B.hasOwnership() ||
          eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");

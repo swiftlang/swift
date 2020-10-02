@@ -341,7 +341,7 @@ func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER^# {
   let x = #^EXPR_MODULE_QUALIFIER^#
 // MODULE_QUALIFIER: Begin completions
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
-// MODULE_QUALIFIER-DAG: Decl[Module]/None: Swift[#Module#]; name=Swift
+// MODULE_QUALIFIER-DAG: Decl[Module]/None/IsSystem: Swift[#Module#]; name=Swift
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Foo[#Module#]; name=Foo
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: FooHelper[#Module#]; name=FooHelper
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Bar[#Module#]; name=Bar

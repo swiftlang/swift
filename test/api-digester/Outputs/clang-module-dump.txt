@@ -43,6 +43,7 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)AnotherObjcProt",
       "moduleName": "Foo",
+      "genericSig": "<Self : AnyObject>",
       "objc_name": "AnotherObjcProt",
       "declAttributes": [
         "ObjC",
@@ -196,10 +197,420 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)ObjcProt",
       "moduleName": "Foo",
+      "genericSig": "<Self : AnyObject>",
       "objc_name": "ObjcProt",
       "declAttributes": [
         "ObjC",
         "Dynamic"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PhotoBracketSettings",
+      "printedName": "PhotoBracketSettings",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(rawPixelFormatType:processedFormat:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoBracketSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoBracketSettings",
+                  "printedName": "Foo.PhotoBracketSettings",
+                  "usr": "c:objc(cs)PhotoBracketSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoBracketSettings(cm)photoBracketSettingsWithRawPixelFormatType:processedFormat:",
+          "moduleName": "Foo",
+          "objc_name": "photoBracketSettingsWithRawPixelFormatType:processedFormat:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(number:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoBracketSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoBracketSettings",
+                  "printedName": "Foo.PhotoBracketSettings",
+                  "usr": "c:objc(cs)PhotoBracketSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoBracketSettings(cm)photoBracketSettingsWithNumber:",
+          "moduleName": "Foo",
+          "objc_name": "photoBracketSettingsWithNumber:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(format:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoBracketSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoBracketSettings",
+                  "printedName": "Foo.PhotoBracketSettings",
+                  "usr": "c:objc(cs)PhotoBracketSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(cm)photoSettingsWithFormat:",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "objc_name": "photoSettingsWithFormat:",
+          "declAttributes": [
+            "Override",
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(cake:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoBracketSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoBracketSettings",
+                  "printedName": "Foo.PhotoBracketSettings",
+                  "usr": "c:objc(cs)PhotoBracketSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(im)initWithCake:",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "objc_name": "initWithCake:",
+          "declAttributes": [
+            "Override",
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "PhotoBracketSettings",
+              "printedName": "Foo.PhotoBracketSettings",
+              "usr": "c:objc(cs)PhotoBracketSettings"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)NSObject(im)init",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "objc_name": "init",
+          "declAttributes": [
+            "Override",
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
+        }
+      ],
+      "declKind": "Class",
+      "usr": "c:objc(cs)PhotoBracketSettings",
+      "moduleName": "Foo",
+      "isOpen": true,
+      "objc_name": "PhotoBracketSettings",
+      "declAttributes": [
+        "ObjC",
+        "Dynamic"
+      ],
+      "superclassUsr": "c:objc(cs)PhotoSettings",
+      "inheritsConvenienceInitializers": true,
+      "superclassNames": [
+        "Foo.PhotoSettings",
+        "ObjectiveC.NSObject"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "NSObjectProtocol",
+          "printedName": "NSObjectProtocol",
+          "usr": "c:objc(pl)NSObject"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Equatable",
+          "printedName": "Equatable",
+          "usr": "s:SQ"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Hashable",
+          "printedName": "Hashable",
+          "usr": "s:SH"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PhotoSettings",
+      "printedName": "PhotoSettings",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(format:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoSettings",
+                  "printedName": "Foo.PhotoSettings",
+                  "usr": "c:objc(cs)PhotoSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(cm)photoSettingsWithFormat:",
+          "moduleName": "Foo",
+          "objc_name": "photoSettingsWithFormat:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(number:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoSettings",
+                  "printedName": "Foo.PhotoSettings",
+                  "usr": "c:objc(cs)PhotoSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(cm)photoSettingsWithNumber:",
+          "moduleName": "Foo",
+          "objc_name": "photoSettingsWithNumber:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(cake:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoSettings",
+                  "printedName": "Foo.PhotoSettings",
+                  "usr": "c:objc(cs)PhotoSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(im)initWithCake:",
+          "moduleName": "Foo",
+          "objc_name": "initWithCake:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "PhotoSettings",
+              "printedName": "Foo.PhotoSettings",
+              "usr": "c:objc(cs)PhotoSettings"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)NSObject(im)init",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "objc_name": "init",
+          "declAttributes": [
+            "Override",
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
+        }
+      ],
+      "declKind": "Class",
+      "usr": "c:objc(cs)PhotoSettings",
+      "moduleName": "Foo",
+      "isOpen": true,
+      "objc_name": "PhotoSettings",
+      "declAttributes": [
+        "ObjC",
+        "Dynamic"
+      ],
+      "superclassUsr": "c:objc(cs)NSObject",
+      "inheritsConvenienceInitializers": true,
+      "superclassNames": [
+        "ObjectiveC.NSObject"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "NSObjectProtocol",
+          "printedName": "NSObjectProtocol",
+          "usr": "c:objc(pl)NSObject"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Equatable",
+          "printedName": "Equatable",
+          "usr": "s:SQ"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Hashable",
+          "printedName": "Hashable",
+          "usr": "s:SH"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
+        }
       ]
     }
   ],

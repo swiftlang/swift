@@ -1,6 +1,6 @@
-from Classification import classification_by_name
-from Node import error  # noqa: I201
-from kinds import lowercase_first_word  # noqa: I201
+from .Classification import classification_by_name
+from .Node import error  # noqa: I201
+from .kinds import lowercase_first_word  # noqa: I201
 
 
 class Token(object):
@@ -265,6 +265,8 @@ SYNTAX_TOKENS = [
                  serialization_code=73),
     PoundKeyword('PoundFile', 'file', text='#file',
                  serialization_code=68),
+    PoundKeyword('PoundFileID', 'fileID', text='#fileID',
+                 serialization_code=122),
     PoundKeyword('PoundFilePath', 'filePath', text='#filePath',
                  serialization_code=121),
     PoundKeyword('PoundColumn', 'column', text='#column',

@@ -4,10 +4,21 @@ include(SwiftUtils)
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+endfunction()
+
+# Return a swiftc flag (e.g. -O or -Onone) to control optimization level based
+# on the build type.
+function(swift_optimize_flag_for_build_type build_type result_var_name)
+  if("${build_type}" STREQUAL "Debug")
+    set("${result_var_name}" "-Onone" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "RelWithDebInfo" OR
+         "${build_type}" STREQUAL "Release")
+    set("${result_var_name}" "-O" PARENT_SCOPE)
+  elseif("${build_type}" STREQUAL "MinSizeRel")
+    set("${result_var_name}" "-Osize" PARENT_SCOPE)
   else()
-    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+    message(FATAL_ERROR "Unknown build type: ${build_type}")
   endif()
 endfunction()
 
@@ -29,7 +40,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
@@ -41,6 +52,8 @@ function(handle_swift_sources
                  IS_SDK_OVERLAY_arg)
   translate_flag(${SWIFTSOURCES_EMBED_BITCODE} "EMBED_BITCODE"
                  EMBED_BITCODE_arg)
+  translate_flag(${SWIFTSOURCES_STATIC} "STATIC"
+                 STATIC_arg)
 
   if(SWIFTSOURCES_IS_MAIN)
     set(SWIFTSOURCES_INSTALL_IN_COMPONENT never_install)
@@ -90,7 +103,10 @@ function(handle_swift_sources
 
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
-    list(APPEND swift_compile_flags "-force-single-frontend-invocation")
+    list(APPEND swift_compile_flags "-whole-module-optimization")
+    if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+      list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
+    endif()
 
     _compile_swift_files(
         dependency_target
@@ -190,8 +206,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
-  is_darwin_based_sdk("${sdk}" IS_DARWIN)
-  if(IS_DARWIN)
+  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
     set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
     get_target_triple(target target_variant "${sdk}" "${arch}"
     MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
@@ -217,7 +232,7 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-resource-dir" "${SWIFTLIB_DIR}")
   endif()
 
-  if(IS_DARWIN)
+  if("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -225,15 +240,14 @@ function(_add_target_variant_swift_compile_flags
       "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
-  is_build_type_optimized("${build_type}" optimized)
-  if(optimized)
-    list(APPEND result "-O")
-  else()
-    list(APPEND result "-Onone")
-  endif()
+  swift_optimize_flag_for_build_type("${build_type}" optimize_flag)
+  list(APPEND result "${optimize_flag}")
 
   is_build_type_with_debuginfo("${build_type}" debuginfo)
   if(debuginfo)
+    list(APPEND result "-g")
+  elseif("${build_type}" STREQUAL "MinSizeRel")
+    # MinSizeRel builds of stdlib (but not the compiler) should get debug info
     list(APPEND result "-g")
   endif()
 
@@ -247,6 +261,10 @@ function(_add_target_variant_swift_compile_flags
 
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING")
+  endif()
+
+  if(SWIFT_STDLIB_OS_VERSIONING)
+    list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -278,13 +296,15 @@ endfunction()
 #     [MODULE_NAME]                     # The module name.
 #     [INSTALL_IN_COMPONENT]            # Install produced files.
 #     [EMBED_BITCODE]                   # Embed LLVM bitcode into the .o files
+#     [STATIC]                          # Also write .swiftmodule etc. to static
+#                                       # resource folder
 #     )
 function(_compile_swift_files
     dependency_target_out_var_name dependency_module_target_out_var_name
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -362,13 +382,13 @@ function(_compile_swift_files
       )
 
   # Determine the subdirectory where the binary should be placed.
-  compute_library_subdir(library_subdir
-      "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
-
+  set(library_subdir_sdk "${SWIFTFILE_SDK}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
-  	compute_library_subdir(library_subdir
-      "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+    set(library_subdir_sdk "MACCATALYST")
   endif()
+
+  compute_library_subdir(library_subdir
+    "${library_subdir_sdk}" "${SWIFTFILE_ARCHITECTURE}")
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -382,13 +402,12 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are always built resiliently.
-  if(SWIFTFILE_IS_STDLIB)
+  # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
+  if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
-    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
-  if(SWIFT_STDLIB_USE_NONATOMIC_RC)
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
@@ -433,6 +452,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
 
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)
@@ -448,8 +471,11 @@ function(_compile_swift_files
   endforeach()
 
   set(module_file)
+  set(module_file_static)
   set(module_doc_file)
+  set(module_doc_file_static)
   set(interface_file)
+  set(interface_file_static)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
@@ -464,15 +490,20 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
-       SWIFTFILE_SDK STREQUAL "MACCATALYST")
-      set(specific_module_dir "${module_base}.swiftmodule")
-      set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
-    else()
-      set(specific_module_dir)
-    endif()
+
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${library_subdir}")
+    set(module_base_static "${module_dir_static}/${SWIFTFILE_MODULE_NAME}")
+
+    set(module_triple ${SWIFT_SDK_${library_subdir_sdk}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
+    set(specific_module_dir "${module_base}.swiftmodule")
+    set(module_base "${module_base}.swiftmodule/${module_triple}")
+    set(specific_module_dir_static "${module_base_static}.swiftmodule")
+    set(module_base_static "${module_base_static}.swiftmodule/${module_triple}")
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
+
+    set(module_file_static "${module_base_static}.swiftmodule")
+    set(module_doc_file_static "${module_base_static}.swiftdoc")
 
     # FIXME: These don't really belong inside the swiftmodule, but there's not
     # an obvious alternate place to put them.
@@ -482,6 +513,7 @@ function(_compile_swift_files
 
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
+      set(interface_file_static "${module_base_static}.swiftinterface")
       list(APPEND swift_module_flags
            "-emit-module-interface-path" "${interface_file}")
     endif()
@@ -504,14 +536,12 @@ function(_compile_swift_files
       set(optional_arg "OPTIONAL")
     endif()
 
-    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
-       SWIFTFILE_SDK STREQUAL "MACCATALYST")
-      swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
-    else()
-      swift_install_in_component(FILES ${module_outputs}
-                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+    swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    if(SWIFTFILE_STATIC)
+      swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
                                  COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
     endif()
 
@@ -530,11 +560,19 @@ function(_compile_swift_files
 
       set(maccatalyst_specific_module_dir
           "${maccatalyst_module_dir}/${SWIFTFILE_MODULE_NAME}.swiftmodule")
-      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${SWIFTFILE_ARCHITECTURE}")
+      set(maccatalyst_module_triple ${SWIFT_SDK_MACCATALYST_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
+      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${maccatalyst_module_triple}")
       set(maccatalyst_module_file "${maccatalyst_module_base}.swiftmodule")
       set(maccatalyst_module_doc_file "${maccatalyst_module_base}.swiftdoc")
 
       set(maccatalyst_module_outputs "${maccatalyst_module_file}" "${maccatalyst_module_doc_file}")
+
+      if(SWIFT_ENABLE_MODULE_INTERFACES)
+        set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}")
+      else()
+        set(maccatalyst_interface_file)
+      endif()
 
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
@@ -554,28 +592,37 @@ function(_compile_swift_files
   endif()
 
   set(module_outputs "${module_file}" "${module_doc_file}")
+  set(module_outputs_static "${module_file_static}" "${module_doc_file_static}")
   if(interface_file)
     list(APPEND module_outputs "${interface_file}")
+    list(APPEND module_outputs_static "${interface_file_static}")
   endif()
 
-  if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+  swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                             COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                             OPTIONAL
+                             PATTERN "Project" EXCLUDE)
+
+  if(SWIFTFILE_STATIC)
+    swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
                                OPTIONAL
                                PATTERN "Project" EXCLUDE)
-  else()
-    swift_install_in_component(FILES ${module_outputs}
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
-  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+
+  if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+    set(HOST_EXECUTABLE_SUFFIX .exe)
+  endif()
+  set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
+
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)
     # Depend on the binary itself, in addition to the symlink.
-    set(swift_compiler_tool_dep "swift")
+    set(swift_compiler_tool_dep "swift-frontend")
   endif()
 
   # If there are more than one output files, we assume that they are specified
@@ -611,6 +658,12 @@ function(_compile_swift_files
     list(APPEND maccatalyst_swift_flags
       "-I" "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
     set(maccatalyst_swift_module_flags ${swift_module_flags})
+    list(FIND maccatalyst_swift_module_flags "${interface_file}" interface_file_index)
+    if(NOT interface_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${interface_file_index} "${maccatalyst_interface_file}")
+      math(EXPR old_interface_file_index "${interface_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
   elseif(maccatalyst_build_flavor STREQUAL "ios-like")
     compute_library_subdir(maccatalyst_library_subdir
       "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
@@ -671,9 +724,9 @@ function(_compile_swift_files
   # need to work around this by avoiding long command line arguments. This can
   # be achieved by writing the list of file paths to a file, then reading that
   # list in the Python script.
-  string(RANDOM file_name)
-  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
+  string(SHA1 file_name "'${source_files_quoted}'")
+  set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
   file(WRITE "${file_path}" "'${source_files_quoted}'")
 
   # If this platform/architecture combo supports backward deployment to old
@@ -700,7 +753,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
-        ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
+        ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${create_dirs_dependency_target}
         ${copy_legacy_layouts_dep}
@@ -743,7 +796,27 @@ function(_compile_swift_files
           ${swift_ide_test_dependency}
           ${create_dirs_dependency_target}
         COMMENT "Generating ${module_file}")
-    set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+
+    if(SWIFTFILE_STATIC)
+      add_custom_command_target(
+        module_dependency_target_static
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
+          ${specific_module_dir_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy" ${module_file} ${module_file_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy" ${module_doc_file} ${module_doc_file_static}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static}
+        OUTPUT ${module_outputs_static}
+        DEPENDS
+          "${module_dependency_target}"
+        COMMENT "Generating ${module_file}")
+      set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
+    else()
+      set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+    endif()
 
     # macCatalyst zippered swiftmodule
     if(maccatalyst_build_flavor STREQUAL "zippered")

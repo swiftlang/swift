@@ -48,15 +48,10 @@ GenericSignatureImpl::GenericSignatureImpl(
     ArrayRef<Requirement> requirements, bool isKnownCanonical)
     : NumGenericParams(params.size()), NumRequirements(requirements.size()),
       CanonicalSignatureOrASTContext() {
-  auto paramsBuffer = getGenericParamsBuffer();
-  for (unsigned i = 0; i < NumGenericParams; ++i) {
-    paramsBuffer[i] = params[i];
-  }
-
-  auto reqtsBuffer = getRequirementsBuffer();
-  for (unsigned i = 0; i < NumRequirements; ++i) {
-    reqtsBuffer[i] = requirements[i];
-  }
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<Type>());
+  std::uninitialized_copy(requirements.begin(), requirements.end(),
+                          getTrailingObjects<Requirement>());
 
 #ifndef NDEBUG
   // Make sure generic parameters are in the right order, and
@@ -70,29 +65,33 @@ GenericSignatureImpl::GenericSignatureImpl(
       count = 0;
     }
     assert(param->getIndex() == count && "Generic parameter index mismatch");
-    count++;
+    ++count;
   }
 #endif
 
   if (isKnownCanonical)
     CanonicalSignatureOrASTContext =
-        &GenericSignature::getASTContext(getGenericParams(), requirements);
+        &GenericSignature::getASTContext(params, requirements);
 }
 
 TypeArrayView<GenericTypeParamType>
 GenericSignatureImpl::getInnermostGenericParams() const {
-  auto params = getGenericParams();
+  const auto params = getGenericParams();
 
-  // Find the point at which the depth changes.
-  unsigned depth = params.back()->getDepth();
-  for (unsigned n = params.size(); n > 0; --n) {
-    if (params[n-1]->getDepth() != depth) {
-      return params.slice(n);
-    }
+  const unsigned maxDepth = params.back()->getDepth();
+  if (params.front()->getDepth() == maxDepth)
+    return params;
+
+  // There is a depth change. Count the number of elements
+  // to slice off the front.
+  unsigned sliceCount = params.size() - 1;
+  while (true) {
+    if (params[sliceCount - 1]->getDepth() != maxDepth)
+      break;
+    --sliceCount;
   }
 
-  // All parameters are at the same depth.
-  return params;
+  return params.slice(sliceCount);
 }
 
 void GenericSignatureImpl::forEachParam(
@@ -156,7 +155,8 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
-GenericSignatureBuilder *GenericSignatureImpl::getGenericSignatureBuilder() {
+GenericSignatureBuilder *
+GenericSignatureImpl::getGenericSignatureBuilder() const {
   // The generic signature builder is associated with the canonical signature.
   if (!isCanonical())
     return getCanonicalSignature()->getGenericSignatureBuilder();
@@ -166,7 +166,7 @@ GenericSignatureBuilder *GenericSignatureImpl::getGenericSignatureBuilder() {
                                              CanGenericSignature(this));
 }
 
-bool GenericSignatureImpl::isEqual(GenericSignature Other) {
+bool GenericSignatureImpl::isEqual(GenericSignature Other) const {
   return getCanonicalSignature() == Other.getCanonicalSignature();
 }
 
@@ -236,18 +236,27 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
              "Left-hand side is not canonical");
       break;
 
-    case RequirementKind::SameType:
-      assert(reqt.getFirstType()->isTypeParameter() &&
-             "Left-hand side must be a type parameter");
+    case RequirementKind::SameType: {
+      auto isCanonicalAnchor = [&](Type type) {
+        if (auto *dmt = type->getAs<DependentMemberType>())
+          return canSig->isCanonicalTypeInContext(dmt->getBase());
+        return type->is<GenericTypeParamType>();
+      };
+
+      auto firstType = reqt.getFirstType();
+      auto secondType = reqt.getSecondType();
+      assert(isCanonicalAnchor(firstType));
+
       if (reqt.getSecondType()->isTypeParameter()) {
-        assert(compareDependentTypes(reqt.getFirstType(), reqt.getSecondType())
-                 < 0 &&
+        assert(isCanonicalAnchor(secondType));
+        assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
+        assert(canSig->isCanonicalTypeInContext(secondType) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
+    }
 
     case RequirementKind::Conformance:
       assert(reqt.getFirstType()->isTypeParameter() &&
@@ -339,23 +348,22 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
   // A stored ASTContext indicates that this is the canonical
   // signature.
   if (CanonicalSignatureOrASTContext.is<ASTContext *>())
-    // TODO: CanGenericSignature should be const-correct.
-    return CanGenericSignature(const_cast<GenericSignatureImpl *>(this));
+    return CanGenericSignature(this);
 
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
-      CanonicalSignatureOrASTContext.get<GenericSignatureImpl *>());
+      CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
 }
 
-GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() {
+GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   if (GenericEnv == nullptr) {
     auto *builder = getGenericSignatureBuilder();
-    GenericEnv = GenericEnvironment::getIncomplete(this, builder);
+    const auto impl = const_cast<GenericSignatureImpl *>(this);
+    impl->GenericEnv = GenericEnvironment::getIncomplete(this, builder);
   }
 
   return GenericEnv;
 }
-
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
   // Canonical signatures store the ASTContext directly.
@@ -378,8 +386,9 @@ GenericSignatureImpl::lookupConformance(CanType type,
   return M->lookupConformance(type, proto);
 }
 
-bool GenericSignatureImpl::requiresClass(Type type) {
-  if (!type->isTypeParameter()) return false;
+bool GenericSignatureImpl::requiresClass(Type type) const {
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -395,22 +404,13 @@ bool GenericSignatureImpl::requiresClass(Type type) {
   // If there is a layout constraint, it might be a class.
   if (equivClass->layout && equivClass->layout->isClass()) return true;
 
-  // If there is a superclass bound, then obviously it must be a class.
-  // FIXME: We shouldn't need this?
-  if (equivClass->superclass) return true;
-
-  // If any of the protocols are class-bound, then it must be a class.
-  // FIXME: We shouldn't need this?
-  for (const auto &conforms : equivClass->conformsTo) {
-    if (conforms.first->requiresClass()) return true;
-  }
-
   return false;
 }
 
 /// Determine the superclass bound on the given dependent type.
-Type GenericSignatureImpl::getSuperclassBound(Type type) {
-  if (!type->isTypeParameter()) return nullptr;
+Type GenericSignatureImpl::getSuperclassBound(Type type) const {
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -427,11 +427,11 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) {
   return equivClass->superclass;
 }
 
-/// Determine the set of protocols to which the given dependent type
-/// must conform.
-SmallVector<ProtocolDecl *, 2>
-GenericSignatureImpl::getConformsTo(Type type) {
-  if (!type->isTypeParameter()) return { };
+/// Determine the set of protocols to which the given type parameter is
+/// required to conform.
+GenericSignature::RequiredProtocols
+GenericSignatureImpl::getRequiredProtocols(Type type) const {
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -440,12 +440,12 @@ GenericSignatureImpl::getConformsTo(Type type) {
                                   ArchetypeResolutionKind::CompleteWellFormed);
   if (!equivClass) return { };
 
-  // If this type was mapped to a concrete type, then there are no
-  // requirements.
+  // If this type parameter was mapped to a concrete type, then there
+  // are no requirements.
   if (equivClass->concreteType) return { };
 
   // Retrieve the protocols to which this type conforms.
-  SmallVector<ProtocolDecl *, 2> result;
+  GenericSignature::RequiredProtocols result;
   for (const auto &conforms : equivClass->conformsTo)
     result.push_back(conforms.first);
 
@@ -455,9 +455,9 @@ GenericSignatureImpl::getConformsTo(Type type) {
   return result;
 }
 
-bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
-  // FIXME: Deal with concrete conformances here?
-  if (!type->isTypeParameter()) return false;
+bool GenericSignatureImpl::requiresProtocol(Type type,
+                                            ProtocolDecl *proto) const {
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -466,7 +466,11 @@ bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
                                   ArchetypeResolutionKind::CompleteWellFormed);
   if (!equivClass) return false;
 
-  // FIXME: Deal with concrete conformances here?
+  // FIXME: Optionally deal with concrete conformances here
+  // or have a separate method do that additionally?
+  //
+  // If this type parameter was mapped to a concrete type, then there
+  // are no requirements.
   if (equivClass->concreteType) return false;
 
   // Check whether the representative conforms to this protocol.
@@ -474,15 +478,15 @@ bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
 }
 
 /// Determine whether the given dependent type is equal to a concrete type.
-bool GenericSignatureImpl::isConcreteType(Type type) {
+bool GenericSignatureImpl::isConcreteType(Type type) const {
   return bool(getConcreteType(type));
 }
 
-/// Return the concrete type that the given dependent type is constrained to,
+/// Return the concrete type that the given type parameter is constrained to,
 /// or the null Type if it is not the subject of a concrete same-type
 /// constraint.
-Type GenericSignatureImpl::getConcreteType(Type type) {
-  if (!type->isTypeParameter()) return Type();
+Type GenericSignatureImpl::getConcreteType(Type type) const {
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -494,8 +498,9 @@ Type GenericSignatureImpl::getConcreteType(Type type) {
   return equivClass->concreteType;
 }
 
-LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) {
-  if (!type->isTypeParameter()) return LayoutConstraint();
+LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have layout constraints");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -507,7 +512,8 @@ LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) {
   return equivClass->layout;
 }
 
-bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1, Type type2) {
+bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
+                                                         Type type2) const {
   assert(type1->isTypeParameter());
   assert(type2->isTypeParameter());
 
@@ -530,7 +536,8 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1, Type type2)
   return equivClass1 == equivClass2;
 }
 
-bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
+bool GenericSignatureImpl::isRequirementSatisfied(
+    Requirement requirement) const {
   auto GSB = getGenericSignatureBuilder();
 
   auto firstType = requirement.getFirstType();
@@ -542,7 +549,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     auto protocol = protocolType->getDecl();
 
     if (canFirstType->isTypeParameter())
-      return conformsToProtocol(canFirstType, protocol);
+      return requiresProtocol(canFirstType, protocol);
     else
       return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
                                           canFirstType, protocol);
@@ -561,7 +568,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     // requirement, but it could also be in terms of concrete types if it has
     // been substituted/otherwise 'resolved', so we need to handle both.
     auto baseType = canFirstType;
-    if (canFirstType->isTypeParameter()) {
+    if (baseType->isTypeParameter()) {
       auto directSuperclass = getSuperclassBound(baseType);
       if (!directSuperclass)
         return false;
@@ -618,7 +625,7 @@ SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
   return result;
 }
 
-bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) {
+bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) const {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
   if (!type->isCanonical())
@@ -633,8 +640,8 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) {
   return isCanonicalTypeInContext(type, builder);
 }
 
-bool GenericSignatureImpl::isCanonicalTypeInContext(Type type,
-                                             GenericSignatureBuilder &builder) {
+bool GenericSignatureImpl::isCanonicalTypeInContext(
+    Type type, GenericSignatureBuilder &builder) const {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
   if (!type->isCanonical())
@@ -661,8 +668,8 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(Type type,
   });
 }
 
-CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type,
-                                             GenericSignatureBuilder &builder) {
+CanType GenericSignatureImpl::getCanonicalTypeInContext(
+    Type type, GenericSignatureBuilder &builder) const {
   type = type->getCanonicalType();
 
   // All the contextual canonicality rules apply to type parameters, so if the
@@ -702,7 +709,7 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type,
   return result;
 }
 
-CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) {
+CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   type = type->getCanonicalType();
 
   // All the contextual canonicality rules apply to type parameters, so if the
@@ -834,7 +841,7 @@ void GenericSignatureImpl::buildConformanceAccessPath(
     SmallVectorImpl<ConformanceAccessPath::Entry> &path,
     ArrayRef<Requirement> reqs, const void *opaqueSource,
     ProtocolDecl *conformingProto, Type rootType,
-    ProtocolDecl *requirementSignatureProto) {
+    ProtocolDecl *requirementSignatureProto) const {
   auto *source = reinterpret_cast<const RequirementSource *>(opaqueSource);
   // Each protocol requirement is a step along the path.
   if (source->isProtocolRequirement()) {
@@ -967,7 +974,8 @@ void GenericSignatureImpl::buildConformanceAccessPath(
 }
 
 ConformanceAccessPath
-GenericSignatureImpl::getConformanceAccessPath(Type type, ProtocolDecl *protocol) {
+GenericSignatureImpl::getConformanceAccessPath(Type type,
+                                               ProtocolDecl *protocol) const {
   assert(type->isTypeParameter() && "not a type parameter");
 
   // Resolve this type to a potential archetype.
@@ -1029,9 +1037,27 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
                               MakeAbstractConformanceForGenericType());
 }
 
-unsigned GenericSignatureImpl::getGenericParamOrdinal(GenericTypeParamType *param) {
-  return GenericParamKey(param->getDepth(), param->getIndex())
-    .findIndexIn(getGenericParams());
+GenericTypeParamType *GenericSignatureImpl::getSugaredType(
+    GenericTypeParamType *type) const {
+  unsigned ordinal = getGenericParamOrdinal(type);
+  return getGenericParams()[ordinal];
+}
+
+Type GenericSignatureImpl::getSugaredType(Type type) const {
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([this](Type Ty) -> Type {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+      return Type(getSugaredType(GP));
+    }
+    return Ty;
+  });
+}
+
+unsigned GenericSignatureImpl::getGenericParamOrdinal(
+    GenericTypeParamType *param) const {
+  return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
 bool GenericSignatureImpl::hasTypeVariable() const {

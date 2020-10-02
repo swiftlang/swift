@@ -19,8 +19,15 @@
 
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/TBDGen/TBDGen.h"
 
 namespace llvm {
+
+class DataLayout;
+class Triple;
+
 namespace MachO {
 class InterfaceFile;
 } // end namespace MachO
@@ -33,12 +40,11 @@ namespace swift {
 
 class FileUnit;
 class ModuleDecl;
-struct TBDGenOptions;
 
 class TBDGenDescriptor final {
   using FileOrModule = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
   FileOrModule Input;
-  const TBDGenOptions &Opts;
+  TBDGenOptions Opts;
 
   TBDGenDescriptor(FileOrModule input, const TBDGenOptions &opts)
       : Input(input), Opts(opts) {
@@ -58,6 +64,10 @@ public:
 
   /// Returns the TBDGen options.
   const TBDGenOptions &getOptions() const { return Opts; }
+  TBDGenOptions &getOptions() { return Opts; }
+
+  const llvm::DataLayout &getDataLayout() const;
+  const llvm::Triple &getTarget() const;
 
   bool operator==(const TBDGenDescriptor &other) const;
   bool operator!=(const TBDGenDescriptor &other) const {
@@ -77,13 +87,12 @@ llvm::hash_code hash_value(const TBDGenDescriptor &desc);
 void simple_display(llvm::raw_ostream &out, const TBDGenDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const TBDGenDescriptor &desc);
 
-using TBDFileAndSymbols =
-    std::pair<llvm::MachO::InterfaceFile, llvm::StringSet<>>;
+using TBDFile = llvm::MachO::InterfaceFile;
 
-/// Computes the TBD file and public symbols for a given module or file.
+/// Computes the TBD file for a given Swift module or file.
 class GenerateTBDRequest
     : public SimpleRequest<GenerateTBDRequest,
-                           TBDFileAndSymbols(TBDGenDescriptor),
+                           TBDFile(TBDGenDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -92,7 +101,140 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  TBDFileAndSymbols evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+  TBDFile evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+};
+
+/// Retrieve the public symbols for a file or module.
+class PublicSymbolsRequest
+    : public SimpleRequest<PublicSymbolsRequest,
+                           std::vector<std::string>(TBDGenDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::vector<std::string>
+  evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+};
+
+/// Describes the origin of a particular symbol, including the stage of
+/// compilation it is introduced, as well as information on what decl introduces
+/// it.
+class SymbolSource {
+public:
+  enum class Kind {
+    /// A symbol introduced when emitting a SIL decl.
+    SIL,
+
+    /// A symbol introduced when emitting LLVM IR.
+    IR,
+
+    /// A symbol used to customize linker behavior, introduced by TBDGen.
+    LinkerDirective,
+
+    /// A symbol with an unknown origin.
+    // FIXME: This should be eliminated.
+    Unknown
+  };
+  Kind kind;
+
+private:
+  union {
+    SILDeclRef silDeclRef;
+    irgen::LinkEntity irEntity;
+  };
+
+  explicit SymbolSource(SILDeclRef ref) : kind(Kind::SIL) {
+    silDeclRef = ref;
+  }
+  explicit SymbolSource(irgen::LinkEntity entity) : kind(Kind::IR) {
+    irEntity = entity;
+  }
+  explicit SymbolSource(Kind kind) : kind(kind) {
+    assert(kind == Kind::LinkerDirective || kind == Kind::Unknown);
+  }
+
+public:
+  static SymbolSource forSILDeclRef(SILDeclRef ref) {
+    return SymbolSource{ref};
+  }
+  static SymbolSource forIRLinkEntity(irgen::LinkEntity entity) {
+    return SymbolSource{entity};
+  }
+  static SymbolSource forLinkerDirective() {
+    return SymbolSource{Kind::LinkerDirective};
+  }
+  static SymbolSource forUnknown() {
+    return SymbolSource{Kind::Unknown};
+  }
+
+  bool isLinkerDirective() const {
+    return kind == Kind::LinkerDirective;
+  }
+
+  SILDeclRef getSILDeclRef() const {
+    assert(kind == Kind::SIL);
+    return silDeclRef;
+  }
+  irgen::LinkEntity getIRLinkEntity() const {
+    assert(kind == Kind::IR);
+    return irEntity;
+  }
+};
+
+/// Maps a symbol back to its source for lazy compilation.
+class SymbolSourceMap {
+  friend class SymbolSourceMapRequest;
+
+  using Storage = llvm::StringMap<SymbolSource>;
+  const Storage *storage;
+
+  explicit SymbolSourceMap(const Storage *storage) : storage(storage) {
+    assert(storage);
+  }
+
+public:
+  Optional<SymbolSource> find(StringRef symbol) const {
+    auto result = storage->find(symbol);
+    if (result == storage->end())
+      return None;
+    return result->second;
+  }
+
+  friend bool operator==(const SymbolSourceMap &lhs,
+                         const SymbolSourceMap &rhs) {
+    return lhs.storage == rhs.storage;
+  }
+  friend bool operator!=(const SymbolSourceMap &lhs,
+                         const SymbolSourceMap &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out, const SymbolSourceMap &) {
+    out << "(symbol storage map)";
+  }
+};
+
+/// Computes a map of symbols to their SymbolSource for a file or module.
+class SymbolSourceMapRequest
+    : public SimpleRequest<SymbolSourceMapRequest,
+                           SymbolSourceMap(TBDGenDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SymbolSourceMap evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 /// Report that a request of the given kind is being evaluated, so it
