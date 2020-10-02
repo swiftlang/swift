@@ -1314,6 +1314,17 @@ namespace {
             IsOnSelfParameter &&
             isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
 
+        // Assignment to a wrapped property can only be re-written to initialization for
+        // members of `self` in an initializer, and for local variables.
+        if (!(isAssignmentToSelfParamInInit || VD->getDeclContext()->isLocalContext()))
+          return false;
+
+        // If this var isn't in a type context, assignment will always use the setter
+        // if there is an initial value.
+        if (!VD->getDeclContext()->isTypeContext() &&
+            wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue())
+          return false;
+
         // If we have a nonmutating setter on a value type, the call
         // captures all of 'self' and we cannot rewrite an assignment
         // into an initialization.
@@ -1403,7 +1414,7 @@ namespace {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
 
-      if (IsOnSelfParameter && canRewriteSetAsPropertyWrapperInit(SGF) &&
+      if (canRewriteSetAsPropertyWrapperInit(SGF) &&
           !Storage->isStatic() &&
           isBackingVarVisible(cast<VarDecl>(Storage),
                               SGF.FunctionDC)) {
@@ -1434,7 +1445,9 @@ namespace {
 
         // Get the address of the storage property.
         ManagedValue proj;
-        if (BaseFormalType->mayHaveSuperclass()) {
+        if (!BaseFormalType) {
+          proj = SGF.maybeEmitValueOfLocalVarDecl(backingVar);
+        } else if (BaseFormalType->mayHaveSuperclass()) {
           RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
                                   typeData);
           proj = std::move(REC).project(SGF, loc, base);
@@ -1471,33 +1484,51 @@ namespace {
                          .SILFnType)
                   .getValue();
 
-        } else
+        } else {
           setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
+        }
+
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
         SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
 
-        SILValue capturedBase;
-        unsigned argIdx = setterConv.getNumSILArguments() - 1;
-        if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
-          capturedBase = base.getValue();
-        } else {
-          capturedBase = base.copy(SGF, loc).forward(SGF);
-        }
+        // Emit captures for the setter
+        SmallVector<SILValue, 4> capturedArgs;
+        auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(setter);
+        if (!captureInfo.getCaptures().empty()) {
+          SmallVector<ManagedValue, 4> captures;
+          SGF.emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
 
-        // If the base is a reference and the setter expects a value, emit a
-        // load. This pattern is emitted for property wrappers with a
-        // nonmutating setter, for example.
-        if (base.getType().isAddress() &&
-            base.getType().getObjectType() ==
-                setterConv.getSILArgumentType(argIdx,
-                                              SGF.getTypeExpansionContext())) {
-          capturedBase = SGF.B.createTrivialLoadOr(
-              loc, capturedBase, LoadOwnershipQualifier::Take);
+          for (auto capture : captures)
+            capturedArgs.push_back(capture.forward(SGF));
+        } else {
+          assert(base);
+
+          SILValue capturedBase;
+          unsigned argIdx = setterConv.getNumSILArguments() - 1;
+
+          if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+            capturedBase = base.getValue();
+          } else {
+            capturedBase = base.copy(SGF, loc).forward(SGF);
+          }
+
+          // If the base is a reference and the setter expects a value, emit a
+          // load. This pattern is emitted for property wrappers with a
+          // nonmutating setter, for example.
+          if (base.getType().isAddress() &&
+              base.getType().getObjectType() ==
+                  setterConv.getSILArgumentType(argIdx,
+                                                SGF.getTypeExpansionContext())) {
+            capturedBase = SGF.B.createTrivialLoadOr(
+                loc, capturedBase, LoadOwnershipQualifier::Take);
+          }
+
+          capturedArgs.push_back(capturedBase);
         }
 
         PartialApplyInst *setterPAI =
           SGF.B.createPartialApply(loc, setterFRef,
-                                   Substitutions, { capturedBase },
+                                   Substitutions, capturedArgs,
                                    ParameterConvention::Direct_Guaranteed);
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 

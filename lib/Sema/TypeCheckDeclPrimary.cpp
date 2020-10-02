@@ -1454,6 +1454,11 @@ public:
     (void) VD->getPropertyWrapperBackingProperty();
     (void) VD->getImplInfo();
 
+    // Visit auxiliary decls first
+    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+      this->visitBoundVariable(var);
+    });
+
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
       VD->getAttrs().add(new (getASTContext())

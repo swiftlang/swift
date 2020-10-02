@@ -24,13 +24,27 @@ public enum AddressOnlyEnum {
 public class AddressOnlySetter {
   @WrapGod var value: AddressOnlyEnum = .value(nil)
 
+  init() {
+    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17AddressOnlySetterCACycfc
+    // CHECK: [[E1:%.*]] = alloc_stack $AddressOnlyEnum
+    // CHECK: [[W:%.*]] = alloc_stack $WrapGod<AddressOnlyEnum>
+    // CHECK: [[I:%.*]] = function_ref @$s27resilient_assign_by_wrapper17AddressOnlySetterC5valueAA0eF4EnumOvpfP : $@convention(thin) (@in AddressOnlyEnum) -> @out WrapGod<AddressOnlyEnum>
+    // CHECK: apply [[I]]([[W]], [[E1]])
+
+    // CHECK: [[E2:%.*]] = alloc_stack $AddressOnlyEnum
+    // CHECK-NEXT: inject_enum_addr [[E2]] : $*AddressOnlyEnum, #AddressOnlyEnum.some!enumelt
+    // CHECK: [[S:%.*]] = partial_apply [callee_guaranteed] {{%.*}}({{%.*}}) : $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
+    // CHECK: assign_by_wrapper [[E2]] : $*AddressOnlyEnum
+    // CHECK-SAME: set [[S]] : $@callee_guaranteed (@in AddressOnlyEnum) -> ()
+    self.value = .some
+  }
+
   func testAssignment() {
     // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17AddressOnlySetterC14testAssignmentyyF
     // CHECK: [[E:%.*]] = alloc_stack $AddressOnlyEnum
     // CHECK: inject_enum_addr [[E]] : $*AddressOnlyEnum, #AddressOnlyEnum.some!enumelt
-    // CHECK: [[S:%.*]] = partial_apply [callee_guaranteed] {{%.*}}({{%.*}}) : $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
-    // CHECK: assign_by_wrapper [[E]] : $*AddressOnlyEnum
-    // CHECK-SAME: set [[S]] : $@callee_guaranteed (@in AddressOnlyEnum) -> ()
+    // CHECK: [[S:%.*]] = class_method %0 : $AddressOnlySetter, #AddressOnlySetter.value!setter : (AddressOnlySetter) -> (AddressOnlyEnum) -> (), $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
+    // CHECK: apply [[S]]([[E]], %0) : $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
     self.value = .some
   }
 }
@@ -40,8 +54,8 @@ public struct SubstitutedSetter<T> {
 }
 
 extension SubstitutedSetter where T == Bool {
-  mutating func testAssignment() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17SubstitutedSetterVAASbRszlE14testAssignmentyyF
+  init() {
+    // CHECK-LABEL: hidden [ossa] @$s27resilient_assign_by_wrapper17SubstitutedSetterVAASbRszlEACySbGycfC
     // CHECK: [[W:%.*]] = struct_element_addr {{%.*}} : $*SubstitutedSetter<Bool>, #SubstitutedSetter._value
     // CHECK: [[B:%.*]] = alloc_stack $Bool
     // CHECK: assign_by_wrapper [[B]] : $*Bool to [[W]] : $*WrapGod<Bool>
@@ -56,9 +70,9 @@ public struct ReabstractedSetter<T> {
 }
 
 extension ReabstractedSetter where T == Int {
-  mutating func testAssignment() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlE14testAssignmentyyF
-    // CHECK: [[F:%.*]] = function_ref @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlE14testAssignmentyyFySicfU_ : $@convention(thin) (Int) -> ()
+  init() {
+    // CHECK-LABEL: hidden [ossa] @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlEACySiGycfC
+    // CHECK: [[F:%.*]] = function_ref @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlEACySiGycfcySicfU_ : $@convention(thin) (Int) -> ()
     // CHECK: [[TH_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) (Int) -> () to $@callee_guaranteed (Int) -> ()
     // CHECK: [[THUNK_REF:%.*]] = function_ref @$sSiIegy_SiIegn_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
     // CHECK: [[CF:%.*]] = partial_apply [callee_guaranteed] [[THUNK_REF]]([[TH_F]]) : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
@@ -76,8 +90,8 @@ public struct ObjectifiedSetter<T: AnyObject> {
 public class SomeObject {}
 
 extension ObjectifiedSetter where T == SomeObject {
-  mutating func testAssignment() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17ObjectifiedSetterVA2A10SomeObjectCRszrlE14testAssignmentyyF : $@convention(method) (@inout ObjectifiedSetter<SomeObject>) -> () {
+  init() {
+    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17ObjectifiedSetterV5valuexvs : $@convention(method) <T where T : AnyObject> (@owned T, @inout ObjectifiedSetter<T>) -> () {
     // CHECK: [[OBJ:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick SomeObject.Type) -> @owned SomeObject
     // CHECK: [[STORAGE:%.*]] = struct_element_addr {{%.*}} : $*ObjectifiedSetter<SomeObject>, #ObjectifiedSetter._value
     // CHECK: assign_by_wrapper [[OBJ]] : $SomeObject to [[STORAGE]] : $*WrapGod<SomeObject>
