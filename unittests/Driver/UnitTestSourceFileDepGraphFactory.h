@@ -27,12 +27,12 @@ class UnitTestSourceFileDepGraphFactory
 
 public:
   UnitTestSourceFileDepGraphFactory(
-      bool includePrivateDeps, bool hadCompilationError, StringRef swiftDeps,
+      bool hadCompilationError, StringRef swiftDeps,
       StringRef fileFingerprint, bool emitDotFileAfterConstruction,
       const DependencyDescriptions &dependencyDescriptions,
       DiagnosticEngine &diags)
       : AbstractSourceFileDepGraphFactory(
-            includePrivateDeps, hadCompilationError, swiftDeps, fileFingerprint,
+            hadCompilationError, swiftDeps, fileFingerprint,
             emitDotFileAfterConstruction, diags),
         dependencyDescriptions(dependencyDescriptions) {}
 

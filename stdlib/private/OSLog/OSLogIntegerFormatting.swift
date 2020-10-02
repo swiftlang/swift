@@ -17,23 +17,30 @@
 public struct OSLogIntegerFormatting {
   /// The base to use for the string representation. `radix` must be at least 2
   /// and at most 36. The default is 10.
-  public var radix: Int
+  @usableFromInline
+  internal var radix: Int
 
   /// When set, a `+` will be printed for all non-negative integers.
-  public var explicitPositiveSign: Bool
+  @usableFromInline
+  internal var explicitPositiveSign: Bool
 
   /// When set, a prefix: 0b or 0o or 0x will be added when the radix is 2, 8 or
   /// 16 respectively.
-  public var includePrefix: Bool
+  @usableFromInline
+  internal var includePrefix: Bool
 
   /// Whether to use uppercase letters to represent numerals
   /// greater than 9 (default is to use lowercase).
-  public var uppercase: Bool
+  @usableFromInline
+  internal var uppercase: Bool
 
   /// Minimum number of digits to display. Numbers having fewer digits than
   /// minDigits will be displayed with leading zeros.
-  public var minDigits: (() -> Int)?
+  @usableFromInline
+  internal var minDigits: (() -> Int)?
 
+  /// Initializes all stored properties.
+  ///
   /// - Parameters:
   ///   - radix: The base to use for the string representation. `radix` must be
   ///     at least 2 and at most 36. The default is 10.
@@ -46,9 +53,8 @@ public struct OSLogIntegerFormatting {
   ///     `false`.
   ///   - minDigits: minimum number of digits to display. Numbers will be
   ///     prefixed with zeros if necessary to meet the minimum. The default is 1.
-  @_semantics("constant_evaluable")
-  @inlinable
-  @_optimize(none)
+  @_transparent
+  @usableFromInline
   internal init(
     radix: Int = 10,
     explicitPositiveSign: Bool = false,
@@ -56,8 +62,6 @@ public struct OSLogIntegerFormatting {
     uppercase: Bool = false,
     minDigits: (() -> Int)?
   ) {
-    precondition(radix >= 2 && radix <= 36)
-
     self.radix = radix
     self.explicitPositiveSign = explicitPositiveSign
     self.includePrefix = includePrefix
@@ -65,11 +69,17 @@ public struct OSLogIntegerFormatting {
     self.minDigits = minDigits
   }
 
+  /// Displays an interpolated integer as a decimal number with the specified number
+  /// of digits and an optional sign.
+  ///
+  /// The parameter `explicitPositiveSign` must be a boolean literal. The
+  /// parameter `minDigits` can be an arbitrary expression.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
+  ///     numbers.
   ///   - minDigits: minimum number of digits to display. Numbers will be
-  ///     prefixed with zeros if necessary to meet the minimum. The default is 1.
+  ///     prefixed with zeros if necessary to meet the minimum.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -83,9 +93,13 @@ public struct OSLogIntegerFormatting {
       minDigits: minDigits)
   }
 
+  /// Displays an interpolated integer as a decimal number with an optional sign.
+  ///
+  /// The parameter `explicitPositiveSign` must be a boolean literal.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
+  ///     numbers.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -98,22 +112,28 @@ public struct OSLogIntegerFormatting {
       minDigits: nil)
   }
 
-  /// Default decimal format.
+  /// Displays an interpolated integer as a decimal number. This is the default format for
+  /// integers.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public static var decimal: OSLogIntegerFormatting { .decimal() }
 
+  /// Displays an interpolated unsigned integer as a hexadecimal number with the
+  /// specified parameters. This formatting option should be used only with unsigned
+  /// integers.
+  ///
+  /// All parameters except `minDigits` should be boolean literals. `minDigits`
+  /// can be an arbitrary expression.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
-  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
-  ///     radices. Default is `false`.
+  ///     numbers.
+  ///   - includePrefix: Pass `true` to add a prefix 0x.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
-  ///     greater than 9, or `false` to use lowercase letters. The default is
-  ///     `false`.
+  ///     greater than 9, or `false` to use lowercase letters. The default is `false`.
   ///   - minDigits: minimum number of digits to display. Numbers will be
-  ///     prefixed with zeros if necessary to meet the minimum. The default is 1.
+  ///     prefixed with zeros if necessary to meet the minimum.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -131,14 +151,17 @@ public struct OSLogIntegerFormatting {
       minDigits: minDigits)
   }
 
+  /// Displays an interpolated unsigned integer as a hexadecimal number with the specified
+  /// parameters. This formatting option should be used only with unsigned integers.
+  ///
+  /// All parameters  should be boolean literals.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
-  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
-  ///     radices. Default is `false`.
+  ///     numbers.
+  ///   - includePrefix: Pass `true` to add a prefix 0x.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
-  ///     greater than 9, or `false` to use lowercase letters. The default is
-  ///     `false`.
+  ///     greater than 9, or `false` to use lowercase letters. The default is `false`.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -155,22 +178,28 @@ public struct OSLogIntegerFormatting {
       minDigits: nil)
   }
 
-  /// Default hexadecimal format.
+  /// Displays an interpolated unsigned integer as a hexadecimal number.
+  /// This formatting option should be used only with unsigned integers.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public static var hex: OSLogIntegerFormatting { .hex() }
 
+  /// Displays an interpolated unsigned integer as an octal number with the specified
+  /// parameters. This formatting option should be used only with unsigned
+  /// integers.
+  ///
+  /// All parameters except `minDigits` should be boolean literals. `minDigits`
+  /// can be an arbitrary expression.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
-  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
-  ///     radices. Default is `false`.
+  ///     numbers.
+  ///   - includePrefix: Pass `true` to add a prefix 0o.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
-  ///     greater than 9, or `false` to use lowercase letters. The default is
-  ///     `false`.
+  ///     greater than 9, or `false` to use lowercase letters. The default is `false`.
   ///   - minDigits: minimum number of digits to display. Numbers will be
-  ///     prefixed with zeros if necessary to meet the minimum. The default is 1.
+  ///     prefixed with zeros if necessary to meet the minimum.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -188,14 +217,17 @@ public struct OSLogIntegerFormatting {
       minDigits: minDigits)
   }
 
+  /// Displays an interpolated unsigned integer as an octal number with the specified parameters.
+  /// This formatting option should be used only with unsigned integers.
+  ///
+  /// All parameters must be boolean literals.
+  ///
   /// - Parameters:
   ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
-  ///     numbers. Default is `false`.
-  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
-  ///     radices. Default is `false`.
+  ///     numbers.
+  ///   - includePrefix: Pass `true` to add a prefix 0o.
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
-  ///     greater than 9, or `false` to use lowercase letters. The default is
-  ///     `false`.
+  ///     greater than 9, or `false` to use lowercase letters.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -212,7 +244,8 @@ public struct OSLogIntegerFormatting {
       minDigits: nil)
   }
 
-  /// Default octal format.
+  /// Displays an interpolated unsigned integer as an octal number.
+  /// This formatting option should be used only with unsigned integers.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -311,13 +344,10 @@ extension OSLogIntegerFormatting {
 
     // Add privacy qualifier after % sign within curly braces. This is an
     // os log specific flag.
-    switch privacy {
-    case .private:
-      specification += "{private}"
-    case .public:
-      specification += "{public}"
-    default:
-      break
+    if let privacySpecifier = privacy.privacySpecifier {
+      specification += "{"
+      specification += privacySpecifier
+      specification += "}"
     }
 
     //

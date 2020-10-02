@@ -351,12 +351,77 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
-  if (Loc.isInvalid())
-    DC = DC->getModuleScopeContext();
+  LookupResult Lookup;
 
-  auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
+  bool AllDeclRefs = true;
+  SmallVector<ValueDecl*, 4> ResultValues;
 
   auto &Context = DC->getASTContext();
+  if (Context.LangOpts.DisableParserLookup) {
+    // First, look for a local binding in scope.
+    if (Loc.isValid() && !Name.isOperator()) {
+      SmallVector<ValueDecl *, 2> localDecls;
+      ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
+                                 Name.getFullName(), Loc,
+                                 /*stopAfterInnermostBraceStmt=*/false,
+                                 ResultValues);
+      for (auto *localDecl : ResultValues) {
+        Lookup.add(LookupResultEntry(localDecl), /*isOuter=*/false);
+      }
+    }
+  }
+
+  if (!Lookup) {
+    // Now, look for all local bindings, even forward references, as well
+    // as type members and top-level declarations.
+    if (Loc.isInvalid())
+      DC = DC->getModuleScopeContext();
+
+    Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
+
+    ValueDecl *localDeclAfterUse = nullptr;
+    auto isValid = [&](ValueDecl *D) {
+      // If we find something in the current context, it must be a forward
+      // reference, because otherwise if it was in scope, it would have
+      // been returned by the call to ASTScope::lookupLocalDecls() above.
+      if (D->getDeclContext()->isLocalContext() &&
+          D->getDeclContext() == DC &&
+          (Context.LangOpts.DisableParserLookup ||
+           (Loc.isValid() && D->getLoc().isValid() &&
+            Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
+            !isa<TypeDecl>(D)))) {
+        localDeclAfterUse = D;
+        return false;
+      }
+      return true;
+    };
+    AllDeclRefs =
+        findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                       /*breakOnMember=*/true, ResultValues, isValid);
+
+    // If local declaration after use is found, check outer results for
+    // better matching candidates.
+    if (ResultValues.empty() && localDeclAfterUse) {
+      auto innerDecl = localDeclAfterUse;
+      while (localDeclAfterUse) {
+        if (Lookup.outerResults().empty()) {
+          Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
+          Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
+                                 localDeclAfterUse->getName());
+          Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
+          return error;
+        }
+
+        Lookup.shiftDownResults();
+        ResultValues.clear();
+        localDeclAfterUse = nullptr;
+        AllDeclRefs =
+            findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                           /*breakOnMember=*/true, ResultValues, isValid);
+      }
+    }
+  }
+
   if (!Lookup) {
     // If we failed lookup of an operator, check to see if this is a range
     // operator misspelling. Otherwise try to diagnose a juxtaposition
@@ -486,50 +551,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
-
-  SmallVector<ValueDecl*, 4> ResultValues;
-  ValueDecl *localDeclAfterUse = nullptr;
-  auto isValid = [&](ValueDecl *D) {
-    // FIXME: The source-location checks won't make sense once
-    // EnableASTScopeLookup is the default.
-    //
-    // Note that we allow forward references to types, because they cannot
-    // capture.
-    if (Loc.isValid() && D->getLoc().isValid() &&
-        D->getDeclContext()->isLocalContext() &&
-        D->getDeclContext() == DC &&
-        Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
-        !isa<TypeDecl>(D)) {
-      localDeclAfterUse = D;
-      return false;
-    }
-    return true;
-  };
-  bool AllDeclRefs =
-      findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                     /*breakOnMember=*/true, ResultValues, isValid);
-
-  // If local declaration after use is found, check outer results for
-  // better matching candidates.
-  if (localDeclAfterUse) {
-    auto innerDecl = localDeclAfterUse;
-    while (localDeclAfterUse) {
-      if (Lookup.outerResults().empty()) {
-        Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
-        Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
-                               localDeclAfterUse->getName());
-        Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
-        return error;
-      }
-
-      Lookup.shiftDownResults();
-      ResultValues.clear();
-      localDeclAfterUse = nullptr;
-      AllDeclRefs =
-          findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                         /*breakOnMember=*/true, ResultValues, isValid);
-    }
-  }
 
   // If we have an unambiguous reference to a type decl, form a TypeExpr.
   if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&

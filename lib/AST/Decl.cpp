@@ -1447,7 +1447,8 @@ void PatternBindingEntry::setInit(Expr *E) {
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   SmallVector<VarDecl *, 8> variables;
   getPattern()->collectVariables(variables);
-  assert(!variables.empty());
+  if (variables.empty())
+    return nullptr;
   return variables[0];
 }
 
@@ -8036,27 +8037,4 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
-}
-
-bool Decl::isPrivateToEnclosingFile() const {
-  if (auto *VD = dyn_cast<ValueDecl>(this))
-    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
-  switch (getKind()) {
-  case DeclKind::Import:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-    return true;
-
-  case DeclKind::Extension:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-    return false;
-
-  default:
-    llvm_unreachable("everything else is a ValueDecl");
-  }
 }
