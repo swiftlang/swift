@@ -450,6 +450,27 @@ SourceRange GuardStmtBodyScope::getSourceRangeOfThisASTNode(
 
 #pragma mark source range caching
 
+CharSourceRange
+ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
+                                        bool omitAssertions) const {
+  if (!isCharSourceRangeCached()) {
+    auto range = getSourceRangeOfThisASTNode(omitAssertions);
+    ASTScopeAssert(range.isValid(), "scope has invalid source range");
+    ASTScopeAssert(SM.isBeforeInBuffer(range.Start, range.End) ||
+                   range.Start == range.End,
+                   "scope source range ends before start");
+
+    cachedCharSourceRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, range);
+  }
+
+  return *cachedCharSourceRange;
+}
+
+bool ASTScopeImpl::isCharSourceRangeCached() const {
+  return cachedCharSourceRange.hasValue();
+}
+
 SourceRange
 ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
   if (!isSourceRangeCached(omitAssertions))

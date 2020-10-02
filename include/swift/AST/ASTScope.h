@@ -157,6 +157,8 @@ private:
   // source range. So include their ranges here
   SourceRange sourceRangeOfIgnoredASTNodes;
 
+  mutable Optional<CharSourceRange> cachedCharSourceRange;
+
 #pragma mark - constructor / destructor
 public:
   ASTScopeImpl(){};
@@ -211,6 +213,10 @@ public:
                      bool ensureDisjoint);
 
   SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
+
+  CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
+                                            bool omitAssertions = false) const;
+  bool isCharSourceRangeCached() const;
 
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
   /// getSourceRange with the starting point. But we might be asked to lookup an
