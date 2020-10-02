@@ -989,7 +989,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         "Original inits are always after the '='");
     scopeCreator
         .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex, isLocalBinding);
+            this, decl, patternEntryIndex);
   }
 
   // Add accessors for the variables in this pattern.
@@ -1378,10 +1378,8 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex,
-    bool isLocalBinding)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex),
-      isLocalBinding(isLocalBinding) {
+    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
 }

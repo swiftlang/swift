@@ -1023,10 +1023,8 @@ class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
-  const bool isLocalBinding;
 
-  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
-                            bool);
+  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -1041,10 +1039,13 @@ public:
 };
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
+  const bool isLocalBinding;
+
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding) {}
+                        bool isLocalBinding, Optional<SourceLoc> endLoc)
+      : AbstractPatternEntryScope(pbDecl, entryIndex),
+        isLocalBinding(isLocalBinding), endLoc(endLoc) {}
   virtual ~PatternEntryDeclScope() {}
 
 protected:
@@ -1070,9 +1071,8 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
   Expr *initAsWrittenWhenCreated;
 
 public:
-  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                               bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding),
+  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
+      : AbstractPatternEntryScope(pbDecl, entryIndex),
         initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
