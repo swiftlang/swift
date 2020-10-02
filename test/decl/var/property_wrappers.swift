@@ -167,6 +167,11 @@ func testLocalContext() {
   @WrapperWithStorageRef
   var hasProjection = 10
   let _: Wrapper = $hasProjection
+
+  @WrapperWithInitialValue
+  var uninitialized: Int { // expected-error {{non-member observing properties require an initializer}}
+    didSet {}
+  }
 }
 
 // ---------------------------------------------------------------------------

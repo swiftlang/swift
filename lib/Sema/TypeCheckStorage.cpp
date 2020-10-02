@@ -2737,6 +2737,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                              initializer);
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
+    } else if (var->hasObservers() && !dc->isTypeContext()) {
+      var->diagnose(diag::observingprop_requires_initializer);
     }
 
     if (var->getOpaqueResultTypeDecl()) {
