@@ -1014,19 +1014,12 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
                          options::OPT_disable_only_one_dependency_file, false);
 
-    const bool EnableTypeFingerprints =
-        ArgList->hasFlag(options::OPT_enable_type_fingerprints,
-                         options::OPT_disable_type_fingerprints,
-                         LangOptions().EnableTypeFingerprints);
-
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool FineGrainedDependenciesIncludeIntrafileOnes =
-        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
     const bool EnableCrossModuleDependencies = ArgList->hasArg(
         options::OPT_enable_experimental_cross_module_incremental_build);
 
@@ -1050,10 +1043,8 @@ Driver::buildCompilation(const ToolChain &TC,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
         OnlyOneDependencyFile,
-        EnableTypeFingerprints,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
-        FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
         CompareIncrementalSchemesPath,

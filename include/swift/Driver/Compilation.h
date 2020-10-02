@@ -265,18 +265,12 @@ public:
   const bool OnlyOneDependencyFile;
 
 private:
-  /// Is the parser recording token hashes for each type body?
-  const bool EnableTypeFingerprints;
-
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
-
-  /// Experiment with intrafile dependencies
-  const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
@@ -319,11 +313,8 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
-              bool EnableTypeFingerprints =
-                LangOptions().EnableTypeFingerprints,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
-              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
               bool CompareIncrementalSchemes = false,
               StringRef CompareIncrementalSchemesPath = "",
@@ -386,18 +377,12 @@ public:
   }
   void disableIncrementalBuild(Twine why);
 
-  bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
-
   bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
     return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
 
   bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
     return EmitFineGrainedDependencyDotFileAfterEveryImport;
-  }
-
-  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
-    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
   bool getEnableSourceRangeDependencies() const {

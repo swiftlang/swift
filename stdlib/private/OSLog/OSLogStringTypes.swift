@@ -14,8 +14,7 @@
 // It defines `appendInterpolation` function for String type. It also defines
 // extensions for serializing strings into the argument buffer passed to
 // os_log ABIs. Note that os_log requires passing a stable pointer to an
-// interpolated string. The SPI: `_convertConstStringToUTF8PointerArgument`
-// is used to construct a stable pointer to a (dynamic) string.
+// interpolated string.
 //
 // The `appendInterpolation` function defined in this file accept privacy and
 // alignment options along with the interpolated expression as shown below:
@@ -25,17 +24,21 @@
 
 extension OSLogInterpolation {
 
-  /// Define interpolation for expressions of type String.
+  /// Defines interpolation for expressions of type String.
+  ///
+  /// Do not call this function directly. It will be called automatically when interpolating
+  /// a value of type `String` in the string interpolations passed to the log APIs.
+  ///
   /// - Parameters:
-  ///  - argumentString: the interpolated expression of type String, which is autoclosured.
-  ///  - align: left or right alignment with the minimum number of columns as
-  ///    defined by the type `OSLogStringAlignment`.
-  ///  - privacy: a privacy qualifier which is either private or public.
-  ///  It is auto-inferred by default.
+  ///   - argumentString: The interpolated expression of type String, which is autoclosured.
+  ///   - align: Left or right alignment with the minimum number of columns as
+  ///     defined by the type `OSLogStringAlignment`.
+  ///   - privacy: A privacy qualifier which is either private or public.
+  ///     It is auto-inferred by default.
   @_semantics("constant_evaluable")
-  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
+  @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
     align: OSLogStringAlignment = .none,
@@ -48,12 +51,20 @@ extension OSLogInterpolation {
     // If minimum column width is specified, append this value first. Note that the
     // format specifier would use a '*' for width e.g. %*s.
     if let minColumns = align.minimumColumnWidth {
-      appendPrecisionArgument(minColumns)
+      appendAlignmentArgument(minColumns)
     }
 
+    // If the privacy has a mask, append the mask argument, which is a constant payload.
+    // Note that this should come after the width but before the precision.
+    if privacy.hasMask {
+      appendMaskArgument(privacy)
+    }
+
+    // Append the string argument.
     addStringHeaders(privacy)
     arguments.append(argumentString)
     argumentCount += 1
+    stringArgumentCount += 1
   }
 
   /// Update preamble and append argument headers based on the parameters of
@@ -90,13 +101,10 @@ extension OSLogInterpolation {
     _ privacy: OSLogPrivacy
   ) -> String {
     var specifier = "%"
-    switch privacy {
-    case .private:
-      specifier += "{private}"
-    case .public:
-      specifier += "{public}"
-    default:
-      break
+    if let privacySpecifier = privacy.privacySpecifier {
+      specifier += "{"
+      specifier += privacySpecifier
+      specifier += "}"
     }
     if case .start = align.anchor {
       specifier += "-"
@@ -117,7 +125,12 @@ extension OSLogArguments {
   @inlinable
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> String) {
-    argumentClosures.append({ serialize(value(), at: &$0, using: &$1) })
+    argumentClosures.append({ (position, _, stringArgumentOwners) in
+      serialize(
+        value(),
+        at: &position,
+        storingStringOwnersIn: &stringArgumentOwners)
+    })
   }
 }
 
@@ -129,34 +142,48 @@ extension OSLogArguments {
 /// This function must be constant evaluable. Note that it is marked transparent
 /// instead of @inline(__always) as it is used in optimize(none) functions.
 @_transparent
-@usableFromInline
+@_alwaysEmitIntoClient
 internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
 /// Serialize a stable pointer to the string `stringValue` at the buffer location
-/// pointed by `bufferPosition`. When necessary, this function would copy the
-/// string contents to a storage with a stable pointer. If that happens, a reference
-/// to the storage will be added to `storageObjects`.
-@inlinable
+/// pointed to by `bufferPosition`.
 @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize(
   _ stringValue: String,
-  at bufferPosition: inout ByteBufferPointer,
-  using storageObjects: inout StorageObjects
+  at bufferPosition: inout UnsafeMutablePointer<UInt8>,
+  storingStringOwnersIn stringArgumentOwners: inout ObjectStorage<Any>
 ) {
-  let (optionalStorage, bytePointer): (AnyObject?, UnsafeRawPointer) =
-    _convertConstStringToUTF8PointerArgument(
-      stringValue)
-
-  if let storage = optionalStorage {
-    storageObjects.append(storage)
-  }
+  let stringPointer =
+    getNullTerminatedUTF8Pointer(
+      stringValue,
+      storingStringOwnersIn: &stringArgumentOwners)
 
   let byteCount = pointerSizeInBytes()
   let dest =
     UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
-  withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }
+  withUnsafeBytes(of: stringPointer) { dest.copyMemory(from: $0) }
   bufferPosition += byteCount
+}
+
+/// Return a pointer that points to a contiguous sequence of null-terminated,
+/// UTF8 charcters. If necessary, extends the lifetime of `stringValue` by
+/// using `stringArgumentOwners`.
+@_alwaysEmitIntoClient
+@inline(never)
+internal func getNullTerminatedUTF8Pointer(
+  _ stringValue: String,
+  storingStringOwnersIn stringArgumentOwners: inout ObjectStorage<Any>
+) -> UnsafeRawPointer {
+  let (optStorage, bytePointer, _, _, _):
+    (AnyObject?, UnsafeRawPointer, Int, Bool, Bool) =
+     stringValue._deconstructUTF8(scratch: nil)
+  if let storage = optStorage {
+    initializeAndAdvance(&stringArgumentOwners, to: storage)
+  } else {
+    initializeAndAdvance(&stringArgumentOwners, to: stringValue._guts)
+  }
+  return bytePointer
 }

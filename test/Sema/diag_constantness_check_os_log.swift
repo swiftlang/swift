@@ -27,7 +27,7 @@ func testNonconstantFormatOption(
 
 func testNonconstantPrivacyOption(privacyOpt: OSLogPrivacy) {
   _osLogTestHelper("Integer: \(Int.max, privacy: privacyOpt)")
-    // expected-error@-1 {{argument must be a case of enum 'OSLogPrivacy'}}
+    // expected-error@-1 {{argument must be a static method or property of 'OSLogPrivacy'}}
 }
 
 func testNonconstantAlignmentOption(alignOpt: OSLogStringAlignment) {
@@ -44,7 +44,7 @@ func testMultipleOptions(
     \(2, format: formatOpt, align: .right(columns: 10), privacy: privacyOpt)
     """)
     // expected-error@-2 {{argument must be a static method or property of 'OSLogIntegerFormatting'}}
-    // expected-error@-3 {{argument must be a case of enum 'OSLogPrivacy'}}
+    // expected-error@-3 {{argument must be a static method or property of 'OSLogPrivacy'}}
 }
 
 func testNoninlinedOSLogMessage() {

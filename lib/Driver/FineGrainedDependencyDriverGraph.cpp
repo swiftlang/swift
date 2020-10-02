@@ -369,12 +369,6 @@ ModuleDepGraph::integrateSourceFileDepGraphNode(
     const SourceFileDepGraph &g, const SourceFileDepGraphNode *integrand,
     const PreexistingNodeIfAny preexistingMatch,
     const StringRef swiftDepsOfJob) {
-
-  if (!EnableTypeFingerprints &&
-      integrand->getKey().getKind() != NodeKind::sourceFileProvide &&
-      integrand->getFingerprint())
-    return None;
-
   if (!integrand->getIsProvides())
     return NullablePtr<ModuleDepGraphNode>(); // depends are captured by
                                               // recordWhatUseDependsUpon below

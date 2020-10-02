@@ -950,9 +950,6 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
-  /// Returns true if this Decl cannot be seen by any other source file
-  bool isPrivateToEnclosingFile() const;
-
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;

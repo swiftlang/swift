@@ -139,14 +139,6 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_type_fingerprints :
-Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable per-nominal and extension body fingerprints">;
-
-def disable_type_fingerprints :
-Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Disable per-nominal and extension body fingerprints">;
-
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Enables incremental build optimization that only produces one dependencies file">;
@@ -189,11 +181,6 @@ def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
 HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps file.">;
-
-def fine_grained_dependency_include_intrafile :
-Flag<["-"], "fine-grained-dependency-include-intrafile">,
-Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
 Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
