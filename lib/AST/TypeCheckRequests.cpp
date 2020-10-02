@@ -1244,12 +1244,6 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
   std::get<0>(getStorage())->setCheckedRedeclaration();
 }
 
-evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
-    const evaluator::DependencyRecorder &eval) const {
-  auto *currentDC = std::get<0>(getStorage())->getDeclContext();
-  return currentDC->getParentSourceFile();
-}
-
 void CheckRedeclarationRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker, evaluator::SideEffect) const {
   auto *current = std::get<0>(getStorage());
@@ -1366,12 +1360,6 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
 void TypeCheckFunctionBodyRequest::cacheResult(BraceStmt *body) const {
   auto *afd = std::get<0>(getStorage());
   afd->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-}
-
-evaluator::DependencySource
-TypeCheckFunctionBodyRequest::readDependencySource(
-    const evaluator::DependencyRecorder &e) const {
-  return std::get<0>(getStorage())->getParentSourceFile();
 }
 
 //----------------------------------------------------------------------------//

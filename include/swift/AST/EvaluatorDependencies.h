@@ -23,6 +23,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
 
@@ -108,8 +109,7 @@ struct DependencyCollector {
         return Reference::tombstone();
       }
       static inline unsigned getHashValue(const Reference &Val) {
-        return llvm::hash_combine(Val.kind, Val.subject,
-                                  Val.name.getAsOpaquePointer());
+        return llvm::hash_value(Val.name.getAsOpaquePointer());
       }
       static bool isEqual(const Reference &LHS, const Reference &RHS) {
         return LHS.kind == RHS.kind && LHS.subject == RHS.subject &&
@@ -122,11 +122,10 @@ public:
   using ReferenceSet = llvm::DenseSet<Reference, Reference::Info>;
 
 private:
-  DependencyRecorder &parent;
   ReferenceSet scratch;
 
 public:
-  explicit DependencyCollector(DependencyRecorder &parent) : parent(parent) {}
+  explicit DependencyCollector() = default;
 
 public:
   /// Registers a named reference from the current dependency scope to a member
@@ -166,12 +165,7 @@ public:
   void addDynamicLookupName(DeclBaseName name);
 
 public:
-  /// Retrieves the dependency recorder that created this dependency collector.
-  const DependencyRecorder &getRecorder() const { return parent; }
-
-  /// Returns \c true if this collector has not accumulated
-  /// any \c Reference objects.
-  bool empty() const { return scratch.empty(); }
+  ReferenceSet takeReferences() && { return std::move(scratch); }
 };
 
 /// A \c DependencyRecorder is an aggregator of named references discovered in a
@@ -181,7 +175,7 @@ struct DependencyRecorder {
 
 private:
   /// A stack of dependency sources in the order they were evaluated.
-  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  llvm::TinyPtrVector<evaluator::DependencySource> dependencySources;
   llvm::DenseMap<SourceFile *, DependencyCollector::ReferenceSet>
       fileReferences;
   llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
@@ -192,12 +186,12 @@ public:
   explicit DependencyRecorder() : isRecording{false} {};
 
 private:
-  /// Records the given \c Reference as a dependency of the current dependency
+  /// Records the given \c ReferenceSet as dependencies of the current dependency
   /// source.
   ///
   /// This is as opposed to merely collecting a \c Reference, which may just buffer
   /// it for realization or replay later.
-  void realize(const DependencyCollector::Reference &ref);
+  void realize(const DependencyCollector::ReferenceSet &session);
 
 public:
   /// Begins the recording of references by invoking the given continuation
@@ -206,8 +200,28 @@ public:
   /// given request.
   ///
   /// Recording only occurs for requests that are dependency sinks.
+  using RecordingSession = llvm::function_ref<DependencyCollector::ReferenceSet(
+      DependencyCollector &&)>;
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
-              llvm::function_ref<void(DependencyCollector &)> rec);
+              const swift::ActiveRequest &req,
+              RecordingSession rec) {
+    assert(!isRecording && "Probably not a good idea to allow nested recording");
+
+    auto source = getActiveDependencySourceOrNull();
+    if (source.isNull()) {
+      return;
+    }
+    assert(source.get()->isPrimary() && "recording in non-primary!");
+
+    llvm::SaveAndRestore<bool> restore(isRecording, true);
+    DependencyCollector::ReferenceSet collected = rec(DependencyCollector{});
+    if (collected.empty()) {
+      return;
+    }
+    const size_t d = (!stack.empty() && req == stack.back()) ? 1 : 0;
+    return unionNearestCachedRequest(stack.getArrayRef().drop_back(d),
+                                     collected);
+  }
 
   /// Replays the \c Reference objects collected by a given cached request and
   /// its sub-requests into the current dependency scope.
@@ -219,7 +233,43 @@ public:
   ///
   /// Replay need only occur for requests that are (separately) cached.
   void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
-              const swift::ActiveRequest &req);
+              const swift::ActiveRequest &req) {
+    assert(!isRecording && "Probably not a good idea to allow nested recording");
+
+    auto source = getActiveDependencySourceOrNull();
+    if (!req.isCached() || source.isNull()) {
+      return;
+    }
+    assert(source.get()->isPrimary() && "replaying in non-primary!");
+
+    auto entry = requestReferences.find_as(req);
+    if (entry == requestReferences.end()) {
+      return;
+    }
+
+    // N.B. This is a particularly subtle detail of the replay unioning step. The
+    // evaluator does not push cached requests onto the active request stack,
+    // so it is possible (and, in fact, quite likely) we'll wind up with an
+    // empty request stack. The remaining troublesome case is when we have a
+    // cached request being run through the uncached path - take the
+    // InterfaceTypeRequest, which involves many component requests, most of which
+    // are themselves cached. In such a case, the active stack will look like
+    //
+    // -> TypeCheckSourceFileRequest
+    // -> ...
+    // -> InterfaceTypeRequest
+    // -> ...
+    // -> UnderlyingTypeRequest
+    //
+    // We want the UnderlyingTypeRequest to union its names into the
+    // InterfaceTypeRequest, and if we were to just start searching the active
+    // stack backwards for a cached request we would find...
+    // the UnderlyingTypeRequest! So, we'll just drop it from consideration.
+    const size_t d = (!stack.empty() && req == stack.back()) ? 1 : 0;
+    return unionNearestCachedRequest(stack.getArrayRef().drop_back(d),
+                                     entry->second);
+  }
+
 private:
   /// Given the current stack of requests and a buffer of \c Reference objects
   /// walk the active stack looking for the next-innermost cached request. If
@@ -235,9 +285,9 @@ private:
   /// \c DependencyRecorder::record or \c DependencyRecorder::replay
   /// or the corresponding set of references for the active dependency scope
   /// will become incoherent.
-  void
-  unionNearestCachedRequest(ArrayRef<swift::ActiveRequest> stack,
-                            const DependencyCollector::ReferenceSet &scratch);
+  void unionNearestCachedRequest(
+      ArrayRef<swift::ActiveRequest> stack,
+                                 const DependencyCollector::ReferenceSet &scratch);
 
 public:
   using ReferenceEnumerator =
@@ -284,7 +334,7 @@ public:
       if (Source.isNull() || !Source.get()->isPrimary()) {
         return;
       }
-      coll.dependencySources.emplace_back(Source);
+      coll.dependencySources.push_back(Source);
       Coll = &coll;
     }
 
