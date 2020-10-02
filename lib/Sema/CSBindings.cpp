@@ -790,9 +790,28 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       }
     }
 
-    if (constraint->getKind() == ConstraintKind::Subtype &&
-        kind == AllowedBindingKind::Subtypes) {
-      result.SubtypeOf.insert(bindingTypeVar);
+    switch (constraint->getKind()) {
+    case ConstraintKind::Subtype:
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::OperatorArgumentConversion: {
+      if (kind == AllowedBindingKind::Subtypes) {
+        result.SubtypeOf.insert({bindingTypeVar, constraint});
+      } else {
+        // TODO: record this type variable as a `supertypeOf`
+      }
+      break;
+    }
+
+    case ConstraintKind::Bind:
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Equal: {
+      // TODO: record this type variable as being equal to other type variable.
+      break;
+    }
+
+    default:
+      break;
     }
 
     return None;

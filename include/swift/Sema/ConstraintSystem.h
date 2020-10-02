@@ -4749,7 +4749,7 @@ private:
     /// chain of subtypes because binding inference algorithm can't,
     /// at the moment, determine bindings transitively through supertype
     /// type variables.
-    llvm::SmallPtrSet<TypeVariableType *, 4> SubtypeOf;
+    llvm::SmallDenseMap<TypeVariableType *, Constraint *, 4> SubtypeOf;
 
     PotentialBindings(TypeVariableType *typeVar)
         : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
@@ -4794,10 +4794,10 @@ private:
       // This is required because algorithm can't currently infer
       // bindings for subtype transitively through superclass ones.
       if (!(x.IsHole && y.IsHole)) {
-        if (x.SubtypeOf.count(y.TypeVar))
+        if (x.isSubtypeOf(y.TypeVar))
           return false;
 
-        if (y.SubtypeOf.count(x.TypeVar))
+        if (y.isSubtypeOf(x.TypeVar))
           return true;
       }
 
@@ -4841,6 +4841,15 @@ private:
                                   ConstraintLocator::GenericParameter;
       }
       return false;
+    }
+
+    bool isSubtypeOf(TypeVariableType *typeVar) const {
+      auto result = SubtypeOf.find(typeVar);
+      if (result == SubtypeOf.end())
+        return false;
+
+      auto *constraint = result->second;
+      return constraint->getKind() == ConstraintKind::Subtype;
     }
 
     /// Check if this binding is favored over a disjunction e.g.
