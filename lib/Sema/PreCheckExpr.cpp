@@ -357,17 +357,16 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   SmallVector<ValueDecl*, 4> ResultValues;
 
   auto &Context = DC->getASTContext();
-  if (Context.LangOpts.DisableParserLookup) {
-    // First, look for a local binding in scope.
-    if (Loc.isValid() && !Name.isOperator()) {
-      SmallVector<ValueDecl *, 2> localDecls;
-      ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                                 Name.getFullName(), Loc,
-                                 /*stopAfterInnermostBraceStmt=*/false,
-                                 ResultValues);
-      for (auto *localDecl : ResultValues) {
-        Lookup.add(LookupResultEntry(localDecl), /*isOuter=*/false);
-      }
+
+  // First, look for a local binding in scope.
+  if (Loc.isValid() && !Name.isOperator()) {
+    SmallVector<ValueDecl *, 2> localDecls;
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
+                               Name.getFullName(), Loc,
+                               /*stopAfterInnermostBraceStmt=*/false,
+                               ResultValues);
+    for (auto *localDecl : ResultValues) {
+      Lookup.add(LookupResultEntry(localDecl), /*isOuter=*/false);
     }
   }
 
