@@ -454,8 +454,9 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    return recorder.record(activeRequests, [&r, &o](auto &c) {
-      return r.writeDependencySink(c, o);
+    return recorder.record(activeRequests, [&r, &o](auto &&c) {
+      r.writeDependencySink(c, o);
+      return std::move(c).takeReferences();
     });
   }
 
