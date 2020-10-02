@@ -203,6 +203,7 @@ public:
   using RecordingSession = llvm::function_ref<DependencyCollector::ReferenceSet(
       DependencyCollector &&)>;
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
+              const swift::ActiveRequest &req,
               RecordingSession rec) {
     assert(!isRecording && "Probably not a good idea to allow nested recording");
 
@@ -217,7 +218,9 @@ public:
     if (collected.empty()) {
       return;
     }
-    return unionNearestCachedRequest(stack.getArrayRef(), collected);
+    const size_t d = (!stack.empty() && req == stack.back()) ? 1 : 0;
+    return unionNearestCachedRequest(stack.getArrayRef().drop_back(d),
+                                     collected);
   }
 
   /// Replays the \c Reference objects collected by a given cached request and
@@ -262,11 +265,6 @@ public:
     // InterfaceTypeRequest, and if we were to just start searching the active
     // stack backwards for a cached request we would find...
     // the UnderlyingTypeRequest! So, we'll just drop it from consideration.
-    //
-    // We do *not* have to consider this during the recording step because none
-    // of the name lookup requests (or any dependency sinks in general) are
-    // cached. Should this change in the future, we will need to sink this logic
-    // into the union step itself.
     const size_t d = (!stack.empty() && req == stack.back()) ? 1 : 0;
     return unionNearestCachedRequest(stack.getArrayRef().drop_back(d),
                                      entry->second);

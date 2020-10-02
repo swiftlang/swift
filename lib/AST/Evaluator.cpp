@@ -400,26 +400,15 @@ void evaluator::DependencyRecorder::unionNearestCachedRequest(
                               [](const auto &req) {
     return req.isCached() || req.isDependencySource();
   });
-  if (nearest == stack.rend()) {
+  if (nearest == stack.rend() || nearest->isDependencySource()) {
     return realize(scratch);
   }
-
-  auto top = std::find_if(nearest, stack.rend(), [](const auto &req) {
-    return req.isDependencySource();
-  });
-  auto realizeRefs = [&](const DependencyCollector::ReferenceSet &scratch) {
-    if (top != stack.rend() && top->isDependencySource()) {
-      realize(scratch);
-    }
-  };
 
   auto entry = requestReferences.find_as(*nearest);
   if (entry != requestReferences.end()) {
     entry->second.insert(scratch.begin(), scratch.end());
-    realizeRefs(entry->second);
   } else {
-    requestReferences.insert({AnyRequest(*nearest), scratch});
-    realizeRefs(scratch);
+    entry = requestReferences.insert({AnyRequest(*nearest), scratch}).first;
   }
 }
 

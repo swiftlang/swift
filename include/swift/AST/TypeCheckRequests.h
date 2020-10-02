@@ -964,7 +964,7 @@ public:
 class TypeCheckFunctionBodyRequest
     : public SimpleRequest<
           TypeCheckFunctionBodyRequest, BraceStmt *(AbstractFunctionDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
+          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -979,11 +979,6 @@ public:
   bool isCached() const { return true; }
   Optional<BraceStmt *> getCachedResult() const;
   void cacheResult(BraceStmt *body) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Request to typecheck a function body element at the given source location.
@@ -2449,7 +2444,7 @@ public:
 class CheckRedeclarationRequest
     : public SimpleRequest<
           CheckRedeclarationRequest, evaluator::SideEffect(ValueDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySource |
+          RequestFlags::SeparatelyCached |
               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2468,8 +2463,6 @@ public:
   void cacheResult(evaluator::SideEffect) const;
 
 public:
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };
