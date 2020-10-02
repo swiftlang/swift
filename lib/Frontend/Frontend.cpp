@@ -493,6 +493,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
+  // Configure ModuleInterfaceChecker for the ASTContext.
+  auto const &Clang = clangImporter->getClangInstance();
+  std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
+  auto &FEOpts = Invocation.getFrontendOptions();
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  Context->addModuleInterfaceChecker(
+    std::make_unique<ModuleInterfaceCheckerImpl>(*Context, ModuleCachePath,
+      FEOpts.PrebuiltModuleCachePath, LoaderOpts));
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
@@ -505,23 +513,15 @@ bool CompilerInstance::setUpModuleLoaders() {
         IgnoreSourceInfoFile);
     this->DefaultSerializedLoader = ESML.get();
     Context->addModuleLoader(std::move(ESML));
-  }
-
-  if (MLM != ModuleLoadingMode::OnlySerialized) {
-    auto const &Clang = clangImporter->getClangInstance();
-    std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
-    auto &FEOpts = Invocation.getFrontendOptions();
-    StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
-    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-    auto PIML = ModuleInterfaceLoader::create(
-        *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        LoaderOpts,
-        IgnoreSourceInfoFile);
-    Context->addModuleLoader(std::move(PIML), false, false, true);
-  }
-
-  if (!ExplicitModuleBuild) {
+  } else {
+    if (MLM != ModuleLoadingMode::OnlySerialized) {
+      // We only need ModuleInterfaceLoader for implicit modules.
+      auto PIML = ModuleInterfaceLoader::create(
+          *Context, *static_cast<ModuleInterfaceCheckerImpl*>(Context
+            ->getModuleInterfaceChecker()), getDependencyTracker(), MLM,
+          FEOpts.PreferInterfaceForModules, IgnoreSourceInfoFile);
+      Context->addModuleLoader(std::move(PIML), false, false, true);
+    }
     std::unique_ptr<ImplicitSerializedModuleLoader> ISML =
     ImplicitSerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
                                    IgnoreSourceInfoFile);

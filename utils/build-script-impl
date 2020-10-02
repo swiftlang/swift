@@ -3060,7 +3060,7 @@ for host in "${ALL_HOSTS[@]}"; do
                grep -v '.py$' | \
                grep -v '.a$' | \
                grep -v 'swift-api-digester' | \
-               xargs -n 1 -P 1 ${dsymutil_path})
+               xargs -P 1 ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.
