@@ -189,8 +189,6 @@ public:
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
-  const bool EnableTypeFingerprints;
-
 private:
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
@@ -296,14 +294,12 @@ public:
   /// \p stats may be null
   ModuleDepGraph(const bool verifyFineGrainedDependencyGraphAfterEveryImport,
                  const bool emitFineGrainedDependencyDotFileAfterEveryImport,
-                 const bool EnableTypeFingerprints,
                  const bool shouldTraceDependencies,
                  UnifiedStatsReporter *stats)
       : verifyFineGrainedDependencyGraphAfterEveryImport(
             verifyFineGrainedDependencyGraphAfterEveryImport),
         emitFineGrainedDependencyDotFileAfterEveryImport(
             emitFineGrainedDependencyDotFileAfterEveryImport),
-        EnableTypeFingerprints(EnableTypeFingerprints),
         currentPathIfTracing(
             shouldTraceDependencies
                 ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
@@ -314,11 +310,10 @@ public:
   }
 
   /// For unit tests.
-  ModuleDepGraph(const bool EnableTypeFingerprints,
-                 const bool EmitDotFilesForDebugging = false)
+  ModuleDepGraph(const bool EmitDotFilesForDebugging = false)
       : ModuleDepGraph(
             true, /*emitFineGrainedDependencyDotFileAfterEveryImport=*/
-            EmitDotFilesForDebugging, EnableTypeFingerprints, false, nullptr) {}
+            EmitDotFilesForDebugging, false, nullptr) {}
 
   //============================================================================
   // MARK: ModuleDepGraph - updating from a switdeps file

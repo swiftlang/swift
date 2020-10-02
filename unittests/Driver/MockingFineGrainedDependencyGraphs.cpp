@@ -26,11 +26,11 @@ using namespace mocking_fine_grained_dependency_graphs;
 void mocking_fine_grained_dependency_graphs::simulateLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
-    StringRef interfaceHashIfNonEmpty, const bool includePrivateDeps,
+    StringRef interfaceHashIfNonEmpty,
     const bool hadCompilationError) {
   const auto changes = getChangesForSimulatedLoad(
       g, cmd, dependencyDescriptions, interfaceHashIfNonEmpty,
-      includePrivateDeps, hadCompilationError);
+      hadCompilationError);
   assert(changes && "simulated load should always succeed");
 }
 
@@ -38,7 +38,7 @@ ModuleDepGraph::Changes
 mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
-    StringRef interfaceHashIfNonEmpty, const bool includePrivateDeps,
+    StringRef interfaceHashIfNonEmpty,
     const bool hadCompilationError) {
   StringRef swiftDeps =
       cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -51,7 +51,7 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
 
   auto sfdg =
       UnitTestSourceFileDepGraphFactory(
-          includePrivateDeps, hadCompilationError, swiftDeps, interfaceHash,
+          hadCompilationError, swiftDeps, interfaceHash,
           g.emitFineGrainedDependencyDotFileAfterEveryImport,
           dependencyDescriptions, diags)
           .construct();
@@ -63,11 +63,11 @@ std::vector<const driver::Job *>
 mocking_fine_grained_dependency_graphs::simulateReload(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
-    StringRef interfaceHashIfNonEmpty, const bool includePrivateDeps,
+    StringRef interfaceHashIfNonEmpty,
     const bool hadCompilationError) {
   const auto changedNodes = getChangesForSimulatedLoad(
       g, cmd, dependencyDescriptions, interfaceHashIfNonEmpty,
-      includePrivateDeps, hadCompilationError);
+      hadCompilationError);
   if (!changedNodes)
     return g.getAllJobs();
   return g.findJobsToRecompileWhenNodesChange(changedNodes.getValue());

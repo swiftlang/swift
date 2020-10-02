@@ -322,8 +322,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
-  // Ensure all non-function-body tokens are hashed into the interface hash
-  langOpts.EnableTypeFingerprints = false;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
@@ -598,10 +596,6 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
-
-  // Since caching uses the interface hash, and since per type fingerprints
-  // weaken that hash, disable them here:
-  Invocation.getLangOptions().EnableTypeFingerprints = false;
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;

@@ -330,20 +330,9 @@ namespace swift {
     /// of active clauses aren't hoisted into the enclosing scope.
     bool DisablePoundIfEvaluation = false;
 
-    /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
-    /// the interface hash, hash them into per-iterable-decl-context
-    /// fingerprints. Fine-grained dependency types won't dirty every provides
-    /// in a file when the user adds a member to, e.g., a struct.
-    bool EnableTypeFingerprints = true;
-
     /// When using fine-grained dependencies, emit dot files for every swiftdeps
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;
-
-    /// To mimic existing system, set to false.
-    /// To experiment with including file-private and private dependency info,
-    /// set to true.
-    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
