@@ -10,6 +10,9 @@ add_swift_target_library(swiftOSLogTestHelper
   OSLogStringTypes.swift
   OSLogNSObjectType.swift
   OSLogFloatingPointTypes.swift
+  OSLogSwiftProtocols.swift
+  OSLogPrivacy.swift
+  OSLogFloatFormatting.swift
 
   SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC
   SWIFT_MODULE_DEPENDS_OSX Darwin ObjectiveC
