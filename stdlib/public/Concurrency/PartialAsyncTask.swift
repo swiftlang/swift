@@ -18,3 +18,19 @@ public struct PartialAsyncTask {
 
   public func run() { }
 }
+
+
+public struct UnsafeContinuation<T> {
+  private var context: UnsafeRawPointer
+
+  public func resume(_: T) { }
+}
+
+public struct UnsafeThrowingContinuation<T> {
+  private var context: UnsafeRawPointer
+
+  public func resume(_: T) { }
+  public func fail(_: Error) { }
+}
+
+

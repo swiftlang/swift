@@ -116,6 +116,12 @@ private:
       Operands.push_back(CBI->getFalseArgs()[Index]);
       return;
     }
+        
+    case TermKind::AwaitAsyncContinuationInst: {
+      auto *AACI = cast<AwaitAsyncContinuationInst>(Term);
+      Operands.push_back(AACI->getOperand());
+      return;
+    }
 
     case TermKind::SwitchEnumInst:
     case TermKind::SwitchEnumAddrInst:

@@ -783,6 +783,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndCOWMutationInst:
     return InlineCost::Free;
 
+  // Turning the task reference into a continuation should be basically free.
+  // TODO(async): make sure this is true.
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::GetAsyncContinuationInst:
+    return InlineCost::Free;
+
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -884,6 +890,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
