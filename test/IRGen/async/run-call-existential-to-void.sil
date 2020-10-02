@@ -1,0 +1,78 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
+
+public protocol P {
+}
+
+public struct S : P {
+  @_hasStorage let int: Int64 { get }
+  init(int: Int64)
+}
+
+
+sil_witness_table [serialized] S: P module main {
+}
+
+sil hidden @S_init : $@convention(method) (Int64, @thin S.Type) -> S {
+bb0(%int : $Int64, %S_type : $@thin S.Type):
+  %instance = struct $S (%int : $Int64)
+  return %instance : $S
+}
+
+// CHECK-LL: define hidden swiftcc void @existentialToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @existentialToVoid : $@async @convention(thin) (@in_guaranteed P) -> () {
+bb0(%existential : $*P):
+  %existential_addr = open_existential_addr immutable_access %existential : $*P to $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
+  %any = alloc_stack $Any
+  %any_addr = init_existential_addr %any : $*Any, $@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
+  copy_addr %existential_addr to [initialization] %any_addr : $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
+  %printAny = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
+  %result = apply %printAny(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
+  destroy_addr %any : $*Any
+  dealloc_stack %any : $*Any
+  return %result : $()
+}
+
+sil hidden @call : $@convention(thin) () -> () {
+bb0:
+  %S_type = metatype $@thin S.Type
+  %int_literal = integer_literal $Builtin.Int64, 7384783
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %S_init = function_ref @S_init : $@convention(method) (Int64, @thin S.Type) -> S
+  %instance = apply %S_init(%int, %S_type) : $@convention(method) (Int64, @thin S.Type) -> S
+  %existential = alloc_stack $P, let, name "existential"
+  %existential_addr = init_existential_addr %existential : $*P, $S
+  store %instance to %existential_addr : $*S
+  %existentialToVoid = function_ref @existentialToVoid : $@async @convention(thin) (@in_guaranteed P) -> ()
+  %result = apply %existentialToVoid(%existential) : $@async @convention(thin) (@in_guaranteed P) -> ()
+  destroy_addr %existential : $*P
+  dealloc_stack %existential : $*P
+  return %result : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 7384783
+  %result = apply %call() : $@convention(thin) () -> ()
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
