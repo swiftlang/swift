@@ -2073,6 +2073,28 @@ public:
     *this << ", resume " << Ctx.getID(YI->getResumeBB())
           << ", unwind " << Ctx.getID(YI->getUnwindBB());
   }
+  
+  void visitGetAsyncContinuationInst(GetAsyncContinuationInst *GI) {
+    if (GI->throws())
+      *this << "[throws] ";
+    *this << '$' << GI->getFormalResumeType();
+  }
+
+  void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
+    if (GI->throws())
+      *this << "[throws] ";
+    *this << '$' << GI->getFormalResumeType()
+          << ", " << getIDAndType(GI->getOperand());
+  }
+  
+  void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AI) {
+    *this << getIDAndType(AI->getOperand())
+          << ", resume " << Ctx.getID(AI->getResumeBB());
+    
+    if (auto errorBB = AI->getErrorBB()) {
+      *this << ", error " << Ctx.getID(AI->getErrorBB());
+    }
+  }
 
   void visitSwitchValueInst(SwitchValueInst *SII) {
     *this << getIDAndType(SII->getOperand());

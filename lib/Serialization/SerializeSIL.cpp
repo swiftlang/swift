@@ -1148,6 +1148,26 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+  case SILInstructionKind::AwaitAsyncContinuationInst: {
+    const AwaitAsyncContinuationInst *AACI
+      = cast<AwaitAsyncContinuationInst>(&SI);
+
+    // Format: continuation, resume block ID, error block ID if given
+    SmallVector<ValueID, 3> ListOfValues;
+    
+    ListOfValues.push_back(addValueRef(AACI->getOperand()));
+    ListOfValues.push_back(BasicBlockMap[AACI->getResumeBB()]);
+    if (auto errorBB = AACI->getErrorBB()) {
+      ListOfValues.push_back(BasicBlockMap[errorBB]);
+    }
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+       SILAbbrCodes[SILOneTypeValuesLayout::Code],
+       (unsigned)SI.getKind(),
+       S.addTypeRef(AACI->getOperand()->getType().getASTType()),
+       (unsigned)AACI->getOperand()->getType().getCategory(),
+       ListOfValues);
+    break;
+  }
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
     // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),
@@ -1544,6 +1564,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                          ? 0 : 1;
     writeOneTypeOneOperandLayout(open.getKind(), attrs, open.getType(),
                                  open.getOperand());
+    break;
+  }
+  case SILInstructionKind::GetAsyncContinuationAddrInst: {
+    auto &gaca = cast<GetAsyncContinuationAddrInst>(SI);
+    writeOneTypeOneOperandLayout(gaca.getKind(), 0, gaca.getType(),
+                                 gaca.getOperand());
+    break;
+  }
+  case SILInstructionKind::GetAsyncContinuationInst: {
+    auto &gaca = cast<GetAsyncContinuationInst>(SI);
+    writeOneTypeLayout(gaca.getKind(), 0, gaca.getType());
     break;
   }
   // Conversion instructions (and others of similar form).

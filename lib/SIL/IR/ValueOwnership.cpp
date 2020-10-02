@@ -148,6 +148,8 @@ CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
+CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
+CONSTANT_OWNERSHIP_INST(Unowned, GetAsyncContinuationAddr)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
