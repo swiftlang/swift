@@ -5888,6 +5888,17 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
   return getPropertyWrapperBackingPropertyInfo().projectionVar;
 }
 
+void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
+  if (getDeclContext()->isTypeContext())
+    return;
+
+  if (auto *backingVar = getPropertyWrapperBackingProperty())
+    visit(backingVar);
+
+  if (auto *projectionVar = getPropertyWrapperProjectionVar())
+    visit(projectionVar);
+}
+
 VarDecl *VarDecl::getLazyStorageProperty() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);

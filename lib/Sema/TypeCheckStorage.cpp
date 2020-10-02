@@ -1169,8 +1169,9 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
     body.push_back(returnStmt);
   }
 
+  // Don't mark local accessors as type-checked - captures still need to be computed.
   return { BraceStmt::create(ctx, loc, body, loc, true),
-           /*isTypeChecked=*/true };
+           /*isTypeChecked=*/!getter->getDeclContext()->isLocalContext() };
 }
 
 /// Synthesize the body of a getter which just directly accesses the
@@ -1445,8 +1446,9 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
 
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storageToUse,
                                             target, setterBody, ctx);
+  // Don't mark local accessors as type-checked - captures still need to be computed.
   return { BraceStmt::create(ctx, loc, setterBody, loc, true),
-           /*isTypeChecked=*/true };
+           /*isTypeChecked=*/!setter->getDeclContext()->isLocalContext() };
 }
 
 static std::pair<BraceStmt *, bool>
@@ -2757,6 +2759,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                              initializer);
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
+    } else if (var->hasObservers() && !dc->isTypeContext()) {
+      var->diagnose(diag::observingprop_requires_initializer);
     }
 
     if (var->getOpaqueResultTypeDecl()) {
