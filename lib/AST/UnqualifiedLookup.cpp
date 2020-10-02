@@ -784,10 +784,17 @@ public:
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
     for (auto *value: values) {
-      if (!value->getName().matchesRef(name))
-        continue;
+      if (auto *varDecl = dyn_cast<VarDecl>(value)) {
+        // Check if the name matches any auxiliary decls not in the AST
+        varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+          if (name.isSimpleName(auxiliaryVar->getName())) {
+            results.push_back(auxiliaryVar);
+          }
+        });
+      }
 
-      results.push_back(value);
+      if (value->getName().matchesRef(name))
+        results.push_back(value);
     }
 
     return (!stopAfterInnermostBraceStmt && !results.empty());
