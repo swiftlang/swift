@@ -502,6 +502,8 @@ void checkParameterList(ParameterList *params);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
+void diagnoseDuplicateCaptureVars(CaptureListExpr *expr);
+
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
 
