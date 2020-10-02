@@ -132,7 +132,7 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-            "-DLLVM_USE_SANITIZER=Thread",
+             "-DLLVM_USE_SANITIZER=Thread",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
