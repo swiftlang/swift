@@ -4741,15 +4741,13 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
-    /// A set of all constraints which contribute to pontential bindings.
-    llvm::SmallPtrSet<Constraint *, 8> Sources;
-
     /// A set of all not-yet-resolved type variables this type variable
-    /// is a subtype of. This is used to determine ordering inside a
-    /// chain of subtypes because binding inference algorithm can't,
-    /// at the moment, determine bindings transitively through supertype
-    /// type variables.
-    llvm::SmallDenseMap<TypeVariableType *, Constraint *, 4> SubtypeOf;
+    /// is a subtype of, supertype of or is equivalent to. This is used
+    /// to determine ordering inside of a chain of subtypes to help infer
+    /// transitive bindings  and protocol requirements.
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SubtypeOf;
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
 
     PotentialBindings(TypeVariableType *typeVar)
         : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}

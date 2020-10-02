@@ -29,29 +29,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
         &inferredBindings) {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
 
-  llvm::SmallVector<Constraint *, 4> conversions;
-  // First, let's collect all of the conversions associated
-  // with this type variable.
-  llvm::copy_if(
-      Sources, std::back_inserter(conversions),
-      [&](const Constraint *constraint) -> bool {
-        if (constraint->getKind() != ConstraintKind::Subtype &&
-            constraint->getKind() != ConstraintKind::Conversion &&
-            constraint->getKind() != ConstraintKind::ArgumentConversion &&
-            constraint->getKind() != ConstraintKind::OperatorArgumentConversion)
-          return false;
-
-        auto rhs = cs.simplifyType(constraint->getSecondType());
-        return rhs->getAs<TypeVariableType>() == TypeVar;
-      });
-
-  for (auto *constraint : conversions) {
-    auto *tv =
-        cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
-    if (!tv || tv == TypeVar)
-      continue;
-
-    auto relatedBindings = inferredBindings.find(tv);
+  for (const auto &entry : SupertypeOf) {
+    auto relatedBindings = inferredBindings.find(entry.first);
     if (relatedBindings == inferredBindings.end())
       continue;
 
@@ -89,7 +68,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
 
     // TODO: We shouldn't need this in the future.
-    if (constraint->getKind() != ConstraintKind::Subtype)
+    if (entry.second->getKind() != ConstraintKind::Subtype)
       continue;
 
     for (auto &binding : bindings.Bindings) {
@@ -670,10 +649,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   auto *typeVar = result.TypeVar;
 
-  // Record constraint which contributes to the
-  // finding of potential bindings.
-  result.Sources.insert(constraint);
-
   auto first = simplifyType(constraint->getFirstType());
   auto second = simplifyType(constraint->getSecondType());
 
@@ -798,7 +773,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       if (kind == AllowedBindingKind::Subtypes) {
         result.SubtypeOf.insert({bindingTypeVar, constraint});
       } else {
-        // TODO: record this type variable as a `supertypeOf`
+        assert(kind == AllowedBindingKind::Supertypes);
+        result.SupertypeOf.insert({bindingTypeVar, constraint});
       }
       break;
     }
@@ -806,7 +782,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      // TODO: record this type variable as being equal to other type variable.
+      result.EquivalentTo.insert({bindingTypeVar, constraint});
       break;
     }
 
