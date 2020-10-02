@@ -572,6 +572,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
       continue;
 
+    // In local context, only consider exact name matches.
+    if (currentDC->isLocalContext() &&
+        current->getName() != other->getName())
+      continue;
+
     // Check whether the overload signatures conflict (ignoring the type for
     // now).
     auto otherSig = other->getOverloadSignature();

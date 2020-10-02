@@ -94,3 +94,8 @@ func stmtTest() {
   // expected-warning@-3 2{{never used}}
   // expected-warning@-4 {{unreachable}}
 }
+
+func fullNameTest() {
+  let x = 123 // expected-warning {{never used}}
+  func x() {}
+}
