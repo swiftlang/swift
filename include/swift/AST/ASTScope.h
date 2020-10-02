@@ -273,14 +273,10 @@ public: // public for debugging
 
 protected:
   SourceManager &getSourceManager() const;
-  bool hasValidSourceRange() const;
-  bool hasValidSourceRangeOfIgnoredASTNodes() const;
-  bool precedesInSource(const ASTScopeImpl *) const;
-  bool verifyThatChildrenAreContainedWithin(SourceRange) const;
-  bool verifyThatThisNodeComeAfterItsPriorSibling() const;
 
 private:
-  bool checkSourceRangeAfterExpansion(const ASTContext &) const;
+  void checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
+                                         const ASTContext &ctx) const;
 
 #pragma mark common queries
 public:

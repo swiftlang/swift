@@ -79,112 +79,58 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   return r;
 }
 
-bool ASTScopeImpl::checkSourceRangeAfterExpansion(const ASTContext &ctx) const {
-  ASTScopeAssert(getSourceRangeOfThisASTNode().isValid() ||
-                     !getChildren().empty(),
-                 "need to be able to find source range");
-  ASTScopeAssert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()),
-                 "Search will fail");
-  ASTScopeAssert(
-      checkLazySourceRange(ctx),
-      "Lazy scopes must have compatible ranges before and after expansion");
+void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
+                                                     const ASTContext &ctx) const {
+  auto &sourceMgr = ctx.SourceMgr;
 
-  return true;
+  auto range = getCharSourceRangeOfScope(sourceMgr);
+
+  auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
+
+  bool childContainedInParent = [&]() {
+    // HACK: For code completion. Handle replaced range.
+    if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
+      auto originalRange = Lexer::getCharSourceRangeFromSourceRange(
+          sourceMgr, replacedRange.Original);
+      auto newRange = Lexer::getCharSourceRangeFromSourceRange(
+          sourceMgr, replacedRange.New);
+
+      if (range.contains(originalRange) &&
+          newRange.contains(childCharRange))
+        return true;
+    }
+
+    return range.contains(childCharRange);
+  }();
+
+  if (!childContainedInParent) {
+    auto &out = verificationError() << "child not contained in its parent:\n";
+    child->print(out);
+    out << "\n***Parent node***\n";
+    this->print(out);
+    abort();
+  }
+
+  if (!storedChildren.empty()) {
+    auto previousChild = storedChildren.back();
+    auto endOfPreviousChild = previousChild->getCharSourceRangeOfScope(
+        sourceMgr).getEnd();
+
+    if (childCharRange.getStart() != endOfPreviousChild &&
+        !sourceMgr.isBeforeInBuffer(endOfPreviousChild,
+                                    childCharRange.getStart())) {
+      auto &out = verificationError() << "child overlaps previous child:\n";
+      child->print(out);
+      out << "\n***Previous child\n";
+      previousChild->print(out);
+      out << "\n***Parent node***\n";
+      this->print(out);
+      abort();
+    }
+  }
 }
 
 #pragma mark validation & debugging
-
-bool ASTScopeImpl::hasValidSourceRange() const {
-  const auto sourceRange = getSourceRangeOfScope();
-  return sourceRange.Start.isValid() && sourceRange.End.isValid() &&
-         !getSourceManager().isBeforeInBuffer(sourceRange.End,
-                                              sourceRange.Start);
-}
-
-bool ASTScopeImpl::hasValidSourceRangeOfIgnoredASTNodes() const {
-  return sourceRangeOfIgnoredASTNodes.isValid();
-}
-
-bool ASTScopeImpl::precedesInSource(const ASTScopeImpl *next) const {
-  if (!hasValidSourceRange() || !next->hasValidSourceRange())
-    return false;
-  return !getSourceManager().isBeforeInBuffer(
-      next->getSourceRangeOfScope().Start, getSourceRangeOfScope().End);
-}
-
-bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
-    const SourceRange range) const {
-  // assumes children are already in order
-  if (getChildren().empty())
-    return true;
-  const SourceRange rangeOfChildren =
-      SourceRange(getChildren().front()->getSourceRangeOfScope().Start,
-                  getChildren().back()->getSourceRangeOfScope().End);
-  if (getSourceManager().rangeContains(range, rangeOfChildren))
-    return true;
-
-  // HACK: For code completion. Handle replaced range.
-  if (const auto &replacedRange = getSourceManager().getReplacedRange()) {
-    if (getSourceManager().rangeContains(replacedRange.Original, range) &&
-        getSourceManager().rangeContains(replacedRange.New, rangeOfChildren))
-      return true;
-  }
-
-  auto &out = verificationError() << "children not contained in its parent\n";
-  if (getChildren().size() == 1) {
-    out << "\n***Only Child node***\n";
-    getChildren().front()->print(out);
-  } else {
-    out << "\n***First Child node***\n";
-    getChildren().front()->print(out);
-    out << "\n***Last Child node***\n";
-    getChildren().back()->print(out);
-  }
-  out << "\n***Parent node***\n";
-  this->print(out);
-  abort();
-}
-
-bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
-  auto priorSibling = getPriorSibling();
-  if (!priorSibling)
-    return true;
-  if (priorSibling.get()->precedesInSource(this))
-    return true;
-  auto &out = verificationError() << "unexpected out-of-order nodes\n";
-  out << "\n***Penultimate child node***\n";
-  priorSibling.get()->print(out);
-  out << "\n***Last Child node***\n";
-  print(out);
-  out << "\n***Parent node***\n";
-  getParent().get()->print(out);
-  //  llvm::errs() << "\n\nsource:\n"
-  //               << getSourceManager()
-  //                      .getRangeForBuffer(
-  //                          getSourceFile()->getBufferID().getValue())
-  //                      .str();
-  ASTScope_unreachable("unexpected out-of-order nodes");
-  return false;
-}
-
-NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
-  auto parent = getParent();
-  if (!parent)
-    return nullptr;
-  auto const &siblingsAndMe = parent.get()->getChildren();
-  // find myIndex, which is probably the last one
-  int myIndex = -1;
-  for (int i = siblingsAndMe.size() - 1; i >= 0; --i) {
-    if (siblingsAndMe[i] == this) {
-      myIndex = i;
-      break;
-    }
-  }
-  ASTScopeAssert(myIndex != -1, "I have been disowned!");
-  if (myIndex == 0)
-    return nullptr;
-  return siblingsAndMe[myIndex - 1];
-}
 
 bool ASTScopeImpl::doesRangeMatch(unsigned start, unsigned end, StringRef file,
                                   StringRef className) {
@@ -507,34 +453,6 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
     c->computeAndCacheSourceRangeOfScope(omitAssertions);
 
   cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
-}
-
-bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
-  const auto unexpandedRange = sourceRangeForDeferredExpansion();
-  const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
-  if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
-    return true;
-  if (unexpandedRange == expandedRange)
-    return true;
-
-  llvm::errs() << "*** Lazy range problem. Parent unexpanded: ***\n";
-  unexpandedRange.print(llvm::errs(), getSourceManager(), false);
-  llvm::errs() << "\n";
-  if (!getChildren().empty()) {
-    llvm::errs() << "*** vs last child: ***\n";
-    auto b = getChildren().back()->computeSourceRangeOfScope();
-    b.print(llvm::errs(), getSourceManager(), false);
-    llvm::errs() << "\n";
-  }
-  else if (hasValidSourceRangeOfIgnoredASTNodes()) {
-    llvm::errs() << "*** vs ignored AST nodes: ***\n";
-    sourceRangeOfIgnoredASTNodes.print(llvm::errs(), getSourceManager(), false);
-    llvm::errs() << "\n";
-  }
-  print(llvm::errs(), 0, false);
-  llvm::errs() << "\n";
-
-  return false;
 }
 
 SourceRange

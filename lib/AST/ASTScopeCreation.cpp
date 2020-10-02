@@ -334,8 +334,6 @@ private:
 
     ASTScopeImpl *insertionPoint =
         child->expandAndBeCurrentDetectingRecursion(*this);
-    ASTScopeAssert(child->verifyThatThisNodeComeAfterItsPriorSibling(),
-                   "Ensure search will work");
     return insertionPoint;
   }
 
@@ -881,6 +879,13 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
 #pragma mark creation helpers
 
 void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
+  ASTScopeAssert(!child->getParent(), "child should not already have parent");
+  child->parent = this;
+
+#ifndef NDEBUG
+  checkSourceRangeBeforeAddingChild(child, ctx);
+#endif
+
   // If this is the first time we've added children, notify the ASTContext
   // that there's a SmallVector that needs to be cleaned up.
   // FIXME: If we had access to SmallVector::isSmall(), we could do better.
@@ -889,8 +894,6 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
     haveAddedCleanup = true;
   }
   storedChildren.push_back(child);
-  ASTScopeAssert(!child->getParent(), "child should not already have parent");
-  child->parent = this;
   clearCachedSourceRangesOfMeAndAncestors();
 }
 
@@ -926,8 +929,6 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
 
   setWasExpanded();
 
-  ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
-                 "Bad range.");
   return insertionPoint;
 }
 
