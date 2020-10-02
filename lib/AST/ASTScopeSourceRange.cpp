@@ -221,7 +221,7 @@ SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
 
 SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return decl->getSourceRange();
+  return SourceRange(decl->getStartLoc(), endLoc);
 }
 
 SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
@@ -401,9 +401,9 @@ BraceStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // 'in' keyword, when present.
   if (auto closure = parentClosureIfAny()) {
     if (closure.get()->getInLoc().isValid())
-      return SourceRange(closure.get()->getInLoc(), stmt->getEndLoc());
+      return SourceRange(closure.get()->getInLoc(), endLoc);
   }
-  return stmt->getSourceRange();
+  return SourceRange(stmt->getStartLoc(), endLoc);
 }
 
 SourceRange ConditionalClauseInitializerScope::getSourceRangeOfThisASTNode(

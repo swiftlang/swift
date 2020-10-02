@@ -1189,8 +1189,10 @@ protected:
 class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
+  SourceLoc endLoc;
 
-  TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
+  TopLevelCodeScope(TopLevelCodeDecl *e, SourceLoc endLoc)
+      : decl(e), endLoc(endLoc) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
@@ -1643,13 +1645,21 @@ class BraceStmtScope final : public AbstractStmtScope {
   /// definition.
   SmallVector<VarDecl *, 2> localVars;
 
+  /// The end location for bindings introduced in this scope. This can
+  /// extend past the actual end of the BraceStmt in top-level code,
+  /// where every TopLevelCodeDecl introduces a new scope through the
+  /// end of the buffer.
+  SourceLoc endLoc;
+
 public:
   BraceStmtScope(BraceStmt *e,
                  SmallVector<ValueDecl *, 2> localFuncsAndTypes,
-                 SmallVector<VarDecl *, 2> localVars)
+                 SmallVector<VarDecl *, 2> localVars,
+                 SourceLoc endLoc)
       : stmt(e),
         localFuncsAndTypes(localFuncsAndTypes),
-        localVars(localVars) {}
+        localVars(localVars),
+        endLoc(endLoc) {}
   virtual ~BraceStmtScope() {}
 
 protected:

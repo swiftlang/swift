@@ -662,8 +662,9 @@ public:
   NullablePtr<ASTScopeImpl> visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                                   ASTScopeImpl *p,
                                                   ScopeCreator &scopeCreator) {
-    return scopeCreator.ifUniqueConstructExpandAndInsert<TopLevelCodeScope>(p,
-                                                                            d);
+    ASTScopeAssert(endLoc.hasValue(), "TopLevelCodeDecl in wrong place?");
+    return scopeCreator.ifUniqueConstructExpandAndInsert<TopLevelCodeScope>(
+        p, d, *endLoc);
   }
 
 #pragma mark special-case creation
@@ -708,9 +709,14 @@ public:
       }
     }
 
+    SourceLoc endLocForBraceStmt = bs->getEndLoc();
+    if (endLoc.hasValue())
+      endLocForBraceStmt = *endLoc;
+
     auto maybeBraceScope =
         scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(
-            p, bs, std::move(localFuncsAndTypes), std::move(localVars));
+            p, bs, std::move(localFuncsAndTypes), std::move(localVars),
+            endLocForBraceStmt);
     if (auto *s = scopeCreator.getASTContext().Stats)
       ++s->getFrontendCounters().NumBraceStmtASTScopes;
 
@@ -989,12 +995,17 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   ASTScopeAssert(SF, "Must already have a SourceFile.");
   ArrayRef<Decl *> decls = SF->getTopLevelDecls();
   // Assume that decls are only added at the end, in source order
+  Optional<SourceLoc> endLoc = None;
+  if (!decls.empty())
+    endLoc = decls.back()->getEndLoc();
+
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
       scopeCreator.addSiblingsToScopeTree(insertionPoint,
                                           scopeCreator.sortBySourceRange(
                                             scopeCreator.cull(newNodes)),
-                                          None);
+                                          endLoc);
+
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
   //           "ASTScope tree missed some DeclContexts or made some up");
@@ -1123,7 +1134,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
                                           scopeCreator.sortBySourceRange(
                                             scopeCreator.cull(
                                               stmt->getElements())),
-                                          stmt->getEndLoc());
+                                          endLoc);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
@@ -1137,7 +1148,7 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
   if (auto *body =
           scopeCreator
-              .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this, None)
+              .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this, endLoc)
               .getPtrOrNull())
     return {body, "So next top level code scope and put its decls in its body "
                   "under a guard statement scope (etc) from the last top level "
