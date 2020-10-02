@@ -487,7 +487,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Stored property initializers are inlinable if the type is explicitly
   // marked as @frozen.
-  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
+  if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
+                                        d->getDeclContext()->isTypeContext())) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,

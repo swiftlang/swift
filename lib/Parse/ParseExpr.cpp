@@ -2228,7 +2228,7 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   Expr *E;
-  if (D == nullptr) {
+  if (D == nullptr || D->getAttrs().hasAttribute<CustomAttr>()) {
     if (name.getBaseName().isEditorPlaceholder()) {
       IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
       return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());

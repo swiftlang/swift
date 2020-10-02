@@ -139,10 +139,6 @@ public:
     bool isClosureResult() const {
       return getKind() == PathElementKind::ClosureResult;
     }
-
-    /// Determine whether this element points to the contextual type
-    /// associated with result of a single expression function.
-    bool isResultOfSingleExprFunction() const;
   };
 
   /// Return the summary flags for an entire path.
@@ -644,20 +640,6 @@ class LocatorPathElt::ClosureBody final : public StoredIntegerElement<1> {
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ClosureBody;
-  }
-};
-
-class LocatorPathElt::ContextualType final : public StoredIntegerElement<1> {
-public:
-  ContextualType(bool isForSingleExprFunction = false)
-      : StoredIntegerElement(ConstraintLocator::ContextualType, isForSingleExprFunction) {}
-
-  /// Whether this element points to the contextual type associated with the
-  /// result of a single expression function.
-  bool isForSingleExprFunction() const { return bool(getValue()); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ContextualType;
   }
 };
 

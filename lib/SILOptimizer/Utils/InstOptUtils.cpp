@@ -1187,6 +1187,54 @@ static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
   return true;
 }
 
+void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
+                                 SILValue operand, InstModCallbacks callbacks) {
+  // If we have an address, we insert a destroy_addr and return. Any live range
+  // issues must have been dealt with by our caller.
+  if (operand->getType().isAddress()) {
+    // Then emit the destroy_addr for this operand. This function does not
+    // delete any instructions
+    SILInstruction *newInst = builder.emitDestroyAddrAndFold(loc, operand);
+    if (newInst != nullptr)
+      callbacks.createdNewInst(newInst);
+    return;
+  }
+
+  // Otherwise, we have an object. We emit the most optimized form of release
+  // possible for that value.
+
+  // If we have qualified ownership, we should just emit a destroy value.
+  if (builder.getFunction().hasOwnership()) {
+    callbacks.createdNewInst(builder.createDestroyValue(loc, operand));
+    return;
+  }
+
+  if (operand->getType().hasReferenceSemantics()) {
+    auto u = builder.emitStrongRelease(loc, operand);
+    if (u.isNull())
+      return;
+
+    if (auto *SRI = u.dyn_cast<StrongRetainInst *>()) {
+      callbacks.deleteInst(SRI);
+      return;
+    }
+
+    callbacks.createdNewInst(u.get<StrongReleaseInst *>());
+    return;
+  }
+
+  auto u = builder.emitReleaseValue(loc, operand);
+  if (u.isNull())
+    return;
+
+  if (auto *rvi = u.dyn_cast<RetainValueInst *>()) {
+    callbacks.deleteInst(rvi);
+    return;
+  }
+
+  callbacks.createdNewInst(u.get<ReleaseValueInst *>());
+}
+
 // *HEY YOU, YES YOU, PLEASE READ*. Even though a textual partial apply is
 // printed with the convention of the closed over function upon it, all
 // non-inout arguments to a partial_apply are passed at +1. This includes
@@ -1202,49 +1250,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                             builder.getFunction()))
     return;
 
-  // Otherwise, we need to destroy the argument. If we have an address, we
-  // insert a destroy_addr and return. Any live range issues must have been
-  // dealt with by our caller.
-  if (arg->getType().isAddress()) {
-    // Then emit the destroy_addr for this arg
-    SILInstruction *newInst = builder.emitDestroyAddrAndFold(loc, arg);
-    callbacks.createdNewInst(newInst);
-    return;
-  }
-
-  // Otherwise, we have an object. We emit the most optimized form of release
-  // possible for that value.
-
-  // If we have qualified ownership, we should just emit a destroy value.
-  if (builder.getFunction().hasOwnership()) {
-    callbacks.createdNewInst(builder.createDestroyValue(loc, arg));
-    return;
-  }
-
-  if (arg->getType().hasReferenceSemantics()) {
-    auto u = builder.emitStrongRelease(loc, arg);
-    if (u.isNull())
-      return;
-
-    if (auto *SRI = u.dyn_cast<StrongRetainInst *>()) {
-      callbacks.deleteInst(SRI);
-      return;
-    }
-
-    callbacks.createdNewInst(u.get<StrongReleaseInst *>());
-    return;
-  }
-
-  auto u = builder.emitReleaseValue(loc, arg);
-  if (u.isNull())
-    return;
-
-  if (auto *rvi = u.dyn_cast<RetainValueInst *>()) {
-    callbacks.deleteInst(rvi);
-    return;
-  }
-
-  callbacks.createdNewInst(u.get<ReleaseValueInst *>());
+  emitDestroyOperation(builder, loc, arg, callbacks);
 }
 
 void swift::deallocPartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
@@ -1415,11 +1421,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
       for (Operand *argOp : argsToHandle) {
         SILValue arg = argOp->get();
         SILBuilderWithScope builder(pai, builderCtxt);
-        if (arg->getType().isObject()) {
-          builder.emitDestroyValueOperation(pai->getLoc(), arg);
-        } else {
-          builder.emitDestroyAddr(pai->getLoc(), arg);
-        }
+        emitDestroyOperation(builder, pai->getLoc(), arg, callbacks);
       }
     }
   }

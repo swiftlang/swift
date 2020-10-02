@@ -140,15 +140,43 @@ struct _UppercaseWrapper<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Limitations on where property wrappers can be used
+// Local property wrappers
 // ---------------------------------------------------------------------------
 
 func testLocalContext() {
-  @WrapperWithInitialValue // expected-error{{property wrappers are not yet supported on local properties}}
+  @WrapperWithInitialValue
   var x = 17
   x = 42
-  _ = x
+  let _: Int = x
+  let _: WrapperWithInitialValue = _x
+
+  @WrapperWithInitialValue(wrappedValue: 17)
+  var initialValue
+  let _: Int = initialValue
+  let _: WrapperWithInitialValue = _initialValue
+
+  @Clamping(min: 0, max: 100)
+  var percent = 50
+  let _: Int = percent
+  let _: Clamping = _percent
+
+  @WrapperA @WrapperB
+  var composed = "hello"
+  let _: WrapperA<WrapperB> = _composed
+
+  @WrapperWithStorageRef
+  var hasProjection = 10
+  let _: Wrapper = $hasProjection
+
+  @WrapperWithInitialValue
+  var uninitialized: Int { // expected-error {{non-member observing properties require an initializer}}
+    didSet {}
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Limitations on where property wrappers can be used
+// ---------------------------------------------------------------------------
 
 enum SomeEnum {
   case foo

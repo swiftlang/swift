@@ -22,6 +22,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -564,8 +565,22 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
       }
     }
 
-    if (!value->getName().matchesRef(factory.Name.getFullName()))
-      continue;
+    auto fullName = factory.Name.getFullName();
+    if (!value->getName().matchesRef(fullName)) {
+      bool foundMatch = false;
+      if (auto *varDecl = dyn_cast<VarDecl>(value)) {
+        // Check if the name matches any auxiliary decls not in the AST
+        varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+          if (auxiliaryVar->ValueDecl::getName().matchesRef(fullName)) {
+            value = auxiliaryVar;
+            foundMatch = true;
+          }
+        });
+      }
+
+      if (!foundMatch)
+        continue;
+    }
 
     // In order to preserve the behavior of the existing context-based lookup,
     // which finds all results for non-local variables at the top level instead

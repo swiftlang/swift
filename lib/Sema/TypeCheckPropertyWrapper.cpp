@@ -414,12 +414,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     // Check various restrictions on which properties can have wrappers
     // attached to them.
 
-    // Local properties do not yet support wrappers.
-    if (var->getDeclContext()->isLocalContext()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_local);
-      continue;
-    }
-
     // Nor does top-level code.
     if (var->getDeclContext()->isModuleScopeContext()) {
       ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_top_level);
