@@ -228,6 +228,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::YieldInst:
+  case TermKind::AwaitAsyncContinuationInst:
     return SILValue();
   case TermKind::BranchInst:
     return cast<const BranchInst>(predTermInst)->getArg(argIndex);
