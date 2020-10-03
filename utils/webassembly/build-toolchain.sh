@@ -65,6 +65,7 @@ build_host_toolchain() {
   # Build the host toolchain and SDK first.
   env SWIFT_BUILD_ROOT="$HOST_BUILD_ROOT" \
     "$SOURCE_PATH/swift/utils/build-script" \
+    --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
     INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
@@ -84,6 +85,7 @@ build_target_toolchain() {
   # build the cross-compilled toolchain
   env SWIFT_BUILD_ROOT="$TARGET_BUILD_ROOT" \
     "$SOURCE_PATH/swift/utils/build-script" \
+    --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$TARGET_PRESET \
     --build-dir="$TARGET_BUILD_DIR" \
     INSTALL_DESTDIR="$TARGET_TOOLCHAIN_DESTDIR" \
