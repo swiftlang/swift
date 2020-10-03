@@ -17,7 +17,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"

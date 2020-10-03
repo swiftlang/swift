@@ -366,7 +366,7 @@ public:
   template <class... ArgTys>
   Status beginInitialization(ConcurrencyControl &concurrency,
                              ArgTys &&...args) {
-    swift_runtime_unreachable("beginAllocation always short-circuits");
+    swift_unreachable("beginAllocation always short-circuits");
   }
 };
 
@@ -592,7 +592,7 @@ inline bool satisfies(PrivateMetadataState state, MetadataState requirement) {
   case MetadataState::Complete:
     return state >= PrivateMetadataState::Complete;
   }
-  swift_runtime_unreachable("unsupported requirement kind");
+  swift_unreachable("unsupported requirement kind");
 }
 
 class PrivateMetadataTrackingInfo {
@@ -642,7 +642,7 @@ public:
   MetadataState getAccomplishedRequestState() const {
     switch (getState()) {
     case PrivateMetadataState::Allocating:
-      swift_runtime_unreachable("cannot call on allocating state");
+      swift_unreachable("cannot call on allocating state");
     case PrivateMetadataState::Abstract:
       return MetadataState::Abstract;
     case PrivateMetadataState::LayoutComplete:
@@ -652,7 +652,7 @@ public:
     case PrivateMetadataState::Complete:
       return MetadataState::Complete;
     }
-    swift_runtime_unreachable("bad state");
+    swift_unreachable("bad state");
   }
 
   bool satisfies(MetadataState requirement) {
@@ -678,7 +678,7 @@ public:
       // Otherwise, if it's a non-blocking request, we do not need to block.
       return (request.isBlocking() && !satisfies(request.getState()));
     }
-    swift_runtime_unreachable("bad state");
+    swift_unreachable("bad state");
   }
 
   constexpr RawType getRawValue() const { return Data; }
@@ -1124,9 +1124,9 @@ private:
       return;
 
     case LSK::Complete:
-      swift_runtime_unreachable("preparing to enqueue when already complete?");
+      swift_unreachable("preparing to enqueue when already complete?");
     }
-    swift_runtime_unreachable("bad kind");
+    swift_unreachable("bad kind");
   }
 
   /// Claim all the satisfied completion queue entries, given that
@@ -1288,7 +1288,7 @@ public:
 
       switch (LockedStorageKind) {
       case LSK::Complete:
-        swift_runtime_unreachable("enqueuing on complete cache entry?");
+        swift_unreachable("enqueuing on complete cache entry?");
 
       case LSK::AllocatingThread:
         LockedStorageKind = LSK::CompletionQueue;
@@ -1340,7 +1340,7 @@ public:
       // Check for an existing dependency.
       switch (LockedStorageKind) {
       case LSK::Complete:
-        swift_runtime_unreachable("dependency on complete cache entry?");
+        swift_unreachable("dependency on complete cache entry?");
 
       case LSK::AllocatingThread:
       case LSK::CompletionQueue:

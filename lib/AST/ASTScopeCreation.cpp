@@ -213,14 +213,17 @@ public:
 
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
+  ///
+  /// \param endLoc The end location for any "scopes until the end" that
+  /// we introduce here, such as PatternEntryDeclScope and GuardStmtScope
   ASTScopeImpl *
   addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
-                         ASTScopeImpl *const organicInsertionPoint,
-                         ArrayRef<ASTNode> nodesOrDeclsToAdd) {
+                         ArrayRef<ASTNode> nodesOrDeclsToAdd,
+                         Optional<SourceLoc> endLoc) {
     auto *ip = insertionPoint;
-    for (auto nd : sortBySourceRange(cull(nodesOrDeclsToAdd))) {
+    for (auto nd : nodesOrDeclsToAdd) {
       auto *const newIP =
-          addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+          addToScopeTreeAndReturnInsertionPoint(nd, ip, endLoc).getPtrOr(ip);
       ip = newIP;
     }
     return ip;
@@ -229,12 +232,16 @@ public:
 public:
   /// For each of searching, call this unless the insertion point is needed
   void addToScopeTree(ASTNode n, ASTScopeImpl *parent) {
-    (void)addToScopeTreeAndReturnInsertionPoint(n, parent);
+    (void)addToScopeTreeAndReturnInsertionPoint(n, parent, None);
   }
   /// Return new insertion point if the scope was not a duplicate
   /// For ease of searching, don't call unless insertion point is needed
+  ///
+  /// \param endLoc The end location for any "scopes until the end" that
+  /// we introduce here, such as PatternEntryDeclScope and GuardStmtScope
   NullablePtr<ASTScopeImpl>
-  addToScopeTreeAndReturnInsertionPoint(ASTNode, ASTScopeImpl *parent);
+  addToScopeTreeAndReturnInsertionPoint(ASTNode, ASTScopeImpl *parent,
+                                        Optional<SourceLoc> endLoc);
 
   bool isWorthTryingToCreateScopeFor(ASTNode n) const {
     if (!n)
@@ -419,9 +426,18 @@ public:
   void addChildrenForKnownAttributes(ValueDecl *decl,
                                      ASTScopeImpl *parent);
 
-public:
+  /// Add PatternEntryDeclScopes for each pattern binding entry.
+  ///
+  /// Returns the new insertion point.
+  ///
+  /// \param endLoc Must be valid iff the pattern binding is in a local
+  /// scope, in which case this is the last source location where the
+  /// pattern bindings are going to be visible.
+  NullablePtr<ASTScopeImpl>
+  addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
+                               ASTScopeImpl *parent,
+                               Optional<SourceLoc> endLoc);
 
-private:
   /// Remove VarDecls because we'll find them when we expand the
   /// PatternBindingDecls. Remove EnunCases
   /// because they overlap EnumElements and AST includes the elements in the
@@ -463,7 +479,6 @@ private:
     return -1 == signum;
   }
 
-public:
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
@@ -545,7 +560,10 @@ class NodeAdder
     : public ASTVisitor<NodeAdder, NullablePtr<ASTScopeImpl>,
                         NullablePtr<ASTScopeImpl>, NullablePtr<ASTScopeImpl>,
                         void, void, void, ASTScopeImpl *, ScopeCreator &> {
+  Optional<SourceLoc> endLoc;
+
 public:
+  explicit NodeAdder(Optional<SourceLoc> endLoc) : endLoc(endLoc) {}
 
 #pragma mark ASTNodes that do not create scopes
 
@@ -637,7 +655,9 @@ public:
   // the deferred nodes.
   NullablePtr<ASTScopeImpl> visitGuardStmt(GuardStmt *e, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
-    return scopeCreator.ifUniqueConstructExpandAndInsert<GuardStmtScope>(p, e);
+    ASTScopeAssert(endLoc.hasValue(), "GuardStmt outside of a BraceStmt?");
+    return scopeCreator.ifUniqueConstructExpandAndInsert<GuardStmtScope>(
+      p, e, *endLoc);
   }
   NullablePtr<ASTScopeImpl> visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                                   ASTScopeImpl *p,
@@ -698,28 +718,8 @@ public:
   visitPatternBindingDecl(PatternBindingDecl *patternBinding,
                           ASTScopeImpl *parentScope,
                           ScopeCreator &scopeCreator) {
-    if (auto *var = patternBinding->getSingleVar())
-      scopeCreator.addChildrenForKnownAttributes(var, parentScope);
-
-    auto *insertionPoint = parentScope;
-    for (auto i : range(patternBinding->getNumPatternEntries())) {
-      bool isLocalBinding = false;
-      if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
-        isLocalBinding = varDecl->getDeclContext()->isLocalContext();
-      }
-
-      insertionPoint =
-          scopeCreator
-              .ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(
-                  insertionPoint, patternBinding, i, isLocalBinding)
-              .getPtrOr(insertionPoint);
-
-      ASTScopeAssert(isLocalBinding || insertionPoint == parentScope,
-                     "Bindings at the top-level or members of types should "
-                     "not change the insertion point");
-    }
-
-    return insertionPoint;
+    return scopeCreator.addPatternBindingToScopeTree(
+        patternBinding, parentScope, endLoc);
   }
 
   NullablePtr<ASTScopeImpl> visitEnumElementDecl(EnumElementDecl *eed,
@@ -773,15 +773,18 @@ public:
 // NodeAdder
 NullablePtr<ASTScopeImpl>
 ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
-                                                    ASTScopeImpl *parent) {
+                                                    ASTScopeImpl *parent,
+                                                    Optional<SourceLoc> endLoc) {
   if (!isWorthTryingToCreateScopeFor(n))
     return parent;
+
+  NodeAdder adder(endLoc);
   if (auto *p = n.dyn_cast<Decl *>())
-    return NodeAdder().visit(p, parent, *this);
+    return adder.visit(p, parent, *this);
   if (auto *p = n.dyn_cast<Expr *>())
-    return NodeAdder().visit(p, parent, *this);
+    return adder.visit(p, parent, *this);
   auto *p = n.get<Stmt *>();
-  return NodeAdder().visit(p, parent, *this);
+  return adder.visit(p, parent, *this);
 }
 
 void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
@@ -829,6 +832,41 @@ void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
       }
     }
   }
+}
+
+NullablePtr<ASTScopeImpl>
+ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
+                                           ASTScopeImpl *parentScope,
+                                           Optional<SourceLoc> endLoc) {
+  if (auto *var = patternBinding->getSingleVar())
+    addChildrenForKnownAttributes(var, parentScope);
+
+  auto *insertionPoint = parentScope;
+  for (auto i : range(patternBinding->getNumPatternEntries())) {
+    bool isLocalBinding = false;
+    if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
+      isLocalBinding = varDecl->getDeclContext()->isLocalContext();
+    }
+
+    Optional<SourceLoc> endLocForBinding = None;
+    if (isLocalBinding) {
+      endLocForBinding = endLoc;
+      ASTScopeAssert(endLoc.hasValue() && endLoc->isValid(),
+                     "PatternBindingDecl in local context outside of BraceStmt?");
+    }
+
+    insertionPoint =
+        ifUniqueConstructExpandAndInsert<PatternEntryDeclScope>(
+            insertionPoint, patternBinding, i,
+            isLocalBinding, endLocForBinding)
+        .getPtrOr(insertionPoint);
+
+    ASTScopeAssert(isLocalBinding || insertionPoint == parentScope,
+                   "Bindings at the top-level or members of types should "
+                   "not change the insertion point");
+  }
+
+  return insertionPoint;
 }
 
 #pragma mark creation helpers
@@ -950,7 +988,10 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   // Assume that decls are only added at the end, in source order
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(insertionPoint, this, newNodes);
+      scopeCreator.addSiblingsToScopeTree(insertionPoint,
+                                          scopeCreator.sortBySourceRange(
+                                            scopeCreator.cull(newNodes)),
+                                          None);
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
   //           "ASTScope tree missed some DeclContexts or made some up");
@@ -991,7 +1032,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         "Original inits are always after the '='");
     scopeCreator
         .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex, isLocalBinding);
+            this, decl, patternEntryIndex);
   }
 
   // Add accessors for the variables in this pattern.
@@ -1050,7 +1091,7 @@ GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
   auto *const lookupParentDiversionScope =
       scopeCreator
           .constructExpandAndInsertUncheckable<LookupParentDiversionScope>(
-              this, conditionLookupParent, stmt->getEndLoc());
+              this, conditionLookupParent, stmt->getEndLoc(), endLoc);
   return {lookupParentDiversionScope,
           "Succeeding code must be in scope of guard variables"};
 }
@@ -1068,7 +1109,11 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
   // TODO: remove the sort after fixing parser to create brace statement
   // elements in source order
   auto *insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(this, this, stmt->getElements());
+      scopeCreator.addSiblingsToScopeTree(this,
+                                          scopeCreator.sortBySourceRange(
+                                            scopeCreator.cull(
+                                              stmt->getElements())),
+                                          stmt->getEndLoc());
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
@@ -1082,7 +1127,7 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
   if (auto *body =
           scopeCreator
-              .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this)
+              .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this, None)
               .getPtrOrNull())
     return {body, "So next top level code scope and put its decls in its body "
                   "under a guard statement scope (etc) from the last top level "
@@ -1377,10 +1422,8 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex,
-    bool isLocalBinding)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex),
-      isLocalBinding(isLocalBinding) {
+    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
 }
@@ -1414,7 +1457,8 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  scopeCreator.addSiblingsToScopeTree(this, this, nodes);
+  nodes = scopeCreator.sortBySourceRange(scopeCreator.cull(nodes));
+  scopeCreator.addSiblingsToScopeTree(this, nodes, None);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }

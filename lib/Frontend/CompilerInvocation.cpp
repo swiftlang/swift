@@ -424,8 +424,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-
-  Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
+  
+  Opts.DisableParserLookup |= Args.hasFlag(OPT_disable_parser_lookup,
+                                           OPT_enable_parser_lookup,
+                                           /*default*/ false);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);

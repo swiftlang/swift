@@ -20,10 +20,10 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/ABI/KeyPath.h"
+#include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
-#include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -410,20 +410,6 @@ enum class SpecialProtocol: uint8_t {
   Error = 1,
 };
 
-/// Identifiers for protocol method dispatch strategies.
-enum class ProtocolDispatchStrategy: uint8_t {
-  /// Uses ObjC method dispatch.
-  ///
-  /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
-  ObjC = 0,
-  
-  /// Uses Swift protocol witness table dispatch.
-  ///
-  /// To invoke methods of this protocol, a pointer to a protocol witness table
-  /// corresponding to the protocol conformance must be available.
-  Swift = 1,
-};
-
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
@@ -486,18 +472,7 @@ public:
   
   /// Does the protocol require a witness table for method dispatch?
   bool needsWitnessTable() const {
-    return needsWitnessTable(getDispatchStrategy());
-  }
-  
-  static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
-    switch (strategy) {
-    case ProtocolDispatchStrategy::ObjC:
-      return false;
-    case ProtocolDispatchStrategy::Swift:
-      return true;
-    }
-
-    swift_runtime_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
+    return swift::protocolRequiresWitnessTable(getDispatchStrategy());
   }
   
   /// Return the identifier if this is a special runtime-known protocol.

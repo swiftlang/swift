@@ -23,7 +23,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
@@ -212,7 +212,7 @@ public:
     }
     }
 
-    swift_runtime_unreachable("Bad TypeInfo kind");
+    swift_unreachable("Bad TypeInfo kind");
   }
 };
 
@@ -2007,7 +2007,7 @@ public:
       return nullptr;
     }
 
-    swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
+    swift_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -2039,7 +2039,7 @@ public:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef(), ExternalTypeInfo);
     }
 
-    swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
+    swift_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *
@@ -2060,7 +2060,7 @@ public:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef(), ExternalTypeInfo);
     }
 
-    swift_runtime_unreachable("Unhandled MetatypeRepresentation in switch.");
+    swift_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -2256,7 +2256,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(
     return nullptr;
   }
 
-  swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
+  swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
 } // namespace reflection

@@ -22,7 +22,7 @@
 #include "llvm/Support/Casting.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 namespace swift {
 namespace reflection {
@@ -856,7 +856,7 @@ public:
 #include "swift/Reflection/TypeRefs.def"
     }
 
-    swift_runtime_unreachable("Unhandled TypeRefKind in switch.");
+    swift_unreachable("Unhandled TypeRefKind in switch.");
   }
 };
 

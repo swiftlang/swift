@@ -33,7 +33,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <set>
 #include <unordered_map>
@@ -1302,7 +1302,7 @@ private:
       return true;
     }
 
-    swift_runtime_unreachable("Unhandled MetadataSourceKind in switch.");
+    swift_unreachable("Unhandled MetadataSourceKind in switch.");
   }
 
   /// Read metadata for a captured generic type from a closure context.

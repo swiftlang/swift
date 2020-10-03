@@ -88,10 +88,10 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
       return (uintptr_t)contextPtr;
     }
     case SymbolicReferenceKind::AccessorFunctionReference: {
-      swift_runtime_unreachable("should not be indirectly referenced");
+      swift_unreachable("should not be indirectly referenced");
     }
     }
-    swift_runtime_unreachable("unknown symbolic reference kind");
+    swift_unreachable("unknown symbolic reference kind");
   } else {
     return ptr;
   }
@@ -176,7 +176,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
                           (uintptr_t)resolvedReference);
   }
   
-  swift_runtime_unreachable("invalid symbolic reference kind");
+  swift_unreachable("invalid symbolic reference kind");
 }
   
 NodePointer
@@ -1168,7 +1168,7 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
     ++currentAssocTypeIdx;
   }
 
-  swift_runtime_unreachable("associated type names don't line up");
+  swift_unreachable("associated type names don't line up");
 }
 
 namespace {
