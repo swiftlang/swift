@@ -2012,7 +2012,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 # Construct dotest arguments. We use semicolons so CMake interprets this as a list.
-                DOTEST_ARGS="--build-dir;${lldb_build_dir}/lldb-test-build.noindex;${LLDB_TEST_CATEGORIES};-t"
+                DOTEST_ARGS="--build-dir;${lldb_build_dir}/lldb-test-build.noindex;${LLDB_TEST_CATEGORIES}"
 
                 # Only set the extra arguments if they're not empty.
                 if [[ -n "${DOTEST_EXTRA}" ]]; then
