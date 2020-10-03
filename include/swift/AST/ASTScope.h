@@ -1023,10 +1023,8 @@ class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
-  const bool isLocalBinding;
 
-  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
-                            bool);
+  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -1041,10 +1039,14 @@ public:
 };
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
+  const bool isLocalBinding;
+  Optional<SourceLoc> endLoc;
+
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding) {}
+                        bool isLocalBinding, Optional<SourceLoc> endLoc)
+      : AbstractPatternEntryScope(pbDecl, entryIndex),
+        isLocalBinding(isLocalBinding), endLoc(endLoc) {}
   virtual ~PatternEntryDeclScope() {}
 
 protected:
@@ -1070,9 +1072,8 @@ class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
   Expr *initAsWrittenWhenCreated;
 
 public:
-  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                               bool isLocalBinding)
-      : AbstractPatternEntryScope(pbDecl, entryIndex, isLocalBinding),
+  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
+      : AbstractPatternEntryScope(pbDecl, entryIndex),
         initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
@@ -1400,7 +1401,8 @@ public:
 class GuardStmtScope final : public LabeledConditionalStmtScope {
 public:
   GuardStmt *const stmt;
-  GuardStmtScope(GuardStmt *e) : stmt(e) {}
+  SourceLoc endLoc;
+  GuardStmtScope(GuardStmt *e, SourceLoc endLoc) : stmt(e), endLoc(endLoc) {}
   virtual ~GuardStmtScope() {}
 
 protected:
@@ -1413,6 +1415,8 @@ private:
 public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 };
 
 /// A scope after a guard statement that follows lookups into the conditions
@@ -1427,9 +1431,11 @@ class LookupParentDiversionScope final : public ASTScopeImpl {
 public:
   ASTScopeImpl *const lookupParent;
   const SourceLoc startLoc;
+  const SourceLoc endLoc;
 
-  LookupParentDiversionScope(ASTScopeImpl *lookupParent, SourceLoc startLoc)
-      : lookupParent(lookupParent), startLoc(startLoc) {}
+  LookupParentDiversionScope(ASTScopeImpl *lookupParent,
+                             SourceLoc startLoc, SourceLoc endLoc)
+      : lookupParent(lookupParent), startLoc(startLoc), endLoc(endLoc) {}
 
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;

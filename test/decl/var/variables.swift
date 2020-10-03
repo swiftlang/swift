@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 var t1 : Int
 var t2 = 10
@@ -14,17 +14,30 @@ var bfx : Int, bfy : Int
 
 _ = 10
 
-var self1 = self1 // expected-error {{variable used within its own initial value}}
-var self2 : Int = self2 // expected-error {{variable used within its own initial value}}
-var (self3) : Int = self3 // expected-error {{variable used within its own initial value}}
-var (self4) : Int = self4 // expected-error {{variable used within its own initial value}}
-var self5 = self5 + self5 // expected-error 2 {{variable used within its own initial value}}
-var self6 = !self6 // expected-error {{variable used within its own initial value}}
-var (self7a, self7b) = (self7b, self7a) // expected-error 2 {{variable used within its own initial value}}
+var self1 = self1
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
+
+var self2 : Int = self2
+var (self3) : Int = self3
+var (self4) : Int = self4
+
+var self5 = self5 + self5
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
+
+var self6 = !self6
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
+
+var (self7a, self7b) = (self7b, self7a)
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
 
 var self8 = 0
 func testShadowing() {
-  var self8 = self8 // expected-error {{variable used within its own initial value}}
+  var self8 = self8
+  // expected-warning@-1 {{initialization of variable 'self8' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 var (paren) = 0

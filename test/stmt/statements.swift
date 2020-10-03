@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 /* block comments */
 /* /* nested too */ */
@@ -501,8 +501,9 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
   guard let e, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
   guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
+  // FIXME: Bring back the tailored diagnostic
   guard let g = y else {
-    markUsed(g)  // expected-error {{variable declared in 'guard' condition is not usable in its body}}
+    markUsed(g)  // expected-error {{cannot find 'g' in scope}}
   }
 
   guard let h = y, cond {}  // expected-error {{expected 'else' after 'guard' condition}} {{25-25=else }}
@@ -512,8 +513,9 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
 
   // SR-7567
   guard let outer = y else {
+    // FIXME: Bring back the tailored diagnostic
     guard true else {
-      print(outer) // expected-error {{variable declared in 'guard' condition is not usable in its body}}
+      print(outer) // expected-error {{cannot find 'outer' in scope}}
     }
   }
 }

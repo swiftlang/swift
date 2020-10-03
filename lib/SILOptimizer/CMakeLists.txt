@@ -1,3 +1,4 @@
+set_swift_llvm_is_available()
 add_swift_host_library(swiftSILOptimizer STATIC
   SILOptimizer.cpp)
 target_link_libraries(swiftSILOptimizer PRIVATE
