@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_TYPELOWERING_H
 #define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/AbstractionPattern.h"
