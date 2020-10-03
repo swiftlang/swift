@@ -1,8 +1,8 @@
-#/bin/bash
+#!/bin/bash
 
 set -ex
-SOURCE_PATH="$(cd "$(dirname $0)/../../.." && pwd)"
-UTILS_PATH="$(cd "$(dirname $0)" && pwd)"
+SOURCE_PATH="$(cd "$(dirname "$0")/../../.." && pwd)"
+UTILS_PATH="$(cd "$(dirname "$0")" && pwd)"
 
 WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 
@@ -14,9 +14,9 @@ case $(uname -s) in
     HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
-    if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
+    if [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=18.04" ]; then
       OS_SUFFIX=ubuntu18.04
-    elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
+    elif [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=20.04" ]; then
       OS_SUFFIX=ubuntu20.04
     else
       echo "Unknown Ubuntu version"
@@ -37,7 +37,6 @@ MONTH=$(date +"%m")
 DAY=$(date +"%d")
 TOOLCHAIN_VERSION="${YEAR}${MONTH}${DAY}"
 TOOLCHAIN_NAME="swift-wasm-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
-ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}.tar.gz"
 
 PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
@@ -60,12 +59,12 @@ HOST_BUILD_DIR=$HOST_BUILD_ROOT/Ninja-Release
 TARGET_BUILD_DIR=$TARGET_BUILD_ROOT/Ninja-Release
 
 # Avoid clang headers symlink issues
-mkdir -p $HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0
+mkdir -p "$HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0"
 
 build_host_toolchain() {
   # Build the host toolchain and SDK first.
   env SWIFT_BUILD_ROOT="$HOST_BUILD_ROOT" \
-    $SOURCE_PATH/swift/utils/build-script \
+    "$SOURCE_PATH/swift/utils/build-script" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
     INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
@@ -74,7 +73,7 @@ build_host_toolchain() {
 }
 
 build_target_toolchain() {
-  mkdir -p $HOST_BUILD_DIR/
+  mkdir -p "$HOST_BUILD_DIR/"
   # Copy the host build dir to reuse it.
   if [[ ! -e "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX" ]]; then
     cp -r "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX" "$TARGET_BUILD_DIR/llvm-$HOST_SUFFIX"
@@ -84,8 +83,8 @@ build_target_toolchain() {
 
   # build the cross-compilled toolchain
   env SWIFT_BUILD_ROOT="$TARGET_BUILD_ROOT" \
-    $SOURCE_PATH/swift/utils/build-script \
-    --preset=$TARGET_PRESET --reconfigure \
+    "$SOURCE_PATH/swift/utils/build-script" \
+    --preset=$TARGET_PRESET \
     --build-dir="$TARGET_BUILD_DIR" \
     INSTALL_DESTDIR="$TARGET_TOOLCHAIN_DESTDIR" \
     SOURCE_PATH="$SOURCE_PATH" \
@@ -97,8 +96,8 @@ build_target_toolchain() {
     TOOLS_BIN_DIR="${HOST_TOOLCHAIN_SDK}/usr/bin" \
     C_CXX_LAUNCHER="$(which sccache)"
 
-  $UTILS_PATH/build-foundation.sh $TARGET_TOOLCHAIN_SDK
-  $UTILS_PATH/build-xctest.sh $TARGET_TOOLCHAIN_SDK
+  "$UTILS_PATH/build-foundation.sh" "$TARGET_TOOLCHAIN_SDK"
+  "$UTILS_PATH/build-xctest.sh" "$TARGET_TOOLCHAIN_SDK"
 
 }
 
@@ -108,16 +107,16 @@ merge_toolchains() {
   cp -r "$HOST_TOOLCHAIN_DESTDIR" "$DIST_TOOLCHAIN_DESTDIR"
 
   # Merge wasi-sdk and the toolchain
-  cp -r $WASI_SDK_PATH/share/wasi-sysroot $DIST_TOOLCHAIN_SDK/usr/share
+  cp -r "$WASI_SDK_PATH/share/wasi-sysroot" "$DIST_TOOLCHAIN_SDK/usr/share"
 
   # Copy the target environment stdlib into the toolchain
   # Avoid copying usr/lib/swift/clang because our toolchain's one is a directory
   # but nightly's one is symbolic link. A simple copy fails to merge them.
-  rsync -v -a $TARGET_TOOLCHAIN_SDK/usr/lib/ $DIST_TOOLCHAIN_SDK/usr/lib/ --exclude 'swift/clang'
-  rsync -v -a $TARGET_TOOLCHAIN_SDK/usr/bin/ $DIST_TOOLCHAIN_SDK/usr/bin/
+  rsync -v -a "$TARGET_TOOLCHAIN_SDK/usr/lib/" "$DIST_TOOLCHAIN_SDK/usr/lib/" --exclude 'swift/clang'
+  rsync -v -a "$TARGET_TOOLCHAIN_SDK/usr/bin/" "$DIST_TOOLCHAIN_SDK/usr/bin/"
 
   # Replace absolute sysroot path with relative path
-  sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap
+  sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap"
 }
 
 build_host_toolchain
@@ -125,5 +124,5 @@ build_target_toolchain
 
 merge_toolchains
 
-cd $DIST_TOOLCHAIN_DESTDIR
-tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
+cd "$DIST_TOOLCHAIN_DESTDIR"
+tar cfz "$PACKAGE_ARTIFACT" "$TOOLCHAIN_NAME"
