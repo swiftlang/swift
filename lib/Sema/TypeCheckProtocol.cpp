@@ -737,18 +737,6 @@ swift::matchWitness(
     }
   }
 
-  // Check for actor-isolation consistency.
-  switch (getActorIsolation(witness)) {
-  case ActorIsolation::ActorInstance:
-    // Actor-isolated witnesses cannot conform to protocol requirements.
-    return RequirementMatch(witness, MatchKind::ActorIsolatedWitness);
-
-  case ActorIsolation::ActorPrivileged:
-  case ActorIsolation::Independent:
-  case ActorIsolation::Unspecified:
-    break;
-  }
-
   // Now finalize the match.
   auto result = finalize(anyRenaming, optionalAdjustments);
   // Check if the requirement's `@differentiable` attributes are satisfied by
@@ -2487,24 +2475,6 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
-  case MatchKind::ActorIsolatedWitness: {
-    bool canBeAsyncHandler = false;
-    if (auto witnessFunc = dyn_cast<FuncDecl>(match.Witness)) {
-      canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
-          witnessFunc->canBeAsyncHandler();
-    }
-    auto diag = match.Witness->diagnose(
-        canBeAsyncHandler ? diag::actor_isolated_witness_could_be_async_handler
-                          : diag::actor_isolated_witness,
-        match.Witness->getDescriptiveKind(), match.Witness->getName());
-
-    if (canBeAsyncHandler) {
-      diag.fixItInsert(
-          match.Witness->getAttributeInsertionLoc(false), "@asyncHandler ");
-    }
-    break;
-  }
-
   case MatchKind::MissingDifferentiableAttr: {
     auto *witness = match.Witness;
     // Emit a note and fix-it showing the missing requirement `@differentiable`
@@ -4365,6 +4335,34 @@ void ConformanceChecker::resolveValueWitnesses() {
           Adoptee->getClassOrBoundGenericClass()->isActor()) {
         witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
         return;
+      }
+
+      // Check for actor-isolation consistency.
+      switch (getActorIsolation(witness)) {
+      case ActorIsolation::ActorInstance: {
+        // Actor-isolated witnesses cannot conform to protocol requirements.
+        bool canBeAsyncHandler = false;
+        if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
+          canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
+          witnessFunc->canBeAsyncHandler();
+        }
+        auto diag = witness->diagnose(
+            canBeAsyncHandler
+                ? diag::actor_isolated_witness_could_be_async_handler
+                : diag::actor_isolated_witness,
+            witness->getDescriptiveKind(), witness->getName());
+
+        if (canBeAsyncHandler) {
+          diag.fixItInsert(
+             witness->getAttributeInsertionLoc(false), "@asyncHandler ");
+        }
+        return;
+      }
+
+      case ActorIsolation::ActorPrivileged:
+      case ActorIsolation::Independent:
+      case ActorIsolation::Unspecified:
+        break;
       }
 
       // Objective-C checking for @objc requirements.

@@ -268,9 +268,6 @@ enum class MatchKind : uint8_t {
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
 
-  /// The witness is part of actor-isolated state.
-  ActorIsolatedWitness,
-
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
   
@@ -503,7 +500,6 @@ struct RequirementMatch {
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
@@ -536,7 +532,6 @@ struct RequirementMatch {
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
