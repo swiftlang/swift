@@ -401,7 +401,7 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
            "discriminator for foreign declaration not supported yet!");
 
     // Special case: methods that are witnesses to Actor.enqueue(partialTask:)
-    // have their own descriminator, which is shared across all actor classes.
+    // have their own discriminator, which is shared across all actor classes.
     if (constant.hasFuncDecl()) {
       auto func = dyn_cast<FuncDecl>(constant.getFuncDecl());
       if (func->isActorEnqueuePartialTaskWitness()) {
