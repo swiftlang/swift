@@ -4708,6 +4708,10 @@ private:
     /// The set of protocol requirements placed on this type variable.
     llvm::SmallVector<Constraint *, 4> Protocols;
 
+    /// The set of transitive protocol requirements inferred through
+    /// subtype/conversion/equivalence relations with other type variables.
+    Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
+
     /// The set of constraints which would be used to infer default types.
     llvm::TinyPtrVector<Constraint *> Defaults;
 
@@ -4873,6 +4877,15 @@ private:
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
+    /// Detect subtype, conversion or equivalence relationship
+    /// between two type variables and attempt to propagate protocol
+    /// requirements down the subtype or equivalence chain.
+    void inferTransitiveProtocolRequirements(
+        const ConstraintSystem &cs,
+        llvm::SmallDenseMap<TypeVariableType *,
+                            ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
     /// Infer bindings based on any protocol conformances that have default
     /// types.
     void inferDefaultTypes(ConstraintSystem &cs,
@@ -4886,8 +4899,8 @@ public:
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
     void finalize(ConstraintSystem &cs,
-                  const llvm::SmallDenseMap<TypeVariableType *,
-                                            ConstraintSystem::PotentialBindings>
+                  llvm::SmallDenseMap<TypeVariableType *,
+                                      ConstraintSystem::PotentialBindings>
                       &inferredBindings);
 
     void dump(llvm::raw_ostream &out,

@@ -22,6 +22,90 @@
 using namespace swift;
 using namespace constraints;
 
+void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
+    const ConstraintSystem &cs,
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+        &inferredBindings) {
+  if (TransitiveProtocols)
+    return;
+
+  llvm::SmallVector<std::pair<TypeVariableType *, TypeVariableType *>, 4>
+      workList;
+  llvm::SmallPtrSet<TypeVariableType *, 4> visitedRelations;
+
+  llvm::SmallDenseMap<TypeVariableType *, SmallPtrSet<Constraint *, 4>, 4>
+      protocols;
+
+  auto addToWorkList = [&](TypeVariableType *parent,
+                           TypeVariableType *typeVar) {
+    if (visitedRelations.insert(typeVar).second)
+      workList.push_back({parent, typeVar});
+  };
+
+  auto propagateProtocolsTo =
+      [&protocols](TypeVariableType *dstVar,
+                   const SmallVectorImpl<Constraint *> &direct,
+                   const SmallPtrSetImpl<Constraint *> &transitive) {
+        auto &destination = protocols[dstVar];
+
+        for (auto *protocol : direct)
+          destination.insert(protocol);
+
+        for (auto *protocol : transitive)
+          destination.insert(protocol);
+      };
+
+  addToWorkList(nullptr, TypeVar);
+
+  do {
+    auto *currentVar = workList.back().second;
+
+    auto cachedBindings = inferredBindings.find(currentVar);
+    if (cachedBindings == inferredBindings.end()) {
+      workList.pop_back();
+      continue;
+    }
+
+    auto &bindings = cachedBindings->getSecond();
+
+    // If current variable already has transitive protocol
+    // conformances inferred, there is no need to look deeper
+    // into subtype/equivalence chain.
+    if (bindings.TransitiveProtocols) {
+      TypeVariableType *parent = nullptr;
+      std::tie(parent, currentVar) = workList.pop_back_val();
+      assert(parent);
+      propagateProtocolsTo(parent, bindings.Protocols,
+                           *bindings.TransitiveProtocols);
+      continue;
+    }
+
+    for (const auto &entry : bindings.SubtypeOf)
+      addToWorkList(currentVar, entry.first);
+
+    for (const auto &entry : bindings.EquivalentTo)
+      addToWorkList(currentVar, entry.first);
+
+    // More subtype/equivalences relations have been added.
+    if (workList.back().second != currentVar)
+      continue;
+
+    TypeVariableType *parent = nullptr;
+    std::tie(parent, currentVar) = workList.pop_back_val();
+
+    // At all of the protocols associated with current type variable
+    // are transitive to its parent, propogate them down the subtype/equivalence
+    // chain.
+    if (parent) {
+      propagateProtocolsTo(parent, bindings.Protocols, protocols[currentVar]);
+    }
+
+    // Update the bindings associated with current type variable,
+    // to avoid repeating this inference process.
+    bindings.TransitiveProtocols.emplace(std::move(protocols[currentVar]));
+  } while (!workList.empty());
+}
+
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
@@ -281,8 +365,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 
 void ConstraintSystem::PotentialBindings::finalize(
     ConstraintSystem &cs,
-    const llvm::SmallDenseMap<TypeVariableType *,
-                              ConstraintSystem::PotentialBindings>
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
   // We need to make sure that there are no duplicate bindings in the
   // set, otherwise solver would produce multiple identical solutions.
@@ -290,8 +373,8 @@ void ConstraintSystem::PotentialBindings::finalize(
   for (const auto &binding : Bindings)
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
+  inferTransitiveProtocolRequirements(cs, inferredBindings);
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
-
   inferDefaultTypes(cs, existingTypes);
 
   // Adjust optionality of existing bindings based on presence of
