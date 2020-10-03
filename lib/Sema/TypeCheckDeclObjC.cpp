@@ -2372,12 +2372,22 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     if (conflicts.empty())
       continue;
 
+    auto bestConflict = conflicts[0];
+    for (auto conflict : conflicts) {
+      if (conflict->getName().isCompoundName() &&
+          conflict->getName().getArgumentNames().size() ==
+            req->getName().getArgumentNames().size()) {
+        bestConflict = conflict;
+        break;
+      }
+    }
+
     // Diagnose the conflict.
     auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);
-    auto conflictDiagInfo = getObjCMethodDiagInfo(conflicts[0]);
+    auto conflictDiagInfo = getObjCMethodDiagInfo(bestConflict);
     auto protocolName
       = cast<ProtocolDecl>(req->getDeclContext())->getName();
-    Ctx.Diags.diagnose(conflicts[0],
+    Ctx.Diags.diagnose(bestConflict,
                        diag::objc_optional_requirement_conflict,
                        conflictDiagInfo.first,
                        conflictDiagInfo.second,
@@ -2387,9 +2397,9 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                        protocolName);
 
     // Fix the name of the witness, if we can.
-    if (req->getName() != conflicts[0]->getName() &&
-        req->getKind() == conflicts[0]->getKind() &&
-        isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
+    if (req->getName() != bestConflict->getName() &&
+        req->getKind() == bestConflict->getKind() &&
+        isa<AccessorDecl>(req) == isa<AccessorDecl>(bestConflict)) {
       // They're of the same kind: fix the name.
       unsigned kind;
       if (isa<ConstructorDecl>(req))
@@ -2402,29 +2412,29 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
         llvm_unreachable("unhandled @objc declaration kind");
       }
 
-      auto diag = Ctx.Diags.diagnose(conflicts[0],
+      auto diag = Ctx.Diags.diagnose(bestConflict,
                                      diag::objc_optional_requirement_swift_rename,
                                      kind, req->getName());
 
       // Fix the Swift name.
-      fixDeclarationName(diag, conflicts[0], req->getName());
+      fixDeclarationName(diag, bestConflict, req->getName());
 
       // Fix the '@objc' attribute, if needed.
-      if (!conflicts[0]->canInferObjCFromRequirement(req))
-        fixDeclarationObjCName(diag, conflicts[0],
-                               conflicts[0]->getObjCRuntimeName(),
+      if (!bestConflict->canInferObjCFromRequirement(req))
+        fixDeclarationObjCName(diag, bestConflict,
+                               bestConflict->getObjCRuntimeName(),
                                req->getObjCRuntimeName(),
                                /*ignoreImpliedName=*/true);
     }
 
     // @nonobjc will silence this warning.
     bool hasExplicitObjCAttribute = false;
-    if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
+    if (auto objcAttr = bestConflict->getAttrs().getAttribute<ObjCAttr>())
       hasExplicitObjCAttribute = !objcAttr->isImplicit();
     if (!hasExplicitObjCAttribute)
-      Ctx.Diags.diagnose(conflicts[0], diag::req_near_match_nonobjc, true)
+      Ctx.Diags.diagnose(bestConflict, diag::req_near_match_nonobjc, true)
         .fixItInsert(
-          conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
+          bestConflict->getAttributeInsertionLoc(/*forModifier=*/false),
           "@nonobjc ");
 
     Ctx.Diags.diagnose(getDeclContextLoc(unsatisfied.first),

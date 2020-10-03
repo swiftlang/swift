@@ -678,6 +678,12 @@ public:
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
+public:
+  /// Key that can be used to uniquely identify a particular Objective-C
+  /// method.
+  using ObjCMethodKey = std::pair<ObjCSelector, char>;
+
+private:
   friend class MultiConformanceChecker;
   friend class AssociatedTypeInference;
 
@@ -711,6 +717,14 @@ class ConformanceChecker : public WitnessChecker {
 
   /// Whether we checked the requirement signature already.
   bool CheckedRequirementSignature = false;
+
+  /// Mapping from Objective-C methods to the set of requirements within this
+  /// protocol that have the same selector and instance/class designation.
+  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
+    objcMethodRequirements;
+
+  /// Whether objcMethodRequirements has been computed.
+  bool computedObjCMethodRequirements = false;
 
   /// Retrieve the associated types that are referenced by the given
   /// requirement with a base of 'Self'.
@@ -827,6 +841,13 @@ public:
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
+
+  /// Retrieve the Objective-C method key from the given function.
+  ObjCMethodKey getObjCMethodKey(AbstractFunctionDecl *func);
+
+  /// Retrieve the Objective-C requirements in this protocol that have the
+  /// given Objective-C method key.
+  ArrayRef<AbstractFunctionDecl *> getObjCRequirements(ObjCMethodKey key);
 };
 
 /// Captures the state needed to infer associated types.
