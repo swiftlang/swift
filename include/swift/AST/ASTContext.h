@@ -499,13 +499,13 @@ public:
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
-#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+#define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of MODULE.NAME. */ \
   DECL_CLASS *get##NAME##Decl() const; \
 \
   /** Retrieve the type of MODULE.NAME. */ \
   Type get##NAME##Type() const;
-#include "swift/AST/KnownObjCTypes.def"
+#include "swift/AST/KnownSDKTypes.def"
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \

@@ -1202,6 +1202,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createMetatype(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
+      
+  case SILInstructionKind::GetAsyncContinuationInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createGetAsyncContinuation(Loc,
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
+  
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
+           && "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createGetAsyncContinuationAddr(Loc,
+      getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                      (SILValueCategory)TyCategory2, Fn)),
+      getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
 
 #define ONETYPE_ONEOPERAND_INST(ID)                                            \
   case SILInstructionKind::ID##Inst:                                           \
@@ -2155,6 +2170,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createCondBranch(
         Loc, Cond, getBBForReference(Fn, ListOfValues[1]), TrueArgs,
         getBBForReference(Fn, ListOfValues[2]), FalseArgs);
+    break;
+  }
+  case SILInstructionKind::AwaitAsyncContinuationInst: {
+    // Format: continuation, resume block ID, error block ID if given
+    SILValue Cont = getLocalValue(
+              ListOfValues[0],
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    
+    SILBasicBlock *resultBB = getBBForReference(Fn, ListOfValues[1]);
+    SILBasicBlock *errorBB = nullptr;
+    if (ListOfValues.size() >= 3) {
+      errorBB = getBBForReference(Fn, ListOfValues[2]);
+    }
+    
+    ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB, errorBB);
     break;
   }
   case SILInstructionKind::SwitchEnumInst:

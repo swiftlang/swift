@@ -713,6 +713,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
                     differentiability_witness_function,
                     SingleValueInstruction, None, DoesNotRelease)
+  
+  // Async
+  // TODO: The side effects declarations on this instruction could likely
+  // be tightened, though we want to be careful that passes that try to do
+  // code motion or eliminate this instruction don't do so without awareness of
+  // its structural requirements.
+  SINGLE_VALUE_INST(GetAsyncContinuationInst, get_async_continuation,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  SINGLE_VALUE_INST(GetAsyncContinuationAddrInst, get_async_continuation_addr,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
@@ -750,6 +760,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, MayRead, DoesNotRelease)
   TERMINATOR(DynamicMethodBranchInst, dynamic_method_br,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(AwaitAsyncContinuationInst, await_async_continuation,
+             TermInst, MayHaveSideEffects, MayRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastBranchInst, checked_cast_br,
              TermInst, None, DoesNotRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,

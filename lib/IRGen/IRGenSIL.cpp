@@ -1083,6 +1083,19 @@ public:
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
+  void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i) {
+    //TODO(async)
+    llvm_unreachable("not implemented");
+  }
+  void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i) {
+    //TODO(async)
+    llvm_unreachable("not implemented");
+  }
+  void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i) {
+    //TODO(async)
+    llvm_unreachable("not implemented");
+  }
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
@@ -1112,6 +1125,7 @@ public:
   LOADABLE_REF_STORAGE_HELPER(Name)
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
+  
 };
 
 } // end anonymous namespace
