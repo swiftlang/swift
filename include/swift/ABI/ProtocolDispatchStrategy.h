@@ -19,7 +19,7 @@
 #ifndef SWIFT_ABI_PROTOCOLDISPATCHSTRATEGY_H
 #define SWIFT_ABI_PROTOCOLDISPATCHSTRATEGY_H
 
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 namespace swift {
 
@@ -46,7 +46,7 @@ inline bool protocolRequiresWitnessTable(ProtocolDispatchStrategy strategy) {
     return true;
   }
 
-  swift_runtime_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
+  swift_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
 }
 
 }
