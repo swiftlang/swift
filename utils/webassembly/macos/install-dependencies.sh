@@ -2,10 +2,12 @@
 
 set -ex
 
-brew uninstall $(brew list | grep python@2)
-brew install cmake ninja llvm sccache wasmer
+if [[ ! -z "$CI" ]]; then
+  brew uninstall $(brew list | grep python@2)
+  brew install cmake ninja llvm sccache wasmer
+fi
 
-SOURCE_PATH="$( cd "$(dirname $0)/../../../../" && pwd  )"
+SOURCE_PATH="$(cd "$(dirname $0)/../../../../" && pwd)"
 SWIFT_PATH=$SOURCE_PATH/swift
 cd $SWIFT_PATH
 
