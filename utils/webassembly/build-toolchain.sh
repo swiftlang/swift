@@ -9,8 +9,8 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
-    HOST_PRESET=webassembly-host
-    TARGET_PRESET=webassembly-macos-target
+    HOST_PRESET=webassembly-host-install
+    TARGET_PRESET=webassembly-macos-target-install
     HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
@@ -22,8 +22,8 @@ case $(uname -s) in
       echo "Unknown Ubuntu version"
       exit 1
     fi
-    HOST_PRESET=webassembly-linux-host
-    TARGET_PRESET=webassembly-linux-target
+    HOST_PRESET=webassembly-linux-host-install
+    TARGET_PRESET=webassembly-linux-target-install
     HOST_SUFFIX=linux-x86_64
   ;;
   *)
