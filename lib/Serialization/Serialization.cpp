@@ -2489,11 +2489,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     auto *storage = dyn_cast<AbstractStorageDecl>(value);
     auto access = value->getFormalAccess();
-    // Emit the private descriminator for private decls.
+    // Emit the private discriminator for private decls.
     // FIXME: We shouldn't need to encode this for /all/ private decls.
     // In theory we can follow the same rules as mangling and only include
     // the outermost private context.
-    bool shouldEmitPrivateDescriminator =
+    bool shouldEmitPrivateDiscriminator =
         access <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext();
 
@@ -2507,10 +2507,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           storage->getFormalAccess() >= swift::AccessLevel::Internal &&
           storage->hasPrivateAccessor()));
 
-    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {
+    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDiscriminator) {
       auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
-        if (shouldEmitPrivateDescriminator) {
+        if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
               enclosingFile->getDiscriminatorForPrivateValue(value);
           unsigned abbrCode =
