@@ -110,15 +110,15 @@ if is_released $toolchain_name; then
   exit 0
 fi
 
-mv swift-wasm-$2-SNAPSHOT-ubuntu18.04.tar.gz "$toolchain_name-ubuntu18.04.tar.gz"
-mv swift-wasm-$2-SNAPSHOT-ubuntu20.04.tar.gz "$toolchain_name-ubuntu20.04.tar.gz"
-mv swift-wasm-$2-SNAPSHOT-osx.tar.gz "$toolchain_name-osx.tar.gz"
+mv swift-wasm-$2-SNAPSHOT-ubuntu18.04.tar.gz "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
+mv swift-wasm-$2-SNAPSHOT-ubuntu20.04.tar.gz "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
+mv swift-wasm-$2-SNAPSHOT-osx.tar.gz "$toolchain_name-macos-x86_64.tar.gz"
 
 create_tag $toolchain_name $head_sha
 release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
 
 upload_tarball $release_id "$toolchain_name-ubuntu18.04.tar.gz"
 upload_tarball $release_id "$toolchain_name-ubuntu20.04.tar.gz"
-upload_tarball $release_id "$toolchain_name-osx.tar.gz"
+upload_tarball $release_id "$toolchain_name-macos-x86_64.tar.gz"
 
 popd
