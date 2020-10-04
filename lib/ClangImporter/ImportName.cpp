@@ -1367,11 +1367,10 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 }
 
 static void
-addEmptyArgNamesForCxxFunc(const clang::FunctionDecl *funcDecl,
-                           SmallVectorImpl<StringRef> &argumentNames) {
-  for (size_t i = 0; i < funcDecl->param_size(); ++i) {
+addEmptyArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
+                                 SmallVectorImpl<StringRef> &argumentNames) {
+  for (size_t i = 0; i < funcDecl->param_size(); ++i)
     argumentNames.push_back(StringRef());
-  }
   if (funcDecl->isVariadic())
     argumentNames.push_back(StringRef());
 }
@@ -1614,9 +1613,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     isFunction = true;
     result.info.initKind = CtorInitializerKind::Designated;
     baseName = "init";
-    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(D)) {
-      addEmptyArgNamesForCxxFunc(ctor, argumentNames);
-    }
+    addEmptyArgNamesForClangFunction(cast<clang::CXXConstructorDecl>(D),
+                                     argumentNames);
     break;
 
   case clang::DeclarationName::CXXConversionFunctionName:
@@ -1691,7 +1689,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (auto function = dyn_cast<clang::FunctionDecl>(D)) {
       isFunction = true;
-      addEmptyArgNamesForCxxFunc(function, argumentNames);
+      addEmptyArgNamesForClangFunction(function, argumentNames);
     }
     break;
 

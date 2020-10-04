@@ -8,6 +8,6 @@ let implicit = ImplicitDefaultConstructor()
 
 let deletedImplicitly = ConstructorWithParam() // expected-error {{missing argument for parameter #1 in call}}
 
-let deletedExplicitly = DefaultConstructorDeleted() // expected-error {{cannot be constructed because it has no accessible initializers}}
+let deletedExplicitly = DefaultConstructorDeleted() // expected-error {{missing argument for parameter 'a' in call}}
 
 let withArg = ConstructorWithParam(42)

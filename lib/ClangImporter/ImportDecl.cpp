@@ -3452,10 +3452,8 @@ namespace {
         ctors.push_back(createDefaultConstructor(Impl, result));
       }
 
-      bool hasUserDeclaredConstructor =
-          cxxRecordDecl && cxxRecordDecl->hasUserDeclaredConstructor();
-      if (hasReferenceableFields && hasMemberwiseInitializer &&
-          !hasUserDeclaredConstructor) {
+      bool isAggregate = cxxRecordDecl && cxxRecordDecl->isAggregate();
+      if (hasReferenceableFields && hasMemberwiseInitializer && isAggregate) {
         // The default zero initializer suppresses the implicit value
         // constructor that would normally be formed, so we have to add that
         // explicitly as well.

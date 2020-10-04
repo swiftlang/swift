@@ -16,6 +16,7 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: struct DefaultConstructorDeleted {
 // CHECK-NEXT:   var a: UnsafeMutablePointer<Int32>
+// CHECK-NEXT:   init(a: UnsafeMutablePointer<Int32>)
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ConstructorWithParam {
 // CHECK-NEXT:   var x: Int32

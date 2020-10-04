@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -I %S/Inputs -enable-cxx-interop -emit-silgen %s | %FileCheck %s
 
 import SynthesizedInitializers
+import Constructors
 
 // CHECK-LABEL: sil [ossa] @$s4main18emptyTypeNoArgInityyF : $@convention(thin) () -> ()
 // CHECK: [[AS:%.*]] = alloc_stack $EmptyStruct
@@ -31,4 +32,13 @@ public func singleMemberTypeNoArgInit() {
 // CHECK-LABEL: end sil function '$sSo6IntBoxV1xABs5Int32V_tcfC'
 public func singleMemberTypeValueInit() {
   let i = IntBox(x: 42)
+}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo25DefaultConstructorDeletedV1aABSpys5Int32VG_tcfC : $@convention(method) (UnsafeMutablePointer<Int32>, @thin DefaultConstructorDeleted.Type) -> DefaultConstructorDeleted
+// CHECK: bb0([[A:%.*]] : $UnsafeMutablePointer<Int32>
+// CHECK-NEXT: [[OUT:%.*]] = struct $DefaultConstructorDeleted ([[A]] : $UnsafeMutablePointer<Int32>)
+// CHECK-NEXT: return [[OUT]] : $DefaultConstructorDeleted
+// CHECK-LABEL:  end sil function '$sSo25DefaultConstructorDeletedV1aABSpys5Int32VG_tcfC'
+public func deletedConstructor(a: UnsafeMutablePointer<Int32>) {
+  let deletedExplicitly = DefaultConstructorDeleted(a: a)
 }
