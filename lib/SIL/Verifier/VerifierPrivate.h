@@ -34,7 +34,7 @@ public:
 
   /// Returns true if exhaustively lbi is guaranteed to never be invalidated by
   /// local writes.
-  bool isNeverInvalidated(LoadBorrowInst *lbi);
+  bool isInvalidated(LoadBorrowInst *lbi);
 
 private:
   bool doesAddressHaveWriteThatInvalidatesLoadBorrow(

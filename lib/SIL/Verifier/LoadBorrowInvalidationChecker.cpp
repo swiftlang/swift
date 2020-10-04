@@ -322,7 +322,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::
   // Treat None as a write.
   if (!writes) {
     llvm::errs() << "Failed to find cached writes for: " << *address;
-    return false;
+    return true;
   }
 
   auto lbiProjPath =
@@ -351,13 +351,13 @@ bool LoadBorrowNeverInvalidatedAnalysis::
     // our address from lbiProjPath. If not, we have to a
     if (!lbiProjPath) {
       llvm::errs() << "Couldn't find path root for load_borrow: " << *lbi;
-      return false;
+      return true;
     }
 
     auto writePath = ProjectionPath::getProjectionPath(address, op->get());
     if (!writePath) {
       llvm::errs() << "Couldn't find path root for write: " << *op->getUser();
-      return false;
+      return true;
     }
 
     // The symmetric difference of two projection paths consists of the parts of
@@ -368,11 +368,11 @@ bool LoadBorrowNeverInvalidatedAnalysis::
     }
 
     llvm::errs() << "Write: " << *op->getUser();
-    return false;
+    return true;
   }
 
   // Ok, we are good.
-  return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -450,8 +450,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 
   return false;
 }
-
-bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
+bool LoadBorrowNeverInvalidatedAnalysis::isInvalidated(
     LoadBorrowInst *lbi) {
 
   // FIXME: To be reenabled separately in a follow-on commit.
@@ -470,7 +469,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
 
   // If we have a let address, then we are already done.
   if (storage.isLetAccess()) {
-    return true;
+    return false;
   }
   // At this point, we know that we /may/ have writes. Now we go through various
   // cases to try and exhaustively identify if those writes overlap with our
@@ -484,7 +483,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   if (auto *bai = dyn_cast<BeginAccessInst>(address)) {
     // We do not have a modify, assume we are correct.
     if (bai->getAccessKind() != SILAccessKind::Modify) {
-      return true;
+      return false;
     }
 
     // Otherwise, validate that any writes to our begin_access is not when the
@@ -533,12 +532,8 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
   }
   case AccessedStorage::Argument: {
     auto *arg = cast<SILFunctionArgument>(storage.getArgument());
-    // We return false if visit a non-address here. Object args are things like
-    // pointer_to_address that we handle earlier.
-    if (!arg->getType().isAddress())
-      return false;
     if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-      return true;
+      return false;
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,
                                                          arg);
   }
@@ -547,7 +542,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
     //
     // FIXME: The yielded address could overlap with another address in this
     // function.
-    return true;
+    return false;
   }
   case AccessedStorage::Box: {
     return doesAddressHaveWriteThatInvalidatesLoadBorrow(lbi, endBorrowUses,

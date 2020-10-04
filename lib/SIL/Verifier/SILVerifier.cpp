@@ -1881,7 +1881,7 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(loadBorrowNeverInvalidatedAnalysis.isNeverInvalidated(LBI),
+    require(!loadBorrowNeverInvalidatedAnalysis.isInvalidated(LBI),
             "Found load borrow that is invalidated by a local write?!");
   }
 
