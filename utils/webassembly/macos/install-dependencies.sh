@@ -1,17 +1,19 @@
-#/bin/bash
+#!/bin/bash
 
 set -ex
 
-brew uninstall $(brew list | grep python@2)
+if [[ ! -z "$CI" ]]; then
+  brew uninstall $(brew list | grep python@2)
+fi
+
 brew install cmake ninja llvm sccache
 
 # Install latest wasmer
-
 if [ ! -e ~/.wasmer/bin/wasmer ]; then
   curl https://get.wasmer.io -sSfL | sh
 fi
 
-SOURCE_PATH="$( cd "$(dirname $0)/../../../../" && pwd  )"
+SOURCE_PATH="$(cd "$(dirname $0)/../../../../" && pwd)"
 SWIFT_PATH=$SOURCE_PATH/swift
 cd $SWIFT_PATH
 
