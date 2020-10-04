@@ -140,3 +140,27 @@ protocol P: Builtin.AnyObject {
 }
 
 extension X: P {}
+
+// Test platform inheritance for iOS unavailability.
+// rdar://68597591
+
+@available(iOS, unavailable)
+public struct UnavailableOniOS { } // expected-note 2 {{'UnavailableOniOS' has been explicitly marked unavailable here}}
+
+@available(iOS, unavailable)
+func unavailableOniOS(_ p: UnavailableOniOS) { } // ok
+
+func functionUsingAnUnavailableType(_ p: UnavailableOniOS) { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+
+public extension UnavailableOniOS { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+
+@available(iOS, unavailable)
+public extension UnavailableOniOS { // ok
+  func someMethod(_ p: UnavailableOniOS) { }
+}
+
+@available(iOS, unavailable)
+@available(macCatalyst, introduced: 13.0)
+public struct AvailableOnMacCatalyst { }
+
+public extension AvailableOnMacCatalyst { } // ok
