@@ -2082,9 +2082,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
-  // Everything externally visible is considered used in Swift.
-  // That mostly means we need to be good at not marking things external.
-  if (linkInfo.isUsed()) {
+  // Allow dead_strip'ing, except for "main".
+  if (linkInfo.isUsed() && name == SWIFT_ENTRY_POINT_FUNCTION) {
     IGM.addUsedGlobal(fn);
   }
 
