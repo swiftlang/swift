@@ -172,13 +172,6 @@ module WinSDK [system] {
     link "NetAPI32.Lib"
   }
 
-  module DbgHelp {
-    header "DbgHelp.h"
-    export *
-
-    link "DbgHelp.Lib"
-  }
-
   module DWM {
     header "dwmapi.h"
     export *
@@ -250,6 +243,20 @@ module WinSDK [system] {
     export *
 
     link "shcore.lib"
+  }
+
+  module System {
+    module DbgHelp {
+      header "DbgHelp.h"
+      export *
+
+      link "DbgHelp.Lib"
+    }
+
+    module IOCTL {
+      header "winioctl.h"
+      export *
+    }
   }
 
   module OLE32 {

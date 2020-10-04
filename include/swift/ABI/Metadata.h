@@ -38,7 +38,7 @@
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -4664,7 +4664,7 @@ int32_t TargetTypeContextDescriptor<Runtime>::getGenericArgumentOffset() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getGenericArgumentOffset();
   default:
-    swift_runtime_unreachable("Not a type context descriptor.");
+    swift_unreachable("Not a type context descriptor.");
   }
 }
 
@@ -4682,7 +4682,7 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getFullGenericContextHeader();
   default:
-    swift_runtime_unreachable("Not a type context descriptor.");
+    swift_unreachable("Not a type context descriptor.");
   }
 }
 
@@ -4699,7 +4699,7 @@ TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
   case ContextDescriptorKind::OpaqueType:
     return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)->getGenericParams();
   default:
-    swift_runtime_unreachable("Not a type context descriptor.");
+    swift_unreachable("Not a type context descriptor.");
   }
 }
 
@@ -4717,7 +4717,7 @@ TargetTypeContextDescriptor<Runtime>::getForeignMetadataInitialization() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getForeignMetadataInitialization();
   default:
-    swift_runtime_unreachable("Not a type context descriptor.");
+    swift_unreachable("Not a type context descriptor.");
   }
 }
 
@@ -4735,7 +4735,7 @@ TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getSingletonMetadataInitialization();
   default:
-    swift_runtime_unreachable("Not a enum, struct or class type descriptor.");
+    swift_unreachable("Not a enum, struct or class type descriptor.");
   }
 }
 
@@ -4753,7 +4753,7 @@ TargetTypeContextDescriptor<Runtime>::getCanonicicalMetadataPrespecializations()
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getCanonicicalMetadataPrespecializations();
   default:
-    swift_runtime_unreachable("Not a type context descriptor.");
+    swift_unreachable("Not a type context descriptor.");
   }
 }
 

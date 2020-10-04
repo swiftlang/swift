@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_TYPELOWERING_H
 #define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -792,8 +792,7 @@ public:
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
-    return ProtocolDescriptorFlags::needsWitnessTable
-             (getProtocolDispatchStrategy(P));
+    return swift::protocolRequiresWitnessTable(getProtocolDispatchStrategy(P));
   }
   
   /// True if a type is passed indirectly at +0 when used as the "self"

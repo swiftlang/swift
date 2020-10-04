@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
@@ -35,8 +35,8 @@ typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type 'T' constr
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types must not have a generic parameter list}}
 // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 
-typealias BadC<T,T> = MyType<String, T>  // expected-error {{definition conflicts with previous value}}
-// expected-note @-1 {{previous definition of 'T' is here}}
+typealias BadC<T,T> = MyType<String, T>  // expected-error {{invalid redeclaration of 'T'}}
+// expected-note @-1 {{'T' previously declared here}}
 
 typealias Tuple2<T1, T2> = (T1, T2)
 

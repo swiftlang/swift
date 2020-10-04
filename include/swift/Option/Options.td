@@ -1102,7 +1102,11 @@ def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
 
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
-  HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+  HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;
+
+def enable_parser_lookup : Flag<["-"], "enable-parser-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable parser lookup">;
 
 def enable_request_based_incremental_dependencies : Flag<["-"],
   "enable-request-based-incremental-dependencies">,
