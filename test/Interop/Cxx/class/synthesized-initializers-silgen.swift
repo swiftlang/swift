@@ -4,24 +4,22 @@ import SynthesizedInitializers
 
 // CHECK-LABEL: sil [ossa] @$s4main18emptyTypeNoArgInityyF : $@convention(thin) () -> ()
 // CHECK: [[AS:%.*]] = alloc_stack $EmptyStruct
-// CHECK: [[META:%.*]] = metatype $@thin EmptyStruct.Type
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
-// CHECK: apply [[FN]]([[AS]], [[META]]) : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) () -> @out EmptyStruct
+// CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out EmptyStruct
 // CHECK-LABEL: end sil function '$s4main18emptyTypeNoArgInityyF'
 
-// CHECL-LABEL: sil [clang EmptyStruct.init] @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) (@thin EmptyStruct.Type) -> @out EmptyStruct
+// CHECL-LABEL: sil [clang EmptyStruct.init] @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) () -> @out EmptyStruct
 public func emptyTypeNoArgInit() {
   let e = EmptyStruct()
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main25singleMemberTypeNoArgInityyF : $@convention(thin) () -> ()
 // CHECK: [[AS:%.*]] = alloc_stack $IntBox
-// CHECK: [[META:%.*]] = metatype $@thin IntBox.Type
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) (@thin IntBox.Type) -> @out IntBox
-// CHECK: apply [[FN]]([[AS]], [[META]]) : $@convention(c) (@thin IntBox.Type) -> @out IntBox
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) () -> @out IntBox
+// CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out IntBox
 // CHECK-LABEL: end sil function '$s4main25singleMemberTypeNoArgInityyF'
 
-//CHECK-LABEL: sil [clang IntBox.init] @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) (@thin IntBox.Type) -> @out IntBox
+//CHECK-LABEL: sil [clang IntBox.init] @{{_ZN6IntBoxC1Ev|\?\?0IntBox@@QEAA@XZ}} : $@convention(c) () -> @out IntBox
 public func singleMemberTypeNoArgInit() {
   let i = IntBox()
 }

@@ -2812,10 +2812,6 @@ emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, SILFunction *initializer,
   for (auto i = thunk->arg_begin(), e = thunk->arg_end(); i != e; ++i) {
     auto *argTy = i->getType();
     auto *paramTy = ctorFnType->getParamType(i - thunk->arg_begin());
-    // Thin metatypes are represented as "void". If we run across one of
-    // thesse, skip it.
-    if (paramTy == IGM.VoidTy)
-      continue;
     if (paramTy != argTy)
       Args.push_back(subIGF.coerceValue(i, paramTy, IGM.DataLayout));
     else

@@ -38,6 +38,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -558,6 +559,11 @@ public:
     auto func = cast<AbstractFunctionDecl>(constant->getDecl());
     result.foreignError = func->getForeignErrorConvention();
     result.foreignSelf = func->getImportAsMemberStatus();
+
+    // Remove the metatype "self" parameter by making this a static member.
+    if (constant->getDecl()->getClangDecl() &&
+        isa<clang::CXXConstructorDecl>(constant->getDecl()->getClangDecl()))
+      result.foreignSelf.setStatic();
 
     return result;
   }

@@ -1315,27 +1315,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Swift parameters list?
   size_t clangToSwiftParamOffset = paramTys.size();
 
-  // This is exactly the same as "params" but without thin metatypes. This must
-  // exist so that when the path for "Indirect" arguments looks for the
-  // SILParameterInfo for a given index, we get the parameter info for the
-  // coorisponding clang type's index and not a "random" parameter's info.
-  //
-  // This is only an issue in very rare cases when we have a constructor that
-  // looks like this: (T, @thin U.Type) -> @out U. In this case "params" will
-  // contain two elements and "paramTys" will contain two elements so the
-  // "Indirect" argument path gets confused and selects the second parameter
-  // (the thin metatype) instead of the first one.
-  SmallVector<SILParameterInfo, 4> adjustedSILParams;
   // Convert each parameter to a Clang type.
   for (auto param : params) {
     auto clangTy = IGM.getClangType(param, FnType);
-    // If a parameter type is lowered to void, this means it should be ignored.
-    // For example, this happens for thin metatypes.
-    if (clangTy->isVoidType()) {
-      continue;
-    }
     paramTys.push_back(clangTy);
-    adjustedSILParams.push_back(param);
   }
 
   // Generate function info for this signature.
@@ -1425,7 +1408,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::Indirect: {
       assert(i >= clangToSwiftParamOffset &&
              "Unexpected index for indirect byval argument");
-      auto &param = adjustedSILParams[i - clangToSwiftParamOffset];
+      auto &param = params[i - clangToSwiftParamOffset];
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));

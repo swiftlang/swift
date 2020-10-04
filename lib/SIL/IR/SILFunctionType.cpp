@@ -4222,7 +4222,17 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
 
-  bridgedParams.push_back(selfParam);
+  // If this is a C++ constructor, don't add the metatype "self" parameter
+  // because we'll never use it and it will cause problems in IRGen.
+  if (constant.getDecl()->getClangDecl() &&
+      isa<clang::CXXConstructorDecl>(constant.getDecl()->getClangDecl())) {
+    // But, make sure it is actually a metatype that we're not adding. If
+    // changes to the self parameter are made in the future, this logic may
+    // need to be updated.
+    assert(selfParam.getParameterType()->is<MetatypeType>());
+  } else {
+    bridgedParams.push_back(selfParam);
+  }
 
   auto uncurried =
     CanAnyFunctionType::get(genericSig,
