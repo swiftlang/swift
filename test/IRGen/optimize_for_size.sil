@@ -4,8 +4,8 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) #0 {
-// O-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) #0 {
+// CHECK-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) local_unnamed_addr #0 {
+// O-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) local_unnamed_addr #0 {
 sil @optimize_for_size_attribute : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
   %1 = tuple ()
