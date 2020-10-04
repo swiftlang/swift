@@ -3485,8 +3485,7 @@ namespace {
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
       if (cxxRecordDecl) {
-        result->setIsCxxNonTrivial(
-            !cxxRecordDecl->isTriviallyCopyable());
+        result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
 
         for (auto ctor : cxxRecordDecl->ctors()) {
           if (ctor->isCopyConstructor() &&
@@ -3925,10 +3924,10 @@ namespace {
       } else {
         auto resultTy = importedType.getType();
 
-        FuncDecl *func = createFuncOrAccessor(
-            Impl.SwiftContext, loc, accessorInfo, name,
-            nameLoc, bodyParams, resultTy,
-            /*async*/ false, /*throws*/ false, dc, decl);
+        FuncDecl *func =
+            createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
+                                 nameLoc, bodyParams, resultTy,
+                                 /*async*/ false, /*throws*/ false, dc, decl);
         result = func;
 
         if (!dc->isModuleScopeContext()) {

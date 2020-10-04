@@ -2806,9 +2806,9 @@ public:
       // actual ABI doesn't match the assumed ABI, we try to get as close as
       // possible to make it easy for LLVM to optimize away the thunk.
       return ResultConvention::Indirect;
-     }
-     return CFunctionTypeConventions::getResult(resultTL);
-   }
+    }
+    return CFunctionTypeConventions::getResult(resultTL);
+  }
   static bool classof(const Conventions *C) {
     return C->getKind() == ConventionsKind::CXXMethod;
   }

@@ -2821,7 +2821,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                 == SILFunctionTypeRepresentation::Block) {
     // Ignore the physical block-object parameter.
     firstParam += 1;
-  // Or the indirect result parameter.
+    // Or the indirect result parameter.
   } else if (fnType->getNumResults() > 0 &&
              fnType->getSingleResult().isFormalIndirect()) {
     // Ignore the indirect result parameter.
