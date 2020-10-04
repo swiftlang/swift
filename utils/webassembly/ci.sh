@@ -40,7 +40,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
 fi
 
 if [[ "$(uname)" == "Linux" ]]; then
-  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 test/stdlib/ || true
+  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 test/stdlib/
   echo "Skip running test suites for Linux"
 else
 
