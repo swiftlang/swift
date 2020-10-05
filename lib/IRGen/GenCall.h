@@ -183,6 +183,10 @@ namespace irgen {
     }
 
     unsigned getFirstDirectReturnIndex() { return getIndexAfterArguments(); }
+    unsigned getDirectReturnCount() { return directReturnInfos.size(); }
+    ElementLayout getDirectReturnLayout(unsigned index) {
+      return getElement(getFirstDirectReturnIndex() + index);
+    }
 
     AsyncContextLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<SILType> fieldTypes,

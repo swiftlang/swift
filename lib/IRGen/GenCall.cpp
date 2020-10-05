@@ -1970,29 +1970,21 @@ public:
       llArgs.add(selfValue);
     }
     auto layout = getAsyncContextLayout();
-    auto params = fnConv.getParameters();
-    for (auto index : indices(params)) {
-      Optional<ElementLayout> fieldLayout;
-      if (selfValue && index == params.size() - 1) {
-        fieldLayout = layout.getLocalContextLayout();
-      } else {
-        fieldLayout = layout.getArgumentLayout(index);
-      }
+    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
+         ++index) {
+      auto fieldLayout = layout.getArgumentLayout(index);
       Address fieldAddr =
-          fieldLayout->project(IGF, context, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(fieldLayout->getType());
+          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
       ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
     }
-    unsigned index = 0;
-    for (auto indirectResult : fnConv.getIndirectSILResultTypes(
-             IGF.IGM.getMaximalTypeExpansionContext())) {
-      (void)indirectResult;
+    for (unsigned index = 0, count = layout.getIndirectReturnCount();
+         index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
       Address fieldAddr =
           fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
       cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, llArgs, fieldAddr, isOutlined);
-      ++index;
     }
     if (layout.hasBindings()) {
       auto bindingLayout = layout.getBindingsLayout();
@@ -2024,15 +2016,14 @@ public:
     Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
     auto dataAddr = layout.emitCastTo(IGF, context);
-    int index = layout.getFirstDirectReturnIndex();
-    for (auto result : fnConv.getDirectSILResults()) {
-      auto &fieldLayout = layout.getElement(index);
+    for (unsigned index = 0, count = layout.getDirectReturnCount();
+         index < count; ++index) {
+      auto fieldLayout = layout.getDirectReturnLayout(index);
       Address fieldAddr =
           fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
       auto &fieldTI = fieldLayout.getType();
       cast<LoadableTypeInfo>(fieldTI).loadAsTake(IGF, fieldAddr,
                                                  nativeExplosion);
-      ++index;
     }
 
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
