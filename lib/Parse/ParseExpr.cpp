@@ -2208,20 +2208,23 @@ Expr *Parser::parseExprIdentifier() {
   // lookups, so disable this check when parsing for SwiftSyntax.
   if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
     D = lookupInScope(name);
-    // FIXME: We want this to work: "var x = { x() }", but for now it's better
-    // to disallow it than to crash.
-    if (D) {
-      for (auto activeVar : DisabledVars) {
-        if (activeVar == D) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-          return new (Context) ErrorExpr(loc.getSourceRange());
+
+    if (!Context.LangOpts.DisableParserLookup) {
+      // FIXME: We want this to work: "var x = { x() }", but for now it's better
+      // to disallow it than to crash.
+      if (D) {
+        for (auto activeVar : DisabledVars) {
+          if (activeVar == D) {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+            return new (Context) ErrorExpr(loc.getSourceRange());
+          }
         }
-      }
-    } else {
-      for (auto activeVar : DisabledVars) {
-        if (activeVar->getName() == name.getFullName()) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-          return new (Context) ErrorExpr(loc.getSourceRange());
+      } else {
+        for (auto activeVar : DisabledVars) {
+          if (activeVar->getName() == name.getFullName()) {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+            return new (Context) ErrorExpr(loc.getSourceRange());
+          }
         }
       }
     }

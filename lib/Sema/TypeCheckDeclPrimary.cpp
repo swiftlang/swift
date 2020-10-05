@@ -1334,6 +1334,14 @@ void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   diagnoseDuplicateDecls(boundVars);
 }
 
+void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
+  SmallVector<VarDecl *, 2> captureListVars;
+  for (auto &capture : expr->getCaptureList())
+    captureListVars.push_back(capture.Var);
+
+  diagnoseDuplicateDecls(captureListVars);
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:

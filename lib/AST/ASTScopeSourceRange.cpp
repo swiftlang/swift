@@ -248,7 +248,13 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return getPatternEntry().getSourceRange();
+  SourceRange range = getPatternEntry().getSourceRange();
+  if (endLoc.hasValue()) {
+    ASTScopeAssert(endLoc->isValid(),
+                   "BraceStmt ends before pattern binding entry?");
+    range.End = *endLoc;
+  }
+  return range;
 }
 
 SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
@@ -445,9 +451,14 @@ SourceRange AttachedPropertyWrapperScope::getSourceRangeOfThisASTNode(
   return sourceRangeWhenCreated;
 }
 
+SourceRange GuardStmtScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return SourceRange(getStmt()->getStartLoc(), endLoc);
+}
+
 SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return SourceRange(startLoc);
+  return SourceRange(startLoc, endLoc);
 }
 
 #pragma mark source range caching
