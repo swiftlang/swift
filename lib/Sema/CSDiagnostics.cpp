@@ -5271,14 +5271,10 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
         scopedParameters[base].push_back(GP);
       });
 
-  // FIXME: this code should be generalized now that we can anchor the
-  // fixes on the TypeRepr with the missing generic arg.
   if (!isScoped) {
-    assert(getAnchor().is<Expr *>() || getAnchor().is<TypeRepr *>());
-    if (auto *expr = getAsExpr(getAnchor()))
-      return diagnoseForAnchor(expr, Parameters);
-
-    return diagnoseForAnchor(getAnchor().get<TypeRepr *>(), Parameters);
+    auto anchor = getAnchor();
+    assert(anchor.is<Expr *>() || anchor.is<TypeRepr *>());
+    return diagnoseForAnchor(anchor, Parameters);
   }
 
   bool diagnosed = false;
@@ -5288,7 +5284,7 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
 }
 
 bool MissingGenericArgumentsFailure::diagnoseForAnchor(
-    Anchor anchor, ArrayRef<GenericTypeParamType *> params) const {
+    ASTNode anchor, ArrayRef<GenericTypeParamType *> params) const {
   bool diagnosed = false;
   for (auto *GP : params)
     diagnosed |= diagnoseParameter(anchor, GP);
@@ -5322,11 +5318,9 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
 }
 
 bool MissingGenericArgumentsFailure::diagnoseParameter(
-    Anchor anchor, GenericTypeParamType *GP) const {
+    ASTNode anchor, GenericTypeParamType *GP) const {
   auto &solution = getSolution();
-
-  auto loc = anchor.is<Expr *>() ? anchor.get<Expr *>()->getLoc()
-                                 : anchor.get<TypeRepr *>()->getLoc();
+  auto loc = ::getLoc(anchor);
 
   auto *locator = getLocator();
   // Type variables associated with missing generic parameters are
@@ -5372,7 +5366,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 }
 
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
-    Anchor anchor) const {
+    ASTNode anchor) const {
   auto &solution = getSolution();
   auto *paramDC = getDeclContext();
 
