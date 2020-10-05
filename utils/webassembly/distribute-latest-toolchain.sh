@@ -119,6 +119,6 @@ release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
 
 upload_tarball $release_id "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
 upload_tarball $release_id "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-macos-x86_64-x86_64.tar.gz"
+upload_tarball $release_id "$toolchain_name-macos-x86_64.tar.gz"
 
 popd
