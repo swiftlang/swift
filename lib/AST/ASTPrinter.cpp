@@ -2315,9 +2315,15 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   if (Options.BracketOptions.shouldOpenExtension(decl)) {
     printDocumentationComment(decl);
     printAttributes(decl);
-    Printer << "extension ";
+    Printer << tok::kw_extension;
+
+    if (decl->isParameterized()) {
+      printGenericDeclGenericParams(decl);
+    }
+
+    Printer << " ";
+
     recordDeclLoc(decl, [&]{
-      // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
       if (!extendedType) {
         // Fallback to TypeRepr.

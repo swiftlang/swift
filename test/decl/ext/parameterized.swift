@@ -173,3 +173,18 @@ _ = o == p // ok
 let q = Pair<Wrapped<Int>>(first: .init(value: 316), second: .init(value: 128))
 let r = Pair<Wrapped<Int>>(first: .init(value: 316), second: .init(value: 128))
 _ = q == r // expected-error {{binary operator '==' cannot be applied to two 'Pair<Wrapped<Int>>' operands}}
+
+// Nested Types in Parameterized Extensions
+
+extension<T> Pair<T?> { // expected-note {{requirement specified as 'Element' == 'T?' [with Element = Int, T = T]}}
+  struct NestedPair {
+    let first: T
+    let second: T
+  }
+}
+
+let s = Pair<Int?>.NestedPair(first: 128, second: 316) // ok
+
+let t = Pair<Int>.NestedPair(first: 128, second: 316) // expected-error {{'Pair<Element>.NestedPair' requires the types 'Int' and 'T?' be equivalent}}
+
+let u = Pair<Int?>.NestedPair(first: nil, second: 316) //expected-error {{'nil' is not compatible with expected argument type 'Int'}}

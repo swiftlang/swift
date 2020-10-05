@@ -3995,9 +3995,8 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto params = genericSig->getGenericParams();
-  unsigned n = params.size();
 
-  while (baseTy && n > 0) {
+  while (baseTy) {
     if (baseTy->is<ErrorType>())
       break;
 
@@ -4005,21 +4004,24 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
       auto args = boundGeneric->getGenericArgs();
-      for (unsigned i = 0, e = args.size(); i < e; ++i) {
-        substitutions[params[n - e + i]->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()] = args[i];
+      auto type = boundGeneric->getAnyGeneric();
+      auto params = type->getGenericParams()->getParams();
+
+      for (unsigned i : indices(args)) {
+        auto genericTy = params[i]->getDeclaredInterfaceType()
+                                  ->getCanonicalType()
+                                  ->castTo<GenericTypeParamType>();
+        substitutions[genericTy] = args[i];
       }
 
       // Continue looking into the parent.
       baseTy = boundGeneric->getParent();
-      n -= args.size();
       continue;
     }
 
     // Continue looking into the parent.
     if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
       baseTy = protocolTy->getParent();
-      --n;
       continue;
     }
 
@@ -4034,16 +4036,85 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     break;
   }
 
-  while (n > 0) {
-    auto *gp = params[--n];
-    auto substTy = (genericEnv
-                    ? genericEnv->mapTypeIntoContext(gp)
-                    : gp);
-    auto result = substitutions.insert(
-      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-       substTy});
-    assert(result.second);
-    (void) result;
+  // Record a list of generic params that didn't have a concrete replacement.
+  SmallVector<GenericTypeParamType *, 2> missingSubs;
+  for (auto param : params) {
+    auto genericTy = param->getCanonicalType()->castTo<GenericTypeParamType>();
+
+    if (substitutions.find(genericTy) != substitutions.end()) {
+      continue;
+    }
+
+    auto replacement = genericEnv ? genericEnv->mapTypeIntoContext(param)
+                                  : param;
+
+    missingSubs.push_back(genericTy);
+    substitutions[genericTy] = replacement;
+  }
+
+  // Attempt to fish out a concrete type for missing subs, but only if we have a
+  // concrete type and the context is a parameterized extension. (This only
+  // occurs in parameterized extensions because those generic params don't show
+  // up in the type signature.)
+  auto outermostDC = dc->getOutermostSyntacticContext();
+  auto ext = dyn_cast<ExtensionDecl>(outermostDC);
+  auto isParameterized = ext ? ext->isParameterized() : false;
+  bool isSpecialized = this->isSpecialized() && !this->hasTypeParameter();
+
+  if (isParameterized && isSpecialized && !missingSubs.empty()) {
+    // FIXME: This is O(n*m) (where n is the size of missing subs and m is the
+    // size of generic requirements) which feels really bad. Is there a better
+    // way to do this?
+    for (auto missingSub : missingSubs) {
+      for (auto req : genericSig->getRequirements()) {
+        if (req.getKind() != RequirementKind::SameType) {
+          continue;
+        }
+
+        if (!req.getSecondType()->hasTypeParameter()) {
+          continue;
+        }
+
+        auto firstTy = req.getFirstType();
+        auto secondTy = req.getSecondType();
+        auto canTy = firstTy->getCanonicalType()
+                           ->castTo<GenericTypeParamType>();
+        auto replace = substitutions[canTy];
+
+        if (replace->hasTypeParameter()) {
+          continue;
+        }
+
+        // Walk the second type in the same type requirement and look for the
+        // missing substitution type.
+        auto wasFound = secondTy.findIf([&](Type type) {
+          return type->isEqual(missingSub);
+        });
+
+        if (!wasFound) {
+          continue;
+        }
+
+        secondTy = genericSig->getGenericEnvironment()
+                             ->mapTypeIntoContext(secondTy);
+
+        // If we found the missing substitution within the second type, walk the
+        // replaced type in parallel as the original type, looking for the
+        // missing substitution.
+        secondTy->substituteBindingsTo(replace,
+                                      [&](ArchetypeType *origTy,
+                                          CanType substTy, ArchetypeType *,
+                                          ArrayRef<ProtocolConformanceRef>) {
+            // If the original generic parameter is equal to this missing
+            // substitution, then we found the substitution.
+            if (origTy->getInterfaceType()->isEqual(missingSub)) {
+              substitutions[missingSub] = substTy;
+            }
+
+            return substTy;
+        });
+      }
+    }
   }
 
   return substitutions;

@@ -448,6 +448,15 @@ public:
         const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
+  /// Returns the outermost context based off syntactic depth, right below the
+  /// module context. E.g. for a nested type in a nested type in an extension,
+  /// this returns that extension.
+  LLVM_READONLY
+  DeclContext *getOutermostSyntacticContext();
+  const DeclContext *getOutermostSyntacticContext() const {
+    return const_cast<DeclContext *>(this)->getOutermostSyntacticContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {
