@@ -111,6 +111,8 @@ following (non-exhaustive) set of useful options::
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
 - ``--distcc``: Use distcc to speed up the build by distributing the c++ part of
   the swift build. This is off by default.
+- ``--sccache``: Use sccache to speed up subsequent builds of the compiler by
+  caching more c++ build artifacts. This is off by default.
 
 More options may be added over time. Please pass ``--help`` to
 ``build-toolchain`` to see the full set of options.

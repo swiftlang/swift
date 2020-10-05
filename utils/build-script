@@ -187,6 +187,11 @@ def validate_arguments(toolchain, args):
             fatal_error(
                 "can't find distcc-pump (please install distcc-pump)")
 
+    if args.sccache:
+        if toolchain.sccache is None:
+            fatal_error(
+                "can't find sccache (please install sccache)")
+
     if args.host_target is None or args.stdlib_deployment_targets is None:
         fatal_error("unknown operating system")
 
@@ -523,6 +528,9 @@ class BuildScriptInvocation(object):
                 "--distcc",
                 "--distcc-pump=%s" % toolchain.distcc_pump
             ]
+        if args.sccache:
+            args.cmake_c_launcher = toolchain.sccache
+            args.cmake_cxx_launcher = toolchain.sccache
 
         # *NOTE* We use normal cmake to pass through tsan/ubsan options. We do
         # NOT pass them to build-script-impl.
@@ -1065,6 +1073,12 @@ def parse_preset_args():
         nargs=argparse.Nargs.OPTIONAL,
         default=os.environ.get('USE_DISTCC') == '1')
     parser.add_argument(
+        "--sccache",
+        help="use sccache",
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL,
+        default=os.environ.get('SWIFT_USE_SCCACHE') == '1')
+    parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
         metavar="PATH")
@@ -1157,6 +1171,10 @@ def main_preset():
         fatal_error(
             '--distcc can not be used with' +
             ' --cmake-c-launcher or --cmake-cxx-launcher')
+    if args.sccache and (args.cmake_c_launcher or args.cmake_cxx_launcher):
+        fatal_error(
+            '--sccache can not be used with' +
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
 
     build_script_args = [sys.argv[0]]
     if args.dry_run:
@@ -1167,6 +1185,8 @@ def main_preset():
     build_script_args += preset_args
     if args.distcc:
         build_script_args += ["--distcc"]
+    if args.sccache:
+        build_script_args += ["--sccache"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
     if args.swiftsyntax_install_prefix:
