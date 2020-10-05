@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "irgen"
 #include "IRGenModule.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"

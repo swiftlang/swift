@@ -28,7 +28,7 @@
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -923,7 +923,7 @@ public:
     }
     }
 
-    swift_runtime_unreachable("Unhandled MetadataKind in switch");
+    swift_unreachable("Unhandled MetadataKind in switch");
   }
 
   TypeLookupErrorOr<typename BuilderType::BuiltType>
@@ -1295,7 +1295,7 @@ public:
     }
     }
 
-    swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
+    swift_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
   /// Read the offset of the generic parameters of a class from the nominal
