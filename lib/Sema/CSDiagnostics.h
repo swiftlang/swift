@@ -1698,8 +1698,6 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
-
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
 public:
@@ -1722,13 +1720,13 @@ public:
 
   bool diagnoseAsError() override;
 
-  bool diagnoseForAnchor(Anchor anchor,
+  bool diagnoseForAnchor(ASTNode anchor,
                          ArrayRef<GenericTypeParamType *> params) const;
 
-  bool diagnoseParameter(Anchor anchor, GenericTypeParamType *GP) const;
+  bool diagnoseParameter(ASTNode anchor, GenericTypeParamType *GP) const;
 
 private:
-  void emitGenericSignatureNote(Anchor anchor) const;
+  void emitGenericSignatureNote(ASTNode anchor) const;
 
   /// Retrieve representative locations for associated generic prameters.
   ///
