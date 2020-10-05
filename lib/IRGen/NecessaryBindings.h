@@ -57,8 +57,8 @@ public:
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
   static NecessaryBindings
-  forAsyncFunctionInvocations(IRGenModule &IGM, CanSILFunctionType origType,
-                              SubstitutionMap subs);
+  forAsyncFunctionInvocation(IRGenModule &IGM, CanSILFunctionType origType,
+                             SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,

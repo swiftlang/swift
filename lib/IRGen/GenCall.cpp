@@ -153,7 +153,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   }
 
   //   ArgTypes formalArguments...;
-  auto bindings = NecessaryBindings::forAsyncFunctionInvocations(
+  auto bindings = NecessaryBindings::forAsyncFunctionInvocation(
       IGF.IGM, originalType, substitutionMap);
   if (!bindings.empty()) {
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);

@@ -3042,7 +3042,7 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   }
 }
 
-NecessaryBindings NecessaryBindings::forAsyncFunctionInvocations(
+NecessaryBindings NecessaryBindings::forAsyncFunctionInvocation(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs) {
   return computeBindings(IGM, origType, subs,
                          false /*forPartialApplyForwarder*/);
