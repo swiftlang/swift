@@ -68,6 +68,9 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertTrue(tc.distcc_pump is None or
                         os.path.basename(tc.distcc_pump) == 'pump' or
                         os.path.basename(tc.distcc_pump) == 'distcc-pump')
+        # sccache
+        self.assertTrue(tc.sccache is None or
+                        os.path.basename(tc.sccache) == 'sccache')
 
     def test_find_tool(self):
         tc = host_toolchain()
