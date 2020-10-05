@@ -1989,13 +1989,16 @@ public:
     if (layout.hasBindings()) {
       auto bindingLayout = layout.getBindingsLayout();
       auto bindingsAddr = bindingLayout.project(IGF, context, /*offsets*/ None);
-      layout.getBindings().save(IGF, bindingsAddr);
+      layout.getBindings().save(IGF, bindingsAddr, llArgs);
     }
-    // At this point, llArgs contains the arguments that are being passed along
-    // via the async context.  We can safely drop them on the floor.
-    (void)llArgs.claimAll();
-    // TODO: Validation: we should be able to check that the contents of llArgs
-    //       matches what is expected by the layout.
+    if (selfValue) {
+      auto fieldLayout = layout.getLocalContextLayout();
+      Address fieldAddr =
+          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
+      ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
+    }
+  }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
