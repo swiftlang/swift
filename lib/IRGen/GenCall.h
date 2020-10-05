@@ -89,6 +89,7 @@ namespace irgen {
       SILType type;
       ParameterConvention convention;
     };
+    struct TrailingWitnessInfo {};
 
   private:
     enum class FixedIndex : unsigned {
@@ -107,6 +108,7 @@ namespace irgen {
     SmallVector<SILResultInfo, 4> indirectReturnInfos;
     Optional<ArgumentInfo> localContextInfo;
     NecessaryBindings bindings;
+    Optional<TrailingWitnessInfo> trailingWitnessInfo;
     SmallVector<ArgumentInfo, 4> argumentInfos;
 
     unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
@@ -125,13 +127,27 @@ namespace irgen {
       assert(hasBindings());
       return getIndexAfterLocalContext();
     }
-    unsigned getFirstArgumentIndex() {
+    unsigned getIndexAfterBindings() {
       return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
     }
+    unsigned getFirstArgumentIndex() { return getIndexAfterBindings(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
-    unsigned getFirstDirectReturnIndex() { return getIndexAfterArguments(); }
+    unsigned getSelfMetadataIndex() {
+      assert(hasTrailingWitnesses());
+      return getIndexAfterArguments();
+    }
+    unsigned getSelfWitnessTableIndex() {
+      assert(hasTrailingWitnesses());
+      return getIndexAfterArguments() + 1;
+    }
+    unsigned getIndexAfterTrailingWitnesses() {
+      return getIndexAfterArguments() + (hasTrailingWitnesses() ? 2 : 0);
+    }
+    unsigned getFirstDirectReturnIndex() {
+      return getIndexAfterTrailingWitnesses();
+    }
 
   public:
     bool canHaveError() { return canHaveValidError; }
@@ -180,24 +196,30 @@ namespace irgen {
           index, IGF.IGM.getMaximalTypeExpansionContext());
     }
     unsigned getArgumentCount() { return argumentInfos.size(); }
+    bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
+    ElementLayout getSelfMetadataLayout() {
+      assert(hasTrailingWitnesses());
+      return getElement(getSelfMetadataIndex());
+    }
+    ElementLayout getSelfWitnessTableLayout() {
+      return getElement(getSelfWitnessTableIndex());
+    }
 
     unsigned getDirectReturnCount() { return directReturnInfos.size(); }
     ElementLayout getDirectReturnLayout(unsigned index) {
       return getElement(getFirstDirectReturnIndex() + index);
     }
 
-    AsyncContextLayout(IRGenModule &IGM, LayoutStrategy strategy,
-                       ArrayRef<SILType> fieldTypes,
-                       ArrayRef<const TypeInfo *> fieldTypeInfos,
-                       IRGenFunction &IGF, CanSILFunctionType originalType,
-                       CanSILFunctionType substitutedType,
-                       SubstitutionMap substitutionMap,
-                       NecessaryBindings &&bindings, SILType errorType,
-                       bool canHaveValidError,
-                       ArrayRef<ArgumentInfo> argumentInfos,
-                       ArrayRef<SILResultInfo> directReturnInfos,
-                       ArrayRef<SILResultInfo> indirectReturnInfos,
-                       Optional<ArgumentInfo> localContextInfo);
+    AsyncContextLayout(
+        IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
+        ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
+        CanSILFunctionType originalType, CanSILFunctionType substitutedType,
+        SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
+        Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
+        bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
+        ArrayRef<SILResultInfo> directReturnInfos,
+        ArrayRef<SILResultInfo> indirectReturnInfos,
+        Optional<ArgumentInfo> localContextInfo);
   };
 
   AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,

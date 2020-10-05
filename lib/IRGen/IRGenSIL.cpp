@@ -1257,9 +1257,23 @@ public:
     return explosion.claimNext();
   };
   llvm::Value *getSelfWitnessTable() override {
-    llvm_unreachable("unimplemented");
+    auto fieldLayout = layout.getSelfWitnessTableLayout();
+    Address fieldAddr =
+        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
+    Explosion explosion;
+    ti.loadAsTake(IGF, fieldAddr, explosion);
+    return explosion.claimNext();
   }
-  llvm::Value *getSelfMetadata() override { llvm_unreachable("unimplemented"); }
+  llvm::Value *getSelfMetadata() override {
+    auto fieldLayout = layout.getSelfMetadataLayout();
+    Address fieldAddr =
+        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
+    Explosion explosion;
+    ti.loadAsTake(IGF, fieldAddr, explosion);
+    return explosion.claimNext();
+  }
   llvm::Value *getCoroutineBuffer() override {
     llvm_unreachable("unimplemented");
   }

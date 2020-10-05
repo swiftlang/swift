@@ -181,6 +181,28 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     paramInfos.push_back({ty, parameter.getConvention()});
   }
 
+  Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
+  if (originalType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    assert(getTrailingWitnessSignatureLength(IGF.IGM, originalType) == 2);
+
+    // First, the Self metadata.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getTypeMetadataPtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    // Then, the Self witness table.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getWitnessTablePtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    trailingWitnessInfo = AsyncContextLayout::TrailingWitnessInfo();
+  }
+
   //     ResultTypes directResults...;
   auto directResults = fnConv.getDirectSILResults();
   for (auto result : directResults) {
@@ -192,11 +214,11 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     directReturnInfos.push_back(result);
   }
 
-  return AsyncContextLayout(IGF.IGM, LayoutStrategy::Optimal, valTypes,
-                            typeInfos, IGF, originalType, substitutedType,
-                            substitutionMap, std::move(bindings), errorType,
-                            canHaveValidError, paramInfos, indirectReturnInfos,
-                            directReturnInfos, localContextInfo);
+  return AsyncContextLayout(
+      IGF.IGM, LayoutStrategy::Optimal, valTypes, typeInfos, IGF, originalType,
+      substitutedType, substitutionMap, std::move(bindings),
+      trailingWitnessInfo, errorType, canHaveValidError, paramInfos,
+      indirectReturnInfos, directReturnInfos, localContextInfo);
 }
 
 AsyncContextLayout::AsyncContextLayout(
@@ -204,8 +226,8 @@ AsyncContextLayout::AsyncContextLayout(
     ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
     CanSILFunctionType originalType, CanSILFunctionType substitutedType,
     SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
-    SILType errorType, bool canHaveValidError,
-    ArrayRef<ArgumentInfo> argumentInfos,
+    Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
+    bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
     ArrayRef<SILResultInfo> indirectReturnInfos,
     ArrayRef<SILResultInfo> directReturnInfos,
     Optional<AsyncContextLayout::ArgumentInfo> localContextInfo)
@@ -218,6 +240,7 @@ AsyncContextLayout::AsyncContextLayout(
       indirectReturnInfos(indirectReturnInfos.begin(),
                           indirectReturnInfos.end()),
       localContextInfo(localContextInfo), bindings(std::move(bindings)),
+      trailingWitnessInfo(trailingWitnessInfo),
       argumentInfos(argumentInfos.begin(), argumentInfos.end()) {
 #ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
