@@ -138,7 +138,11 @@ AsyncContextLayout irgen::getAsyncContextLayout(
       SILType ty =
           IGF.IGM.silConv.getSILType(localContextParameter, substitutedType,
                                      IGF.IGM.getMaximalTypeExpansionContext());
-      auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
+      auto argumentLoweringType =
+          getArgumentLoweringType(ty.getASTType(), localContextParameter,
+                                  /*isNoEscape*/ true);
+
+      auto &ti = IGF.getTypeInfoForLowered(argumentLoweringType);
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
       localContextInfo = {ty, localContextParameter.getConvention()};
@@ -1998,7 +2002,6 @@ public:
       auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
       ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
     }
-  }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
