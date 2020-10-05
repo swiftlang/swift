@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 
 using namespace swift;
@@ -325,6 +326,77 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   }
 
   return nullptr;
+}
+
+CustomAttr *GlobalActorAttributeRequest::evaluate(
+    Evaluator &evaluator, Decl *decl) const {
+  ASTContext &ctx = decl->getASTContext();
+  auto dc = decl->getDeclContext();
+  CustomAttr *globalActorAttr = nullptr;
+  NominalTypeDecl *globalActorNominal = nullptr;
+
+  for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    auto mutableAttr = const_cast<CustomAttr *>(attr);
+    // Figure out which nominal declaration this custom attribute refers to.
+    auto nominal = evaluateOrDefault(ctx.evaluator,
+                                     CustomAttrNominalRequest{mutableAttr, dc},
+                                     nullptr);
+
+    // Ignore unresolvable custom attributes.
+    if (!nominal)
+      continue;
+
+    // We are only interested in global actor types.
+    if (!nominal->isGlobalActor())
+      continue;
+
+    // Only a single global actor can be applied to a given declaration.
+    if (globalActorAttr) {
+      decl->diagnose(
+          diag::multiple_global_actors, globalActorNominal->getName(),
+          nominal->getName());
+      continue;
+    }
+
+    globalActorAttr = const_cast<CustomAttr *>(attr);
+    globalActorNominal = nominal;
+  }
+
+  if (!globalActorAttr)
+    return nullptr;
+
+  // Check that a global actor attribute makes sense on this kind of
+  // declaration.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // Nominal types are okay...
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
+      if (classDecl->isActor()) {
+        // ... except for actor classes.
+        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
+            .highlight(globalActorAttr->getRangeWithAt());
+        return nullptr;
+      }
+    }
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+    // Subscripts and properties are fine...
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (var->getDeclContext()->isLocalContext()) {
+        var->diagnose(diag::global_actor_on_local_variable, var->getName())
+            .highlight(globalActorAttr->getRangeWithAt());
+        return nullptr;
+      }
+    }
+  } else if (isa<ExtensionDecl>(decl)) {
+    // Extensions are okay.
+  } else if (isa<ConstructorDecl>(decl) || isa<FuncDecl>(decl)) {
+    // Functions are okay.
+  } else {
+    // Everything else is disallowed.
+    decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
+    return nullptr;
+  }
+
+  return globalActorAttr;
 }
 
 namespace {

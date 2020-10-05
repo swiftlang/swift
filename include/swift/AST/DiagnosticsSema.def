@@ -4221,6 +4221,16 @@ NOTE(global_actor_shared_non_actor_type,none,
      "'shared' property type %0 does not conform to the 'Actor' protocol",
      (Type))
 
+ERROR(multiple_global_actors,none,
+      "declaration can not have multiple global actor attributes (%0 and %1)",
+      (Identifier, Identifier))
+ERROR(global_actor_disallowed,none,
+      "%0 cannot have a global actor", (DescriptiveDeclKind))
+ERROR(global_actor_on_actor_class,none,
+      "actor class %0 cannot have a global actor", (Identifier))
+ERROR(global_actor_on_local_variable,none,
+      "local variable %0 cannot have a global actor", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------

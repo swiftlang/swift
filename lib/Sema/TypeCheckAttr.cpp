@@ -3065,6 +3065,13 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  // If the nominal type is a global actor, let the global actor attribute
+  // retrieval request perform checking for us.
+  if (nominal->isGlobalActor()) {
+    (void)D->getGlobalActorAttr();
+    return;
+  }
+
   diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
            nominal->getDescriptiveKind(), nominal->getName());
   nominal->diagnose(diag::decl_declared_here, nominal->getName());

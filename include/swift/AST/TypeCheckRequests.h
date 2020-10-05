@@ -880,6 +880,30 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request the custom attribute which denotes the global actor for the given
+/// declaration.
+///
+/// This is the "raw" global actor attribute as written directly on the
+/// declaration, with any inference rules applied.
+class GlobalActorAttributeRequest :
+    public SimpleRequest<GlobalActorAttributeRequest,
+                         CustomAttr *(Decl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CustomAttr *
+  evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine the actor isolation for the given declaration.
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,

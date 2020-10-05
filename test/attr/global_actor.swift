@@ -5,6 +5,10 @@ import _Concurrency
 
 actor class SomeActor { }
 
+// -----------------------------------------------------------------------
+// @globalActor attribute itself.
+// -----------------------------------------------------------------------
+
 // Well-formed global actor.
 @globalActor
 struct GA1 {
@@ -43,3 +47,37 @@ extension GA6 where T: Equatable {
 class GA7 { // expected-error{{global actor 'GA7' requires a static property 'shared' that produces an actor instance}}
   static let shared = 5 // expected-note{{'shared' property type 'Int' does not conform to the 'Actor' protocol}}
 }
+
+// -----------------------------------------------------------------------
+// Applying global actors to entities.
+// -----------------------------------------------------------------------
+@globalActor
+struct OtherGlobalActor {
+  static let shared = SomeActor()
+}
+
+@GA1 func f() {
+  @GA1 let x = 17 // expected-error{{local variable 'x' cannot have a global actor}}
+  _ = x
+}
+
+@GA1 struct X { }
+
+struct Y {
+  @GA1 subscript(i: Int) -> Int { i }
+}
+
+@GA1 extension Y { }
+
+@GA1 func g() { }
+
+class SomeClass {
+  @GA1 init() { }
+  @GA1 deinit { } // expected-error{{deinitializer cannot have a global actor}}
+}
+
+@GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
+
+@GA1 actor class ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
+
+@GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}

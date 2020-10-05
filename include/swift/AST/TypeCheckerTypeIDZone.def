@@ -90,6 +90,8 @@ SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(ClassDecl *),
 SWIFT_REQUEST(TypeChecker, GlobalActorInstanceRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
+              CustomAttr *(Decl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
               ActorIsolationState(ValueDecl *),
               Cached, NoLocationInfo)

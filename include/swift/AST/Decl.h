@@ -950,6 +950,16 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// Returns true if this Decl cannot be seen by any other source file
+  bool isPrivateToEnclosingFile() const;
+
+  /// Retrieve the global actor attribute that applies to this declaration,
+  /// if any.
+  ///
+  /// This is the "raw" global actor attribute as written directly on the
+  /// declaration, with any inference rules applied.
+  CustomAttr *getGlobalActorAttr() const;
+
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
