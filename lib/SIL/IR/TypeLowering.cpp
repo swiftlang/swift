@@ -154,7 +154,7 @@ namespace {
   /// classification.
   template <class Impl, class RetTy>
   class TypeClassifierBase
-    : public CanTypeVisitor<Impl, RetTy, AbstractionPattern>
+    : public CanTypeVisitor<Impl, RetTy, AbstractionPattern, IsTypeExpansionSensitive_t>
   {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
@@ -167,9 +167,10 @@ namespace {
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
     //   RetTy handleTrivial(CanType);
-    //   RetTy handleTrivial(CanType. RecursiveProperties properties);
+    //   RetTy handleTrivial(CanType, RecursiveProperties properties);
     //   // A reference type.
-    //   RetTy handleReference(CanType);
+    //   RetTy handleReference(CanType, RecursiveProperties properties);
+    //   RetTy handleReference(CanType, RecursiveProperties properties);
     //   // Non-trivial and address-only.
     //   RetTy handleAddressOnly(CanType, RecursiveProperties properties);
     // and, if it doesn't override handleTupleType,
@@ -196,13 +197,46 @@ namespace {
     RetTy handleTrivial(CanType type) {
       return asImpl().handleTrivial(type, RecursiveProperties::forTrivial());
     }
+
     RetTy handleReference(CanType type) {
-      return asImpl().handle(type, RecursiveProperties::forReference());
+      return handleReference(type, RecursiveProperties::forReference());
+    }
+
+    RetTy handleReference(CanType type, RecursiveProperties properties) {
+      return asImpl().handle(type, properties);
+    }
+
+    RecursiveProperties
+    mergeIsTypeExpansionSensitive(IsTypeExpansionSensitive_t isSensitive,
+                                  RecursiveProperties props) {
+      if (isSensitive == IsTypeExpansionSensitive)
+        props.setTypeExpansionSensitive(isSensitive);
+      return props;
+    }
+
+    RecursiveProperties
+    getTrivialRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forTrivial());
+    }
+
+    RecursiveProperties
+    getReferenceRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forReference());
+    }
+
+    RecursiveProperties
+    getOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forOpaque());
     }
 
 #define IMPL(TYPE, LOWERING)                                                 \
-    RetTy visit##TYPE##Type(Can##TYPE##Type type, AbstractionPattern orig) { \
-      return asImpl().handle##LOWERING(type);                                \
+    RetTy visit##TYPE##Type(Can##TYPE##Type type, AbstractionPattern orig,   \
+                            IsTypeExpansionSensitive_t isSensitive) {        \
+      return asImpl().handle##LOWERING(type,                                 \
+                           get##LOWERING##RecursiveProperties(isSensitive)); \
     }
 
     IMPL(BuiltinInteger, Trivial)
@@ -222,36 +256,46 @@ namespace {
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
-                                         AbstractionPattern origType) {
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
-                                               IsAddressOnly, IsNotResilient});
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive});
     }
 
     RetTy visitAnyFunctionType(CanAnyFunctionType type,
-                               AbstractionPattern origType) {
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
       switch (type->getRepresentation()) {
       case AnyFunctionType::Representation::Swift:
       case AnyFunctionType::Representation::Block:
-        return asImpl().handleReference(type);
+        return asImpl().handleReference(
+            type, getReferenceRecursiveProperties(isSensitive));
       case AnyFunctionType::Representation::CFunctionPointer:
       case AnyFunctionType::Representation::Thin:
-        return asImpl().handleTrivial(type);
+        return asImpl().handleTrivial(
+            type, getTrivialRecursiveProperties(isSensitive));
       }
       llvm_unreachable("bad function representation");
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type,
-                               AbstractionPattern origType) {
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
       // Handle `@differentiable` and `@differentiable(linear)` functions.
       switch (type->getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         return asImpl().visitNormalDifferentiableSILFunctionType(
-            type, getNormalDifferentiableSILFunctionTypeRecursiveProperties(
-                      type, origType));
+            type, mergeIsTypeExpansionSensitive(
+                      isSensitive,
+                      getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+                          type, origType)));
       case DifferentiabilityKind::Linear:
         return asImpl().visitLinearDifferentiableSILFunctionType(
-            type, getLinearDifferentiableSILFunctionTypeRecursiveProperties(
-                      type, origType));
+            type, mergeIsTypeExpansionSensitive(
+                      isSensitive,
+                      getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+                          type, origType)));
       case DifferentiabilityKind::NonDifferentiable:
         break;
       }
@@ -260,9 +304,11 @@ namespace {
                              type->getExtInfo().getRepresentation() ==
                                  SILFunctionType::Representation::Thick;
       if (type->getExtInfo().hasContext() && !isSwiftEscaping)
-        return asImpl().handleReference(type);
+        return asImpl().handleReference(
+            type, getReferenceRecursiveProperties(isSensitive));
       // No escaping closures are trivial types.
-      return asImpl().handleTrivial(type);
+      return asImpl().handleTrivial(type,
+                                    getTrivialRecursiveProperties(isSensitive));
     }
 
     RecursiveProperties
@@ -315,48 +361,55 @@ namespace {
     }
 
     RetTy visitLValueType(CanLValueType type,
-                          AbstractionPattern origType) {
+                          AbstractionPattern origType,
+                          IsTypeExpansionSensitive_t) {
       llvm_unreachable("shouldn't get an l-value type here");
     }
     RetTy visitInOutType(CanInOutType type,
-                         AbstractionPattern origType) {
+                         AbstractionPattern origType,
+                         IsTypeExpansionSensitive_t) {
       llvm_unreachable("shouldn't get an inout type here");
     }
     RetTy visitErrorType(CanErrorType type,
-                         AbstractionPattern origType) {
-      return asImpl().handleTrivial(type);
+                         AbstractionPattern origType,
+                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleTrivial(type,
+                                    getTrivialRecursiveProperties(isSensitive));
     }
 
     // Dependent types can be lowered according to their corresponding
     // abstraction pattern.
 
-    RetTy visitAbstractTypeParamType(CanType type,
-                                     AbstractionPattern origType) {
+    RetTy visitAbstractTypeParamType(CanType type, AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
       if (origType.isTypeParameterOrOpaqueArchetype() ||
           origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
         if (origType.requiresClass()) {
-          return asImpl().handleReference(type);
+          return asImpl().handleReference(
+              type, getReferenceRecursiveProperties(isSensitive));
         } else {
-          return asImpl().handleAddressOnly(type,
-                                            RecursiveProperties::forOpaque());
+          return asImpl().handleAddressOnly(
+              type, getOpaqueRecursiveProperties(isSensitive));
         }
       } else {
         // If the abstraction pattern provides a concrete type, lower as that
         // type. This can occur if the abstraction pattern provides a more
         // constrained generic signature with more same-type constraints than
         // the original declaration whose type we're lowering.
-        return asImpl().visit(origType.getType(), origType);
+        return asImpl().visit(origType.getType(), origType, isSensitive);
       }
     }
 
     RetTy visitGenericTypeParamType(CanGenericTypeParamType type,
-                                    AbstractionPattern origType) {
-      return visitAbstractTypeParamType(type, origType);
+                                    AbstractionPattern origType,
+                                    IsTypeExpansionSensitive_t isSensitive) {
+      return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
     RetTy visitDependentMemberType(CanDependentMemberType type,
-                                   AbstractionPattern origType) {
-      return visitAbstractTypeParamType(type, origType);
+                                   AbstractionPattern origType,
+                                   IsTypeExpansionSensitive_t isSensitive) {
+      return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
     Type getConcreteReferenceStorageReferent(Type type) {
@@ -369,78 +422,102 @@ namespace {
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
-                                   AbstractionPattern origType) { \
+                                   AbstractionPattern origType, \
+                                   IsTypeExpansionSensitive_t isSensitive) { \
       return asImpl().handleAddressOnly(type, {IsNotTrivial, \
                                                IsFixedABI, \
                                                IsAddressOnly, \
-                                               IsNotResilient}); \
+                                               IsNotResilient, \
+                                               isSensitive}); \
     }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
-                                   AbstractionPattern origType) { \
-      return asImpl().handleReference(type); \
+                                   AbstractionPattern origType, \
+                                   IsTypeExpansionSensitive_t isSensitive) { \
+      return asImpl().handleReference(type, \
+                                getReferenceRecursiveProperties(isSensitive)); \
     }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     RetTy visitLoadable##Name##StorageType(Can##Name##StorageType type, \
-                                           AbstractionPattern origType) { \
-      return asImpl().handleReference(type); \
+                                           AbstractionPattern origType, \
+                                     IsTypeExpansionSensitive_t isSensitive) { \
+      return asImpl().handleReference(type, \
+                                getReferenceRecursiveProperties(isSensitive)); \
     } \
     RetTy visitAddressOnly##Name##StorageType(Can##Name##StorageType type, \
-                                              AbstractionPattern origType) { \
+                                              AbstractionPattern origType, \
+                                     IsTypeExpansionSensitive_t isSensitive) { \
       return asImpl().handleAddressOnly(type, {IsNotTrivial, \
                                                IsFixedABI, \
                                                IsAddressOnly, \
-                                               IsNotResilient}); \
+                                               IsNotResilient, \
+                                               isSensitive}); \
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
-                                   AbstractionPattern origType) { \
+                                   AbstractionPattern origType, \
+                                   IsTypeExpansionSensitive_t isSensitive) { \
       auto referentType = \
         type->getReferentType()->lookThroughSingleOptionalType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
-        return asImpl().visitLoadable##Name##StorageType(type, origType); \
+        return asImpl().visitLoadable##Name##StorageType(type, origType, \
+                                                         isSensitive); \
       } else { \
-        return asImpl().visitAddressOnly##Name##StorageType(type, origType); \
+        return asImpl().visitAddressOnly##Name##StorageType(type, origType, \
+                                                            isSensitive); \
       } \
     }
 #define UNCHECKED_REF_STORAGE(Name, ...) \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
-                                   AbstractionPattern origType) { \
-      return asImpl().handleTrivial(type); \
+                                   AbstractionPattern origType, \
+                                   IsTypeExpansionSensitive_t isSensitive) { \
+      return asImpl().handleTrivial(type, \
+                                  getTrivialRecursiveProperties(isSensitive)); \
     }
 #include "swift/AST/ReferenceStorage.def"
 
     RetTy visitOpaqueTypeArchetypeType(CanOpaqueTypeArchetypeType ty,
-                                       AbstractionPattern origType) {
+                                       AbstractionPattern origType, \
+                                       IsTypeExpansionSensitive_t) {
       auto replacedTy = substOpaqueTypesWithUnderlyingTypes(ty, Expansion);
       if (replacedTy == ty)
-        return visitArchetypeType(ty, origType);
-      return this->visit(replacedTy, origType);
+        return visitArchetypeType(ty, origType, IsTypeExpansionSensitive);
+      return this->visit(replacedTy, origType, IsTypeExpansionSensitive);
     }
 
-    RetTy visitArchetypeType(CanArchetypeType type,
-                             AbstractionPattern origType) {
+    RetTy visitArchetypeType(CanArchetypeType ty, AbstractionPattern origType) {
+      return visitArchetypeType(ty, origType, IsNotTypeExpansionSensitive);
+    }
+
+    RetTy
+    visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
+                       IsTypeExpansionSensitive_t isSensitive) {
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
-          return asImpl().handleTrivial(type);
+          return asImpl().handleTrivial(
+              type, getTrivialRecursiveProperties(isSensitive));
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          auto properties = RecursiveProperties::forTrivial();
+          auto properties = getTrivialRecursiveProperties(isSensitive);
           properties.setAddressOnly();
           return asImpl().handleAddressOnly(type, properties);
         }
 
-        if (LayoutInfo->isRefCounted())
-          return asImpl().handleReference(type);
+        if (LayoutInfo->isRefCounted()) {
+          return asImpl().handleReference(
+              type, getReferenceRecursiveProperties(isSensitive));
+        }
       }
-      return asImpl().handleAddressOnly(type, RecursiveProperties::forOpaque());
+      return asImpl().handleAddressOnly(
+          type, getOpaqueRecursiveProperties(isSensitive));
     }
 
     RetTy visitExistentialType(CanType type,
-                               AbstractionPattern origType) {
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
       switch (SILType::getPrimitiveObjectType(type)
                 .getPreferredExistentialRepresentation()) {
       case ExistentialRepresentation::None:
@@ -450,77 +527,93 @@ namespace {
         return asImpl().handleAddressOnly(type, {IsNotTrivial,
                                                  IsFixedABI,
                                                  IsAddressOnly,
-                                                 IsNotResilient});
+                                                 IsNotResilient,
+                                                 isSensitive});
       // Class-constrained and boxed existentials are refcounted.
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Boxed:
-        return asImpl().handleReference(type);
+        return asImpl().handleReference(
+            type, getReferenceRecursiveProperties(isSensitive));
       // Existential metatypes are trivial.
       case ExistentialRepresentation::Metatype:
-        return asImpl().handleTrivial(type);
+        return asImpl().handleTrivial(
+            type, getTrivialRecursiveProperties(isSensitive));
       }
 
       llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
     }
-    RetTy visitProtocolType(CanProtocolType type,
-                            AbstractionPattern origType) {
-      return visitExistentialType(type, origType);
+    RetTy visitProtocolType(CanProtocolType type, AbstractionPattern origType,
+                            IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
     }
     RetTy visitProtocolCompositionType(CanProtocolCompositionType type,
-                                       AbstractionPattern origType) {
-      return visitExistentialType(type, origType);
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
     }
 
     // Enums depend on their enumerators.
-    RetTy visitEnumType(CanEnumType type,
-                        AbstractionPattern origType) {
-      return asImpl().visitAnyEnumType(type, origType, type->getDecl());
+    RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
+                        IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
+                                       isSensitive);
     }
     RetTy visitBoundGenericEnumType(CanBoundGenericEnumType type,
-                                    AbstractionPattern origType) {
-      return asImpl().visitAnyEnumType(type, origType, type->getDecl());
+                                    AbstractionPattern origType,
+                                    IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
+                                       isSensitive);
     }
-    
+
     // Structs depend on their physical fields.
-    RetTy visitStructType(CanStructType type,
-                          AbstractionPattern origType) {
-      return asImpl().visitAnyStructType(type, origType, type->getDecl());
+    RetTy visitStructType(CanStructType type, AbstractionPattern origType,
+                          IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyStructType(type, origType, type->getDecl(),
+                                         isSensitive);
     }
     RetTy visitBoundGenericStructType(CanBoundGenericStructType type,
-                                      AbstractionPattern origType) {
-      return asImpl().visitAnyStructType(type, origType, type->getDecl());
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyStructType(type, origType, type->getDecl(),
+                                         isSensitive);
     }
 
     // Tuples depend on their elements.
-    RetTy visitTupleType(CanTupleType type,
-                         AbstractionPattern origType) {
+    RetTy visitTupleType(CanTupleType type, AbstractionPattern origType,
+                         IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties props;
       for (unsigned i = 0, e = type->getNumElements(); i < e; ++i) {
         props.addSubobject(classifyType(origType.getTupleElementType(i),
                                         type.getElementType(i),
                                         TC, Expansion));
       }
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
       return asImpl().handleAggregateByProperties(type, props);
     }
 
     RetTy visitDynamicSelfType(CanDynamicSelfType type,
-                               AbstractionPattern origType) {
-      return this->visit(type.getSelfType(), origType);
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
+      return this->visit(type.getSelfType(), origType, isSensitive);
     }
     
     RetTy visitSILBlockStorageType(CanSILBlockStorageType type,
-                                   AbstractionPattern origType) {
+                                   AbstractionPattern origType,
+                                   IsTypeExpansionSensitive_t isSensitive) {
       // Should not be loaded.
       return asImpl().handleAddressOnly(type, {IsNotTrivial,
                                                IsFixedABI,
                                                IsAddressOnly,
-                                               IsNotResilient});
+                                               IsNotResilient,
+                                               isSensitive});
     }
 
     RetTy visitSILBoxType(CanSILBoxType type,
-                          AbstractionPattern origType) {
+                          AbstractionPattern origType,
+                          IsTypeExpansionSensitive_t isSensitive) {
       // Should not be loaded.
-      return asImpl().handleReference(type);
+      return asImpl().handleReference(
+          type, getReferenceRecursiveProperties(isSensitive));
     }
 
     RetTy handleAggregateByProperties(CanType type, RecursiveProperties props) {
@@ -548,32 +641,37 @@ namespace {
 
     RecursiveProperties visitAnyEnumType(CanType type,
                                          AbstractionPattern origType,
-                                         EnumDecl *D) {
+                                         EnumDecl *D,
+                                       IsTypeExpansionSensitive_t isSensitive) {
       // We have to look through optionals here without grabbing the
       // type lowering because the way that optionals are reabstracted
       // can trip recursion checks if we try to build a lowered type.
       if (D->isOptionalDecl()) {
         return visit(type.getOptionalObjectType(),
-                     origType.getOptionalObjectType());
+                     origType.getOptionalObjectType(),
+                     isSensitive);
       }
 
       // Consult the type lowering.
       auto &lowering = TC.getTypeLowering(origType, type, Expansion);
-      return handleClassificationFromLowering(type, lowering);
+      return handleClassificationFromLowering(type, lowering, isSensitive);
     }
 
     RecursiveProperties visitAnyStructType(CanType type,
                                            AbstractionPattern origType,
-                                           StructDecl *D) {
+                                           StructDecl *D,
+                                       IsTypeExpansionSensitive_t isSensitive) {
       // Consult the type lowering.
       auto &lowering = TC.getTypeLowering(origType, type, Expansion);
-      return handleClassificationFromLowering(type, lowering);
+      return handleClassificationFromLowering(type, lowering, isSensitive);
     }
 
   private:
-    RecursiveProperties handleClassificationFromLowering(CanType type,
-                                           const TypeLowering &lowering) {
-      return handle(type, lowering.getRecursiveProperties());
+    RecursiveProperties
+    handleClassificationFromLowering(CanType type, const TypeLowering &lowering,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      return handle(type, mergeIsTypeExpansionSensitive(
+                              isSensitive, lowering.getRecursiveProperties()));
     }
   };
 } // end anonymous namespace
@@ -582,7 +680,8 @@ static RecursiveProperties classifyType(AbstractionPattern origType,
                                         CanType type,
                                         TypeConverter &tc,
                                         TypeExpansionContext expansion) {
-  return TypeClassifier(tc, expansion).visit(type, origType);
+  return TypeClassifier(tc, expansion)
+      .visit(type, origType, IsNotTypeExpansionSensitive);
 }
 
 /// True if the type, or the referenced type of an address
@@ -1292,9 +1391,10 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
-    ReferenceTypeLowering(SILType type, TypeExpansionContext forExpansion)
-      : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(),
-                                 IsReferenceCounted, forExpansion) {}
+    ReferenceTypeLowering(SILType type, RecursiveProperties properties,
+                          TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
+                                   forExpansion) {}
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
@@ -1324,8 +1424,9 @@ namespace {
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
     Loadable##Name##TypeLowering(SILType type, \
-                                 TypeExpansionContext forExpansion) \
-      : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(), \
+                                 TypeExpansionContext forExpansion, \
+                                 RecursiveProperties props) \
+      : LeafLoadableTypeLowering(type, props, \
                                  IsReferenceCounted, \
                                  forExpansion) {} \
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc, \
@@ -1436,10 +1537,11 @@ namespace {
   class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
   public:
     UnsafeValueBufferTypeLowering(SILType type,
-                                  TypeExpansionContext forExpansion)
+                                  TypeExpansionContext forExpansion,
+                                  IsTypeExpansionSensitive_t isSensitive)
       : AddressOnlyTypeLowering(type,
                                 {IsNotTrivial, IsFixedABI,
-                                 IsAddressOnly, IsNotResilient},
+                                 IsAddressOnly, IsNotResilient, isSensitive},
                                 forExpansion) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -1520,9 +1622,16 @@ namespace {
       return new (TC) TrivialTypeLowering(silType, properties, Expansion);
     }
 
+    TypeLowering *handleReference(CanType type,
+                                  RecursiveProperties properties) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      return new (TC) ReferenceTypeLowering(silType, properties, Expansion);
+    }
+
     TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC) ReferenceTypeLowering(silType, Expansion);
+      return new (TC) ReferenceTypeLowering(
+          silType, RecursiveProperties::forReference(), Expansion);
     }
 
     TypeLowering *handleAddressOnly(CanType type,
@@ -1539,30 +1648,37 @@ namespace {
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
     visit##Name##StorageType(Can##Name##StorageType type, \
-                             AbstractionPattern origType) { \
+                             AbstractionPattern origType, \
+                             IsTypeExpansionSensitive_t isSensitive) { \
       return new (TC) Loadable##Name##TypeLowering( \
                                   SILType::getPrimitiveObjectType(type), \
-                                  Expansion); \
+                                  Expansion, \
+                                getReferenceRecursiveProperties(isSensitive)); \
     }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
     visitLoadable##Name##StorageType(Can##Name##StorageType type, \
-                                     AbstractionPattern origType) { \
+                                     AbstractionPattern origType, \
+                                     IsTypeExpansionSensitive_t isSensitive) { \
       return new (TC) Loadable##Name##TypeLowering( \
                                   SILType::getPrimitiveObjectType(type), \
-                                  Expansion); \
+                                  Expansion, \
+                                getReferenceRecursiveProperties(isSensitive)); \
     }
 #include "swift/AST/ReferenceStorage.def"
 
     TypeLowering *
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type,
-                                      AbstractionPattern origType) {
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
       auto silType = SILType::getPrimitiveAddressType(type);
-      return new (TC) UnsafeValueBufferTypeLowering(silType, Expansion);
+      return new (TC)
+          UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
     }
 
     TypeLowering *visitTupleType(CanTupleType tupleType,
-                                 AbstractionPattern origType) {
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
         auto eltType = tupleType.getElementType(i);
@@ -1570,6 +1686,7 @@ namespace {
         auto &lowering = TC.getTypeLowering(origEltType, eltType, Expansion);
         properties.addSubobject(lowering.getRecursiveProperties());
       }
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
                                                                     properties);
@@ -1602,8 +1719,11 @@ namespace {
 
     TypeLowering *visitAnyStructType(CanType structType,
                                      AbstractionPattern origType,
-                                     StructDecl *D) {
+                                     StructDecl *D,
+                                     IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
+
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
@@ -1638,8 +1758,11 @@ namespace {
         
     TypeLowering *visitAnyEnumType(CanType enumType,
                                    AbstractionPattern origType,
-                                   EnumDecl *D) {
+                                   EnumDecl *D,
+                                   IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
+
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
@@ -1859,32 +1982,33 @@ TypeConverter::getSILFunctionType(TypeExpansionContext context,
       getLoweredRValueType(context, origType, substType));
 }
 
-bool TypeConverter::hasOpaqueArchetypeOrPropertiesOrCases(CanType ty) {
-  if (ty->hasOpaqueArchetype())
-    return true;
-
-  auto it = opaqueArchetypeFields.find(ty);
-  if (it == opaqueArchetypeFields.end()) {
-    bool res = ty->hasOpaqueArchetypePropertiesOrCases();
-    opaqueArchetypeFields[ty] = res;
-    return res;
-  }
-  return it->second;
-}
-
 const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType,
                                TypeExpansionContext forExpansion) {
   CanType substType = origSubstType->getCanonicalType();
-  auto origHadOpaqueTypeArchetype =
-      hasOpaqueArchetypeOrPropertiesOrCases(origSubstType->getCanonicalType());
+  bool origHasOpaqueArchetype = substType->hasOpaqueArchetype();
+  // A type is type expansion sensitive if its lowering could depend on the type
+  // expansion context:
+  // - If the type has an opaque archetype
+  //   Because depending on the type expansion context we might get a different
+  //   SIL  type (Foo<some P> vs Foo<Int>).
+  // - or if during type lowering we discover an opaque archetype that
+  //   influences type lowering by type expansion context
+  //   E.g a struct containing a field that is a opaque archetype will be
+  //   loadable or not depending on the type expansion context. In a more
+  //   permissive type expansion context we will look through the opaque
+  //   archetype and could discover a loadable type making the whole aggregate
+  //   loadable.
+  auto isTypeExpansionSensitive = origHasOpaqueArchetype
+                                      ? IsTypeExpansionSensitive
+                                      : IsNotTypeExpansionSensitive;
   auto key = getTypeKey(origType, substType, forExpansion);
   assert(!substType->is<InOutType>());
 
   auto *candidateLowering = find(key.getKeyForMinimalExpansion());
   auto *lowering = getTypeLoweringForExpansion(
-      key, forExpansion, candidateLowering, origHadOpaqueTypeArchetype);
+      key, forExpansion, candidateLowering, IsNotTypeExpansionSensitive);
   if (lowering != nullptr)
     return *lowering;
 
@@ -1902,20 +2026,19 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
-    lowering = LowerType(*this, forExpansion)
-      .visit(key.SubstType, key.OrigType);
+    lowering =
+        LowerType(*this, forExpansion)
+            .visit(key.SubstType, key.OrigType, isTypeExpansionSensitive);
 
-  // Otherwise, check the table at a key that would be used by the
-  // SILType-based lookup path for the type we just lowered to, then cache
-  // that same result at this key if possible.
+    // Otherwise, check the table at a key that would be used by the
+    // SILType-based lookup path for the type we just lowered to, then cache
+    // that same result at this key if possible.
   } else {
-    lowering = &getTypeLoweringForLoweredType(origType,
-                                              loweredSubstType,
-                                              forExpansion,
-                                              origHadOpaqueTypeArchetype);
+    lowering = &getTypeLoweringForLoweredType(
+        origType, loweredSubstType, forExpansion, isTypeExpansionSensitive);
   }
 
-  if (!lowering->isResilient() && !origHadOpaqueTypeArchetype) {
+  if (!lowering->isResilient() && !lowering->isTypeExpansionSensitive()) {
     insert(key.getKeyForMinimalExpansion(), lowering);
   } else {
     insert(key, lowering);
@@ -2099,13 +2222,12 @@ TypeConverter::getTypeLowering(SILType type,
   // The type lowering for a type parameter relies on its context.
   assert(sig || !type.getASTType()->hasTypeParameter());
   auto loweredType = type.getASTType();
-  auto origHadOpaqueTypeArchetype =
-      hasOpaqueArchetypeOrPropertiesOrCases(loweredType);
-
-  return getTypeLoweringForLoweredType(
-                       AbstractionPattern(sig, loweredType),
-                       loweredType, forExpansion,
-                       origHadOpaqueTypeArchetype);
+  auto isTypeExpansionSensitive = loweredType->hasOpaqueArchetype()
+                                      ? IsTypeExpansionSensitive
+                                      : IsNotTypeExpansionSensitive;
+  return getTypeLoweringForLoweredType(AbstractionPattern(sig, loweredType),
+                                       loweredType, forExpansion,
+                                       isTypeExpansionSensitive);
 }
 
 const TypeLowering &
@@ -2114,11 +2236,10 @@ TypeConverter::getTypeLowering(SILType t, SILFunction &F) {
                        F.getLoweredFunctionType()->getSubstGenericSignature());
 }
 
-const TypeLowering &
-TypeConverter::getTypeLoweringForLoweredType(AbstractionPattern origType,
-                                             CanType loweredType,
-                                             TypeExpansionContext forExpansion,
-                                             bool origHadOpaqueTypeArchetype) {
+const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
+    AbstractionPattern origType, CanType loweredType,
+    TypeExpansionContext forExpansion,
+    IsTypeExpansionSensitive_t isTypeExpansionSensitive) {
   assert(loweredType->isLegalSILType() && "type is not lowered!");
   (void)loweredType;
   
@@ -2133,7 +2254,7 @@ TypeConverter::getTypeLoweringForLoweredType(AbstractionPattern origType,
 
   auto *candidateLowering = find(key.getKeyForMinimalExpansion());
   auto *lowering = getTypeLoweringForExpansion(
-      key, forExpansion, candidateLowering, origHadOpaqueTypeArchetype);
+      key, forExpansion, candidateLowering, isTypeExpansionSensitive);
   if (lowering != nullptr)
     return *lowering;
 
@@ -2151,9 +2272,9 @@ TypeConverter::getTypeLoweringForLoweredType(AbstractionPattern origType,
 
   lowering =
       LowerType(*this, forExpansion)
-        .visit(loweredType, origType);
+        .visit(loweredType, origType, isTypeExpansionSensitive);
 
-  if (!lowering->isResilient() && !origHadOpaqueTypeArchetype)
+  if (!lowering->isResilient() && !lowering->isTypeExpansionSensitive())
     insert(key.getKeyForMinimalExpansion(), lowering);
   else {
     insert(key, lowering);
@@ -2169,22 +2290,23 @@ TypeConverter::getTypeLoweringForLoweredType(AbstractionPattern origType,
 /// check if its the one we want; if not, walk the list until we
 /// find the right one, returning nullptr if the caller needs to
 /// go ahead and lower the type with the correct expansion.
-const TypeLowering *TypeConverter::
-getTypeLoweringForExpansion(TypeKey key,
-                            TypeExpansionContext forExpansion,
-                            const TypeLowering *lowering,
-                            bool origHadOpaqueTypeArchetype) {
-  if (lowering == nullptr)
+const TypeLowering *TypeConverter::getTypeLoweringForExpansion(
+    TypeKey key, TypeExpansionContext forExpansion,
+    const TypeLowering *minimalExpansionLowering,
+    IsTypeExpansionSensitive_t isOrigTypeSensitive) {
+  if (minimalExpansionLowering == nullptr)
     return nullptr;
 
-  if (!lowering->isResilient() && !origHadOpaqueTypeArchetype) {
+  if (!minimalExpansionLowering->isResilient() &&
+      !minimalExpansionLowering->isTypeExpansionSensitive() &&
+      !isOrigTypeSensitive) {
     // Don't try to refine the lowering for other resilience expansions if
     // we don't expect to get a different lowering anyway. Similar if the
     // original type did not have opaque type archetypes.
     //
     // See LowerType::handleResilience() for the gory details; we only
     // set this flag if the type is resilient *and* inside our module.
-    return lowering;
+    return minimalExpansionLowering;
   }
 
   auto *exactLowering = find(key);
