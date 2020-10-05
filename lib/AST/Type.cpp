@@ -5048,27 +5048,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   return opened;
 }
 
-bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
-  if (auto *structDecl = getStructOrBoundGenericStruct()) {
-    for (auto *field : structDecl->getStoredProperties()) {
-      auto fieldTy = field->getInterfaceType()->getCanonicalType();
-      if (fieldTy->hasOpaqueArchetype() ||
-          fieldTy->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-
-  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
-    for (auto *elt : enumDecl->getAllElements()) {
-      auto eltType = elt->getInterfaceType();
-      if (eltType->hasOpaqueArchetype() ||
-          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-  return false;
-}
-
 CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
                                                    TypeExpansionContext context,
                                                    bool allowLoweredTypes) {
