@@ -555,8 +555,8 @@ namespace {
       // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
-
-      SmallVector<TupleTypeElt, 8> elts{size, elementType};
+      
+      SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());
     }
 

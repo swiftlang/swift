@@ -454,6 +454,10 @@ function set_build_options_for_host() {
             SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
             llvm_target_arch="AArch64"
             ;;
+        android-armv7)
+            SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
+            llvm_target_arch="ARM"
+            ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
             llvm_target_arch="ARM"
