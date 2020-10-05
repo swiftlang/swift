@@ -197,13 +197,13 @@ endif()
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                            DESTINATION "lib/swift/clang"
                            COMPONENT clang-builtin-headers
-                           PATTERN "*.h")
+                           FILES_MATCHING PATTERN "*.h")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                              DESTINATION "lib/swift_static/clang"
                              COMPONENT clang-builtin-headers
-                             PATTERN "*.h")
+                             FILES_MATCHING PATTERN "*.h")
 endif()
 
 
@@ -227,4 +227,4 @@ file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
 swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
-                           PATTERN "*.h")
+                           FILES_MATCHING PATTERN "*.h")
