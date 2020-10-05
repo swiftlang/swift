@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -31,6 +30,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 

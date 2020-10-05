@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckProtocol.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 

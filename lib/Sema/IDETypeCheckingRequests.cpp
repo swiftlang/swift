@@ -16,8 +16,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
+#include "swift/Sema/TypeChecker.h"
 #include "swift/Subsystems.h"
-#include "TypeChecker.h"
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 

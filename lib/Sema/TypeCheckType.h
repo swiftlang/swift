@@ -17,8 +17,10 @@
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "llvm/ADT/None.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 

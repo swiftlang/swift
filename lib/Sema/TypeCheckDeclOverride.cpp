@@ -17,7 +17,6 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
-#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
@@ -26,6 +25,8 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/TypeChecker.h"
+
 using namespace swift;
 
 static void adjustFunctionTypeForOverride(Type &type) {

@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
@@ -34,6 +33,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/TypeChecker.h"
+
 using namespace swift;
 
 /// Set each bound variable in the pattern to have an error type.

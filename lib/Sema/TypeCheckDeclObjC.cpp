@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckObjC.h"
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "swift/AST/ASTContext.h"
@@ -27,6 +26,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/TypeChecker.h"
+
 using namespace swift;
 
 #pragma mark Determine whether an entity is representable in Objective-C.

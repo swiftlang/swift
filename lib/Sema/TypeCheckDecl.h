@@ -18,11 +18,14 @@
 #ifndef SWIFT_TYPECHECKING_TYPECHECKDECL_H
 #define SWIFT_TYPECHECKING_TYPECHECKDECL_H
 
+#include "swift/Basic/Located.h"
+
 namespace swift {
 
 class ASTContext;
 class DeclContext;
 class ValueDecl;
+class PrecedenceGroupDecl;
 class Pattern;
 
 /// Walks up the override chain for \p CD until it finds an initializer that is

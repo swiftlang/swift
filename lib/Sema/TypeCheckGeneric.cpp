@@ -13,7 +13,6 @@
 // This file implements support for generics.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -26,6 +25,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;

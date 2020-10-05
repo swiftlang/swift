@@ -18,6 +18,8 @@
 #define SWIFT_SEMA_TYPOCORRECTION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "llvm/ADT/Optional.h"

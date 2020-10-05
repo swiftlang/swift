@@ -15,13 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 

@@ -13,11 +13,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/Support/raw_ostream.h"
 #include "DerivedConformances.h"
 

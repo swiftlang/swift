@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
@@ -40,6 +39,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/TypeChecker.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"

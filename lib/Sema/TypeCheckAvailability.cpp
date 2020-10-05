@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
-#include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
@@ -30,6 +29,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"

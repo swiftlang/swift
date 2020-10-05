@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "DerivedConformances.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -23,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 using namespace swift::objc_translation;

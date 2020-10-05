@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/TypeChecker.h"
 #include "ConstraintSystem.h"
 
 using namespace swift;

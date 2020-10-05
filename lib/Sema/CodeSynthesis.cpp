@@ -17,7 +17,6 @@
 #include "CodeSynthesis.h"
 
 #include "ConstraintSystem.h"
-#include "TypeChecker.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -33,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;

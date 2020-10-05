@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -24,6 +23,8 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/TypeChecker.h"
+
 using namespace swift;
 
 /// The kind of property initializer to look for

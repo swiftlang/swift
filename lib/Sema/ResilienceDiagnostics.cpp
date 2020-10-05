@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckAccess.h"
 #include "swift/AST/Attr.h"
@@ -24,6 +23,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 

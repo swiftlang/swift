@@ -9,7 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Attr.h"
@@ -21,6 +20,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/TypeChecker.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;

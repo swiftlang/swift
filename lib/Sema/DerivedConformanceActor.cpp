@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/Sema/TypeChecker.h"
+
 
 using namespace swift;
 

@@ -15,9 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
-
 #include "swift/AST/ASTWalker.h"
+#include "swift/Sema/TypeChecker.h"
 
 namespace swift {
 namespace instrumenter_support {

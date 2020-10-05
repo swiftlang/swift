@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
-#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 

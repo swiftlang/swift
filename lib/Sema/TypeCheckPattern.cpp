@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "swift/Basic/StringExtras.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/TypeChecker.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
 using namespace swift;

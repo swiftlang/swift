@@ -14,9 +14,9 @@
 // expressions.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "TypoCorrection.h"
 #include "swift/Basic/Range.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 

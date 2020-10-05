@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -22,6 +21,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/TypeChecker.h"
 #include "DerivedConformances.h"
 
 using namespace swift;

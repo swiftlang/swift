@@ -22,7 +22,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
@@ -32,6 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/TypeChecker.h"
 #include "DerivedConformances.h"
 
 using namespace swift;

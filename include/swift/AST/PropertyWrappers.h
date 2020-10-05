@@ -27,7 +27,9 @@ class ConstructorDecl;
 class CustomAttr;
 class Expr;
 class VarDecl;
+class SubscriptDecl;
 class OpaqueValueExpr;
+class PropertyWrapperValuePlaceholderExpr;
 
 /// Describes a property wrapper type.
 struct PropertyWrapperTypeInfo {

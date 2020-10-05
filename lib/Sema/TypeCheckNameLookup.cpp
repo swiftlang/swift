@@ -15,7 +15,6 @@
 // declaration of members (such as constructors).
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
@@ -23,6 +22,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
+#include "swift/Sema/TypeChecker.h"
 #include <algorithm>
 
 using namespace swift;

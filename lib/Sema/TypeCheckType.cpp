@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
@@ -42,6 +41,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Sema/TypeChecker.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"

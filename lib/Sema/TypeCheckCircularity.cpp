@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/TypeChecker.h"
 
 using namespace swift;
 
