@@ -10,19 +10,34 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(SOURCES_FOLDER ../Differentiation)
+set(DIFF_SOURCE_FILES
+    Differentiable.swift
+    DifferentialOperators.swift
+    DifferentiationUtilities.swift
+    AnyDifferentiable.swift
+    ArrayDifferentiation.swift
+    OptionalDifferentiation.swift)
+
+set(GYB_SOURCE_FILES
+    FloatingPointDifferentiation.swift.gyb
+    SIMDDifferentiation.swift.gyb)
+
+# The logic handling gyb files gets confused if we want to pull the sources
+# directly from ../Differentiation -- for now prefer copying those files
+# in the current source directory
+# A better solution would be to use symlinks, however
+# those could not readily available under Windows
+# (see https://github.com/git-for-windows/git/wiki/Symbolic-Links)
+foreach(CURRENT_FILE IN LISTS DIFF_SOURCE_FILES GYB_SOURCE_FILES)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${SOURCES_FOLDER}/${CURRENT_FILE}
+    ${CMAKE_CURRENT_SOURCE_DIR} COPYONLY)
+endforeach()
 
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  ${SOURCES_FOLDER}/Differentiable.swift
-  ${SOURCES_FOLDER}/DifferentialOperators.swift
-  ${SOURCES_FOLDER}/DifferentiationUtilities.swift
-  ${SOURCES_FOLDER}/AnyDifferentiable.swift
-  ${SOURCES_FOLDER}/ArrayDifferentiation.swift
-  ${SOURCES_FOLDER}/OptionalDifferentiation.swift
+  ${DIFF_SOURCE_FILES}
 
   GYB_SOURCES
-    ${SOURCES_FOLDER}/FloatingPointDifferentiation.swift.gyb
-    ${SOURCES_FOLDER}/SIMDDifferentiation.swift.gyb
+    ${GYB_SOURCE_FILES}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
