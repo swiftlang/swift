@@ -573,6 +573,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator,
     }
 
     case Node::Kind::Extension:
+    case Node::Kind::GenericExtension:
       mangleGenericArgs(node->getChild(1), Separator,
                         fullSubstitutionMap);
       break;
@@ -1021,6 +1022,13 @@ void Remangler::mangleExtension(Node *node) {
   if (node->getNumChildren() == 3)
     mangleChildNode(node, 2); // generic signature
   Buffer << 'E';
+}
+
+void Remangler::mangleGenericExtension(Node *node) {
+  mangleChildNode(node, 1); // context
+  mangleChildNode(node, 0); // type
+  mangleChildNode(node, 2); // generic signature
+  Buffer << 'J';
 }
 
 void Remangler::mangleAnonymousContext(Node *node) {
@@ -2662,6 +2670,7 @@ bool Demangle::isSpecialized(Node *node) {
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
+    case Node::Kind::GenericExtension:
       return isSpecialized(node->getChild(1));
 
     default:
@@ -2732,11 +2741,12 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       return unboundFunction;
     }
 
-    case Node::Kind::Extension: {
+    case Node::Kind::Extension:
+    case Node::Kind::GenericExtension: {
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
         return node;
-      NodePointer result = Factory.createNode(Node::Kind::Extension);
+      NodePointer result = Factory.createNode(node->getKind());
       result->addChild(node->getFirstChild(), Factory);
       result->addChild(getUnspecialized(parent, Factory), Factory);
       if (node->getNumChildren() == 3) {

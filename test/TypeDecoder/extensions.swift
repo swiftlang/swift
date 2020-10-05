@@ -58,3 +58,24 @@ extension Generic where T: AnyObject {
 // DEMANGLE-DECL: $s10extensions7GenericVAARlzClE18NestedViaAnyObjectV
 // CHECK-DECL: extensions.(file).Generic extension.NestedViaAnyObject
 
+// Parameterized Extensions
+
+extension<U> Generic<U?> {
+  struct Nested3 {}
+}
+
+extension<U: Proto> Generic<U> {
+  struct Nested4 {}
+}
+
+// DEMANGLE-TYPE: $s10extensions7GenericVAAqd__SgRszlJ7Nested3VyAD_GD
+// CHECK-TYPE: Generic<Optional<τ_1_0>>.Nested3
+
+// DEMANGLE-TYPE: $s10extensions7GenericVA2A5ProtoRzqd__RszlJ7Nested4Vyx_GD
+// CHECK-TYPE: Generic<τ_0_0>.Nested4
+
+// DEMANGLE-DECL: $s10extensions7GenericVAAqd__SgRszlJ7Nested3V
+// CHECK-DECL: extensions.(file).Generic extension.Nested3
+
+// DEMANGLE-DECL: $s10extensions7GenericVA2A5ProtoRzqd__RszlJ7Nested4V
+// CHECK-DECL: extensions.(file).Generic extension.Nested4
