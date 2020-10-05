@@ -858,6 +858,28 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieve the static "shared" property within a global actor that provides
+/// the actor instance representing the global actor.
+///
+/// Global actors can be applied to a declaration to indicate that the
+/// declaration operations on state that is protected by the global actor.
+class GlobalActorInstanceRequest :
+    public SimpleRequest<GlobalActorInstanceRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine the actor isolation for the given declaration.
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,

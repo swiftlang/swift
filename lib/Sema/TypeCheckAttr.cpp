@@ -323,6 +323,14 @@ public:
       return;
     }
   }
+
+  void visitGlobalActorAttr(GlobalActorAttr *attr) {
+    auto nominal = dyn_cast<NominalTypeDecl>(D);
+    if (!nominal)
+      return; // already diagnosed
+
+    (void)nominal->isGlobalActor();
+  }
 };
 } // end anonymous namespace
 

@@ -3172,6 +3172,20 @@ public:
 
   void synthesizeSemanticMembersIfNeeded(DeclName member);
 
+  /// Retrieves the static 'shared' property of a global actor type, which
+  /// is used to extract the actor instance.
+  ///
+  /// \returns the static 'shared' property for a global actor, or \c nullptr
+  /// for types that are not global actors.
+  VarDecl *getGlobalActorInstance() const;
+
+  /// Whether this type is a global actor, which can be used as an
+  /// attribute to decorate declarations for inclusion in the actor-isolated
+  /// state denoted by this type.
+  bool isGlobalActor() const {
+    return getGlobalActorInstance() != nullptr;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
