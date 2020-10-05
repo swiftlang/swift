@@ -1078,6 +1078,7 @@ private:
       case Node::Kind::Module:
         break;
       case Node::Kind::Extension:
+      case Node::Kind::GenericExtension:
         // Decode the type being extended.
         if (parentContext->getNumChildren() < 2)
           return MAKE_NODE_TYPE_ERROR(parentContext,

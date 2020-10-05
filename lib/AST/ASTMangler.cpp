@@ -1920,13 +1920,13 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     return;
 
   case DeclContextKind::ExtensionDecl: {
-    auto ExtD = cast<ExtensionDecl>(ctx);
-    auto decl = ExtD->getExtendedNominal();
+    auto ext = cast<ExtensionDecl>(ctx);
+    auto decl = ext->getExtendedNominal();
     // Recover from erroneous extension.
     if (!decl)
-      return appendContext(ExtD->getDeclContext(), useModuleName);
+      return appendContext(ext->getDeclContext(), useModuleName);
 
-    if (!ExtD->isEquivalentToExtendedContext()) {
+    if (!ext->isEquivalentToExtendedContext()) {
     // Mangle the extension if:
     // - the extension is defined in a different module from the original
     //   nominal type decl,
@@ -1936,17 +1936,22 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     // "extension is to a protocol" would no longer be a reason to use the
     // extension mangling, because an extension method implementation could be
     // resiliently moved into the original protocol itself.
-      auto sig = ExtD->getGenericSignature();
+      auto sig = ext->getGenericSignature();
       // If the extension is constrained, mangle the generic signature that
       // constrains it.
       appendAnyGenericType(decl);
-      appendModule(ExtD->getParentModule(), useModuleName);
-      if (sig && ExtD->isConstrainedExtension()) {
-        Mod = ExtD->getModuleContext();
-        auto nominalSig = ExtD->getSelfNominalTypeDecl()
+      appendModule(ext->getParentModule(), useModuleName);
+      if (sig && ext->isConstrainedExtension()) {
+        Mod = ext->getModuleContext();
+        auto nominalSig = ext->getSelfNominalTypeDecl()
                             ->getGenericSignatureOfContext();
         appendGenericSignature(sig, nominalSig);
       }
+
+      if (ext->isParameterized()) {
+        return appendOperator("J");
+      }
+
       return appendOperator("E");
     }
     return appendAnyGenericType(decl);

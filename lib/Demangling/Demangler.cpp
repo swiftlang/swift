@@ -740,7 +740,7 @@ recur:
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
     case 'D': return demangleTypeMangling();
-    case 'E': return demangleExtensionContext();
+    case 'E': return demangleExtensionContext(/*parameterized*/ false);
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
     case 'H':
@@ -762,6 +762,7 @@ recur:
       }
 
     case 'I': return demangleImplFunctionType();
+    case 'J': return demangleExtensionContext(/*parameterized*/ true);
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
     case 'M': return demangleMetatype();
@@ -1199,13 +1200,21 @@ NodePointer Demangler::demangleAnyGenericType(Node::Kind kind) {
   return NTy;
 }
 
-NodePointer Demangler::demangleExtensionContext() {
+NodePointer Demangler::demangleExtensionContext(bool isParameterized) {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Module = popModule();
   NodePointer Type = popTypeAndGetAnyGeneric();
-  NodePointer Ext = createWithChildren(Node::Kind::Extension, Module, Type);
+  NodePointer Ext;
+
+  if (isParameterized) {
+    Ext = createWithChildren(Node::Kind::GenericExtension, Module, Type);
+  } else {
+    Ext = createWithChildren(Node::Kind::Extension, Module, Type);
+  }
+
   if (GenSig)
     Ext = addChild(Ext, GenSig);
+
   return Ext;
 }
 
@@ -1639,10 +1648,11 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
 
   if (TypeListIdx < TypeLists.size()) {
     NodePointer BoundParent = nullptr;
-    if (Context->getKind() == Node::Kind::Extension) {
+    if (Context->getKind() == Node::Kind::Extension ||
+        Context->getKind() == Node::Kind::GenericExtension) {
       BoundParent = demangleBoundGenericArgs(Context->getChild(1), TypeLists,
                                              TypeListIdx);
-      BoundParent = createWithChildren(Node::Kind::Extension,
+      BoundParent = createWithChildren(Context->getKind(),
                                        Context->getFirstChild(),
                                        BoundParent);
       if (Context->getNumChildren() == 3) {

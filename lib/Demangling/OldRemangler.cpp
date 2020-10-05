@@ -1576,12 +1576,20 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   } else {
     Buffer << 'E';
   }
-  mangleEntityContext(node->begin()[0], ctx); // module
+  mangleEntityContext(node->getChild(0), ctx); // module
   if (node->getNumChildren() == 3) {
-    mangleDependentGenericSignature(node->begin()[2]); // generic sig
+    mangleDependentGenericSignature(node->getChild(2)); // generic sig
   }
 
-  mangleEntityContext(node->begin()[1], ctx); // context
+  mangleEntityContext(node->getChild(1), ctx); // context
+}
+
+void Remangler::mangleGenericExtension(Node *node, EntityContext &ctx) {
+  assert(node->getNumChildren() == 3);
+  Buffer << 'J';
+  mangleEntityContext(node->getChild(0), ctx); // module
+  mangleDependentGenericSignature(node->getChild(2)); // generic sig
+  mangleEntityContext(node->getChild(1), ctx); // context
 }
 
 void Remangler::mangleAnonymousContext(Node *node, EntityContext &ctx) {
@@ -1734,7 +1742,8 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
   }
 
   case Node::Kind::AnonymousContext:
-  case Node::Kind::Extension: {
+  case Node::Kind::Extension:
+  case Node::Kind::GenericExtension: {
     mangleGenericArgs(node->getChild(1), ctx);
     break;
   }
