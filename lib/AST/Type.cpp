@@ -3959,6 +3959,54 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   return ErrorType::get(this);
 }
 
+// This is used to dig out a concrete type for a generic parameter not found in
+// the type signature. E.g. this occurs in something like Generic<U?>.Nested
+// where U is introduced in a parameterized extension and isn't found in the
+// signature. We dig out a concrete type by walking other substitutions and
+// checking their concrete counter part if we found U defined in some other
+// context.
+class SubFinder final : public TypeWalker {
+private:
+  Type missingSub;
+  Type concreteFind;
+  SmallVector<Action, 8> actions;
+  unsigned currentIdx = 0;
+  bool done = false;
+
+public:
+  SubFinder(Type missingSub) : missingSub(missingSub) {}
+
+  Action walkToTypePre(Type t) {
+    // Replay the events if we're already done.
+    if (done) {
+      Action step = actions[currentIdx];
+      currentIdx += 1;
+
+      if (step == Action::Stop) {
+        concreteFind = t;
+      }
+
+      return step;
+    }
+
+    if (t->isEqual(missingSub)) {
+      done = true;
+      return record(Action::Stop);
+    }
+
+    return record(Action::Continue);
+  }
+
+  Action record(Action step) {
+    actions.push_back(step);
+    return step;
+  }
+
+  Type getConcreteFind() {
+    return concreteFind;
+  }
+};
+
 TypeSubstitutionMap
 TypeBase::getContextSubstitutions(const DeclContext *dc,
                                   GenericEnvironment *genericEnv) {
@@ -3995,9 +4043,8 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto params = genericSig->getGenericParams();
-  unsigned n = params.size();
 
-  while (baseTy && n > 0) {
+  while (baseTy) {
     if (baseTy->is<ErrorType>())
       break;
 
@@ -4005,21 +4052,24 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
       auto args = boundGeneric->getGenericArgs();
-      for (unsigned i = 0, e = args.size(); i < e; ++i) {
-        substitutions[params[n - e + i]->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()] = args[i];
+      auto type = boundGeneric->getAnyGeneric();
+      auto params = type->getGenericParams()->getParams();
+
+      for (unsigned i : indices(args)) {
+        auto genericTy = params[i]->getDeclaredInterfaceType()
+                                  ->getCanonicalType()
+                                  ->castTo<GenericTypeParamType>();
+        substitutions[genericTy] = args[i];
       }
 
       // Continue looking into the parent.
       baseTy = boundGeneric->getParent();
-      n -= args.size();
       continue;
     }
 
     // Continue looking into the parent.
     if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
       baseTy = protocolTy->getParent();
-      --n;
       continue;
     }
 
@@ -4034,16 +4084,66 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     break;
   }
 
-  while (n > 0) {
-    auto *gp = params[--n];
-    auto substTy = (genericEnv
-                    ? genericEnv->mapTypeIntoContext(gp)
-                    : gp);
-    auto result = substitutions.insert(
-      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-       substTy});
-    assert(result.second);
-    (void) result;
+  // Record a list of generic params that didn't have a concrete replacement.
+  SmallVector<GenericTypeParamType *, 2> missingSubs;
+  for (auto param : params) {
+    auto genericTy = param->getCanonicalType()->castTo<GenericTypeParamType>();
+
+    if (substitutions.find(genericTy) != substitutions.end()) {
+      continue;
+    }
+
+    auto replacement = genericEnv ? genericEnv->mapTypeIntoContext(param)
+                                  : param;
+
+    missingSubs.push_back(genericTy);
+    substitutions[genericTy] = replacement;
+  }
+
+  // Attempt to fish out a concrete type for missing subs, but only if we have a
+  // concrete type and the context is a parameterized extension. (This only
+  // occurs in parameterized extensions because those generic params don't show
+  // up in the type signature.)
+  auto outermostDC = dc->getOutermostSyntacticContext();
+  auto ext = dyn_cast<ExtensionDecl>(outermostDC);
+  auto isParameterized = ext ? ext->isParameterized() : false;
+  bool isSpecialized = this->isSpecialized() && !this->hasTypeParameter();
+
+  if (isParameterized && isSpecialized && !missingSubs.empty()) {
+    // FIXME: This is O(n*m) (where n is the size of missing subs and m is the
+    // size of generic parameters) which feels really bad. Is there a better
+    // way to do this?
+    for (auto param : missingSubs) {
+      for (auto source : params) {
+        if (source == param) {
+          continue;
+        }
+
+        for (auto req : genericSig->getRequirements()) {
+          if (req.getKind() != RequirementKind::SameType) continue;
+          if (!req.getFirstType()->isEqual(source)) continue;
+          if (!req.getSecondType()->hasTypeParameter()) continue;
+
+          auto secondTy = req.getSecondType();
+          auto canTy = source->getCanonicalType()
+                             ->castTo<GenericTypeParamType>();
+          auto replace = substitutions[canTy];
+
+          if (!replace->hasTypeParameter()) {
+            SubFinder findSub(param);
+
+            if (secondTy.walk(findSub)) {
+              replace.walk(findSub);
+              
+              if (findSub.getConcreteFind()) {
+                substitutions[param] = findSub.getConcreteFind();
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
   }
 
   return substitutions;

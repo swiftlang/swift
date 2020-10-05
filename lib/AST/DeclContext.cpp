@@ -247,6 +247,17 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   return nullptr;
 }
 
+DeclContext *DeclContext::getOutermostSyntacticContext() {
+  auto depth = getSyntacticDepth() - 1;
+  auto dc = this;
+
+  for (auto i = 0; i != depth; i += 1) {
+    dc = dc->getParent();
+  }
+
+  return dc;
+}
+
 DeclContext *DeclContext::getParentForLookup() const {
   if (isa<ProtocolDecl>(this) || isa<ExtensionDecl>(this)) {
     // If we are inside a protocol or an extension, skip directly
