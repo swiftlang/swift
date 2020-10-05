@@ -815,8 +815,8 @@ are helpful in such cases:
 
   - `llvm-bcanalyzer` can print (in rough form) the contents of LLVM bitcode
     streams, such as Swift module files and the PCH/PCM files clang stores its
-    serialized ASTs in. The latter requires combing `llvm-objdump` and
-    `llvm-bcanalyzer` in the following fashion: `llvm-objdump -raw-clang-ast
+    serialized ASTs in. The latter requires combining `llvm-objdump` and
+    `llvm-bcanalyzer` in the following fashion: `llvm-objdump --raw-clang-ast
     file.pcm | llvm-bcanalyzer -dump`
 
   - `llvm-dwarfdump` and `llvm-dis` can be used to print textual representations
