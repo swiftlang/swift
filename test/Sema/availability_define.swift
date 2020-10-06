@@ -58,3 +58,17 @@ func client() {
 
   if #available(_unknownMacro, *) { } // expected-error {{expected version number}}
 }
+
+@inlinable
+public func forbidMacrosInInlinableCode() {
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+}
+
+@_alwaysEmitIntoClient
+public func forbidMacrosInInlinableCode1() {
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+}

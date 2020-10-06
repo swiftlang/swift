@@ -465,6 +465,24 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   for (auto &elt : cond) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       hadAnyFalsable = true;
+
+      // Reject inlinable code using availability macros.
+      PoundAvailableInfo *info = elt.getAvailability();
+      if (auto *decl = dc->getAsDecl()) {
+        if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
+            decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          for (auto queries : info->getQueries())
+            if (auto availSpec =
+                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
+              if (availSpec->getMacroLoc().isValid()) {
+                Context.Diags.diagnose(
+                    availSpec->getMacroLoc(),
+                    swift::diag::availability_macro_in_inlinable,
+                    decl->getDescriptiveKind());
+                break;
+              }
+      }
+
       continue;
     }
 

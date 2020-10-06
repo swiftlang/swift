@@ -4922,6 +4922,10 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in inlinable %0",
+      (DescriptiveDeclKind))
+
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.

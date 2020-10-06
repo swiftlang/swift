@@ -1408,8 +1408,18 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     return makeParserError(); // Failed to match the version, that's an error.
   }
 
-  Specs.append(VersionMatch->getSecond().begin(),
-               VersionMatch->getSecond().end());
+  // Make a copy of the specs to add the macro source location
+  // for the diagnostic about the use of macros in inlinable code.
+  SourceLoc MacroLoc = Tok.getLoc();
+  for (auto *Spec : VersionMatch->getSecond())
+    if (auto *PlatformVersionSpec =
+          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+      auto SpecCopy =
+        new (Context) PlatformVersionConstraintAvailabilitySpec(
+                                                       *PlatformVersionSpec);
+      SpecCopy->setMacroLoc(MacroLoc);
+      Specs.push_back(SpecCopy);
+    }
 
   return makeParserSuccess();
 }
