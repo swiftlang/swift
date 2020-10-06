@@ -1364,7 +1364,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
     HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
     DEST_LIB_CLANG_DIR="${clang_dest_dir}/lib/clang"
 
-    [ -d "${HOST_LIB_CLANG_DIR}" -a -d "${DEST_LIB_CLANG_DIR}" ] || return
+    [ -d "${HOST_LIB_CLANG_DIR}" -a -d "${DEST_LIB_CLANG_DIR}" ] || return 0
 
     DEST_CXX_BUILTINS_VERSION=$(ls -1 "${DEST_LIB_CLANG_DIR}")
     DEST_BUILTINS_DIR="${clang_dest_dir}/lib/clang/${DEST_CXX_BUILTINS_VERSION}/lib/darwin"
