@@ -1220,18 +1220,6 @@ public:
     Address addr = errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
     return addr.getAddress();
   }
-  llvm::Value *getErrorResultAddrForCall() {
-    auto errorLayout = layout.getErrorLayout();
-    auto &ti = cast<LoadableTypeInfo>(errorLayout.getType());
-    auto allocaAddr = ti.allocateStack(IGF, layout.getErrorType(), "arg");
-    auto addrInContext =
-        layout.getErrorLayout().project(IGF, dataAddr, /*offsets*/ llvm::None);
-    Explosion explosion;
-    ti.loadAsTake(IGF, addrInContext, explosion);
-    ti.initialize(IGF, explosion, allocaAddr.getAddress(),
-                  /*isOutlined*/ false);
-    return allocaAddr.getAddress().getAddress();
-  }
   llvm::Value *getContext() override {
     auto contextLayout = layout.getLocalContextLayout();
     Address addr = contextLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
