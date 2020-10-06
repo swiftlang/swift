@@ -72,14 +72,6 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
                                                       scopeCreator);
 }
 
-bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
-  const auto r = getSourceRangeOfThisASTNode();
-  (void)r;
-  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start),
-                 "Range is backwards.");
-  return true;
-}
-
 /// If the \p loc is in a new buffer but \p range is not, consider the location
 /// is at the start of replaced range. Otherwise, returns \p loc as is.
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,

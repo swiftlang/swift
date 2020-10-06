@@ -572,7 +572,6 @@ public:
 #define VISIT_AND_IGNORE(What)                                                 \
   NullablePtr<ASTScopeImpl> visit##What(What *w, ASTScopeImpl *p,              \
                                         ScopeCreator &) {                      \
-    p->widenSourceRangeForIgnoredASTNode(w);                                   \
     return p;                                                                  \
   }
 
@@ -766,10 +765,9 @@ public:
 
   NullablePtr<ASTScopeImpl> visitExpr(Expr *expr, ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
-    if (expr) {
-      p->widenSourceRangeForIgnoredASTNode(expr);
+    if (expr)
       scopeCreator.addExprToScopeTree(expr, p);
-    }
+
     return p;
   }
 };
@@ -894,7 +892,6 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
     haveAddedCleanup = true;
   }
   storedChildren.push_back(child);
-  clearCachedSourceRangesOfMeAndAncestors();
 }
 
 #pragma mark implementations of expansion

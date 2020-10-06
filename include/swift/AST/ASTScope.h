@@ -141,21 +141,12 @@ private:
   ASTScopeImpl *parent = nullptr; // null at the root
 
   /// Child scopes, sorted by source range.
-  /// Must clear source range change whenever this changes
   Children storedChildren;
 
   bool wasExpanded = false;
 
   /// Can clear storedChildren, so must remember this
   bool haveAddedCleanup = false;
-
-  // Must be updated after last child is added and after last child's source
-  // position is known
-  mutable Optional<SourceRange> cachedSourceRange;
-
-  // When ignoring ASTNodes in a scope, they still must count towards a scope's
-  // source range. So include their ranges here
-  SourceRange sourceRangeOfIgnoredASTNodes;
 
   mutable Optional<CharSourceRange> cachedCharSourceRange;
 
@@ -194,9 +185,6 @@ protected:
 public:
   void addChild(ASTScopeImpl *child, ASTContext &);
 
-private:
-  NullablePtr<ASTScopeImpl> getPriorSibling() const;
-
 public:
   void preOrderDo(function_ref<void(ASTScopeImpl *)>);
   /// Like preorderDo but without myself.
@@ -205,67 +193,15 @@ public:
 
 #pragma mark - source ranges
 
-#pragma mark - source range queries
-
 public:
   /// Return signum of ranges. Centralize the invariant that ASTScopes use ends.
   static int compare(SourceRange, SourceRange, const SourceManager &,
                      bool ensureDisjoint);
 
-  SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
-
   CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
                                             bool omitAssertions = false) const;
   bool isCharSourceRangeCached() const;
 
-  /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
-  /// getSourceRange with the starting point. But we might be asked to lookup an
-  /// identifer within one of them. So, find the real source range of them here.
-  SourceRange getEffectiveSourceRange(ASTNode) const;
-
-  void computeAndCacheSourceRangeOfScope(bool omitAssertions = false) const;
-  bool isSourceRangeCached(bool omitAssertions = false) const;
-
-  bool checkSourceRangeOfThisASTNode() const;
-
-  /// For debugging
-  bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
-                      StringRef className = "");
-
-  unsigned countDescendants() const;
-
-  /// Make sure that when the argument is executed, there are as many
-  /// descendants after as before.
-  void assertThatTreeDoesNotShrink(function_ref<void()>);
-
-private:
-  SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
-  SourceRange
-  computeSourceRangeOfScopeWithChildASTNodes(bool omitAssertions = false) const;
-  bool ensureNoAncestorsSourceRangeIsCached() const;
-
-#pragma mark - source range adjustments
-private:
-  SourceRange widenSourceRangeForIgnoredASTNodes(SourceRange range) const;
-
-  /// If the scope refers to a Decl whose source range tells the whole story,
-  /// for example a NominalTypeScope, it is not necessary to widen the source
-  /// range by examining the children. In that case we could just return
-  /// the childlessRange here.
-  /// But, we have not marked such scopes yet. Doing so would be an
-  /// optimization.
-  SourceRange widenSourceRangeForChildren(SourceRange range,
-                                          bool omitAssertions) const;
-
-  /// Even ASTNodes that do not form scopes must be included in a Scope's source
-  /// range. Widen the source range of the receiver to include the (ignored)
-  /// node.
-  void widenSourceRangeForIgnoredASTNode(ASTNode);
-
-private:
-  void clearCachedSourceRangesOfMeAndAncestors();
-
-public: // public for debugging
   /// Returns source range of this node alone, without factoring in any
   /// children.
   virtual SourceRange
@@ -331,19 +267,11 @@ protected:
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
 
-private:
-  /// Compare the pre-expasion range with the post-expansion range and return
-  /// false if lazyiness couild miss lookups.
-  bool checkLazySourceRange(const ASTContext &) const;
-
 public:
   /// Some scopes can be expanded lazily.
-  /// Such scopes must: not change their source ranges after expansion, and
-  /// their expansion must return an insertion point outside themselves.
-  /// After a node is expanded, its source range (getSourceRangeofThisASTNode
-  /// union children's ranges) must be same as this.
+  /// Such scopes must return an insertion point outside themselves when
+  /// expanded.
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
-  virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 private:
   virtual ScopeCreator &getScopeCreator();
@@ -547,8 +475,6 @@ public:
 
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
-  virtual SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const = 0;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
@@ -572,8 +498,6 @@ public:
 
     NullablePtr<ASTScopeImpl>
     insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-    SourceRange
-    sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
   };
 
   /// GenericTypeOrExtension = GenericType or Extension
@@ -605,8 +529,6 @@ public:
 
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-  SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// Behavior specific to representing the Body of a NominalTypeDecl or
@@ -624,8 +546,6 @@ public:
 
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-  SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// GenericType or Extension scope
@@ -722,7 +642,6 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-  SourceRange sourceRangeForDeferredExpansion() const override;
 
   void countBodies(ScopeCreator &) const;
 };
@@ -931,7 +850,6 @@ protected:
 public:
   std::string getClassName() const override;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
