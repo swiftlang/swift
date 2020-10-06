@@ -908,6 +908,14 @@ struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
 
+  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
+
+  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
+      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
+
+  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
+      : typeLoc(typeLoc), purpose(purpose) {}
+
   Type getType() const { return typeLoc.getType(); }
 };
 

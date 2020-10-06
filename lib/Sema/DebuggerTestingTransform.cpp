@@ -29,6 +29,7 @@
 #include "swift/Subsystems.h"
 
 #include "TypeChecker.h"
+#include "ConstraintSystem.h"
 
 using namespace swift;
 
@@ -244,7 +245,8 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
+    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext(),
+                                          /*contextualInfo=*/{}))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
     // Captures have to be computed after the closure is type-checked. This

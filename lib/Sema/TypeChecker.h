@@ -51,6 +51,7 @@ namespace constraints {
   class Solution;
   class SolutionApplicationTarget;
   class SolutionResult;
+  struct ContextualTypeInfo;
 }
 
 /// Special-case type checking semantics for certain declarations.
@@ -549,21 +550,18 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 /// \param expr The expression to type-check, which will be modified in
 /// place.
 ///
-/// \param convertTypePurpose When convertType is specified, this indicates
+/// \param contextualInfo The type that the expression is being converted to,
+/// or null if the expression is standalone. When convertType is specified, this indicates
 /// what the conversion is doing.  This allows diagnostics generation to
 /// produce more specific and helpful error messages when the conversion fails
 /// to be possible.
-///
-/// \param convertType The type that the expression is being converted to,
-/// or null if the expression is standalone.
 ///
 /// \param options Options that control how type checking is performed.
 ///
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                         Type convertType = Type(),
-                         ContextualTypePurpose convertTypePurpose = CTP_Unused,
+                         constraints::ContextualTypeInfo contextualInfo,
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
 Optional<constraints::SolutionApplicationTarget>

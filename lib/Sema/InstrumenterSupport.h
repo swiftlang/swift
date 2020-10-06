@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-
+#include "ConstraintSystem.h"
 #include "swift/AST/ASTWalker.h"
 
 namespace swift {

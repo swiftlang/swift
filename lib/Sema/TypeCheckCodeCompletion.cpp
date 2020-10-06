@@ -962,8 +962,8 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
 
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
-                                                   CTP_Unused);
+  auto resultTy =
+      TypeChecker::typeCheckExpression(parsedExpr, DC, /*contextualInfo=*/{});
   return !resultTy;
 }
 

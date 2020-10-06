@@ -781,9 +781,8 @@ public:
       }
     }
 
-    auto exprTy = TypeChecker::typeCheckExpression(E, DC,
-                                                   ResultTy,
-                                                   ctp, options);
+    auto exprTy =
+        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -844,8 +843,7 @@ public:
       }
 
       TypeChecker::typeCheckExpression(exprToCheck, DC,
-                                       contextType,
-                                       contextTypePurpose);
+                                       {contextType, contextTypePurpose});
 
       // Propagate the change into the inout expression we stripped before.
       if (inout) {
@@ -867,10 +865,9 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
     if (!exnType) return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, exnType,
-                                     CTP_ThrowStmt);
+    TypeChecker::typeCheckExpression(E, DC, {exnType, CTP_ThrowStmt});
     TS->setSubExpr(E);
-    
+
     return TS;
   }
 
@@ -885,7 +882,7 @@ public:
     TypeChecker::typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
-    TypeChecker::typeCheckExpression(theCall, DC);
+    TypeChecker::typeCheckExpression(theCall, DC, /*contextualInfo=*/{});
     DS->setCallExpr(theCall);
 
     return DS;
@@ -1159,7 +1156,8 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
-    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC,
+                                                     /*contextualInfo=*/{});
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr =
             TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
@@ -1519,7 +1517,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     }
 
     auto resultTy =
-        TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
+        TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
 
     // If a closure expression is unused, the user might have intended to write
     // "do { ... }".
@@ -1619,9 +1617,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
-  auto resultTy =
-      TypeChecker::typeCheckExpression(r, ctor, Type(), CTP_Unused,
-                                       TypeCheckExprFlags::IsDiscarded);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      r, ctor, /*contextualInfo=*/{}, TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
