@@ -994,10 +994,8 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeAssert(SF, "Must already have a SourceFile.");
   ArrayRef<Decl *> decls = SF->getTopLevelDecls();
-  // Assume that decls are only added at the end, in source order
-  Optional<SourceLoc> endLoc = None;
-  if (!decls.empty())
-    endLoc = decls.back()->getEndLoc();
+
+  SourceLoc endLoc = getSourceRangeOfThisASTNode().End;
 
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
