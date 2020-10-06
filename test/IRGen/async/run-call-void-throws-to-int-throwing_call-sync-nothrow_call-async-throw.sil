@@ -1,0 +1,153 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+sil @$ss5ErrorPsE5_codeSivg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int
+sil @$ss5ErrorPsE9_userInfoyXlSgvg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned Optional<AnyObject>
+sil @$ss5ErrorPsE7_domainSSvg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+
+struct E : Error {
+  @_hasStorage let code: Int64 { get }
+  init(code: Int64)
+}
+
+sil hidden @E_init : $@convention(method) (Int64, @thin E.Type) -> E {
+bb0(%int : $Int64, %E_type : $@thin E.Type):
+  %instance = struct $E (%int : $Int64)
+  return %instance : $E
+}
+
+sil private [transparent] [thunk] @S_domain_getter : $@convention(witness_method: Error) (@in_guaranteed E) -> @owned String {
+bb0(%0 : $*E):
+  %1 = function_ref @$ss5ErrorPsE7_domainSSvg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+  %2 = apply %1<E>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+  return %2 : $String
+}
+
+
+sil private [transparent] [thunk] @S_code_getter : $@convention(witness_method: Error) (@in_guaranteed E) -> Int {
+bb0(%0 : $*E):
+  %1 = function_ref @$ss5ErrorPsE5_codeSivg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int
+  %2 = apply %1<E>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int
+  return %2 : $Int
+}
+
+sil private [transparent] [thunk] @S_userinfo_getter : $@convention(witness_method: Error) (@in_guaranteed E) -> @owned Optional<AnyObject> {
+bb0(%0 : $*E):
+  %1 = function_ref @$ss5ErrorPsE9_userInfoyXlSgvg : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned Optional<AnyObject>
+  %2 = apply %1<E>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned Optional<AnyObject>
+  return %2 : $Optional<AnyObject>
+}
+
+sil_witness_table hidden E: Error module main {
+  method #Error._domain!getter: <Self where Self : Error> (Self) -> () -> String : @S_domain_getter
+  method #Error._code!getter: <Self where Self : Error> (Self) -> () -> Int : @S_code_getter
+  method #Error._userInfo!getter: <Self where Self : Error> (Self) -> () -> AnyObject? : @S_userinfo_getter
+}
+
+
+sil hidden @call : $@convention(thin) () -> () {
+bb0:
+  %voidThrowsToInt = function_ref @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
+  try_apply %voidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal bb1, error bb3
+
+bb1(%result_int : $Int64):
+  br bb2
+
+bb2:
+  %out = tuple ()
+  return %out : $()
+
+bb3(%result_error : $Error):
+  %error = alloc_stack $Error
+  strong_retain %result_error : $Error
+  store %result_error to %error : $*Error
+  %instance = alloc_stack $E
+  checked_cast_addr_br copy_on_success Error in %error : $*Error to E in %instance : $*E, bb4, bb5
+
+bb4:
+  dealloc_stack %instance : $*E
+  destroy_addr %error : $*Error
+  dealloc_stack %error : $*Error
+  %int_addr = struct_element_addr %instance : $*E, #E.code
+  %Int64 = load %int_addr : $*Int64
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %result = apply %printInt64(%Int64) : $@convention(thin) (Int64) -> ()
+  br bb2
+
+bb5:
+  dealloc_stack %instance : $*E
+  destroy_addr %error : $*Error
+  dealloc_stack %error : $*Error
+  br bb2
+}
+
+// CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
+entry:
+  %syncVoidThrowsToInt = function_ref @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error)
+  try_apply %syncVoidThrowsToInt() : $@convention(thin) () -> (Int64, @error Error), normal success1, error error1
+success1(%out1 : $Int64):
+  %asyncVoidThrowsToInt = function_ref @asyncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
+  try_apply %asyncVoidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal success2, error error2
+success2(%out : $Int64):
+  return %out : $Int64
+error1(%error1 : $Error):
+  br error(%error1 : $Error)
+error2(%error2 : $Error):
+  br error(%error2 : $Error)
+error(%error : $Error):
+  throw %error : $Error
+}
+
+sil hidden @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error) {
+bb0:
+  %int_literal = integer_literal $Builtin.Int64, 1          // user: %2
+  %Int64 = struct $Int64 (%int_literal : $Builtin.Int64)          // user: %3
+  return %Int64 : $Int64
+}
+
+sil hidden @asyncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
+bb0:
+  %e_type = metatype $@thin E.Type
+  %int_literal = integer_literal $Builtin.Int64, 42
+  %Int64 = struct $Int64 (%int_literal : $Builtin.Int64)
+  %E_init = function_ref @E_init : $@convention(method) (Int64, @thin E.Type) -> E
+  %instance = apply %E_init(%Int64, %e_type) : $@convention(method) (Int64, @thin E.Type) -> E
+  %error = alloc_existential_box $Error, $E
+  %instance_addr = project_existential_box $E in %error : $Error
+  store %instance to %instance_addr : $*E
+  %result = builtin "willThrow"(%error : $Error) : $()
+  throw %error : $Error
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 42
+  %result = apply %call() : $@convention(thin) () -> ()
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+
+
+
+
+

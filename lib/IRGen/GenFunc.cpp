@@ -189,6 +189,7 @@ namespace {
   class FuncTypeInfo :
       public ScalarPairTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
       public FuncSignatureInfo {
+  protected:
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits,
                  IsPOD_t pod)
@@ -655,7 +656,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         out);
 }
 
-static CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
+CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
                                        bool isNoEscape) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.

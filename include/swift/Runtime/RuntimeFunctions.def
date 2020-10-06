@@ -1461,6 +1461,22 @@ FUNCTION(GetTypeByMangledNameInContextInMetadataState,
               Int8PtrPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// void *swift_taskAlloc(SwiftTask *task, size_t size);
+FUNCTION(TaskAlloc,
+         swift_taskAlloc, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(SwiftTaskPtrTy, SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void swift_taskDealloc(SwiftTask *task, void *ptr);
+FUNCTION(TaskDealloc,
+         swift_taskDealloc, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
