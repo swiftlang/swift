@@ -1079,7 +1079,8 @@ class TestData : TestDataSuper {
 
     func test_rangeOfDataProtocol() {
         // https://bugs.swift.org/browse/SR-10689
-        
+        guard #available(macOS 11, iOS 14, watchOS 7, tvOS 14, *) else { return }
+
         let base = Data([0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03,
                          0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03])
         let subdata = base[10..<13] // [0x02, 0x03, 0x00]
