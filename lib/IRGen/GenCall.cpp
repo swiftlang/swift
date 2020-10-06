@@ -1890,8 +1890,9 @@ CallEmission::CallEmission(CallEmission &&other)
     LastArgWritten(other.LastArgWritten),
     EmittedCall(other.EmittedCall) {
   // Prevent other's destructor from asserting.
-  LastArgWritten = 0;
-  EmittedCall = true;
+  other.LastArgWritten = 0;
+  other.EmittedCall = true;
+  other.Temporaries.clear();
 }
 
 CallEmission::~CallEmission() {
