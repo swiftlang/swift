@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "TypeChecker.h"
 #include "llvm/ADT/SetVector.h"
 #include <tuple>
 

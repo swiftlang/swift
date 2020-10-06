@@ -24,16 +24,20 @@
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
-#include "TypeChecker.h"
+#include "SolutionResult.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
@@ -49,14 +53,31 @@
 namespace swift {
 
 class Expr;
+class FuncDecl;
+class BraseStmt;
+enum class TypeCheckExprFlags;
 
 namespace constraints {
 
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
+class SolutionApplicationTarget;
 
 } // end namespace constraints
+
+// Forward declare some TypeChecker related functions
+// so they could be made friends of ConstraintSystem.
+namespace TypeChecker {
+
+Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+                                                        Type builderType);
+
+Optional<constraints::SolutionApplicationTarget>
+typeCheckExpression(constraints::SolutionApplicationTarget &target,
+                    OptionSet<TypeCheckExprFlags> options);
+
+} // end namespace TypeChecker
 
 } // end namespace swift
 
@@ -2730,9 +2751,10 @@ private:
   friend Optional<BraceStmt *>
   swift::TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
+
   friend Optional<SolutionApplicationTarget>
-  swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
-                                          TypeCheckExprOptions options);
+  swift::TypeChecker::typeCheckExpression(
+      SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
