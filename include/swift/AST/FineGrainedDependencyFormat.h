@@ -136,7 +136,8 @@ bool writeFineGrainedDependencyGraphToPath(DiagnosticEngine &diags,
                                            const SourceFileDepGraph &g);
 
 void writeFineGrainedDependencyGraph(llvm::BitstreamWriter &Out,
-                                     const SourceFileDepGraph &g);
+                                     const SourceFileDepGraph &g,
+                                     bool standalone);
 
 } // namespace fine_grained_dependencies
 } // namespace swift
