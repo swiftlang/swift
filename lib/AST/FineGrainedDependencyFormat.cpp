@@ -571,17 +571,17 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
     SourceFileDepGraph &g) {
   if (!checkModuleSignature(Cursor, {0xE2, 0x9C, 0xA8, 0x0E}) ||
       !enterTopLevelModuleBlock(Cursor, llvm::bitc::FIRST_APPLICATION_BLOCKID, false)) {
-    return false;
+    return true;
   }
 
   llvm::BitstreamEntry topLevelEntry;
-  bool ReadFineGrainedDependencies = false;
+  bool DidNotReadFineGrainedDependencies = true;
   while (!Cursor.AtEndOfStream()) {
     llvm::Expected<llvm::BitstreamEntry> maybeEntry =
         Cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       consumeError(maybeEntry.takeError());
-      return false;
+      return true;
     }
     topLevelEntry = maybeEntry.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
@@ -592,13 +592,13 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
       if (llvm::Error Err =
               Cursor.EnterSubBlock(INCREMENTAL_INFORMATION_BLOCK_ID)) {
         consumeError(std::move(Err));
-        return false;
+        return true;
       }
       if (readFineGrainedDependencyGraph(g, Purpose::ForSwiftModule)) {
         break;
       }
 
-      ReadFineGrainedDependencies = true;
+      DidNotReadFineGrainedDependencies = false;
       break;
     }
 
@@ -606,11 +606,11 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (Cursor.SkipBlock()) {
-        return false;
+        return true;
       }
       break;
     }
   }
 
-  return ReadFineGrainedDependencies;
+  return DidNotReadFineGrainedDependencies;
 }
