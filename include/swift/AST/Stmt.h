@@ -632,17 +632,17 @@ public:
 ///
 class GuardStmt : public LabeledConditionalStmt {
   SourceLoc GuardLoc;
-  Stmt *Body;
+  BraceStmt *Body;
   
 public:
   GuardStmt(SourceLoc GuardLoc, StmtCondition Cond,
-            Stmt *Body, Optional<bool> implicit = None)
+            BraceStmt *Body, Optional<bool> implicit = None)
   : LabeledConditionalStmt(StmtKind::Guard,
                            getDefaultImplicitFlag(implicit, GuardLoc),
                            LabeledStmtInfo(), Cond),
     GuardLoc(GuardLoc), Body(Body) {}
   
-  GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
+  GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
             Optional<bool> implicit, ASTContext &Ctx);
   
   SourceLoc getGuardLoc() const { return GuardLoc; }
@@ -654,8 +654,8 @@ public:
     return Body->getEndLoc();
   }
   
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *s) { Body = s; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }

@@ -380,7 +380,7 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
            implicit) {
 }
 
-GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
+GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
                      Optional<bool> implicit, ASTContext &Ctx)
   : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
     

@@ -912,7 +912,7 @@ public:
   Stmt *visitGuardStmt(GuardStmt *GS) {
     typeCheckConditionForStatement(GS, DC);
 
-    Stmt *S = GS->getBody();
+    BraceStmt *S = GS->getBody();
     typeCheckStmt(S);
     GS->setBody(S);
     return GS;

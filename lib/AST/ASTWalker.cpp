@@ -1478,7 +1478,7 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   if (doIt(US->getCond()))
     return nullptr;
   
-  if (Stmt *S2 = doIt(US->getBody()))
+  if (BraceStmt *S2 = cast_or_null<BraceStmt>(doIt(US->getBody())))
     US->setBody(S2);
   else
     return nullptr;
