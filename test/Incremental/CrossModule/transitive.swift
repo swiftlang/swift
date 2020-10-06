@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/transitive/* %t
 
+// rdar://problem/70012853
+// XFAIL: OS=windows-msvc
+
 //
 // This test establishes a "transitive" chain of modules that import one another
 // and ensures that a cross-module incremental build rebuilds all modules
