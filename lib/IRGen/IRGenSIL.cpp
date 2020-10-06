@@ -1207,6 +1207,14 @@ class AsyncNativeCCEntryPointArgumentEmission final
   /*const*/ AsyncContextLayout layout;
   const Address dataAddr;
 
+  llvm::Value *loadValue(ElementLayout layout) {
+    Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    Explosion explosion;
+    ti.loadAsTake(IGF, addr, explosion);
+    return explosion.claimNext();
+  }
+
 public:
   AsyncNativeCCEntryPointArgumentEmission(IRGenSILFunction &IGF,
                                           SILBasicBlock &entry,
@@ -1222,22 +1230,15 @@ public:
   }
   llvm::Value *getContext() override {
     auto contextLayout = layout.getLocalContextLayout();
-    Address addr = contextLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto &ti = cast<LoadableTypeInfo>(contextLayout.getType());
-    Explosion explosion;
-    ti.loadAsTake(IGF, addr, explosion);
-    return explosion.claimNext();
+    return loadValue(contextLayout);
   }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
     assert(size > 0);
     Explosion result;
     for (unsigned i = index, end = index + size; i < end; ++i) {
       auto argumentLayout = layout.getArgumentLayout(i);
-      auto addr = argumentLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(argumentLayout.getType());
-      Explosion explosion;
-      ti.loadAsTake(IGF, addr, explosion);
-      result.add(explosion.claimAll());
+      auto *value = loadValue(argumentLayout);
+      result.add(value);
     }
     return result;
   }
@@ -1249,30 +1250,15 @@ public:
   }
   llvm::Value *getIndirectResult(unsigned index) override {
     auto fieldLayout = layout.getIndirectReturnLayout(index);
-    Address fieldAddr =
-        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-    Explosion explosion;
-    ti.loadAsTake(IGF, fieldAddr, explosion);
-    return explosion.claimNext();
+    return loadValue(fieldLayout);
   };
   llvm::Value *getSelfWitnessTable() override {
     auto fieldLayout = layout.getSelfWitnessTableLayout();
-    Address fieldAddr =
-        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-    Explosion explosion;
-    ti.loadAsTake(IGF, fieldAddr, explosion);
-    return explosion.claimNext();
+    return loadValue(fieldLayout);
   }
   llvm::Value *getSelfMetadata() override {
     auto fieldLayout = layout.getSelfMetadataLayout();
-    Address fieldAddr =
-        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-    Explosion explosion;
-    ti.loadAsTake(IGF, fieldAddr, explosion);
-    return explosion.claimNext();
+    return loadValue(fieldLayout);
   }
   llvm::Value *getCoroutineBuffer() override {
     llvm_unreachable("unimplemented");
