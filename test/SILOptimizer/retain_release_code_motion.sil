@@ -718,6 +718,65 @@ bb2:
   return %9999 : $()
 }
 
+// Don't remove a retain of an AnyObject which comes from a metatype.
+//
+// CHECK-LABEL: sil @conditional_metatype_cast
+// CHECK: bb2([[ARG:%[0-9]+]] : $AnyObject):
+// CHECK: strong_retain [[ARG]]
+// CHECK: checked_cast_addr_br
+// CHECK: } // end sil function 'conditional_metatype_cast'
+sil @conditional_metatype_cast : $@convention(thin) () -> AnyObject {
+bb0:
+  %0 = metatype $@thick Int.Type
+  checked_cast_br %0 : $@thick Int.Type to AnyObject, bb2, bb1
+
+bb1:
+  unreachable
+
+bb2(%6 : $AnyObject):
+  strong_retain %6 : $AnyObject
+  %9 = alloc_stack $AnyObject
+  store %6 to %9 : $*AnyObject
+  %11 = alloc_stack $@thick Int.Type
+  checked_cast_addr_br take_always AnyObject in %9 : $*AnyObject to Int.Type in %11 : $*@thick Int.Type, bb3, bb4
+
+bb3:
+  dealloc_stack %11 : $*@thick Int.Type
+  dealloc_stack %9 : $*AnyObject
+  return %6 : $AnyObject
+
+bb4:
+  unreachable
+}
+
+// Don't remove a retain of an AnyObject which comes from a metatype.
+//
+// CHECK-LABEL: sil @unconditional_metatype_cast
+// CHECK: [[O:%[0-9]+]] = unconditional_checked_cast
+// CHECK: strong_retain [[O]]
+// CHECK: checked_cast_addr_br
+// CHECK: } // end sil function 'unconditional_metatype_cast'
+sil @unconditional_metatype_cast : $@convention(thin) () -> AnyObject {
+bb0:
+  %0 = metatype $@thick Int.Type
+  %6 = unconditional_checked_cast %0 : $@thick Int.Type to AnyObject
+  strong_retain %6 : $AnyObject
+  %9 = alloc_stack $AnyObject
+  store %6 to %9 : $*AnyObject
+  %11 = alloc_stack $@thick Int.Type
+  checked_cast_addr_br take_always AnyObject in %9 : $*AnyObject to Int.Type in %11 : $*@thick Int.Type, bb3, bb4
+
+bb3:
+  dealloc_stack %11 : $*@thick Int.Type
+  dealloc_stack %9 : $*AnyObject
+  return %6 : $AnyObject
+
+bb4:
+  unreachable
+}
+
+
+
 // Hoist releases above dealloc_stack
 // CHECK-LABEL: sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject) -> () {
 // CHECK: bb0(%0 : $AnyObject):
