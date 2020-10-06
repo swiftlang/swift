@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -2471,6 +2472,15 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                                    calleeLV, selfValue,
                                    site.getSubstitutionMap(),
                                    &witnessMetadata, llArgs);
+
+  // Check if this call site has a callee marked
+  // with the musttail semantics attribute
+  // if it is then mark the emmision.
+  if (SILFunction *f = site.getReferencedFunctionOrNull()) {
+    if (f->hasSemanticsAttr(semantics::MUST_TAIL)) {
+      emission.setMustTail();
+    }
+  }
 
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
