@@ -17,7 +17,6 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
-#include "ConstraintSystem.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
@@ -917,8 +916,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // FIXME: Since we're not resolving overloads or anything, we should be
     // building fully type-checked AST above; we already have all the
     // information that we need.
-    if (!TypeChecker::typeCheckExpression(lookupExpr, accessor,
-                                          /*contextualInfo=*/{}))
+    if (!TypeChecker::typeCheckExpression(lookupExpr, accessor))
       return nullptr;
 
     // Make sure we produce an lvalue only when desired.

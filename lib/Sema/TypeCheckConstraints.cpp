@@ -594,7 +594,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // re-typecheck it.
   if (expr->getType() && expr->getType()->isBool()) {
     auto resultTy =
-        TypeChecker::typeCheckExpression(expr, dc, /*contextualInfo=*/{});
+        TypeChecker::typeCheckExpression(expr, dc);
     return !resultTy;
   }
 

@@ -29,7 +29,6 @@
 #include "swift/Subsystems.h"
 
 #include "TypeChecker.h"
-#include "ConstraintSystem.h"
 
 using namespace swift;
 

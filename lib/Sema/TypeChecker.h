@@ -17,6 +17,7 @@
 #ifndef TYPECHECKING_H
 #define TYPECHECKING_H
 
+#include "ConstraintSystem.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -51,7 +52,6 @@ namespace constraints {
   class Solution;
   class SolutionApplicationTarget;
   class SolutionResult;
-  struct ContextualTypeInfo;
 }
 
 /// Special-case type checking semantics for certain declarations.
@@ -561,7 +561,7 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                         constraints::ContextualTypeInfo contextualInfo,
+                         constraints::ContextualTypeInfo contextualInfo = {},
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
 Optional<constraints::SolutionApplicationTarget>
