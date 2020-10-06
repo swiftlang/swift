@@ -20,6 +20,7 @@ swift_install_in_component(
   DIRECTORY ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   DESTINATION "share/swift/diagnostics"
   COMPONENT compiler
+  FILES_MATCHING
   PATTERN "*.db"
   PATTERN "*.yaml"
 )
