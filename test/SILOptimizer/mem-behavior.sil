@@ -35,11 +35,11 @@ bb0(%0 : $X):
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
 // CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
-// CHECK-NEXT:  r=1,w=1,se=1
+// CHECK-NEXT:  r=1,w=1
 // CHECK:     PAIR #2.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
 // CHECK-NEXT:   %2 = argument of bb0 : $*Int32
-// CHECK-NEXT:  r=0,w=0,se=0
+// CHECK-NEXT:  r=0,w=0
 sil @call_unknown_func : $@convention(thin) (Int32, @in Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
   %3 = function_ref @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
@@ -53,11 +53,11 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
-// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #2.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %2 = argument of bb0 : $*Int32
-// CHECK-NEXT:  r=0,w=0,se=0
+// CHECK-NEXT:  r=0,w=0
 sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
   %3 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -71,11 +71,11 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK:     PAIR #3.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}             // user: %6
-// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #4.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %4 = ref_element_addr %2 : $X, #X.a
-// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK-NEXT:  r=0,w=1
 sil @call_store_to_int_aliased : $@convention(thin) (Int32, @guaranteed X, @guaranteed X) -> () {
 bb0(%0 : $Int32, %1 : $X, %2 : $X):
   %3 = ref_element_addr %1 : $X, #X.a
@@ -100,7 +100,7 @@ bb0(%0 : $X, %1 : $X):
 // CHECK:     PAIR #1
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                         // user: %5
-// CHECK-NEXT:  r=0,w=0,se=0
+// CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = alloc_stack $Int32                         // user: %5
@@ -115,7 +115,7 @@ bb0(%0 : $Int32):
 // CHECK: PAIR #1.
 // CHECK-NEXT:   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32
-// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK-NEXT:  r=0,w=1
 sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = alloc_stack $Int32                         // users: %3, %5
@@ -131,7 +131,7 @@ bb0(%0 : $Int32):
 // CHECK: PAIR #1.
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
-// CHECK-NEXT:  r=0,w=0,se=0
+// CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = alloc_stack $Int32                         // users: %3, %5
@@ -148,7 +148,7 @@ bb0(%0 : $Int32):
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
 // CHECK-NEXT:   %1 = alloc_stack $X{{.*}}                      // users: %5, %4, %2
-// CHECK-NEXT: r=1,w=0,se=0
+// CHECK-NEXT: r=1,w=0
 sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
   %1 = alloc_stack $X
@@ -176,7 +176,7 @@ struct TwoInts {
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %0 = alloc_stack $TwoInts{{.*}}                // users: %5, %2, %1
-// CHECK-NEXT: r=1,w=1,se=1
+// CHECK-NEXT: r=1,w=1
 sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $TwoInts
@@ -201,7 +201,7 @@ bb0(%0 : $*Int32, %1 : $*Int32):
 // CHECK:      PAIR #0.
 // CHECK-NEXT:    %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
 // CHECK-NEXT:    %0 = argument of bb0 : $*Int
-// CHECK-NEXT:  r=1,w=0,se=0
+// CHECK-NEXT:  r=1,w=0
 sil @test_in_guaranteed_only_fun_is_ro_sink : $@convention(thin) (Int) -> ()
 sil @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
 

@@ -88,11 +88,9 @@ class MemBehaviorDumper : public SILModuleTransform {
 
               bool Read = AA->mayReadFromMemory(&I, V);
               bool Write = AA->mayWriteToMemory(&I, V);
-              bool SideEffects = AA->mayHaveSideEffects(&I, V);
               llvm::outs() << "PAIR #" << PairCount++ << ".\n"
                            << "  " << I << "  " << V
-                           << "  r=" << Read << ",w=" << Write
-                           << ",se=" << SideEffects << "\n";
+                           << "  r=" << Read << ",w=" << Write << "\n";
             }
           }
         }

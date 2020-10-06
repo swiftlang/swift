@@ -66,15 +66,10 @@ class MemoryBehaviorVisitor
   /// The SILType of the value.
   Optional<SILType> TypedAccessTy;
 
-  /// Should we treat instructions that increment ref counts as None instead of
-  /// MayHaveSideEffects.
-  RetainObserveKind InspectionMode;
-
 public:
   MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA,
-                        EscapeAnalysis *EA, SILValue V,
-                        RetainObserveKind IgnoreRefCountIncs)
-      : AA(AA), SEA(SEA), EA(EA), V(V), InspectionMode(IgnoreRefCountIncs) {}
+                        EscapeAnalysis *EA, SILValue V)
+      : AA(AA), SEA(SEA), EA(EA), V(V) {}
 
   SILType getValueTBAAType() {
     if (!TypedAccessTy)
@@ -223,9 +218,7 @@ public:
   // memory this will be unnecessary.
 #define REFCOUNTINC_MEMBEHAVIOR_INST(Name)                                     \
   MemBehavior visit##Name(Name *I) {                                           \
-    if (InspectionMode == RetainObserveKind::IgnoreRetains)          \
-      return MemBehavior::None;                                                \
-    return I->getMemoryBehavior();                                             \
+    return MemBehavior::None;                                                \
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
@@ -364,19 +357,15 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
     // one the parameters in the function call is @in_guaranteed of V, ie. the
     // callee isn't allowed to modify it.
     Behavior = MemBehavior::MayRead;
-  } else if (ApplyEffects.mayReadRC() ||
-        (InspectionMode == RetainObserveKind::ObserveRetains &&
-         ApplyEffects.mayAllocObjects())) {
-      Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-    Behavior = GlobalEffects.getMemBehavior(InspectionMode);
+    Behavior = GlobalEffects.getMemBehavior(RetainObserveKind::IgnoreRetains);
 
     // Check all parameter effects.
     for (unsigned Idx = 0, End = AI->getNumArguments();
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-      auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
+      auto ArgBehavior = ArgEffect.getMemBehavior(RetainObserveKind::IgnoreRetains);
       if (ArgEffect.mayRelease()) {
         Behavior = MemBehavior::MayHaveSideEffects;
         break;
@@ -442,9 +431,8 @@ visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
 //===----------------------------------------------------------------------===//
 
 MemBehavior
-AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                     RetainObserveKind InspectionMode) {
-  MemBehaviorKeyTy Key = toMemoryBehaviorKey(Inst, V, InspectionMode);
+AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V) {
+  MemBehaviorKeyTy Key = toMemoryBehaviorKey(Inst, V);
   // Check if we've already computed this result.
   auto It = MemoryBehaviorCache.find(Key);
   if (It != MemoryBehaviorCache.end()) {
@@ -457,27 +445,25 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
     MemoryBehaviorNodeToIndex.clear();
 
     // Key is no longer valid as we cleared the MemoryBehaviorNodeToIndex.
-    Key = toMemoryBehaviorKey(Inst, V, InspectionMode);
+    Key = toMemoryBehaviorKey(Inst, V);
   }
 
   // Calculate the aliasing result and store it in the cache.
-  auto Result = computeMemoryBehaviorInner(Inst, V, InspectionMode);
+  auto Result = computeMemoryBehaviorInner(Inst, V);
   MemoryBehaviorCache[Key] = Result;
   return Result;
 }
 
 MemBehavior
-AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
-                                          RetainObserveKind InspectionMode) {
+AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V) {
   LLVM_DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                           << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
-  return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
+  return MemoryBehaviorVisitor(this, SEA, EA, V).visit(Inst);
 }
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
-                                                    SILValue V2,
-                                                    RetainObserveKind M) {
+                                                    SILValue V2) {
   size_t idx1 =
     MemoryBehaviorNodeToIndex.getIndex(V1->getRepresentativeSILNodeInObject());
   assert(idx1 != std::numeric_limits<size_t>::max() &&
@@ -486,5 +472,5 @@ MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
       V2->getRepresentativeSILNodeInObject());
   assert(idx2 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
-  return {idx1, idx2, M};
+  return {idx1, idx2};
 }
