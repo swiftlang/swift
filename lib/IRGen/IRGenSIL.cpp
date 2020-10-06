@@ -1260,11 +1260,13 @@ public:
                      "indirected through the context");
   }
   llvm::Value *getIndirectResult(unsigned index) override {
-    Address dataAddr = layout.emitCastTo(IGF, context);
     auto fieldLayout = layout.getIndirectReturnLayout(index);
     Address fieldAddr =
         fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    return IGF.Builder.CreateLoad(fieldAddr);
+    auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
+    Explosion explosion;
+    ti.loadAsTake(IGF, fieldAddr, explosion);
+    return explosion.claimNext();
   };
   llvm::Value *getSelfWitnessTable() override {
     llvm_unreachable("unimplemented");
