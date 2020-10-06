@@ -58,14 +58,31 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   }
 }
 
+/// Returns a null SILValue if V has a trivial type, otherwise returns V.
+///
+/// RCIdentityAnalysis must not look through casts which cast from a trivial
+/// type, like a metatype, to something which is retainable, like an AnyObject.
+/// On some platforms such casts dynamically allocate a ref-counted box for the
+/// metatype.
+/// Now, if the RCRoot of such an AnyObject would be a trivial type, ARC
+/// optimizations get confused and might eliminate a retain of such an object
+/// completely.
+static SILValue noTrivialType(SILValue V, SILFunction *F) {
+  if (V->getType().isTrivial(*F))
+    return SILValue();
+  return V;
+}
+
 //===----------------------------------------------------------------------===//
 //                    RC Identity Root Instruction Casting
 //===----------------------------------------------------------------------===//
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
-  if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SingleValueInstruction>(V)->getOperand(0);
+  if (isRCIdentityPreservingCast(V->getKind())) {
+    auto *inst = cast<SingleValueInstruction>(V);
+    return noTrivialType(inst->getOperand(0), inst->getFunction());
+  }
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -118,7 +135,7 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // purposes.
   if (auto *A = dyn_cast<SILPhiArgument>(V))
     if (SILValue Result = A->getSingleTerminatorOperand())
-      return Result;
+      return noTrivialType(Result, A->getFunction());
 
   return SILValue();
 }
@@ -321,6 +338,9 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
   }
 
   unsigned IVListSize = IncomingValues.size();
+  if (IVListSize == 1 &&
+      !noTrivialType(IncomingValues[0].second, A->getFunction()))
+    return SILValue();
 
   assert(IVListSize != 1 && "Should have been handled in "
          "stripRCIdentityPreservingInsts");
