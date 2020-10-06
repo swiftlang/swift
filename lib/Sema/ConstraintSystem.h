@@ -106,6 +106,17 @@ enum ContextualTypePurpose {
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
+/// Specify how we handle the binding of underconstrained (free) type variables
+/// within a solution to a constraint system.
+enum class FreeTypeVariableBinding {
+  /// Disallow any binding of such free type variables.
+  Disallow,
+  /// Allow the free type variables to persist in the solution.
+  Allow,
+  /// Bind the type variables to UnresolvedType to represent the ambiguity.
+  UnresolvedType
+};
+
 namespace constraints {
 
 /// Describes the algorithm to use for trailing closure matching.
