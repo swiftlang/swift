@@ -1876,9 +1876,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
-    SourceLoc lbraceLoc = Tok.getLoc();
     diagnose(whileLoc, diag::missing_condition_after_while);
-    condition = makeParserErrorResult(new (Context) ErrorExpr(lbraceLoc));
+    condition = makeParserErrorResult(new (Context) ErrorExpr(whileLoc));
   } else {
     condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;
