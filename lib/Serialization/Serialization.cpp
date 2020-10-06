@@ -5240,7 +5240,7 @@ void Serializer::writeToStream(
     S.writeAST(DC);
     if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
-          S.Out, *DepGraph, /*standalone*/ false);
+          S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
   }
 

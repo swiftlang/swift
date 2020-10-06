@@ -44,7 +44,7 @@ class Deserializer {
 
 public:
   Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
-  bool readFineGrainedDependencyGraph(SourceFileDepGraph &g, bool standalone);
+  bool readFineGrainedDependencyGraph(SourceFileDepGraph &g, Purpose purpose);
   bool readFineGrainedDependencyGraphFromSwiftModule(SourceFileDepGraph &g);
 };
 
@@ -152,14 +152,23 @@ static llvm::Optional<DeclAspect> getDeclAspect(unsigned declAspect) {
 }
 
 bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
-                                                  bool standalone) {
+                                                  Purpose purpose) {
   using namespace record_block;
 
-  if (standalone && readSignature())
-    return true;
+  switch (purpose) {
+  case Purpose::ForSwiftDeps:
+    if (readSignature())
+      return true;
 
-  if (standalone && enterTopLevelBlock())
-    return true;
+    if (enterTopLevelBlock())
+      return true;
+    LLVM_FALLTHROUGH;
+  case Purpose::ForSwiftModule:
+    // N.B. Incremental metadata embedded in swiftmodule files does not have
+    // a leading signature, and its top-level block has already been
+    // consumed by the time we get here.
+    break;
+  }
 
   if (readMetadata())
     return true;
@@ -261,7 +270,7 @@ bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
 bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
     llvm::MemoryBuffer &buffer, SourceFileDepGraph &g) {
   Deserializer deserializer(buffer.getMemBufferRef());
-  return deserializer.readFineGrainedDependencyGraph(g, /*standalone*/true);
+  return deserializer.readFineGrainedDependencyGraph(g, Purpose::ForSwiftDeps);
 }
 
 bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
@@ -324,7 +333,7 @@ public:
 
 public:
   void writeFineGrainedDependencyGraph(const SourceFileDepGraph &g,
-                                       bool standalone);
+                                       Purpose purpose);
 };
 
 } // end namespace
@@ -385,13 +394,19 @@ void Serializer::writeMetadata() {
 
 void
 Serializer::writeFineGrainedDependencyGraph(const SourceFileDepGraph &g,
-                                            bool standalone) {
-  auto blockID = INCREMENTAL_INFORMATION_BLOCK_ID;
-  if (standalone) {
+                                            Purpose purpose) {
+  unsigned blockID = 0;
+  switch (purpose) {
+  case Purpose::ForSwiftDeps:
     writeSignature();
     writeBlockInfoBlock();
     blockID = RECORD_BLOCK_ID;
+    break;
+  case Purpose::ForSwiftModule:
+    blockID = INCREMENTAL_INFORMATION_BLOCK_ID;
+    break;
   }
+
   llvm::BCBlockRAII restoreBlock(Out, blockID, 8);
 
   using namespace record_block;
@@ -474,9 +489,10 @@ unsigned Serializer::getIdentifier(StringRef str) {
 }
 
 void swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
-    llvm::BitstreamWriter &Out, const SourceFileDepGraph &g, bool standalone) {
+    llvm::BitstreamWriter &Out, const SourceFileDepGraph &g,
+    Purpose purpose) {
   Serializer serializer{Out};
-  serializer.writeFineGrainedDependencyGraph(g, standalone);
+  serializer.writeFineGrainedDependencyGraph(g, purpose);
 }
 
 bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
@@ -486,7 +502,7 @@ bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
   return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
-    writeFineGrainedDependencyGraph(Writer, g, /*standalone*/ true);
+    writeFineGrainedDependencyGraph(Writer, g, Purpose::ForSwiftDeps);
     out.write(Buffer.data(), Buffer.size());
     out.flush();
     return false;
@@ -578,7 +594,7 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
         consumeError(std::move(Err));
         return false;
       }
-      if (readFineGrainedDependencyGraph(g, /*standalone*/ false)) {
+      if (readFineGrainedDependencyGraph(g, Purpose::ForSwiftModule)) {
         break;
       }
 

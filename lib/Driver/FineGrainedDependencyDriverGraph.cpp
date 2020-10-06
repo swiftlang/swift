@@ -120,7 +120,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSwiftModuleBuffer(
       SourceFileDepGraph::loadFromSwiftModuleBuffer(buffer);
   if (!sourceFileDepGraph)
     return None;
-  jobsBySwiftDeps.insert(std::make_pair(buffer.getBufferIdentifier(), Cmd));
+  jobsBySwiftDeps[buffer.getBufferIdentifier().str()] = Cmd;
   auto changes = integrate(*sourceFileDepGraph, buffer.getBufferIdentifier());
   if (verifyFineGrainedDependencyGraphAfterEveryImport)
     verify();
