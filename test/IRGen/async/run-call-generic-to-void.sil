@@ -1,0 +1,45 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// CHECK-LL: define hidden swiftcc void @genericToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @genericToVoid : $@async @convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%instance : $*T):
+  %print_generic = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %print_generic<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 922337203685477580
+  return %result : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %int_literal = integer_literal $Builtin.Int64, 922337203685477580
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %int_addr = alloc_stack $Int64
+  store %int to %int_addr : $*Int64
+  %genericToVoid = function_ref @genericToVoid : $@async @convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %genericToVoid<Int64>(%int_addr) : $@async @convention(thin) <T> (@in_guaranteed T) -> ()
+  dealloc_stack %int_addr : $*Int64
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32                              // id: %4
+}
+
+
+

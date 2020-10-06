@@ -1,0 +1,132 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+struct Big {
+  @_hasStorage let i1: Int64 { get }
+  @_hasStorage let i2: Int64 { get }
+  @_hasStorage let i3: Int64 { get }
+  @_hasStorage let i4: Int64 { get }
+  @_hasStorage let i5: Int64 { get }
+  @_hasStorage let i6: Int64 { get }
+  @_hasStorage let i7: Int64 { get }
+  @_hasStorage let i8: Int64 { get }
+  @_hasStorage let i9: Int64 { get }
+  @_hasStorage let i0: Int64 { get }
+  init()
+}
+
+sil hidden @Big_init : $@convention(method) (@thin Big.Type) -> Big {
+// %0 "$metatype"
+bb0(%0 : $@thin Big.Type):
+  %1 = alloc_stack $Big, var, name "self"
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = begin_access [modify] [static] %1 : $*Big
+  %5 = struct_element_addr %4 : $*Big, #Big.i1
+  store %3 to %5 : $*Int64
+  end_access %4 : $*Big
+  %8 = integer_literal $Builtin.Int64, 2
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  %10 = begin_access [modify] [static] %1 : $*Big
+  %11 = struct_element_addr %10 : $*Big, #Big.i2
+  store %9 to %11 : $*Int64
+  end_access %10 : $*Big
+  %14 = integer_literal $Builtin.Int64, 3
+  %15 = struct $Int64 (%14 : $Builtin.Int64)
+  %16 = begin_access [modify] [static] %1 : $*Big
+  %17 = struct_element_addr %16 : $*Big, #Big.i3
+  store %15 to %17 : $*Int64
+  end_access %16 : $*Big
+  %20 = integer_literal $Builtin.Int64, 4
+  %21 = struct $Int64 (%20 : $Builtin.Int64)
+  %22 = begin_access [modify] [static] %1 : $*Big
+  %23 = struct_element_addr %22 : $*Big, #Big.i4
+  store %21 to %23 : $*Int64
+  end_access %22 : $*Big
+  %26 = integer_literal $Builtin.Int64, 5
+  %27 = struct $Int64 (%26 : $Builtin.Int64)
+  %28 = begin_access [modify] [static] %1 : $*Big
+  %29 = struct_element_addr %28 : $*Big, #Big.i5
+  store %27 to %29 : $*Int64
+  end_access %28 : $*Big
+  %32 = integer_literal $Builtin.Int64, 6
+  %33 = struct $Int64 (%32 : $Builtin.Int64)
+  %34 = begin_access [modify] [static] %1 : $*Big
+  %35 = struct_element_addr %34 : $*Big, #Big.i6
+  store %33 to %35 : $*Int64
+  end_access %34 : $*Big
+  %38 = integer_literal $Builtin.Int64, 7
+  %39 = struct $Int64 (%38 : $Builtin.Int64)
+  %40 = begin_access [modify] [static] %1 : $*Big
+  %41 = struct_element_addr %40 : $*Big, #Big.i7
+  store %39 to %41 : $*Int64
+  end_access %40 : $*Big
+  %44 = integer_literal $Builtin.Int64, 8
+  %45 = struct $Int64 (%44 : $Builtin.Int64)
+  %46 = begin_access [modify] [static] %1 : $*Big
+  %47 = struct_element_addr %46 : $*Big, #Big.i8
+  store %45 to %47 : $*Int64
+  end_access %46 : $*Big
+  %50 = integer_literal $Builtin.Int64, 9
+  %51 = struct $Int64 (%50 : $Builtin.Int64)
+  %52 = begin_access [modify] [static] %1 : $*Big
+  %53 = struct_element_addr %52 : $*Big, #Big.i9
+  store %51 to %53 : $*Int64
+  end_access %52 : $*Big
+  %56 = integer_literal $Builtin.Int64, 0
+  %57 = struct $Int64 (%56 : $Builtin.Int64)
+  %58 = begin_access [modify] [static] %1 : $*Big
+  %59 = struct_element_addr %58 : $*Big, #Big.i0
+  store %57 to %59 : $*Int64
+  end_access %58 : $*Big
+  %62 = struct $Big (%3 : $Int64, %9 : $Int64, %15 : $Int64, %21 : $Int64, %27 : $Int64, %33 : $Int64, %39 : $Int64, %45 : $Int64, %51 : $Int64, %57 : $Int64)
+  dealloc_stack %1 : $*Big
+  return %62 : $Big
+}
+
+// CHECK-LL: define hidden swiftcc void @getBig(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @getBig : $@async @convention(thin) () -> Big {
+bb0:
+  %0 = metatype $@thin Big.Type
+  // function_ref Big.init()
+  %1 = function_ref @Big_init : $@convention(method) (@thin Big.Type) -> Big
+  %2 = apply %1(%0) : $@convention(method) (@thin Big.Type) -> Big
+  return %2 : $Big
+}
+
+sil hidden @printBig : $@convention(thin) () -> () {
+    %getBig = function_ref @getBig : $@async @convention(thin) () -> Big
+    %big = apply %getBig() : $@async @convention(thin) () -> Big
+    %big_addr = alloc_stack $Big
+    store %big to %big_addr : $*Big
+    %print = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+    %result = apply %print<Big>(%big_addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+    dealloc_stack %big_addr : $*Big
+    %out = tuple ()
+    return %out : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %printBig = function_ref @printBig : $@convention(thin) () -> ()
+  %result = apply %printBig() : $@convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32                              // id: %4
+}

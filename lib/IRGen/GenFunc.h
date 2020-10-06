@@ -53,6 +53,8 @@ namespace irgen {
       ArrayRef<SILParameterInfo> argTypes, SubstitutionMap subs,
       CanSILFunctionType origType, CanSILFunctionType substType,
       CanSILFunctionType outType, Explosion &out, bool isOutlined);
+  CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
+                                  bool isNoEscape);
 
 } // end namespace irgen
 } // end namespace swift

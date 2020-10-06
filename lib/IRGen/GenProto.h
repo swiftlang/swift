@@ -46,6 +46,7 @@ namespace irgen {
   class IRGenModule;
   class MetadataPath;
   class MetadataResponse;
+  class NativeCCEntryPointArgumentEmission;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -120,9 +121,10 @@ namespace irgen {
 
   /// Collect any required metadata for a witness method from the end
   /// of the given parameter list.
-  void collectTrailingWitnessMetadata(IRGenFunction &IGF, SILFunction &fn,
-                                      Explosion &params,
-                                      WitnessMetadata &metadata);
+  void
+  collectTrailingWitnessMetadata(IRGenFunction &IGF, SILFunction &fn,
+                                 NativeCCEntryPointArgumentEmission &params,
+                                 WitnessMetadata &metadata);
 
   using GetParameterFn = llvm::function_ref<llvm::Value*(unsigned)>;
 
