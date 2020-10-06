@@ -284,10 +284,6 @@ option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
 
-if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
-endif()
-
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
