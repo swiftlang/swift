@@ -205,18 +205,18 @@ typedef int (*fptr)(int);
 fptr getFunctionPointer(void);
 void useFunctionPointer(fptr);
 
-int (*getFunctionPointer_(void))(int);
+size_t (*getFunctionPointer_(void))(size_t);
 
 struct FunctionPointerWrapper {
   fptr a;
   fptr b;
 };
 
-typedef void (*fptr2)(int, long, void *);
+typedef void (*fptr2)(size_t, long, void *);
 fptr2 getFunctionPointer2(void);
 void useFunctionPointer2(fptr2);
 
-int (*(*getHigherOrderFunctionPointer(void))(int (*)(int)))(int);
+size_t (*(*getHigherOrderFunctionPointer(void))(size_t (*)(size_t)))(size_t);
 
 typedef struct Dummy {
     int x;
