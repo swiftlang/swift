@@ -10,6 +10,8 @@
 #
 #===----------------------------------------------------------------------===#
 
+set(SOURCES_FOLDER ../Differentiation)
+
 set(DIFF_SOURCE_FILES
     Differentiable.swift
     DifferentialOperators.swift
