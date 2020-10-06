@@ -991,3 +991,29 @@ sil @test_partial_apply_method : $@convention(thin) () -> @owned @callee_owned (
 // CHECK: [[FN:%.*]] = function_ref @method
 // CHECK-NEXT: partial_apply [[FN]]()
 // CHECK-NEXT: return
+
+sil [noinline] @$foo : $@convention(thin) (@owned { var Int64 }) -> () 
+
+// CHECK-LABEL: sil private [noinline] @$testdeadpartialapply :
+// CHECK-NOT: partial_apply
+// CHECK-LABEL: } // end sil function '$testdeadpartialapply'
+sil private [noinline] @$testdeadpartialapply : $@convention(thin) (@owned { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %3 = function_ref @$foo : $@convention(thin) (@owned { var Int64 }) -> ()
+  %5 = partial_apply [callee_guaranteed] %3(%0) : $@convention(thin) (@owned { var Int64 }) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : ${ var Int64 }
+  strong_retain %5 : $@callee_guaranteed () -> ()
+  unreachable
+bb2:
+  strong_retain %0 : ${ var Int64 }
+  strong_retain %5 : $@callee_guaranteed () -> ()
+  br bb3
+bb3:
+  strong_release %5 : $@callee_guaranteed () -> ()
+  strong_release %5 : $@callee_guaranteed () -> ()
+  strong_release %0 : ${ var Int64 }
+  %rv = tuple()
+  return %rv : $()
+}
