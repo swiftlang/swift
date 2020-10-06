@@ -194,10 +194,6 @@ public:
 #pragma mark - source ranges
 
 public:
-  /// Return signum of ranges. Centralize the invariant that ASTScopes use ends.
-  static int compare(SourceRange, SourceRange, const SourceManager &,
-                     bool ensureDisjoint);
-
   CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
                                             bool omitAssertions = false) const;
   bool isCharSourceRangeCached() const;

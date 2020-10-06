@@ -359,27 +359,6 @@ public:
     return culled;
   }
 
-  /// Templated to work on either ASTNodes, Decl*'s, or whatnot.
-  template <typename Rangeable>
-  std::vector<Rangeable>
-  sortBySourceRange(std::vector<Rangeable> toBeSorted) const {
-    auto compareNodes = [&](Rangeable n1, Rangeable n2) {
-      return isNotAfter(n1, n2);
-    };
-    std::stable_sort(toBeSorted.begin(), toBeSorted.end(), compareNodes);
-    return toBeSorted;
-  }
-
-  template <typename Rangeable>
-  bool isNotAfter(Rangeable n1, Rangeable n2) const {
-    const auto r1 = getRangeableSourceRange(n1);
-    const auto r2 = getRangeableSourceRange(n2);
-
-    const int signum = ASTScopeImpl::compare(r1, r2, ctx.SourceMgr,
-                                             /*ensureDisjoint=*/true);
-    return -1 == signum;
-  }
-
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
@@ -895,8 +874,7 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
       scopeCreator.addSiblingsToScopeTree(insertionPoint,
-                                          scopeCreator.sortBySourceRange(
-                                            scopeCreator.cull(newNodes)),
+                                          scopeCreator.cull(newNodes),
                                           endLoc);
 
   // Too slow to perform all the time:
@@ -1024,9 +1002,8 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
   // elements in source order
   auto *insertionPoint =
       scopeCreator.addSiblingsToScopeTree(this,
-                                          scopeCreator.sortBySourceRange(
-                                            scopeCreator.cull(
-                                              stmt->getElements())),
+                                          scopeCreator.cull(
+                                            stmt->getElements()),
                                           endLoc);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
@@ -1388,7 +1365,7 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  nodes = scopeCreator.sortBySourceRange(scopeCreator.cull(nodes));
+  nodes = scopeCreator.cull(nodes);
   scopeCreator.addSiblingsToScopeTree(this, nodes, None);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
