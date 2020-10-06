@@ -417,7 +417,7 @@ def create_argument_parser():
                 'fuzzing swiftc')
 
     option('--compiler-vendor', store,
-           choices=['none', 'apple'],
+           choices=['none', 'apple', 'swiftwasm'],
            default=defaults.COMPILER_VENDOR,
            help='Compiler vendor name')
     option('--clang-compiler-version', store,
