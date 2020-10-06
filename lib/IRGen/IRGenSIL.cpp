@@ -1261,9 +1261,7 @@ public:
   }
   llvm::Value *getIndirectResult(unsigned index) override {
     Address dataAddr = layout.emitCastTo(IGF, context);
-    unsigned baseIndirectReturnIndex = layout.getFirstIndirectReturnIndex();
-    unsigned elementIndex = baseIndirectReturnIndex + index;
-    auto &fieldLayout = layout.getElement(elementIndex);
+    auto fieldLayout = layout.getIndirectReturnLayout(index);
     Address fieldAddr =
         fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
     return IGF.Builder.CreateLoad(fieldAddr);
@@ -3101,16 +3099,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);
-    unsigned index = layout.getFirstDirectReturnIndex();
-    for (auto r :
-         IGF.CurSILFn->getLoweredFunctionType()->getDirectFormalResults()) {
-      (void)r;
-      auto &fieldLayout = layout.getElement(index);
+    for (unsigned index = 0, count = layout.getDirectReturnCount();
+         index < count; ++index) {
+      auto fieldLayout = layout.getDirectReturnLayout(index);
       Address fieldAddr =
           fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
       cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
-      ++index;
     }
     IGF.Builder.CreateRetVoid();
   } else {

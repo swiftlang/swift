@@ -109,26 +109,42 @@ namespace irgen {
     NecessaryBindings bindings;
     SmallVector<ArgumentInfo, 4> argumentInfos;
 
+    unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
+    unsigned getFirstIndirectReturnIndex() {
+      return getErrorIndex() + getErrorCount();
+    }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getFirstIndirectReturnIndex() + getIndirectReturnCount();
+    }
+    unsigned getIndexAfterLocalContext() {
+      return getFirstIndirectReturnIndex() + getIndirectReturnCount() +
+             (hasLocalContext() ? 1 : 0);
+    }
+    unsigned getBindingsIndex() {
+      assert(hasBindings());
+      return getIndexAfterLocalContext();
+    }
+    unsigned getFirstArgumentIndex() {
+      return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
+    }
+    unsigned getIndexAfterArguments() {
+      return getFirstArgumentIndex() + getArgumentCount();
+    }
+    unsigned getFirstDirectReturnIndex() { return getIndexAfterArguments(); }
+
   public:
     bool canHaveError() { return canHaveValidError; }
-    unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
     ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
     unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
     SILType getErrorType() { return errorType; }
 
-    unsigned getFirstIndirectReturnIndex() {
-      return getErrorIndex() + getErrorCount();
-    }
     ElementLayout getIndirectReturnLayout(unsigned index) {
       return getElement(getFirstIndirectReturnIndex() + index);
     }
     unsigned getIndirectReturnCount() { return indirectReturnInfos.size(); }
 
     bool hasLocalContext() { return (bool)localContextInfo; }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
-      return getFirstIndirectReturnIndex() + getIndirectReturnCount();
-    }
     ElementLayout getLocalContextLayout() {
       assert(hasLocalContext());
       return getElement(getLocalContextIndex());
@@ -141,48 +157,30 @@ namespace irgen {
       assert(hasLocalContext());
       return localContextInfo->type;
     }
-    unsigned getIndexAfterLocalContext() {
-      return getFirstIndirectReturnIndex() + getIndirectReturnCount() +
-             (hasLocalContext() ? 1 : 0);
-    }
 
     bool hasBindings() const { return !bindings.empty(); }
-    unsigned getBindingsIndex() {
-      assert(hasBindings());
-      return getIndexAfterLocalContext();
-    }
     ElementLayout getBindingsLayout() {
       assert(hasBindings());
       return getElement(getBindingsIndex());
     }
-    ParameterConvention getBindingsConvention() {
-      return ParameterConvention::Direct_Unowned;
-    }
     const NecessaryBindings &getBindings() const { return bindings; }
 
-    unsigned getFirstArgumentIndex() {
-      return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
-    }
     ElementLayout getArgumentLayout(unsigned index) {
       return getElement(getFirstArgumentIndex() + index);
-    }
-    ParameterConvention getArgumentConvention(unsigned index) {
-      return argumentInfos[index].convention;
     }
     SILType getArgumentType(unsigned index) {
       return argumentInfos[index].type;
     }
+    // Returns the type of a parameter of the substituted function using the
+    // indexing of the function parameters, *not* the indexing of
+    // AsyncContextLayout.
     SILType getParameterType(unsigned index) {
       SILFunctionConventions origConv(substitutedType, IGF.getSILModule());
       return origConv.getSILArgumentType(
           index, IGF.IGM.getMaximalTypeExpansionContext());
     }
     unsigned getArgumentCount() { return argumentInfos.size(); }
-    unsigned getIndexAfterArguments() {
-      return getFirstArgumentIndex() + getArgumentCount();
-    }
 
-    unsigned getFirstDirectReturnIndex() { return getIndexAfterArguments(); }
     unsigned getDirectReturnCount() { return directReturnInfos.size(); }
     ElementLayout getDirectReturnLayout(unsigned index) {
       return getElement(getFirstDirectReturnIndex() + index);
