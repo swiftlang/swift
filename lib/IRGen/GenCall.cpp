@@ -1957,6 +1957,11 @@ class AsyncCallEmission final : public CallEmission {
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     ti.initialize(IGF, explosion, addr, isOutlined);
   }
+  void loadValue(ElementLayout layout, Explosion &explosion) {
+    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    auto &ti = layout.getType();
+    cast<LoadableTypeInfo>(ti).loadAsTake(IGF, addr, explosion);
+  }
 
 public:
   AsyncCallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
@@ -2036,20 +2041,13 @@ public:
       // argument buffer.
       return;
     }
-    assert(call->arg_size() == 1);
-    auto context = call->arg_begin()->get();
     // Gather the values.
     Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
-    auto dataAddr = layout.emitCastTo(IGF, context);
     for (unsigned index = 0, count = layout.getDirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getDirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      auto &fieldTI = fieldLayout.getType();
-      cast<LoadableTypeInfo>(fieldTI).loadAsTake(IGF, fieldAddr,
-                                                 nativeExplosion);
+      loadValue(fieldLayout, nativeExplosion);
     }
 
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
