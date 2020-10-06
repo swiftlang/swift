@@ -1150,7 +1150,7 @@ public:
             getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
-      Stmt *body = caseBlock->getBody();
+      BraceStmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
     }

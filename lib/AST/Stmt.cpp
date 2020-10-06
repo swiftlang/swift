@@ -407,7 +407,7 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
-                   Stmt *body,
+                   BraceStmt *body,
                    Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
                    Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
@@ -445,7 +445,7 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                            SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
-                           Stmt *body,
+                           BraceStmt *body,
                            Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
                            Optional<bool> implicit,
                            NullablePtr<FallthroughStmt> fallthroughStmt) {

@@ -1631,7 +1631,7 @@ Stmt *Traversal::visitCaseStmt(CaseStmt *S) {
     }
   }
 
-  if (Stmt *newBody = doIt(S->getBody()))
+  if (BraceStmt *newBody = cast_or_null<BraceStmt>(doIt(S->getBody())))
     S->setBody(newBody);
   else
     return nullptr;
