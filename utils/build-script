@@ -829,7 +829,7 @@ class BuildScriptInvocation(object):
         product_classes = []
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
-        if self.args.build_swift_driver:
+        if self.args.build_swift_driver or self.args.install_swift_driver:
             product_classes.append(products.SwiftDriver)
         if self.args.build_swiftsyntax:
             product_classes.append(products.SwiftSyntax)
