@@ -631,7 +631,10 @@ namespace {
     void visitExtensionDecl(ExtensionDecl *ED) {
       printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
-      ED->getExtendedType().print(OS);
+      if (ED->hasBeenBound())
+        ED->getExtendedType().print(OS);
+      else
+        ED->getExtendedTypeRepr()->print(OS);
       printCommonPost(ED);
     }
 
@@ -854,20 +857,22 @@ namespace {
       if (D->isStatic())
         PrintWithColorRAII(OS, DeclModifierColor) << " type";
 
-      auto impl = D->getImplInfo();
-      PrintWithColorRAII(OS, DeclModifierColor)
-        << " readImpl="
-        << getReadImplKindName(impl.getReadImpl());
-      if (!impl.supportsMutation()) {
+      if (D->hasInterfaceType()) {
+        auto impl = D->getImplInfo();
         PrintWithColorRAII(OS, DeclModifierColor)
-          << " immutable";
-      } else {
-        PrintWithColorRAII(OS, DeclModifierColor)
-          << " writeImpl="
-          << getWriteImplKindName(impl.getWriteImpl());
-        PrintWithColorRAII(OS, DeclModifierColor)
-          << " readWriteImpl="
-          << getReadWriteImplKindName(impl.getReadWriteImpl());
+          << " readImpl="
+          << getReadImplKindName(impl.getReadImpl());
+        if (!impl.supportsMutation()) {
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " immutable";
+        } else {
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " writeImpl="
+            << getWriteImplKindName(impl.getWriteImpl());
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " readWriteImpl="
+            << getReadWriteImplKindName(impl.getReadWriteImpl());
+        }
       }
     }
 
