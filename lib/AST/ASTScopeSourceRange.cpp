@@ -448,7 +448,7 @@ SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
 
 SourceRange AttachedPropertyWrapperScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return sourceRangeWhenCreated;
+  return attr->getRange();
 }
 
 SourceRange GuardStmtScope::getSourceRangeOfThisASTNode(

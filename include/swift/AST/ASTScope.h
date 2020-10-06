@@ -966,19 +966,8 @@ public:
   CustomAttr *attr;
   VarDecl *decl;
 
-  /// Because we have to avoid request cycles, we approximate the test for an
-  /// AttachedPropertyWrapper with one based on source location. We might get
-  /// false positives, that that doesn't hurt anything. However, the result of
-  /// the conservative source range computation doesn't seem to be stable. So
-  /// keep the original here, and use it for source range queries.
-  const SourceRange sourceRangeWhenCreated;
-
   AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
-      : attr(attr), decl(decl),
-        sourceRangeWhenCreated(attr->getTypeRepr()->getSourceRange()) {
-    ASTScopeAssert(sourceRangeWhenCreated.isValid(),
-                   "VarDecls must have ranges to be looked-up");
-  }
+      : attr(attr), decl(decl) {}
   virtual ~AttachedPropertyWrapperScope() {}
 
 protected:
