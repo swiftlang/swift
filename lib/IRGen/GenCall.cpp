@@ -1974,14 +1974,6 @@ public:
       llArgs.add(selfValue);
     }
     auto layout = getAsyncContextLayout();
-    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
-         ++index) {
-      auto fieldLayout = layout.getArgumentLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-      ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
-    }
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
@@ -1989,6 +1981,14 @@ public:
           fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
       cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, llArgs, fieldAddr, isOutlined);
+    }
+    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
+         ++index) {
+      auto fieldLayout = layout.getArgumentLayout(index);
+      Address fieldAddr =
+          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
+      ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
     }
     if (layout.hasBindings()) {
       auto bindingLayout = layout.getBindingsLayout();
