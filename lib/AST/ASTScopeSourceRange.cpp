@@ -226,7 +226,7 @@ SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
 
 SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return decl->getSourceRange();
+  return decl->getSourceRangeIncludingAttrs();
 }
 
 SourceRange
