@@ -179,9 +179,13 @@ private:
     // When the body is inlinable consider only the explicitly declared range
     // for checking availability. Otherwise, use the parent range which may
     // begin at the minimum deployment target.
+    //
+    // Also use the parent range when reading swiftinterfaces for
+    // retrocompatibility.
     bool isInlinable = D->getAttrs().hasAttribute<InlinableAttr>() ||
                        D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
-    if (!isInlinable)) {
+    SourceFile *SF = D->getDeclContext()->getParentSourceFile();
+    if (!isInlinable || (SF && SF->Kind == SourceFileKind::Interface)) {
       DeclInfo.intersectWith(
           getCurrentTRC()->getAvailabilityInfo());
     }
