@@ -53,6 +53,15 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # TODO: Remove this constant, it's really not helpful.
 HOME = os.environ.get("HOME", "/")
 
+_SUPPORTED_XCODE_BUILDS = (
+    "12A8169g", # 12.0b3
+    "12A8179i", # 12.0b4
+    "12A8189h", # 12.0b5
+    "12A8189n", # 12.0b6
+    "12A7208", # 12.0GM1
+    "12A7209", # 12.0GM2
+    "12A7300", # 12.0.1
+)
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -147,6 +156,22 @@ def print_xcodebuild_versions(file=sys.stdout):
     print(fmt.format(version=version, sdks=sdks), file=file)
     file.flush()
 
+def validate_xcode_compatibility():
+    if sys.platform != 'darwin':
+        return
+
+    if os.getenv("SKIP_XCODE_VERSION_CHECK"):
+        print("note: skipping Xcode version check")
+        return
+
+    version = shell.capture(
+        ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
+    if not version.endswith(_SUPPORTED_XCODE_BUILDS):
+        raise SystemExit(
+            "error: using unsupported Xcode version:\n\n{}\n\nInstall one of: {}".format(
+                version, ", ".join(_SUPPORTED_XCODE_BUILDS)
+            )
+        )
 
 def tar(source, destination):
     """
@@ -1334,6 +1359,8 @@ def main():
             "source root directory \'" + SWIFT_SOURCE_ROOT +
             "\' does not exist " +
             "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
+
+    validate_xcode_compatibility()
 
     # Determine if we are invoked in the preset mode and dispatch accordingly.
     if any([(opt.startswith("--preset") or opt == "--show-presets")
