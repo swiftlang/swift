@@ -181,6 +181,28 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     paramInfos.push_back({ty, parameter.getConvention()});
   }
 
+  Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
+  if (originalType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    assert(getTrailingWitnessSignatureLength(IGF.IGM, originalType) == 2);
+
+    // First, the Self metadata.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getTypeMetadataPtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    // Then, the Self witness table.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getWitnessTablePtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    trailingWitnessInfo = AsyncContextLayout::TrailingWitnessInfo();
+  }
+
   //     ResultTypes directResults...;
   auto directResults = fnConv.getDirectSILResults();
   for (auto result : directResults) {
@@ -192,11 +214,11 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     directReturnInfos.push_back(result);
   }
 
-  return AsyncContextLayout(IGF.IGM, LayoutStrategy::Optimal, valTypes,
-                            typeInfos, IGF, originalType, substitutedType,
-                            substitutionMap, std::move(bindings), errorType,
-                            canHaveValidError, paramInfos, indirectReturnInfos,
-                            directReturnInfos, localContextInfo);
+  return AsyncContextLayout(
+      IGF.IGM, LayoutStrategy::Optimal, valTypes, typeInfos, IGF, originalType,
+      substitutedType, substitutionMap, std::move(bindings),
+      trailingWitnessInfo, errorType, canHaveValidError, paramInfos,
+      indirectReturnInfos, directReturnInfos, localContextInfo);
 }
 
 AsyncContextLayout::AsyncContextLayout(
@@ -204,8 +226,8 @@ AsyncContextLayout::AsyncContextLayout(
     ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
     CanSILFunctionType originalType, CanSILFunctionType substitutedType,
     SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
-    SILType errorType, bool canHaveValidError,
-    ArrayRef<ArgumentInfo> argumentInfos,
+    Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
+    bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
     ArrayRef<SILResultInfo> indirectReturnInfos,
     ArrayRef<SILResultInfo> directReturnInfos,
     Optional<AsyncContextLayout::ArgumentInfo> localContextInfo)
@@ -218,6 +240,7 @@ AsyncContextLayout::AsyncContextLayout(
       indirectReturnInfos(indirectReturnInfos.begin(),
                           indirectReturnInfos.end()),
       localContextInfo(localContextInfo), bindings(std::move(bindings)),
+      trailingWitnessInfo(trailingWitnessInfo),
       argumentInfos(argumentInfos.begin(), argumentInfos.end()) {
 #ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
@@ -1929,6 +1952,17 @@ class AsyncCallEmission final : public CallEmission {
                                    getCallee().getSubstitutions());
   }
 
+  void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {
+    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    ti.initialize(IGF, explosion, addr, isOutlined);
+  }
+  void loadValue(ElementLayout layout, Explosion &explosion) {
+    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    auto &ti = layout.getType();
+    cast<LoadableTypeInfo>(ti).loadAsTake(IGF, addr, explosion);
+  }
+
 public:
   AsyncCallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : CallEmission(IGF, selfValue, std::move(callee)) {
@@ -1974,21 +2008,15 @@ public:
       llArgs.add(selfValue);
     }
     auto layout = getAsyncContextLayout();
-    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
-         ++index) {
-      auto fieldLayout = layout.getArgumentLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-      ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
-    }
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, llArgs, fieldAddr, isOutlined);
+      saveValue(fieldLayout, llArgs, isOutlined);
+    }
+    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
+         ++index) {
+      auto fieldLayout = layout.getArgumentLayout(index);
+      saveValue(fieldLayout, llArgs, isOutlined);
     }
     if (layout.hasBindings()) {
       auto bindingLayout = layout.getBindingsLayout();
@@ -1997,10 +2025,7 @@ public:
     }
     if (selfValue) {
       auto fieldLayout = layout.getLocalContextLayout();
-      Address fieldAddr =
-          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(fieldLayout.getType());
-      ti.initialize(IGF, llArgs, fieldAddr, isOutlined);
+      saveValue(fieldLayout, llArgs, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
@@ -2016,20 +2041,13 @@ public:
       // argument buffer.
       return;
     }
-    assert(call->arg_size() == 1);
-    auto context = call->arg_begin()->get();
     // Gather the values.
     Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
-    auto dataAddr = layout.emitCastTo(IGF, context);
     for (unsigned index = 0, count = layout.getDirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getDirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      auto &fieldTI = fieldLayout.getType();
-      cast<LoadableTypeInfo>(fieldTI).loadAsTake(IGF, fieldAddr,
-                                                 nativeExplosion);
+      loadValue(fieldLayout, nativeExplosion);
     }
 
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
