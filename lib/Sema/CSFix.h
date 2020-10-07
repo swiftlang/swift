@@ -17,7 +17,6 @@
 #ifndef SWIFT_SEMA_CSFIX_H
 #define SWIFT_SEMA_CSFIX_H
 
-#include "ConstraintLocator.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
