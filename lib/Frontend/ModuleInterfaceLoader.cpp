@@ -859,13 +859,6 @@ class ModuleInterfaceLoaderImpl {
                                                 prebuiltCacheDir,
                                                 /*serializeDependencyHashes*/false,
                                                 trackSystemDependencies);
-    // Set up a builder if we need to build the module. It'll also set up
-    // the genericSubInvocation we'll need to use to compute the cache paths.
-    ModuleInterfaceBuilder builder(
-      ctx.SourceMgr, ctx.Diags, astDelegate, interfacePath, moduleName, cacheDir,
-      prebuiltCacheDir,
-      Opts.disableInterfaceLock, diagnosticLoc,
-      dependencyTracker);
 
     // Compute the output path if we're loading or emitting a cached module.
     llvm::SmallString<256> cachedOutputPath;
@@ -908,6 +901,18 @@ class ModuleInterfaceLoaderImpl {
 
       return std::move(module.moduleBuffer);
     }
+    // If building from interface is disabled, return error.
+    if (Opts.disableBuildingInterface) {
+      return std::make_error_code(std::errc::not_supported);
+    }
+
+    // Set up a builder if we need to build the module. It'll also set up
+    // the genericSubInvocation we'll need to use to compute the cache paths.
+    ModuleInterfaceBuilder builder(
+      ctx.SourceMgr, ctx.Diags, astDelegate, interfacePath, moduleName, cacheDir,
+      prebuiltCacheDir,
+      Opts.disableInterfaceLock, diagnosticLoc,
+      dependencyTracker);
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
