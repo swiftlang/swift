@@ -2567,8 +2567,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (!source) return MetadataResponse();
 
-    auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
-    auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
+    auto sourceMetadata =
+      IGF.emitAbstractTypeMetadataRef(sourceType);
+    auto associatedMetadata =
+      IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
     auto sourceWTable = source.getMetadata();
 
     AssociatedConformance associatedConformanceRef(sourceProtocol,
