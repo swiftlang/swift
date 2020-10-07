@@ -2728,24 +2728,45 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
                                     [&](CanType type) { return type;});
 }
 
+template <typename Transform>
+static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
+                 Address buffer, Transform transform) {
+  emitInitOfGenericRequirementsBuffer(
+      IGF, bindings.getRequirements().getArrayRef(), buffer,
+      [&](GenericRequirement requirement) -> llvm::Value * {
+        CanType type = requirement.TypeParameter;
+        if (auto protocol = requirement.Protocol) {
+          if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+            auto wtable =
+                emitArchetypeWitnessTableRef(IGF, archetype, protocol);
+            return transform(requirement, wtable);
+          } else {
+            auto conformance = bindings.getConformance(requirement);
+            auto wtable = emitWitnessTableRef(IGF, type, conformance);
+            return transform(requirement, wtable);
+          }
+        } else {
+          auto metadata = IGF.emitTypeMetadataRef(type);
+          return transform(requirement, metadata);
+        }
+      });
+};
+
+void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
+                             Explosion &source) const {
+  ::save(*this, IGF, buffer,
+         [&](GenericRequirement requirement,
+             llvm::Value *expected) -> llvm::Value * {
+           auto *value = source.claimNext();
+           assert(value == expected);
+           return value;
+         });
+}
+
 void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
-  emitInitOfGenericRequirementsBuffer(IGF, Requirements.getArrayRef(), buffer,
-        [&](GenericRequirement requirement) -> llvm::Value* {
-    CanType type = requirement.TypeParameter;
-    if (auto protocol = requirement.Protocol) {
-      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-        auto wtable = emitArchetypeWitnessTableRef(IGF, archetype, protocol);
-        return wtable;
-      } else {
-        auto conformance = getConformance(requirement);
-        auto wtable = emitWitnessTableRef(IGF, type, conformance);
-        return wtable;
-      }
-    } else {
-      auto metadata = IGF.emitTypeMetadataRef(type);
-      return metadata;
-    }
-  });
+  ::save(*this, IGF, buffer,
+         [](GenericRequirement requirement,
+            llvm::Value *value) -> llvm::Value * { return value; });
 }
 
 void NecessaryBindings::addTypeMetadata(CanType type) {
@@ -3021,7 +3042,7 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   }
 }
 
-NecessaryBindings NecessaryBindings::forAsyncFunctionInvocations(
+NecessaryBindings NecessaryBindings::forAsyncFunctionInvocation(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs) {
   return computeBindings(IGM, origType, subs,
                          false /*forPartialApplyForwarder*/);

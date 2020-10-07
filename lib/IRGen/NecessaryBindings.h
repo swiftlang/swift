@@ -25,6 +25,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
+#include "Explosion.h"
+
 namespace swift {
   class CanType;
   enum class MetadataState : size_t;
@@ -55,8 +57,8 @@ public:
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
   static NecessaryBindings
-  forAsyncFunctionInvocations(IRGenModule &IGM, CanSILFunctionType origType,
-                              SubstitutionMap subs);
+  forAsyncFunctionInvocation(IRGenModule &IGM, CanSILFunctionType origType,
+                             SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,
@@ -93,6 +95,8 @@ public:
 
   /// Save the necessary bindings to the given buffer.
   void save(IRGenFunction &IGF, Address buffer) const;
+
+  void save(IRGenFunction &IGF, Address buffer, Explosion &source) const;
 
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
