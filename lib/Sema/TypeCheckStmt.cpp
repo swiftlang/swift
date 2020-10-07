@@ -912,7 +912,7 @@ public:
   Stmt *visitGuardStmt(GuardStmt *GS) {
     typeCheckConditionForStatement(GS, DC);
 
-    Stmt *S = GS->getBody();
+    BraceStmt *S = GS->getBody();
     typeCheckStmt(S);
     GS->setBody(S);
     return GS;
@@ -1150,7 +1150,7 @@ public:
             getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
-      Stmt *body = caseBlock->getBody();
+      BraceStmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
     }
