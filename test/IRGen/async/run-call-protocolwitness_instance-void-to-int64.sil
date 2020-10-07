@@ -18,28 +18,17 @@ sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) ->
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
 protocol P {
-  func printMe() -> Int64
-}
-
-extension P {
-  func callPrintMe() async -> Int64
+  func printMe() async -> Int64
 }
 
 struct I : P {
   @_hasStorage let int: Int64 { get }
-  func printMe() -> Int64
+  func printMe() async -> Int64
   init(int: Int64)
 }
 
-// CHECK-LL: define hidden swiftcc void @callPrintMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
-sil hidden @callPrintMe : $@async @convention(method) <Self where Self : P> (@in_guaranteed Self) -> Int64 {
-bb0(%self : $*Self):
-  %P_printMe = witness_method $Self, #P.printMe : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %result = apply %P_printMe<Self>(%self) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  return %result : $Int64
-}
-
-sil hidden @I_printMe : $@convention(method) (I) -> Int64 {
+// CHECK-LL-LABEL: define hidden swiftcc void @I_printMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @I_printMe : $@async @convention(method) (I) -> Int64 {
 bb0(%self : $I):
   %self_addr = alloc_stack $I
   store %self to %self_addr : $*I
@@ -50,11 +39,12 @@ bb0(%self : $I):
   return %result : $Int64
 }
 
-sil private [transparent] [thunk] @I_P_printMe : $@convention(witness_method: P) (@in_guaranteed I) -> Int64 {
+// CHECK-LL-LABEL: define internal swiftcc void @I_P_printMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil private [transparent] [thunk] @I_P_printMe : $@async @convention(witness_method: P) (@in_guaranteed I) -> Int64 {
 bb0(%self_addr : $*I):
   %self = load %self_addr : $*I
-  %I_printMe = function_ref @I_printMe : $@convention(method) (I) -> Int64
-  %result = apply %I_printMe(%self) : $@convention(method) (I) -> Int64
+  %I_printMe = function_ref @I_printMe : $@async @convention(method) (I) -> Int64
+  %result = apply %I_printMe(%self) : $@async @convention(method) (I) -> Int64
   return %result : $Int64
 }
 
@@ -66,8 +56,8 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %i = struct $I (%i_int : $Int64)
   %i_addr = alloc_stack $I
   store %i to %i_addr : $*I
-  %callPrintMe = function_ref @callPrintMe : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %result = apply %callPrintMe<I>(%i_addr) : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // CHECK: I(int: 99)
+  %P_printMe = witness_method $I, #P.printMe : <Self where Self : P> (Self) -> () async -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %result = apply %P_printMe<I>(%i_addr) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // CHECK: I(int: 99)
   dealloc_stack %i_addr : $*I
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 99
@@ -78,5 +68,6 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
 }
 
 sil_witness_table hidden I: P module main {
-  method #P.printMe: <Self where Self : P> (Self) -> () -> Int64 : @I_P_printMe
+  method #P.printMe: <Self where Self : P> (Self) -> () async -> Int64 : @I_P_printMe
 }
+

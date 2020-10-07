@@ -860,7 +860,7 @@ namespace driver {
           computeFirstRoundCompileJobsForIncrementalCompilation();
 
       for (const Job *Cmd : Comp.getJobs()) {
-        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
+        if (!isa<IncrementalJobAction>(Cmd->getSource()) ||
             compileJobsToSchedule.count(Cmd)) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
           noteBuilding(Cmd, /*willBeBuilding*/ true, /*isTentative=*/false,
@@ -899,20 +899,22 @@ namespace driver {
     CommandSet
     computeDependenciesAndGetNeededCompileJobs(const bool forRanges) {
       auto getEveryCompileJob = [&] {
-        CommandSet everyCompileJob;
+        CommandSet everyIncrementalJob;
         for (const Job *Cmd : Comp.getJobs()) {
-          if (!Cmd->getFirstSwiftPrimaryInput().empty())
-            everyCompileJob.insert(Cmd);
+          if (isa<IncrementalJobAction>(Cmd->getSource()))
+            everyIncrementalJob.insert(Cmd);
         }
-        return everyCompileJob;
+        return everyIncrementalJob;
       };
 
       CommandSet jobsToSchedule;
       CommandSet initialCascadingCommands;
       for (const Job *cmd : Comp.getJobs()) {
-        const StringRef primary = cmd->getFirstSwiftPrimaryInput();
-        if (primary.empty())
-          continue; // not Compile
+        // Skip jobs that have no associated incremental info.
+        if (!isa<IncrementalJobAction>(cmd->getSource())) {
+          continue;
+        }
+
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
             computeShouldInitiallyScheduleJobAndDependendents(cmd, forRanges);
         if (!shouldSchedAndIsCascading)

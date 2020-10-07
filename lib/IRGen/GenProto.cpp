@@ -3100,7 +3100,11 @@ NecessaryBindings NecessaryBindings::computeBindings(
       continue;
 
     case MetadataSource::Kind::SelfMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
+      // Async functions pass the SelfMetadata and SelfWitnessTable parameters
+      // along explicitly.
+      if (forPartialApplyForwarder) {
+        bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
+      }
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:

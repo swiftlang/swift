@@ -1221,6 +1221,14 @@ class AsyncNativeCCEntryPointArgumentEmission final
   /*const*/ AsyncContextLayout layout;
   const Address dataAddr;
 
+  llvm::Value *loadValue(ElementLayout layout) {
+    Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    Explosion explosion;
+    ti.loadAsTake(IGF, addr, explosion);
+    return explosion.claimNext();
+  }
+
 public:
   AsyncNativeCCEntryPointArgumentEmission(IRGenSILFunction &IGF,
                                           SILBasicBlock &entry,
@@ -1234,36 +1242,17 @@ public:
     Address addr = errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
     return addr.getAddress();
   }
-  llvm::Value *getErrorResultAddrForCall() {
-    auto errorLayout = layout.getErrorLayout();
-    auto &ti = cast<LoadableTypeInfo>(errorLayout.getType());
-    auto allocaAddr = ti.allocateStack(IGF, layout.getErrorType(), "arg");
-    auto addrInContext =
-        layout.getErrorLayout().project(IGF, dataAddr, /*offsets*/ llvm::None);
-    Explosion explosion;
-    ti.loadAsTake(IGF, addrInContext, explosion);
-    ti.initialize(IGF, explosion, allocaAddr.getAddress(),
-                  /*isOutlined*/ false);
-    return allocaAddr.getAddress().getAddress();
-  }
   llvm::Value *getContext() override {
     auto contextLayout = layout.getLocalContextLayout();
-    Address addr = contextLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto &ti = cast<LoadableTypeInfo>(contextLayout.getType());
-    Explosion explosion;
-    ti.loadAsTake(IGF, addr, explosion);
-    return explosion.claimNext();
+    return loadValue(contextLayout);
   }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
     assert(size > 0);
     Explosion result;
     for (unsigned i = index, end = index + size; i < end; ++i) {
       auto argumentLayout = layout.getArgumentLayout(i);
-      auto addr = argumentLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(argumentLayout.getType());
-      Explosion explosion;
-      ti.loadAsTake(IGF, addr, explosion);
-      result.add(explosion.claimAll());
+      auto *value = loadValue(argumentLayout);
+      result.add(value);
     }
     return result;
   }
@@ -1274,18 +1263,17 @@ public:
                      "indirected through the context");
   }
   llvm::Value *getIndirectResult(unsigned index) override {
-    Address dataAddr = layout.emitCastTo(IGF, context);
-    unsigned baseIndirectReturnIndex = layout.getFirstIndirectReturnIndex();
-    unsigned elementIndex = baseIndirectReturnIndex + index;
-    auto &fieldLayout = layout.getElement(elementIndex);
-    Address fieldAddr =
-        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    return IGF.Builder.CreateLoad(fieldAddr);
+    auto fieldLayout = layout.getIndirectReturnLayout(index);
+    return loadValue(fieldLayout);
   };
   llvm::Value *getSelfWitnessTable() override {
-    llvm_unreachable("unimplemented");
+    auto fieldLayout = layout.getSelfWitnessTableLayout();
+    return loadValue(fieldLayout);
   }
-  llvm::Value *getSelfMetadata() override { llvm_unreachable("unimplemented"); }
+  llvm::Value *getSelfMetadata() override {
+    auto fieldLayout = layout.getSelfMetadataLayout();
+    return loadValue(fieldLayout);
+  }
   llvm::Value *getCoroutineBuffer() override {
     llvm_unreachable("unimplemented");
   }
@@ -3115,16 +3103,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);
-    unsigned index = layout.getFirstDirectReturnIndex();
-    for (auto r :
-         IGF.CurSILFn->getLoweredFunctionType()->getDirectFormalResults()) {
-      (void)r;
-      auto &fieldLayout = layout.getElement(index);
+    for (unsigned index = 0, count = layout.getDirectReturnCount();
+         index < count; ++index) {
+      auto fieldLayout = layout.getDirectReturnLayout(index);
       Address fieldAddr =
           fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
       cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
-      ++index;
     }
     IGF.Builder.CreateRetVoid();
   } else {

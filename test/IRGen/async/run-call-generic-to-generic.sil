@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
@@ -35,7 +35,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %out_addr = alloc_stack $Int64
 
   %genericToGeneric = function_ref @genericToGeneric : $@async @convention(thin) <T> (@in_guaranteed T) -> @out T
-  %result1 = apply %genericToGeneric<Int64>(%int_addr, %out_addr) : $@async @convention(thin) <T> (@in_guaranteed T) -> @out T
+  %result1 = apply %genericToGeneric<Int64>(%out_addr, %int_addr) : $@async @convention(thin) <T> (@in_guaranteed T) -> @out T
 
   %print_int = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %out = load %out_addr : $*Int64
