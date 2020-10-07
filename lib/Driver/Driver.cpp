@@ -1876,6 +1876,54 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   return OutputInfo::Mode::StandardCompile;
 }
 
+namespace {
+/// Encapsulates the computation of input jobs that are relevant to the
+/// merge-modules job the scheduler can insert if we are not in a single compile
+/// mode.
+class ModuleInputs final {
+private:
+  using InputInfo = IncrementalJobAction::InputInfo;
+  SmallVector<const Action *, 2> AllModuleInputs;
+  InputInfo StatusBound;
+
+public:
+  explicit ModuleInputs()
+      : StatusBound
+            {InputInfo::Status::UpToDate, llvm::sys::TimePoint<>::min()} {}
+
+public:
+  void addInput(const Action *inputAction) {
+    if (auto *IJA = dyn_cast<IncrementalJobAction>(inputAction)) {
+      // Take the upper bound of the status of any incremental inputs to
+      // ensure that the merge-modules job gets run if *any* input job is run.
+      const auto conservativeStatus =
+          std::max(StatusBound.status, IJA->getInputInfo().status);
+      // The modification time here is not important to the rest of the
+      // incremental build. We take the upper bound in case an attempt to
+      // compare the swiftmodule output's mod time and any input files is
+      // made. If the compilation has been correctly scheduled, the
+      // swiftmodule's mod time will always strictly exceed the mod time of
+      // any of its inputs when we are able to skip it.
+      const auto conservativeModTime = std::max(
+          StatusBound.previousModTime, IJA->getInputInfo().previousModTime);
+      StatusBound = InputInfo{conservativeStatus, conservativeModTime};
+    }
+    AllModuleInputs.push_back(inputAction);
+  }
+
+public:
+  /// Returns \c true if no inputs have been registered with this instance.
+  bool empty() const { return AllModuleInputs.empty(); }
+
+public:
+  /// Consumes this \c ModuleInputs instance and returns a merge-modules action
+  /// from the list of input actions and status it has computed thus far.
+  JobAction *intoAction(Compilation &C) && {
+    return C.createAction<MergeModuleJobAction>(AllModuleInputs, StatusBound);
+  }
+};
+} // namespace
+
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
                           const InputInfoMap *OutOfDateMap,
