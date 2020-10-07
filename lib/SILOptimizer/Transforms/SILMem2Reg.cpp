@@ -468,8 +468,12 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     // Stop on deallocation.
     if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
-      if (DSI->getOperand() == ASI)
+      if (DSI->getOperand() == ASI) {
+        // Reset LastStore.
+        // So that we don't pass RunningVal as a phi arg beyond dealloc_stack
+        LastStore = nullptr;
         break;
+      }
     }
   }
   if (LastStore) {

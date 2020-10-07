@@ -465,3 +465,30 @@ bb0(%0 : $Optional<Klass>):
   %4 = tuple()
   return %4 : $()
 }
+
+// CHECK-LABEL: sil @multi_basic_block_use_on_one_path :
+// CHECK-NOT: alloc_stack
+// CHECK:bb2:
+// CHECK: br bb3(undef : $Klass)
+// CHECK-LABEL: } // end sil function 'multi_basic_block_use_on_one_path'
+sil @multi_basic_block_use_on_one_path : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %1 : $*Klass
+  strong_release %0 : $Klass
+  br bb3
+
+bb2:
+  store %0 to %1 : $*Klass
+  %7 = load %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  strong_release %7 : $Klass
+  br bb3
+
+bb3:
+  %11 = tuple ()
+  return %11 : $()
+}
