@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
