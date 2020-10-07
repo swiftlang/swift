@@ -39,89 +39,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-#pragma mark source range utilities
-static bool rangeableIsIgnored(const Decl *d) { return d->isImplicit(); }
-static bool rangeableIsIgnored(const Expr *d) {
-  return false; // implicit expr may contain closures
-}
-static bool rangeableIsIgnored(const Stmt *d) {
-  return false; // ??
-}
-static bool rangeableIsIgnored(const ASTNode n) {
-  return (n.is<Decl *>() && rangeableIsIgnored(n.get<Decl *>())) ||
-         (n.is<Stmt *>() && rangeableIsIgnored(n.get<Stmt *>())) ||
-         (n.is<Expr *>() && rangeableIsIgnored(n.get<Expr *>()));
-}
-
-template <typename Rangeable>
-static SourceRange getRangeableSourceRange(const Rangeable *const p) {
-  return p->getSourceRange();
-}
-static SourceRange getRangeableSourceRange(const ASTNode n) {
-  return n.getSourceRange();
-}
-
-template <typename Rangeable>
-static bool isLocalizable(const Rangeable astElement) {
-  return !rangeableIsIgnored(astElement) &&
-         getRangeableSourceRange(astElement).isValid();
-}
-
-template <typename Rangeable>
-static void dumpRangeable(const Rangeable r, llvm::raw_ostream &f) {
-  r.dump(f);
-}
-template <typename Rangeable>
-static void dumpRangeable(const Rangeable *r, llvm::raw_ostream &f) {
-  r->dump(f);
-}
-template <typename Rangeable>
-static void dumpRangeable(Rangeable *r, llvm::raw_ostream &f) {
-  r->dump(f);
-}
-
-static void dumpRangeable(const SpecializeAttr *r,
-                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
-static void dumpRangeable(const SpecializeAttr *r, llvm::raw_ostream &f) {
-  llvm::errs() << "SpecializeAttr\n";
-}
-static void dumpRangeable(SpecializeAttr *r,
-                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
-static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
-  llvm::errs() << "SpecializeAttr\n";
-}
-
-static void dumpRangeable(const DifferentiableAttr *a,
-                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
-static void dumpRangeable(const DifferentiableAttr *a, llvm::raw_ostream &f) {
-  llvm::errs() << "DifferentiableAttr\n";
-}
-static void dumpRangeable(DifferentiableAttr *a,
-                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
-static void dumpRangeable(DifferentiableAttr *a, llvm::raw_ostream &f) {
-  llvm::errs() << "DifferentiableAttr\n";
-}
-
-/// For Debugging
-template <typename T>
-bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
-                             unsigned start, unsigned end,
-                             StringRef file = "") {
-  auto const r = getRangeableSourceRange(x);
-  if (r.isInvalid())
-    return false;
-  if (start && SM.getLineAndColumnInBuffer(r.Start).first != start)
-    return false;
-  if (end && SM.getLineAndColumnInBuffer(r.End).first != end)
-    return false;
-  if (file.empty())
-    return true;
-  const auto buf = SM.findBufferContainingLoc(r.Start);
-  return SM.getIdentifierForBuffer(buf).endswith(file);
-}
-
-#pragma mark end of rangeable
-
 static std::vector<ASTNode> asNodeVector(DeclRange dr) {
   std::vector<ASTNode> nodes;
   llvm::transform(dr, std::back_inserter(nodes),
@@ -832,8 +749,10 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // so compute it ourselves.
   // Even if this predicate fails, there may be an initContext but
   // we cannot make a scope for it, since no source range.
-  if (patternEntry.getOriginalInit() &&
-      isLocalizable(patternEntry.getOriginalInit())) {
+  if (patternEntry.getOriginalInit()) {
+    ASTScopeAssert(
+        patternEntry.getOriginalInit()->getSourceRange().isValid(),
+        "pattern initializer has invalid source range");
     ASTScopeAssert(
         !getSourceManager().isBeforeInBuffer(
             patternEntry.getOriginalInit()->getStartLoc(), decl->getStartLoc()),
@@ -1053,8 +972,10 @@ void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   scopeCreator.addToScopeTree(stmt->getSubjectExpr(), this);
 
   for (auto caseStmt : stmt->getCases()) {
-    if (isLocalizable(caseStmt))
-      scopeCreator.constructExpandAndInsert<CaseStmtScope>(this, caseStmt);
+    ASTScopeAssert(
+        caseStmt->getSourceRange().isValid(),
+        "pattern initializer has invalid source range");
+    scopeCreator.constructExpandAndInsert<CaseStmtScope>(this, caseStmt);
   }
 }
 
@@ -1068,8 +989,10 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // the body is implicit and it would overlap the source range of the expr
   // above.
   if (!stmt->getBody()->isImplicit()) {
-    if (isLocalizable(stmt->getBody()))
-      scopeCreator.constructExpandAndInsert<ForEachPatternScope>(this, stmt);
+    ASTScopeAssert(
+        stmt->getBody()->getSourceRange().isValid(),
+        "pattern initializer has invalid source range");
+    scopeCreator.constructExpandAndInsert<ForEachPatternScope>(this, stmt);
   }
 }
 
