@@ -127,7 +127,7 @@ public:
   }
 };
 
-class CompileJobAction : public JobAction {
+class IncrementalJobAction : public JobAction {
 public:
   struct InputInfo {
     enum Status {
@@ -136,6 +136,8 @@ public:
       NeedsNonCascadingBuild,
       NewlyAdded
     };
+
+  public:
     Status status = UpToDate;
     llvm::sys::TimePoint<> previousModTime;
 
@@ -153,17 +155,31 @@ private:
   InputInfo inputInfo;
 
 public:
-  CompileJobAction(file_types::ID OutputType)
-      : JobAction(Action::Kind::CompileJob, None, OutputType),
-        inputInfo() {}
+  IncrementalJobAction(Kind Kind, ArrayRef<const Action *> Inputs,
+                       file_types::ID Type, InputInfo info)
+      : JobAction(Kind, Inputs, Type), inputInfo(info) {}
 
-  CompileJobAction(Action *Input, file_types::ID OutputType, InputInfo info)
-      : JobAction(Action::Kind::CompileJob, Input, OutputType),
-        inputInfo(info) {}
-
+public:
   InputInfo getInputInfo() const {
     return inputInfo;
   }
+
+public:
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::Kind::CompileJob;
+  }
+};
+
+class CompileJobAction : public IncrementalJobAction {
+private:
+  virtual void anchor() override;
+
+public:
+  CompileJobAction(file_types::ID OutputType)
+      : IncrementalJobAction(Action::Kind::CompileJob, None, OutputType, {}) {}
+  CompileJobAction(Action *Input, file_types::ID OutputType, InputInfo info)
+      : IncrementalJobAction(Action::Kind::CompileJob, Input, OutputType,
+                             info) {}
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::CompileJob;
