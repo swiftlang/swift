@@ -3728,48 +3728,46 @@ void ClangImporter::Implementation::lookupValue(
 
     // If we have a declaration and nothing matched so far, try the names used
     // in other versions of Swift.
-    if (!anyMatching) {
-      if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-        const clang::NamedDecl *recentClangDecl =
-            clangDecl->getMostRecentDecl();
+    if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+      const clang::NamedDecl *recentClangDecl =
+          clangDecl->getMostRecentDecl();
 
-        CurrentVersion.forEachOtherImportNameVersion(
-            SwiftContext.LangOpts.EnableExperimentalConcurrency,
-            [&](ImportNameVersion nameVersion) {
-          if (anyMatching)
-            return;
+      CurrentVersion.forEachOtherImportNameVersion(
+          SwiftContext.LangOpts.EnableExperimentalConcurrency,
+          [&](ImportNameVersion nameVersion) {
+        if (anyMatching)
+          return;
 
-          // Check to see if the name and context match what we expect.
-          ImportedName newName = importFullName(recentClangDecl, nameVersion);
-          if (!newName.getDeclName().matchesRef(name))
-            return;
+        // Check to see if the name and context match what we expect.
+        ImportedName newName = importFullName(recentClangDecl, nameVersion);
+        if (!newName.getDeclName().matchesRef(name))
+          return;
 
-          // If we asked for an async import and didn't find one, skip this.
-          // This filters out duplicates.
-          if (nameVersion.supportsConcurrency() &&
-              !newName.getAsyncInfo())
-            return;
+        // If we asked for an async import and didn't find one, skip this.
+        // This filters out duplicates.
+        if (nameVersion.supportsConcurrency() &&
+            !newName.getAsyncInfo())
+          return;
 
-          const clang::DeclContext *clangDC =
-              newName.getEffectiveContext().getAsDeclContext();
-          if (!clangDC || !clangDC->isFileContext())
-            return;
+        const clang::DeclContext *clangDC =
+            newName.getEffectiveContext().getAsDeclContext();
+        if (!clangDC || !clangDC->isFileContext())
+          return;
 
-          // Then try to import the decl under the alternate name.
-          auto alternateNamedDecl =
-              cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
-                                                     nameVersion));
-          if (!alternateNamedDecl || alternateNamedDecl == decl)
-            return;
-          assert(alternateNamedDecl->getName().matchesRef(name) &&
-                 "importFullName behaved differently from importDecl");
-          if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
-            consumer.foundDecl(alternateNamedDecl,
-                               DeclVisibilityKind::VisibleAtTopLevel);
-            anyMatching = true;
-          }
-        });
-      }
+        // Then try to import the decl under the alternate name.
+        auto alternateNamedDecl =
+            cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
+                                                   nameVersion));
+        if (!alternateNamedDecl || alternateNamedDecl == decl)
+          return;
+        assert(alternateNamedDecl->getName().matchesRef(name) &&
+               "importFullName behaved differently from importDecl");
+        if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
+          consumer.foundDecl(alternateNamedDecl,
+                             DeclVisibilityKind::VisibleAtTopLevel);
+          anyMatching = true;
+        }
+      });
     }
   }
 }

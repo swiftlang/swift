@@ -27,17 +27,12 @@ func asyncHandlerBad3() throws { }
 func asyncHandlerBad4(result: inout Int) { }
 // expected-error@-1{{'inout' parameter is not allowed in '@asyncHandler' function}}
 
-struct X {
+actor class X {
   @asyncHandler func asyncHandlerMethod() { }
-
-  @asyncHandler
-  mutating func asyncHandlerMethodBad1() { }
-  // expected-error@-1{{'@asyncHandler' function cannot be 'mutating'}}{{3-12=}}
 
   @asyncHandler init() { }
   // expected-error@-1{{@asyncHandler may only be used on 'func' declarations}}
 }
-
 
 // Inference of @asyncHandler
 protocol P {
@@ -49,4 +44,22 @@ extension X: P {
     // okay, it's an async context
     let _ = await globalAsyncFunction()
  }
+}
+
+class Y: P {
+  // @asyncHandler is not inferred for classes
+
+  func callback() {
+    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}}
+    // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}}
+
+    // okay, it's an async context
+    let _ = await globalAsyncFunction() // expected-error{{'async' in a function that does not support concurrency}}
+ }
+}
+
+struct Z {
+  @asyncHandler
+  mutating func asyncHandlerMethodBad1() { }
+  // expected-error@-1{{'@asyncHandler' function cannot be 'mutating'}}{{3-12=}}
 }

@@ -110,12 +110,14 @@ bool IsAsyncHandlerRequest::evaluate(
 
   // Are we in a context where inference is possible?
   auto dc = func->getDeclContext();
-  if (!dc->isTypeContext() || !dc->getParentSourceFile() ||
-      isa<ProtocolDecl>(dc) || !func->hasBody())
+  if (!dc->getSelfClassDecl() || !dc->getParentSourceFile() || !func->hasBody())
     return false;
 
   // Is it possible to infer @asyncHandler for this function at all?
   if (!func->canBeAsyncHandler())
+    return false;
+
+  if (!dc->getSelfClassDecl()->isActor())
     return false;
 
   // Add an implicit @asyncHandler attribute and return true. We're done.
