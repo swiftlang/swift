@@ -966,19 +966,8 @@ public:
   CustomAttr *attr;
   VarDecl *decl;
 
-  /// Because we have to avoid request cycles, we approximate the test for an
-  /// AttachedPropertyWrapper with one based on source location. We might get
-  /// false positives, that that doesn't hurt anything. However, the result of
-  /// the conservative source range computation doesn't seem to be stable. So
-  /// keep the original here, and use it for source range queries.
-  const SourceRange sourceRangeWhenCreated;
-
   AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
-      : attr(attr), decl(decl),
-        sourceRangeWhenCreated(attr->getTypeRepr()->getSourceRange()) {
-    ASTScopeAssert(sourceRangeWhenCreated.isValid(),
-                   "VarDecls must have ranges to be looked-up");
-  }
+      : attr(attr), decl(decl) {}
   virtual ~AttachedPropertyWrapperScope() {}
 
 protected:
@@ -1093,45 +1082,27 @@ protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
-/// The scope introduced by a conditional clause in an if/guard/while
-/// statement.
-/// Since there may be more than one "let foo = ..." in (e.g.) an "if",
-/// we allocate a matrushka of these.
-class ConditionalClauseScope final : public ASTScopeImpl {
+/// The scope introduced by a conditional clause initializer in an
+/// if/while/guard statement.
+class ConditionalClauseInitializerScope final : public ASTScopeImpl {
 public:
-  LabeledConditionalStmt *const stmt;
-  const unsigned index;
-  const SourceLoc endLoc; // cannot get it from the stmt
+  Expr *const initializer;
+  const SourceRange bodyRange;
 
-  ConditionalClauseScope(LabeledConditionalStmt *stmt, unsigned index,
-                         SourceLoc endLoc)
-      : stmt(stmt), index(index), endLoc(endLoc) {}
+  ConditionalClauseInitializerScope(Expr *initializer)
+      : initializer(initializer) {}
 
-  virtual ~ConditionalClauseScope() {}
+  virtual ~ConditionalClauseInitializerScope() {}
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  std::string getClassName() const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-
-protected:
-  void printSpecifics(llvm::raw_ostream &out) const override;
-
-public:
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
-private:
-  ArrayRef<StmtConditionElement> getCond() const;
-  const StmtConditionElement &getStmtConditionElement() const;
-
-protected:
-  bool isLabeledStmtLookupTerminator() const override;
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
@@ -1139,16 +1110,20 @@ protected:
 /// the normal lookup rule to pass the lookup scope into the deepest conditional
 /// clause.
 class ConditionalClausePatternUseScope final : public ASTScopeImpl {
-  Pattern *const pattern;
-  const SourceLoc startLoc;
+  StmtConditionElement sec;
+  SourceLoc endLoc;
 
 public:
-  ConditionalClausePatternUseScope(Pattern *pattern, SourceLoc startLoc)
-      : pattern(pattern), startLoc(startLoc) {}
+  ConditionalClausePatternUseScope(StmtConditionElement sec, SourceLoc endLoc)
+      : sec(sec), endLoc(endLoc) {}
 
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
+
+private:
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1214,8 +1189,10 @@ protected:
 class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
+  SourceLoc endLoc;
 
-  TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
+  TopLevelCodeScope(TopLevelCodeDecl *e, SourceLoc endLoc)
+      : decl(e), endLoc(endLoc) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
@@ -1361,7 +1338,7 @@ public:
 protected:
   /// Return the lookupParent required to search these.
   ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &,
-                                                    const Stmt *afterConds);
+                                                    SourceLoc);
 };
 
 class IfStmtScope final : public LabeledConditionalStmtScope {
@@ -1419,27 +1396,23 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 };
 
-/// A scope after a guard statement that follows lookups into the conditions
-/// Also for:
-///  The insertion point of the last statement of an active clause in an #if
-///  must be the lookup parent
-/// of any following scopes. But the active clause may not be the last clause.
-/// In short, this is another case where the lookup parent cannot follow the same
-/// nesting as the source order. IfConfigUseScope implements this twist. It
-/// follows the IfConfig, wraps all subsequent scopes, and redirects the lookup.
-class LookupParentDiversionScope final : public ASTScopeImpl {
+/// A scope for the body of a guard statement. Lookups from the body must
+/// skip the parent scopes for introducing pattern bindings, since they're
+/// not visible in the guard body, only after the body ends.
+class GuardStmtBodyScope final : public ASTScopeImpl {
 public:
   ASTScopeImpl *const lookupParent;
-  const SourceLoc startLoc;
-  const SourceLoc endLoc;
+  BraceStmt *const body;
 
-  LookupParentDiversionScope(ASTScopeImpl *lookupParent,
-                             SourceLoc startLoc, SourceLoc endLoc)
-      : lookupParent(lookupParent), startLoc(startLoc), endLoc(endLoc) {}
+  GuardStmtBodyScope(ASTScopeImpl *lookupParent, BraceStmt *body)
+      : lookupParent(lookupParent), body(body) {}
 
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1672,13 +1645,21 @@ class BraceStmtScope final : public AbstractStmtScope {
   /// definition.
   SmallVector<VarDecl *, 2> localVars;
 
+  /// The end location for bindings introduced in this scope. This can
+  /// extend past the actual end of the BraceStmt in top-level code,
+  /// where every TopLevelCodeDecl introduces a new scope through the
+  /// end of the buffer.
+  SourceLoc endLoc;
+
 public:
   BraceStmtScope(BraceStmt *e,
                  SmallVector<ValueDecl *, 2> localFuncsAndTypes,
-                 SmallVector<VarDecl *, 2> localVars)
+                 SmallVector<VarDecl *, 2> localVars,
+                 SourceLoc endLoc)
       : stmt(e),
         localFuncsAndTypes(localFuncsAndTypes),
-        localVars(localVars) {}
+        localVars(localVars),
+        endLoc(endLoc) {}
   virtual ~BraceStmtScope() {}
 
 protected:
