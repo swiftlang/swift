@@ -20,8 +20,6 @@
 
 #include "CSFix.h"
 #include "Constraint.h"
-#include "ConstraintGraph.h"
-#include "ConstraintGraphScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
@@ -34,6 +32,8 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "swift/Sema/SolutionResult.h"

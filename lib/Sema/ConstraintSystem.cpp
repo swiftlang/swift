@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
-#include "ConstraintGraph.h"
 #include "CSDiagnostics.h"
 #include "CSFix.h"
 #include "TypeChecker.h"
@@ -26,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"

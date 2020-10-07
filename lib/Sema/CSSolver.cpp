@@ -14,12 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 #include "CSStep.h"
-#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"

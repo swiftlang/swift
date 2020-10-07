@@ -18,7 +18,6 @@
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
-#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 
 using namespace swift;
