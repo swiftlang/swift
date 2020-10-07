@@ -132,8 +132,8 @@ public:
   struct InputInfo {
     enum Status {
       UpToDate,
-      NeedsCascadingBuild,
       NeedsNonCascadingBuild,
+      NeedsCascadingBuild,
       NewlyAdded
     };
 
