@@ -1258,7 +1258,7 @@ namespace {
       }
 
       // For properties, build member references.
-      if (isa<VarDecl>(member)) {
+      if (auto *varDecl = dyn_cast<VarDecl>(member)) {
         if (isUnboundInstanceMember) {
           assert(memberLocator.getBaseLocator() &&
                  cs.UnevaluatedRootExprs.count(
@@ -1271,17 +1271,22 @@ namespace {
           base->setImplicit();
         }
 
+        auto hasDynamicSelf =
+          varDecl->getValueInterfaceType()->hasDynamicSelfType();
+
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit, semantics);
         memberRefExpr->setIsSuper(isSuper);
+
+        if (hasDynamicSelf)
+          refTy = refTy->replaceCovariantResultType(containerTy, 1);
         cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
 
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
 
-        if (cast<VarDecl>(member)->getValueInterfaceType()
-                                 ->hasDynamicSelfType()) {
+        if (hasDynamicSelf) {
           if (!baseTy->isEqual(containerTy)) {
             result = new (context) CovariantReturnConversionExpr(
                 result, simplifyType(openedType));
