@@ -42,7 +42,7 @@ class C1: Actor {
 
 // Method that is not usable as a witness.
 actor class BA1 {
-  func enqueue(partialTask: PartialAsyncTask) { } // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'enqueue(partialTask:)'}}
+  func enqueue(partialTask: PartialAsyncTask) { } // expected-error{{actor-isolated instance method 'enqueue(partialTask:)' cannot be used to satisfy a protocol requirement; did you mean to make it an asychronous handler?}}
 }
 
 // Method that isn't part of the main class definition cannot be used to
