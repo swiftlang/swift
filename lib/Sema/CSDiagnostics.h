@@ -16,7 +16,6 @@
 #ifndef SWIFT_SEMA_CSDIAGNOSTICS_H
 #define SWIFT_SEMA_CSDIAGNOSTICS_H
 
-#include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"

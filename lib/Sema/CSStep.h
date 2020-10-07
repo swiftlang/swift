@@ -18,9 +18,9 @@
 #ifndef SWIFT_SEMA_CSSTEP_H
 #define SWIFT_SEMA_CSSTEP_H
 
-#include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
