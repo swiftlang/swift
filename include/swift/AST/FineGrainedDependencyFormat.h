@@ -135,8 +135,32 @@ bool writeFineGrainedDependencyGraphToPath(DiagnosticEngine &diags,
                                            llvm::StringRef path,
                                            const SourceFileDepGraph &g);
 
+/// Enumerates the supported set of purposes for writing out or reading in
+/// swift dependency information into a file. These can be used to influence
+/// the structure of the resulting data that is produced by the serialization
+/// machinery defined here.
+enum class Purpose : bool {
+  /// Write out fine grained dependency metadata suitable for embedding in
+  /// \c .swiftmodule file.
+  ///
+  /// The resulting metadata does not contain the usual block descriptor header
+  /// nor does it contain a leading magic signature, which would otherwise
+  /// disrupt clients and tools that do not expect them to be present such as
+  /// llvm-bcanalyzer.
+  ForSwiftModule = false,
+  /// Write out fine grained dependency metadata suitable for a standalone
+  /// \c .swiftdeps file.
+  ///
+  /// The resulting metadata will contain a leading magic signature and block
+  /// descriptor header.
+  ForSwiftDeps = true,
+};
+
+/// Tries to write out the given dependency graph with the given
+/// bitstream writer.
 void writeFineGrainedDependencyGraph(llvm::BitstreamWriter &Out,
-                                     const SourceFileDepGraph &g);
+                                     const SourceFileDepGraph &g,
+                                     Purpose purpose);
 
 } // namespace fine_grained_dependencies
 } // namespace swift
