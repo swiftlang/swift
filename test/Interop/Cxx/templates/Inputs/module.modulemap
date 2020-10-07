@@ -34,10 +34,30 @@ module ClassTemplateEagerInstantiationProblems {
   header "class-template-eager-instantiation-problems.h"
 }
 
+module MagicWrapper {
+  header "magic-wrapper.h"
+}
+
 module Mangling {
   header "mangling.h"
 }
 
 module LinkageOfSwiftSymbolsForImportedTypes {
   header "linkage-of-swift-symbols-for-imported-types.h"
+}
+
+module ClassTemplateInstantiationErrors {
+  header "class-template-instantiation-errors.h"
+}
+
+module ClassTemplateVariadic {
+  header "class-template-variadic.h"
+}
+
+module ClassTemplateNonTypeParameter {
+  header "class-template-non-type-parameter.h"
+}
+
+module ClassTemplateTemplateParameter {
+  header "class-template-template-parameter.h"
 }

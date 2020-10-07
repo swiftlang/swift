@@ -176,6 +176,14 @@ public:
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
+  /// Instantiate and import class template.
+  virtual NominalTypeDecl *
+  instantiateTemplate(clang::ClassTemplateDecl *decl,
+                      ArrayRef<clang::TemplateArgument> arguments) = 0;
+
+  /// Lookup identifier for an already imported decl.
+  virtual Identifier
+  lookupIdentifier(const clang::IdentifierInfo* declName) = 0;
 
   /// Try to parse the string as a Clang function type.
   ///

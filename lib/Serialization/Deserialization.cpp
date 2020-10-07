@@ -34,6 +34,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -1390,6 +1391,44 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   case XREF_INITIALIZER_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
 
+  case XREF_CLANG_TEMPLATE_INSTANTIATION: {
+    auto &astContext = getContext();
+    auto clangModuleLoader = astContext.getClangModuleLoader();
+    auto &clangASTContext = clangModuleLoader->getClangASTContext();
+
+    IdentifierID templateId;
+    ArrayRef<uint64_t> argumentIds;
+    XRefClangTemplateInstantiationLayout::readRecord(scratch, templateId, argumentIds);
+
+    auto templateIdent = getIdentifier(templateId);
+    SmallVector<ValueDecl*, 4> templateDeclResults;
+    VectorDeclConsumer templateDeclConsumer(templateDeclResults);
+    clangModuleLoader->lookupValue(templateIdent, templateDeclConsumer);
+    assert(templateDeclResults.size() == 1);
+    auto *templateDecl = templateDeclResults[0];
+    auto *classTemplateDecl = const_cast<clang::ClassTemplateDecl *>(
+        dyn_cast<clang::ClassTemplateDecl>(templateDecl->getClangDecl()));
+    assert(classTemplateDecl);
+
+    SmallVector<ValueDecl*, 2> arguments;
+    VectorDeclConsumer argumentsConsumer(arguments);
+    unsigned counter = 0;
+    for (auto id : argumentIds) {
+      auto argIdent = getIdentifier(id);
+      clangModuleLoader->lookupValue(argIdent, argumentsConsumer);
+      assert(arguments.size() == ++counter);
+    }
+    SmallVector<clang::TemplateArgument, 2> templateArguments;
+    for (auto &decl : arguments) {
+      templateArguments.push_back(
+          clang::TemplateArgument(clangASTContext.getTagDeclType(
+              dyn_cast<clang::TagDecl>(decl->getClangDecl()))));
+    }
+
+    auto *instantiation = clangModuleLoader->instantiateTemplate(
+        classTemplateDecl, templateArguments);
+    return instantiation;
+  }
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);

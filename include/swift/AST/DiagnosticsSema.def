@@ -2763,6 +2763,16 @@ ERROR(unexportable_clang_function_type,none,
       "it may use anonymous types or types defined outside of a module",
       (Type))
 
+ERROR(cxx_class_instantiation_failed,none,
+      "clang couldn't instantiate class template",
+      ())
+ERROR(cxx_class_instantiation_non_tag_argument,none,
+      "only struct/class/enum/union type arguments supported",
+      ())
+ERROR(cxx_class_instantiation_non_cxx_argument,none,
+      "only C++ types supported",
+      ())
+
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
         (Identifier))

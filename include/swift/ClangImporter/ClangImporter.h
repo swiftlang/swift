@@ -240,6 +240,13 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
 
+  NominalTypeDecl *
+  instantiateTemplate(clang::ClassTemplateDecl *decl,
+                      ArrayRef<clang::TemplateArgument> arguments) override;
+
+  Identifier
+  lookupIdentifier(const clang::IdentifierInfo* declName) override;
+
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
   ClangNode getEffectiveClangNode(const Decl *decl) const;

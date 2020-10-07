@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Serialization.h"
+#include "ModuleFormat.h"
 #include "SILFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -46,6 +47,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
+#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1829,6 +1831,26 @@ void Serializer::writeCrossReference(const Decl *D) {
                                                 genericParam->getDepth(),
                                                 genericParam->getIndex());
     return;
+  }
+
+  if (D->hasClangNode()) {
+    if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+            D->getClangDecl())) {
+      auto *clangModuleLoader = D->getASTContext().getClangModuleLoader();
+      abbrCode = DeclTypeAbbrCodes[XRefClangTemplateInstantiationLayout::Code];
+      SmallVector<IdentifierID, 4> arguments;
+      for (auto &param : ctsd->getTemplateArgs().asArray()) {
+        arguments.push_back(
+            addDeclBaseNameRef(clangModuleLoader->lookupIdentifier(
+                param.getAsType().getBaseTypeIdentifier())));
+      }
+      XRefClangTemplateInstantiationLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addDeclBaseNameRef(
+              clangModuleLoader->lookupIdentifier(ctsd->getDeclName().getAsIdentifierInfo())),
+          arguments);
+      return;
+    }
   }
 
   bool isProtocolExt = D->getDeclContext()->getExtendedProtocolDecl();
@@ -4581,6 +4603,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
+  registerDeclTypeAbbr<XRefClangTemplateInstantiationLayout>();
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

@@ -44,6 +44,9 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclBase.h"
+#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -821,6 +824,41 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     else
       diags.diagnose(loc, diag::use_of_void_pointer, "").
         fixItReplace(generic->getSourceRange(), "UnsafeRawPointer");
+  }
+
+  if (auto clangDecl = decl->getClangDecl()) {
+    if (auto classTemplateDecl =
+            dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
+      SmallVector<clang::TemplateArgument, 2> templateArguments;
+      for (auto &argTypeRepr : generic->getGenericArgs()) {
+        Type argType = resolution.resolveType(argTypeRepr);
+        auto *clangDecl = argType->getAnyNominal()->getDecl()->getClangDecl();
+        if (clangDecl) {
+          if (auto *tagDecl = dyn_cast<clang::TagDecl>(clangDecl)) {
+            auto type =
+                classTemplateDecl->getASTContext().getTagDeclType(tagDecl);
+            templateArguments.push_back(clang::TemplateArgument(type));
+          } else {
+            diags.diagnose(loc, diag::cxx_class_instantiation_non_tag_argument);
+            return ErrorType::get(ctx);
+          }
+        } else {
+          diags.diagnose(loc, diag::cxx_class_instantiation_non_cxx_argument);
+          return ErrorType::get(ctx);
+        }
+      }
+
+      auto *clangModuleLoader = decl->getASTContext().getClangModuleLoader();
+      auto instantiatedDecl = clangModuleLoader->instantiateTemplate(
+          const_cast<clang::ClassTemplateDecl *>(classTemplateDecl),
+          templateArguments);
+      if (instantiatedDecl) {
+        return instantiatedDecl->getDeclaredInterfaceType();
+      } else {
+        diags.diagnose(loc, diag::cxx_class_instantiation_failed);
+        return ErrorType::get(ctx);
+      }
+    }
   }
   return result;
 }

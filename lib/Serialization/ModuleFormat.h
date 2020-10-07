@@ -1703,6 +1703,12 @@ namespace decls_block {
     BCVBR<5>  // index
   >;
 
+  using XRefClangTemplateInstantiationLayout = BCRecordLayout<
+    XREF_CLANG_TEMPLATE_INSTANTIATION,
+    IdentifierIDField, // template name
+    BCArray<IdentifierIDField> // template args
+  >;
+
   using SILGenNameDeclAttrLayout = BCRecordLayout<
     SILGenName_DECL_ATTR,
     BCFixed<1>, // implicit flag
