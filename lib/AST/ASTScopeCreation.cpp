@@ -180,62 +180,6 @@ public:
   addToScopeTreeAndReturnInsertionPoint(ASTNode, ASTScopeImpl *parent,
                                         Optional<SourceLoc> endLoc);
 
-  bool isWorthTryingToCreateScopeFor(ASTNode n) const {
-    if (!n)
-      return false;
-    if (n.is<Expr *>())
-      return true;
-    // Cannot ignore implicit statements because implict return can contain
-    // scopes in the expression, such as closures.
-    // But must ignore other implicit statements, e.g. brace statments
-    // if they can have no children and no stmt source range.
-    // Deal with it in visitBraceStmt
-    if (n.is<Stmt *>())
-      return true;
-
-    auto *const d = n.get<Decl *>();
-    // Implicit nodes may not have source information for name lookup.
-    if (!isLocalizable(d))
-      return false;
-
-    // Commented out for
-    // validation-test/compiler_crashers_fixed/27962-swift-rebindselfinconstructorexpr-getcalledconstructor.swift
-    // In that test the invalid PBD -> var decl which contains the desired
-    // closure scope
-    //    if (const auto *PBD = dyn_cast<PatternBindingDecl>(d))
-    //      if (!isLocalizable(PBD))
-    //        return false;
-    /// In
-    /// \code
-    /// @propertyWrapper
-    /// public struct Wrapper<T> {
-    ///   public var value: T
-    ///
-    ///   public init(body: () -> T) {
-    ///     self.value = body()
-    ///   }
-    /// }
-    ///
-    /// let globalInt = 17
-    ///
-    /// @Wrapper(body: { globalInt })
-    /// public var y: Int
-    /// \endcode
-    /// I'm seeing a dumped AST include:
-    /// (pattern_binding_decl range=[test.swift:13:8 - line:12:29]
-    const auto &SM = d->getASTContext().SourceMgr;
-
-    // Once we allow invalid PatternBindingDecls (see
-    // isWorthTryingToCreateScopeFor), then
-    // IDE/complete_property_delegate_attribute.swift fails because we try to
-    // expand a member whose source range is backwards.
-    (void)SM;
-    ASTScopeAssert(d->getStartLoc().isInvalid() ||
-                       !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc()),
-                   "end-before-start will break tree search via location");
-    return true;
-  }
-
   template <typename Scope, typename... Args>
   ASTScopeImpl *constructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
     auto *child = new (ctx) Scope(args...);
@@ -338,26 +282,6 @@ public:
   addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
                                ASTScopeImpl *parent,
                                Optional<SourceLoc> endLoc);
-
-  /// Remove VarDecls because we'll find them when we expand the
-  /// PatternBindingDecls. Remove EnunCases
-  /// because they overlap EnumElements and AST includes the elements in the
-  /// members.
-  std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
-    // TODO: Investigate whether to move the real EndLoc tracking of
-    // SubscriptDecl up into AbstractStorageDecl. May have to cull more.
-    std::vector<ASTNode> culled;
-    llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
-      ASTScopeAssert(
-          !n.isDecl(DeclKind::Accessor),
-          "Should not find accessors in iterable types or brace statements");
-      return isLocalizable(n) &&
-             !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::EnumCase) &&
-             !n.isDecl(DeclKind::IfConfig);
-    });
-    return culled;
-  }
 
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
@@ -465,6 +389,10 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+
+  // Only members of the active clause are in scope, and those
+  // are visited separately.
+  VISIT_AND_IGNORE(IfConfigDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)
@@ -612,14 +540,6 @@ public:
     return p;
   }
 
-  ASTScopeImpl *visitIfConfigDecl(IfConfigDecl *icd,
-                                  ASTScopeImpl *p,
-                                  ScopeCreator &scopeCreator) {
-    ASTScope_unreachable(
-        "Should be handled inside of "
-        "expandIfConfigClausesThenCullAndSortElementsOrMembers");
-  }
-
   ASTScopeImpl *visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
                                 ScopeCreator &scopeCreator) {
     if (rs->hasResult())
@@ -657,8 +577,12 @@ ASTScopeImpl *
 ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
                                                     ASTScopeImpl *parent,
                                                     Optional<SourceLoc> endLoc) {
-  if (!isWorthTryingToCreateScopeFor(n))
+  if (!n)
     return parent;
+
+  if (auto *d = n.dyn_cast<Decl *>())
+    if (d->isImplicit())
+      return parent;
 
   NodeAdder adder(endLoc);
   if (auto *p = n.dyn_cast<Decl *>())
@@ -874,8 +798,7 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   std::vector<ASTNode> newNodes(decls.begin(), decls.end());
   insertionPoint =
       scopeCreator.addSiblingsToScopeTree(insertionPoint,
-                                          scopeCreator.cull(newNodes),
-                                          endLoc);
+                                          newNodes, endLoc);
 
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
@@ -1002,8 +925,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
   // elements in source order
   auto *insertionPoint =
       scopeCreator.addSiblingsToScopeTree(this,
-                                          scopeCreator.cull(
-                                            stmt->getElements()),
+                                          stmt->getElements(),
                                           endLoc);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
@@ -1365,7 +1287,6 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  nodes = scopeCreator.cull(nodes);
   scopeCreator.addSiblingsToScopeTree(this, nodes, None);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
