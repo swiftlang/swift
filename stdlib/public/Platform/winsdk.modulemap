@@ -137,13 +137,6 @@ module WinSDK [system] {
     }
   }
 
-  module AuthZ {
-    header "AuthZ.h"
-    export *
-
-    link "AuthZ.Lib"
-  }
-
   module Controls {
     module CommCtrl {
       header "CommCtrl.h"
@@ -222,6 +215,29 @@ module WinSDK [system] {
     export *
 
     link "WinMM.Lib"
+  }
+
+  module Security {
+    module AuthZ {
+      header "AuthZ.h"
+      export *
+
+      link "AuthZ.Lib"
+    }
+
+    module SmartCard {
+      header "winscard.h"
+      export *
+
+      link "winscard.lib"
+    }
+
+    module WinCrypt {
+      header "wincrypt.h"
+      export *
+
+      link "Crypt32.Lib"
+    }
   }
 
   module Shell {
@@ -305,13 +321,6 @@ module WinSDK [system] {
   module WinBase {
     header "winbase.h"
     export *
-  }
-
-  module WinCrypt {
-    header "wincrypt.h"
-    export *
-
-    link "Crypt32.Lib"
   }
 
   module WinDNS {
