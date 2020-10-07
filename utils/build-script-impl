@@ -1375,12 +1375,16 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
             echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
             for OS in ios watchos tvos; do
+                # Copy over the device .a when necessary
                 LIB_NAME="libclang_rt.$OS.a"
                 HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                if [[ -f "${HOST_LIB_PATH}" ]]; then
-                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                elif [[ "${VERBOSE_BUILD}" ]]; then
-                    echo "no file exists at ${HOST_LIB_PATH}"
+                DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                if [[ ! -f "${DEST_LIB_PATH}" ]]; then
+                    if [[ -f "${HOST_LIB_PATH}" ]]; then
+                        call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                    elif [[ "${VERBOSE_BUILD}" ]]; then
+                        echo "no file exists at ${HOST_LIB_PATH}"
+                    fi
                 fi
 
                 # Copy over the simulator .a when necessary
@@ -2989,7 +2993,7 @@ for host in "${ALL_HOSTS[@]}"; do
         build_dir=$(build_directory ${host} ${product})
 
         call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
-        
+
         # When we are installing LLVM copy over the compiler-rt
         # builtins for iOS/tvOS/watchOS to ensure that we don't
         # have linker errors  when building apps for such platforms.
