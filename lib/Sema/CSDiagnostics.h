@@ -18,7 +18,6 @@
 
 #include "Constraint.h"
 #include "ConstraintSystem.h"
-#include "OverloadChoice.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
@@ -29,6 +28,7 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
 

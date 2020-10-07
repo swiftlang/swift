@@ -20,12 +20,12 @@
 #include "CSDiagnostics.h"
 #include "ConstraintLocator.h"
 #include "ConstraintSystem.h"
-#include "OverloadChoice.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
