@@ -573,6 +573,7 @@ def experimental_cxx_stdlib :
 
 def enable_experimental_cross_module_incremental_build :
   Flag<["-"], "enable-experimental-cross-module-incremental-build">,
+  Flags<[FrontendOption]>,
   HelpText<"(experimental) Enable cross-module incremental build metadata and "
            "driver scheduling">;
 

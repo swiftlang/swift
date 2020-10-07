@@ -120,7 +120,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSwiftModuleBuffer(
       SourceFileDepGraph::loadFromSwiftModuleBuffer(buffer);
   if (!sourceFileDepGraph)
     return None;
-  registerJob(Cmd);
+  jobsBySwiftDeps[buffer.getBufferIdentifier().str()] = Cmd;
   auto changes = integrate(*sourceFileDepGraph, buffer.getBufferIdentifier());
   if (verifyFineGrainedDependencyGraphAfterEveryImport)
     verify();
@@ -445,11 +445,11 @@ bool ModuleDepGraph::recordWhatUseDependsUpon(
           StringRef externalSwiftDeps = def->getKey().getName();
           if (def->getKey().getKind() == NodeKind::externalDepend) {
             externalDependencies.insert(externalSwiftDeps.str());
+            useHasNewExternalDependency = true;
           } else if (def->getKey().getKind() ==
                      NodeKind::incrementalExternalDepend) {
             incrementalExternalDependencies.insert(externalSwiftDeps.str());
           }
-          useHasNewExternalDependency = true;
         }
       });
   return useHasNewExternalDependency;
