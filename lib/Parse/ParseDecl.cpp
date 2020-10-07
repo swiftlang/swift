@@ -6000,7 +6000,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // up in Decls to be returned to caller.
     if (topLevelDecl) {
       PBD->setDeclContext(topLevelDecl);
-      auto range = PBD->getSourceRange();
+      auto range = PBD->getSourceRangeIncludingAttrs();
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
                                               ASTNode(PBD), range.End, true));
       Decls.insert(Decls.begin()+NumDeclsInResult, topLevelDecl);
