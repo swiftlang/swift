@@ -39,13 +39,6 @@
 using namespace swift;
 using namespace ast_scope;
 
-static std::vector<ASTNode> asNodeVector(DeclRange dr) {
-  std::vector<ASTNode> nodes;
-  llvm::transform(dr, std::back_inserter(nodes),
-                  [&](Decl *d) { return ASTNode(d); });
-  return nodes;
-}
-
 namespace swift {
 namespace ast_scope {
 
@@ -66,22 +59,6 @@ public:
 
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
-
-  /// Given an array of ASTNodes or Decl pointers, add them
-  /// Return the resultant insertionPoint
-  ///
-  /// \param endLoc The end location for any "scopes until the end" that
-  /// we introduce here, such as PatternEntryDeclScope and GuardStmtScope
-  ASTScopeImpl *
-  addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
-                         ArrayRef<ASTNode> nodesOrDeclsToAdd,
-                         Optional<SourceLoc> endLoc) {
-    auto *ip = insertionPoint;
-    for (auto nd : nodesOrDeclsToAdd) {
-      ip = addToScopeTreeAndReturnInsertionPoint(nd, ip, endLoc);
-    }
-    return ip;
-  }
 
 public:
   /// For each of searching, call this unless the insertion point is needed
@@ -270,7 +247,7 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
-    : SF(SF), scopeCreator(scopeCreator), insertionPoint(this) {}
+    : SF(SF), scopeCreator(scopeCreator) {}
 
 #pragma mark NodeAdder
 
@@ -708,18 +685,15 @@ AnnotatedInsertionPoint
 ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeAssert(SF, "Must already have a SourceFile.");
-  ArrayRef<Decl *> decls = SF->getTopLevelDecls();
 
   SourceLoc endLoc = getSourceRangeOfThisASTNode().End;
 
-  std::vector<ASTNode> newNodes(decls.begin(), decls.end());
-  insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(insertionPoint,
-                                          newNodes, endLoc);
+  ASTScopeImpl *insertionPoint = this;
+  for (auto *d : SF->getTopLevelDecls()) {
+    insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(
+      ASTNode(d), insertionPoint, endLoc);
+  }
 
-  // Too slow to perform all the time:
-  //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
-  //           "ASTScope tree missed some DeclContexts or made some up");
   return {insertionPoint, "Next time decls are added they go here."};
 }
 
@@ -840,14 +814,15 @@ GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
 AnnotatedInsertionPoint
 BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  // TODO: remove the sort after fixing parser to create brace statement
-  // elements in source order
-  auto *insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(this,
-                                          stmt->getElements(),
-                                          endLoc);
+  ASTScopeImpl *insertionPoint = this;
+  for (auto nd : stmt->getElements()) {
+    insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(
+        nd, insertionPoint, endLoc);
+  }
+
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
+
   return {
       insertionPoint,
       "For top-level code decls, need the scope under, say a guard statment."};
@@ -1209,8 +1184,9 @@ void FunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
-  auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  scopeCreator.addSiblingsToScopeTree(this, nodes, None);
+  for (auto *d : getIterableDeclContext().get()->getMembers())
+    scopeCreator.addToScopeTree(ASTNode(d), this);
+
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
