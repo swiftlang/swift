@@ -159,8 +159,8 @@ public:
   }
 
   void
-  addChildrenForAllLocalizableAccessorsInSourceOrder(AbstractStorageDecl *asd,
-                                                     ASTScopeImpl *parent);
+  addChildrenForParsedAccessors(AbstractStorageDecl *asd,
+                                ASTScopeImpl *parent);
 
   void addChildrenForKnownAttributes(ValueDecl *decl,
                                      ASTScopeImpl *parent);
@@ -339,7 +339,7 @@ public:
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
   // This declaration is handled from
-  // addChildrenForAllLocalizableAccessorsInSourceOrder
+  // addChildrenForParsedAccessors
   ASTScopeImpl *visitAccessorDecl(AccessorDecl *ad, ASTScopeImpl *p,
                                   ScopeCreator &scopeCreator) {
     return visitAbstractFunctionDecl(ad, p, scopeCreator);
@@ -487,7 +487,7 @@ ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
   return adder.visit(p, parent, *this);
 }
 
-void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
+void ScopeCreator::addChildrenForParsedAccessors(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
   asd->visitParsedAccessors([&](AccessorDecl *ad) {
     assert(asd == ad->getStorage());
@@ -738,7 +738,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
 
   // Add accessors for the variables in this pattern.
   patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-    scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(var, this);
+    scopeCreator.addChildrenForParsedAccessors(var, this);
   });
 
   // In local context, the PatternEntryDeclScope becomes the insertion point, so
@@ -1007,7 +1007,7 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
       decl, decl->getGenericParams(), this);
   scopeCreator.constructExpandAndInsert<ParameterListScope>(
       leaf, decl->getIndices(), decl->getAccessor(AccessorKind::Get));
-  scopeCreator.addChildrenForAllLocalizableAccessorsInSourceOrder(decl, leaf);
+  scopeCreator.addChildrenForParsedAccessors(decl, leaf);
 }
 
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
