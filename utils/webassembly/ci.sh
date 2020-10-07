@@ -34,6 +34,8 @@ export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
 $BUILD_SCRIPT
 
+echo "Build script completed, will attempt to run test suites..."
+
 if [[ "$(uname)" == "Darwin" ]]; then
   # workaround: host target test directory is necessary to use run-test
   mkdir -p $TARGET_BUILD_DIR/swift-macosx-x86_64/test-macosx-x86_64
@@ -53,3 +55,5 @@ else
   # Run test but ignore failure temporarily
   ninja check-swift-wasi-wasm32 -C $TARGET_BUILD_DIR/swift-$HOST_SUFFIX || true
 fi
+
+echo "The test suite has finished"
