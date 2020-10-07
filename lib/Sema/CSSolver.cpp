@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "SolutionResult.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/STLExtras.h"
