@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CSFix.h"
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Expr.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"

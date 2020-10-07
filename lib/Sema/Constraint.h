@@ -18,7 +18,6 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
-#include "CSFix.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -43,6 +42,7 @@ class TypeVariableType;
 
 namespace constraints {
 
+class ConstraintFix;
 class ConstraintLocator;
 class ConstraintSystem;
 enum class TrailingClosureMatching;
