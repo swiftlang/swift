@@ -2749,24 +2749,30 @@ static void addDiagFileOutputForPersistentPCHAction(
 
 /// If the file at \p input has not been modified since the last build (i.e. its
 /// mtime has not changed), adjust the Job's condition accordingly.
-static void
-handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
-                          StringRef input, bool alwaysRebuildDependents) {
-  if (inputInfo.status == CompileJobAction::InputInfo::NewlyAdded) {
+static void handleCompileJobCondition(Job *J,
+                                      CompileJobAction::InputInfo inputInfo,
+                                      Optional<StringRef> input,
+                                      bool alwaysRebuildDependents) {
   using InputStatus = CompileJobAction::InputInfo::Status;
+
+  if (inputInfo.status == InputStatus::NewlyAdded) {
     J->setCondition(Job::Condition::NewlyAdded);
     return;
   }
 
+  auto output = J->getOutput().getPrimaryOutputFilename();
   bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (!llvm::sys::fs::status(input, inputStatus)) {
+  if (input.hasValue() && !llvm::sys::fs::status(*input, inputStatus)) {
+    J->setInputModTime(inputStatus.getLastModificationTime());
+    hasValidModTime = J->getInputModTime() == inputInfo.previousModTime;
+  } else if (!llvm::sys::fs::status(output, inputStatus)) {
     J->setInputModTime(inputStatus.getLastModificationTime());
     hasValidModTime = true;
   }
 
   Job::Condition condition;
-  if (hasValidModTime && J->getInputModTime() == inputInfo.previousModTime) {
+  if (hasValidModTime) {
     switch (inputInfo.status) {
     case InputStatus::UpToDate:
       if (llvm::sys::fs::exists(output))
@@ -2942,14 +2948,18 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
-  if (!J->getOutput()
-           .getAdditionalOutputForType(file_types::TY_SwiftDeps)
-           .empty()) {
-    if (InputActions.size() == 1) {
-      auto compileJob = cast<CompileJobAction>(JA);
-      bool alwaysRebuildDependents =
-          C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
-      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput,
+  if (auto incrementalJob = dyn_cast<IncrementalJobAction>(JA)) {
+    const bool alwaysRebuildDependents =
+        C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
+    if (!J->getOutput()
+             .getAdditionalOutputForType(file_types::TY_SwiftDeps)
+             .empty()) {
+      if (InputActions.size() == 1) {
+        handleCompileJobCondition(J, incrementalJob->getInputInfo(), BaseInput,
+                                  alwaysRebuildDependents);
+      }
+    } else if (isa<MergeModuleJobAction>(JA)) {
+      handleCompileJobCondition(J, incrementalJob->getInputInfo(), None,
                                 alwaysRebuildDependents);
     }
   }
