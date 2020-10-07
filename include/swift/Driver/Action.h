@@ -183,7 +183,8 @@ public:
 
 public:
   static bool classof(const Action *A) {
-    return A->getKind() == Action::Kind::CompileJob;
+    return A->getKind() == Action::Kind::CompileJob ||
+           A->getKind() == Action::Kind::MergeModuleJob;
   }
 };
 
@@ -280,12 +281,12 @@ public:
   }
 };
 
-class MergeModuleJobAction : public JobAction {
+class MergeModuleJobAction : public IncrementalJobAction {
   virtual void anchor() override;
 public:
-  MergeModuleJobAction(ArrayRef<const Action *> Inputs)
-      : JobAction(Action::Kind::MergeModuleJob, Inputs,
-                  file_types::TY_SwiftModuleFile) {}
+  MergeModuleJobAction(ArrayRef<const Action *> Inputs, InputInfo input)
+      : IncrementalJobAction(Action::Kind::MergeModuleJob, Inputs,
+                             file_types::TY_SwiftModuleFile, input) {}
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::MergeModuleJob;
