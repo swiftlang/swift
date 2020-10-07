@@ -176,18 +176,13 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   });
 }
 
-void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
-  ASTScopeImpl::printSpecifics(out);
-  out << "index " << index;
-}
-
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
-  pattern->print(out);
+  sec.getPattern()->print(out);
 }
 
 bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }
