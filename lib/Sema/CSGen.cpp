@@ -16,6 +16,7 @@
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"

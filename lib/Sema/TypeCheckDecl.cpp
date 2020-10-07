@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
@@ -1199,9 +1198,9 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     
     {
       Expr *exprToCheck = prevValue;
-      if (TypeChecker::typeCheckExpression(exprToCheck, ED,
-                                           rawTy,
-                                           CTP_EnumCaseRawValue)) {
+      if (TypeChecker::typeCheckExpression(
+              exprToCheck, ED,
+              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
         TypeChecker::checkEnumElementEffects(elt, exprToCheck);
       }
     }

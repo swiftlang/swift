@@ -18,7 +18,6 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
-#include "ConstraintSystem.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -781,9 +780,8 @@ public:
       }
     }
 
-    auto exprTy = TypeChecker::typeCheckExpression(E, DC,
-                                                   ResultTy,
-                                                   ctp, options);
+    auto exprTy =
+        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -844,8 +842,7 @@ public:
       }
 
       TypeChecker::typeCheckExpression(exprToCheck, DC,
-                                       contextType,
-                                       contextTypePurpose);
+                                       {contextType, contextTypePurpose});
 
       // Propagate the change into the inout expression we stripped before.
       if (inout) {
@@ -867,10 +864,9 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
     if (!exnType) return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, exnType,
-                                     CTP_ThrowStmt);
+    TypeChecker::typeCheckExpression(E, DC, {exnType, CTP_ThrowStmt});
     TS->setSubExpr(E);
-    
+
     return TS;
   }
 
@@ -1519,7 +1515,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     }
 
     auto resultTy =
-        TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
+        TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
 
     // If a closure expression is unused, the user might have intended to write
     // "do { ... }".
@@ -1619,9 +1615,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
-  auto resultTy =
-      TypeChecker::typeCheckExpression(r, ctor, Type(), CTP_Unused,
-                                       TypeCheckExprFlags::IsDiscarded);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      r, ctor, /*contextualInfo=*/{}, TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
