@@ -44,7 +44,7 @@ class Deserializer {
 
 public:
   Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
-  bool readFineGrainedDependencyGraph(SourceFileDepGraph &g);
+  bool readFineGrainedDependencyGraph(SourceFileDepGraph &g, Purpose purpose);
   bool readFineGrainedDependencyGraphFromSwiftModule(SourceFileDepGraph &g);
 };
 
@@ -151,14 +151,24 @@ static llvm::Optional<DeclAspect> getDeclAspect(unsigned declAspect) {
   return None;
 }
 
-bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g) {
+bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
+                                                  Purpose purpose) {
   using namespace record_block;
 
-  if (readSignature())
-    return true;
+  switch (purpose) {
+  case Purpose::ForSwiftDeps:
+    if (readSignature())
+      return true;
 
-  if (enterTopLevelBlock())
-    return true;
+    if (enterTopLevelBlock())
+      return true;
+    LLVM_FALLTHROUGH;
+  case Purpose::ForSwiftModule:
+    // N.B. Incremental metadata embedded in swiftmodule files does not have
+    // a leading signature, and its top-level block has already been
+    // consumed by the time we get here.
+    break;
+  }
 
   if (readMetadata())
     return true;
@@ -260,7 +270,7 @@ bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g) {
 bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
     llvm::MemoryBuffer &buffer, SourceFileDepGraph &g) {
   Deserializer deserializer(buffer.getMemBufferRef());
-  return deserializer.readFineGrainedDependencyGraph(g);
+  return deserializer.readFineGrainedDependencyGraph(g, Purpose::ForSwiftDeps);
 }
 
 bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
@@ -322,7 +332,8 @@ public:
   Serializer(llvm::BitstreamWriter &ExistingOut) : Out(ExistingOut) {}
 
 public:
-  void writeFineGrainedDependencyGraph(const SourceFileDepGraph &g);
+  void writeFineGrainedDependencyGraph(const SourceFileDepGraph &g,
+                                       Purpose purpose);
 };
 
 } // end namespace
@@ -382,11 +393,21 @@ void Serializer::writeMetadata() {
 }
 
 void
-Serializer::writeFineGrainedDependencyGraph(const SourceFileDepGraph &g) {
-  writeSignature();
-  writeBlockInfoBlock();
+Serializer::writeFineGrainedDependencyGraph(const SourceFileDepGraph &g,
+                                            Purpose purpose) {
+  unsigned blockID = 0;
+  switch (purpose) {
+  case Purpose::ForSwiftDeps:
+    writeSignature();
+    writeBlockInfoBlock();
+    blockID = RECORD_BLOCK_ID;
+    break;
+  case Purpose::ForSwiftModule:
+    blockID = INCREMENTAL_INFORMATION_BLOCK_ID;
+    break;
+  }
 
-  llvm::BCBlockRAII restoreBlock(Out, RECORD_BLOCK_ID, 8);
+  llvm::BCBlockRAII restoreBlock(Out, blockID, 8);
 
   using namespace record_block;
 
@@ -468,9 +489,10 @@ unsigned Serializer::getIdentifier(StringRef str) {
 }
 
 void swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
-    llvm::BitstreamWriter &Out, const SourceFileDepGraph &g) {
+    llvm::BitstreamWriter &Out, const SourceFileDepGraph &g,
+    Purpose purpose) {
   Serializer serializer{Out};
-  serializer.writeFineGrainedDependencyGraph(g);
+  serializer.writeFineGrainedDependencyGraph(g, purpose);
 }
 
 bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
@@ -480,7 +502,7 @@ bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
   return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
-    writeFineGrainedDependencyGraph(Writer, g);
+    writeFineGrainedDependencyGraph(Writer, g, Purpose::ForSwiftDeps);
     out.write(Buffer.data(), Buffer.size());
     out.flush();
     return false;
@@ -516,7 +538,7 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor, unsigned ID,
   if (next.Kind != llvm::BitstreamEntry::SubBlock)
     return false;
 
-  if (next.ID == RECORD_BLOCK_ID) {
+  if (next.ID == llvm::bitc::BLOCKINFO_BLOCK_ID) {
     if (shouldReadBlockInfo) {
       if (!cursor.ReadBlockInfoBlock())
         return false;
@@ -531,7 +553,6 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor, unsigned ID,
     return false;
 
   if (llvm::Error Err = cursor.EnterSubBlock(ID)) {
-    // FIXME this drops the error on the floor.
     consumeError(std::move(Err));
     return false;
   }
@@ -549,18 +570,18 @@ bool swift::fine_grained_dependencies::
 bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
     SourceFileDepGraph &g) {
   if (!checkModuleSignature(Cursor, {0xE2, 0x9C, 0xA8, 0x0E}) ||
-      !enterTopLevelModuleBlock(Cursor, RECORD_BLOCK_ID, false)) {
-    return false;
+      !enterTopLevelModuleBlock(Cursor, llvm::bitc::FIRST_APPLICATION_BLOCKID, false)) {
+    return true;
   }
 
   llvm::BitstreamEntry topLevelEntry;
-
+  bool DidNotReadFineGrainedDependencies = true;
   while (!Cursor.AtEndOfStream()) {
     llvm::Expected<llvm::BitstreamEntry> maybeEntry =
         Cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       consumeError(maybeEntry.takeError());
-      return false;
+      return true;
     }
     topLevelEntry = maybeEntry.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
@@ -571,9 +592,13 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
       if (llvm::Error Err =
               Cursor.EnterSubBlock(INCREMENTAL_INFORMATION_BLOCK_ID)) {
         consumeError(std::move(Err));
-        return false;
+        return true;
       }
-      readFineGrainedDependencyGraph(g);
+      if (readFineGrainedDependencyGraph(g, Purpose::ForSwiftModule)) {
+        break;
+      }
+
+      DidNotReadFineGrainedDependencies = false;
       break;
     }
 
@@ -581,11 +606,11 @@ bool Deserializer::readFineGrainedDependencyGraphFromSwiftModule(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (Cursor.SkipBlock()) {
-        return false;
+        return true;
       }
       break;
     }
   }
 
-  return false;
+  return DidNotReadFineGrainedDependencies;
 }

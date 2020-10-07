@@ -861,6 +861,13 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
 
+  BLOCK(INCREMENTAL_INFORMATION_BLOCK);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, METADATA);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, SOURCE_FILE_DEP_GRAPH_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, FINGERPRINT_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, DEPENDS_ON_DEFINITION_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, IDENTIFIER_NODE);
+
 #undef BLOCK
 #undef BLOCK_RECORD
 }
@@ -5232,8 +5239,9 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo) {
-      S.writeIncrementalInfo(DepGraph);
+    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+      fine_grained_dependencies::writeFineGrainedDependencyGraph(
+          S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
   }
 

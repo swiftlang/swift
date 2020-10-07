@@ -278,8 +278,6 @@ private:
     assert(swiftDeps.hasValue() && "Don't call me for expats.");
     auto iter = jobsBySwiftDeps.find(swiftDeps.getValue());
     assert(iter != jobsBySwiftDeps.end() && "All jobs should be tracked.");
-    assert(getSwiftDeps(iter->second) == swiftDeps.getValue() &&
-           "jobsBySwiftDeps should be inverse of getSwiftDeps.");
     return iter->second;
   }
 
