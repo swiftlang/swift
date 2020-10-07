@@ -4948,19 +4948,17 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
 
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // Check the requirements of a generic subscript.
-    if (subscript->isGeneric()) {
-      if (auto result =
-            ::findProtocolSelfReferences(this,
-                                         subscript->getGenericSignature()))
-        return result;
-    }
-
-    return ::findProtocolSelfReferences(this, type,
-                                        skipAssocTypes);
   } else {
-    assert(isa<VarDecl>(value));
+    assert(isa<AbstractStorageDecl>(value));
+
+    if (auto *const subscript = dyn_cast<SubscriptDecl>(value)) {
+      // Check the requirements of a generic subscript.
+      if (subscript->isGeneric()) {
+        if (auto result = ::findProtocolSelfReferences(
+                this, subscript->getGenericSignature()))
+          return result;
+      }
+    }
 
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
@@ -4977,6 +4975,12 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
                                              /*skipAssocTypes=*/false);
   if (selfKind.parameter || selfKind.other)
     return false;
+
+  // FIXME: Appropriately diagnose assignments instead.
+  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (selfKind.result && storageDecl->supportsMutation())
+      return false;
+  }
 
   return true;
 }
