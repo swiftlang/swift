@@ -17,6 +17,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
   OptionalDifferentiation.swift
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   GYB_SOURCES
     FloatingPointDifferentiation.swift.gyb
@@ -38,5 +39,4 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  DARWIN_INSTALL_NAME_DIR "@rpath"
   INSTALL_IN_COMPONENT stdlib)
