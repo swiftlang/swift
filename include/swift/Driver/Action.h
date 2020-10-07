@@ -130,15 +130,28 @@ public:
 class IncrementalJobAction : public JobAction {
 public:
   struct InputInfo {
-    enum Status {
+    /// The status of an input known to the driver. These are used to affect
+    /// the scheduling decisions made during an incremental build.
+    ///
+    /// \Note The order of cases matters. They are ordered from least to
+    /// greatest impact on the incremental build schedule.
+    enum class Status {
+      /// The input to this job is up to date.
       UpToDate,
+      /// The input to this job has changed in a way that requires this job to
+      /// be rerun, but not in such a way that it requires a cascading rebuild.
       NeedsNonCascadingBuild,
+      /// The input to this job has changed in a way that requires this job to
+      /// be rerun, and in such a way that all jobs dependent upon this one
+      /// must be scheduled as well.
       NeedsCascadingBuild,
+      /// The input to this job was not known to the driver when it was last
+      /// run.
       NewlyAdded
     };
 
   public:
-    Status status = UpToDate;
+    Status status = Status::UpToDate;
     llvm::sys::TimePoint<> previousModTime;
 
     InputInfo() = default;

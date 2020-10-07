@@ -1608,8 +1608,8 @@ namespace driver {
           CompileJobAction::InputInfo info;
           info.previousModTime = entry.first->getInputModTime();
           info.status = entry.second ?
-            CompileJobAction::InputInfo::NeedsCascadingBuild :
-            CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+            CompileJobAction::InputInfo::Status::NeedsCascadingBuild :
+            CompileJobAction::InputInfo::Status::NeedsNonCascadingBuild;
           inputs[&inputFile->getInputArg()] = info;
         }
       }
@@ -1626,7 +1626,7 @@ namespace driver {
 
           CompileJobAction::InputInfo info;
           info.previousModTime = entry->getInputModTime();
-          info.status = CompileJobAction::InputInfo::UpToDate;
+          info.status = CompileJobAction::InputInfo::Status::UpToDate;
           inputs[&inputFile->getInputArg()] = info;
         }
       }
