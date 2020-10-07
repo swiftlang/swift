@@ -146,7 +146,11 @@ public:
         : status(stat), previousModTime(time) {}
 
     static InputInfo makeNewlyAdded() {
-      return InputInfo(Status::NewlyAdded, llvm::sys::TimePoint<>::max());
+      return {Status::NewlyAdded, llvm::sys::TimePoint<>::max()};
+    }
+
+    static InputInfo makeNeedsCascadingRebuild() {
+      return {Status::NeedsCascadingBuild, llvm::sys::TimePoint<>::min()};
     }
   };
 
