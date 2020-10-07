@@ -53,15 +53,15 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # TODO: Remove this constant, it's really not helpful.
 HOME = os.environ.get("HOME", "/")
 
-_SUPPORTED_XCODE_BUILDS = (
-    "12A8169g", # 12.0b3
-    "12A8179i", # 12.0b4
-    "12A8189h", # 12.0b5
-    "12A8189n", # 12.0b6
-    "12A7208", # 12.0GM1
-    "12A7209", # 12.0GM2
-    "12A7300", # 12.0.1
-)
+_SUPPORTED_XCODE_BUILDS = [
+    ("12.0 beta 3", "12A8169g"),
+    ("12.0 beta 4", "12A8179i"),
+    ("12.0 beta 5", "12A8189h"),
+    ("12.0 beta 6", "12A8189n"),
+    ("12.0 GM 1", "12A7208"),
+    ("12.0 GM 2", "12A7209"),
+    ("12.0.1", "12A7300"),
+]
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -166,10 +166,14 @@ def validate_xcode_compatibility():
 
     version = shell.capture(
         ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
-    if not version.endswith(_SUPPORTED_XCODE_BUILDS):
+
+    valid_build_numbers = tuple(x[1] for x in _SUPPORTED_XCODE_BUILDS)
+    if not version.endswith(valid_build_numbers):
+        valid_versions_string = "\n".join(
+            "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
         raise SystemExit(
-            "error: using unsupported Xcode version:\n\n{}\n\nInstall one of: {}".format(
-                version, ", ".join(_SUPPORTED_XCODE_BUILDS)
+            "error: using unsupported Xcode version:\n\n{}\n\nInstall one of:\n{}\n\nOr set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
+                version, valid_versions_string
             )
         )
 
