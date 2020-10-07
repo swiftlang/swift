@@ -1163,7 +1163,12 @@ namespace driver {
           continue;
         }
 
-        // Can we run a cross-module incremental build at all? If not, fallback.
+        // Is this module out of date? If not, just keep searching.
+        if (Comp.getLastBuildTime() >= depStatus.getLastModificationTime())
+          continue;
+
+        // Can we run a cross-module incremental build at all?
+        // If not, fall back.
         if (!Comp.getEnableCrossModuleIncrementalBuild()) {
           fallbackToExternalBehavior(external);
           continue;

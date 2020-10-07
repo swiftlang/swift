@@ -1936,7 +1936,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     return;
   }
 
-  SmallVector<const Action *, 2> AllModuleInputs;
+  ModuleInputs AllModuleInputs;
   SmallVector<const Action *, 2> AllLinkerInputs;
 
   switch (OI.CompilerMode) {
@@ -1977,10 +1977,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Source inputs always need to be compiled.
         assert(file_types::isPartOfSwiftCompilation(InputType));
 
-        CompileJobAction::InputInfo previousBuildState = {
-          CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimePoint<>::min()
-        };
+        auto previousBuildState =
+            IncrementalJobAction::InputInfo::makeNeedsCascadingRebuild();
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
         if (Args.hasArg(options::OPT_embed_bitcode)) {
@@ -1988,7 +1986,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
               Current, file_types::TY_LLVM_BC, previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           Current = C.createAction<BackendJobAction>(Current,
                                                      OI.CompilerOutputType, 0);
         } else {
@@ -1997,7 +1995,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                                                      previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
         }
         AllLinkerInputs.push_back(Current);
         break;
@@ -2009,7 +2007,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
           // inputs to a MergeModule action.
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           break;
         } else if (OI.shouldLink()) {
           // Otherwise, if linking, pass .swiftmodule files as inputs to the
@@ -2091,7 +2089,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Create a single CompileJobAction and a single BackendJobAction.
         JobAction *CA =
             C.createAction<CompileJobAction>(file_types::TY_LLVM_BC);
-        AllModuleInputs.push_back(CA);
+        AllModuleInputs.addInput(CA);
 
         int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
@@ -2127,7 +2125,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
       CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
     }
-    AllModuleInputs.push_back(CA);
+    AllModuleInputs.addInput(CA);
     AllLinkerInputs.push_back(CA);
     break;
   }
@@ -2176,7 +2174,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       !AllModuleInputs.empty()) {
     // We're performing multiple compilations; set up a merge module step
     // so we generate a single swiftmodule as output.
-    MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
+    MergeModuleAction = std::move(AllModuleInputs).intoAction(C);
   }
 
   bool shouldPerformLTO = OI.LTOVariant != OutputInfo::LTOKind::None;
