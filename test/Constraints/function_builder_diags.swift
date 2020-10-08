@@ -638,7 +638,7 @@ struct MyView {
 
   @TupleBuilder var invalidCaseWithoutDot: some P {
     switch Optional.some(1) {
-    case none: 42 // expected-error {{cannot find 'none' in scope}}
+    case none: 42 // expected-error {{cannot find 'none' in scope}} expected-note {{add 'let' or 'var' keyword to bind 'none' in a pattern}}
     case .some(let x):
       0
     }

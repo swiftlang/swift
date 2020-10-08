@@ -246,7 +246,7 @@ case (1, _):
 func patternVarUsedInAnotherPattern(x: Int) {
   switch x {
   case let a, // expected-error {{'a' must be bound in every pattern}}
-       a: // expected-error {{cannot find 'a' in scope}}
+       a: // expected-error {{cannot find 'a' in scope}} expected-note {{add 'let' or 'var' keyword to bind 'a' in a pattern}}
     break
   }
 }

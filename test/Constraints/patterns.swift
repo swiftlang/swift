@@ -21,7 +21,7 @@ default:
 }
 
 switch (1, 2) {
-case (var a, a): // expected-error {{cannot find 'a' in scope}}
+case (var a, a): // expected-error {{cannot find 'a' in scope}} expected-note {{add 'let' or 'var' keyword to bind 'a' in a pattern}}
   ()
 }
 
