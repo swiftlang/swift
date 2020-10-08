@@ -189,9 +189,9 @@ void Parser::performCodeCompletionSecondPassImpl(
     parseDecl(ParseDeclOptions(info.Flags),
               /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
-                  NTD->addMember(D);
+                  NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-                  ED->addMember(D);
+                  ED->addMemberPreservingSourceOrder(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
                   SF->addTopLevelDecl(D);
                 } else {

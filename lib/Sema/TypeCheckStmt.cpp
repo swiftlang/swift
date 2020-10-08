@@ -20,6 +20,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1910,6 +1911,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->isBodyTypeChecked())
       return false;
+
+    ASTScope::expandFunctionBody(AFD);
   }
 
   // Function builder function doesn't support partial type checking.
