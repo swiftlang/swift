@@ -520,11 +520,19 @@ public:
           EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
                              ude->getName(), referencedElement, nullptr);
     }
-      
-    
+
     // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(
-        ude, DC, /*replaceInvalidRefsWithErrors=*/true));
+    auto result = TypeChecker::resolveDeclRefExpr(
+                                ude, DC, /*replaceInvalidRefsWithErrors=*/true);
+
+    // if name lookup in the pattern failed, suggest binding it with let / var
+    if (isa<ErrorExpr>(result)) {
+      Context.Diags.diagnose(ude->getStartLoc(), 
+                             diag::letvar_required_for_binding, ude->getName())
+        .fixItInsert(ude->getStartLoc(), "let ");
+    }
+    
+    return getSubExprPattern(result);
   }
 
   // Call syntax forms a pattern if:
