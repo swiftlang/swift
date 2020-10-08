@@ -830,12 +830,32 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
   }
 
+  // If the base is not 'self', default get access to nonmutating and set access to mutating.
+  bool getterMutatesBase = selfDecl && storage->isGetterMutating();
+  bool setterMutatesBase = !selfDecl || storage->isSetterMutating();
+  // If we're not accessing via a property wrapper, we don't need to adjust
+  // the mutability.
+  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
+    auto var = cast<VarDecl>(accessor->getStorage());
+    auto mutability = var->getPropertyWrapperMutability();
+    // Only adjust mutability if it's possible to mutate the base.
+    if (mutability && !var->isStatic() &&
+        !(selfDecl && selfTypeForAccess->hasReferenceSemantics())) {
+      getterMutatesBase = (mutability->Getter == PropertyWrapperMutability::Mutating);
+      setterMutatesBase = (mutability->Setter == PropertyWrapperMutability::Mutating);
+    }
+  }
+
+  // If the accessor is mutating, then the base should be referred as an l-value
+  bool isBaseLValue = (getterMutatesBase && isUsedForGetAccess) ||
+                      (setterMutatesBase && isUsedForSetAccess);
+
   if (!selfDecl) {
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              /*IsImplicit=*/true, semantics);
     auto type = storage->getValueInterfaceType().subst(subs);
-    if (isLValue)
+    if (isBaseLValue)
       type = LValueType::get(type);
     storageDRE->setType(type);
 
@@ -843,32 +863,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   // Build self
-
-  bool isGetterMutating = storage->isGetterMutating();
-  bool isSetterMutating = storage->isSetterMutating();
-  // If we're not accessing via a property wrapper, we don't need to adjust
-  // the mutability.
-  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
-    auto var = cast<VarDecl>(accessor->getStorage());
-    if (auto mutability = var->getPropertyWrapperMutability()) {
-      // We consider the storage's mutability too because the wrapped property
-      // might be part of a class, in case of which nothing is mutating.
-      isGetterMutating = (mutability->Getter == PropertyWrapperMutability::Mutating)
-        ? (storage->isGetterMutating() || storage->isSetterMutating())
-        : storage->isGetterMutating();
-      isSetterMutating = (mutability->Setter == PropertyWrapperMutability::Mutating)
-        ? (storage->isGetterMutating() || storage->isSetterMutating())
-        : storage->isGetterMutating();
-    }
-  }
-
-  // If the accessor is mutating, then self should be referred as an l-value
-  bool isSelfLValue = (isGetterMutating && isUsedForGetAccess) ||
-                      (isSetterMutating && isUsedForSetAccess);
-
-  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
+  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isBaseLValue,
                                      /*convertTy*/ selfTypeForAccess);
-  if (isSelfLValue)
+  if (isBaseLValue)
     selfTypeForAccess = LValueType::get(selfTypeForAccess);
 
   if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
@@ -1169,9 +1166,8 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
     body.push_back(returnStmt);
   }
 
-  // Don't mark local accessors as type-checked - captures still need to be computed.
   return { BraceStmt::create(ctx, loc, body, loc, true),
-           /*isTypeChecked=*/!getter->getDeclContext()->isLocalContext() };
+           /*isTypeChecked=*/true };
 }
 
 /// Synthesize the body of a getter which just directly accesses the
@@ -1446,9 +1442,8 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
 
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storageToUse,
                                             target, setterBody, ctx);
-  // Don't mark local accessors as type-checked - captures still need to be computed.
   return { BraceStmt::create(ctx, loc, setterBody, loc, true),
-           /*isTypeChecked=*/!setter->getDeclContext()->isLocalContext() };
+           /*isTypeChecked=*/true };
 }
 
 static std::pair<BraceStmt *, bool>
