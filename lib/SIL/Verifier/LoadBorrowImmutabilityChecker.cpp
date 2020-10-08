@@ -1,4 +1,4 @@
-//===--- LoadBorrowInvalidationChecker.cpp --------------------------------===//
+//===--- LoadBorrowImmutabilityChecker.cpp --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,12 +13,12 @@
 /// \file
 ///
 /// This file defines a verifier that exhaustively validates that there aren't
-/// any load_borrows in a SIL module that are invalidated by a write to their
+/// any load_borrows in a SIL module that have in-scope writes to their
 /// underlying storage.
 ///
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-load-borrow-invalidation-checker"
+#define DEBUG_TYPE "sil-load-borrow-immutability-checker"
 #include "VerifierPrivate.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -39,9 +39,9 @@ using namespace swift::silverifier;
 //                               Write Gatherer
 //===----------------------------------------------------------------------===//
 
-static bool constructValuesForBuiltinKey(
-    Operand *op, BuiltinInst *bi,
-    SmallVectorImpl<Operand *> &wellBehavedWriteAccumulator) {
+// Helper for gatherAddressWrites.
+static bool gatherBuiltinWrites(Operand *op, BuiltinInst *bi,
+                                SmallVectorImpl<Operand *> &writeAccumulator) {
   // If we definitely do not write to memory, just return true early.
   if (!bi->mayWriteToMemory()) {
     return true;
@@ -49,16 +49,16 @@ static bool constructValuesForBuiltinKey(
 
   // TODO: Should we make this an exhaustive list so that when new builtins are
   // added, they need to actually update this code?
-  wellBehavedWriteAccumulator.push_back(op);
+  writeAccumulator.push_back(op);
   return true;
 }
 
 /// Returns true if we were able to ascertain that either the initialValue has
 /// no write uses or all of the write uses were writes that we could understand.
 static bool
-constructValuesForKey(SILValue initialValue,
-                      SmallVectorImpl<Operand *> &wellBehavedWriteAccumulator) {
-  SmallVector<Operand *, 8> worklist(initialValue->getUses());
+gatherAddressWrites(SILValue address,
+                         SmallVectorImpl<Operand *> &writeAccumulator) {
+  SmallVector<Operand *, 8> worklist(address->getUses());
 
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
@@ -81,7 +81,7 @@ constructValuesForKey(SILValue initialValue,
     if (auto *oeai = dyn_cast<OpenExistentialAddrInst>(user)) {
       // Mutable access!
       if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
       }
 
       //  Otherwise, look through it and continue.
@@ -90,8 +90,8 @@ constructValuesForKey(SILValue initialValue,
     }
 
     // Add any destroy_addrs to the resultAccumulator.
-    if (isa<DestroyAddrInst>(user)) {
-      wellBehavedWriteAccumulator.push_back(op);
+    if (isa<DestroyAddrInst>(user) || isa<DestroyValueInst>(user)) {
+      writeAccumulator.push_back(op);
       continue;
     }
 
@@ -103,13 +103,13 @@ constructValuesForKey(SILValue initialValue,
 
     if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
       if (mdi->getValue() == op->get()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
       }
       continue;
     }
 
     if (isa<InjectEnumAddrInst>(user)) {
-      wellBehavedWriteAccumulator.push_back(op);
+      writeAccumulator.push_back(op);
       continue;
     }
 
@@ -121,7 +121,7 @@ constructValuesForKey(SILValue initialValue,
     if (auto *ccbi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
       if (ccbi->getConsumptionKind() == CastConsumptionKind::TakeAlways ||
           ccbi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
     }
@@ -139,7 +139,7 @@ constructValuesForKey(SILValue initialValue,
     if (auto *bai = dyn_cast<BeginAccessInst>(user)) {
       // If we do not have a read, mark this as a write.
       if (bai->getAccessKind() != SILAccessKind::Read) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
       }
 
       // Otherwise, add the users to the worklist and continue.
@@ -150,7 +150,7 @@ constructValuesForKey(SILValue initialValue,
     // If we have a load, we just need to mark the load [take] as a write.
     if (auto *li = dyn_cast<LoadInst>(user)) {
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
       }
       continue;
     }
@@ -158,12 +158,12 @@ constructValuesForKey(SILValue initialValue,
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)      \
   if (auto *li = dyn_cast<Load##Name##Inst>(user)) {                           \
     if (li->isTake() == IsTake) {                                              \
-      wellBehavedWriteAccumulator.push_back(op);                               \
+      writeAccumulator.push_back(op);                               \
     }                                                                          \
     continue;                                                                  \
   }                                                                            \
   if (isa<Store##Name##Inst>(user)) {                                          \
-    wellBehavedWriteAccumulator.push_back(op);                                 \
+    writeAccumulator.push_back(op);                                 \
     continue;                                                                  \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -173,7 +173,7 @@ constructValuesForKey(SILValue initialValue,
     // interprocedural analysis that we do not perform here.
     if (auto fas = FullApplySite::isa(user)) {
       if (fas.isIndirectResultOperand(*op)) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
 
@@ -191,12 +191,12 @@ constructValuesForKey(SILValue initialValue,
       }
 
       if (argConv.isInoutConvention()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
 
       if (argConv.isOwnedConvention()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
 
@@ -207,7 +207,7 @@ constructValuesForKey(SILValue initialValue,
     }
 
     if (auto as = ApplySite::isa(user)) {
-      wellBehavedWriteAccumulator.push_back(op);
+      writeAccumulator.push_back(op);
       continue;
     }
 
@@ -215,14 +215,14 @@ constructValuesForKey(SILValue initialValue,
     if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
       // If our value is the destination, this is a write.
       if (cai->getDest() == op->get()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
 
       // Ok, so we are Src by process of elimination. Make sure we are not being
       // taken.
       if (cai->isTakeOfSrc()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
 
@@ -231,7 +231,7 @@ constructValuesForKey(SILValue initialValue,
     }
 
     if (isa<StoreInst>(user) || isa<AssignInst>(user)) {
-      wellBehavedWriteAccumulator.push_back(op);
+      writeAccumulator.push_back(op);
       continue;
     }
 
@@ -261,7 +261,7 @@ constructValuesForKey(SILValue initialValue,
       }
 
       if (info.isIndirectMutating() || info.isConsumed()) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
         continue;
       }
     }
@@ -273,19 +273,19 @@ constructValuesForKey(SILValue initialValue,
 
     // unconditional_checked_cast_addr does a take on its input memory.
     if (isa<UnconditionalCheckedCastAddrInst>(user)) {
-      wellBehavedWriteAccumulator.push_back(op);
+      writeAccumulator.push_back(op);
       continue;
     }
 
     if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
       if (ccabi->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess) {
-        wellBehavedWriteAccumulator.push_back(op);
+        writeAccumulator.push_back(op);
       }
       continue;
     }
 
     if (auto *bi = dyn_cast<BuiltinInst>(user)) {
-      if (constructValuesForBuiltinKey(op, bi, wellBehavedWriteAccumulator)) {
+      if (gatherBuiltinWrites(op, bi, writeAccumulator)) {
         continue;
       }
     }
@@ -304,14 +304,15 @@ constructValuesForKey(SILValue initialValue,
 }
 
 //===----------------------------------------------------------------------===//
-//                   Load Borrow Never Invalidated Analysis
+//                   Load Borrow Immutability Analysis
 //===----------------------------------------------------------------------===//
 
-LoadBorrowNeverInvalidatedAnalysis::LoadBorrowNeverInvalidatedAnalysis(
+LoadBorrowImmutabilityAnalysis::LoadBorrowImmutabilityAnalysis(
     DeadEndBlocks &deadEndBlocks)
-    : cache(constructValuesForKey), deadEndBlocks(deadEndBlocks) {}
+    : cache(gatherAddressWrites), deadEndBlocks(deadEndBlocks) {}
 
-bool LoadBorrowNeverInvalidatedAnalysis::
+// \p address may be an address, pointer, or box type.
+bool LoadBorrowImmutabilityAnalysis::
     doesAddressHaveWriteThatInvalidatesLoadBorrow(
         LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
         SILValue address) {
@@ -379,7 +380,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-bool LoadBorrowNeverInvalidatedAnalysis::
+bool LoadBorrowImmutabilityAnalysis::
     doesBoxHaveWritesThatInvalidateLoadBorrow(LoadBorrowInst *lbi,
                                               ArrayRef<Operand *> endBorrowUses,
                                               SILValue originalBox) {
@@ -450,7 +451,7 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 
   return false;
 }
-bool LoadBorrowNeverInvalidatedAnalysis::isInvalidated(
+bool LoadBorrowImmutabilityAnalysis::isInvalidated(
     LoadBorrowInst *lbi) {
 
   // FIXME: To be reenabled separately in a follow-on commit.

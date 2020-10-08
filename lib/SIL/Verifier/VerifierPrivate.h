@@ -25,12 +25,12 @@ class Operand;
 
 namespace silverifier {
 
-class LoadBorrowNeverInvalidatedAnalysis {
+class LoadBorrowImmutabilityAnalysis {
   SmallMultiMapCache<SILValue, Operand *> cache;
   DeadEndBlocks &deadEndBlocks;
 
 public:
-  LoadBorrowNeverInvalidatedAnalysis(DeadEndBlocks &deadEndBlocks);
+  LoadBorrowImmutabilityAnalysis(DeadEndBlocks &deadEndBlocks);
 
   /// Returns true if exhaustively lbi is guaranteed to never be invalidated by
   /// local writes.

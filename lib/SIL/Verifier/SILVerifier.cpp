@@ -664,7 +664,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
   
   DeadEndBlocks DEBlocks;
-  LoadBorrowNeverInvalidatedAnalysis loadBorrowNeverInvalidatedAnalysis;
+  LoadBorrowImmutabilityAnalysis loadBorrowNeverInvalidatedAnalysis;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
