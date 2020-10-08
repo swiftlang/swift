@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-// CHECK: class-template-instantiation-error-handling.swift:10:18: error: only C++ types supported
+// CHECK: class-template-instantiation-error-handling.swift:10:21: error: only C++ types supported
 TemplatesTestSuite.test("swift-template-arg-not-supported") {
   var magicString = MagicWrapper<String>(t: "asdf")
 }

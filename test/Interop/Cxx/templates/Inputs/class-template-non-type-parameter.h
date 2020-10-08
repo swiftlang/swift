@@ -1,7 +1,7 @@
 #ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NON_TYPE_PARAMETER_H
 
-template<class T, auto Size>
+template<class T, auto Size = 42>
 struct MagicArray {
     T t[Size];
 };
