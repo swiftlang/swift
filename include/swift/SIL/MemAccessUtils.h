@@ -890,6 +890,7 @@ struct AccessPathWithBase {
   //
   // base may be invalid for global_addr -> address_to_pointer -> phi patterns.
   // FIXME: add a structural requirement to SIL so base is always valid in OSSA.
+  // !!! make this a PtrIntPair with a the access kind
   SILValue base;
 
   /// \p address identifies the object seen by any memory operation that
