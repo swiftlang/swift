@@ -1195,8 +1195,10 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
-  bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
-                                  tok::kw_rethrows);
+  bool isFunctionType =
+      Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
+      (shouldParseExperimentalConcurrency() &&
+       Tok.isContextualKeyword("async"));
 
   // If there were any labels, figure out which labels should go into the type
   // representation.
