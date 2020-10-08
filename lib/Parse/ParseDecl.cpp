@@ -717,13 +717,12 @@ bool Parser::parseSpecializeAttributeArguments(
 
   // Parse the where clause.
   if (Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
+    SourceLoc whereLoc, endLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    bool firstTypeInComplete;
-    parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
+    parseGenericWhereClause(whereLoc, endLoc, requirements,
                             /* AllowLayoutConstraints */ true);
     TrailingWhereClause =
-        TrailingWhereClause::create(Context, whereLoc, requirements);
+        TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
   }
   return true;
 }
@@ -1053,12 +1052,12 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Parse a trailing 'where' clause if any.
   if (Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
+    SourceLoc whereLoc, endLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    bool firstTypeInComplete;
-    parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
+    parseGenericWhereClause(whereLoc, endLoc, requirements,
                             /*AllowLayoutConstraints*/ true);
-    whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
+    whereClause =
+        TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
   }
   return false;
 }
@@ -4878,19 +4877,17 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TrailingWhereClause *trailingWhereClause = nullptr;
   bool trailingWhereHadCodeCompletion = false;
   if (Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
+    SourceLoc whereLoc, endLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    bool firstTypeInComplete;
-    auto whereStatus = parseGenericWhereClause(whereLoc, requirements,
-                                               firstTypeInComplete);
+    auto whereStatus = parseGenericWhereClause(whereLoc, endLoc, requirements);
     if (whereStatus.hasCodeCompletion()) {
       if (isCodeCompletionFirstPass())
         return whereStatus;
       trailingWhereHadCodeCompletion = true;
     }
     if (!requirements.empty()) {
-      trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
-                                                        requirements);
+      trailingWhereClause =
+          TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
     }
     status |= whereStatus;
   }
