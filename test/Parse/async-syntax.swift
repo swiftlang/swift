@@ -5,6 +5,7 @@ func asyncGlobal2() async throws { }
 
 typealias AsyncFunc1 = () async -> ()
 typealias AsyncFunc2 = () async throws -> ()
+typealias AsyncFunc3 = (_ a: Bool, _ b: Bool) async throws -> ()
 
 func testTypeExprs() {
   let _ = [() async -> ()]()
