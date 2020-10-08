@@ -2766,9 +2766,6 @@ ERROR(unexportable_clang_function_type,none,
 ERROR(cxx_class_instantiation_failed,none,
       "clang couldn't instantiate class template",
       ())
-ERROR(cxx_class_instantiation_non_tag_argument,none,
-      "only struct/class/enum/union type arguments supported",
-      ())
 ERROR(cxx_class_instantiation_non_cxx_argument,none,
       "only C++ types supported",
       ())
