@@ -1425,7 +1425,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
               dyn_cast<clang::TagDecl>(decl->getClangDecl()))));
     }
 
-    auto *instantiation = clangModuleLoader->instantiateTemplate(
+    auto *instantiation = clangModuleLoader->instantiateCXXClassTemplate(
         classTemplateDecl, templateArguments);
     return instantiation;
   }

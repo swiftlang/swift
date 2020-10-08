@@ -834,7 +834,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
         Type argType = resolution.resolveType(argTypeRepr);
         auto *clangDecl = argType->getAnyNominal()->getDecl()->getClangDecl();
         if (clangDecl) {
-          auto *tagDecl = cast<clang::TagDecl>(clangDecl));
+          auto *tagDecl = cast<clang::TagDecl>(clangDecl);
           auto type =
               classTemplateDecl->getASTContext().getTagDeclType(tagDecl);
           templateArguments.push_back(clang::TemplateArgument(type));
@@ -845,7 +845,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       }
 
       auto *clangModuleLoader = decl->getASTContext().getClangModuleLoader();
-      auto instantiatedDecl = clangModuleLoader->instantiateTemplate(
+      auto instantiatedDecl = clangModuleLoader->instantiateCXXClassTemplate(
           const_cast<clang::ClassTemplateDecl *>(classTemplateDecl),
           templateArguments);
       if (instantiatedDecl) {

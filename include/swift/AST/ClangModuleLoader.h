@@ -178,7 +178,7 @@ public:
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
   /// Instantiate and import class template.
   virtual NominalTypeDecl *
-  instantiateTemplate(clang::ClassTemplateDecl *decl,
+  instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
 
   /// Lookup identifier for an already imported decl.

@@ -7,7 +7,7 @@ var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 // CHECK: class-template-instantiation-error-handling.swift:10:18: error: only C++ types supported
 TemplatesTestSuite.test("swift-template-arg-not-supported") {
-  var magicInt = MagicWrapper<String>(t: "asdf")
+  var magicString = MagicWrapper<String>(t: "asdf")
 }
 
 // CHECK: class-template-instantiation-errors.h:18:7: error: no member named 'doesNotExist' in 'IntWrapper'

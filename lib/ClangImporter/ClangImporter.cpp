@@ -2744,7 +2744,7 @@ void ClangImporter::lookupRelatedEntity(
 }
 
 NominalTypeDecl *
-ClangImporter::instantiateTemplate(
+ClangImporter::instantiateCXXClassTemplate(
     clang::ClassTemplateDecl *decl,
     ArrayRef<clang::TemplateArgument> arguments) {
   void *InsertPos = nullptr;

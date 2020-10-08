@@ -241,7 +241,7 @@ public:
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   NominalTypeDecl *
-  instantiateTemplate(clang::ClassTemplateDecl *decl,
+  instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
 
   Identifier
