@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSStep.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"

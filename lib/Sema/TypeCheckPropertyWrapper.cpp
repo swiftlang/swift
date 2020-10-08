@@ -13,7 +13,6 @@
 // This file implements semantic analysis for property wrappers.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"

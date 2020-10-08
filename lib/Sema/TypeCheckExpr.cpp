@@ -25,7 +25,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "ConstraintSystem.h"
 
 using namespace swift;
 

@@ -15,7 +15,6 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
@@ -26,6 +25,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
