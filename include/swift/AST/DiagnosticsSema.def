@@ -3947,7 +3947,7 @@ ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
       (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 NOTE(letvar_required_for_binding,none,
-      "add 'let' or 'var' keyword to introduce %0 in a pattern", (DeclNameRef))
+      "add 'let' or 'var' keyword to bind %0 in a pattern", (DeclNameRef))
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
       (DeclNameRef))
