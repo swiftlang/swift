@@ -668,7 +668,7 @@ private:
       case sizeof(uint32_t):
         return (&IndexZero32)[i].load(order);
       default:
-        swift_runtime_unreachable("unknown index size");
+        swift_unreachable("unknown index size");
       }
     }
 
@@ -683,7 +683,7 @@ private:
       case sizeof(uint32_t):
         return (&IndexZero32)[i].store(value, order);
       default:
-        swift_runtime_unreachable("unknown index size");
+        swift_unreachable("unknown index size");
       }
     }
   };
