@@ -297,7 +297,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     // necessary for performance. Fallback to building the module in case of any lock
     // related errors.
     if (RemarkRebuild) {
-      diagnose(diag::interface_file_lock_failure, interfacePath);
+      diagnose(diag::interface_file_lock_failure);
     }
     // Clear out any potential leftover.
     Locked.unsafeRemoveLockFile();
