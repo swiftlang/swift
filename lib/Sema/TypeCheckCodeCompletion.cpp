@@ -786,6 +786,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     ConstraintSystemOptions options;
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
+    options |= ConstraintSystemFlags::ForCodeCompletion;
 
     ConstraintSystem cs(DC, options);
 

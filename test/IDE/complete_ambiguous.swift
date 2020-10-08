@@ -4,6 +4,7 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=ERROR_IN_BASE | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC_MISSINGARG | %FileCheck %s --check-prefix=NORESULTS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_MISSINGARG | %FileCheck %s --check-prefix=POINT_MEMBER
@@ -33,6 +34,11 @@ struct HasMembers {
 }
 
 HasMembers().overloadedReturn().#^SIMPLE_MEMBERS^#
+
+func givenErrorExpr(_ a: String) -> A {}
+func givenErrorExpr(_ b: Int) -> B {}
+
+givenErrorExpr(undefined).#^ERROR_IN_BASE^#
 
 // SIMPLE: Begin completions, 4 items
 // SIMPLE-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
