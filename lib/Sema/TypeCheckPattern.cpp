@@ -525,7 +525,7 @@ public:
     auto result = TypeChecker::resolveDeclRefExpr(
                                 ude, DC, /*replaceInvalidRefsWithErrors=*/true);
 
-    // if name lookup in the pattern failed, suggest binding it with let / var
+    // if name lookup failed, suggest binding it with let / var
     if (isa<ErrorExpr>(result)) {
       Context.Diags.diagnose(ude->getStartLoc(), 
                              diag::letvar_required_for_binding, ude->getName())
