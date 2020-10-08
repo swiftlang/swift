@@ -80,8 +80,26 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
-set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
+  set(libicu_i18n_a -licui18nswift)
+  set(libicu_uc_a -licuucswift)
+  set(libicu_data_a -licudataswift)
+else()
+  find_package(ICU REQUIRED COMPONENTS uc i18n data)
+  set(libicu_i18n_a ${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_STATIC})
+  set(libicu_uc_a ${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_STATIC})
+  set(libicu_data_a ${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_DATA_STATIC})
+endif()
+
+# TODO: Put the logic for finding libdl in a module, similar to ICU.
+set(libdl)
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
+  set(libdl -ldl)
+endif()
+
+
+set(sdk "${SWIFT_HOST_VARIANT_SDK}")
+if(SWIFT_BUILD_STATIC_STDLIB AND ${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
   list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
@@ -126,22 +144,30 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
-  add_custom_command_target(swift_static_binary_${sdk}_args
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    OUTPUT
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DEPENDS
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
+  file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-static
+-lswiftCore
+-lswiftImageInspectionShared
+-Xlinker
+--defsym=__import_pthread_self=pthread_self
+-Xlinker
+--defsym=__import_pthread_once=pthread_once
+-Xlinker
+--defsym=__import_pthread_key_create=pthread_key_create
+-lpthread
+${libicu_i18n_a}
+${libicu_uc_a}
+${libicu_data_a}
+${libdl}
+-lstdc++
+-lm")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                              DESTINATION "lib/swift_static/${lowercase_sdk}"
                              COMPONENT stdlib)
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
-  foreach(arch IN LISTS SWIFT_SDK_LINUX_ARCHITECTURES)
+  foreach(arch IN LISTS SWIFT_SDK_${sdk}_ARCHITECTURES)
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
@@ -255,30 +281,9 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     # 'GenericUnix' (eg linux)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
       string(TOLOWER "${sdk}" lowercase_sdk)
-      if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
-        set(libicu_i18n_a -licui18nswift)
-        set(libicu_uc_a -licuucswift)
-        set(libicu_data_a -licudataswift)
-      else()
-        find_package(ICU REQUIRED COMPONENTS uc i18n)
-        get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
-        get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
-
-        set(libicu_i18n_a -licui18n)
-        set(libicu_uc_a -licuuc)
-        set(libicu_data_a)
-        if(EXISTS ${ICU_I18N_LIBDIR}/libicui18n.a AND
-            EXISTS ${ICU_UC_LIBDIR}/libicuuc.a AND
-            EXISTS ${ICU_UC_LIBDIR}/libicudata.a)
-          set(libicu_i18n_a ${ICU_I18N_LIBDIR}/libicui18n.a)
-          set(libicu_uc_a ${ICU_UC_LIBDIR}/libicuuc.a)
-          set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
-        endif()
-      endif()
-
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
--ldl
+${libdl}
 -lpthread
 -lswiftCore
 -lswiftImageInspectionShared

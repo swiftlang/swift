@@ -1,3 +1,5 @@
+// See SR-13165
+// UNSUPPORTED: static_stdlib
 
 // RUN: echo %s > %t.filelist.txt
 // RUN: not --crash %target-swift-frontend -interpret -filelist %t.filelist.txt 2>&1 | %FileCheck %s

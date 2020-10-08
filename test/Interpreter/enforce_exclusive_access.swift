@@ -1,3 +1,5 @@
+// See SR-13165
+// UNSUPPORTED: static_stdlib
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift  -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
