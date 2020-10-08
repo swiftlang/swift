@@ -3747,56 +3747,48 @@ public:
 struct SelfReferenceKind {
   bool result;
   bool parameter;
-  bool requirement;
   bool other;
 
   /// The type does not refer to 'Self' at all.
   static SelfReferenceKind None() {
-    return SelfReferenceKind(false, false, false, false);
+    return SelfReferenceKind(false, false, false);
   }
 
   /// The type refers to 'Self', but only as the type of a property or
   /// the result type of a method/subscript.
   static SelfReferenceKind Result() {
-    return SelfReferenceKind(true, false, false, false);
+    return SelfReferenceKind(true, false, false);
   }
 
   /// The type refers to 'Self', but only as the parameter type
   /// of a method/subscript.
   static SelfReferenceKind Parameter() {
-    return SelfReferenceKind(false, true, false, false);
-  }
-
-  /// The type refers to 'Self' within a same-type requiement.
-  static SelfReferenceKind Requirement() {
-    return SelfReferenceKind(false, false, true, false);
+    return SelfReferenceKind(false, true, false);
   }
 
   /// The type refers to 'Self' in a position that is invariant.
   static SelfReferenceKind Other() {
-    return SelfReferenceKind(false, false, false, true);
+    return SelfReferenceKind(false, false, true);
   }
 
   SelfReferenceKind flip() const {
-    return SelfReferenceKind(parameter, result, requirement, other);
+    return SelfReferenceKind(parameter, result, other);
   }
 
   SelfReferenceKind operator|=(SelfReferenceKind kind) {
     result |= kind.result;
-    requirement |= kind.requirement;
     parameter |= kind.parameter;
     other |= kind.other;
     return *this;
   }
 
   operator bool() const {
-    return result || parameter || requirement || other;
+    return result || parameter || other;
   }
 
 private:
-  SelfReferenceKind(bool result, bool parameter, bool requirement, bool other)
-    : result(result), parameter(parameter), requirement(requirement),
-      other(other) { }
+  SelfReferenceKind(bool result, bool parameter, bool other)
+    : result(result), parameter(parameter), other(other) { }
 };
 
 /// The set of known protocols for which derived conformances are supported.
