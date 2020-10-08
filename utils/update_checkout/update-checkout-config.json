@@ -342,7 +342,7 @@
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "PythonKit": "master",
-                "swift-format": "master",
+                "swift-format": "main",
                 "tensorflow": "v2.3.0",
                 "tensorflow-swift-apis": "master"
             }
