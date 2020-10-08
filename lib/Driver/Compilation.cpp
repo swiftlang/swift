@@ -1181,10 +1181,11 @@ namespace driver {
 
         // Cons up a fake `Job` to satisfy the incremental job tracing
         // code's internal invariants.
-        Job fakeJob(Comp.getDerivedOutputFileMap(), external);
+        const auto *externalJob = Comp.addExternalJob(
+            std::make_unique<Job>(Comp.getDerivedOutputFileMap(), external));
         auto subChanges =
             getFineGrainedDepGraph(forRanges).loadFromSwiftModuleBuffer(
-                &fakeJob, *buffer.get(), Comp.getDiags());
+                externalJob, *buffer.get(), Comp.getDiags());
 
         // If the incremental dependency graph failed to load, fall back to
         // treating this as plain external job.
@@ -1196,7 +1197,7 @@ namespace driver {
         for (auto *CMD :
              getFineGrainedDepGraph(forRanges)
                  .findJobsToRecompileWhenNodesChange(subChanges.getValue())) {
-          if (CMD == &fakeJob) {
+          if (CMD == externalJob) {
             continue;
           }
           ExternallyDependentJobs.push_back(CMD);
@@ -1716,6 +1717,12 @@ Compilation::~Compilation() = default;
 Job *Compilation::addJob(std::unique_ptr<Job> J) {
   Job *result = J.get();
   Jobs.emplace_back(std::move(J));
+  return result;
+}
+
+Job *Compilation::addExternalJob(std::unique_ptr<Job> J) {
+  Job *result = J.get();
+  ExternalJobs.emplace_back(std::move(J));
   return result;
 }
 

@@ -198,22 +198,3 @@ void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
     child->postOrderDo(fn);
   fn(this);
 }
-
-unsigned ASTScopeImpl::countDescendants() const {
-  unsigned count = 0;
-  const_cast<ASTScopeImpl *>(this)->preOrderDo(
-      [&](ASTScopeImpl *) { ++count; });
-  return count - 1;
-}
-
-// Can fail if a subscope is lazy and not reexpanded
-void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
-#ifndef NDEBUG
-  unsigned beforeCount = countDescendants();
-#endif
-  fn();
-#ifndef NDEBUG
-  unsigned afterCount = countDescendants();
-  ASTScopeAssert(beforeCount <= afterCount, "shrank?!");
-#endif
-}
