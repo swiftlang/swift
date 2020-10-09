@@ -4672,13 +4672,8 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   // If we're hashing the type body separately, record the curly braces but
   // nothing inside for the interface hash.
-  //
-  // FIXME: There's no real reason code completion cannot also use this code
-  // path. But it seems to cause lazy parsing in contexts that the current
-  // implementation does not expect.
   Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> MemberHashingScope;
-  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash() &&
-      !L->isCodeCompletion()) {
+  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
     MemberHashingScope.emplace(CurrentTokenHash, llvm::MD5());
@@ -4712,9 +4707,6 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
   // were errors while parsing inner decls, because we recovered.
   if (RBLoc.isInvalid())
     hadError = true;
-
-  if (L->isCodeCompletion())
-    return std::make_pair(decls, None);
 
   llvm::MD5::MD5Result result;
   auto declListHash = MemberHashingScope ? *CurrentTokenHash : llvm::MD5();
