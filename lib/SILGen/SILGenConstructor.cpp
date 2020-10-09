@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -1058,8 +1059,37 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Figure out what we're initializing.
         auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
 
-        emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
-                                     origType, substType, memberInit.get());
+        // This whole conversion thing is about eliminating the
+        // paired orig-to-subst subst-to-orig conversions that
+        // will happen if the storage is at a different abstraction
+        // level than the constructor. When emitApply() is used
+        // to call the stored property initializer, it naturally
+        // wants to convert the result back to the most substituted
+        // abstraction level. To undo this, we use a converting
+        // initialization and rely on the peephole that optimizes
+        // out the redundant conversion.
+        auto loweredResultTy = getLoweredType(origType, substType);
+        auto loweredSubstTy = getLoweredType(substType);
+
+        if (loweredResultTy != loweredSubstTy) {
+          Conversion conversion = Conversion::getSubstToOrig(
+              origType, substType,
+              loweredResultTy);
+
+          ConvertingInitialization convertingInit(conversion,
+                                                  SGFContext(memberInit.get()));
+
+          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
+                                       origType, substType, &convertingInit);
+
+          auto finalValue = convertingInit.finishEmission(
+              *this, varPattern, ManagedValue::forInContext());
+          if (!finalValue.isInContext())
+            finalValue.forwardInto(*this, varPattern, memberInit.get());
+        } else {
+          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
+                                       origType, substType, memberInit.get());
+        }
       }
     }
   }
