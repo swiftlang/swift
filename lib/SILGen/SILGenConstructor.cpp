@@ -966,7 +966,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   }
 }
 
-static Type getInitializationTypeInContext(
+static std::pair<AbstractionPattern, CanType>
+getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
   auto interfaceType = pattern->getType()->mapTypeOutOfContext();
@@ -981,9 +982,13 @@ static Type getInitializationTypeInContext(
     }
   }
 
-  auto resultType = toDC->mapTypeIntoContext(interfaceType);
+  AbstractionPattern origType(
+    fromDC->getGenericSignatureOfContext().getCanonicalSignature(),
+    interfaceType->getCanonicalType());
 
-  return resultType;
+  auto substType = toDC->mapTypeIntoContext(interfaceType)->getCanonicalType();
+
+  return std::make_pair(origType, substType);
 }
 
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
@@ -1006,15 +1011,16 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
-        CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, varPattern)->getCanonicalType();
-        AbstractionPattern origResultType(resultType);
+        auto resultType = getInitializationTypeInContext(
+            pbd->getDeclContext(), dc, varPattern);
+        AbstractionPattern origType = resultType.first;
+        CanType substType = resultType.second;
 
         // FIXME: Can emitMemberInit() share code with
         // InitializationForPattern in SILGenDecl.cpp?
         RValue result = emitApplyOfStoredPropertyInitializer(
                                   init, pbd->getAnchoringVarDecl(i), subs,
-                                  resultType, origResultType,
+                                  substType, origType,
                                   SGFContext());
 
         // If we have the backing storage for a property with an attached
