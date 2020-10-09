@@ -74,6 +74,7 @@ class Builder(object):
             shell.call(command, env=env, dry_run=self.dry_run, echo=self.verbose)
 
     def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
+        environment = {}
         cmake_args = [self.toolchain.cmake, "-G", "Ninja"]
         cmake_args += ["-DCMAKE_MAKE_PROGRAM=" + self.ninja_path]
 
@@ -90,6 +91,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=" + deployment_version,
             ]
+            environment["SDKROOT"] = "macosx"
 
         elif self.host == "linux":
             host_triple = "%s-unknown-linux" % (self.arch)
@@ -252,7 +254,7 @@ class Builder(object):
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
         cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")]
-        self.call(cmake_args)
+        self.call(cmake_args, env=environment)
 
     def build_target(self, build_dir, target, env=None):
         invocation = [self.toolchain.cmake, "--build", build_dir]
@@ -435,6 +437,17 @@ Example invocations:
         help="host platform to build for (default = %s)" % default_host,
     )
     option(
+        "--short-host",
+        store,
+        choices=[
+            "osx",
+            "ios_sim",
+            "ios",
+        ],
+        default=None,
+        help="optional alternative way to define host platform to build for",
+    )
+    option(
         "--architectures",
         store,
         default=default_architectures,
@@ -480,6 +493,13 @@ Example invocations:
               (swift_src_path, swift_src_in_llvm_project_path), file=sys.stderr)
         shell.symlink(swift_src_path, swift_src_in_llvm_project_path,
                       dry_run=args.dry_run, echo=args.verbose)
+
+    if args.short_host == "osx":
+        args.host = "macosx"
+    elif args.short_host == "ios_sim":
+        args.host = "iphonesimulator"
+    elif args.short_host == "ios":
+        args.host = "iphoneos"
 
     architectures = args.architectures.split(" ")
     architectures = [arch for arch in architectures if arch != ""]
