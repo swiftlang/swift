@@ -150,15 +150,28 @@ struct SILDeclRef {
   unsigned isForeign : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
-  /// The derivative function identifier.
-  AutoDiffDerivativeFunctionIdentifier *derivativeFunctionIdentifier = nullptr;
 
-  GenericSignature specializedSignature;
+  PointerUnion<AutoDiffDerivativeFunctionIdentifier *,
+               const GenericSignatureImpl *>
+      pointer;
+
+  /// The derivative function identifier.
+  AutoDiffDerivativeFunctionIdentifier * getDerivativeFunctionIdentifier() const {
+    if (!pointer.is<AutoDiffDerivativeFunctionIdentifier *>())
+      return nullptr;
+    return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
+  }
+
+  GenericSignature getSpecializedSignature() const {
+    if (!pointer.is<const GenericSignatureImpl *>())
+      return GenericSignature();
+    else
+      return GenericSignature(pointer.get<const GenericSignatureImpl *>());
+  }
 
   /// Produces a null SILDeclRef.
   SILDeclRef()
-      : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0),
-        derivativeFunctionIdentifier(nullptr) {}
+      : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0) {}
 
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(
@@ -294,7 +307,7 @@ struct SILDeclRef {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() &&
            kind == rhs.kind && isForeign == rhs.isForeign &&
            defaultArgIndex == rhs.defaultArgIndex &&
-           derivativeFunctionIdentifier == rhs.derivativeFunctionIdentifier;
+           pointer == rhs.pointer;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -309,7 +322,7 @@ struct SILDeclRef {
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind, foreign, defaultArgIndex,
-                      derivativeFunctionIdentifier);
+                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
 
   /// Returns the entry point for the corresponding autodiff derivative
@@ -318,16 +331,16 @@ struct SILDeclRef {
       AutoDiffDerivativeFunctionIdentifier *derivativeId) const {
     assert(derivativeId);
     SILDeclRef declRef = *this;
-    declRef.derivativeFunctionIdentifier = derivativeId;
+    declRef.pointer = derivativeId;
     return declRef;
   }
 
   /// Returns the entry point for the original function corresponding to an
   /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
-    assert(derivativeFunctionIdentifier);
+    assert(pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
     SILDeclRef declRef = *this;
-    declRef.derivativeFunctionIdentifier = nullptr;
+    declRef.pointer = (AutoDiffDerivativeFunctionIdentifier *)nullptr;
     return declRef;
   }
 
@@ -405,13 +418,14 @@ struct SILDeclRef {
   bool canBeDynamicReplacement() const;
 
   bool isAutoDiffDerivativeFunction() const {
-    return derivativeFunctionIdentifier != nullptr;
+    return pointer.is<AutoDiffDerivativeFunctionIdentifier *>() &&
+           pointer.get<AutoDiffDerivativeFunctionIdentifier *>() != nullptr;
   }
 
   AutoDiffDerivativeFunctionIdentifier *
   getAutoDiffDerivativeFunctionIdentifier() const {
     assert(isAutoDiffDerivativeFunction());
-    return derivativeFunctionIdentifier;
+    return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
   }
 
 private:
@@ -422,7 +436,7 @@ private:
                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
       : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
         isForeign(isForeign), defaultArgIndex(defaultArgIndex),
-        derivativeFunctionIdentifier(derivativeId) {}
+        pointer(derivativeId) {}
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
@@ -457,7 +471,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
                     : 0;
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    unsigned h5 = PointerInfo::getHashValue(Val.derivativeFunctionIdentifier);
+    unsigned h5 = PointerInfo::getHashValue(Val.pointer.getOpaqueValue());
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
