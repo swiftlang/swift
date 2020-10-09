@@ -96,7 +96,12 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
     genericParams = proto->getGenericParams();
   } else {
-    genericParams = cast<ExtensionDecl>(this)->getGenericParams();
+    auto ext = cast<ExtensionDecl>(this);
+    genericParams = ext->getGenericParams();
+
+    if (ext->isParameterized()) {
+      genericParams = genericParams->getOuterParameters();
+    }
   }
 
   if (genericParams == nullptr)
@@ -240,6 +245,17 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   } while ((dc = dc->getParent()));
 
   return nullptr;
+}
+
+DeclContext *DeclContext::getOutermostSyntacticContext() {
+  auto depth = getSyntacticDepth() - 1;
+  auto dc = this;
+
+  for (auto i = 0; i != depth; i += 1) {
+    dc = dc->getParent();
+  }
+
+  return dc;
 }
 
 DeclContext *DeclContext::getParentForLookup() const {

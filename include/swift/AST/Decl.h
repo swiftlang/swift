@@ -1213,6 +1213,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
                 MutableArrayRef<TypeLoc> inherited,
+                GenericParamList *genericParams,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
 
@@ -1238,6 +1239,7 @@ public:
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
                                TypeRepr *extendedType,
                                MutableArrayRef<TypeLoc> inherited,
+                               GenericParamList *genericParams,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
                                ClangNode clangNode = ClangNode());
@@ -1341,6 +1343,10 @@ public:
   /// extension mangling, because an extension method implementation could be
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
+
+  /// Whether this extension contains unique generic parameters that differ from
+  /// the extended nominal's generic signature.
+  bool isParameterized() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

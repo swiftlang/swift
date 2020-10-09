@@ -339,7 +339,8 @@ extension Tree.LimbContent.Contents {
 }
 
 extension Tree.BoughPayload.Contents {
- // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+ // expected-error@-1 {{extension of type 'Tree.BoughPayload.Contents' (aka 'Nest<Int>') must be declared as an extension of 'Nest<Int>'}}
+ // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}} {{11-37=Nest<Int>}}
 }
 
 // SR-10466 Check 'where' clause when referencing type defined inside extension

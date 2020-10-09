@@ -1107,9 +1107,10 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              MutableArrayRef<TypeLoc> inherited,
+                             GenericParamList *genericParams,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
-  : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
+  : GenericContext(DeclContextKind::ExtensionDecl, parent, genericParams),
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
@@ -1124,6 +1125,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
+                                     GenericParamList *genericParams,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -1134,8 +1136,8 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
   // Construct the extension.
   auto result = ::new (declPtr) ExtensionDecl(extensionLoc, extendedType,
-                                              inherited, parent,
-                                              trailingWhereClause);
+                                              inherited, genericParams,
+                                              parent, trailingWhereClause);
   if (clangNode)
     result->setClangNode(clangNode);
 
@@ -1231,6 +1233,20 @@ bool ExtensionDecl::isEquivalentToExtendedContext() const {
   return extendDeclFromSameModule
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
+}
+
+bool ExtensionDecl::isParameterized() const {
+  if (!hasBeenBound())
+    return getParsedGenericParams();
+
+  auto nominal = getExtendedNominal();
+  if (!nominal && getParsedGenericParams())
+    return true;
+
+  if (!nominal)
+    return false;
+
+  return getGenericContextDepth() != nominal->getGenericContextDepth();
 }
 
 AccessLevel ExtensionDecl::getDefaultAccessLevel() const {

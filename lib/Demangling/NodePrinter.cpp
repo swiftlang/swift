@@ -556,6 +556,7 @@ private:
     case Node::Kind::GlobalVariableOnceDeclList:
     case Node::Kind::GlobalVariableOnceFunction:
     case Node::Kind::GlobalVariableOnceToken:
+    case Node::Kind::GenericExtension:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1166,6 +1167,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     }
     return nullptr;
   case Node::Kind::Extension:
+  case Node::Kind::GenericExtension:
     assert((Node->getNumChildren() == 2 || Node->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
     if (Options.QualifyEntities && Options.DisplayExtensionContexts) {

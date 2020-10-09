@@ -3929,7 +3929,7 @@ public:
       return declOrOffset;
 
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
-                                           DC, nullptr);
+                                           nullptr, DC, nullptr);
     declOrOffset = extension;
 
     // Generic parameter lists are written from outermost to innermost.

@@ -840,13 +840,33 @@ ASTBuilder::getForeignModuleKind(NodePointer node) {
 
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
-    NodePointer node) {
+    NodePointer node,
+    bool isParameterizedExtension) {
+  SmallVector<GenericTypeParamType *, 2> gpTypes;
   SmallVector<Requirement, 2> requirements;
 
   for (auto &child : *node) {
-    if (child->getKind() ==
-          Demangle::Node::Kind::DependentGenericParamCount)
+    if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount) {
+      // If this is not a parameterized extension, just ignore this node.
+      if (!isParameterizedExtension) {
+        continue;
+      }
+
+      // However, if it is a parameterized extension, this node tells us exactly
+      // how many generic parameters the extension introduced. Create that many
+      // generic parameter types for the generic signature.
+
+      // The extension's generic depth is 1 higher than the context it's
+      // extending.
+      unsigned depth = nominalDecl->getGenericContextDepth() + 1;
+
+      for (uint64_t i = 0; i != child->getIndex(); i += 1) {
+        auto gpTy = GenericTypeParamType::get(depth, i, Ctx);
+        gpTypes.push_back(gpTy);
+      }
+
       continue;
+    }
 
     if (child->getNumChildren() != 2)
       return CanGenericSignature();
@@ -930,7 +950,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   return evaluateOrDefault(Ctx.evaluator,
                            AbstractGenericSignatureRequest{
                                nominalDecl->getGenericSignature().getPointer(),
-                               {},
+                               std::move(gpTypes),
                                std::move(requirements)},
                            GenericSignature())
       .getCanonicalSignature();
@@ -1018,7 +1038,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
   case Demangle::Node::Kind::Global:
     return findDeclContext(node->getChild(0));
 
-  case Demangle::Node::Kind::Extension: {
+  case Demangle::Node::Kind::Extension:
+  case Demangle::Node::Kind::GenericExtension: {
     auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(
         findDeclContext(node->getChild(0)));
     if (!moduleDecl)
@@ -1029,9 +1050,14 @@ ASTBuilder::findDeclContext(NodePointer node) {
     if (!nominalDecl)
       return nullptr;
 
+    bool isParameterized = false;
+    if (node->getKind() == Demangle::Node::Kind::GenericExtension)
+      isParameterized = true;
+
     CanGenericSignature genericSig;
     if (node->getNumChildren() > 2)
-      genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+      genericSig = demangleGenericSignature(nominalDecl, node->getChild(2),
+                                            isParameterized);
 
     for (auto *ext : nominalDecl->getExtensions()) {
       if (ext->getParentModule() != moduleDecl)

@@ -19,11 +19,9 @@ extension Double : P2 {
 }
 
 extension X<Int, Double, String> {
-// expected-error@-1{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
   let x = 0
   // expected-error@-1 {{extensions must not contain stored properties}}
   static let x = 0
-  // expected-error@-1 {{static stored properties not supported in generic types}}
   func f() -> Int {}
   class C<T> {}
 }

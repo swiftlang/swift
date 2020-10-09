@@ -630,6 +630,9 @@ namespace {
 
     void visitExtensionDecl(ExtensionDecl *ED) {
       printCommon(ED, "extension_decl", ExtensionColor);
+      if (ED->isParameterized()) {
+        printGenericParameters(OS, ED->getParsedGenericParams());
+      }
       OS << ' ';
       if (ED->hasBeenBound())
         ED->getExtendedType().print(OS);

@@ -297,6 +297,7 @@ NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
 NODE(GlobalVariableOnceFunction)
 NODE(GlobalVariableOnceToken)
 NODE(GlobalVariableOnceDeclList)
+CONTEXT_NODE(GenericExtension)
 
 #undef CONTEXT_NODE
 #undef NODE
