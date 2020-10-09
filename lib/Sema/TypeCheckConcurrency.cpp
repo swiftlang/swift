@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -328,7 +330,8 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   return nullptr;
 }
 
-CustomAttr *GlobalActorAttributeRequest::evaluate(
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator, Decl *decl) const {
   ASTContext &ctx = decl->getASTContext();
   auto dc = decl->getDeclContext();
@@ -363,7 +366,7 @@ CustomAttr *GlobalActorAttributeRequest::evaluate(
   }
 
   if (!globalActorAttr)
-    return nullptr;
+    return None;
 
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
@@ -374,7 +377,7 @@ CustomAttr *GlobalActorAttributeRequest::evaluate(
         // ... except for actor classes.
         nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
-        return nullptr;
+        return None;
       }
     }
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
@@ -383,7 +386,7 @@ CustomAttr *GlobalActorAttributeRequest::evaluate(
       if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
-        return nullptr;
+        return None;
       }
     }
   } else if (isa<ExtensionDecl>(decl)) {
@@ -393,10 +396,10 @@ CustomAttr *GlobalActorAttributeRequest::evaluate(
   } else {
     // Everything else is disallowed.
     decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
-    return nullptr;
+    return None;
   }
 
-  return globalActorAttr;
+  return std::make_pair(globalActorAttr, globalActorNominal);
 }
 
 namespace {
@@ -417,9 +420,12 @@ public:
     /// data races. The context in which the local was defined is provided.
     LocalCapture,
 
-    /// References to this local variable that can only be made from the
     /// References to this member of an actor are only permitted on 'self'.
     ActorSelf,
+
+    /// References to a declaration that is part of a global actor are only
+    /// permitted from other declarations with that same global actor.
+    GlobalActor,
   };
 
 private:
@@ -432,6 +438,9 @@ private:
 
     /// The actor class that the entity is declared in.
     ClassDecl *actorClass;
+
+    /// The global actor type.
+    TypeBase *globalActor;
   } data;
 
   explicit IsolationRestriction(Kind kind) : kind(kind) { }
@@ -449,6 +458,12 @@ public:
   ClassDecl *getActorClass() const {
     assert(kind == ActorSelf);
     return data.actorClass;
+  }
+
+  /// Retrieve the actor class that the declaration is within.
+  Type getGlobalActor() const {
+    assert(kind == GlobalActor);
+    return Type(data.globalActor);
   }
 
   /// There are no restrictions on the use of the entity.
@@ -473,6 +488,14 @@ public:
   static IsolationRestriction forLocalCapture(DeclContext *dc) {
     IsolationRestriction result(LocalCapture);
     result.data.localContext = dc;
+    return result;
+  }
+
+  /// Accesses to the given declaration can only be made via this particular
+  /// global actor.
+  static IsolationRestriction forGlobalActor(Type globalActor) {
+    IsolationRestriction result(GlobalActor);
+    result.data.globalActor = globalActor.getPointer();
     return result;
   }
 
@@ -538,8 +561,12 @@ public:
         // Protected actor instance members can only be accessed on 'self'.
         return forActorSelf(isolation.getActor());
 
+      case ActorIsolation::GlobalActor:
+        return forGlobalActor(isolation.getGlobalActor());
+
       case ActorIsolation::Independent:
       case ActorIsolation::ActorPrivileged:
+      case ActorIsolation::GlobalActorPrivileged:
         // Actor-independent and actor-privileged declarations have no
         // restrictions on their access.
         return forUnrestricted();
@@ -712,6 +739,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
     /// Note that the given actor member is isolated.
     static void noteIsolatedActorMember(ValueDecl *decl) {
+      // FIXME: Make this diagnostic more sensitive to the isolation context
+      // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // FIXME: We'd like to insert 'async' at the appropriate place, but
         // FuncDecl/AbstractFunctionDecl doesn't have the right source-location
@@ -793,6 +822,87 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       return true;
     }
 
+    /// Get the actor isolation of the innermost relevant context.
+    ActorIsolation getInnermostIsolatedContext(const DeclContext *constDC) {
+      auto dc = const_cast<DeclContext *>(constDC);
+      while (!dc->isModuleScopeContext()) {
+        // Look through non-escaping closures.
+        if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+          if (auto type = closure->getType()) {
+            if (auto fnType = type->getAs<AnyFunctionType>()) {
+              if (fnType->isNoEscape()) {
+                dc = closure->getParent();
+                continue;
+              }
+            }
+          }
+        }
+
+        // Functions have actor isolation defined on them.
+        if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
+          return getActorIsolation(func);
+
+        // Subscripts have actor isolation defined on them.
+        if (auto subscript = dyn_cast<SubscriptDecl>(dc))
+          return getActorIsolation(subscript);
+
+        // Pattern binding declarations have actor isolation defined on their
+        // properties, if any.
+        if (auto init = dyn_cast<PatternBindingInitializer>(dc)) {
+          auto var = init->getBinding()->getAnchoringVarDecl(
+              init->getBindingIndex());
+          if (var)
+            return getActorIsolation(var);
+
+          return ActorIsolation::forUnspecified();
+        }
+
+        return ActorIsolation::forUnspecified();
+      }
+
+      return ActorIsolation::forIndependent();
+    }
+
+    /// Check a reference to an entity within a global actor.
+    bool checkGlobalActorReference(
+        ValueDecl *value, SourceLoc loc, Type globalActor) {
+      switch (auto contextIsolation =
+                  getInnermostIsolatedContext(getDeclContext())) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::ActorPrivileged:
+        ctx.Diags.diagnose(
+            loc, diag::global_actor_from_instance_actor_context,
+            value->getDescriptiveKind(), value->getName(), globalActor,
+            contextIsolation.getActor()->getName());
+        noteIsolatedActorMember(value);
+        return true;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorPrivileged:
+        // If the global actor types are the same, we're done.
+        if (contextIsolation.getGlobalActor()->isEqual(globalActor))
+          return false;
+
+        ctx.Diags.diagnose(
+            loc, diag::global_actor_from_other_global_actor_context,
+            value->getDescriptiveKind(), value->getName(), globalActor,
+            contextIsolation.getGlobalActor());
+        noteIsolatedActorMember(value);
+        return true;
+
+      case ActorIsolation::Independent:
+        ctx.Diags.diagnose(
+            loc, diag::global_actor_from_independent_context,
+            value->getDescriptiveKind(), value->getName(), globalActor);
+        noteIsolatedActorMember(value);
+        return true;
+
+      case ActorIsolation::Unspecified:
+        // Okay.
+        return false;
+      }
+    }
+
     /// Check a reference to a local or global.
     bool checkNonMemberReference(ValueDecl *value, SourceLoc loc) {
       if (!value)
@@ -804,6 +914,10 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
       case IsolationRestriction::ActorSelf:
         llvm_unreachable("non-member reference into an actor");
+
+      case IsolationRestriction::GlobalActor:
+        return checkGlobalActorReference(
+            value, loc, isolation.getGlobalActor());
 
       case IsolationRestriction::LocalCapture:
         // Only diagnose unsafe concurrent accesses within the context of an
@@ -856,7 +970,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         }
 
         // Check whether the context of 'self' is actor-isolated.
-        switch (getActorIsolation(
+        switch (auto contextIsolation = getActorIsolation(
                    cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
           case ActorIsolation::ActorInstance:
           case ActorIsolation::ActorPrivileged:
@@ -885,6 +999,18 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
                 member->getName());
             noteIsolatedActorMember(member);
             return true;
+
+          case ActorIsolation::GlobalActor:
+          case ActorIsolation::GlobalActorPrivileged:
+            // The 'self' is for a member that's part of a global actor, which
+            // means we cannot refer to actor-isolated state.
+            ctx.Diags.diagnose(
+                memberLoc, diag::actor_isolated_global_actor_context,
+                member->getDescriptiveKind(),
+                member->getName(),
+                contextIsolation.getGlobalActor());
+            noteIsolatedActorMember(member);
+            return true;
         }
 
         // Check whether we are in a context that will not execute concurrently
@@ -902,6 +1028,10 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return false;
       }
 
+      case IsolationRestriction::GlobalActor:
+        return checkGlobalActorReference(
+            member, memberLoc, isolation.getGlobalActor());
+
       case IsolationRestriction::LocalCapture:
         llvm_unreachable("Locals cannot be referenced with member syntax");
 
@@ -917,10 +1047,50 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
-  // If the attribute is explicitly marked @actorIndependent, report it as
-  // independent.
-  if (value->getAttrs().hasAttribute<ActorIndependentAttr>()) {
-    return ActorIsolation::forIndependent();
+  // Look up attributes on the declaration that can affect its actor isolation.
+  // If any of them are present, use that attribute.
+  auto independentAttr = value->getAttrs().getAttribute<ActorIndependentAttr>();
+  auto globalActorAttr = value->getGlobalActorAttr();
+  unsigned numIsolationAttrs =
+    (independentAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
+  if (numIsolationAttrs > 0) {
+    // Only one such attribute is valid.
+    if (numIsolationAttrs > 1) {
+      value->diagnose(
+          diag::actor_isolation_multiple_attr, value->getDescriptiveKind(),
+          value->getName(), independentAttr->getAttrName(),
+          globalActorAttr->second->getName().str())
+        .highlight(independentAttr->getRangeWithAt())
+        .highlight(globalActorAttr->first->getRangeWithAt());
+    }
+
+    // If the declaration is explicitly marked @actorIndependent, report it as
+    // independent.
+    if (independentAttr) {
+      return ActorIsolation::forIndependent();
+    }
+
+    // If the declaration is marked with a global actor, report it as being
+    // part of that global actor.
+    if (globalActorAttr) {
+      TypeResolutionOptions options(TypeResolverContext::None);
+      TypeResolution resolver = TypeResolution::forInterface(
+          value->getInnermostDeclContext(), options, nullptr);
+      Type globalActorType = resolver.resolveType(
+          globalActorAttr->first->getTypeRepr(), nullptr);
+      if (!globalActorType || globalActorType->hasError())
+        return ActorIsolation::forUnspecified();
+
+      // A function that is an asynchronous context is actor-privileged.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+        if (func->isAsyncContext())
+          return ActorIsolation::forGlobalActorPrivileged(globalActorType);
+      }
+
+      return ActorIsolation::forGlobalActor(globalActorType);
+    }
+
+    llvm_unreachable("Forgot about an attribute?");
   }
 
   // If the declaration overrides another declaration, it must have the same

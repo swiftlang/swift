@@ -957,8 +957,10 @@ public:
   /// if any.
   ///
   /// This is the "raw" global actor attribute as written directly on the
-  /// declaration, with any inference rules applied.
-  CustomAttr *getGlobalActorAttr() const;
+  /// declaration, along with the nominal type declaration to which it refers,
+  /// without any inference rules applied.
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  getGlobalActorAttr() const;
 
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.

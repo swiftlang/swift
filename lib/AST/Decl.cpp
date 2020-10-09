@@ -672,12 +672,12 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   llvm_unreachable("invalid file kind");
 }
 
-CustomAttr *Decl::getGlobalActorAttr() const {
+Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<Decl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            GlobalActorAttributeRequest{mutableThis},
-                           nullptr);
+                           None);
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {

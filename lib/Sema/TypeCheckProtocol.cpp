@@ -4359,7 +4359,13 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
       }
 
+      case ActorIsolation::GlobalActor: {
+        // FIXME: Check against the requirement. This needs serious refactoring.
+        break;
+      }
+
       case ActorIsolation::ActorPrivileged:
+      case ActorIsolation::GlobalActorPrivileged:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         break;

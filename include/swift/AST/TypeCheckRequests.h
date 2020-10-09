@@ -880,15 +880,18 @@ public:
   bool isCached() const { return true; }
 };
 
+using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
+
 /// Request the custom attribute which denotes the global actor for the given
 /// declaration.
 ///
 /// This is the "raw" global actor attribute as written directly on the
 /// declaration, with any inference rules applied.
 class GlobalActorAttributeRequest :
-    public SimpleRequest<GlobalActorAttributeRequest,
-                         CustomAttr *(Decl *),
-                         RequestFlags::Cached> {
+    public SimpleRequest<
+        GlobalActorAttributeRequest,
+        Optional<CustomAttrNominalPair>(Decl *),
+        RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -896,7 +899,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  CustomAttr *
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
   evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:

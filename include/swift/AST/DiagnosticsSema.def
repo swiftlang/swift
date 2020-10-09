@@ -4153,6 +4153,21 @@ ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be referenced from an "
         "'@actorIndependent' context",
         (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_global_actor_context,none,
+      "actor-isolated %0 %1 can not be referenced from context of global "
+      "actor %2",
+      (DescriptiveDeclKind, DeclName, Type))
+ERROR(global_actor_from_instance_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from actor %3",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
+ERROR(global_actor_from_other_global_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from "
+      "different global actor %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(global_actor_from_independent_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from an "
+      "'@actorIndependent' context",
+      (DescriptiveDeclKind, DeclName, Type))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4230,6 +4245,10 @@ ERROR(global_actor_on_actor_class,none,
       "actor class %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
+
+ERROR(actor_isolation_multiple_attr,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
+      (DescriptiveDeclKind, DeclName, StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

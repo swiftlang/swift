@@ -389,6 +389,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     return true;
 
   case ActorIsolation::ActorPrivileged:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorPrivileged:
   case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:
     return false;

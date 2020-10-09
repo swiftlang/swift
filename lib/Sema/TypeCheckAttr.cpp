@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -317,11 +318,14 @@ public:
       return;
     }
 
-    if (!cast<ValueDecl>(D)->isInstanceMember()) {
+    auto VD = cast<ValueDecl>(D);
+    if (!VD->isInstanceMember()) {
       diagnoseAndRemoveAttr(
           attr, diag::actorisolated_not_actor_instance_member);
       return;
     }
+
+    (void)getActorIsolation(VD);
   }
 
   void visitGlobalActorAttr(GlobalActorAttr *attr) {
@@ -3069,6 +3073,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
     (void)D->getGlobalActorAttr();
+    if (auto value = dyn_cast<ValueDecl>(D))
+      (void)getActorIsolation(value);
     return;
   }
 

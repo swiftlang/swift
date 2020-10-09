@@ -1466,7 +1466,24 @@ void swift::simple_display(
     case ActorIsolation::Unspecified:
       out << "unspecified actor isolation";
       break;
+
+    case ActorIsolation::GlobalActor:
+      out << "actor-isolated to global actor "
+          << state.getGlobalActor().getString();
+      break;
+
+    case ActorIsolation::GlobalActorPrivileged:
+      out << "actor-privileged to global actor "
+          << state.getGlobalActor().getString();
+      break;
   }
+}
+
+bool swift::areTypesEqual(Type type1, Type type2) {
+  if (!type1 || !type2)
+    return !type1 && !type2;
+
+  return type1->isEqual(type2);
 }
 
 void swift::simple_display(

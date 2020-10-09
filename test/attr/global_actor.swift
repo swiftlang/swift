@@ -81,3 +81,10 @@ class SomeClass {
 @GA1 actor class ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
+
+// -----------------------------------------------------------------------
+// Redundant attributes
+// -----------------------------------------------------------------------
+extension SomeActor {
+  @GA1 @actorIndependent func conflict1() { } // expected-error{{instance method 'conflict1()' has multiple actor-isolation attributes ('actorIndependent' and 'GA1')}}
+}
