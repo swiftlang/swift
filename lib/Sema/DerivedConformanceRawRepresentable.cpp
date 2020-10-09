@@ -401,13 +401,15 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
-  auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
-                                                 KnownProtocolKind::Equatable);
-  assert(equatableProto);
-  assert(
-      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl));
-  (void)equatableProto;
-  (void)rawType;
+
+  assert([&]() -> bool {
+    auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
+                                                   KnownProtocolKind::Equatable);
+    if (!equatableProto) {
+      return false;
+    }
+    return !TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl).isInvalid();
+  }());
 
   auto *rawDecl = new (C)
       ParamDecl(SourceLoc(), SourceLoc(),
