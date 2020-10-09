@@ -1583,6 +1583,8 @@ ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
 ERROR(attr_specialize_expected_function,none,
       "expected a function name as the value of the 'target' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_spi_name,none,
+      "expected an SPI identifier as the value of the 'spi' parameter in '_specialize' attribute", ())
 
 // _implements
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,

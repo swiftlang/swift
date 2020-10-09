@@ -578,6 +578,13 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  // Is \p attr accessible as an explictly imported SPI from this module?
+  bool isImportedAsSPI(const SpecializeAttr *attr,
+                       const ValueDecl *targetDecl) const;
+
+  // Is \p spiGroup accessible as an explictly imported SPI from this module?
+  bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.

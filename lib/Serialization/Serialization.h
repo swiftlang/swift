@@ -504,6 +504,9 @@ public:
   /// \see FileUnit::getExportedModuleName
   IdentifierID addContainingModuleRef(const DeclContext *DC);
 
+  /// Records the module \m.
+  IdentifierID addModuleRef(const ModuleDecl *m);
+
   /// Write a normal protocol conformance.
   void writeASTBlockEntity(const NormalProtocolConformance *conformance);
 

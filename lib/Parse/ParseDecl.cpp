@@ -582,8 +582,9 @@ bool Parser::parseSpecializeAttributeArguments(
     swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
     Optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction,
-    llvm::function_ref<bool(Parser &)> parseSILTargetName) {
+    DeclNameRef &targetFunction, SmallVectorImpl<Identifier> &spiGroups,
+    llvm::function_ref<bool(Parser &)> parseSILTargetName,
+    llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
@@ -595,7 +596,8 @@ bool Parser::parseSpecializeAttributeArguments(
                              ? SyntaxKind::TargetFunctionEntry
                              : SyntaxKind::LabeledSpecializeEntry);
       if (ParamLabel != "exported" && ParamLabel != "kind" &&
-          ParamLabel != "target") {
+          ParamLabel != "target" && ParamLabel != "spi" &&
+          ParamLabel != "spiModule") {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
                  ParamLabel);
       }
@@ -616,7 +618,8 @@ bool Parser::parseSpecializeAttributeArguments(
         return false;
       }
       if ((ParamLabel == "exported" && Exported.hasValue()) ||
-          (ParamLabel == "kind" && Kind.hasValue())) {
+          (ParamLabel == "kind" && Kind.hasValue()) ||
+          (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
                  ParamLabel);
       }
@@ -673,6 +676,23 @@ bool Parser::parseSpecializeAttributeArguments(
                   DeclNameFlag::AllowOperators);
         }
       }
+      if (ParamLabel == "spiModule") {
+        if (!parseSILSIPModule(*this)) {
+          diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
+                   ParamLabel);
+          return false;
+        }
+      }
+      if (ParamLabel == "spi") {
+        if (!Tok.is(tok::identifier)) {
+          diagnose(Tok.getLoc(), diag::attr_specialize_expected_spi_name);
+          consumeToken();
+          return false;
+        }
+        auto text = Tok.getText();
+        spiGroups.push_back(Context.getIdentifier(text));
+        consumeToken();
+      }
       if (!consumeIf(tok::comma)) {
         diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
         skipUntil(tok::comma, tok::kw_where);
@@ -712,7 +732,8 @@ bool Parser::parseSpecializeAttributeArguments(
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
     SpecializeAttr *&Attr,
-    llvm::function_ref<bool(Parser &)> parseSILTargetName) {
+    llvm::function_ref<bool(Parser &)> parseSILTargetName,
+    llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
 
   SourceLoc lParenLoc = consumeToken();
@@ -725,9 +746,10 @@ bool Parser::parseSpecializeAttribute(
   TrailingWhereClause *trailingWhereClause = nullptr;
 
   DeclNameRef targetFunction;
-  if (!parseSpecializeAttributeArguments(ClosingBrace, DiscardAttribute,
-                                         exported, kind, trailingWhereClause,
-                                         targetFunction, parseSILTargetName)) {
+  SmallVector<Identifier, 4> spiGroups;
+  if (!parseSpecializeAttributeArguments(
+          ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
+          targetFunction, spiGroups, parseSILTargetName, parseSILSIPModule)) {
     return false;
   }
 
@@ -756,7 +778,7 @@ bool Parser::parseSpecializeAttribute(
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.getValue(),
-                                kind.getValue(), targetFunction);
+                                kind.getValue(), targetFunction, spiGroups);
   return true;
 }
 

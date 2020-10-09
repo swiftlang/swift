@@ -703,13 +703,22 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     unsigned specializationKindVal;
     GenericSignatureID specializedSigID;
     IdentifierID targetFunctionID;
-    SILSpecializeAttrLayout::readRecord(scratch, exported,
-                                        specializationKindVal, specializedSigID,
-                                        targetFunctionID);
+    IdentifierID spiGroupID;
+    ModuleID spiModuleID;
+    SILSpecializeAttrLayout::readRecord(
+        scratch, exported, specializationKindVal, specializedSigID,
+        targetFunctionID, spiGroupID, spiModuleID);
 
     SILFunction *target = nullptr;
     if (targetFunctionID) {
       target = getFuncForReference(MF->getIdentifier(targetFunctionID).str());
+    }
+
+    Identifier spiGroup;
+    const ModuleDecl *spiModule = nullptr;
+    if (spiGroupID) {
+      spiGroup = MF->getIdentifier(spiGroupID);
+      spiModule = MF->getModule(spiModuleID);
     }
 
     SILSpecializeAttr::SpecializationKind specializationKind =
@@ -721,7 +730,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (shouldAddAtttributes) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
-          SILMod, specializedSig, exported != 0, specializationKind, target));
+          SILMod, specializedSig, exported != 0, specializationKind, target,
+          spiGroup, spiModule));
     }
   }
 

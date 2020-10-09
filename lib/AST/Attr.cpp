@@ -898,12 +898,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Specialize: {
-    Printer << "@" << getAttrName() << "(";
     auto *attr = cast<SpecializeAttr>(this);
+    // Don't print the _specialize attribute if it is marked spi and we are
+    // asked to skip SPI.
+    if (!Options.PrintSPIs && !attr->getSPIGroups().empty())
+      return false;
+
+    Printer << "@" << getAttrName() << "(";
     auto exported = attr->isExported() ? "true" : "false";
     auto kind = attr->isPartialSpecialization() ? "partial" : "full";
     auto target = attr->getTargetFunctionName();
     Printer << "exported: "<<  exported << ", ";
+    for (auto id : attr->getSPIGroups()) {
+      Printer << "spi: " << id << ", ";
+    }
     Printer << "kind: " << kind << ", ";
     if (target)
       Printer << "target: " << target << ", ";
@@ -1558,16 +1566,17 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               TrailingWhereClause *clause,
-                               bool exported,
+                               TrailingWhereClause *clause, bool exported,
                                SpecializationKind kind,
                                GenericSignature specializedSignature,
-                               DeclNameRef targetFunctionName)
+                               DeclNameRef targetFunctionName,
+                               ArrayRef<Identifier> spiGroups)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
-      trailingWhereClause(clause),
-      specializedSignature(specializedSignature),
-      targetFunctionName(targetFunctionName) {
+      trailingWhereClause(clause), specializedSignature(specializedSignature),
+      targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()) {
+  std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
+                          getTrailingObjects<Identifier>());
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
 }
@@ -1579,32 +1588,38 @@ TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
 SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TrailingWhereClause *clause,
-                                       bool exported,
-                                       SpecializationKind kind,
+                                       bool exported, SpecializationKind kind,
                                        DeclNameRef targetFunctionName,
+                                       ArrayRef<Identifier> spiGroups,
                                        GenericSignature specializedSignature) {
-  return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
-                                  specializedSignature, targetFunctionName);
-}
-
-SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
-                                SpecializationKind kind,
-                                GenericSignature specializedSignature,
-                                DeclNameRef targetFunctionName) {
-  return new (ctx)
-      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
-                     specializedSignature, targetFunctionName);
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem)
+      SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
+                     targetFunctionName, spiGroups);
 }
 
 SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
                                        SpecializationKind kind,
+                                       ArrayRef<Identifier> spiGroups,
                                        GenericSignature specializedSignature,
-                                       DeclNameRef targetFunctionName,
-                                       LazyMemberLoader *resolver,
-                                       uint64_t data) {
-  auto *attr =  new (ctx)
+                                       DeclNameRef targetFunctionName) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem)
       SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
-                     specializedSignature, targetFunctionName);
+                     specializedSignature, targetFunctionName, spiGroups);
+}
+
+SpecializeAttr *SpecializeAttr::create(
+    ASTContext &ctx, bool exported, SpecializationKind kind,
+    ArrayRef<Identifier> spiGroups, GenericSignature specializedSignature,
+    DeclNameRef targetFunctionName, LazyMemberLoader *resolver, uint64_t data) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
+  auto *attr = new (mem)
+      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
+                     specializedSignature, targetFunctionName, spiGroups);
   attr->resolver = resolver;
   attr->resolverContextData = data;
   return attr;

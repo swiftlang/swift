@@ -33,20 +33,22 @@ using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
-                                     SILFunction *target)
+                                     SILFunction *target, Identifier spiGroup,
+                                     const ModuleDecl *spiModule)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
-      targetFunction(target) {
-        if (targetFunction)
-          targetFunction->incrementRefCount();
-      }
+      spiGroup(spiGroup), spiModule(spiModule), targetFunction(target) {
+  if (targetFunction)
+    targetFunction->incrementRefCount();
+}
 
-SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             GenericSignature specializedSig,
-                                             bool exported,
-                                             SpecializationKind kind,
-                                             SILFunction *target) {
+SILSpecializeAttr *
+SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
+                          bool exported, SpecializationKind kind,
+                          SILFunction *target, Identifier spiGroup,
+                          const ModuleDecl *spiModule) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target);
+  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target,
+                                       spiGroup, spiModule);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {

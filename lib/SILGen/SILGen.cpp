@@ -1998,6 +1998,15 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
   } else if (auto *vd = dyn_cast<AbstractFunctionDecl>(d)) {
     for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
       auto *SA = cast<SpecializeAttr>(A);
+      // Filter _spi.
+      auto spiGroups = SA->getSPIGroups();
+      auto hasSPIGroup = !spiGroups.empty();
+      if (hasSPIGroup) {
+        if (vd->getModuleContext() != M.getSwiftModule() &&
+            !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+          continue;
+        }
+      }
       if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
         auto target = SILDeclRef(targetFunctionDecl);
         auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
@@ -2005,9 +2014,13 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
                             SpecializeAttr::SpecializationKind::Full
                         ? SILSpecializeAttr::SpecializationKind::Full
                         : SILSpecializeAttr::SpecializationKind::Partial;
-
+        Identifier spiGroupIdent;
+        if (hasSPIGroup) {
+          spiGroupIdent = spiGroups[0];
+        }
         targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr));
+            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+            spiGroupIdent, vd->getModuleContext()));
       }
     }
   }

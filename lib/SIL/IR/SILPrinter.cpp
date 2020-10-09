@@ -3465,6 +3465,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
+  if (!getSPIGroup().empty()) {
+    OS << "spi: " << getSPIGroup() << ", ";
+    OS << "spiModule: ";
+    getSPIModule()->getReverseFullModuleName().printForward(OS);
+    OS << ", ";
+  }
 
   auto *genericEnv = getFunction()->getGenericEnvironment();
   GenericSignature genericSig;

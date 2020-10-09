@@ -2448,6 +2448,17 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
       continue;
+    // Check whether SPI allows using this function.
+    auto spiGroup = SA->getSPIGroup();
+    if (!spiGroup.empty()) {
+      auto currentModule = funcBuilder.getModule().getSwiftModule();
+      auto funcModule = SA->getSPIModule();
+      // Don't use this SPI if the current module does not import the function's
+      // module with @_spi(<spiGroup>).
+      if (currentModule != funcModule &&
+          !currentModule->isImportedAsSPI(spiGroup, funcModule))
+        continue;
+    }
     ReabstractionInfo reInfo(funcBuilder.getModule().getSwiftModule(),
                              funcBuilder.getModule().isWholeModule(), refF,
                              SA->getSpecializedSignature(),

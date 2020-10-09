@@ -689,6 +689,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
   return addDeclBaseNameRef(exportedModuleID);
 }
 
+IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
+  if (module == this->M)
+    return CURRENT_MODULE_ID;
+  if (module == this->M->getASTContext().TheBuiltinModule)
+    return BUILTIN_MODULE_ID;
+  auto moduleName =
+      module->getASTContext().getIdentifier(module->getName().str());
+  return addDeclBaseNameRef(moduleName);
+}
+
 SILLayoutID Serializer::addSILLayoutRef(const SILLayout *layout) {
   return SILLayoutsToSerialize.addRef(layout);
 }
@@ -2367,6 +2377,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *targetFunDecl = attr->getTargetFunctionDecl(cast<ValueDecl>(D));
 
       SmallVector<IdentifierID, 4> pieces;
+
       // encodes whether this a a simple or compound name by adding one.
       size_t numArgs = 0;
       if (targetFun) {
@@ -2380,12 +2391,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           numArgs = pieces.size() + 1;
       }
 
+      for (auto spi : attr->getSPIGroups()) {
+        assert(!spi.empty() && "Empty SPI name");
+        pieces.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      auto numSPIGroups = attr->getSPIGroups().size();
+      assert(pieces.size() == numArgs + numSPIGroups ||
+             pieces.size() == (numArgs - 1 + numSPIGroups));
+
       SpecializeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
           S.addGenericSignatureRef(attr->getSpecializedSignature()),
-          S.addDeclRef(targetFunDecl), numArgs,
-          pieces);
+          S.addDeclRef(targetFunDecl), numArgs, numSPIGroups, pieces);
       return;
     }
 

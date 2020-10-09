@@ -303,7 +303,9 @@ namespace sil_block {
                      BCFixed<1>, // exported
                      BCFixed<1>, // specialization kind
                      GenericSignatureIDField, // specialized signature
-                     DeclIDField // Target SILFunction name or 0.
+                     DeclIDField, // Target SILFunction name or 0.
+                     DeclIDField,  // SPIGroup or 0.
+                     DeclIDField // SPIGroup Module name id.
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

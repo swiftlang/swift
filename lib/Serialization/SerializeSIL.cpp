@@ -457,12 +457,18 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       addReferencedSILFunction(target, true);
       targetFunctionNameID = S.addUniquedStringRef(target->getName());
     }
+    IdentifierID spiGroupID = 0;
+    IdentifierID spiModuleDeclID = 0;
+    auto ident = SA->getSPIGroup();
+    if (!ident.empty()) {
+      spiGroupID = S.addUniquedStringRef(ident.str());
+      spiModuleDeclID = S.addModuleRef(SA->getSPIModule());
+    }
     SILSpecializeAttrLayout::emitRecord(
-        Out, ScratchRecord, specAttrAbbrCode,
-        (unsigned)SA->isExported(),
+        Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
-        targetFunctionNameID);
+        targetFunctionNameID, spiGroupID, spiModuleDeclID);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

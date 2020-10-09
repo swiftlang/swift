@@ -56,15 +56,31 @@ void SILFunctionBuilder::addFunctionAttributes(
     SILFunction *targetFunction = nullptr;
     auto *attributedFuncDecl = constant.getDecl();
     auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
+    // Filter out _spi.
+    auto spiGroups = SA->getSPIGroups();
+    bool hasSPI = !spiGroups.empty();
+    if (hasSPI) {
+      if (attributedFuncDecl->getModuleContext() != M.getSwiftModule() &&
+          !M.getSwiftModule()->isImportedAsSPI(SA, attributedFuncDecl)) {
+        continue;
+      }
+    }
+    assert(spiGroups.size() <= 1 && "SIL does not support multiple SPI groups");
+    Identifier spiGroupIdent;
+    if (hasSPI) {
+      spiGroupIdent = spiGroups[0];
+    }
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
-      F->addSpecializeAttr(
-          SILSpecializeAttr::create(M, SA->getSpecializedSignature(),
-                                    SA->isExported(), kind, targetFunction));
+      F->addSpecializeAttr(SILSpecializeAttr::create(
+          M, SA->getSpecializedSignature(), SA->isExported(), kind,
+          targetFunction, spiGroupIdent,
+          attributedFuncDecl->getModuleContext()));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr));
+          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          spiGroupIdent, attributedFuncDecl->getModuleContext()));
     }
   }
 
