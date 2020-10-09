@@ -1106,7 +1106,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
-                             MutableArrayRef<TypeLoc> inherited,
+                             ArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
@@ -1123,7 +1123,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
-                                     MutableArrayRef<TypeLoc> inherited,
+                                     ArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -3704,7 +3704,7 @@ PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
-                                 MutableArrayRef<TypeLoc> inherited,
+                                 ArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
     GenericContext(DeclContextKind::GenericTypeDecl, DC, GenericParams),
     TypeDecl(K, DC, name, nameLoc, inherited) {}
@@ -3914,7 +3914,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<TypeLoc> Inherited,
+                     ArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -3934,7 +3934,7 @@ Type EnumDecl::getRawType() const {
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       MutableArrayRef<TypeLoc> Inherited,
+                       ArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4045,7 +4045,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<TypeLoc> Inherited,
+                     ArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4509,9 +4509,7 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
 }
       
 void EnumDecl::setHasFixedRawValues() {
-  auto flags = LazySemanticInfo.RawTypeAndFlags.getInt() |
-      EnumDecl::HasFixedRawValues;
-  LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+  SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{EnumDecl::HasFixedRawValues};
 }
 
 bool EnumDecl::hasCircularRawValue() const {
@@ -4523,7 +4521,7 @@ bool EnumDecl::hasCircularRawValue() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           MutableArrayRef<TypeLoc> Inherited,
+                           ArrayRef<TypeLoc> Inherited,
                            TrailingWhereClause *TrailingWhere)
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),

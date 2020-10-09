@@ -1193,7 +1193,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// extended nominal.
   llvm::PointerIntPair<NominalTypeDecl *, 1, bool> ExtendedNominal;
 
-  MutableArrayRef<TypeLoc> Inherited;
+  ArrayRef<TypeLoc> Inherited;
 
   /// The next extension in the linked list of extensions.
   ///
@@ -1212,7 +1212,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class IterableDeclContext;
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
-                MutableArrayRef<TypeLoc> inherited,
+                ArrayRef<TypeLoc> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
 
@@ -1237,7 +1237,7 @@ public:
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
                                TypeRepr *extendedType,
-                               MutableArrayRef<TypeLoc> inherited,
+                               ArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
                                ClangNode clangNode = ClangNode());
@@ -1289,10 +1289,9 @@ public:
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
-  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -2405,12 +2404,12 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
-  MutableArrayRef<TypeLoc> Inherited;
+  ArrayRef<TypeLoc> Inherited;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
-           MutableArrayRef<TypeLoc> inherited) :
+           ArrayRef<TypeLoc> inherited) :
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
@@ -2428,10 +2427,9 @@ public:
 
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
-  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -2456,7 +2454,7 @@ class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
-                  MutableArrayRef<TypeLoc> inherited,
+                  ArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams);
 
   // Resolve ambiguity due to multiple base classes.
@@ -2982,7 +2980,7 @@ protected:
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
-                  MutableArrayRef<TypeLoc> inherited,
+                  ArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
@@ -3224,34 +3222,14 @@ class EnumDecl final : public NominalTypeDecl {
     // Is the complete set of raw values type checked?
     HasFixedRawValuesAndTypes  = 1 << 2,
   };
-  
-  struct {
-    /// The raw type and a bit to indicate whether the
-    /// raw was computed yet or not.
-    llvm::PointerIntPair<Type, 3, OptionSet<SemanticInfoFlags>> RawTypeAndFlags;
-    
-    bool hasRawType() const {
-      return RawTypeAndFlags.getInt().contains(HasComputedRawType);
-    }
-    void cacheRawType(Type ty) {
-      auto flags = RawTypeAndFlags.getInt() | HasComputedRawType;
-      RawTypeAndFlags.setPointerAndInt(ty, flags);
-    }
-    
-    bool hasFixedRawValues() const {
-      return RawTypeAndFlags.getInt().contains(HasFixedRawValues);
-    }
-    bool hasCheckedRawValues() const {
-      return RawTypeAndFlags.getInt().contains(HasFixedRawValuesAndTypes);
-    }
-  } LazySemanticInfo;
+  OptionSet<SemanticInfoFlags> SemanticFlags;
 
   friend class EnumRawValuesRequest;
   friend class EnumRawTypeRequest;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<TypeLoc> Inherited,
+            ArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return EnumLoc; }
@@ -3387,7 +3365,7 @@ class StructDecl final : public NominalTypeDecl {
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             MutableArrayRef<TypeLoc> Inherited,
+             ArrayRef<TypeLoc> Inherited,
              GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
@@ -3526,7 +3504,7 @@ class ClassDecl final : public NominalTypeDecl {
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<TypeLoc> Inherited,
+            ArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return ClassLoc; }
@@ -3907,7 +3885,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, MutableArrayRef<TypeLoc> Inherited,
+               Identifier Name, ArrayRef<TypeLoc> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
