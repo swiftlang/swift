@@ -402,188 +402,86 @@ GlobalActorAttributeRequest::evaluate(
   return std::make_pair(globalActorAttr, globalActorNominal);
 }
 
-namespace {
+/// Determine the isolation rules for a given declaration.
+ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(Decl *decl) {
+  switch (decl->getKind()) {
+  case DeclKind::AssociatedType:
+  case DeclKind::Class:
+  case DeclKind::Enum:
+  case DeclKind::Extension:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::OpaqueType:
+  case DeclKind::Protocol:
+  case DeclKind::Struct:
+  case DeclKind::TypeAlias:
+    // Types are always available.
+    return forUnrestricted();
 
-/// The isolation restriction in effect for a given declaration that is
-/// referenced from source.
-class IsolationRestriction {
-public:
-  enum Kind {
-    /// There is no restriction on references to the given declaration,
-    /// e.g., because it's immutable.
-    Unrestricted,
+  case DeclKind::Constructor:
+  case DeclKind::EnumCase:
+  case DeclKind::EnumElement:
+    // Type-level entities don't require isolation.
+    return forUnrestricted();
 
-    /// Access to the declaration is unsafe in a concurrent context.
-    Unsafe,
+  case DeclKind::IfConfig:
+  case DeclKind::Import:
+  case DeclKind::InfixOperator:
+  case DeclKind::MissingMember:
+  case DeclKind::Module:
+  case DeclKind::PatternBinding:
+  case DeclKind::PostfixOperator:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::PrefixOperator:
+  case DeclKind::TopLevelCode:
+    // Non-value entities don't require isolation.
+    return forUnrestricted();
 
-    /// The declaration is a local entity whose capture could introduce
-    /// data races. The context in which the local was defined is provided.
-    LocalCapture,
+  case DeclKind::Destructor:
+    // Destructors don't require isolation.
+    return forUnrestricted();
 
-    /// References to this member of an actor are only permitted on 'self'.
-    ActorSelf,
-
-    /// References to a declaration that is part of a global actor are only
-    /// permitted from other declarations with that same global actor.
-    GlobalActor,
-  };
-
-private:
-  /// The kind of restriction
-  Kind kind;
-
-  union {
-    /// The local context that an entity is tied to.
-    DeclContext *localContext;
-
-    /// The actor class that the entity is declared in.
-    ClassDecl *actorClass;
-
-    /// The global actor type.
-    TypeBase *globalActor;
-  } data;
-
-  explicit IsolationRestriction(Kind kind) : kind(kind) { }
-
-public:
-  Kind getKind() const { return kind; }
-
-  /// Retrieve the declaration context in which a local was defined.
-  DeclContext *getLocalContext() const {
-    assert(kind == LocalCapture);
-    return data.localContext;
-  }
-
-  /// Retrieve the actor class that the declaration is within.
-  ClassDecl *getActorClass() const {
-    assert(kind == ActorSelf);
-    return data.actorClass;
-  }
-
-  /// Retrieve the actor class that the declaration is within.
-  Type getGlobalActor() const {
-    assert(kind == GlobalActor);
-    return Type(data.globalActor);
-  }
-
-  /// There are no restrictions on the use of the entity.
-  static IsolationRestriction forUnrestricted() {
-    return IsolationRestriction(Unrestricted);
-  }
-
-  /// Accesses to the given declaration are unsafe.
-  static IsolationRestriction forUnsafe() {
-    return IsolationRestriction(Unsafe);
-  }
-
-  /// Accesses to the given declaration can only be made via the 'self' of
-  /// the current actor.
-  static IsolationRestriction forActorSelf(ClassDecl *actorClass) {
-    IsolationRestriction result(ActorSelf);
-    result.data.actorClass = actorClass;
-    return result;
-  }
-
-  /// Access is restricted to code running within the given local context.
-  static IsolationRestriction forLocalCapture(DeclContext *dc) {
-    IsolationRestriction result(LocalCapture);
-    result.data.localContext = dc;
-    return result;
-  }
-
-  /// Accesses to the given declaration can only be made via this particular
-  /// global actor.
-  static IsolationRestriction forGlobalActor(Type globalActor) {
-    IsolationRestriction result(GlobalActor);
-    result.data.globalActor = globalActor.getPointer();
-    return result;
-  }
-
-  /// Determine the isolation rules for a given declaration.
-  static IsolationRestriction forDeclaration(Decl *decl) {
-    switch (decl->getKind()) {
-    case DeclKind::AssociatedType:
-    case DeclKind::Class:
-    case DeclKind::Enum:
-    case DeclKind::Extension:
-    case DeclKind::GenericTypeParam:
-    case DeclKind::OpaqueType:
-    case DeclKind::Protocol:
-    case DeclKind::Struct:
-    case DeclKind::TypeAlias:
-      // Types are always available.
+  case DeclKind::Param:
+  case DeclKind::Var:
+    // 'let' declarations are immutable, so there are no restrictions on
+    // their access.
+    if (cast<VarDecl>(decl)->isLet())
       return forUnrestricted();
 
-    case DeclKind::Constructor:
-    case DeclKind::EnumCase:
-    case DeclKind::EnumElement:
-      // Type-level entities don't require isolation.
-      return forUnrestricted();
+    LLVM_FALLTHROUGH;
 
-    case DeclKind::IfConfig:
-    case DeclKind::Import:
-    case DeclKind::InfixOperator:
-    case DeclKind::MissingMember:
-    case DeclKind::Module:
-    case DeclKind::PatternBinding:
-    case DeclKind::PostfixOperator:
-    case DeclKind::PoundDiagnostic:
-    case DeclKind::PrecedenceGroup:
-    case DeclKind::PrefixOperator:
-    case DeclKind::TopLevelCode:
-      // Non-value entities don't require isolation.
-      return forUnrestricted();
-
-    case DeclKind::Destructor:
-      // Destructors don't require isolation.
-      return forUnrestricted();
-
-    case DeclKind::Param:
-    case DeclKind::Var:
-      // 'let' declarations are immutable, so there are no restrictions on
-      // their access.
-      if (cast<VarDecl>(decl)->isLet())
+  case DeclKind::Accessor:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+    // A function that provides an asynchronous context has no restrictions
+    // on its access.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (func->isAsyncContext())
         return forUnrestricted();
+    }
 
-      LLVM_FALLTHROUGH;
+    // Local captures can only be referenced in their local context or a
+    // context that is guaranteed not to run concurrently with it.
+    if (cast<ValueDecl>(decl)->isLocalCapture())
+      return forLocalCapture(decl->getDeclContext());
 
-    case DeclKind::Accessor:
-    case DeclKind::Func:
-    case DeclKind::Subscript:
-      // A function that provides an asynchronous context has no restrictions
-      // on its access.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (func->isAsyncContext())
-          return forUnrestricted();
-      }
+    // Determine the actor isolation of the given declaration.
+    switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
+    case ActorIsolation::ActorInstance:
+      // Protected actor instance members can only be accessed on 'self'.
+      return forActorSelf(isolation.getActor());
 
-      // Local captures can only be referenced in their local context or a
-      // context that is guaranteed not to run concurrently with it.
-      if (cast<ValueDecl>(decl)->isLocalCapture())
-        return forLocalCapture(decl->getDeclContext());
+    case ActorIsolation::GlobalActor:
+      return forGlobalActor(isolation.getGlobalActor());
 
-      // Determine the actor isolation of the given declaration.
-      switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
-      case ActorIsolation::ActorInstance:
-        // Protected actor instance members can only be accessed on 'self'.
-        return forActorSelf(isolation.getActor());
+    case ActorIsolation::Independent:
+      // Actor-independent have no restrictions on their access.
+      return forUnrestricted();
 
-      case ActorIsolation::GlobalActor:
-        return forGlobalActor(isolation.getGlobalActor());
-
-      case ActorIsolation::Independent:
-        // Actor-independent have no restrictions on their access.
-        return forUnrestricted();
-
-      case ActorIsolation::Unspecified:
-        return forUnsafe();
-      }
+    case ActorIsolation::Unspecified:
+      return forUnsafe();
     }
   }
-
-  operator Kind() const { return kind; };
-};
-
 }
 
 namespace {
@@ -910,18 +808,18 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       if (!value)
         return false;
 
-      switch (auto isolation = IsolationRestriction::forDeclaration(value)) {
-      case IsolationRestriction::Unrestricted:
+      switch (auto isolation = ActorIsolationRestriction::forDeclaration(value)) {
+      case ActorIsolationRestriction::Unrestricted:
         return false;
 
-      case IsolationRestriction::ActorSelf:
+      case ActorIsolationRestriction::ActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
-      case IsolationRestriction::GlobalActor:
+      case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
             value, loc, isolation.getGlobalActor());
 
-      case IsolationRestriction::LocalCapture:
+      case ActorIsolationRestriction::LocalCapture:
         // Only diagnose unsafe concurrent accesses within the context of an
         // actor. This is globally unsafe, but locally enforceable.
         if (!getNearestEnclosingActorContext(getDeclContext()))
@@ -941,7 +839,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
         return false;
 
-      case IsolationRestriction::Unsafe:
+      case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafe(value, loc);
       }
     }
@@ -953,11 +851,11 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       if (!base || !member)
         return false;
 
-      switch (auto isolation = IsolationRestriction::forDeclaration(member)) {
-      case IsolationRestriction::Unrestricted:
+      switch (auto isolation = ActorIsolationRestriction::forDeclaration(member)) {
+      case ActorIsolationRestriction::Unrestricted:
         return false;
 
-      case IsolationRestriction::ActorSelf: {
+      case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
         auto selfVar = getSelfReference(base);
         if (!selfVar) {
@@ -1028,14 +926,14 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return false;
       }
 
-      case IsolationRestriction::GlobalActor:
+      case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
             member, memberLoc, isolation.getGlobalActor());
 
-      case IsolationRestriction::LocalCapture:
+      case ActorIsolationRestriction::LocalCapture:
         llvm_unreachable("Locals cannot be referenced with member syntax");
 
-      case IsolationRestriction::Unsafe:
+      case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafe(member, memberLoc);
       }
     }
