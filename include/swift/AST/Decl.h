@@ -3304,11 +3304,7 @@ public:
   Type getRawType() const;
 
   /// Set the raw type of the enum from its inheritance clause.
-  void setRawType(Type rawType) {
-    auto flags = LazySemanticInfo.RawTypeAndFlags.getInt();
-    LazySemanticInfo.RawTypeAndFlags.setPointerAndInt(
-        rawType, flags | HasComputedRawType);
-  }
+  void setRawType(Type rawType);
 
   /// True if none of the enum cases have associated values.
   ///

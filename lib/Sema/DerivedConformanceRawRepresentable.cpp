@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/APInt.h"
 #include "DerivedConformances.h"
+#include "TypeCheckDecl.h"
 
 using namespace swift;
 
@@ -448,7 +449,10 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
     return false;
 
   Type rawType = enumDecl->getRawType();
-  if (!rawType)
+  if (!rawType || rawType->hasError())
+    return false;
+
+  if (!computeAutomaticEnumValueKind(enumDecl))
     return false;
 
   rawType = DC->mapTypeIntoContext(rawType);
