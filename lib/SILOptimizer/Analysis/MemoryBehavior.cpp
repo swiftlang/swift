@@ -172,6 +172,10 @@ public:
   MemBehavior visitCopyAddrInst(CopyAddrInst *CAI);
   MemBehavior visitApplyInst(ApplyInst *AI);
   MemBehavior visitTryApplyInst(TryApplyInst *AI);
+  MemBehavior visitBeginApplyInst(BeginApplyInst *AI);
+  MemBehavior visitEndApplyInst(EndApplyInst *EAI);
+  MemBehavior visitAbortApplyInst(AbortApplyInst *AAI);
+  MemBehavior getApplyBehavior(FullApplySite AS);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
@@ -326,70 +330,137 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
-  MemBehavior Behavior = MemBehavior::MayHaveSideEffects;
-  // Ask escape analysis.
-  if (!EA->canEscapeTo(V, AI))
-    Behavior = MemBehavior::None;
-
-  // Otherwise be conservative and return that we may have side effects.
-  LLVM_DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior <<'\n');
-  return Behavior;
+  return getApplyBehavior(AI);
 }
 
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
+  return getApplyBehavior(AI);
+}
 
-  FunctionSideEffects ApplyEffects;
-  SEA->getCalleeEffects(ApplyEffects, AI);
+MemBehavior MemoryBehaviorVisitor::visitBeginApplyInst(BeginApplyInst *AI) {
+  return getApplyBehavior(AI);
+}
 
-  MemBehavior Behavior = MemBehavior::None;
+MemBehavior MemoryBehaviorVisitor::visitEndApplyInst(EndApplyInst *EAI) {
+  return getApplyBehavior(EAI->getBeginApply());
+}
 
-  // We can ignore mayTrap().
-  bool any_in_guaranteed_params = false;
-  for (auto op : enumerate(AI->getArgumentOperands())) {
-    if (op.value().get() == V &&
-        AI->getSubstCalleeConv().getSILArgumentConvention(op.index()) == swift::SILArgumentConvention::Indirect_In_Guaranteed) {
-      any_in_guaranteed_params = true;
-      break;
-    }
-  }
+MemBehavior MemoryBehaviorVisitor::visitAbortApplyInst(AbortApplyInst *AAI) {
+  return getApplyBehavior(AAI->getBeginApply());
+}
 
-  if (any_in_guaranteed_params) {
-    // one the parameters in the function call is @in_guaranteed of V, ie. the
-    // callee isn't allowed to modify it.
-    Behavior = MemBehavior::MayRead;
-  } else {
-    auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-    Behavior = GlobalEffects.getMemBehavior(RetainObserveKind::IgnoreRetains);
+/// Returns true if the \p address may have any users which let the address
+/// escape in an unusual way, e.g. with an address_to_pointer instruction.
+static bool hasEscapingUses(SILValue address, int &numChecks) {
+  for (Operand *use : address->getUses()) {
+    SILInstruction *user = use->getUser();
+    
+    // Avoid quadratic complexity in corner cases. A limit of 24 is more than
+    // enough in most cases.
+    if (++numChecks > 24)
+      return true;
 
-    // Check all parameter effects.
-    for (unsigned Idx = 0, End = AI->getNumArguments();
-         Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
-      auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-      auto ArgBehavior = ArgEffect.getMemBehavior(RetainObserveKind::IgnoreRetains);
-      if (ArgEffect.mayRelease()) {
-        Behavior = MemBehavior::MayHaveSideEffects;
+    switch (user->getKind()) {
+      case SILInstructionKind::DebugValueAddrInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::LoadInst:
+      case SILInstructionKind::StoreInst:
+      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DeallocStackInst:
+        // Those instructions have no result and cannot escape the address.
         break;
-      }
-      auto NewBehavior = combineMemoryBehavior(Behavior, ArgBehavior);
-      if (NewBehavior != Behavior) {
-        SILValue Arg = AI->getArgument(Idx);
-        // We only consider the argument effects if the argument aliases V.
-        if (!Arg->getType().isAddress() || mayAlias(Arg))
-          Behavior = NewBehavior;
-      }
+      case SILInstructionKind::ApplyInst:
+      case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::BeginApplyInst:
+        // Apply instructions can not let an address escape either. It's not
+        // possible that an address, passed as an indirect parameter, escapes
+        // the function in any way (which is not unsafe and undefined behavior).
+        break;
+      case SILInstructionKind::OpenExistentialAddrInst:
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+      case SILInstructionKind::StructElementAddrInst:
+      case SILInstructionKind::TupleElementAddrInst:
+      case SILInstructionKind::UncheckedAddrCastInst:
+        // Check the uses of address projections.
+        if (hasEscapingUses(cast<SingleValueInstruction>(user), numChecks))
+          return true;
+        break;
+      case SILInstructionKind::AddressToPointerInst:
+        // This is _the_ instruction which can let an address escape.
+        return true;
+      default:
+        // To be conservative, also bail for anything we don't handle here.
+        return true;
+    }
+  }
+  return false;
+}
+
+MemBehavior MemoryBehaviorVisitor::getApplyBehavior(FullApplySite AS) {
+
+  // Do a quick check first: if V is directly passed to an in_guaranteed
+  // argument, we know that the function cannot write to it.
+  for (Operand &argOp : AS.getArgumentOperands()) {
+    if (argOp.get() == V &&
+        AS.getArgumentConvention(argOp) ==
+          swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+      return MemBehavior::MayRead;
     }
   }
 
-  if (Behavior > MemBehavior::None) {
-    if (Behavior > MemBehavior::MayRead && isLetValue())
-      Behavior = MemBehavior::MayRead;
+  SILValue object = getUnderlyingObject(V);
+  int numUsesChecked = 0;
+  
+  // For exclusive/local addresses we can do a quick and good check with alias
+  // analysis. For everything else we use escape analysis (see below).
+  // TODO: The check for not-escaping can probably done easier with the upcoming
+  // API of AccessStorage.
+  bool nonEscapingAddress =
+    (isa<AllocStackInst>(object) || isExclusiveArgument(object)) &&
+    !hasEscapingUses(object, numUsesChecked);
+
+  FunctionSideEffects applyEffects;
+  SEA->getCalleeEffects(applyEffects, AS);
+
+  MemBehavior behavior = MemBehavior::None;
+  MemBehavior globalBehavior = applyEffects.getGlobalEffects().getMemBehavior(
+                           RetainObserveKind::IgnoreRetains);
+
+  // If it's a non-escaping address, we don't care about the "global" effects
+  // of the called function.
+  if (!nonEscapingAddress)
+    behavior = globalBehavior;
+  
+  // Check all parameter effects.
+  for (unsigned argIdx = 0, end = AS.getNumArguments();
+       argIdx < end && behavior < MemBehavior::MayHaveSideEffects;
+       ++argIdx) {
+    SILValue arg = AS.getArgument(argIdx);
+    
+    // In case the argument is not an address, alias analysis will always report
+    // a no-alias. Therefore we have to treat non-address arguments
+    // conservatively here. For example V could be a ref_element_addr of a
+    // reference argument. In this case V clearly "aliases" the argument, but
+    // this is not reported by alias analysis.
+    if ((!nonEscapingAddress && !arg->getType().isAddress()) ||
+         mayAlias(arg)) {
+      MemBehavior argBehavior = applyEffects.getArgumentBehavior(AS, argIdx);
+      behavior = combineMemoryBehavior(behavior, argBehavior);
+    }
+  }
+
+  if (behavior > MemBehavior::None) {
+    if (behavior > MemBehavior::MayRead && isLetValue())
+      behavior = MemBehavior::MayRead;
 
     // Ask escape analysis.
-    if (!EA->canEscapeTo(V, AI))
-      Behavior = MemBehavior::None;
+    if (!nonEscapingAddress && !EA->canEscapeTo(V, AS))
+      behavior = MemBehavior::None;
   }
-  LLVM_DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
-  return Behavior;
+  LLVM_DEBUG(llvm::dbgs() << "  Found apply, returning " << behavior << '\n');
+
+  return behavior;
 }
 
 MemBehavior

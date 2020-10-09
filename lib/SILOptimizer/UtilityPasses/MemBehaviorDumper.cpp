@@ -59,7 +59,10 @@ class MemBehaviorDumper : public SILModuleTransform {
   // selected types of instructions.
   static bool shouldTestInstruction(SILInstruction *I) {
     // Only consider function calls.
-    if ((EnableDumpAll && I->mayReadOrWriteMemory()) || FullApplySite::isa(I))
+    if ((EnableDumpAll && I->mayReadOrWriteMemory()) ||
+        FullApplySite::isa(I) ||
+        isa<EndApplyInst>(I) ||
+        isa<AbortApplyInst>(I))
       return true;
 
     return false;
