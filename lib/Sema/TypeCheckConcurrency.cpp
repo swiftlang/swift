@@ -403,7 +403,10 @@ GlobalActorAttributeRequest::evaluate(
 }
 
 /// Determine the isolation rules for a given declaration.
-ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(Decl *decl) {
+ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
+    ConcreteDeclRef declRef) {
+  auto decl = declRef.getDecl();
+
   switch (decl->getKind()) {
   case DeclKind::AssociatedType:
   case DeclKind::Class:
@@ -471,8 +474,13 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(Decl *decl) 
       // Protected actor instance members can only be accessed on 'self'.
       return forActorSelf(isolation.getActor());
 
-    case ActorIsolation::GlobalActor:
-      return forGlobalActor(isolation.getGlobalActor());
+    case ActorIsolation::GlobalActor: {
+      Type actorType = isolation.getGlobalActor();
+      if (auto subs = declRef.getSubstitutions())
+        actorType = actorType.subst(subs);
+
+      return forGlobalActor(actorType);
+    }
 
     case ActorIsolation::Independent:
       // Actor-independent have no restrictions on their access.
@@ -520,14 +528,13 @@ static Optional<PartialApplyThunkInfo> decomposePartialApplyThunk(
 }
 
 /// Find the immediate member reference in the given expression.
-static Optional<std::pair<ValueDecl *, SourceLoc>>
+static Optional<std::pair<ConcreteDeclRef, SourceLoc>>
 findMemberReference(Expr *expr) {
   if (auto declRef = dyn_cast<DeclRefExpr>(expr))
-    return std::make_pair(declRef->getDecl(), declRef->getLoc());
+    return std::make_pair(declRef->getDeclRef(), declRef->getLoc());
 
   if (auto otherCtor = dyn_cast<OtherConstructorDeclRefExpr>(expr)) {
-    return std::make_pair(
-        static_cast<ValueDecl *>(otherCtor->getDecl()), otherCtor->getLoc());
+    return std::make_pair(otherCtor->getDeclRef(), otherCtor->getLoc());
   }
 
   return None;
@@ -562,13 +569,13 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       }
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
-        checkMemberReference(lookup->getBase(), lookup->getMember().getDecl(),
+        checkMemberReference(lookup->getBase(), lookup->getMember(),
                              lookup->getLoc());
         return { true, expr };
       }
 
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-        checkNonMemberReference(declRef->getDecl(), declRef->getLoc());
+        checkNonMemberReference(declRef->getDeclRef(), declRef->getLoc());
         return { true, expr };
       }
 
@@ -726,6 +733,22 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
     /// Get the actor isolation of the innermost relevant context.
     ActorIsolation getInnermostIsolatedContext(const DeclContext *constDC) {
+      // Retrieve the actor isolation for a declaration somewhere in our
+      // declaration context chain and map it into our own context so that
+      // the types can be compared.
+      auto getActorIsolation = [constDC](ValueDecl *value) {
+        switch (auto isolation = swift::getActorIsolation(value)) {
+        case ActorIsolation::ActorInstance:
+        case ActorIsolation::Independent:
+        case ActorIsolation::Unspecified:
+          return isolation;
+
+        case ActorIsolation::GlobalActor:
+          return ActorIsolation::forGlobalActor(
+              constDC->mapTypeIntoContext(isolation.getGlobalActor()));
+        }
+      };
+
       auto dc = const_cast<DeclContext *>(constDC);
       while (!dc->isModuleScopeContext()) {
         // Look through non-escaping closures.
@@ -778,7 +801,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         noteIsolatedActorMember(value);
         return true;
 
-      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActor: {
         // If the global actor types are the same, we're done.
         if (contextIsolation.getGlobalActor()->isEqual(globalActor))
           return false;
@@ -789,6 +812,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
             contextIsolation.getGlobalActor());
         noteIsolatedActorMember(value);
         return true;
+      }
 
       case ActorIsolation::Independent:
         ctx.Diags.diagnose(
@@ -804,11 +828,13 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     }
 
     /// Check a reference to a local or global.
-    bool checkNonMemberReference(ValueDecl *value, SourceLoc loc) {
-      if (!value)
+    bool checkNonMemberReference(ConcreteDeclRef valueRef, SourceLoc loc) {
+      if (!valueRef)
         return false;
 
-      switch (auto isolation = ActorIsolationRestriction::forDeclaration(value)) {
+      auto value = valueRef.getDecl();
+      switch (auto isolation =
+                  ActorIsolationRestriction::forDeclaration(valueRef)) {
       case ActorIsolationRestriction::Unrestricted:
         return false;
 
@@ -846,12 +872,14 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
     /// Check a reference with the given base expression to the given member.
     bool checkMemberReference(
-        Expr *base, ValueDecl *member, SourceLoc memberLoc,
+        Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
         bool isEscapingPartialApply = false) {
-      if (!base || !member)
+      if (!base || !memberRef)
         return false;
 
-      switch (auto isolation = ActorIsolationRestriction::forDeclaration(member)) {
+      auto member = memberRef.getDecl();
+      switch (auto isolation =
+                  ActorIsolationRestriction::forDeclaration(memberRef)) {
       case ActorIsolationRestriction::Unrestricted:
         return false;
 

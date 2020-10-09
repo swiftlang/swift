@@ -25,6 +25,7 @@ namespace swift {
 class ActorIsolation;
 class ASTContext;
 class ClassDecl;
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class Expr;
@@ -138,7 +139,7 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
-  static ActorIsolationRestriction forDeclaration(Decl *decl);
+  static ActorIsolationRestriction forDeclaration(ConcreteDeclRef declRef);
 
   operator Kind() const { return kind; };
 };

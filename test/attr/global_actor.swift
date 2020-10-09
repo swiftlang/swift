@@ -15,6 +15,11 @@ struct GA1 {
   static let shared = SomeActor()
 }
 
+@globalActor
+struct GenericGlobalActor<T> {
+  static var shared: SomeActor { SomeActor() }
+}
+
 // Ill-formed global actors.
 @globalActor
 open class GA2 { // expected-error{{global actor 'GA2' requires a static property 'shared' that produces an actor instance}}{{17-17=\n    public static let shared = <#actor instance#>}}
@@ -81,6 +86,11 @@ class SomeClass {
 @GA1 actor class ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
+
+struct Container {
+  // FIXME: Diagnostic could be improved to show the generic arguments.
+@GenericGlobalActor<Int> @GenericGlobalActor<String> func twoGenericGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('GenericGlobalActor' and 'GenericGlobalActor')}}
+}
 
 // -----------------------------------------------------------------------
 // Redundant attributes

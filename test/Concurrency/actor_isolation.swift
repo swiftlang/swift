@@ -192,6 +192,11 @@ struct SomeOtherGlobalActor {
   static let shared = SomeActor()
 }
 
+@globalActor
+struct GenericGlobalActor<T> {
+  static var shared: SomeActor { SomeActor() }
+}
+
 @SomeGlobalActor func syncGlobalActorFunc() { } // expected-note 3{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
 @SomeGlobalActor func asyncGlobalActorFunc() async { }
 
@@ -236,6 +241,27 @@ extension MyActor {
     _ = otherActor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0] // expected-error{{actor-isolated property 'text' can only be referenced on 'self'}}
+  }
+}
+
+struct GenericStruct<T> {
+  @GenericGlobalActor<T> func f() { } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+
+  @GenericGlobalActor<T> func g() {
+    f() // okay
+  }
+
+  @GenericGlobalActor<String> func h() {
+    f() // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
+  }
+}
+
+extension GenericStruct where T == String {
+  @GenericGlobalActor<T>
+  func h2() {
+    f()
+    g()
+    h()
   }
 }
 
