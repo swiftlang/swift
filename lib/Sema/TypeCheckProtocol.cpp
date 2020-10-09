@@ -913,10 +913,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // defining a non-final class conforming to 'Collection' which uses
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
-        auto selfKind = proto->findProtocolSelfReferences(req,
-                                             /*allowCovariantParameters=*/false,
-                                             /*skipAssocTypes=*/false);
-        if (!selfKind.other) {
+        const auto selfRefInfo = proto->findProtocolSelfReferences(
+            req, /*treatNonResultCovariantSelfAsInvariant=*/true);
+        if (!selfRefInfo.assocTypeRef) {
           covariantSelf = classDecl;
         }
       }
@@ -3482,11 +3481,10 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
-  auto selfKind = Proto->findProtocolSelfReferences(requirement,
-                                       /*allowCovariantParameters=*/false,
-                                       /*skipAssocTypes=*/true);
+  const auto selfRefInfo = Proto->findProtocolSelfReferences(
+      requirement, /*treatNonResultCovariantSelfAsInvariant=*/true);
 
-  if (selfKind.other) {
+  if (selfRefInfo.selfRef == SelfReferencePosition::Invariant) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
@@ -3501,7 +3499,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                        conformance->getType());
         emitDeclaredHereIfNeeded(diags, diagLoc, witness);
       });
-  } else if (selfKind.result) {
+  } else if (selfRefInfo.hasCovariantSelfResult) {
     // The reference to Self occurs in the result type of a method/subscript
     // or the type of a property. A non-final class can satisfy this requirement
     // by holding onto Self accordingly.
@@ -3569,12 +3567,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // associated types.
   if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
     if (witness->getDeclContext()->getExtendedProtocolDecl()) {
-      auto selfKindWithAssocTypes = Proto->findProtocolSelfReferences(
-          requirement,
-          /*allowCovariantParameters=*/false,
-          /*skipAssocTypes=*/false);
-      if (selfKindWithAssocTypes.other &&
-          selfKindWithAssocTypes.result) {
+      if (selfRefInfo.hasCovariantSelfResult && selfRefInfo.assocTypeRef) {
         diagnoseOrDefer(requirement, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
