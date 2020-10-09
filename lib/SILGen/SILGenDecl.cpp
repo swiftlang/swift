@@ -1255,7 +1255,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
       InitializationPtr initialization =
-      InitializationForPattern(*this, FalseDest).visit(elt.getPattern());
+        emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
