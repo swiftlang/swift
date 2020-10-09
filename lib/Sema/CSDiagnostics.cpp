@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
-#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
