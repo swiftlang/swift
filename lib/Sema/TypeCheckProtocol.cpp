@@ -4340,6 +4340,14 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Check for actor-isolation consistency.
       switch (getActorIsolation(witness)) {
       case ActorIsolation::ActorInstance: {
+        // Asynchronous contexts can be used to conform to protocol
+        // requirements.
+        // FIXME: Feels duplicative.
+        if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
+          if (func->isAsyncContext())
+            break;
+        }
+
         // Actor-isolated witnesses cannot conform to protocol requirements.
         bool canBeAsyncHandler = false;
         if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
@@ -4364,8 +4372,6 @@ void ConformanceChecker::resolveValueWitnesses() {
         break;
       }
 
-      case ActorIsolation::ActorPrivileged:
-      case ActorIsolation::GlobalActorPrivileged:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         break;

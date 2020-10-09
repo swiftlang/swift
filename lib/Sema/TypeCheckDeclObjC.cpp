@@ -375,6 +375,13 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   // Check actor isolation.
   bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
 
+  // Asynchronous contexts can be @objc.
+  // FIXME: Feels duplicative of TypeCheckConcurrency.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (func->isAsyncContext())
+      return false;
+  }
+
   switch (getActorIsolation(const_cast<ValueDecl *>(VD))) {
   case ActorIsolation::ActorInstance:
     // Actor-isolated functions cannot be @objc.
@@ -388,9 +395,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     }
     return true;
 
-  case ActorIsolation::ActorPrivileged:
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorPrivileged:
+    // FIXME: Consider whether to limit @objc on global-actor-qualified
+    // declarations.
   case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:
     return false;

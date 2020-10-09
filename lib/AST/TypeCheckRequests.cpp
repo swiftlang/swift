@@ -1455,10 +1455,6 @@ void swift::simple_display(
       out << "actor-isolated to instance of " << state.getActor()->getName();
       break;
 
-    case ActorIsolation::ActorPrivileged:
-      out << "actor-privileged to instance of " << state.getActor()->getName();
-      break;
-
     case ActorIsolation::Independent:
       out << "actor-independent";
       break;
@@ -1469,11 +1465,6 @@ void swift::simple_display(
 
     case ActorIsolation::GlobalActor:
       out << "actor-isolated to global actor "
-          << state.getGlobalActor().getString();
-      break;
-
-    case ActorIsolation::GlobalActorPrivileged:
-      out << "actor-privileged to global actor "
           << state.getGlobalActor().getString();
       break;
   }

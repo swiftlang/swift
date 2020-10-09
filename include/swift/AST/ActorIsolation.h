@@ -42,9 +42,6 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration can refer to actor-isolated state, but can also be
-    /// referenced from outside the actor.
-    ActorPrivileged,
     /// The declaration is explicitly specified to be independent of any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
@@ -52,9 +49,6 @@ public:
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
-    /// The declaration can refer to state isolated by the given global actor,
-    /// and can be used from anywhere.
-    GlobalActorPrivileged,
   };
 
 private:
@@ -78,16 +72,8 @@ public:
     return ActorIsolation(Independent, nullptr);
   }
 
-  static ActorIsolation forActorPrivileged(ClassDecl *actor) {
-    return ActorIsolation(ActorPrivileged, actor);
-  }
-
   static ActorIsolation forActorInstance(ClassDecl *actor) {
     return ActorIsolation(ActorInstance, actor);
-  }
-
-  static ActorIsolation forGlobalActorPrivileged(Type globalActor) {
-    return ActorIsolation(GlobalActorPrivileged, globalActor);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor) {
@@ -99,12 +85,12 @@ public:
   operator Kind() const { return getKind(); }
 
   ClassDecl *getActor() const {
-    assert(getKind() == ActorInstance || getKind() == ActorPrivileged);
+    assert(getKind() == ActorInstance);
     return actor;
   }
 
   Type getGlobalActor() const {
-    assert(getKind() == GlobalActor || getKind() == GlobalActorPrivileged);
+    assert(getKind() == GlobalActor);
     return globalActor;
   }
 
@@ -119,11 +105,9 @@ public:
       return true;
 
     case ActorInstance:
-    case ActorPrivileged:
       return lhs.actor == rhs.actor;
 
     case GlobalActor:
-    case GlobalActorPrivileged:
       return areTypesEqual(lhs.globalActor, rhs.globalActor);
     }
   }

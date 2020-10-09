@@ -550,6 +550,13 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Func:
     case DeclKind::Subscript:
+      // A function that provides an asynchronous context has no restrictions
+      // on its access.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (func->isAsyncContext())
+          return forUnrestricted();
+      }
+
       // Local captures can only be referenced in their local context or a
       // context that is guaranteed not to run concurrently with it.
       if (cast<ValueDecl>(decl)->isLocalCapture())
@@ -565,10 +572,7 @@ public:
         return forGlobalActor(isolation.getGlobalActor());
 
       case ActorIsolation::Independent:
-      case ActorIsolation::ActorPrivileged:
-      case ActorIsolation::GlobalActorPrivileged:
-        // Actor-independent and actor-privileged declarations have no
-        // restrictions on their access.
+        // Actor-independent have no restrictions on their access.
         return forUnrestricted();
 
       case ActorIsolation::Unspecified:
@@ -869,7 +873,6 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       switch (auto contextIsolation =
                   getInnermostIsolatedContext(getDeclContext())) {
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::ActorPrivileged:
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_instance_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
@@ -878,7 +881,6 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return true;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorPrivileged:
         // If the global actor types are the same, we're done.
         if (contextIsolation.getGlobalActor()->isEqual(globalActor))
           return false;
@@ -973,7 +975,6 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         switch (auto contextIsolation = getActorIsolation(
                    cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::ActorPrivileged:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
             if (isEscapingPartialApply) {
@@ -1001,7 +1002,6 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
             return true;
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorPrivileged:
             // The 'self' is for a member that's part of a global actor, which
             // means we cannot refer to actor-isolated state.
             ctx.Diags.diagnose(
@@ -1081,12 +1081,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (!globalActorType || globalActorType->hasError())
         return ActorIsolation::forUnspecified();
 
-      // A function that is an asynchronous context is actor-privileged.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-        if (func->isAsyncContext())
-          return ActorIsolation::forGlobalActorPrivileged(globalActorType);
-      }
-
       return ActorIsolation::forGlobalActor(globalActorType);
     }
 
@@ -1104,13 +1098,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // actor-isolated state.
   auto classDecl = value->getDeclContext()->getSelfClassDecl();
   if (classDecl && classDecl->isActor() && value->isInstanceMember()) {
-    // A function that is an asynchronous context is actor-privileged.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (func->isAsyncContext())
-        return ActorIsolation::forActorPrivileged(classDecl);
-    }
-
-    // Everything else is part of the actor's isolated state.
+    // Part of the actor's isolated state.
     return ActorIsolation::forActorInstance(classDecl);
   }
 
