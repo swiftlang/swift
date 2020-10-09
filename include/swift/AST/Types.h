@@ -87,6 +87,7 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
+class ErrorExpr;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -5738,7 +5739,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 /// constraint solver and transformed into UnresolvedType to be used in AST.
 class HoleType : public TypeBase {
   using Originator = llvm::PointerUnion<TypeVariableType *,
-                                        DependentMemberType *, VarDecl *>;
+                                        DependentMemberType *, VarDecl *,
+                                        ErrorExpr *>;
 
   Originator O;
 

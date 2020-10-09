@@ -3523,6 +3523,8 @@ namespace {
         printRec("type_variable", typeVar);
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
+      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+        printFlag("error_expr");
       } else {
         printRec("dependent_member_type",
                  originator.get<DependentMemberType *>());
