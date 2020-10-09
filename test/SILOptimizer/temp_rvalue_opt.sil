@@ -14,7 +14,9 @@ struct GS<Base> {
   var _value: Builtin.Int64
 }
 
-class Klass {}
+class Klass {
+  @_hasStorage var a: String
+}
 
 struct Str {
   var kl: Klass
@@ -22,6 +24,7 @@ struct Str {
 }
 
 sil @unknown : $@convention(thin) () -> ()
+sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -331,6 +334,23 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
   dealloc_stack %4 : $*GS<B>
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @consider_implicit_aliases_in_callee
+// CHECK:         alloc_stack
+// CHECK-NEXT:    copy_addr
+// CHECK:       } // end sil function 'consider_implicit_aliases_in_callee'
+
+sil [ossa] @consider_implicit_aliases_in_callee : $@convention(thin) (@guaranteed Klass) -> String {
+bb0(%0 : @guaranteed $Klass):
+  %1 = ref_element_addr %0 : $Klass, #Klass.a
+  %2 = alloc_stack $String
+  copy_addr %1 to [initialization] %2 : $*String
+  %f = function_ref @load_string : $@convention(thin) (@in_guaranteed String) -> String
+  %a = apply %f(%2) : $@convention(thin) (@in_guaranteed String) -> String
+  destroy_addr %2 : $*String
+  dealloc_stack %2 : $*String
+  return %a : $String
 }
 
 // Test temp RValue elimination on switches.
