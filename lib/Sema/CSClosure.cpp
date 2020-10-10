@@ -17,6 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "TypeChecker.h"
+
 using namespace swift;
 using namespace swift::constraints;
 

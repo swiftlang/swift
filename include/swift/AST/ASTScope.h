@@ -141,7 +141,6 @@ private:
   ASTScopeImpl *parent = nullptr; // null at the root
 
   /// Child scopes, sorted by source range.
-  /// Must clear source range change whenever this changes
   Children storedChildren;
 
   bool wasExpanded = false;
@@ -149,13 +148,7 @@ private:
   /// Can clear storedChildren, so must remember this
   bool haveAddedCleanup = false;
 
-  // Must be updated after last child is added and after last child's source
-  // position is known
-  mutable Optional<SourceRange> cachedSourceRange;
-
-  // When ignoring ASTNodes in a scope, they still must count towards a scope's
-  // source range. So include their ranges here
-  SourceRange sourceRangeOfIgnoredASTNodes;
+  mutable Optional<CharSourceRange> cachedCharSourceRange;
 
 #pragma mark - constructor / destructor
 public:
@@ -192,9 +185,6 @@ protected:
 public:
   void addChild(ASTScopeImpl *child, ASTContext &);
 
-private:
-  NullablePtr<ASTScopeImpl> getPriorSibling() const;
-
 public:
   void preOrderDo(function_ref<void(ASTScopeImpl *)>);
   /// Like preorderDo but without myself.
@@ -203,63 +193,15 @@ public:
 
 #pragma mark - source ranges
 
-#pragma mark - source range queries
-
 public:
   /// Return signum of ranges. Centralize the invariant that ASTScopes use ends.
   static int compare(SourceRange, SourceRange, const SourceManager &,
                      bool ensureDisjoint);
 
-  SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
+  CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
+                                            bool omitAssertions = false) const;
+  bool isCharSourceRangeCached() const;
 
-  /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
-  /// getSourceRange with the starting point. But we might be asked to lookup an
-  /// identifer within one of them. So, find the real source range of them here.
-  SourceRange getEffectiveSourceRange(ASTNode) const;
-
-  void computeAndCacheSourceRangeOfScope(bool omitAssertions = false) const;
-  bool isSourceRangeCached(bool omitAssertions = false) const;
-
-  bool checkSourceRangeOfThisASTNode() const;
-
-  /// For debugging
-  bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
-                      StringRef className = "");
-
-  unsigned countDescendants() const;
-
-  /// Make sure that when the argument is executed, there are as many
-  /// descendants after as before.
-  void assertThatTreeDoesNotShrink(function_ref<void()>);
-
-private:
-  SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
-  SourceRange
-  computeSourceRangeOfScopeWithChildASTNodes(bool omitAssertions = false) const;
-  bool ensureNoAncestorsSourceRangeIsCached() const;
-
-#pragma mark - source range adjustments
-private:
-  SourceRange widenSourceRangeForIgnoredASTNodes(SourceRange range) const;
-
-  /// If the scope refers to a Decl whose source range tells the whole story,
-  /// for example a NominalTypeScope, it is not necessary to widen the source
-  /// range by examining the children. In that case we could just return
-  /// the childlessRange here.
-  /// But, we have not marked such scopes yet. Doing so would be an
-  /// optimization.
-  SourceRange widenSourceRangeForChildren(SourceRange range,
-                                          bool omitAssertions) const;
-
-  /// Even ASTNodes that do not form scopes must be included in a Scope's source
-  /// range. Widen the source range of the receiver to include the (ignored)
-  /// node.
-  void widenSourceRangeForIgnoredASTNode(ASTNode);
-
-private:
-  void clearCachedSourceRangesOfMeAndAncestors();
-
-public: // public for debugging
   /// Returns source range of this node alone, without factoring in any
   /// children.
   virtual SourceRange
@@ -267,14 +209,10 @@ public: // public for debugging
 
 protected:
   SourceManager &getSourceManager() const;
-  bool hasValidSourceRange() const;
-  bool hasValidSourceRangeOfIgnoredASTNodes() const;
-  bool precedesInSource(const ASTScopeImpl *) const;
-  bool verifyThatChildrenAreContainedWithin(SourceRange) const;
-  bool verifyThatThisNodeComeAfterItsPriorSibling() const;
 
 private:
-  bool checkSourceRangeAfterExpansion(const ASTContext &) const;
+  void checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
+                                         const ASTContext &ctx) const;
 
 #pragma mark common queries
 public:
@@ -329,19 +267,11 @@ protected:
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
 
-private:
-  /// Compare the pre-expasion range with the post-expansion range and return
-  /// false if lazyiness couild miss lookups.
-  bool checkLazySourceRange(const ASTContext &) const;
-
 public:
   /// Some scopes can be expanded lazily.
-  /// Such scopes must: not change their source ranges after expansion, and
-  /// their expansion must return an insertion point outside themselves.
-  /// After a node is expanded, its source range (getSourceRangeofThisASTNode
-  /// union children's ranges) must be same as this.
+  /// Such scopes must return an insertion point outside themselves when
+  /// expanded.
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
-  virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 private:
   virtual ScopeCreator &getScopeCreator();
@@ -545,8 +475,6 @@ public:
 
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
-  virtual SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const = 0;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
@@ -570,8 +498,6 @@ public:
 
     NullablePtr<ASTScopeImpl>
     insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-    SourceRange
-    sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
   };
 
   /// GenericTypeOrExtension = GenericType or Extension
@@ -603,8 +529,6 @@ public:
 
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-  SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// Behavior specific to representing the Body of a NominalTypeDecl or
@@ -622,8 +546,6 @@ public:
 
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-  SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// GenericType or Extension scope
@@ -720,7 +642,6 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-  SourceRange sourceRangeForDeferredExpansion() const override;
 
   void countBodies(ScopeCreator &) const;
 };
@@ -929,7 +850,6 @@ protected:
 public:
   std::string getClassName() const override;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
@@ -966,19 +886,8 @@ public:
   CustomAttr *attr;
   VarDecl *decl;
 
-  /// Because we have to avoid request cycles, we approximate the test for an
-  /// AttachedPropertyWrapper with one based on source location. We might get
-  /// false positives, that that doesn't hurt anything. However, the result of
-  /// the conservative source range computation doesn't seem to be stable. So
-  /// keep the original here, and use it for source range queries.
-  const SourceRange sourceRangeWhenCreated;
-
   AttachedPropertyWrapperScope(CustomAttr *attr, VarDecl *decl)
-      : attr(attr), decl(decl),
-        sourceRangeWhenCreated(attr->getTypeRepr()->getSourceRange()) {
-    ASTScopeAssert(sourceRangeWhenCreated.isValid(),
-                   "VarDecls must have ranges to be looked-up");
-  }
+      : attr(attr), decl(decl) {}
   virtual ~AttachedPropertyWrapperScope() {}
 
 protected:
@@ -1093,45 +1002,27 @@ protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
-/// The scope introduced by a conditional clause in an if/guard/while
-/// statement.
-/// Since there may be more than one "let foo = ..." in (e.g.) an "if",
-/// we allocate a matrushka of these.
-class ConditionalClauseScope final : public ASTScopeImpl {
+/// The scope introduced by a conditional clause initializer in an
+/// if/while/guard statement.
+class ConditionalClauseInitializerScope final : public ASTScopeImpl {
 public:
-  LabeledConditionalStmt *const stmt;
-  const unsigned index;
-  const SourceLoc endLoc; // cannot get it from the stmt
+  Expr *const initializer;
+  const SourceRange bodyRange;
 
-  ConditionalClauseScope(LabeledConditionalStmt *stmt, unsigned index,
-                         SourceLoc endLoc)
-      : stmt(stmt), index(index), endLoc(endLoc) {}
+  ConditionalClauseInitializerScope(Expr *initializer)
+      : initializer(initializer) {}
 
-  virtual ~ConditionalClauseScope() {}
+  virtual ~ConditionalClauseInitializerScope() {}
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  std::string getClassName() const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-
-protected:
-  void printSpecifics(llvm::raw_ostream &out) const override;
-
-public:
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
-private:
-  ArrayRef<StmtConditionElement> getCond() const;
-  const StmtConditionElement &getStmtConditionElement() const;
-
-protected:
-  bool isLabeledStmtLookupTerminator() const override;
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
@@ -1139,16 +1030,20 @@ protected:
 /// the normal lookup rule to pass the lookup scope into the deepest conditional
 /// clause.
 class ConditionalClausePatternUseScope final : public ASTScopeImpl {
-  Pattern *const pattern;
-  const SourceLoc startLoc;
+  StmtConditionElement sec;
+  SourceLoc endLoc;
 
 public:
-  ConditionalClausePatternUseScope(Pattern *pattern, SourceLoc startLoc)
-      : pattern(pattern), startLoc(startLoc) {}
+  ConditionalClausePatternUseScope(StmtConditionElement sec, SourceLoc endLoc)
+      : sec(sec), endLoc(endLoc) {}
 
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
+
+private:
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1214,8 +1109,10 @@ protected:
 class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
+  SourceLoc endLoc;
 
-  TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
+  TopLevelCodeScope(TopLevelCodeDecl *e, SourceLoc endLoc)
+      : decl(e), endLoc(endLoc) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
@@ -1361,7 +1258,7 @@ public:
 protected:
   /// Return the lookupParent required to search these.
   ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &,
-                                                    const Stmt *afterConds);
+                                                    SourceLoc);
 };
 
 class IfStmtScope final : public LabeledConditionalStmtScope {
@@ -1419,27 +1316,23 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 };
 
-/// A scope after a guard statement that follows lookups into the conditions
-/// Also for:
-///  The insertion point of the last statement of an active clause in an #if
-///  must be the lookup parent
-/// of any following scopes. But the active clause may not be the last clause.
-/// In short, this is another case where the lookup parent cannot follow the same
-/// nesting as the source order. IfConfigUseScope implements this twist. It
-/// follows the IfConfig, wraps all subsequent scopes, and redirects the lookup.
-class LookupParentDiversionScope final : public ASTScopeImpl {
+/// A scope for the body of a guard statement. Lookups from the body must
+/// skip the parent scopes for introducing pattern bindings, since they're
+/// not visible in the guard body, only after the body ends.
+class GuardStmtBodyScope final : public ASTScopeImpl {
 public:
   ASTScopeImpl *const lookupParent;
-  const SourceLoc startLoc;
-  const SourceLoc endLoc;
+  BraceStmt *const body;
 
-  LookupParentDiversionScope(ASTScopeImpl *lookupParent,
-                             SourceLoc startLoc, SourceLoc endLoc)
-      : lookupParent(lookupParent), startLoc(startLoc), endLoc(endLoc) {}
+  GuardStmtBodyScope(ASTScopeImpl *lookupParent, BraceStmt *body)
+      : lookupParent(lookupParent), body(body) {}
 
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1672,13 +1565,21 @@ class BraceStmtScope final : public AbstractStmtScope {
   /// definition.
   SmallVector<VarDecl *, 2> localVars;
 
+  /// The end location for bindings introduced in this scope. This can
+  /// extend past the actual end of the BraceStmt in top-level code,
+  /// where every TopLevelCodeDecl introduces a new scope through the
+  /// end of the buffer.
+  SourceLoc endLoc;
+
 public:
   BraceStmtScope(BraceStmt *e,
                  SmallVector<ValueDecl *, 2> localFuncsAndTypes,
-                 SmallVector<VarDecl *, 2> localVars)
+                 SmallVector<VarDecl *, 2> localVars,
+                 SourceLoc endLoc)
       : stmt(e),
         localFuncsAndTypes(localFuncsAndTypes),
-        localVars(localVars) {}
+        localVars(localVars),
+        endLoc(endLoc) {}
   virtual ~BraceStmtScope() {}
 
 protected:

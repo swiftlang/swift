@@ -19,6 +19,7 @@
 #include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"

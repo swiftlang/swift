@@ -72,22 +72,14 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
                                                       scopeCreator);
 }
 
-bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
-  const auto r = getSourceRangeOfThisASTNode();
-  (void)r;
-  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start),
-                 "Range is backwards.");
-  return true;
-}
-
 /// If the \p loc is in a new buffer but \p range is not, consider the location
 /// is at the start of replaced range. Otherwise, returns \p loc as is.
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
-                                              SourceRange range,
+                                              CharSourceRange range,
                                               SourceLoc loc) {
   if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
     if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
-        !sourceMgr.rangeContains(replacedRange.New, range)) {
+        !sourceMgr.rangeContainsTokenLoc(replacedRange.New, range.getStart())) {
       return replacedRange.Original.Start;
     }
   }
@@ -101,17 +93,19 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
   auto *const *child = llvm::lower_bound(
       getChildren(), loc,
       [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
-        ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-        auto rangeOfScope = scope->getSourceRangeOfScope();
+        auto rangeOfScope = scope->getCharSourceRangeOfScope(sourceMgr);
+        ASTScopeAssert(!sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(),
+                                                   rangeOfScope.getStart()),
+                       "Source range is backwards");
         loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-        return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
-                                           /*ensureDisjoint=*/false);
+        return (rangeOfScope.getEnd() == loc ||
+                sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(), loc));
       });
 
   if (child != getChildren().end()) {
-    auto rangeOfScope = (*child)->getSourceRangeOfScope();
+    auto rangeOfScope = (*child)->getCharSourceRangeOfScope(sourceMgr);
     loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-    if (sourceMgr.rangeContainsTokenLoc(rangeOfScope, loc))
+    if (rangeOfScope.contains(loc))
       return *child;
   }
 
@@ -272,7 +266,8 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 NullablePtr<const ASTScopeImpl>
 PatternEntryInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  assert(parent->getClassName() == "PatternEntryDeclScope");
+  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+                 "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
   // scope that introduces bindings bound by the pattern, since we
@@ -280,6 +275,23 @@ PatternEntryInitializerScope::getLookupParent() const {
   //
   // func f(x: Int) {
   //   let x = x
+  //   print(x)
+  // }
+  return parent->getLookupParent();
+}
+
+NullablePtr<const ASTScopeImpl>
+ConditionalClauseInitializerScope::getLookupParent() const {
+  auto parent = getParent().get();
+  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+                 "ConditionalClauseInitializerScope in unexpected place");
+
+  // Lookups from inside a conditional clause initializer skip the parent
+  // scope that introduces bindings bound by the pattern, since we
+  // want this to work:
+  //
+  // func f(x: Int?) {
+  //   guard let x = x else { return }
   //   print(x)
   // }
   return parent->getLookupParent();
@@ -411,7 +423,7 @@ bool ClosureParametersScope::lookupLocalsOrMembers(
 
 bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(pattern, consumer);
+  return lookupLocalBindingsInPattern(sec.getPattern(), consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
@@ -488,11 +500,7 @@ bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
   return true;
 }
 
-bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
-  return false;
-}
-
-bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+bool GuardStmtBodyScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 

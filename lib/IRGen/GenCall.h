@@ -20,9 +20,13 @@
 
 #include <stdint.h>
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/SIL/ApplySite.h"
 #include "llvm/IR/CallingConv.h"
+
+#include "GenHeap.h"
+#include "IRGenModule.h"
 
 namespace llvm {
   class AttributeList;
@@ -49,6 +53,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class LoadableTypeInfo;
+  class NativeCCEntryPointArgumentEmission;
   class Size;
   class TypeInfo;
 
@@ -59,6 +64,171 @@ namespace irgen {
   inline TranslationDirection reverse(TranslationDirection direction) {
     return TranslationDirection(!bool(direction));
   }
+
+  // struct SwiftContext {
+  //   SwiftContext * __ptrauth(...) callerContext;
+  //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
+  //   SwiftActor * __ptrauth(...) callerActor;
+  //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
+  //   SwiftError *errorResult;
+  //   IndirectResultTypes *indirectResults...;
+  //   SelfType self?;
+  //   ArgTypes formalArguments...;
+  //   union {
+  //     struct {
+  //       SwiftPartialFunction * __ptrauth(...) resumeFromYield?;
+  //       SwiftPartialFunction * __ptrauth(...) abortFromYield?;
+  //       SwiftActor * __ptrauth(...) calleeActorDuringYield?;
+  //       YieldTypes yieldValues...;
+  //     };
+  //     ResultTypes directResults...;
+  //   };
+  // };
+  struct AsyncContextLayout : StructLayout {
+    struct ArgumentInfo {
+      SILType type;
+      ParameterConvention convention;
+    };
+    struct TrailingWitnessInfo {};
+
+  private:
+    enum class FixedIndex : unsigned {
+      Error = 0,
+    };
+    enum class FixedCount : unsigned {
+      Error = 1,
+    };
+    IRGenFunction &IGF;
+    CanSILFunctionType originalType;
+    CanSILFunctionType substitutedType;
+    SubstitutionMap substitutionMap;
+    SILType errorType;
+    bool canHaveValidError;
+    SmallVector<SILResultInfo, 4> directReturnInfos;
+    SmallVector<SILResultInfo, 4> indirectReturnInfos;
+    Optional<ArgumentInfo> localContextInfo;
+    NecessaryBindings bindings;
+    Optional<TrailingWitnessInfo> trailingWitnessInfo;
+    SmallVector<ArgumentInfo, 4> argumentInfos;
+
+    unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
+    unsigned getFirstIndirectReturnIndex() {
+      return getErrorIndex() + getErrorCount();
+    }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getFirstIndirectReturnIndex() + getIndirectReturnCount();
+    }
+    unsigned getIndexAfterLocalContext() {
+      return getFirstIndirectReturnIndex() + getIndirectReturnCount() +
+             (hasLocalContext() ? 1 : 0);
+    }
+    unsigned getBindingsIndex() {
+      assert(hasBindings());
+      return getIndexAfterLocalContext();
+    }
+    unsigned getIndexAfterBindings() {
+      return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
+    }
+    unsigned getFirstArgumentIndex() { return getIndexAfterBindings(); }
+    unsigned getIndexAfterArguments() {
+      return getFirstArgumentIndex() + getArgumentCount();
+    }
+    unsigned getSelfMetadataIndex() {
+      assert(hasTrailingWitnesses());
+      return getIndexAfterArguments();
+    }
+    unsigned getSelfWitnessTableIndex() {
+      assert(hasTrailingWitnesses());
+      return getIndexAfterArguments() + 1;
+    }
+    unsigned getIndexAfterTrailingWitnesses() {
+      return getIndexAfterArguments() + (hasTrailingWitnesses() ? 2 : 0);
+    }
+    unsigned getFirstDirectReturnIndex() {
+      return getIndexAfterTrailingWitnesses();
+    }
+
+  public:
+    bool canHaveError() { return canHaveValidError; }
+    ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
+    unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
+    SILType getErrorType() { return errorType; }
+
+    ElementLayout getIndirectReturnLayout(unsigned index) {
+      return getElement(getFirstIndirectReturnIndex() + index);
+    }
+    unsigned getIndirectReturnCount() { return indirectReturnInfos.size(); }
+
+    bool hasLocalContext() { return (bool)localContextInfo; }
+    ElementLayout getLocalContextLayout() {
+      assert(hasLocalContext());
+      return getElement(getLocalContextIndex());
+    }
+    ParameterConvention getLocalContextConvention() {
+      assert(hasLocalContext());
+      return localContextInfo->convention;
+    }
+    SILType getLocalContextType() {
+      assert(hasLocalContext());
+      return localContextInfo->type;
+    }
+
+    bool hasBindings() const { return !bindings.empty(); }
+    ElementLayout getBindingsLayout() {
+      assert(hasBindings());
+      return getElement(getBindingsIndex());
+    }
+    const NecessaryBindings &getBindings() const { return bindings; }
+
+    ElementLayout getArgumentLayout(unsigned index) {
+      return getElement(getFirstArgumentIndex() + index);
+    }
+    SILType getArgumentType(unsigned index) {
+      return argumentInfos[index].type;
+    }
+    // Returns the type of a parameter of the substituted function using the
+    // indexing of the function parameters, *not* the indexing of
+    // AsyncContextLayout.
+    SILType getParameterType(unsigned index) {
+      SILFunctionConventions origConv(substitutedType, IGF.getSILModule());
+      return origConv.getSILArgumentType(
+          index, IGF.IGM.getMaximalTypeExpansionContext());
+    }
+    unsigned getArgumentCount() { return argumentInfos.size(); }
+    bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
+    ElementLayout getSelfMetadataLayout() {
+      assert(hasTrailingWitnesses());
+      return getElement(getSelfMetadataIndex());
+    }
+    ElementLayout getSelfWitnessTableLayout() {
+      return getElement(getSelfWitnessTableIndex());
+    }
+
+    unsigned getDirectReturnCount() { return directReturnInfos.size(); }
+    ElementLayout getDirectReturnLayout(unsigned index) {
+      return getElement(getFirstDirectReturnIndex() + index);
+    }
+
+    AsyncContextLayout(
+        IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
+        ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
+        CanSILFunctionType originalType, CanSILFunctionType substitutedType,
+        SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
+        Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
+        bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
+        ArrayRef<SILResultInfo> directReturnInfos,
+        ArrayRef<SILResultInfo> indirectReturnInfos,
+        Optional<ArgumentInfo> localContextInfo);
+  };
+
+  AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
+                                           SILFunction *function);
+
+  AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
+                                           CanSILFunctionType originalType,
+                                           CanSILFunctionType substitutedType,
+                                           SubstitutionMap substitutionMap);
 
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
@@ -127,15 +297,24 @@ namespace irgen {
 
   Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);
-  void emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
-                                   CanSILFunctionType coroutineType,
-                                   Explosion &allParams);
+  void
+  emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
+                              CanSILFunctionType coroutineType,
+                              NativeCCEntryPointArgumentEmission &emission);
 
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
-  void emitYieldManyCoroutineEntry(IRGenFunction &IGF,
-                                   CanSILFunctionType coroutineType,
-                                   Explosion &allParams);
+  void
+  emitYieldManyCoroutineEntry(IRGenFunction &IGF,
+                              CanSILFunctionType coroutineType,
+                              NativeCCEntryPointArgumentEmission &emission);
+
+  Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
+                        Alignment alignment);
+  void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
+  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
+                                                 AsyncContextLayout layout);
+  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);
 
   /// Yield the given values from the current continuation.
   ///

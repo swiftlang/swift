@@ -120,7 +120,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSwiftModuleBuffer(
       SourceFileDepGraph::loadFromSwiftModuleBuffer(buffer);
   if (!sourceFileDepGraph)
     return None;
-  registerJob(Cmd);
+  jobsBySwiftDeps[buffer.getBufferIdentifier().str()] = Cmd;
   auto changes = integrate(*sourceFileDepGraph, buffer.getBufferIdentifier());
   if (verifyFineGrainedDependencyGraphAfterEveryImport)
     verify();
@@ -445,11 +445,11 @@ bool ModuleDepGraph::recordWhatUseDependsUpon(
           StringRef externalSwiftDeps = def->getKey().getName();
           if (def->getKey().getKind() == NodeKind::externalDepend) {
             externalDependencies.insert(externalSwiftDeps.str());
+            useHasNewExternalDependency = true;
           } else if (def->getKey().getKind() ==
                      NodeKind::incrementalExternalDepend) {
             incrementalExternalDependencies.insert(externalSwiftDeps.str());
           }
-          useHasNewExternalDependency = true;
         }
       });
   return useHasNewExternalDependency;
@@ -749,9 +749,14 @@ void ModuleDepGraph::printPath(raw_ostream &out,
 }
 
 StringRef ModuleDepGraph::getProvidingFilename(
-    const Optional<std::string> swiftDeps) const {
+    const Optional<std::string> &swiftDeps) const {
   if (!swiftDeps)
     return "<unknown";
+  auto ext = llvm::sys::path::extension(*swiftDeps);
+  if (file_types::lookupTypeForExtension(ext) ==
+      file_types::TY_SwiftModuleFile) {
+    return *swiftDeps;
+  }
   const StringRef inputName =
       llvm::sys::path::filename(getJob(swiftDeps)->getFirstSwiftPrimaryInput());
   // FineGrainedDependencyGraphTests work with simulated jobs with empty

@@ -123,9 +123,7 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
 }
 
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
-  if (!isSourceRangeCached(true))
-    out << "(uncached) ";
-  SourceRange range = computeSourceRangeOfScope(/*omitAssertions=*/true);
+  SourceRange range = getSourceRangeOfThisASTNode(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
 }
 
@@ -176,18 +174,13 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   });
 }
 
-void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
-  ASTScopeImpl::printSpecifics(out);
-  out << "index " << index;
-}
-
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
-  pattern->print(out);
+  sec.getPattern()->print(out);
 }
 
 bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }

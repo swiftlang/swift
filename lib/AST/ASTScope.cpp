@@ -137,8 +137,8 @@ DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
 DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
 DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
-DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
+DEFINE_GET_CLASS_NAME(ConditionalClauseInitializerScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
 DEFINE_GET_CLASS_NAME(ClosureParametersScope)
 DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
@@ -149,7 +149,7 @@ DEFINE_GET_CLASS_NAME(EnumElementScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
 DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)
-DEFINE_GET_CLASS_NAME(LookupParentDiversionScope)
+DEFINE_GET_CLASS_NAME(GuardStmtBodyScope)
 DEFINE_GET_CLASS_NAME(RepeatWhileScope)
 DEFINE_GET_CLASS_NAME(DoStmtScope)
 DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
@@ -197,32 +197,4 @@ void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
   for (auto *child : getChildren())
     child->postOrderDo(fn);
   fn(this);
-}
-
-ArrayRef<StmtConditionElement> ConditionalClauseScope::getCond() const {
-  return stmt->getCond();
-}
-
-const StmtConditionElement &
-ConditionalClauseScope::getStmtConditionElement() const {
-  return getCond()[index];
-}
-
-unsigned ASTScopeImpl::countDescendants() const {
-  unsigned count = 0;
-  const_cast<ASTScopeImpl *>(this)->preOrderDo(
-      [&](ASTScopeImpl *) { ++count; });
-  return count - 1;
-}
-
-// Can fail if a subscope is lazy and not reexpanded
-void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
-#ifndef NDEBUG
-  unsigned beforeCount = countDescendants();
-#endif
-  fn();
-#ifndef NDEBUG
-  unsigned afterCount = countDescendants();
-  ASTScopeAssert(beforeCount <= afterCount, "shrank?!");
-#endif
 }

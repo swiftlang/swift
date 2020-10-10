@@ -25,6 +25,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
+#include "Explosion.h"
+
 namespace swift {
   class CanType;
   enum class MetadataState : size_t;
@@ -41,7 +43,7 @@ namespace irgen {
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
   llvm::SetVector<GenericRequirement> Requirements;
-
+  llvm::DenseMap<GenericRequirement, ProtocolConformanceRef> Conformances;
 
   /// Are the bindings to be computed for a partial apply forwarder.
   /// In the case this is true we need to store/restore the conformance of a
@@ -54,9 +56,9 @@ public:
   
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
-  static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
-                                                  CanSILFunctionType origType,
-                                                  SubstitutionMap subs);
+  static NecessaryBindings
+  forAsyncFunctionInvocation(IRGenModule &IGM, CanSILFunctionType origType,
+                             SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,
@@ -69,6 +71,11 @@ public:
   /// Get the requirement from the bindings at index i.
   const GenericRequirement &operator[](size_t i) const {
     return Requirements[i];
+  }
+
+  ProtocolConformanceRef
+  getConformance(const GenericRequirement &requirement) const {
+    return Conformances.lookup(requirement);
   }
 
   size_t size() const {
@@ -89,12 +96,17 @@ public:
   /// Save the necessary bindings to the given buffer.
   void save(IRGenFunction &IGF, Address buffer) const;
 
+  void save(IRGenFunction &IGF, Address buffer, Explosion &source) const;
+
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
 
   const llvm::SetVector<GenericRequirement> &getRequirements() const {
     return Requirements;
   }
+
+  bool forAsyncFunction() { return !forPartialApply; }
+
 private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,
                                            CanSILFunctionType origType,
