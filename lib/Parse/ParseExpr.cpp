@@ -421,6 +421,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       isType = canParseType();
     }
     if (isType) {
+      SyntaxParsingContext TyExprCtx(SyntaxContext, SyntaxKind::TypeExpr);
       ParserResult<TypeRepr> ty = parseType();
       if (ty.isNonNull())
         return makeParserResult(
