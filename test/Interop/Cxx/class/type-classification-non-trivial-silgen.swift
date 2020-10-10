@@ -21,12 +21,12 @@ public func testStructWithDestructor() {
 // for a "destroy_addr".
 // CHECK-LABEL: sil [ossa] @$s4main33testStructWithSubobjectDestructoryyF : $@convention(thin) () -> ()
 // CHECK: [[AS:%.*]] = alloc_stack $StructWithSubobjectDestructor
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN29StructWithSubobjectDestructorC1Ev|\?\?1StructWithSubobjectDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithSubobjectDestructor
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN29StructWithSubobjectDestructorC1Ev|\?\?0StructWithSubobjectDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithSubobjectDestructor
 // CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out StructWithSubobjectDestructor
 // CHECK: destroy_addr [[AS]]
 // CHECK-LABEL: end sil function '$s4main33testStructWithSubobjectDestructoryyF'
 
-// CHECK-LABEL: sil [clang StructWithSubobjectDestructor.init] @{{_ZN29StructWithSubobjectDestructorC1Ev|\?\?1StructWithSubobjectDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithSubobjectDestructor
+// CHECK-LABEL: sil [clang StructWithSubobjectDestructor.init] @{{_ZN29StructWithSubobjectDestructorC1Ev|\?\?0StructWithSubobjectDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithSubobjectDestructor
 public func testStructWithSubobjectDestructor() {
   let d = StructWithSubobjectDestructor()
 }
