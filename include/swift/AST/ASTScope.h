@@ -397,7 +397,6 @@ class ASTSourceFileScope final : public ASTScopeImpl {
 public:
   SourceFile *const SF;
   ScopeCreator *const scopeCreator;
-  ASTScopeImpl *insertionPoint;
 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
@@ -798,7 +797,6 @@ protected:
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-  SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
   std::string getClassName() const override;

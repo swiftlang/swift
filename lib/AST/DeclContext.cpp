@@ -774,8 +774,18 @@ void IterableDeclContext::addMemberPreservingSourceOrder(Decl *member) {
     if (existingMember->isImplicit())
       continue;
 
-    if (isa<EnumCaseDecl>(existingMember) ||
-        isa<IfConfigDecl>(existingMember))
+    // An EnumCaseDecl contains one or more EnumElementDecls,
+    // but the EnumElementDecls are also added as members of
+    // the parent enum. We ignore the EnumCaseDecl since its
+    // source range overlaps with that of the EnumElementDecls.
+    if (isa<EnumCaseDecl>(existingMember))
+      continue;
+
+    // The elements of the active clause of an IfConfigDecl
+    // are added to the parent type. We ignore the IfConfigDecl
+    // since its source range overlaps with the source ranges
+    // of the active elements.
+    if (isa<IfConfigDecl>(existingMember))
       continue;
 
     if (!SM.isBeforeInBuffer(existingMember->getEndLoc(), start))
@@ -819,14 +829,24 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
   assert(!member->NextDecl && "Already added to a container");
 
 #ifndef NDEBUG
+  // Assert that new declarations are always added in source order.
   auto checkSourceRange = [&](Decl *prev, Decl *next) {
+    // SKip these checks for imported and deserialized decls.
     if (!member->getDeclContext()->getParentSourceFile())
       return;
 
     auto shouldSkip = [](Decl *d) {
-      if (isa<VarDecl>(d) || isa<EnumElementDecl>(d) || isa<IfConfigDecl>(d))
+      // PatternBindingDecl source ranges overlap with VarDecls,
+      // EnumCaseDecl source ranges overlap with EnumElementDecls,
+      // and IfConfigDecl source ranges overlap with the elements
+      // of the active clause. Skip them all here to avoid
+      // spurious assertions.
+      if (isa<PatternBindingDecl>(d) ||
+          isa<EnumCaseDecl>(d) ||
+          isa<IfConfigDecl>(d))
         return true;
 
+      // Ignore source location information of implicit declarations.
       if (d->isImplicit())
         return true;
 
@@ -839,8 +859,10 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
     SourceLoc prevEnd = prev->getEndLoc();
     SourceLoc nextStart = next->getStartLoc();
 
-    if (!prevEnd.isValid() || !nextStart.isValid())
-      return;
+    assert(prevEnd.isValid() &&
+           "Only implicit decls can have invalid source location");
+    assert(nextStart.isValid() &&
+           "Only implicit decls can have invalid source location");
 
     if (getASTContext().SourceMgr.isBeforeInBuffer(prevEnd, nextStart))
       return;

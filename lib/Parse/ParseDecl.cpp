@@ -6588,11 +6588,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
 
   // If the body consists of a single expression, turn it into a return
   // statement.
-  //
-  // But don't do this transformation when performing certain kinds of code
-  // completion, as the source may be incomplete and the type mismatch in return
-  // statement will just confuse the type checker.
-  if (shouldSuppressSingleExpressionBodyTransform(Body, BS->getElements()))
+  if (BS->getNumElements() != 1)
     return BS;
 
   auto Element = BS->getFirstElement();
