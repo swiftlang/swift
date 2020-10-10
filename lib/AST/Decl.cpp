@@ -672,6 +672,14 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   llvm_unreachable("invalid file kind");
 }
 
+Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<Decl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           GlobalActorAttributeRequest{mutableThis},
+                           None);
+}
+
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();
@@ -4046,6 +4054,13 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     (void)evaluateOrDefault(Context.evaluator,
         ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
   }
+}
+
+VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GlobalActorInstanceRequest{mutableThis},
+                           nullptr);
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
