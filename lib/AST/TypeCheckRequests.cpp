@@ -1392,49 +1392,30 @@ TypeCheckFunctionBodyRequest::readDependencySource(
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const AttributedImport<ImportedModule> &import) {
+                           const ImportedModule &module) {
   out << "import of ";
-
-  simple_display(out, import.module.importedModule);
-
-  out << " [";
-  if (!import.module.accessPath.empty()) {
-    out << " scoped(";
-    import.module.accessPath.print(out);
-    out << ")";
+  if (!module.accessPath.empty()) {
+    module.accessPath.print(out);
+    out << " in ";
   }
-  if (import.options.contains(ImportFlags::Exported))
-    out << " exported";
-  if (import.options.contains(ImportFlags::Testable))
-    out << " testable";
-  if (import.options.contains(ImportFlags::ImplementationOnly))
-    out << " implementation-only";
-  if (import.options.contains(ImportFlags::PrivateImport))
-    out << " private(" << import.sourceFileArg << ")";
-
-  if (import.options.contains(ImportFlags::SPIAccessControl)) {
-    out << " spi(";
-    llvm::interleaveComma(import.spiGroups, out, [&out](Identifier name) {
-                                                   simple_display(out, name);
-                                                 });
-    out << ")";
-  }
-
-  out << " ]";
+  simple_display(out, module.importedModule);
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                       const AttributedImport<UnloadedImportedModule> &import) {
-  out << "import of unloaded ";
-
-  import.module.getModulePath().print(out);
-
-  out << " [";
-  if (!import.module.getAccessPath().empty()) {
-    out << " scoped(";
-    import.module.getAccessPath().print(out);
-    out << ")";
+                           const UnloadedImportedModule &module) {
+  out << "import of ";
+  if (!module.getAccessPath().empty()) {
+    module.getAccessPath().print(out);
+    out << " in ";
   }
+  out << "unloaded ";
+  module.getModulePath().print(out);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const AttributedImport<std::tuple<>> &import) {
+  out << " [";
+
   if (import.options.contains(ImportFlags::Exported))
     out << " exported";
   if (import.options.contains(ImportFlags::Testable))

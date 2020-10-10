@@ -570,13 +570,27 @@ struct AttributedImport {
   }
 };
 
-/// A module which has been implicitly imported.
 void simple_display(llvm::raw_ostream &out,
-                    const AttributedImport<ImportedModule> &import);
+                    const ImportedModule &import);
 
-/// A module which will be implicitly imported.
 void simple_display(llvm::raw_ostream &out,
-                    const AttributedImport<UnloadedImportedModule> &import);
+                    const UnloadedImportedModule &import);
+
+// This is a quasi-implementation detail of the template version below.
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<std::tuple<>> &import);
+
+template<typename ModuleInfo>
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<ModuleInfo> &import) {
+  // Print the module.
+  simple_display(out, import.module);
+
+  // Print the other details of the import, using the std::tuple<>
+  // specialization.
+  AttributedImport<std::tuple<>> importWithoutModule({}, import);
+  simple_display(out, importWithoutModule);
+}
 
 // MARK: - Implicit imports
 
