@@ -126,10 +126,9 @@ public:
 };
 
 /// Request the raw type of the given enum.
-class EnumRawTypeRequest :
-    public SimpleRequest<EnumRawTypeRequest,
-                         Type(EnumDecl *, TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+class EnumRawTypeRequest
+    : public SimpleRequest<EnumRawTypeRequest, Type(EnumDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -137,18 +136,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type
-  evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
-           TypeResolutionStage stage) const;
+  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 
-  // Separate caching.
-  bool isCached() const;
-  Optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
+  bool isCached() const { return true; }
 };
 
 /// Request to determine the set of declarations that were are overridden
