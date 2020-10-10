@@ -1162,7 +1162,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (uncheckedRawValueOf(elt)) {
       if (!uncheckedRawValueOf(elt)->isImplicit())
         lastExplicitValueElt = elt;
-    } else if (!ED->LazySemanticInfo.hasFixedRawValues()) {
+    } else if (!ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues)) {
       // Try to pull out the automatic enum value kind.  If that fails, bail.
       if (!valueKind) {
         valueKind = computeAutomaticEnumValueKind(ED);
@@ -1217,7 +1217,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     // to have set things up correctly.  This comes up with imported enums
     // and deserialized @objc enums which always have their raw values setup
     // beforehand.
-    if (ED->LazySemanticInfo.hasFixedRawValues())
+    if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues))
       continue;
 
     // Using magic literals like #file as raw value is not supported right now.

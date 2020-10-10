@@ -179,21 +179,10 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   diags.diagnose(enumDecl, diag::circular_enum_inheritance, enumDecl->getName());
 }
 
-bool EnumRawTypeRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-Optional<Type> EnumRawTypeRequest::getCachedResult() const {
-  auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.hasRawType())
-    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
-
-  return None;
-}
-
-void EnumRawTypeRequest::cacheResult(Type value) const {
-  auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.cacheRawType(value);
+void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
 }
 
 //----------------------------------------------------------------------------//
@@ -854,17 +843,15 @@ bool EnumRawValuesRequest::isCached() const {
 
 Optional<evaluator::SideEffect> EnumRawValuesRequest::getCachedResult() const {
   auto *ED = std::get<0>(getStorage());
-  if (ED->LazySemanticInfo.hasCheckedRawValues())
+  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
     return std::make_tuple<>();
   return None;
 }
 
 void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
   auto *ED = std::get<0>(getStorage());
-  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
-      EnumDecl::HasFixedRawValues |
-      EnumDecl::HasFixedRawValuesAndTypes;
-  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
+      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
 }
 
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {

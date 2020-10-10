@@ -234,7 +234,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  MutableArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);

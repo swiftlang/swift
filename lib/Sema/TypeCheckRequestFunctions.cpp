@@ -136,13 +136,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Type
-EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
-                             TypeResolutionStage stage) const {
+Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
+                                  EnumDecl *enumDecl) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
-    auto inheritedTypeResult =
-      evaluator(InheritedTypeRequest{enumDecl, idx, stage});
-    
+    auto inheritedTypeResult = evaluator(
+        InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface});
+
     if (auto err = inheritedTypeResult.takeError()) {
       llvm::handleAllErrors(std::move(err),
         [](const CyclicalRequestError<InheritedTypeRequest> &E) {
