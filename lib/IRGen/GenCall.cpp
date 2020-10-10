@@ -1924,6 +1924,9 @@ public:
     // This can happen when calling C functions, or class method dispatch thunks
     // for methods that have covariant ABI-compatible overrides.
     auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
+    // If the expected result type is void, bail.
+    if (expectedNativeResultType->isVoidTy())
+      return;
     if (result->getType() != expectedNativeResultType) {
       result =
           IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
