@@ -853,6 +853,55 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieve the static "shared" property within a global actor that provides
+/// the actor instance representing the global actor.
+///
+/// Global actors can be applied to a declaration to indicate that the
+/// declaration operations on state that is protected by the global actor.
+class GlobalActorInstanceRequest :
+    public SimpleRequest<GlobalActorInstanceRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
+
+/// Request the custom attribute which denotes the global actor for the given
+/// declaration.
+///
+/// This is the "raw" global actor attribute as written directly on the
+/// declaration, with any inference rules applied.
+class GlobalActorAttributeRequest :
+    public SimpleRequest<
+        GlobalActorAttributeRequest,
+        Optional<CustomAttrNominalPair>(Decl *),
+        RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine the actor isolation for the given declaration.
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,
