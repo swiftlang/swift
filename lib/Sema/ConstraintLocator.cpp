@@ -15,11 +15,11 @@
 // a particular constraint was derived.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintLocator.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 

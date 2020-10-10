@@ -1,4 +1,4 @@
-//===--- ConstraintSystem.h - Constraint-based Type Checking ----*- C++ -*-===//
+//===--- TypeCheckProtocol.h - Constraint-based Type Checking ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"

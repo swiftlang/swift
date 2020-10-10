@@ -13,9 +13,9 @@
 // This file implements selection of bindings for type variables.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintGraph.h"
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
 #include <tuple>
 

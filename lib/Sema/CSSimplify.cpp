@@ -16,8 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
-#include "CSFix.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -28,6 +26,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSFix.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"

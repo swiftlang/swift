@@ -17,6 +17,8 @@
 #ifndef SWIFT_AST_FUNCTION_REF_KIND_H
 #define SWIFT_AST_FUNCTION_REF_KIND_H
 
+#include "llvm/ADT/StringRef.h"
+
 namespace swift {
 
 /// Describes how a function is referenced within an expression node,
@@ -43,7 +45,7 @@ enum class FunctionRefKind : unsigned {
 
 /// Produce a string describing a function reference kind, for
 /// debugging purposes.
-StringRef getFunctionRefKindStr(FunctionRefKind refKind);
+llvm::StringRef getFunctionRefKindStr(FunctionRefKind refKind);
 
 }
 
