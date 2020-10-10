@@ -691,17 +691,20 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
   using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
   using StringRefDMI = DenseMapInfo<StringRef>;
-  // FIXME: SPI groups not used by DenseMapInfo???
+  // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
+  // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
     return AttributedImport(ModuleInfoDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
-                            StringRefDMI::getEmptyKey());
+                            StringRefDMI::getEmptyKey(),
+                            {});
   }
   static inline AttributedImport getTombstoneKey() {
     return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
                             ImportOptionsDMI::getTombstoneKey(),
-                            StringRefDMI::getTombstoneKey());
+                            StringRefDMI::getTombstoneKey(),
+                            {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(
@@ -714,7 +717,8 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                       const AttributedImport &b) {
     return ModuleInfoDMI::isEqual(a.module, b.module) &&
            ImportOptionsDMI::isEqual(a.options, b.options) &&
-           StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg);
+           StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg) &&
+           a.spiGroups == b.spiGroups;
   }
 };
 }
