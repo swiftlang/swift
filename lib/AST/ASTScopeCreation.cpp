@@ -588,12 +588,15 @@ public:
     if (endLoc.hasValue())
       endLocForBraceStmt = *endLoc;
 
-    if (auto *s = scopeCreator.getASTContext().Stats)
+    ASTContext &ctx = scopeCreator.getASTContext();
+    if (auto *s = ctx.Stats)
       ++s->getFrontendCounters().NumBraceStmtASTScopes;
 
     return
         scopeCreator.constructExpandAndInsert<BraceStmtScope>(
-            p, bs, std::move(localFuncsAndTypes), std::move(localVars),
+            p, bs,
+            ctx.AllocateCopy(localFuncsAndTypes),
+            ctx.AllocateCopy(localVars),
             endLocForBraceStmt);
   }
 
