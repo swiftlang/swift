@@ -2833,6 +2833,30 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                             initializer, wrappedValue);
 }
 
+VarDecl *
+PropertyWrapperWrappedValueVarRequest::evaluate(Evaluator &evaluator,
+                                                VarDecl *var) const {
+  auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+  if (!wrapperInfo || !isa<ParamDecl>(var))
+    return nullptr;
+
+  auto dc = var->getDeclContext();
+  auto &ctx = var->getASTContext();
+  VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
+                                        VarDecl::Introducer::Var,
+                                        var->getLoc(),
+                                        var->getName(), dc);
+  localVar->setInterfaceType(var->getInterfaceType());
+  localVar->setImplicit();
+  localVar->getAttrs() = var->getAttrs();
+  localVar->overwriteAccess(var->getFormalAccess());
+  localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
+
+  evaluator.cacheOutput(PropertyWrapperBackingPropertyInfoRequest{localVar},
+                        std::move(wrapperInfo));
+  return localVar;
+}
+
 /// Given a storage declaration in a protocol, set it up with the right
 /// StorageImpl and add the right set of opaque accessors.
 static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,

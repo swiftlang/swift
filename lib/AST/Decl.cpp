@@ -5948,8 +5948,17 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
   return getPropertyWrapperBackingPropertyInfo().projectionVar;
 }
 
+VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperWrappedValueVarRequest{mutableThis},
+      nullptr);
+}
+
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
-  if (getDeclContext()->isTypeContext())
+  if (getDeclContext()->isTypeContext() || isImplicit())
     return;
 
   if (getAttrs().hasAttribute<LazyAttr>()) {
@@ -5963,6 +5972,9 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
 
     if (auto *projectionVar = getPropertyWrapperProjectionVar())
       visit(projectionVar);
+
+    if (auto *wrappedValueVar = getPropertyWrapperWrappedValueVar())
+      visit(wrappedValueVar);
   }
 }
 

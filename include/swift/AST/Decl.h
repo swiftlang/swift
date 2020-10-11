@@ -4978,6 +4978,10 @@ public:
   /// property wrapper with a \c projectedValue .
   VarDecl *getPropertyWrapperProjectionVar() const;
 
+  /// Retrieve the local wrapped value var for for a parameter that has
+  /// an attached property wrapper.
+  VarDecl *getPropertyWrapperWrappedValueVar() const;
+
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support
