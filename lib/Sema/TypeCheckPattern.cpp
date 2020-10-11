@@ -1721,4 +1721,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                     params[i].isInOut());
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
   }
+
+  TypeChecker::checkParameterList(P, CE);
 }

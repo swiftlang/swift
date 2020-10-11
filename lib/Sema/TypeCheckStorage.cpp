@@ -2485,9 +2485,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   else
     property->setImplInfo(StorageImplInfo::getImmutableComputed());
 
-  var->getAttrs().add(
-      new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                           /*Implicit=*/true));
+  if (!isa<ParamDecl>(var))
+    var->getAttrs().add(
+        new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
+                                             /*Implicit=*/true));
   return property;
 }
 
