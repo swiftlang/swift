@@ -215,7 +215,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
 
   computeImportObjCHeaderOptions();
-  computeImplicitImportModuleNames();
+  computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
+  computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
   computeLLVMArgs();
 
   return false;
@@ -586,16 +587,17 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
     Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
   }
 }
-void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
+void ArgsToFrontendOptionsConverter::
+computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {
   using namespace options;
-  for (const Arg *A : Args.filtered(OPT_import_module)) {
+  for (const Arg *A : Args.filtered(id)) {
     auto *moduleStr = A->getValue();
     if (!Lexer::isIdentifier(moduleStr)) {
       Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleStr,
                      /*suggestModuleNameFlag*/ false);
       continue;
     }
-    Opts.ImplicitImportModuleNames.push_back(moduleStr);
+    Opts.ImplicitImportModuleNames.emplace_back(moduleStr, isTestable);
   }
 }
 void ArgsToFrontendOptionsConverter::computeLLVMArgs() {

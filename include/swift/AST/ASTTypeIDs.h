@@ -42,7 +42,7 @@ class GenericTypeParamType;
 class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
-struct ImplicitImport;
+struct ImplicitImportList;
 class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;
