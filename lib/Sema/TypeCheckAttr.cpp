@@ -2987,7 +2987,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // through a property.
   if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
     // property wrappers can only be applied to variables
-    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+    if (!isa<VarDecl>(D)) {
       diagnose(attr->getLocation(),
                diag::property_wrapper_attribute_not_on_property,
                nominal->getName());
