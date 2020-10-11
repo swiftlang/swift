@@ -1017,6 +1017,19 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
 }
 
+static bool
+haveTranslationForEducationalNote(DiagID id, StringRef locale,
+                                  const char *const *const translations[]) {
+  auto noteTranslations = translations[(uint32_t)id];
+  while (noteTranslations && *noteTranslations) {
+    if (*noteTranslations == locale) {
+      return true;
+    }
+    noteTranslations++;
+  }
+  return false;
+}
+
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
     SmallVector<DiagnosticInfo, 1> childInfo;
@@ -1033,10 +1046,21 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     SmallVector<std::string, 1> educationalNotePaths;
 
     auto associatedNote = educationalNotes[(uint32_t)diagnostic.getID()];
+
     if (associatedNote) {
       SmallString<128> notePath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(notePath, associatedNote);
-      educationalNotePaths.push_back(notePath.str().str());
+      if (!locale.empty() && locale != "en" &&
+          haveTranslationForEducationalNote(diagnostic.getID(), locale,
+                                            educationalNoteTranslations)) {
+        llvm::sys::path::append(notePath, locale);
+        llvm::sys::path::append(notePath, associatedNote);
+        educationalNotePaths.push_back(notePath.str().str());
+      } else if (haveTranslationForEducationalNote(
+                     diagnostic.getID(), "en", educationalNoteTranslations)) {
+        // Ensure an english fallback translation is available.
+        llvm::sys::path::append(notePath, associatedNote);
+        educationalNotePaths.push_back(notePath.str().str());
+      }
     }
     info->EducationalNotePaths = educationalNotePaths;
 

@@ -687,6 +687,9 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// The current locale, if set.
+    std::string locale = "";
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
@@ -745,6 +748,7 @@ namespace swift {
     void setLocalization(std::string locale, std::string path) {
       assert(!locale.empty());
       assert(!path.empty());
+      this->locale = locale;
       llvm::SmallString<128> filePath(path);
       llvm::sys::path::append(filePath, locale);
       llvm::sys::path::replace_extension(filePath, ".db");
