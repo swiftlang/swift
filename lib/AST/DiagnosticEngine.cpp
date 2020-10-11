@@ -117,9 +117,10 @@ static constexpr const char *const fixItStrings[] = {
     "<not a fix-it>",
 };
 
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
-                                                                  nullptr};
+#define EDUCATIONAL_NOTES(DIAG, NAME, ...)                                     \
+  static constexpr const char *const DIAG##_educationalNote = NAME;            \
+  static constexpr const char *const DIAG##_educationalNoteTranslations[] = {  \
+      __VA_ARGS__, nullptr};
 #include "swift/AST/EducationalNotes.def"
 
 // NOTE: sadly, while GCC and Clang support array designators in C++, they are
@@ -129,17 +130,24 @@ static constexpr const char *const fixItStrings[] = {
 // what the C array would have looked like.
 template<int N>
 struct EducationalNotes {
-  constexpr EducationalNotes() : value() {
-    for (auto i = 0; i < N; ++i) value[i] = {};
+  constexpr EducationalNotes() : translations(), names() {
+    for (auto i = 0; i < N; ++i)
+      translations[i] = {};
+    for (auto i = 0; i < N; ++i)
+      names[i] = nullptr;
 #define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  value[LocalDiagID::DIAG] = DIAG##_educationalNotes;
+  translations[LocalDiagID::DIAG] = DIAG##_educationalNoteTranslations;        \
+  names[LocalDiagID::DIAG] = DIAG##_educationalNote;
 #include "swift/AST/EducationalNotes.def"
   }
-  const char *const *value[N];
+  const char *const *translations[N];
+  const char *names[N];
 };
 
 static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
-static constexpr auto educationalNotes = _EducationalNotes.value;
+static constexpr auto educationalNotes = _EducationalNotes.names;
+static constexpr auto educationalNoteTranslations =
+    _EducationalNotes.translations;
 
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
@@ -1024,12 +1032,11 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     
     SmallVector<std::string, 1> educationalNotePaths;
 
-    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-    while (associatedNotes && *associatedNotes) {
+    auto associatedNote = educationalNotes[(uint32_t)diagnostic.getID()];
+    if (associatedNote) {
       SmallString<128> notePath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(notePath, *associatedNotes);
+      llvm::sys::path::append(notePath, associatedNote);
       educationalNotePaths.push_back(notePath.str().str());
-      ++associatedNotes;
     }
     info->EducationalNotePaths = educationalNotePaths;
 
