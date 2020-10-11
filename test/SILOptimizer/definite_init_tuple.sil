@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct S<T> {
+  var x: (T, T)
+}
+
+sil [ossa] @$s19definite_init_tuple1SV1xx_xtvpfi : $@convention(thin) <T> () -> (@out T, @out T)
+
+sil [ossa] @$s19definite_init_tuple1SVACyxGycfC : $@convention(method) <T> (@thin S<T>.Type) -> @out S<T> {
+bb0(%0 : $*S<T>, %1 : $@thin S<T>.Type):
+  %2 = alloc_box $<τ_0_0> { var S<τ_0_0> } <T>, var, name "self"
+  %3 = mark_uninitialized [rootself] %2 : $<τ_0_0> { var S<τ_0_0> } <T>
+  %4 = project_box %3 : $<τ_0_0> { var S<τ_0_0> } <T>, 0
+  %5 = struct_element_addr %4 : $*S<T>, #S.x
+  %6 = function_ref @$s19definite_init_tuple1SV1xx_xtvpfi : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @out τ_0_0)
+  %7 = tuple_element_addr %5 : $*(T, T), 0
+  %8 = tuple_element_addr %5 : $*(T, T), 1
+  %9 = apply %6<T>(%7, %8) : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @out τ_0_0)
+  copy_addr %4 to [initialization] %0 : $*S<T>
+  destroy_value %3 : $<τ_0_0> { var S<τ_0_0> } <T>
+  %12 = tuple ()
+  return %12 : $()
+}
