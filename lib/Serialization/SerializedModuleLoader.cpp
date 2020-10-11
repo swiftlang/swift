@@ -973,13 +973,6 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                   isFramework, isSystemModule)) {
     return nullptr;
   }
-  if (dependencyTracker) {
-    // Don't record cached artifacts as dependencies.
-    StringRef DepPath = moduleInputBuffer->getBufferIdentifier();
-    if (!isCached(DepPath)) {
-      dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
-    }
-  }
 
   assert(moduleInputBuffer);
 
@@ -996,6 +989,18 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     M->addFile(*file);
   } else {
     M->setFailedToLoad();
+  }
+
+  if (dependencyTracker && file) {
+    auto DepPath = file->getFilename();
+    // Don't record cached artifacts as dependencies.
+    if (!isCached(DepPath)) {
+      if (M->hasIncrementalInfo()) {
+        dependencyTracker->addIncrementalDependency(DepPath);
+      } else {
+        dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
+      }
+    }
   }
   return M;
 }

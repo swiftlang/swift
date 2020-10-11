@@ -24,16 +24,20 @@
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
-#include "TypeChecker.h"
+#include "SolutionResult.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
@@ -49,14 +53,31 @@
 namespace swift {
 
 class Expr;
+class FuncDecl;
+class BraseStmt;
+enum class TypeCheckExprFlags;
 
 namespace constraints {
 
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
+class SolutionApplicationTarget;
 
 } // end namespace constraints
+
+// Forward declare some TypeChecker related functions
+// so they could be made friends of ConstraintSystem.
+namespace TypeChecker {
+
+Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+                                                        Type builderType);
+
+Optional<constraints::SolutionApplicationTarget>
+typeCheckExpression(constraints::SolutionApplicationTarget &target,
+                    OptionSet<TypeCheckExprFlags> options);
+
+} // end namespace TypeChecker
 
 } // end namespace swift
 
@@ -65,6 +86,57 @@ void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
                    size_t alignment = 8);
 
 namespace swift {
+
+/// This specifies the purpose of the contextual type, when specified to
+/// typeCheckExpression.  This is used for diagnostic generation to produce more
+/// specified error messages when the conversion fails.
+///
+enum ContextualTypePurpose {
+  CTP_Unused,           ///< No contextual type is specified.
+  CTP_Initialization,   ///< Pattern binding initialization.
+  CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
+  CTP_ReturnSingleExpr, ///< Value implicitly returned from a function.
+  CTP_YieldByValue,     ///< By-value yield operand.
+  CTP_YieldByReference, ///< By-reference yield operand.
+  CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
+  CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
+  CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
+
+  /// Default value in @autoclosure parameter
+  /// 'foo(a : @autoclosure () -> Int = 42)'.
+  CTP_AutoclosureDefaultParameter,
+
+  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
+  CTP_CallArgument,     ///< Call to function or operator requires type.
+  CTP_ClosureResult,    ///< Closure result expects a specific type.
+  CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
+  CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
+  CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
+  CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
+  CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
+  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
+                             ///< result type.
+  CTP_Condition,        ///< Condition expression of various statements e.g.
+                        ///< `if`, `for`, `while` etc.
+  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
+                        ///< is expected to conform to 'Sequence' protocol.
+  CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
+  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
+                               ///< former 'wrappedValue' type
+
+  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
+};
+
+/// Specify how we handle the binding of underconstrained (free) type variables
+/// within a solution to a constraint system.
+enum class FreeTypeVariableBinding {
+  /// Disallow any binding of such free type variables.
+  Disallow,
+  /// Allow the free type variables to persist in the solution.
+  Allow,
+  /// Bind the type variables to UnresolvedType to represent the ambiguity.
+  UnresolvedType
+};
 
 namespace constraints {
 
@@ -856,6 +928,14 @@ using OpenedTypeMap =
 struct ContextualTypeInfo {
   TypeLoc typeLoc;
   ContextualTypePurpose purpose;
+
+  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
+
+  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
+      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
+
+  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
+      : typeLoc(typeLoc), purpose(purpose) {}
 
   Type getType() const { return typeLoc.getType(); }
 };
@@ -2671,9 +2751,10 @@ private:
   friend Optional<BraceStmt *>
   swift::TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
+
   friend Optional<SolutionApplicationTarget>
-  swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
-                                          TypeCheckExprOptions options);
+  swift::TypeChecker::typeCheckExpression(
+      SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
@@ -4912,41 +4993,7 @@ private:
                                   llvm::function_ref<bool(Constraint *)> pred);
 
   bool isReadOnlyKeyPathComponent(const AbstractStorageDecl *storage,
-                                  SourceLoc referenceLoc) {
-    // See whether key paths can store to this component. (Key paths don't
-    // get any special power from being formed in certain contexts, such
-    // as the ability to assign to `let`s in initialization contexts, so
-    // we pass null for the DC to `isSettable` here.)
-    if (!getASTContext().isSwiftVersionAtLeast(5)) {
-      // As a source-compatibility measure, continue to allow
-      // WritableKeyPaths to be formed in the same conditions we did
-      // in previous releases even if we should not be able to set
-      // the value in this context.
-      if (!storage->isSettable(DC)) {
-        // A non-settable component makes the key path read-only, unless
-        // a reference-writable component shows up later.
-        return true;
-      }
-    } else if (!storage->isSettable(nullptr) ||
-               !storage->isSetterAccessibleFrom(DC)) {
-      // A non-settable component makes the key path read-only, unless
-      // a reference-writable component shows up later.
-      return true;
-    }
-    
-    // If the setter is unavailable, then the keypath ought to be read-only
-    // in this context.
-    if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-      auto maybeUnavail = TypeChecker::checkDeclarationAvailability(setter,
-                                                                    referenceLoc,
-                                                                    DC);
-      if (maybeUnavail.hasValue()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+                                  SourceLoc referenceLoc);
 
 public:
   // Given a type variable, attempt to find the disjunction of

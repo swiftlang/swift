@@ -299,3 +299,18 @@ struct OuterType {
     return optional.map { `Self`(string: $0) }
   }
 }
+
+// rdar://69804933 - CSApply assigns wrong type to MemberRefExpr for property with
+// DynamicSelfType
+class HasDynamicSelfProperty {
+  var me: Self {
+    return self
+  }
+}
+
+// SILGen doesn't care about the MemberRefExpr's type, so it's hard to come up with an
+// example that actually fails. Here, the rogue 'Self' type was diagnosed as being invalid
+// in a stored property initializer.
+class UsesDynamicSelfProperty {
+  var c = HasDynamicSelfProperty().me
+}

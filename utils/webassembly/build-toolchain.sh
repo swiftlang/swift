@@ -58,9 +58,6 @@ TARGET_BUILD_ROOT=$SOURCE_PATH/target-build
 HOST_BUILD_DIR=$HOST_BUILD_ROOT/Ninja-Release
 TARGET_BUILD_DIR=$TARGET_BUILD_ROOT/Ninja-Release
 
-# Avoid clang headers symlink issues
-mkdir -p "$HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0"
-
 build_host_toolchain() {
   # Build the host toolchain and SDK first.
   env SWIFT_BUILD_ROOT="$HOST_BUILD_ROOT" \

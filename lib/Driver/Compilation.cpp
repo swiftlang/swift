@@ -860,7 +860,7 @@ namespace driver {
           computeFirstRoundCompileJobsForIncrementalCompilation();
 
       for (const Job *Cmd : Comp.getJobs()) {
-        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
+        if (!isa<IncrementalJobAction>(Cmd->getSource()) ||
             compileJobsToSchedule.count(Cmd)) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
           noteBuilding(Cmd, /*willBeBuilding*/ true, /*isTentative=*/false,
@@ -899,20 +899,22 @@ namespace driver {
     CommandSet
     computeDependenciesAndGetNeededCompileJobs(const bool forRanges) {
       auto getEveryCompileJob = [&] {
-        CommandSet everyCompileJob;
+        CommandSet everyIncrementalJob;
         for (const Job *Cmd : Comp.getJobs()) {
-          if (!Cmd->getFirstSwiftPrimaryInput().empty())
-            everyCompileJob.insert(Cmd);
+          if (isa<IncrementalJobAction>(Cmd->getSource()))
+            everyIncrementalJob.insert(Cmd);
         }
-        return everyCompileJob;
+        return everyIncrementalJob;
       };
 
       CommandSet jobsToSchedule;
       CommandSet initialCascadingCommands;
       for (const Job *cmd : Comp.getJobs()) {
-        const StringRef primary = cmd->getFirstSwiftPrimaryInput();
-        if (primary.empty())
-          continue; // not Compile
+        // Skip jobs that have no associated incremental info.
+        if (!isa<IncrementalJobAction>(cmd->getSource())) {
+          continue;
+        }
+
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
             computeShouldInitiallyScheduleJobAndDependendents(cmd, forRanges);
         if (!shouldSchedAndIsCascading)
@@ -1161,10 +1163,6 @@ namespace driver {
           continue;
         }
 
-        // Is this module out of date? If not, just keep searching.
-        if (Comp.getLastBuildTime() >= depStatus.getLastModificationTime())
-          continue;
-
         // Can we run a cross-module incremental build at all? If not, fallback.
         if (!Comp.getEnableCrossModuleIncrementalBuild()) {
           fallbackToExternalBehavior(external);
@@ -1183,10 +1181,11 @@ namespace driver {
 
         // Cons up a fake `Job` to satisfy the incremental job tracing
         // code's internal invariants.
-        Job fakeJob(Comp.getDerivedOutputFileMap(), external);
+        const auto *externalJob = Comp.addExternalJob(
+            std::make_unique<Job>(Comp.getDerivedOutputFileMap(), external));
         auto subChanges =
             getFineGrainedDepGraph(forRanges).loadFromSwiftModuleBuffer(
-                &fakeJob, *buffer.get(), Comp.getDiags());
+                externalJob, *buffer.get(), Comp.getDiags());
 
         // If the incremental dependency graph failed to load, fall back to
         // treating this as plain external job.
@@ -1198,7 +1197,7 @@ namespace driver {
         for (auto *CMD :
              getFineGrainedDepGraph(forRanges)
                  .findJobsToRecompileWhenNodesChange(subChanges.getValue())) {
-          if (CMD == &fakeJob) {
+          if (CMD == externalJob) {
             continue;
           }
           ExternallyDependentJobs.push_back(CMD);
@@ -1718,6 +1717,12 @@ Compilation::~Compilation() = default;
 Job *Compilation::addJob(std::unique_ptr<Job> J) {
   Job *result = J.get();
   Jobs.emplace_back(std::move(J));
+  return result;
+}
+
+Job *Compilation::addExternalJob(std::unique_ptr<Job> J) {
+  Job *result = J.get();
+  ExternalJobs.emplace_back(std::move(J));
   return result;
 }
 

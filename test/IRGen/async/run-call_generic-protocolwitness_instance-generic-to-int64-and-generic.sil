@@ -1,0 +1,97 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+protocol P {
+  func printMe<T>(_ t: T) async -> (Int64, T)
+}
+
+extension P {
+  func callPrintMe<T>(_ t: T) async -> (Int64, T)
+}
+
+struct I : P {
+  @_hasStorage let int: Int64 { get }
+  func printMe<T>(_ t: T) async -> (Int64, T)
+  init(int: Int64)
+}
+
+sil hidden @I_printMe : $@convention(method) @async <T> (@in_guaranteed T, I) -> (Int64, @out T) {
+bb0(%out_addr : $*T, %in_addr : $*T, %self : $I):
+  %self_addr = alloc_stack $I
+  store %self to %self_addr : $*I
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %printGeneric_result = apply %printGeneric<I>(%self_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %self_addr : $*I
+  %value = struct_extract %self : $I, #I.int
+  copy_addr %in_addr to [initialization] %out_addr : $*T
+  return %value : $Int64
+}
+
+// CHECK-LL: define internal swiftcc void @I_P_printMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil private [transparent] [thunk] @I_P_printMe : $@convention(witness_method: P) @async <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed I) -> (Int64, @out τ_0_0) {
+bb0(%out_addr : $*τ_0_0, %in_addr : $*τ_0_0, %self_addr : $*I):
+  %self = load %self_addr : $*I
+  %I_printMe = function_ref @I_printMe : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, I) -> (Int64, @out τ_0_0)
+  %result = apply %I_printMe<τ_0_0>(%out_addr, %in_addr, %self) : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, I) -> (Int64, @out τ_0_0)
+  return %result : $Int64
+}
+
+sil hidden @callPrintMe : $@convention(thin) <T, U where T : P> (@in_guaranteed T, @in_guaranteed U) -> (Int64, @out U) {
+bb0(%out_addr : $*U, %self_addr : $*T, %in_addr : $*U):
+  %I_P_printMe = witness_method $T, #P.printMe : <Self where Self : P><T> (Self) -> (T) async -> (Int64, T) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> (Int64, @out τ_1_0)
+  %result = apply %I_P_printMe<T, U>(%out_addr, %in_addr, %self_addr) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> (Int64, @out τ_1_0)
+  return %result : $Int64
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %I_type = metatype $@thin I.Type
+  %int_literal = integer_literal $Builtin.Int64, 99
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %i = struct $I (%int : $Int64)
+  %out_addr = alloc_stack $I
+  %in_addr = alloc_stack $I
+  store %i to %in_addr : $*I
+  %i_addr = alloc_stack $I
+  store %i to %i_addr : $*I
+  %callPrintMe = function_ref @callPrintMe : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
+  %result = apply %callPrintMe<I, I>(%out_addr, %in_addr, %i_addr) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
+  dealloc_stack %i_addr : $*I
+  dealloc_stack %in_addr : $*I
+  %out = load %out_addr : $*I
+  dealloc_stack %out_addr : $*I
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 99
+  %out_addr_2 = alloc_stack $I
+  store %out to %out_addr_2 : $*I
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %printGeneric_result = apply %printGeneric<I>(%out_addr_2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // CHECK: I(int: 99)
+  dealloc_stack %out_addr_2 : $*I
+
+
+
+  %returnCode_literal = integer_literal $Builtin.Int32, 0
+  %returnCode = struct $Int32 (%returnCode_literal : $Builtin.Int32)
+  return %returnCode : $Int32
+}
+
+
+sil_witness_table hidden I: P module main {
+  method #P.printMe: <Self where Self : P><T> (Self) -> (T) async -> (Int64, T) : @I_P_printMe
+}

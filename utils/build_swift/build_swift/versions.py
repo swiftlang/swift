@@ -168,7 +168,7 @@ class InvalidVersionError(Exception):
 
 @functools.total_ordering
 class Version(object):
-    """Similar to the standard distutils.versons.LooseVersion, but with a
+    """Similar to the standard distutils.version.LooseVersion, but with a
     little more wiggle-room for alpha characters.
     """
 

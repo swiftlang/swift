@@ -1,0 +1,65 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+struct S {
+  @_hasStorage var storage: Int64 { get set }
+  func structinstanceSInt64ToVoid(_ int: Int64)
+  init(storage: Int64)
+}
+
+// CHECK-LL: define hidden swiftcc void @structinstanceSInt64ToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @structinstanceSInt64ToVoid : $@async @convention(method) (Int64, S) -> () {
+bb0(%int : $Int64, %self : $S):
+  %takeSAndInt64 = function_ref @takeSAndInt64 : $@convention(thin) (S, Int64) -> ()
+  %takeSAndInt64_result = apply %takeSAndInt64(%self, %int) : $@convention(thin) (S, Int64) -> ()
+  %out = tuple ()
+  return %out : $()
+}
+
+sil hidden @takeSAndInt64 : $@convention(thin) (S, Int64) -> () {
+bb0(%self : $S, %int : $Int64):
+  %s_addr = alloc_stack $S
+  store %self to %s_addr : $*S
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %printGeneric_result = apply %printGeneric<S>(%s_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // CHECK: S(storage: 987654321)
+  dealloc_stack %s_addr : $*S
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_result = apply %printInt64(%int) : $@convention(thin) (Int64) -> () // CHECK: 123456789
+  %out = tuple ()
+  return %out : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %s_type = metatype $@thin S.Type
+  %storage_literal = integer_literal $Builtin.Int64, 987654321
+  %storage = struct $Int64 (%storage_literal : $Builtin.Int64)
+  %s = struct $S (%storage : $Int64)
+  %int_literal = integer_literal $Builtin.Int64, 123456789
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %structinstanceSInt64ToVoid = function_ref @structinstanceSInt64ToVoid : $@async @convention(method) (Int64, S) -> ()
+  %result = apply %structinstanceSInt64ToVoid(%int, %s) : $@async @convention(method) (Int64, S) -> ()
+
+  %exitcode_literal = integer_literal $Builtin.Int32, 0
+  %exitcode = struct $Int32 (%exitcode_literal : $Builtin.Int32)
+  return %exitcode : $Int32
+}
+
+
+

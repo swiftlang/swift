@@ -1323,7 +1323,8 @@ bool swift::collectDestroys(SingleValueInstruction *inst,
 ///       not be needed anymore with OSSA.
 static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
                                         ArrayRef<SILInstruction *> paiUsers,
-                                        SILBuilderContext &builderCtxt) {
+                                        SILBuilderContext &builderCtxt,
+                                        InstModCallbacks callbacks) {
   SmallVector<Operand *, 8> argsToHandle;
   getConsumedPartialApplyArgs(pai, argsToHandle,
                               /*includeTrivialAddrArgs*/ false);
@@ -1357,7 +1358,7 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
 
     // Delay the destroy of the value (either as SSA value or in the stack-
     // allocated temporary) at the end of the partial_apply's lifetime.
-    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt);
+    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
   }
   return true;
 }
@@ -1406,7 +1407,8 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
            "partial_apply [stack] should have been handled before");
     SILBuilderContext builderCtxt(pai->getModule());
     if (needKeepArgsAlive) {
-      if (!keepArgsOfPartialApplyAlive(pai, closureDestroys, builderCtxt))
+      if (!keepArgsOfPartialApplyAlive(pai, closureDestroys, builderCtxt,
+                                       callbacks))
         return false;
     } else {
       // A preceeding partial_apply -> apply conversion (done in

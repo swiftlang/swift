@@ -11,6 +11,9 @@
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
 @property(readwrite) void (^completionHandler)(NSInteger);
+
+-(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
+-(NSInteger)doSomethingConflicted:(NSString *)operation;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -19,6 +22,13 @@
 - (void)refrigerator:(id)fridge didGetFilledWithIntegers:(NSInteger *)items count:(NSInteger)count;
 - (void)refrigerator:(id)fridge willAddItem:(id)item;
 - (BOOL)refrigerator:(id)fridge didRemoveItem:(id)item;
+@end
+
+@protocol ConcurrentProtocol
+-(void)askUserToSolvePuzzle:(NSString *)puzzle completionHandler:(void (^ _Nullable)(NSString * _Nullable, NSError * _Nullable))completionHandler;
+
+@optional
+-(void)askUserToJumpThroughHoop:(NSString *)hoop completionHandler:(void (^ _Nullable)(NSString *))completionHandler;
 @end
 
 #pragma clang assume_nonnull end

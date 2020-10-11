@@ -268,9 +268,6 @@ enum class MatchKind : uint8_t {
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
 
-  /// The witness is part of actor-isolated state.
-  ActorIsolatedWitness,
-
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
   
@@ -503,7 +500,6 @@ struct RequirementMatch {
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
@@ -536,7 +532,6 @@ struct RequirementMatch {
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-    case MatchKind::ActorIsolatedWitness:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
       return false;
@@ -678,6 +673,12 @@ public:
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
+public:
+  /// Key that can be used to uniquely identify a particular Objective-C
+  /// method.
+  using ObjCMethodKey = std::pair<ObjCSelector, char>;
+
+private:
   friend class MultiConformanceChecker;
   friend class AssociatedTypeInference;
 
@@ -711,6 +712,14 @@ class ConformanceChecker : public WitnessChecker {
 
   /// Whether we checked the requirement signature already.
   bool CheckedRequirementSignature = false;
+
+  /// Mapping from Objective-C methods to the set of requirements within this
+  /// protocol that have the same selector and instance/class designation.
+  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
+    objcMethodRequirements;
+
+  /// Whether objcMethodRequirements has been computed.
+  bool computedObjCMethodRequirements = false;
 
   /// Retrieve the associated types that are referenced by the given
   /// requirement with a base of 'Self'.
@@ -789,7 +798,10 @@ class ConformanceChecker : public WitnessChecker {
 
 public:
   /// Call this to diagnose currently known missing witnesses.
-  void diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
+  ///
+  /// \returns true if any witnesses were diagnosed.
+  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
+
   /// Emit any diagnostics that have been delayed.
   void emitDelayedDiags();
 
@@ -824,6 +836,13 @@ public:
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
+
+  /// Retrieve the Objective-C method key from the given function.
+  ObjCMethodKey getObjCMethodKey(AbstractFunctionDecl *func);
+
+  /// Retrieve the Objective-C requirements in this protocol that have the
+  /// given Objective-C method key.
+  ArrayRef<AbstractFunctionDecl *> getObjCRequirements(ObjCMethodKey key);
 };
 
 /// Captures the state needed to infer associated types.

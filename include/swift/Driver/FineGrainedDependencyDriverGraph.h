@@ -278,8 +278,6 @@ private:
     assert(swiftDeps.hasValue() && "Don't call me for expats.");
     auto iter = jobsBySwiftDeps.find(swiftDeps.getValue());
     assert(iter != jobsBySwiftDeps.end() && "All jobs should be tracked.");
-    assert(getSwiftDeps(iter->second) == swiftDeps.getValue() &&
-           "jobsBySwiftDeps should be inverse of getSwiftDeps.");
     return iter->second;
   }
 
@@ -468,7 +466,7 @@ public:
   void printPath(raw_ostream &out, const driver::Job *node) const;
 
   /// Get a printable filename, given a node's swiftDeps.
-  StringRef getProvidingFilename(Optional<std::string> swiftDeps) const;
+  StringRef getProvidingFilename(const Optional<std::string> &swiftDeps) const;
 
   /// Print one node on the dependency path.
   static void printOneNodeOfPath(raw_ostream &out, const DependencyKey &key,

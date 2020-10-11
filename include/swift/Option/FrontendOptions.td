@@ -758,4 +758,8 @@ def candidate_module_file
 def use_static_resource_dir
   : Flag<["-"], "use-static-resource-dir">,
     HelpText<"Use resources in the static resource directory">;
+
+def disable_building_interface
+  : Flag<["-"], "disable-building-interface">,
+    HelpText<"Disallow building binary module from textual interface">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -6,12 +6,14 @@ sudo apt update
 
 if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
   sudo apt install -y \
-    git ninja-build clang python python-six \
+    git ninja-build clang-10 python python-six \
     uuid-dev libicu-dev icu-devtools libbsd-dev \
     libedit-dev libxml2-dev libsqlite3-dev swig \
     libpython-dev libncurses5-dev pkg-config \
     libblocksruntime-dev libcurl4-openssl-dev \
-    systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+    systemtap-sdt-dev tzdata rsync wget llvm-10 zip unzip
+  sudo ln -s -f /usr/bin/clang-10 /usr/bin/clang
+  sudo ln -s -f /usr/bin/clang++-10 /usr/bin/clang++
 elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
   sudo apt install -y \
     git ninja-build clang python python-six \
