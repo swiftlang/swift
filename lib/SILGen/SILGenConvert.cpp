@@ -1354,7 +1354,25 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
   switch (outerConversion.getKind()) {
   case Conversion::OrigToSubst:
   case Conversion::SubstToOrig:
-    // TODO: peephole these when the abstraction patterns are the same!
+    switch (innerConversion.getKind()) {
+    case Conversion::OrigToSubst:
+    case Conversion::SubstToOrig:
+      if (innerConversion.getKind() == outerConversion.getKind())
+        break;
+
+      if (innerConversion.getReabstractionOrigType().getCachingKey() !=
+          outerConversion.getReabstractionOrigType().getCachingKey() ||
+          innerConversion.getReabstractionSubstType() !=
+          outerConversion.getReabstractionSubstType()) {
+        break;
+      }
+
+      return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
+
+    default:
+      break;
+    }
+
     return None;
 
   case Conversion::AnyErasure:
