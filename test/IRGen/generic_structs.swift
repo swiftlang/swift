@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -DINT_32=i32
+// RUN: %target-swift-frontend -disable-type-layout -primary-file %s -emit-ir
 
 struct A<T1, T2>
 {
@@ -37,13 +37,3 @@ public struct GenericStruct<T : Proto> {
 
   public init() {}
 }
-
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s15generic_structs13GenericStructVACyxGycfC"
-// CHECK:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15generic_structs13GenericStructVMa"([[INT]] 0, %swift.type* %T, i8** %T.Proto)
-// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to [[INT_32]]*
-// CHECK:  [[FIELDOFFSET:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[PTR]], [[INT]] [[IDX:6|10]]
-// CHECK:  [[OFFSET:%.*]] = load [[INT_32]], [[INT_32]]* [[FIELDOFFSET]]
-// CHECK:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, [[INT_32]] [[OFFSET]]
-// CHECK:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
-// CHECK:  call %TSq* @"$sxSg15generic_structs5ProtoRzlWOb"(%TSq* {{.*}}, %TSq* [[OPTPTR]]

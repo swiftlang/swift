@@ -580,13 +580,11 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
-  // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
-  // CHECK:   [[CANARY_ACCESS:%.*]] = begin_access [modify] [dynamic] [[CANARY_ADDR]]
-  // CHECK:   assign [[OPT_CANARY]] to [[CANARY_ACCESS]]
-  // CHECK:   end_access [[CANARY_ACCESS]]
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
+  // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
+  // CHECK:   store [[OPT_CANARY]] to [init] [[CANARY_ADDR]]
   // CHECK:   end_borrow [[SELF]]
   //
   // Now we perform the unwrap.
@@ -624,13 +622,11 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
-  // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
-  // CHECK:   [[CANARY_ACCESS:%.*]] = begin_access [modify] [dynamic] [[CANARY_ADDR]]
-  // CHECK:   assign [[OPT_CANARY]] to [[CANARY_ACCESS]]
-  // CHECK:   end_access [[CANARY_ACCESS]]
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
+  // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
+  // CHECK:   store [[OPT_CANARY]] to [init] [[CANARY_ADDR]]
   // CHECK:   end_borrow [[SELF]]
   //
   // Now we begin argument emission where we perform the unwrap.
