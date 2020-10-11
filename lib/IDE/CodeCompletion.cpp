@@ -2036,8 +2036,8 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
-    SmallVector<ModuleDecl::ImportedModule, 16> Imported;
-    SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
+    SmallVector<ImportedModule, 16> Imported;
+    SmallVector<ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(
         Imported,
         {ModuleDecl::ImportFilterKind::Exported,
@@ -5923,7 +5923,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 
   for (auto &Request: Lookup.RequestedCachedResults) {
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
-    auto handleImport = [&](ModuleDecl::ImportedModule Import) {
+    auto handleImport = [&](ImportedModule Import) {
       ModuleDecl *TheModule = Import.importedModule;
       ImportPath::Access Path = Import.accessPath;
       if (TheModule->getFiles().empty())
@@ -5991,7 +5991,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
         Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
-      SmallVector<ModuleDecl::ImportedModule, 4> Imports;
+      SmallVector<ImportedModule, 4> Imports;
       SF.getImportedModules(
           Imports, {ModuleDecl::ImportFilterKind::Exported,
                     ModuleDecl::ImportFilterKind::Default,

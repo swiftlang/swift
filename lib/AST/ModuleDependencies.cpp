@@ -62,8 +62,7 @@ void ModuleDependencies::addModuleDependencies(
     if (!importDecl)
       continue;
 
-    addModuleDependency(importDecl->getModulePath().front().Item.str(),
-                        &alreadyAddedModules);
+    addModuleDependency(importDecl->getModulePath(), &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();

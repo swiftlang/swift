@@ -14,6 +14,7 @@
 #define SWIFT_AST_SOURCEFILE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/SetVector.h"
@@ -32,58 +33,6 @@ class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
 public:
-  /// Possible attributes for imports in source files.
-  enum class ImportFlags {
-    /// The imported module is exposed to anyone who imports the parent module.
-    Exported = 0x1,
-
-    /// This source file has access to testable declarations in the imported
-    /// module.
-    Testable = 0x2,
-
-    /// This source file has access to private declarations in the imported
-    /// module.
-    PrivateImport = 0x4,
-
-    /// The imported module is an implementation detail of this file and should
-    /// not be required to be present if the main module is ever imported
-    /// elsewhere.
-    ///
-    /// Mutually exclusive with Exported.
-    ImplementationOnly = 0x8,
-
-    // The module is imported to have access to named SPIs which is an
-    // implementation detail of this file.
-    SPIAccessControl = 0x10,
-
-    /// Used for DenseMap.
-    Reserved = 0x80
-  };
-
-  /// \see ImportFlags
-  using ImportOptions = OptionSet<ImportFlags>;
-
-  struct ImportedModuleDesc {
-    ModuleDecl::ImportedModule module;
-    ImportOptions importOptions;
-
-    // Filename for a @_private import.
-    StringRef filename;
-
-    // Names of explicitly imported SPIs.
-    ArrayRef<Identifier> spiGroups;
-
-    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename = {},
-                       ArrayRef<Identifier> spiGroups = {})
-        : module(module), importOptions(options), filename(filename),
-          spiGroups(spiGroups) {
-      assert(!(importOptions.contains(ImportFlags::Exported) &&
-               importOptions.contains(ImportFlags::ImplementationOnly)) ||
-             importOptions.contains(ImportFlags::Reserved));
-    }
-  };
-
   /// Flags that direct how the source file is parsed.
   enum class ParsingFlags : uint8_t {
     /// Whether to disable delayed parsing for nominal type, extension, and
@@ -133,7 +82,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is \c None until it is filled in by the import resolution phase.
-  Optional<ArrayRef<ImportedModuleDesc>> Imports;
+  Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -339,11 +288,13 @@ public:
   ~SourceFile();
 
   /// Retrieve an immutable view of the source file's imports.
-  ArrayRef<ImportedModuleDesc> getImports() const { return *Imports; }
+  ArrayRef<AttributedImport<ImportedModule>> getImports() const {
+    return *Imports;
+  }
 
   /// Set the imports for this source file. This gets called by import
   /// resolution.
-  void setImports(ArrayRef<ImportedModuleDesc> imports);
+  void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -447,7 +398,7 @@ public:
   getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+  getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
   virtual void
@@ -659,61 +610,5 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
 } // end namespace swift
-
-namespace llvm {
-
-template<>
-struct DenseMapInfo<swift::SourceFile::ImportOptions> {
-  using ImportOptions = swift::SourceFile::ImportOptions;
-
-  using UnsignedDMI = DenseMapInfo<uint8_t>;
-
-  static inline ImportOptions getEmptyKey() {
-    return ImportOptions(UnsignedDMI::getEmptyKey());
-  }
-  static inline ImportOptions getTombstoneKey() {
-    return ImportOptions(UnsignedDMI::getTombstoneKey());
-  }
-  static inline unsigned getHashValue(ImportOptions options) {
-    return UnsignedDMI::getHashValue(options.toRaw());
-  }
-  static bool isEqual(ImportOptions a, ImportOptions b) {
-    return UnsignedDMI::isEqual(a.toRaw(), b.toRaw());
-  }
-};
-
-template<>
-struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
-  using ImportedModuleDesc = swift::SourceFile::ImportedModuleDesc;
-
-  using ImportedModuleDMI = DenseMapInfo<swift::ModuleDecl::ImportedModule>;
-  using ImportOptionsDMI = DenseMapInfo<swift::SourceFile::ImportOptions>;
-  using StringRefDMI = DenseMapInfo<StringRef>;
-
-  static inline ImportedModuleDesc getEmptyKey() {
-    return ImportedModuleDesc(ImportedModuleDMI::getEmptyKey(),
-                              ImportOptionsDMI::getEmptyKey(),
-                              StringRefDMI::getEmptyKey());
-  }
-  static inline ImportedModuleDesc getTombstoneKey() {
-    return ImportedModuleDesc(ImportedModuleDMI::getTombstoneKey(),
-                              ImportOptionsDMI::getTombstoneKey(),
-                              StringRefDMI::getTombstoneKey());
-  }
-  static inline unsigned getHashValue(const ImportedModuleDesc &import) {
-    return detail::combineHashValue(
-        ImportedModuleDMI::getHashValue(import.module),
-        detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.importOptions),
-            StringRefDMI::getHashValue(import.filename)));
-  }
-  static bool isEqual(const ImportedModuleDesc &a,
-                      const ImportedModuleDesc &b) {
-    return ImportedModuleDMI::isEqual(a.module, b.module) &&
-           ImportOptionsDMI::isEqual(a.importOptions, b.importOptions) &&
-           StringRefDMI::isEqual(a.filename, b.filename);
-  }
-};
-}
 
 #endif

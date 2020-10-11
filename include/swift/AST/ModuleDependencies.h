@@ -19,6 +19,7 @@
 #define SWIFT_AST_MODULE_DEPENDENCIES_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Import.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
@@ -329,6 +330,12 @@ public:
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,
                            llvm::StringSet<> *alreadyAddedModules = nullptr);
+
+  /// Add a dependency on the given module, if it was not already in the set.
+  void addModuleDependency(ImportPath::Module module,
+                           llvm::StringSet<> *alreadyAddedModules = nullptr) {
+    addModuleDependency(module.front().Item.str(), alreadyAddedModules);
+  }
 
   /// Add all of the module dependencies for the imports in the given source
   /// file to the set of module dependencies.

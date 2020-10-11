@@ -347,14 +347,14 @@ ImportDepth::ImportDepth(ASTContext &context,
   // Imports from -import-name such as Playground auxiliary sources are treated
   // specially by applying import depth 0.
   llvm::StringSet<> auxImports;
-  for (StringRef moduleName :
+  for (const auto &pair :
        invocation.getFrontendOptions().getImplicitImportModuleNames())
-    auxImports.insert(moduleName);
+    auxImports.insert(pair.first);
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
   // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
-  SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
+  SmallVector<ImportedModule, 16> mainImports;
   main->getImportedModules(mainImports,
                            {ModuleDecl::ImportFilterKind::Default,
                             ModuleDecl::ImportFilterKind::ImplementationOnly});
@@ -384,7 +384,7 @@ ImportDepth::ImportDepth(ASTContext &context,
     }
 
     // Add imports to the worklist.
-    SmallVector<ModuleDecl::ImportedModule, 16> imports;
+    SmallVector<ImportedModule, 16> imports;
     module->getImportedModules(imports);
     for (auto &import : imports) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap

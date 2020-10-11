@@ -2538,30 +2538,11 @@ public:
   }
 };
 
-/// A module which has been implicitly imported.
-struct ImplicitImport {
-  using ImportOptions = SourceFile::ImportOptions;
-
-  ModuleDecl *Module;
-  ImportOptions Options;
-
-  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
-      : Module(module), Options(opts) {}
-
-  friend bool operator==(const ImplicitImport &lhs,
-                         const ImplicitImport &rhs) {
-    return lhs.Module == rhs.Module &&
-           lhs.Options.toRaw() == rhs.Options.toRaw();
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
-
 /// Computes the loaded modules that should be implicitly imported by each file
 /// of a given module.
 class ModuleImplicitImportsRequest
     : public SimpleRequest<ModuleImplicitImportsRequest,
-                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           ImplicitImportList(ModuleDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2569,8 +2550,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<ImplicitImport>
-  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+  ImplicitImportList evaluate(Evaluator &evaluator, ModuleDecl *module) const;
 
 public:
   // Cached.
