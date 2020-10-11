@@ -242,6 +242,9 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
+    if (auto *backingVar = PD->getPropertyWrapperBackingProperty())
+      PD = cast<ParamDecl>(backingVar);
+
     auto type = PD->getType();
 
     assert(type->isMaterializable());
