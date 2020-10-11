@@ -58,7 +58,7 @@ EDUCATIONAL_NOTES(cannot_infer_closure_result_type,
 
 EDUCATIONAL_NOTES(invalid_dynamic_callable_type,
                   "dynamic-callable-requirements.md",
-                  "en")
+                  "en", "test")
 EDUCATIONAL_NOTES(missing_dynamic_callable_kwargs_method,
                   "dynamic-callable-requirements.md",
                   "en")

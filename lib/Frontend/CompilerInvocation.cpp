@@ -961,7 +961,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     // Check if the locale code is available.
     if (llvm::none_of(localeCodes, [&](const char *locale) {
           return localeCode == locale;
-        })) {
+        }) && localeCode != "test") {
       std::string availableLocaleCodes = "";
       llvm::interleave(
           std::begin(localeCodes), std::end(localeCodes),
