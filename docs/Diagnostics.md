@@ -115,11 +115,17 @@ To add a new educational note:
     - An entry in a `Diagnostics*.def` file describing the diagnostic. If there are any closely related diagnostics the note should also be attached to, they can usually be found nearby.
     - Each point in the compiler source where the diagnostic is emitted. This can be helpful in determining the exact circumstances which cause it to be emitted.
 4. Add a new Markdown file in the `userdocs/diagnostics/` directory in the swift repository containing the contents of the note. When writing a note, keep the writing guidelines from the section above in mind. The existing notes in the directory are another useful guide.
-5. Associate the note with the appropriate diagnostics in `EducationalNotes.def`. An entry like `EDUCATIONAL_NOTES(property_wrapper_failable_init, "property-wrapper-requirements.md")` will associate the note with filename `property-wrapper-requirements.md` with the diagnostic having an internal identifier of `property_wrapper_failable_init`.
+5. Associate the note with the appropriate diagnostics in `EducationalNotes.def`. An entry like `EDUCATIONAL_NOTES(property_wrapper_failable_init, "property-wrapper-requirements.md", "en")` will associate the note with filename `property-wrapper-requirements.md` with the diagnostic having an internal identifier of `property_wrapper_failable_init`.
 6. If possible, rebuild the compiler and try recompiling your test program with `-print-educational-notes`. Your new note should appear after the diagnostic in the terminal.
 7. That's it! The new note is now ready to be submitted as a pull request on GitHub.
 
 If you run into any issues or have questions while following the steps above, feel free to post a question on the Swift forums or open a work-in-progress pull request on GitHub.
+
+### Localizing Educational Notes ###
+
+To add a localization of an educational note:
+1. Add a file to the `userdocs/diagnostics/<language code>/` directory with the contents of the localized note, where <language code> is an [ISO 639-1](https://en.wikipedia.org/wiki/ISO_639-1) language code. The localized note should have the same filename as the english version.
+2. In `EducationalNotes.def`, add the language code to the end of the list corresponding to the relevant diagnostics. 
 
 ### Format Specifiers ###
 
