@@ -217,6 +217,13 @@ module WinSDK [system] {
     link "WinMM.Lib"
   }
 
+  module Networking {
+    header "winnetwk.h"
+    export *
+
+    link "Mpr.Lib"
+  }
+
   module Security {
     module AuthZ {
       header "AuthZ.h"
