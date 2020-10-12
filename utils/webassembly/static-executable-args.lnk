@@ -1,6 +1,5 @@
 -static
 -lswiftCore
--lswiftImageInspectionShared
 -lswiftSwiftOnoneSupport
 -lswiftWasiPthread
 -licuuc
