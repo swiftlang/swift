@@ -13,24 +13,42 @@
 #include "SemaFixture.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
-#include "swift/Strings.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/LLVMInitialize.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
 using namespace swift::unittest;
 
+using ModuleDecl = SourceFile::ImportedModuleDesc;
+
 SemaTest::SemaTest()
     : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
                                ClangImporterOpts, SourceMgr, Diags)) {
+  INITIALIZE_LLVM();
+
   registerParseRequestFunctions(Context.evaluator);
   registerTypeCheckerRequestFunctions(Context.evaluator);
-  auto stdlibID = Context.getIdentifier(STDLIB_NAME);
-  auto *module = ModuleDecl::create(stdlibID, Context);
-  Context.addLoadedModule(module);
 
-  FileForLookups = new (Context) SourceFile(*module, SourceFileKind::Library,
-                                            /*buffer*/ None);
-  module->addFile(*FileForLookups);
+  Context.addModuleLoader(ImplicitSerializedModuleLoader::create(Context));
+  Context.addModuleLoader(ClangImporter::create(Context), /*isClang=*/true);
+
+  auto *stdlib = Context.getStdlibModule(/*loadIfAbsent=*/true);
+  assert(stdlib && "Failed to load standard library");
+
+  auto *module =
+      ModuleDecl::create(Context.getIdentifier("SemaTests"), Context);
+
+  MainFile = new (Context) SourceFile(*module, SourceFileKind::Main,
+                                      /*buffer=*/None);
+
+  auto stdlibImport =
+      ModuleDesc({ImportPath::Access(), stdlib}, /*options=*/{});
+
+  MainFile->setImports(stdlibImport);
+  module->addFile(*MainFile);
 
   DC = module;
 }

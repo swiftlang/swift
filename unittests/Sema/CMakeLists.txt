@@ -4,4 +4,9 @@ add_swift_unittest(swiftSemaTests
 
 target_link_libraries(swiftSemaTests
   PRIVATE
-    swiftSema)
+    swiftAST
+    swiftSema
+    swiftSerialization)
+
+target_compile_definitions(swiftSemaTests PRIVATE
+  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")

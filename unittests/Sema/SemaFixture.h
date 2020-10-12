@@ -15,9 +15,14 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/Path.h"
 #include "gtest/gtest.h"
+#include <string>
 
 namespace swift {
 namespace unittest {
@@ -33,12 +38,20 @@ public:
 
   SemaTestBase() : Diags(SourceMgr) {
     LangOpts.Target = llvm::Triple(llvm::sys::getProcessTriple());
+
+    llvm::SmallString<128> libDir(SWIFTLIB_DIR);
+    llvm::sys::path::append(libDir, getPlatformNameForTriple(LangOpts.Target));
+
+    SearchPathOpts.RuntimeResourcePath = SWIFTLIB_DIR;
+    SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(libDir.str()));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(
+        std::string(libDir.str()));
   }
 };
 
 /// Owns an ASTContext and the associated types.
 class SemaTest : public SemaTestBase {
-  SourceFile *FileForLookups;
+  SourceFile *MainFile;
 
 public:
   ASTContext &Context;
