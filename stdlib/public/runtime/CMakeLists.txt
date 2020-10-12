@@ -81,59 +81,11 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
-set(static_binary_lnk_file_list)
-set(static_binary_dependencies_list)
 macro(add_image_inspection_shared sdk primary_arch inspection_file linkfile_src)
-  if(${inspection_file} IN_LIST swift_runtime_sources)
-    list(REMOVE_ITEM swift_runtime_sources ${inspection_file})
-  endif()
+  set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
 
-  # These two libraries are only used with the static swiftcore
-  add_swift_target_library(swiftImageInspectionShared STATIC
-    ${inspection_file}
-    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    TARGET_SDKS ${sdk}
-    INSTALL_IN_COMPONENT stdlib)
-
-  foreach(arch IN LISTS SWIFT_SDK_${sdk}_ARCHITECTURES)
-    set(FragileSupportLibrary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch})
-    set(LibraryLocation ${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${arch})
-
-    add_custom_command_target(swift_image_inspection_${lowercase_sdk}_${arch}_static
-      COMMAND
-        "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:${FragileSupportLibrary}> ${LibraryLocation}
-      OUTPUT
-        "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
-      DEPENDS
-         ${FragileSupportLibrary})
-
-    list(APPEND static_binary_dependencies_list ${swift_image_inspection_${lowercase_sdk}_${arch}_static})
-    add_dependencies(stdlib ${FragileSupportLibrary})
-    swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibrary}>
-                               DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}"
-                               COMPONENT stdlib)
-  endforeach()
-
-  if(NOT "${primary_arch}" STREQUAL "")
-    set(FragileSupportLibraryPrimary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${primary_arch})
-    set(LibraryLocationPrimary ${SWIFTSTATICLIB_DIR}/${lowercase_sdk})
-    add_custom_command_target(swift_image_inspection_static_${lowercase_sdk}_primary_arch
-        COMMAND
-           "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:${FragileSupportLibraryPrimary}> ${LibraryLocationPrimary}
-        OUTPUT
-        "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
-        DEPENDS
-           ${FragileSupportLibraryPrimary})
-       list(APPEND static_binary_dependencies_list ${swift_image_inspection_static_${lowercase_sdk}_primary_arch})
-    add_dependencies(stdlib ${FragileSupportLibraryPrimary})
-    swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
-                               DESTINATION "lib/swift_static/${lowercase_sdk}"
-                               COMPONENT stdlib)
-  endif()
-
+  # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
   add_custom_command_target(swift_static_binary_${sdk}_args
     COMMAND
@@ -149,14 +101,6 @@ macro(add_image_inspection_shared sdk primary_arch inspection_file linkfile_src)
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                              DESTINATION "lib/swift_static/${lowercase_sdk}"
                              COMPONENT stdlib)
-
-  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY
-    ${inspection_file}
-    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    TARGET_SDKS ${sdk}
-    INSTALL_IN_COMPONENT never_install)
 endmacro()
 
 set(is_image_inspection_required)
@@ -194,7 +138,7 @@ foreach(sdk IN LISTS SWIFT_SDKS)
 endforeach()
 
 if(is_image_inspection_required)
-  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list} ${static_binary_dependencies_list})
+  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
   add_dependencies(stdlib static_binary_magic)
 endif()
 
@@ -338,7 +282,6 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
 -ldl
 -lpthread
 -lswiftCore
--lswiftImageInspectionShared
 ${libicu_i18n_a}
 ${libicu_uc_a}
 ${libicu_data_a}

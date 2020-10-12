@@ -28,12 +28,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     endif()
   endif()
 
-  set(swift_runtime_test_extra_libraries)
-  if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    list(APPEND swift_runtime_test_extra_libraries 
-      $<TARGET_FILE:swiftImageInspectionShared-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}>)
-  endif()
-
   add_subdirectory(LongTests)
 
   set(PLATFORM_SOURCES)
@@ -94,7 +88,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
-    ${swift_runtime_test_extra_libraries}
     )
 endif()
 
