@@ -1147,6 +1147,13 @@ public:
   llvm::Value *getIndirectResult(unsigned index) override {
     return allParamValues.claimNext();
   };
+  llvm::Value *
+  getNextPolymorphicParameter(GenericRequirement &requirement) override {
+    return allParamValues.claimNext();
+  }
+  llvm::Value *getNextPolymorphicParameterAsMetadata() override {
+    return allParamValues.claimNext();
+  }
 };
 class AsyncEntryPointArgumentEmission
     : public virtual EntryPointArgumentEmission {
@@ -1206,6 +1213,7 @@ class AsyncNativeCCEntryPointArgumentEmission final
   llvm::Value *context;
   /*const*/ AsyncContextLayout layout;
   const Address dataAddr;
+  unsigned polymorphicParameterIndex = 0;
 
   llvm::Value *loadValue(ElementLayout layout) {
     Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
@@ -1247,6 +1255,46 @@ public:
     llvm_unreachable("async function do not need to lower direct SIL results "
                      "into indirect IR results because all results are already "
                      "indirected through the context");
+  }
+  Address getNextUncastBinding() {
+    auto index = polymorphicParameterIndex;
+    ++polymorphicParameterIndex;
+
+    assert(layout.hasBindings());
+
+    auto bindingLayout = layout.getBindingsLayout();
+    auto bindingsAddr = bindingLayout.project(IGF, dataAddr, /*offsets*/ None);
+    auto erasedBindingsAddr =
+        IGF.Builder.CreateBitCast(bindingsAddr, IGF.IGM.Int8PtrPtrTy);
+    auto uncastBindingAddr = IGF.Builder.CreateConstArrayGEP(
+        erasedBindingsAddr, index, IGF.IGM.getPointerSize());
+    return uncastBindingAddr;
+  }
+  llvm::Value *castUncastBindingToMetadata(Address uncastBindingAddr) {
+    auto bindingAddrAddr = IGF.Builder.CreateBitCast(
+        uncastBindingAddr.getAddress(), IGF.IGM.TypeMetadataPtrPtrTy);
+    auto bindingAddr =
+        IGF.Builder.CreateLoad(bindingAddrAddr, IGF.IGM.getPointerAlignment());
+    return bindingAddr;
+  }
+  llvm::Value *castUncastBindingToWitnessTable(Address uncastBindingAddr) {
+    auto bindingAddrAddr = IGF.Builder.CreateBitCast(
+        uncastBindingAddr.getAddress(), IGF.IGM.WitnessTablePtrPtrTy);
+    auto bindingAddr =
+        IGF.Builder.CreateLoad(bindingAddrAddr, IGF.IGM.getPointerAlignment());
+    return bindingAddr;
+  }
+  llvm::Value *
+  getNextPolymorphicParameter(GenericRequirement &requirement) override {
+    auto uncastBindingAddr = getNextUncastBinding();
+    if (requirement.Protocol) {
+      return castUncastBindingToWitnessTable(uncastBindingAddr);
+    } else {
+      return castUncastBindingToMetadata(uncastBindingAddr);
+    }
+  }
+  llvm::Value *getNextPolymorphicParameterAsMetadata() override {
+    return castUncastBindingToMetadata(getNextUncastBinding());
   }
   llvm::Value *getIndirectResult(unsigned index) override {
     auto fieldLayout = layout.getIndirectReturnLayout(index);
@@ -1675,13 +1723,13 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Bind polymorphic arguments.  This can only be done after binding
   // all the value parameters.
   if (hasPolymorphicParameters(funcTy)) {
-    emitPolymorphicParameters(IGF, *IGF.CurSILFn, allParamValues,
-                              &witnessMetadata,
-      [&](unsigned paramIndex) -> llvm::Value* {
-        SILValue parameter =
-          IGF.CurSILFn->getArgumentsWithoutIndirectResults()[paramIndex];
-        return IGF.getLoweredSingletonExplosion(parameter);
-      });
+    emitPolymorphicParameters(
+        IGF, *IGF.CurSILFn, *emission, &witnessMetadata,
+        [&](unsigned paramIndex) -> llvm::Value * {
+          SILValue parameter =
+              IGF.CurSILFn->getArgumentsWithoutIndirectResults()[paramIndex];
+          return IGF.getLoweredSingletonExplosion(parameter);
+        });
   }
 
   assert(allParamValues.empty() && "didn't claim all parameters!");
@@ -1776,7 +1824,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   // all the value parameters, and must be done even for non-polymorphic
   // functions because of imported Objective-C generics.
   emitPolymorphicParameters(
-      IGF, *IGF.CurSILFn, params, nullptr,
+      IGF, *IGF.CurSILFn, *emission, nullptr,
       [&](unsigned paramIndex) -> llvm::Value * {
         SILValue parameter = entry->getArguments()[paramIndex];
         return IGF.getLoweredSingletonExplosion(parameter);

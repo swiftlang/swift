@@ -489,7 +489,8 @@ class EmitPolymorphicParameters : public PolymorphicConvention {
 public:
   EmitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn);
 
-  void emit(Explosion &in, WitnessMetadata *witnessMetadata,
+  void emit(EntryPointArgumentEmission &emission,
+            WitnessMetadata *witnessMetadata,
             const GetParameterFn &getParameter);
 
 private:
@@ -499,7 +500,8 @@ private:
 
   /// Fulfill local type data from any extra information associated with
   /// the given source.
-  void bindExtraSource(const MetadataSource &source, Explosion &in,
+  void bindExtraSource(const MetadataSource &source,
+                       EntryPointArgumentEmission &emission,
                        WitnessMetadata *witnessMetadata);
 
   void bindParameterSources(const GetParameterFn &getParameter);
@@ -528,9 +530,9 @@ CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) cons
       IGM.getSILModule(), FnType, IGM.getMaximalTypeExpansionContext()));
 }
 
-void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
-                                                Explosion &in,
-                                         WitnessMetadata *witnessMetadata) {
+void EmitPolymorphicParameters::bindExtraSource(
+    const MetadataSource &source, EntryPointArgumentEmission &emission,
+    WitnessMetadata *witnessMetadata) {
   switch (source.getKind()) {
     case MetadataSource::Kind::Metadata:
     case MetadataSource::Kind::ClassPointer:
@@ -540,7 +542,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
     case MetadataSource::Kind::GenericLValueMetadata: {
       CanType argTy = getArgTypeInContext(source.getParamIndex());
 
-      llvm::Value *metadata = in.claimNext();
+      llvm::Value *metadata = emission.getNextPolymorphicParameterAsMetadata();
       setTypeMetadataName(IGF.IGM, metadata, argTy);
 
       IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata,
@@ -2223,55 +2225,23 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 }
 
 /// Emit a polymorphic parameters clause, binding all the metadata necessary.
-void EmitPolymorphicParameters::emit(Explosion &in,
+void EmitPolymorphicParameters::emit(EntryPointArgumentEmission &emission,
                                      WitnessMetadata *witnessMetadata,
                                      const GetParameterFn &getParameter) {
   // Collect any early sources and bind local type data from them.
   for (auto &source : getSources()) {
-    bindExtraSource(source, in, witnessMetadata);
+    bindExtraSource(source, emission, witnessMetadata);
   }
   
   auto getInContext = [&](CanType type) -> CanType {
     return getTypeInContext(type);
   };
 
-  unsigned index = 0;
   // Collect any concrete type metadata that's been passed separately.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
-    llvm::Value *value;
-    if (Fn.isAsync()) {
-      auto *context = in.peek(
-          /*the index of the swift.context in the async function CC*/ 0);
-      auto layout = getAsyncContextLayout(IGF, &Fn);
-      Address dataAddr = layout.emitCastTo(IGF, context);
-      assert(layout.hasBindings());
-
-      auto bindingLayout = layout.getBindingsLayout();
-      auto bindingsAddr =
-          bindingLayout.project(IGF, dataAddr, /*offsets*/ None);
-      auto erasedBindingsAddr =
-          IGF.Builder.CreateBitCast(bindingsAddr, IGF.IGM.Int8PtrPtrTy);
-      auto uncastBindingAddr = IGF.Builder.CreateConstArrayGEP(
-          erasedBindingsAddr, index, IGF.IGM.getPointerSize());
-      if (requirement.Protocol) {
-        auto bindingAddrAddr = IGF.Builder.CreateBitCast(
-            uncastBindingAddr.getAddress(), IGF.IGM.WitnessTablePtrPtrTy);
-        auto bindingAddr = IGF.Builder.CreateLoad(
-            bindingAddrAddr, IGF.IGM.getPointerAlignment());
-        value = bindingAddr;
-      } else {
-        auto bindingAddrAddr = IGF.Builder.CreateBitCast(
-            uncastBindingAddr.getAddress(), IGF.IGM.TypeMetadataPtrPtrTy);
-        auto bindingAddr = IGF.Builder.CreateLoad(
-            bindingAddrAddr, IGF.IGM.getPointerAlignment());
-        value = bindingAddr;
-      }
-    } else {
-      value = in.claimNext();
-    }
+    llvm::Value *value = emission.getNextPolymorphicParameter(requirement);
     bindGenericRequirement(IGF, requirement, value, MetadataState::Complete,
                            getInContext);
-    ++index;
   });
 
   // Bind all the fulfillments we can from the formal parameters.
@@ -2689,12 +2659,12 @@ void irgen::collectTrailingWitnessMetadata(
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
-void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
-                                      SILFunction &Fn,
-                                      Explosion &in,
+void irgen::emitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn,
+                                      EntryPointArgumentEmission &emission,
                                       WitnessMetadata *witnessMetadata,
                                       const GetParameterFn &getParameter) {
-  EmitPolymorphicParameters(IGF, Fn).emit(in, witnessMetadata, getParameter);
+  EmitPolymorphicParameters(IGF, Fn).emit(emission, witnessMetadata,
+                                          getParameter);
 }
 
 /// Given an array of polymorphic arguments as might be set up by

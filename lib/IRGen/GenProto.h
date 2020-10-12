@@ -40,6 +40,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class DynamicMetadataRequest;
+  class EntryPointArgumentEmission;
   class Explosion;
   class FunctionPointer;
   class IRGenFunction;
@@ -133,12 +134,11 @@ namespace irgen {
   ///
   /// \param witnessMetadata - can be omitted if the function is
   ///   definitely not a witness method
-  void emitPolymorphicParameters(IRGenFunction &IGF,
-                                 SILFunction &Fn,
-                                 Explosion &args,
+  void emitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn,
+                                 EntryPointArgumentEmission &emission,
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
- 
+
   void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
                                           NominalTypeDecl *typeDecl,
                                           Address array,
