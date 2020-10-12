@@ -1074,6 +1074,13 @@ struct StableAddressConcurrentReadableHashMap
     return {ptr, outerCreated};
   }
 
+  template <class KeyTy> ElemTy *find(const KeyTy &key) {
+    auto result = this->snapshot().find(key);
+    if (!result)
+      return nullptr;
+    return result->Ptr;
+  }
+
 private:
   // Clearing would require deallocating elements, which we don't support.
   void clear() = delete;
