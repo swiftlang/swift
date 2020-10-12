@@ -4,6 +4,9 @@
 // rdar://problem/70012853
 // XFAIL: OS=windows-msvc
 
+// rdar://70175753
+// REQUIRES: rdar70175753
+
 //
 // This test establishes a chain of modules that all depend on a set of
 // bridging headers. This test ensures that changes to external dependencies -
