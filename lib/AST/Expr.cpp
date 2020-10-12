@@ -1499,8 +1499,9 @@ PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
                                             Type ty, Expr *wrappedValue,
                                             bool isAutoClosure) {
-  auto *placeholder =
-      new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
+  OpaqueValueExpr *placeholder = nullptr;
+  if (ty)
+    placeholder = new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
   return new (ctx) PropertyWrapperValuePlaceholderExpr(
       range, ty, placeholder, wrappedValue, isAutoClosure);

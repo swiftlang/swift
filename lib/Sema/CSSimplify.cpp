@@ -1450,14 +1450,23 @@ ConstraintSystem::matchPropertyWrapperArgument(Type wrapperType, Type wrappedVal
   if (!anchor)
     return getTypeMatchFailure(locator);
 
-  auto *arg = getAsExpr(anchor);
-  auto initializer = buildPropertyWrapperWrappedValueCall(param, wrapperType, arg,
+  // Use a wrapped value placeholder to avoid generating constriants for the
+  // argument expression again.
+  auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
+      getASTContext(), param->getSourceRange(), Type(), /*wrappedValue=*/nullptr);
+  setType(placeholder, wrappedValueArgumentType);
+  auto initializer = buildPropertyWrapperWrappedValueCall(param, wrapperType, placeholder,
                                                           /*ignoreAttributeArgs=*/false);
+  auto *arg = getAsExpr(anchor);
   appliedPropertyWrappers[arg] = initializer;
 
   generateConstraints(initializer, DC);
   addConstraint(matchKind, getType(initializer), wrapperType,
                 getConstraintLocator(initializer));
+
+  // Set the original wrapped value _after_ generating constraints
+  // so the argument expression isn't visited in CSGen.
+  placeholder->setOriginalWrappedValue(arg);
 
   // FIXME: Can there be failures from the above?
   return getTypeMatchSuccess();

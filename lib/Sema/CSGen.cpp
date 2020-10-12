@@ -2666,7 +2666,11 @@ namespace {
 
     Type visitPropertyWrapperValuePlaceholderExpr(
         PropertyWrapperValuePlaceholderExpr *expr) {
-      return expr->getType();
+      if (auto ty = expr->getType())
+        return ty;
+
+      assert(CS.getType(expr));
+      return CS.getType(expr);
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {

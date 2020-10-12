@@ -3437,6 +3437,12 @@ namespace {
 
     Expr *visitPropertyWrapperValuePlaceholderExpr(
         PropertyWrapperValuePlaceholderExpr *expr) {
+      // If there is no opaque value placeholder, the enclosing init(wrappedValue:)
+      // expression cannot be reused, so we only need the original wrapped value
+      // argument in the AST.
+      if (!expr->getOpaqueValuePlaceholder())
+        return expr->getOriginalWrappedValue();
+
       return expr;
     }
 

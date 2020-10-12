@@ -495,10 +495,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E) {
-    if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
-      E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
-    else
-      return nullptr;
+    if (E->getOpaqueValuePlaceholder()) {
+      if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
+        E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
+      else
+        return nullptr;
+    }
 
     if (E->getOriginalWrappedValue()) {
       if (auto *newValue = doIt(E->getOriginalWrappedValue()))
