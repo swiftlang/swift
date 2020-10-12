@@ -106,16 +106,13 @@ struct ConcurrencyControl {
   ConcurrencyControl() = default;
 };
 
-template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag>
 class LockingConcurrentMapStorage {
-  ConcurrentMap<EntryType, ProvideDestructor,
-                TaggedMetadataAllocator<Tag>> Map;
-  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
+  StableAddressConcurrentReadableHashMap<EntryType, TaggedMetadataAllocator<Tag>> Map;
+  StaticOwningPointer<ConcurrencyControl, false> Concurrency;
 
 public:
   LockingConcurrentMapStorage() : Concurrency(new ConcurrencyControl()) {}
-
-  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
 
   ConcurrencyControl &getConcurrency() { return *Concurrency; }
 
@@ -185,8 +182,6 @@ class LockingConcurrentMap {
 
 public:
   LockingConcurrentMap() = default;
-
-  MetadataAllocator &getAllocator() { return Storage.getAllocator(); }
 
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
@@ -492,6 +487,10 @@ public:
 
   uint32_t hash() const {
     return Hash;
+  }
+
+  friend llvm::hash_code hash_value(const MetadataCacheKey &key) {
+    return key.Hash;
   }
 
   const void * const *begin() const { return Data; }
@@ -1424,15 +1423,19 @@ public:
     return Hash;
   }
 
-  int compareWithKey(const MetadataCacheKey &key) const {
-    return key.compare(getKey());
+  friend llvm::hash_code hash_value(const VariadicMetadataCacheEntryBase<Impl, Objects...> &value) {
+    return hash_value(value.getKey());
+  }
+
+  bool matchesKey(const MetadataCacheKey &key) const {
+    return key == getKey();
   }
 };
 
-template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag>
 class MetadataCache :
     public LockingConcurrentMap<EntryType,
-             LockingConcurrentMapStorage<EntryType, Tag, ProvideDestructor>> {
+             LockingConcurrentMapStorage<EntryType, Tag>> {
 };
 
 } // namespace swift
