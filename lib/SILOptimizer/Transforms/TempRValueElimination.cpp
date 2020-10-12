@@ -79,9 +79,8 @@ class TempRValueOptPass : public SILFunctionTransform {
   checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst,
                          ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
 
-  bool checkNoTempObjectModificationInApply(Operand *tempObjUser,
-                                            SILInstruction *inst,
-                                            SILValue srcAddr);
+  bool canApplyBeTreatedAsLoad(Operand *tempObjUser, ApplySite apply,
+                               SILValue srcAddr);
 
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
   std::pair<SILBasicBlock::iterator, bool>
@@ -115,57 +114,39 @@ bool TempRValueOptPass::collectLoadsFromProjection(
   return true;
 }
 
-/// Check if 'tempObjUser' passed to the apply instruction can be modified by it
-bool TempRValueOptPass::checkNoTempObjectModificationInApply(
-    Operand *tempObjUser, SILInstruction *applyInst, SILValue srcAddr) {
-  ApplySite apply(applyInst);
-
+/// Check if \p tempObjUser, passed to the apply instruction, is only loaded,
+/// but not modified and if \p srcAddr is not modified as well.
+bool TempRValueOptPass::canApplyBeTreatedAsLoad(
+    Operand *tempObjUser, ApplySite apply, SILValue srcAddr) {
   // Check if the function can just read from tempObjUser.
   auto convention = apply.getArgumentConvention(*tempObjUser);
   if (!convention.isGuaranteedConvention()) {
     LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
                                "its source"
-                            << *applyInst);
+                            << *apply.getInstruction());
     return false;
   }
 
-  // If we do not have an src address, but are indirect, bail. We would need
-  // to perform function signature specialization to change the functions
-  // signature to pass something direct.
-  if (!srcAddr && convention.isIndirectConvention()) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "  Temp used to materialize value for indirect convention?! Can "
-           "not remove temporary without func sig opts"
-        << *applyInst);
-    return false;
-  }
-
-  // Check if there is another function argument, which is inout which might
-  // modify the source address if we have one.
-  //
-  // When a use of the temporary is an apply, then we need to prove that the
-  // function called by the apply cannot modify the temporary's source
-  // value. By design, this should be handled by
-  // `checkNoSourceModification`. However, this would be too conservative
-  // since it's common for the apply to have an @out argument, and alias
-  // analysis cannot prove that the @out does not alias with `src`. Instead,
-  // `checkNoSourceModification` always avoids analyzing the current use, so
-  // applies need to be handled here. We already know that an @out cannot
-  // alias with `src` because the `src` value must be initialized at the point
-  // of the call. Hence, it is sufficient to check specifically for another
-  // @inout that might alias with `src`.
   if (srcAddr) {
-    auto calleeConv = apply.getSubstCalleeConv();
-    unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
-    for (const auto &operand : apply.getArgumentOperands()) {
-      auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
-      if (argConv.isInoutConvention()) {
-        if (!aa->isNoAlias(operand.get(), srcAddr)) {
-          return false;
-        }
-      }
-      ++calleeArgIdx;
+    // If the function may write to the source of the copy_addr, the apply
+    // cannot be treated as a load: all (potential) writes of the source must
+    // appear _after_ all loads of the temporary. But in case of a function call
+    // we don't know in which order the writes and loads are executed inside the
+    // called function. The source may be written before the temporary is
+    // loaded, which would make the optization invalid.
+    if (aa->mayWriteToMemory(apply.getInstruction(), srcAddr))
+      return false;
+  } else {
+    // If we do not have an src address, but are indirect, bail. We would need
+    // to perform function signature specialization to change the functions
+    // signature to pass something direct.
+    if (convention.isIndirectConvention()) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "  Temp used to materialize value for indirect convention?! Can "
+             "not remove temporary without func sig opts"
+          << *apply.getInstruction());
+      return false;
     }
   }
   return true;
@@ -189,7 +170,8 @@ bool TempRValueOptPass::collectLoads(
     SILValue srcAddr, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
-  if (user->getParent() != address->getParent())
+  SILBasicBlock *block = address->getParent();
+  if (user->getParent() != block)
     return false;
 
   // Only allow uses that cannot destroy their operand. We need to be sure
@@ -232,22 +214,25 @@ bool TempRValueOptPass::collectLoads(
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
-    if (!checkNoTempObjectModificationInApply(userOp, user, srcAddr))
+    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
       return false;
     // Everything is okay with the function call. Register it as a "load".
     loadInsts.insert(user);
     return true;
   }
   case SILInstructionKind::BeginApplyInst: {
-    if (!checkNoTempObjectModificationInApply(userOp, user, srcAddr))
+    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
       return false;
 
     auto beginApply = cast<BeginApplyInst>(user);
     // Register 'end_apply'/'abort_apply' as loads as well
     // 'checkNoSourceModification' should check instructions until
     // 'end_apply'/'abort_apply'.
-    for (auto tokenUses : beginApply->getTokenResult()->getUses()) {
-      loadInsts.insert(tokenUses->getUser());
+    for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
+      SILInstruction *user = tokenUse->getUser();
+      if (user->getParent() != block)
+        return false;
+      loadInsts.insert(tokenUse->getUser());
     }
     return true;
   }
@@ -285,7 +270,8 @@ bool TempRValueOptPass::collectLoads(
     return collectLoadsFromProjection(utedai, srcAddr, loadInsts);
   }
   case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst: {
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::UncheckedAddrCastInst: {
     return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
                                       srcAddr, loadInsts);
   }

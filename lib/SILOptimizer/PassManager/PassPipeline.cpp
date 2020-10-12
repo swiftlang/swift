@@ -393,6 +393,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+  P.addTempRValueOpt();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
