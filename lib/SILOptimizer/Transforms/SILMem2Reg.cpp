@@ -323,8 +323,10 @@ promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   // Avoid inserting the same debug_value twice.
   for (Operand *Use : Value->getUses())
     if (auto *DVI = dyn_cast<DebugValueInst>(Use->getUser()))
-      if (*DVI->getVarInfo() == *DVAI->getVarInfo())
+      if (*DVI->getVarInfo() == *DVAI->getVarInfo()) {
+        DVAI->eraseFromParent();
         return;
+      }
   B.setInsertionPoint(DVAI);
   B.setCurrentDebugScope(DVAI->getDebugScope());
   B.createDebugValue(DVAI->getLoc(), Value, *DVAI->getVarInfo());
