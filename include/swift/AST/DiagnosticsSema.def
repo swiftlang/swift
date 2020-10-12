@@ -4207,22 +4207,22 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       "requirement from protocol %3 isolated to global actor %4",
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
-ERROR(actorisolated_let,none,
-      "'@actorIsolated' is meaningless on 'let' declarations because "
+ERROR(actorindependent_let,none,
+      "'@actorIndependent' is meaningless on 'let' declarations because "
       "they are immutable",
       ())
-ERROR(actorisolated_mutable_storage,none,
-      "'@actorIsolated' can not be applied to stored properties",
+ERROR(actorindependent_mutable_storage,none,
+      "'@actorIndependent' can not be applied to stored properties",
       ())
-ERROR(actorisolated_local_var,none,
-      "'@actorIsolated' can not be applied to local variables",
+ERROR(actorindependent_local_var,none,
+      "'@actorIndependent' can not be applied to local variables",
       ())
-ERROR(actorisolated_not_actor_member,none,
-      "'@actorIsolated' can only be applied to actor members and "
+ERROR(actorindependent_not_actor_member,none,
+      "'@actorIndependent' can only be applied to actor members and "
       "global/static variables",
       ())
-ERROR(actorisolated_not_actor_instance_member,none,
-      "'@actorIsolated' can only be applied to instance members of actors",
+ERROR(actorindependent_not_actor_instance_member,none,
+      "'@actorIndependent' can only be applied to instance members of actors",
       ())
 
 ERROR(concurrency_lib_missing,none,

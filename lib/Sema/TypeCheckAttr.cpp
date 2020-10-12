@@ -286,19 +286,19 @@ public:
     if (auto var = dyn_cast<VarDecl>(D)) {
       // @actorIndependent is meaningless on a `let`.
       if (var->isLet()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_let);
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
         return;
       }
 
       // @actorIndependent can not be applied to stored properties.
       if (var->hasStorage()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_mutable_storage);
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
         return;
       }
 
       // @actorIndependent can not be applied to local properties.
       if (dc->isLocalContext()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_local_var);
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
         return;
       }
 
@@ -315,14 +315,14 @@ public:
     // @actorIndependent only makes sense on an actor instance member.
     if (!dc->getSelfClassDecl() ||
         !dc->getSelfClassDecl()->isActor()) {
-      diagnoseAndRemoveAttr(attr, diag::actorisolated_not_actor_member);
+      diagnoseAndRemoveAttr(attr, diag::actorindependent_not_actor_member);
       return;
     }
 
     auto VD = cast<ValueDecl>(D);
     if (!VD->isInstanceMember()) {
       diagnoseAndRemoveAttr(
-          attr, diag::actorisolated_not_actor_instance_member);
+          attr, diag::actorindependent_not_actor_instance_member);
       return;
     }
 
