@@ -4,6 +4,9 @@
 // rdar://problem/70012853
 // XFAIL: OS=windows-msvc
 
+// rdar://70175753
+// REQUIRES: rdar70175753
+
 //
 // This test establishes a "linear" chain of modules that import one another
 // and ensures that a cross-module incremental build does not needlessly
