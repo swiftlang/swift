@@ -958,7 +958,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_locale)) {
     std::string localeCode = A->getValue();
 
-    // Check if the locale code is available.
+    // Check if the locale code is available, or "test" was specified.
+    // -locale test is a specially recognized code used as a temporary hack
+    // to support testing before real translations are available.
     if (llvm::none_of(localeCodes, [&](const char *locale) {
           return localeCode == locale;
         }) && localeCode != "test") {
