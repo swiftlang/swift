@@ -2656,6 +2656,114 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
+bool ConformanceChecker::checkActorIsolation(
+    ValueDecl *requirement, ValueDecl *witness) {
+  // Ensure that the witness is not actor-isolated in a manner that makes it
+  // unsuitable as a witness.
+  Type witnessGlobalActor;
+  switch (auto witnessRestriction =
+              ActorIsolationRestriction::forDeclaration(witness)) {
+  case ActorIsolationRestriction::ActorSelf: {
+    // Actor-isolated witnesses cannot conform to protocol requirements.
+    bool canBeAsyncHandler = false;
+    if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
+      canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
+      witnessFunc->canBeAsyncHandler();
+    }
+    auto diag = witness->diagnose(
+        canBeAsyncHandler
+            ? diag::actor_isolated_witness_could_be_async_handler
+            : diag::actor_isolated_witness,
+        witness->getDescriptiveKind(), witness->getName());
+
+    if (canBeAsyncHandler) {
+      diag.fixItInsert(
+         witness->getAttributeInsertionLoc(false), "@asyncHandler ");
+    }
+
+    return true;
+  }
+
+  case ActorIsolationRestriction::GlobalActor: {
+    // Hang on to the global actor that's used for the witness. It will need
+    // to match that of the requirement.
+    witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
+        witnessRestriction.getGlobalActor());
+    break;
+  }
+
+  case ActorIsolationRestriction::Unsafe:
+  case ActorIsolationRestriction::LocalCapture:
+    break;
+
+  case ActorIsolationRestriction::Unrestricted:
+    // The witness is completely unrestricted, so ignore any annotations on
+    // the requirement.
+    return false;
+  }
+
+  // Check whether the requirement requires some particular actor isolation.
+  Type requirementGlobalActor;
+  switch (auto requirementIsolation = getActorIsolation(requirement)) {
+  case ActorIsolation::ActorInstance:
+    llvm_unreachable("There are not actor protocols");
+
+  case ActorIsolation::GlobalActor: {
+    auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
+        Proto, Adoptee, ProtocolConformanceRef(Conformance));
+    requirementGlobalActor = requirementIsolation.getGlobalActor()
+        .subst(requirementSubs);
+    break;
+  }
+
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    break;
+  }
+
+  // If neither has a global actor, we're done.
+  if (!witnessGlobalActor && !requirementGlobalActor)
+    return false;
+
+  // If the witness has a global actor but the requirement does not, we have
+  // an isolation error.
+  if (witnessGlobalActor && !requirementGlobalActor) {
+    witness->diagnose(
+        diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
+        witness->getName(), witnessGlobalActor, Proto->getName());
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // If the requirement has a global actor but the witness does not, we have
+  // an isolation error.
+  //
+  // FIXME: Within a module, this will be an inference rule.
+  if (requirementGlobalActor && !witnessGlobalActor) {
+    witness->diagnose(
+        diag::global_actor_isolated_requirement, witness->getDescriptiveKind(),
+        witness->getName(), requirementGlobalActor, Proto->getName())
+      .fixItInsert(
+        witness->getAttributeInsertionLoc(/*forModifier=*/false),
+      "@" + requirementGlobalActor.getString());
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // If both have global actors but they differ, this is an isolation error.
+  if (!witnessGlobalActor->isEqual(requirementGlobalActor)) {
+    witness->diagnose(
+        diag::global_actor_isolated_requirement_witness_conflict,
+        witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
+        Proto->getName(), requirementGlobalActor);
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // Everything is okay.
+  return false;
+}
+
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
                                                  AssociatedTypeDecl *assocType,
                                                  Type type,
@@ -4337,39 +4445,8 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
       }
 
-      // Check for actor-isolation consistency.
-      switch (auto restriction =
-                  ActorIsolationRestriction::forDeclaration(witness)) {
-      case ActorIsolationRestriction::ActorSelf: {
-        // Actor-isolated witnesses cannot conform to protocol requirements.
-        bool canBeAsyncHandler = false;
-        if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
-          canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
-          witnessFunc->canBeAsyncHandler();
-        }
-        auto diag = witness->diagnose(
-            canBeAsyncHandler
-                ? diag::actor_isolated_witness_could_be_async_handler
-                : diag::actor_isolated_witness,
-            witness->getDescriptiveKind(), witness->getName());
-
-        if (canBeAsyncHandler) {
-          diag.fixItInsert(
-             witness->getAttributeInsertionLoc(false), "@asyncHandler ");
-        }
+      if (checkActorIsolation(requirement, witness))
         return;
-      }
-
-      case ActorIsolationRestriction::GlobalActor: {
-        // FIXME: Check against the requirement. This needs serious refactoring.
-        break;
-      }
-
-      case ActorIsolationRestriction::Unrestricted:
-      case ActorIsolationRestriction::Unsafe:
-      case ActorIsolationRestriction::LocalCapture:
-        break;
-      }
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&

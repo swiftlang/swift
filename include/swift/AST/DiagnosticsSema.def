@@ -4194,6 +4194,18 @@ ERROR(actor_isolated_witness_could_be_async_handler,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
      "did you mean to make it an asychronous handler?",
      (DescriptiveDeclKind, DeclName))
+ERROR(global_actor_isolated_requirement,none,
+      "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_witness,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_requirement_witness_conflict,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3 isolated to global actor %4",
+      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 ERROR(actorisolated_let,none,
       "'@actorIsolated' is meaningless on 'let' declarations because "
