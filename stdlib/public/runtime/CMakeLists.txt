@@ -301,7 +301,6 @@ ${libicu_data_a}
 -latomic
 -lswiftWasiPthread
 -lswiftCore
--lswiftImageInspectionShared
 -licuuc
 -licudata
 -lstdc++
