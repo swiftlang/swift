@@ -943,17 +943,6 @@ public:
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
-  /// FIXME: Remove this, it's vestigial.
-  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
-
-  void markWasHandled(Decl *D) {
-    AlreadyHandledDecls.insert(D);
-  }
-
-  bool declWasHandledAlready(Decl *D) {
-    return AlreadyHandledDecls.erase(D);
-  }
-
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);

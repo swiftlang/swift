@@ -3849,6 +3849,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
   auto OrigTok = Tok;
   bool MayNeedOverrideCompletion = false;
 
+  bool HandlerAlreadyCalled = false;
+
   auto parseLetOrVar = [&](bool HasLetOrVarKeyword) {
     // Collect all modifiers into a modifier list.
     DeclParsingContext.setCreateSyntax(SyntaxKind::VariableDecl);
@@ -3861,8 +3863,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         && isCodeCompletionFirstPass())
       return;
     std::for_each(Entries.begin(), Entries.end(), Handler);
-    if (auto *D = DeclResult.getPtrOrNull())
-      markWasHandled(D);
+    HandlerAlreadyCalled = true;
   };
 
   auto parseFunc = [&](bool HasFuncKeyword) {
@@ -3909,8 +3910,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         isCodeCompletionFirstPass())
       break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
-    if (auto *D = DeclResult.getPtrOrNull())
-      markWasHandled(D);
+    HandlerAlreadyCalled = true;
     break;
   }
   case tok::kw_class:
@@ -3955,8 +3955,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
     MayNeedOverrideCompletion = true;
-    if (auto *D = DeclResult.getPtrOrNull())
-      markWasHandled(D);
+    HandlerAlreadyCalled = true;
     break;
   }
 
@@ -4136,7 +4135,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
-    if (!declWasHandledAlready(D))
+    if (!HandlerAlreadyCalled)
       Handler(D);
     setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);
   }
