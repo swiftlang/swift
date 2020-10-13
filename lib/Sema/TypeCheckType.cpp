@@ -575,7 +575,6 @@ static TypeResolutionOptions
 adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options.setContext(None);
   options -= TypeResolutionFlags::SILType;
-  options -= TypeResolutionFlags::AllowUnavailableProtocol;
 
   return options;
 }
@@ -1877,9 +1876,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options.setContext(None);
   }
-
-  if (getASTContext().LangOpts.DisableAvailabilityChecking)
-    options |= TypeResolutionFlags::AllowUnavailable;
 
   bool isDirect = false;
   if ((options & TypeResolutionFlags::Direct) && !isa<SpecifierTypeRepr>(repr)){
