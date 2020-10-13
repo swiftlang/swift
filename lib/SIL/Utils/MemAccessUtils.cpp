@@ -118,7 +118,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // conservative given that classes are not "uniquely identified".
     auto *REA = cast<RefElementAddrInst>(base);
     value = stripBorrow(REA->getOperand());
-    setElementIndex(REA->getFieldNo());
+    setElementIndex(REA->getFieldIndex());
     break;
   }
   case Tail: {
@@ -156,7 +156,7 @@ const ValueDecl *AccessedStorage::getDecl() const {
 
   case Class: {
     auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
-    return decl->getStoredProperties()[getPropertyIndex()];
+    return getIndexedField(decl, getPropertyIndex());
   }
   case Tail:
     return nullptr;

@@ -363,6 +363,9 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
+  unreachable("unsupported");
+}
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   unreachable("unsupported");
 }
@@ -1255,6 +1258,8 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
+  } else if (text == "@async") {
+    Buffer << "H";
   } else {
     unreachable("bad impl-function-attribute");
   }

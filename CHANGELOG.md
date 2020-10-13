@@ -27,6 +27,7 @@ CHANGELOG
 Swift Next
 ----------
 
+
 * [#34005][]:
 
   Non-final classes can now satisfy read-only subscript and property requirements with a possibly optional `Self` result type by following existing rules for implementing analogous *method* requirements:
@@ -44,7 +45,21 @@ Swift Next
     var property: Self { self } // Now OK
   }
   ```
-  
+
+* [SR-10069][]:
+
+  Function overloading now works in local contexts, making the following valid:
+
+  ```swift
+  func outer(x: Int, y: String) {
+    func doIt(_: Int) {}
+    func doIt(_: String) {}
+
+    doIt(x) // calls the first 'doIt(_:)' with an Int value
+    doIt(y) // calls the second 'doIt(_:)' with a String value
+  }
+  ```
+
 * [SE-0284][]:
 
   Functions, subscripts, and initializers may now have more than one variadic parameter, as long as all parameters which follow variadic parameters are labeled. This makes declarations like the following valid:
@@ -8214,6 +8229,7 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
+[SR-10069]: <https://bugs.swift.org/browse/SR-10069>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
 [SR-11700]: <https://bugs.swift.org/browse/SR-11700>

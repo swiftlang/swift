@@ -100,15 +100,18 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
-  /// Return the error result slot, given an error type.  There's
-  /// always only one error type.
-  Address getErrorResultSlot(SILType errorType);
+  /// Return the error result slot to be passed to the callee, given an error
+  /// type.  There's always only one error type.
+  ///
+  /// For async functions, this is different from the caller result slot because
+  /// that is a gep into the %swift.context.
+  Address getCalleeErrorResultSlot(SILType errorType);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
 
-  /// Set the error result slot.
-  void setErrorResultSlot(llvm::Value *address);
+  /// Set the error result slot for the current function.
+  void setCallerErrorResultSlot(llvm::Value *address);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -131,8 +134,10 @@ private:
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  llvm::Value *ErrorResultSlot = nullptr;
+  llvm::Value *CalleeErrorResultSlot = nullptr;
+  llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
+  bool IsAsync = false;
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -145,6 +150,9 @@ public:
   bool optimizeForSize() const {
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
+
+  bool isAsync() const { return IsAsync; }
+  void setAsync(bool async = true) { IsAsync = async; }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");

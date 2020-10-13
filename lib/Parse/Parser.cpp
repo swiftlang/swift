@@ -189,9 +189,9 @@ void Parser::performCodeCompletionSecondPassImpl(
     parseDecl(ParseDeclOptions(info.Flags),
               /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
-                  NTD->addMember(D);
+                  NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-                  ED->addMember(D);
+                  ED->addMemberPreservingSourceOrder(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
                   SF->addTopLevelDecl(D);
                 } else {
@@ -1183,34 +1183,6 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 
   return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
                                                Segments.front().Length));
-}
-
-bool Parser::
-shouldSuppressSingleExpressionBodyTransform(ParserStatus Status,
-                                            MutableArrayRef<ASTNode> BodyElems) {
-  if (BodyElems.size() != 1)
-    return true;
-
-  if (!Status.hasCodeCompletion())
-    return false;
-
-  struct HasMemberCompletion: public ASTWalker {
-    bool Value = false;
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
-        // If it has a base expression this is member completion, which is
-        // performed using the new solver-based mechanism, so it's ok to go
-        // ahead with the transform (and necessary to pick up the correct
-        // expected type).
-        Value = CCE->getBase();
-        return {false, nullptr};
-      }
-      return {true, E};
-    }
-  };
-  HasMemberCompletion Check;
-  BodyElems.front().walk(Check);
-  return !Check.Value;
 }
 
 struct ParserUnit::Implementation {

@@ -18,15 +18,31 @@
 #ifndef SWIFT_SEMA_DERIVEDCONFORMANCES_H
 #define SWIFT_SEMA_DERIVEDCONFORMANCES_H
 
+#include "swift/Basic/LLVM.h"
 #include <utility>
 
 namespace swift {
-class Decl;
-class DeclRefExpr;
+class AbstractFunctionDecl;
 class AccessorDecl;
+class AssociatedTypeDecl;
+class ASTContext;
+struct ASTNode;
+class Decl;
+class DeclContext;
+class DeclRefExpr;
+class EnumDecl;
+class EnumElementDecl;
+class Expr;
+class GuardStmt;
+class Identifier;
 class NominalTypeDecl;
+class ParamDecl;
+class Pattern;
 class PatternBindingDecl;
+class ProtocolDecl;
+class StructDecl;
 class Type;
+class TypeDecl;
 class ValueDecl;
 class VarDecl;
 
@@ -276,6 +292,14 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
+
+  /// Whether we can derive the given Actor requirement in the given context.
+  static bool canDeriveActor(NominalTypeDecl *nominal, DeclContext *dc);
+
+  /// Derive an Actor requirement for an actor class.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveActor(ValueDecl *requirement);
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

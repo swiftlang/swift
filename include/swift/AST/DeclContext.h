@@ -490,6 +490,10 @@ public:
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 
+  /// Determine whether this or any parent context is a `@_specialize` extension
+  /// context.
+  bool isInSpecializeExtensionContext() const;
+
   /// Get the most optimal resilience expansion for code in this context.
   /// If the body is able to be inlined into functions in other resilience
   /// domains, this ensures that only sufficiently-conservative access patterns
@@ -782,9 +786,20 @@ public:
   /// abstractions on top of member loading, such as a name lookup table.
   DeclRange getCurrentMembersWithoutLoading() const;
 
-  /// Add a member to this context. If the hint decl is specified, the new decl
-  /// is inserted immediately after the hint.
-  void addMember(Decl *member, Decl *hint = nullptr);
+  /// Add a member to this context.
+  ///
+  /// If the hint decl is specified, the new decl is inserted immediately
+  /// after the hint.
+  ///
+  /// If insertAtHead is set, the new decl is inserted at the beginning of
+  /// the list.
+  ///
+  /// Otherwise, it is inserted at the end.
+  void addMember(Decl *member, Decl *hint = nullptr, bool insertAtHead = false);
+
+  /// Add a member in the right place to preserve source order. This should
+  /// only be called from the code completion delayed parsing path.
+  void addMemberPreservingSourceOrder(Decl *member);
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
@@ -862,10 +877,7 @@ public:
 private:
   /// Add a member to the list for iteration purposes, but do not notify the
   /// subclass that we have done so.
-  ///
-  /// This is used internally when loading members, because loading a
-  /// member is an invisible addition.
-  void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
+  void addMemberSilently(Decl *member, Decl *hint, bool insertAtHead) const;
 };
 
 /// Define simple_display for DeclContexts but not for subclasses in order to

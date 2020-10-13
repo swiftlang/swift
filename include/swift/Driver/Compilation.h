@@ -157,6 +157,16 @@ private:
 
   /// The Jobs which will be performed by this compilation.
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
+  // The Jobs which represent external actions performed by other drivers in
+  // the build graph.
+  //
+  // These Jobs are never scheduled into the build graph. This vector is
+  // populated by the routine that computes the set of incremental external
+  // dependencies that affect the current computation. Due to the way the
+  // Driver models multiple aspects of the incremental compilation scheduler
+  // by mapping to and from Jobs, it is necessary to lie and retain a set of
+  // pseudo-Jobs.
+  SmallVector<std::unique_ptr<const Job>, 32> ExternalJobs;
 
   /// The original (untranslated) input argument list.
   ///
@@ -265,18 +275,12 @@ public:
   const bool OnlyOneDependencyFile;
 
 private:
-  /// Is the parser recording token hashes for each type body?
-  const bool EnableTypeFingerprints;
-
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
-
-  /// Experiment with intrafile dependencies
-  const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
@@ -319,11 +323,8 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
-              bool EnableTypeFingerprints =
-                LangOptions().EnableTypeFingerprints,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
-              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
               bool CompareIncrementalSchemes = false,
               StringRef CompareIncrementalSchemesPath = "",
@@ -357,7 +358,6 @@ public:
   UnwrappedArrayView<const Job> getJobs() const {
     return llvm::makeArrayRef(Jobs);
   }
-  Job *addJob(std::unique_ptr<Job> J);
 
   /// To send job list to places that don't truck in fancy array views.
   std::vector<const Job *> getJobsSimply() const {
@@ -386,18 +386,12 @@ public:
   }
   void disableIncrementalBuild(Twine why);
 
-  bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
-
   bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
     return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
 
   bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
     return EmitFineGrainedDependencyDotFileAfterEveryImport;
-  }
-
-  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
-    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
   bool getEnableSourceRangeDependencies() const {
@@ -529,6 +523,13 @@ public:
   void sortJobsToMatchCompilationInputs(
       const JobCollection &unsortedJobs,
       SmallVectorImpl<const Job *> &sortedJobs) const;
+
+private:
+  friend class Driver;
+  friend class PerformJobsState;
+
+  Job *addJob(std::unique_ptr<Job> J);
+  Job *addExternalJob(std::unique_ptr<Job> J);
 
 private:
   /// Perform all jobs.

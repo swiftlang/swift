@@ -24,7 +24,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Runtime/Portability.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <vector>
@@ -706,6 +706,8 @@ public:
           } else if (text == "@convention(block)") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Block);
+          } else if (text == "@async") {
+            flags = flags.withAsync();
           }
         } else if (child->getKind() == NodeKind::ImplDifferentiable) {
           flags = flags.withDifferentiabilityKind(

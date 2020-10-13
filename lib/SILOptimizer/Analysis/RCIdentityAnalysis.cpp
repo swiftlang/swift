@@ -34,6 +34,21 @@ static bool isNoPayloadEnum(SILValue V) {
   return !EI->hasOperand();
 }
 
+/// Returns true if V is a valid operand of a cast which preserves RC identity.
+///
+/// V is a valid operand if it has a non-trivial type.
+/// RCIdentityAnalysis must not look through casts which cast from a trivial
+/// type, like a metatype, to something which is retainable, like an AnyObject.
+/// On some platforms such casts dynamically allocate a ref-counted box for the
+/// metatype. Naturally that is the place where a new rc-identity begins.
+/// Therefore such a cast is introducing a new rc identical object.
+///
+/// If we would look through such a cast, ARC optimizations would get confused
+/// and might eliminate a retain of such an object completely.
+static bool isValidRCIdentityCastOperand(SILValue V, SILFunction *F) {
+  return !V->getType().isTrivial(*F);
+}
+
 /// RC identity is more than a guarantee that references refer to the same
 /// object. It also means that reference counting operations on those references
 /// have the same semantics. If the types on either side of a cast do not have
@@ -42,8 +57,8 @@ static bool isNoPayloadEnum(SILValue V) {
 /// necessarily preserve RC identity because it may cast from a
 /// reference-counted type to a non-reference counted type, or from a larger to
 /// a smaller struct with fewer references.
-static bool isRCIdentityPreservingCast(ValueKind Kind) {
-  switch (Kind) {
+static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
+  switch (V->getKind()) {
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UnconditionalCheckedCastInst:
@@ -51,11 +66,17 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
-  case ValueKind::ConvertFunctionInst:
-    return true;
-  default:
-    return false;
+  case ValueKind::ConvertFunctionInst: {
+    auto *inst = cast<SingleValueInstruction>(V);
+    SILValue castOp = inst->getOperand(0);
+    if (isValidRCIdentityCastOperand(castOp, inst->getFunction()))
+      return castOp;
+    break;
   }
+  default:
+    break;
+  }
+  return SILValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -64,8 +85,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
-  if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SingleValueInstruction>(V)->getOperand(0);
+  if (SILValue castOp = getRCIdentityPreservingCastOperand(V))
+    return castOp;
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -116,9 +137,14 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // since we will only visit it twice if we go around a back edge due to a
   // different SILArgument that is actually being used for its phi node like
   // purposes.
-  if (auto *A = dyn_cast<SILPhiArgument>(V))
-    if (SILValue Result = A->getSingleTerminatorOperand())
-      return Result;
+  if (auto *A = dyn_cast<SILPhiArgument>(V)) {
+    if (SILValue Result = A->getSingleTerminatorOperand()) {
+      // In case the terminator is a conditional cast, Result is the source of
+      // the cast.
+      if (isValidRCIdentityCastOperand(Result, A->getFunction()))
+        return Result;
+    }
+  }
 
   return SILValue();
 }
@@ -321,6 +347,9 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
   }
 
   unsigned IVListSize = IncomingValues.size();
+  if (IVListSize == 1 &&
+      !isValidRCIdentityCastOperand(IncomingValues[0].second, A->getFunction()))
+    return SILValue();
 
   assert(IVListSize != 1 && "Should have been handled in "
          "stripRCIdentityPreservingInsts");

@@ -99,3 +99,23 @@ struct UseWrapperWithAutoclosure {
   } // expected-error{{return from initializer without initializing all stored properties}}
   // expected-note@-1{{'self.wrapped' not initialized}}  
 }
+
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+}
+
+func local() {
+  var anotherVar: String // expected-note {{variable defined here}}
+
+  @Wrapper var value = 10 {
+    didSet {
+      anotherVar = "hello!"
+    }
+  }
+
+  value = 15 // expected-error {{variable 'anotherVar' used by function definition before being initialized}}
+
+  anotherVar = "hello!"
+  _ = anotherVar
+}

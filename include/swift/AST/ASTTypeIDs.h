@@ -24,6 +24,9 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ActorIsolation;
+class ApplyExpr;
+enum class BodyInitKind;
+struct BodyInitKindAndExpr;
 class BraceStmt;
 class ClosureExpr;
 class CodeCompletionCallbacksFactory;
@@ -39,7 +42,7 @@ class GenericTypeParamType;
 class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
-struct ImplicitImport;
+struct ImplicitImportList;
 class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;

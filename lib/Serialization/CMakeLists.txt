@@ -1,3 +1,4 @@
+set_swift_llvm_is_available()
 add_swift_host_library(swiftSerialization STATIC
   Deserialization.cpp
   DeserializeSIL.cpp
@@ -8,7 +9,6 @@ add_swift_host_library(swiftSerialization STATIC
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
   SerializeDoc.cpp
-  SerializeIncremental.cpp
   SerializeSIL.cpp
 
   LLVM_LINK_COMPONENTS

@@ -1,0 +1,102 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
+
+
+
+
+
+class S {
+  func classinstanceSVoidToVoid() async
+  deinit
+  init()
+}
+
+// CHECK-LL: define hidden swiftcc void @classinstanceSVoidToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @classinstanceSVoidToVoid : $@async @convention(method) (@guaranteed S) -> () {
+bb0(%instance : $S):
+  %take_s = function_ref @take_S : $@convention(thin) (@guaranteed S) -> ()
+  %result = apply %take_s(%instance) : $@convention(thin) (@guaranteed S) -> ()
+  return %result : $()
+}
+
+sil hidden @take_S : $@convention(thin) (@guaranteed S) -> () {
+bb0(%instance : $S):
+  %any = alloc_stack $Any
+  strong_retain %instance : $S
+  %any_addr = init_existential_addr %any : $*Any, $S
+  store %instance to %any_addr : $*S
+  %print_any = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
+  %result = apply %print_any(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
+  destroy_addr %any_addr : $*S
+  dealloc_stack %any : $*Any
+  return %result : $()
+}
+
+sil hidden [exact_self_class] @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S {
+bb0(%0 : $@thick S.Type):
+  %1 = alloc_ref $S
+  %2 = function_ref @$S_init : $@convention(method) (@owned S) -> @owned S
+  %3 = apply %2(%1) : $@convention(method) (@owned S) -> @owned S
+  return %3 : $S
+}
+
+sil hidden @$S_init : $@convention(method) (@owned S) -> @owned S {
+bb0(%0 : $S):
+  return %0 : $S
+}
+
+sil hidden @$S_deinit : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject {
+bb0(%0 : $S):
+  %2 = unchecked_ref_cast %0 : $S to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+sil hidden @S_deallocating_deinit : $@convention(method) (@owned S) -> () {
+bb0(%0 : $S):
+  %2 = function_ref @$S_deinit : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $S
+  dealloc_ref %4 : $S
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil_vtable S {
+  #S.classinstanceSVoidToVoid: (S) -> () async -> () : @classinstanceSVoidToVoid
+  #S.init!allocator: (S.Type) -> () -> S : @S_allocating_init
+  #S.deinit!deallocator: @S_deallocating_deinit
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %s_type = metatype $@thick S.Type
+  %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S
+  %instance = apply %allocating_init(%s_type) : $@convention(method) (@thick S.Type) -> @owned S
+  %classinstanceSVoidToVoid = class_method %instance : $S, #S.classinstanceSVoidToVoid : (S) -> () async -> (), $@convention(method) @async (@guaranteed S) -> ()
+  strong_retain %instance : $S
+  %result = apply %classinstanceSVoidToVoid(%instance) : $@convention(method) @async (@guaranteed S) -> () // CHECK: main.S
+  strong_release %instance : $S
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32                              // id: %4
+}
+
+

@@ -55,6 +55,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
@@ -1477,7 +1478,7 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   if (doIt(US->getCond()))
     return nullptr;
   
-  if (Stmt *S2 = doIt(US->getBody()))
+  if (BraceStmt *S2 = cast_or_null<BraceStmt>(doIt(US->getBody())))
     US->setBody(S2);
   else
     return nullptr;
@@ -1630,7 +1631,7 @@ Stmt *Traversal::visitCaseStmt(CaseStmt *S) {
     }
   }
 
-  if (Stmt *newBody = doIt(S->getBody()))
+  if (BraceStmt *newBody = cast_or_null<BraceStmt>(doIt(S->getBody())))
     S->setBody(newBody);
   else
     return nullptr;

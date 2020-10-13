@@ -871,7 +871,7 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
                                      bool Implicit)
-    : LiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
+    : BuiltinLiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
       Range(Range) {
   Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(UTF8);
   Bits.StringLiteralExpr.IsSingleUnicodeScalar =
@@ -2461,6 +2461,11 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "#" << expr->getParamIndex() + 1 << " ";
   out << "of ";
   simple_display(out, expr->getDefaultArgsOwner().getDecl());
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const Expr *expr) {
+  out << "expression";
 }
 
 SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {

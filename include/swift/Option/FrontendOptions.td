@@ -175,36 +175,6 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
-} // end let Flags = [FrontendOption, NoDriverOption]
-
-def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
-class DebugCrashOpt : Group<debug_crash_Group>;
-
-
-// Flags that are saved into module interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
-
-def enable_objc_interop :
-  Flag<["-"], "enable-objc-interop">,
-  HelpText<"Enable Objective-C interop code generation and config directives">;
-
-def disable_objc_interop :
-  Flag<["-"], "disable-objc-interop">,
-  HelpText<"Disable Objective-C interop code generation and config directives">;
-
-def enable_objc_attr_requires_foundation_module :
-  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
-  HelpText<"Enable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def disable_objc_attr_requires_foundation_module :
-  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
-  HelpText<"Disable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Deprecated, use -enable-library-evolution instead">;
-
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules explicitly by the compiler">;
 
@@ -227,6 +197,37 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+} // end let Flags = [FrontendOption, NoDriverOption]
+
+def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
+class DebugCrashOpt : Group<debug_crash_Group>;
+
+
+// Flags that are saved into module interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
+  def enable_objc_interop :
+    Flag<["-"], "enable-objc-interop">,
+    HelpText<"Enable Objective-C interop code generation and config directives">;
+
+  def disable_objc_interop :
+    Flag<["-"], "disable-objc-interop">,
+    HelpText<"Disable Objective-C interop code generation and config directives">;
+
+  def enable_objc_attr_requires_foundation_module :
+    Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+    HelpText<"Enable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+  def disable_objc_attr_requires_foundation_module :
+    Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+    HelpText<"Disable requiring uses of @objc to require importing the "
+             "Foundation module">;
+
+def enable_experimental_concurrency :
+  Flag<["-"], "enable-experimental-concurrency">,
+  HelpText<"Enable experimental concurrency model">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+     HelpText<"Deprecated, use -enable-library-evolution instead">;
 }
 
 // HIDDEN FLAGS
@@ -389,10 +390,6 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
-
 def enable_subst_sil_function_types_for_function_values :
   Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
   HelpText<"Use substituted function types for SIL type lowering of function values">;
@@ -514,6 +511,9 @@ def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
 
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
+
+def testable_import_module : Separate<["-"], "testable-import-module">,
+  HelpText<"Implicitly import the specified module with @testable">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
@@ -761,4 +761,8 @@ def candidate_module_file
 def use_static_resource_dir
   : Flag<["-"], "use-static-resource-dir">,
     HelpText<"Use resources in the static resource directory">;
+
+def disable_building_interface
+  : Flag<["-"], "disable-building-interface">,
+    HelpText<"Disallow building binary module from textual interface">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

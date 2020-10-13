@@ -15,11 +15,11 @@
 // a particular constraint was derived.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintLocator.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -95,12 +95,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   }
 
   llvm_unreachable("Unhandled PathElementKind in switch.");
-}
-
-bool LocatorPathElt::isResultOfSingleExprFunction() const {
-  if (auto elt = getAs<ContextualType>())
-    return elt->isForSingleExprFunction();
-  return false;
 }
 
 /// Determine whether given locator points to the subscript reference
@@ -412,10 +406,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       break;
 
     case ContextualType:
-      if (elt.isResultOfSingleExprFunction())
-        out << "expected result type of the function with a single expression";
-      else
-        out << "contextual type";
+      out << "contextual type";
       break;
 
     case SynthesizedArgument: {

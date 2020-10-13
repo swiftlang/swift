@@ -20,7 +20,7 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
@@ -116,7 +116,7 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
     return nullptr;
   }
 
-  swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
+  swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 #endif
 
@@ -155,7 +155,7 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   }
   }
 
-  swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
+  swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
 template<>

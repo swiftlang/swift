@@ -283,10 +283,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // splits up copy_addr.
   P.addCopyForwarding();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Optimize copies from a temporary (an "l-value") to a destination.
   P.addTempLValueOpt();
 
@@ -299,6 +295,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   } else {
     P.addSROA();
   }
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Promote stack allocations to values.
   P.addMem2Reg();
@@ -393,6 +393,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+  P.addTempRValueOpt();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
@@ -805,6 +806,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Create pre-specializations.
+  P.addOnonePrespecializations();
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();

@@ -60,9 +60,9 @@
 // -output-file-map itself
 // RUN: echo "{\"main.swift\": {\"object\": \"main-modified.o\"}}" > %t/ofmo2.json
 // RUN: touch %t/main.swift
-// RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2
+// RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2 --enable-yaml-compatibility
 // -output-file-map= is an alias for -output-file-map
-// RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map=ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2
+// RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map=ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2 --enable-yaml-compatibility
 // OUTPUT_FILE_MAP_2: BUILD_DIR{{.*}}main-modified.o
 
 // RUN: %empty-directory(%t/sub)

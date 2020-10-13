@@ -115,7 +115,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
 
     // Destroy the argument value (either as SSA value or in the stack-
     // allocated temporary) at the end of the partial_apply's lifetime.
-    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt);
+    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
   }
   return true;
 }

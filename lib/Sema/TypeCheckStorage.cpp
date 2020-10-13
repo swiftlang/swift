@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -113,6 +114,21 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     if (var->hasAttachedPropertyWrapper())
       (void) var->getPropertyWrapperBackingProperty();
   }
+
+  // If this is an actor class, check conformance to the Actor protocol to
+  // ensure that the actor storage will get created (if needed).
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (classDecl->isActor()) {
+      ASTContext &ctx = decl->getASTContext();
+      if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
+        SmallVector<ProtocolConformance *, 1> conformances;
+        classDecl->lookupConformance(
+            decl->getModuleContext(), actorProto, conformances);
+        for (auto conformance : conformances)
+          TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      }
+    }
+  }
 }
 
 ArrayRef<VarDecl *>
@@ -128,10 +144,16 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
+  ASTContext &ctx = decl->getASTContext();
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
+      if (!var->isStatic() && var->hasStorage()) {
+        // Actor storage always goes at the beginning.
+        if (var->getName() == ctx.Id_actorStorage)
+          results.insert(results.begin(), var);
+        else
+          results.push_back(var);
+      }
   }
 
   return decl->getASTContext().AllocateCopy(results);
@@ -808,12 +830,32 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
   }
 
+  // If the base is not 'self', default get access to nonmutating and set access to mutating.
+  bool getterMutatesBase = selfDecl && storage->isGetterMutating();
+  bool setterMutatesBase = !selfDecl || storage->isSetterMutating();
+  // If we're not accessing via a property wrapper, we don't need to adjust
+  // the mutability.
+  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
+    auto var = cast<VarDecl>(accessor->getStorage());
+    auto mutability = var->getPropertyWrapperMutability();
+    // Only adjust mutability if it's possible to mutate the base.
+    if (mutability && !var->isStatic() &&
+        !(selfDecl && selfTypeForAccess->hasReferenceSemantics())) {
+      getterMutatesBase = (mutability->Getter == PropertyWrapperMutability::Mutating);
+      setterMutatesBase = (mutability->Setter == PropertyWrapperMutability::Mutating);
+    }
+  }
+
+  // If the accessor is mutating, then the base should be referred as an l-value
+  bool isBaseLValue = (getterMutatesBase && isUsedForGetAccess) ||
+                      (setterMutatesBase && isUsedForSetAccess);
+
   if (!selfDecl) {
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              /*IsImplicit=*/true, semantics);
     auto type = storage->getValueInterfaceType().subst(subs);
-    if (isLValue)
+    if (isBaseLValue)
       type = LValueType::get(type);
     storageDRE->setType(type);
 
@@ -821,32 +863,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   // Build self
-
-  bool isGetterMutating = storage->isGetterMutating();
-  bool isSetterMutating = storage->isSetterMutating();
-  // If we're not accessing via a property wrapper, we don't need to adjust
-  // the mutability.
-  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
-    auto var = cast<VarDecl>(accessor->getStorage());
-    if (auto mutability = var->getPropertyWrapperMutability()) {
-      // We consider the storage's mutability too because the wrapped property
-      // might be part of a class, in case of which nothing is mutating.
-      isGetterMutating = (mutability->Getter == PropertyWrapperMutability::Mutating)
-        ? (storage->isGetterMutating() || storage->isSetterMutating())
-        : storage->isGetterMutating();
-      isSetterMutating = (mutability->Setter == PropertyWrapperMutability::Mutating)
-        ? (storage->isGetterMutating() || storage->isSetterMutating())
-        : storage->isGetterMutating();
-    }
-  }
-
-  // If the accessor is mutating, then self should be referred as an l-value
-  bool isSelfLValue = (isGetterMutating && isUsedForGetAccess) ||
-                      (isSetterMutating && isUsedForSetAccess);
-
-  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
+  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isBaseLValue,
                                      /*convertTy*/ selfTypeForAccess);
-  if (isSelfLValue)
+  if (isBaseLValue)
     selfTypeForAccess = LValueType::get(selfTypeForAccess);
 
   if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
@@ -2735,6 +2754,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                              initializer);
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
+    } else if (var->hasObservers() && !dc->isTypeContext()) {
+      var->diagnose(diag::observingprop_requires_initializer);
     }
 
     if (var->getOpaqueResultTypeDecl()) {
@@ -3165,3 +3186,71 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   return info;
 }
+
+bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
+                                   AccessorDecl *decl) const {
+
+  class OldValueFinder : public ASTWalker {
+    const ParamDecl *OldValueParam;
+    bool foundOldValueRef = false;
+
+  public:
+    OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return {true, E};
+      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto decl = DRE->getDecl()) {
+          if (decl == OldValueParam) {
+            foundOldValueRef = true;
+            return {false, nullptr};
+          }
+        }
+      }
+
+      return {true, E};
+    }
+
+    bool didFindOldValueRef() { return foundOldValueRef; }
+  };
+
+  // If this is not a didSet accessor, bail out.
+  if (decl->getAccessorKind() != AccessorKind::DidSet) {
+    return false;
+  }
+
+  // Always assume non-simple 'didSet' in code completion mode.
+  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+    return false;
+
+  // didSet must have a single parameter.
+  if (decl->getParameters()->size() != 1) {
+    return false;
+  }
+
+  auto param = decl->getParameters()->get(0);
+  // If this parameter is not implicit, then it means it has been explicitly
+  // provided by the user (i.e. 'didSet(oldValue)'). This means we cannot
+  // consider this a "simple" didSet because we have to fetch the oldValue
+  // regardless of whether it's referenced in the body or not.
+  if (!param->isImplicit()) {
+    return false;
+  }
+
+  // If we find a reference to the implicit 'oldValue' parameter, then it is
+  // not a "simple" didSet because we need to fetch it.
+  auto walker = OldValueFinder(param);
+  decl->getTypecheckedBody()->walk(walker);
+  auto hasOldValueRef = walker.didFindOldValueRef();
+  if (!hasOldValueRef) {
+    // If the body does not refer to implicit 'oldValue', it means we can
+    // consider this as a "simple" didSet. Let's also erase the implicit
+    // oldValue as it is never used.
+    auto &ctx = decl->getASTContext();
+    decl->setParameters(ParameterList::createEmpty(ctx));
+    return true;
+  }
+  return false;
+}
+

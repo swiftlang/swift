@@ -127,13 +127,14 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
-  }
 
-  module AuthZ {
-    header "AuthZ.h"
-    export *
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "winver.h"
+      export *
 
-    link "AuthZ.Lib"
+      link "Version.Lib"
+    }
   }
 
   module Controls {
@@ -162,13 +163,6 @@ module WinSDK [system] {
     export *
 
     link "NetAPI32.Lib"
-  }
-
-  module DbgHelp {
-    header "DbgHelp.h"
-    export *
-
-    link "DbgHelp.Lib"
   }
 
   module DWM {
@@ -223,6 +217,36 @@ module WinSDK [system] {
     link "WinMM.Lib"
   }
 
+  module Networking {
+    header "winnetwk.h"
+    export *
+
+    link "Mpr.Lib"
+  }
+
+  module Security {
+    module AuthZ {
+      header "AuthZ.h"
+      export *
+
+      link "AuthZ.Lib"
+    }
+
+    module SmartCard {
+      header "winscard.h"
+      export *
+
+      link "winscard.lib"
+    }
+
+    module WinCrypt {
+      header "wincrypt.h"
+      export *
+
+      link "Crypt32.Lib"
+    }
+  }
+
   module Shell {
     header "ShlObj.h"
     export *
@@ -244,11 +268,44 @@ module WinSDK [system] {
     link "shcore.lib"
   }
 
+  module System {
+    module DbgHelp {
+      header "DbgHelp.h"
+      export *
+
+      link "DbgHelp.Lib"
+    }
+
+    module IOCTL {
+      header "winioctl.h"
+      export *
+    }
+  }
+
   module OLE32 {
     header "oaidl.h"
     export *
 
     link "OleAut32.Lib"
+  }
+
+  module Performance {
+    module PerfLib {
+      header "perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    header "winperf.h"
+    export *
   }
 
   module Printing {
@@ -273,13 +330,6 @@ module WinSDK [system] {
     export *
   }
 
-  module WinCrypt {
-    header "wincrypt.h"
-    export *
-
-    link "Crypt32.Lib"
-  }
-
   module WinDNS {
     header "WinDNS.h"
     export *
@@ -292,6 +342,11 @@ module WinSDK [system] {
     export *
 
     link "Gdi32.Lib"
+  }
+
+  module WinNT {
+    header "winnt.h"
+    export *
   }
 
   module WinReg {

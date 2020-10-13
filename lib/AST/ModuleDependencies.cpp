@@ -21,17 +21,37 @@ using namespace swift;
 ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() { }
 
 bool ModuleDependencies::isSwiftModule() const {
-  return isa<SwiftModuleDependenciesStorage>(storage.get());
+  return isSwiftTextualModule() ||
+         isSwiftBinaryModule() ||
+         isSwiftPlaceholderModule();
 }
 
-bool ModuleDependencies::isPlaceholderSwiftModule() const {
-  return isa<PlaceholderSwiftModuleDependencyStorage>(storage.get());
+bool ModuleDependencies::isSwiftTextualModule() const {
+  return isa<SwiftTextualModuleDependenciesStorage>(storage.get());
+}
+
+bool ModuleDependencies::isSwiftBinaryModule() const {
+  return isa<SwiftBinaryModuleDependencyStorage>(storage.get());
+}
+
+bool ModuleDependencies::isSwiftPlaceholderModule() const {
+  return isa<SwiftPlaceholderModuleDependencyStorage>(storage.get());
+}
+
+bool ModuleDependencies::isClangModule() const {
+  return isa<ClangModuleDependenciesStorage>(storage.get());
 }
 
 /// Retrieve the dependencies for a Swift module.
-const SwiftModuleDependenciesStorage *
-ModuleDependencies::getAsSwiftModule() const {
-  return dyn_cast<SwiftModuleDependenciesStorage>(storage.get());
+const SwiftTextualModuleDependenciesStorage *
+ModuleDependencies::getAsSwiftTextualModule() const {
+  return dyn_cast<SwiftTextualModuleDependenciesStorage>(storage.get());
+}
+
+/// Retrieve the dependencies for a binary Swift dependency module.
+const SwiftBinaryModuleDependencyStorage *
+ModuleDependencies::getAsSwiftBinaryModule() const {
+  return dyn_cast<SwiftBinaryModuleDependencyStorage>(storage.get());
 }
 
 /// Retrieve the dependencies for a Clang module.
@@ -41,9 +61,9 @@ ModuleDependencies::getAsClangModule() const {
 }
 
 /// Retrieve the dependencies for a placeholder dependency module stub.
-const PlaceholderSwiftModuleDependencyStorage *
+const SwiftPlaceholderModuleDependencyStorage *
 ModuleDependencies::getAsPlaceholderDependencyModule() const {
-  return dyn_cast<PlaceholderSwiftModuleDependencyStorage>(storage.get());
+  return dyn_cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
 }
 
 void ModuleDependencies::addModuleDependency(
@@ -62,8 +82,7 @@ void ModuleDependencies::addModuleDependencies(
     if (!importDecl)
       continue;
 
-    addModuleDependency(importDecl->getModulePath().front().Item.str(),
-                        &alreadyAddedModules);
+    addModuleDependency(importDecl->getModulePath(), &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();
@@ -72,7 +91,7 @@ void ModuleDependencies::addModuleDependencies(
 
   // If the storage is for an interface file, the only source file we
   // should see is that interface file.
-  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
   if (swiftStorage->swiftInterfaceFile) {
     assert(fileName == *swiftStorage->swiftInterfaceFile);
     return;
@@ -83,26 +102,26 @@ void ModuleDependencies::addModuleDependencies(
 }
 
 Optional<std::string> ModuleDependencies::getBridgingHeader() const {
-  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
   return swiftStorage->bridgingHeaderFile;
 }
 
 void ModuleDependencies::addBridgingHeader(StringRef bridgingHeader) {
-  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
   assert(!swiftStorage->bridgingHeaderFile);
   swiftStorage->bridgingHeaderFile = bridgingHeader.str();
 }
 
 /// Add source files that the bridging header depends on.
 void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
-  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
   swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
 }
 
 /// Add (Clang) module on which the bridging header depends.
 void ModuleDependencies::addBridgingModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
-  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
   if (alreadyAddedModules.insert(module).second)
     swiftStorage->bridgingModuleDependencies.push_back(module.str());
 }
@@ -110,10 +129,12 @@ void ModuleDependencies::addBridgingModuleDependency(
 llvm::StringMap<ModuleDependencies> &
 ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
   switch (kind) {
-  case ModuleDependenciesKind::Swift:
-    return SwiftModuleDependencies;
+  case ModuleDependenciesKind::SwiftTextual:
+    return SwiftTextualModuleDependencies;
+  case ModuleDependenciesKind::SwiftBinary:
+    return SwiftBinaryModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
-    return PlaceholderSwiftModuleDependencies;
+    return SwiftPlaceholderModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -123,10 +144,12 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
 const llvm::StringMap<ModuleDependencies> &
 ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
   switch (kind) {
-  case ModuleDependenciesKind::Swift:
-    return SwiftModuleDependencies;
+  case ModuleDependenciesKind::SwiftTextual:
+    return SwiftTextualModuleDependencies;
+  case ModuleDependenciesKind::SwiftBinary:
+    return SwiftBinaryModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
-    return PlaceholderSwiftModuleDependencies;
+    return SwiftPlaceholderModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -137,7 +160,8 @@ bool ModuleDependenciesCache::hasDependencies(
     StringRef moduleName,
     Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
-    return hasDependencies(moduleName, ModuleDependenciesKind::Swift) ||
+    return hasDependencies(moduleName, ModuleDependenciesKind::SwiftTextual) ||
+        hasDependencies(moduleName, ModuleDependenciesKind::SwiftBinary) ||
         hasDependencies(moduleName, ModuleDependenciesKind::SwiftPlaceholder) ||
         hasDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
@@ -150,9 +174,12 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
     StringRef moduleName,
     Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
-    if (auto swiftDep = findDependencies(
-            moduleName, ModuleDependenciesKind::Swift))
-      return swiftDep;
+    if (auto swiftTextualDep = findDependencies(
+            moduleName, ModuleDependenciesKind::SwiftTextual))
+      return swiftTextualDep;
+    else if (auto swiftBinaryDep = findDependencies(
+            moduleName, ModuleDependenciesKind::SwiftBinary))
+      return swiftBinaryDep;
     else if (auto swiftPlaceholderDep = findDependencies(
             moduleName, ModuleDependenciesKind::SwiftPlaceholder))
       return swiftPlaceholderDep;
@@ -170,8 +197,8 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
 
 void ModuleDependenciesCache::recordDependencies(
     StringRef moduleName,
-    ModuleDependencies dependencies,
-    ModuleDependenciesKind kind) {
+    ModuleDependencies dependencies) {
+  auto kind = dependencies.getKind();
   auto &map = getDependenciesMap(kind);
   assert(map.count(moduleName) == 0 && "Already added to map");
   map.insert({moduleName, std::move(dependencies)});

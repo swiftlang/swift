@@ -18,9 +18,9 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
-#include "ConstraintSystem.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -465,6 +465,24 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   for (auto &elt : cond) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       hadAnyFalsable = true;
+
+      // Reject inlinable code using availability macros.
+      PoundAvailableInfo *info = elt.getAvailability();
+      if (auto *decl = dc->getAsDecl()) {
+        if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
+            decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          for (auto queries : info->getQueries())
+            if (auto availSpec =
+                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
+              if (availSpec->getMacroLoc().isValid()) {
+                Context.Diags.diagnose(
+                    availSpec->getMacroLoc(),
+                    swift::diag::availability_macro_in_inlinable,
+                    decl->getDescriptiveKind());
+                break;
+              }
+      }
+
       continue;
     }
 
@@ -503,6 +521,8 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
       continue;
     }
     elt.setPattern(pattern);
+
+    TypeChecker::diagnoseDuplicateBoundVars(pattern);
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
@@ -779,9 +799,8 @@ public:
       }
     }
 
-    auto exprTy = TypeChecker::typeCheckExpression(E, DC,
-                                                   ResultTy,
-                                                   ctp, options);
+    auto exprTy =
+        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -842,8 +861,7 @@ public:
       }
 
       TypeChecker::typeCheckExpression(exprToCheck, DC,
-                                       contextType,
-                                       contextTypePurpose);
+                                       {contextType, contextTypePurpose});
 
       // Propagate the change into the inout expression we stripped before.
       if (inout) {
@@ -865,10 +883,9 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
     if (!exnType) return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, exnType,
-                                     CTP_ThrowStmt);
+    TypeChecker::typeCheckExpression(E, DC, {exnType, CTP_ThrowStmt});
     TS->setSubExpr(E);
-    
+
     return TS;
   }
 
@@ -910,7 +927,7 @@ public:
   Stmt *visitGuardStmt(GuardStmt *GS) {
     typeCheckConditionForStatement(GS, DC);
 
-    Stmt *S = GS->getBody();
+    BraceStmt *S = GS->getBody();
     typeCheckStmt(S);
     GS->setBody(S);
     return GS;
@@ -955,6 +972,8 @@ public:
   Stmt *visitForEachStmt(ForEachStmt *S) {
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
+
+    TypeChecker::diagnoseDuplicateBoundVars(S->getPattern());
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
@@ -1031,6 +1050,8 @@ public:
       });
     }
     labelItem.setPattern(pattern, /*resolved=*/true);
+
+    TypeChecker::diagnoseDuplicateBoundVars(pattern);
 
     // Otherwise for each variable in the pattern, make sure its type is
     // identical to the initial case decl and stash the previous case decl as
@@ -1144,7 +1165,7 @@ public:
             getASTContext(), caseBlock, limitExhaustivityChecks);
       }
 
-      Stmt *body = caseBlock->getBody();
+      BraceStmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
     }
@@ -1513,7 +1534,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     }
 
     auto resultTy =
-        TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
+        TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
 
     // If a closure expression is unused, the user might have intended to write
     // "do { ... }".
@@ -1613,9 +1634,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
-  auto resultTy =
-      TypeChecker::typeCheckExpression(r, ctor, Type(), CTP_Unused,
-                                       TypeCheckExprFlags::IsDiscarded);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      r, ctor, /*contextualInfo=*/{}, TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
@@ -1704,30 +1724,30 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   ASTContext &ctx = classDecl->getASTContext();
   bool wantSuperInitCall = false;
   bool isDelegating = false;
-  ApplyExpr *initExpr = nullptr;
-  switch (ctor->getDelegatingOrChainedInitKind(&ctx.Diags, &initExpr)) {
-  case ConstructorDecl::BodyInitKind::Delegating:
+  auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
+  switch (initKindAndExpr.initKind) {
+  case BodyInitKind::Delegating:
     isDelegating = true;
     wantSuperInitCall = false;
     break;
 
-  case ConstructorDecl::BodyInitKind::Chained:
-    checkSuperInit(ctor, initExpr, false);
+  case BodyInitKind::Chained:
+    checkSuperInit(ctor, initKindAndExpr.initExpr, false);
 
     /// A convenience initializer cannot chain to a superclass constructor.
     if (ctor->isConvenienceInit()) {
-      ctx.Diags.diagnose(initExpr->getLoc(),
+      ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(),
                          diag::delegating_convenience_super_init,
                          ctor->getDeclContext()->getDeclaredInterfaceType());
     }
 
     LLVM_FALLTHROUGH;
 
-  case ConstructorDecl::BodyInitKind::None:
+  case BodyInitKind::None:
     wantSuperInitCall = false;
     break;
 
-  case ConstructorDecl::BodyInitKind::ImplicitChained:
+  case BodyInitKind::ImplicitChained:
     wantSuperInitCall = true;
     break;
   }
@@ -1743,7 +1763,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
           .fixItInsert(ctor->getLoc(), "convenience ");
     }
 
-    ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
+    ctx.Diags.diagnose(initKindAndExpr.initExpr->getLoc(), diag::delegation_here);
   }
 
   // An inlinable constructor in a class must always be delegating,
@@ -1891,6 +1911,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->isBodyTypeChecked())
       return false;
+
+    ASTScope::expandFunctionBody(AFD);
   }
 
   // Function builder function doesn't support partial type checking.
@@ -2039,7 +2061,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
-  checkParameterAttributes(closure->getParameters());
+  TypeChecker::checkParameterList(closure->getParameters());
 
   BraceStmt *body = closure->getBody();
 

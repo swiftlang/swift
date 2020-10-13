@@ -20,6 +20,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -44,7 +45,6 @@ using namespace swift::namelookup;
 
 void VisibleDeclConsumer::anchor() {}
 void VectorDeclConsumer::anchor() {}
-void NamedDeclConsumer::anchor() {}
 
 ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)
@@ -290,8 +290,7 @@ static void recordShadowedDeclsAfterTypeMatch(
       auto file = dc->getParentSourceFile();
       if (!file) return false;
       for (const auto &import : file->getImports()) {
-        if (import.importOptions.contains(
-                SourceFile::ImportFlags::PrivateImport)
+        if (import.options.contains(ImportFlags::PrivateImport)
             && import.module.importedModule == module
             && import.module.accessPath.matches(name))
           return true;
@@ -1503,7 +1502,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   // Check access.
   if (!(options & NL_IgnoreAccessControl) &&
       !dc->getASTContext().isAccessControlDisabled()) {
-    return decl->isAccessibleFrom(dc);
+    bool allowInlinable = options & NL_IncludeUsableFromInlineAndInlineable;
+    return decl->isAccessibleFrom(dc, /*forConformance*/ false, allowInlinable);
   }
 
   return true;
@@ -1779,8 +1779,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
-    lookupInModule(module, member.getFullName(), decls,
-                   NLKind::QualifiedLookup, kind, topLevelScope);
+    lookupInModule(module, member.getFullName(), decls, NLKind::QualifiedLookup,
+                   kind, topLevelScope, options);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1796,7 +1796,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                        return accessPath.matches(member.getFullName());
                      })) {
       lookupInModule(module, member.getFullName(), decls,
-                     NLKind::QualifiedLookup, kind, topLevelScope);
+                     NLKind::QualifiedLookup, kind, topLevelScope,
+                     options);
     }
   }
 
@@ -2290,12 +2291,33 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                   inheritedTypes, modulesFound, anyObject);
 
     // Look for a class declaration.
+    ClassDecl *superclass = nullptr;
     for (auto inheritedNominal : inheritedNominalTypes) {
-      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
-        return classDecl;
+      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal)) {
+        superclass = classDecl;
+        break;
+      }
+    }
+
+    // If we found a superclass, ensure that we don't have a circular
+    // inheritance hierarchy by evaluating its superclass. This forces the
+    // diagnostic at this point and then suppresses the superclass failure.
+    if (superclass) {
+      auto result = Ctx.evaluator(SuperclassDeclRequest{superclass});
+      bool hadCycle = false;
+      if (auto err = result.takeError()) {
+        llvm::handleAllErrors(std::move(err),
+          [&hadCycle](const CyclicalRequestError<SuperclassDeclRequest> &E) {
+          hadCycle = true;
+          });
+
+        if (hadCycle)
+          return nullptr;
+      }
+
+      return superclass;
     }
   }
-
 
   return nullptr;
 }

@@ -1683,7 +1683,7 @@ namespace {
     void emitNonoverriddenMethod(SILDeclRef fn) {
       // TODO: Derivative functions do not distinguish themselves in the mangled
       // names of method descriptor symbols yet, causing symbol name collisions.
-      if (fn.derivativeFunctionIdentifier)
+      if (fn.getDerivativeFunctionIdentifier())
         return;
 
      HasNonoverriddenMethods = true;
@@ -5045,6 +5045,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
+  case KnownProtocolKind::Actor:
     return SpecialProtocol::None;
   }
 

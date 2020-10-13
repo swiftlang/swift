@@ -54,11 +54,13 @@
 #include "CallEmission.h"
 #include "ConformanceDescription.h"
 #include "ConstantBuilder.h"
+#include "EntryPointArgumentEmission.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "Fulfillment.h"
 #include "GenArchetype.h"
+#include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenEnum.h"
@@ -73,6 +75,7 @@
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
 #include "MetadataPath.h"
 #include "MetadataRequest.h"
 #include "NecessaryBindings.h"
@@ -486,7 +489,8 @@ class EmitPolymorphicParameters : public PolymorphicConvention {
 public:
   EmitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn);
 
-  void emit(Explosion &in, WitnessMetadata *witnessMetadata,
+  void emit(EntryPointArgumentEmission &emission,
+            WitnessMetadata *witnessMetadata,
             const GetParameterFn &getParameter);
 
 private:
@@ -496,7 +500,8 @@ private:
 
   /// Fulfill local type data from any extra information associated with
   /// the given source.
-  void bindExtraSource(const MetadataSource &source, Explosion &in,
+  void bindExtraSource(const MetadataSource &source,
+                       EntryPointArgumentEmission &emission,
                        WitnessMetadata *witnessMetadata);
 
   void bindParameterSources(const GetParameterFn &getParameter);
@@ -525,9 +530,9 @@ CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) cons
       IGM.getSILModule(), FnType, IGM.getMaximalTypeExpansionContext()));
 }
 
-void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
-                                                Explosion &in,
-                                         WitnessMetadata *witnessMetadata) {
+void EmitPolymorphicParameters::bindExtraSource(
+    const MetadataSource &source, EntryPointArgumentEmission &emission,
+    WitnessMetadata *witnessMetadata) {
   switch (source.getKind()) {
     case MetadataSource::Kind::Metadata:
     case MetadataSource::Kind::ClassPointer:
@@ -537,7 +542,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
     case MetadataSource::Kind::GenericLValueMetadata: {
       CanType argTy = getArgTypeInContext(source.getParamIndex());
 
-      llvm::Value *metadata = in.claimNext();
+      llvm::Value *metadata = emission.getNextPolymorphicParameterAsMetadata();
       setTypeMetadataName(IGF.IGM, metadata, argTy);
 
       IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata,
@@ -2220,12 +2225,12 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 }
 
 /// Emit a polymorphic parameters clause, binding all the metadata necessary.
-void EmitPolymorphicParameters::emit(Explosion &in,
+void EmitPolymorphicParameters::emit(EntryPointArgumentEmission &emission,
                                      WitnessMetadata *witnessMetadata,
                                      const GetParameterFn &getParameter) {
   // Collect any early sources and bind local type data from them.
   for (auto &source : getSources()) {
-    bindExtraSource(source, in, witnessMetadata);
+    bindExtraSource(source, emission, witnessMetadata);
   }
   
   auto getInContext = [&](CanType type) -> CanType {
@@ -2234,7 +2239,7 @@ void EmitPolymorphicParameters::emit(Explosion &in,
 
   // Collect any concrete type metadata that's been passed separately.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
-    auto value = in.claimNext();
+    llvm::Value *value = emission.getNextPolymorphicParameter(requirement);
     bindGenericRequirement(IGF, requirement, value, MetadataState::Complete,
                            getInContext);
   });
@@ -2532,8 +2537,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (!source) return MetadataResponse();
 
-    auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
-    auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
+    auto sourceMetadata =
+      IGF.emitAbstractTypeMetadataRef(sourceType);
+    auto associatedMetadata =
+      IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
     auto sourceWTable = source.getMetadata();
 
     AssociatedConformance associatedConformanceRef(sourceProtocol,
@@ -2631,21 +2638,21 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
 
 /// Collect any required metadata for a witness method from the end of
 /// the given parameter list.
-void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
-                                           SILFunction &fn,
-                                           Explosion &params,
-                                           WitnessMetadata &witnessMetadata) {
+void irgen::collectTrailingWitnessMetadata(
+    IRGenFunction &IGF, SILFunction &fn,
+    NativeCCEntryPointArgumentEmission &emission,
+    WitnessMetadata &witnessMetadata) {
   assert(fn.getLoweredFunctionType()->getRepresentation()
            == SILFunctionTypeRepresentation::WitnessMethod);
 
-  llvm::Value *wtable = params.takeLast();
+  llvm::Value *wtable = emission.getSelfWitnessTable();
   assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy &&
          "parameter signature mismatch: witness metadata didn't "
          "end in witness table?");
   wtable->setName("SelfWitnessTable");
   witnessMetadata.SelfWitnessTable = wtable;
 
-  llvm::Value *metatype = params.takeLast();
+  llvm::Value *metatype = emission.getSelfMetadata();
   assert(metatype->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "parameter signature mismatch: witness metadata didn't "
          "end in metatype?");
@@ -2654,12 +2661,12 @@ void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
-void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
-                                      SILFunction &Fn,
-                                      Explosion &in,
+void irgen::emitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn,
+                                      EntryPointArgumentEmission &emission,
                                       WitnessMetadata *witnessMetadata,
                                       const GetParameterFn &getParameter) {
-  EmitPolymorphicParameters(IGF, Fn).emit(in, witnessMetadata, getParameter);
+  EmitPolymorphicParameters(IGF, Fn).emit(emission, witnessMetadata,
+                                          getParameter);
 }
 
 /// Given an array of polymorphic arguments as might be set up by
@@ -2693,26 +2700,53 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
                                     [&](CanType type) { return type;});
 }
 
+template <typename Transform>
+static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
+                 Address buffer, Transform transform) {
+  emitInitOfGenericRequirementsBuffer(
+      IGF, bindings.getRequirements().getArrayRef(), buffer,
+      [&](GenericRequirement requirement) -> llvm::Value * {
+        CanType type = requirement.TypeParameter;
+        if (auto protocol = requirement.Protocol) {
+          if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+            auto wtable =
+                emitArchetypeWitnessTableRef(IGF, archetype, protocol);
+            return transform(requirement, wtable);
+          } else {
+            auto conformance = bindings.getConformance(requirement);
+            auto wtable = emitWitnessTableRef(IGF, type, conformance);
+            return transform(requirement, wtable);
+          }
+        } else {
+          auto metadata = IGF.emitTypeMetadataRef(type);
+          return transform(requirement, metadata);
+        }
+      });
+};
+
+void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
+                             Explosion &source) const {
+  ::save(*this, IGF, buffer,
+         [&](GenericRequirement requirement,
+             llvm::Value *expected) -> llvm::Value * {
+           auto *value = source.claimNext();
+           assert(value == expected);
+           return value;
+         });
+}
+
 void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
-  emitInitOfGenericRequirementsBuffer(IGF, Requirements.getArrayRef(), buffer,
-        [&](GenericRequirement requirement) -> llvm::Value* {
-    CanType type = requirement.TypeParameter;
-    if (auto protocol = requirement.Protocol) {
-      auto wtable =
-        emitArchetypeWitnessTableRef(IGF, cast<ArchetypeType>(type), protocol);
-      return wtable;
-    } else {
-      auto metadata = IGF.emitTypeMetadataRef(type);
-      return metadata;
-    }
-  });
+  ::save(*this, IGF, buffer,
+         [](GenericRequirement requirement,
+            llvm::Value *value) -> llvm::Value * { return value; });
 }
 
 void NecessaryBindings::addTypeMetadata(CanType type) {
   assert(!isa<InOutType>(type));
 
   // Bindings are only necessary at all if the type is dependent.
-  if (!type->hasArchetype()) return;
+  if (!type->hasArchetype() && !forAsyncFunction())
+    return;
 
   // Break down structural types so that we don't eagerly pass metadata
   // for the structural type.  Future considerations for this:
@@ -2774,16 +2808,26 @@ static void addAbstractConditionalRequirements(
 void NecessaryBindings::addProtocolConformance(CanType type,
                                                ProtocolConformanceRef conf) {
   if (!conf.isAbstract()) {
+    auto concreteConformance = conf.getConcrete();
     auto specializedConf =
-        dyn_cast<SpecializedProtocolConformance>(conf.getConcrete());
+        dyn_cast<SpecializedProtocolConformance>(concreteConformance);
     // The partial apply forwarder does not have the context to reconstruct
     // abstract conditional conformance requirements.
     if (forPartialApply && specializedConf) {
       addAbstractConditionalRequirements(specializedConf, Requirements);
+    } else if (forAsyncFunction()) {
+      ProtocolDecl *protocol = conf.getRequirement();
+      GenericRequirement requirement;
+      requirement.TypeParameter = type;
+      requirement.Protocol = protocol;
+      std::pair<GenericRequirement, ProtocolConformanceRef> pair{requirement,
+                                                                 conf};
+      Conformances.insert(pair);
+      Requirements.insert({type, concreteConformance->getProtocol()});
     }
     return;
   }
-  assert(isa<ArchetypeType>(type));
+  assert(isa<ArchetypeType>(type) || forAsyncFunction());
 
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
@@ -2970,10 +3014,8 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   }
 }
 
-NecessaryBindings
-NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
-                                          CanSILFunctionType origType,
-                                          SubstitutionMap subs) {
+NecessaryBindings NecessaryBindings::forAsyncFunctionInvocation(
+    IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs) {
   return computeBindings(IGM, origType, subs,
                          false /*forPartialApplyForwarder*/);
 }
@@ -3028,7 +3070,11 @@ NecessaryBindings NecessaryBindings::computeBindings(
       continue;
 
     case MetadataSource::Kind::SelfMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
+      // Async functions pass the SelfMetadata and SelfWitnessTable parameters
+      // along explicitly.
+      if (forPartialApplyForwarder) {
+        bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
+      }
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:

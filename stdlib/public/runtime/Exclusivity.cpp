@@ -219,7 +219,7 @@ public:
       }
     }
 
-    swift_runtime_unreachable("access not found in set");
+    swift_unreachable("access not found in set");
   }
 
 #ifndef NDEBUG

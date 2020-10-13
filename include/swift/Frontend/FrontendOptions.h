@@ -34,7 +34,8 @@ class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
   /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
+  std::vector<std::pair<std::string, bool /*testable*/>>
+      ImplicitImportModuleNames;
 
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
@@ -272,6 +273,10 @@ public:
   /// built and given to the compiler invocation.
   bool DisableImplicitModules = false;
 
+  /// Disable building Swift modules from textual interfaces. This should be
+  /// for testing purposes only.
+  bool DisableBuildingInterface = false;
+
   /// When performing a dependency scanning action, only identify and output all imports
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
@@ -347,7 +352,8 @@ public:
 
   /// Retrieves the list of arbitrary modules to import and make implicitly
   /// visible.
-  ArrayRef<std::string> getImplicitImportModuleNames() const {
+  ArrayRef<std::pair<std::string, bool /*testable*/>>
+  getImplicitImportModuleNames() const {
     return ImplicitImportModuleNames;
   }
 

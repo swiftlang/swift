@@ -1289,6 +1289,9 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   case Node::Kind::GenericSpecialization:
     Buffer << "Tg";
     break;
+  case Node::Kind::GenericSpecializationPrespecialized:
+    Buffer << "Ts";
+    break;
   case Node::Kind::GenericSpecializationNotReAbstracted:
     Buffer << "TG";
     break;
@@ -1303,6 +1306,10 @@ void Remangler::mangleGenericSpecialization(Node *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
       mangle(Child);
   }
+}
+
+void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
+  mangleGenericSpecialization(node);
 }
 
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
@@ -1340,6 +1347,7 @@ void Remangler::mangleGlobal(Node *node) {
     switch (Child->getKind()) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
+      case Node::Kind::GenericSpecializationPrespecialized:
       case Node::Kind::GenericSpecializationNotReAbstracted:
       case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
@@ -1537,6 +1545,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Case("@convention(witness_method)", 'W')
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
+                        .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
         Buffer << FuncAttr;

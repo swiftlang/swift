@@ -66,6 +66,10 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
+option(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH
+       "Build Differentation without tgmath (and dependency on platform runtime libraries)"
+       FALSE)
+
 #
 # End of user-configurable options.
 #

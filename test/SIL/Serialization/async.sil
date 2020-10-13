@@ -1,0 +1,100 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name async
+// RUN: %target-sil-opt %t/tmp.sib -module-name async | %FileCheck %s
+// REQUIRES: concurrency
+
+import Builtin
+import Swift
+import _Concurrency
+
+sil [serialized] @aaa : $@convention(thin) () -> () {
+entry:
+  %a = function_ref @async_continuation : $@convention(thin) @async () -> ()
+  %b = function_ref @async_continuation_throws : $@convention(thin) @async () -> ()
+  %c = function_ref @async_continuation_addr : $@convention(thin) @async () -> ()
+  %d = function_ref @async_continuation_throws_addr : $@convention(thin) @async () -> ()
+  return undef : $()
+}
+
+// CHECK: sil [serialized] @async_continuation : $@convention(thin) @async () -> () {
+sil [serialized] @async_continuation : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation $Builtin.Int32
+  %c = get_async_continuation $Builtin.Int32
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
+bb1(%r : $Builtin.Int32):
+  return undef : $()
+}
+
+// CHECK: sil [serialized] @async_continuation_throws : $@convention(thin) @async () -> () {
+sil [serialized] @async_continuation_throws : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation [throws] $Builtin.Int32
+  %c = get_async_continuation [throws] $Builtin.Int32
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+bb2(%e : $Error):
+  // CHECK-NEXT: br
+  br bb3
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
+bb1(%r : $Builtin.Int32):
+  // CHECK-NEXT: br
+  br bb3
+
+bb3: 
+  return undef : $()
+}
+
+// CHECK: sil [serialized] @async_continuation_addr : $@convention(thin) @async () -> () {
+sil [serialized] @async_continuation_addr : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK: [[SLOT:%.*]] = alloc_stack
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK: sil [serialized] @async_continuation_throws_addr : $@convention(thin) @async () -> () {
+sil [serialized] @async_continuation_throws_addr : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK: [[SLOT:%.*]] = alloc_stack
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr [throws] $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr [throws] $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+bb2(%e : $Error):
+  // CHECK-NEXT: dealloc_stack
+  dealloc_stack %a : $*Builtin.Int32
+  // CHECK-NEXT: br
+  br bb3
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  return undef : $()
+}
+

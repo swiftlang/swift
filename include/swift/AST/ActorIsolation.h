@@ -24,6 +24,11 @@ class raw_ostream;
 
 namespace swift {
 class ClassDecl;
+class Type;
+
+/// Determine whether the given types are (canonically) equal, declared here
+/// to avoid having to include Types.h.
+bool areTypesEqual(Type type1, Type type2);
 
 /// Describes the actor isolation of a given declaration, which determines
 /// the actors with which it can interact.
@@ -37,20 +42,26 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration can refer to actor-isolated state, but can also be
-    //// referenced from outside the actor.
-    ActorPrivileged,
     /// The declaration is explicitly specified to be independent of any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
     Independent,
+    /// The declaration is isolated to a global actor. It can refer to other
+    /// entities with the same global actor.
+    GlobalActor,
   };
 
 private:
   Kind kind;
-  ClassDecl *actor;
+  union {
+    ClassDecl *actor;
+    Type globalActor;
+    void *pointer;
+  };
 
   ActorIsolation(Kind kind, ClassDecl *actor) : kind(kind), actor(actor) { }
+  ActorIsolation(Kind kind, Type globalActor)
+      : kind(kind), globalActor(globalActor) { }
 
 public:
   static ActorIsolation forUnspecified() {
@@ -61,12 +72,12 @@ public:
     return ActorIsolation(Independent, nullptr);
   }
 
-  static ActorIsolation forActorPrivileged(ClassDecl *actor) {
-    return ActorIsolation(ActorPrivileged, actor);
-  }
-
   static ActorIsolation forActorInstance(ClassDecl *actor) {
     return ActorIsolation(ActorInstance, actor);
+  }
+
+  static ActorIsolation forGlobalActor(Type globalActor) {
+    return ActorIsolation(GlobalActor, globalActor);
   }
 
   Kind getKind() const { return kind; }
@@ -74,8 +85,13 @@ public:
   operator Kind() const { return getKind(); }
 
   ClassDecl *getActor() const {
-    assert(getKind() == ActorInstance || getKind() == ActorPrivileged);
+    assert(getKind() == ActorInstance);
     return actor;
+  }
+
+  Type getGlobalActor() const {
+    assert(getKind() == GlobalActor);
+    return globalActor;
   }
 
   friend bool operator==(const ActorIsolation &lhs,
@@ -89,8 +105,10 @@ public:
       return true;
 
     case ActorInstance:
-    case ActorPrivileged:
       return lhs.actor == rhs.actor;
+
+    case GlobalActor:
+      return areTypesEqual(lhs.globalActor, rhs.globalActor);
     }
   }
 
@@ -100,7 +118,7 @@ public:
   }
 
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(state.kind, state.actor);
+    return llvm::hash_combine(state.kind, state.pointer);
   }
 };
 

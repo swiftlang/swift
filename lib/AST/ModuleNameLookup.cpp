@@ -53,7 +53,8 @@ public:
   void lookupInModule(SmallVectorImpl<ValueDecl *> &decls,
                       const DeclContext *moduleOrFile,
                       ImportPath::Access accessPath,
-                      const DeclContext *moduleScopeContext);
+                      const DeclContext *moduleScopeContext,
+                      NLOptions options);
 };
 
 
@@ -124,7 +125,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     SmallVectorImpl<ValueDecl *> &decls,
     const DeclContext *moduleOrFile,
     ImportPath::Access accessPath,
-    const DeclContext *moduleScopeContext) {
+    const DeclContext *moduleScopeContext,
+    NLOptions options) {
   assert(moduleOrFile->isModuleScopeContext());
 
   // Does the module scope have any separately-imported overlays shadowing
@@ -135,7 +137,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   if (!overlays.empty()) {
     // If so, look in each of those overlays.
     for (auto overlay : overlays)
-      lookupInModule(decls, overlay, accessPath, moduleScopeContext);
+      lookupInModule(decls, overlay, accessPath, moduleScopeContext, options);
     // FIXME: This may not work gracefully if more than one of these lookups
     // finds something.
     return;
@@ -143,6 +145,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
+  bool includeInlineable = options & NL_IncludeUsableFromInlineAndInlineable;
 
   auto updateNewDecls = [&](const DeclContext *moduleScopeContext) {
     if (decls.size() == currentCount)
@@ -153,7 +156,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       [&](ValueDecl *VD) {
         if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
           return true;
-        if (respectAccessControl && !VD->isAccessibleFrom(moduleScopeContext))
+        if (respectAccessControl &&
+            !VD->isAccessibleFrom(moduleScopeContext, false, includeInlineable))
           return true;
         return false;
       });
@@ -182,7 +186,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   if (!canReturnEarly) {
     auto &imports = ctx.getImportCache().getImportSet(moduleOrFile);
 
-    auto visitImport = [&](ModuleDecl::ImportedModule import,
+    auto visitImport = [&](ImportedModule import,
                            const DeclContext *moduleScopeContext) {
       if (import.accessPath.empty())
         import.accessPath = accessPath;
@@ -202,9 +206,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       if (auto *loader = ctx.getClangModuleLoader()) {
         headerImportModule = loader->getImportedHeaderModule();
         if (headerImportModule) {
-          ModuleDecl::ImportedModule import{ImportPath::Access(),
-                                            headerImportModule};
-          visitImport(import, nullptr);
+          visitImport(ImportedModule(headerImportModule), nullptr);
         }
       }
     }
@@ -249,13 +251,13 @@ QualifiedLookupResult
 LookupInModuleRequest::evaluate(
     Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
     NLKind lookupKind, ResolutionKind resolutionKind,
-    const DeclContext *moduleScopeContext) const {
+    const DeclContext *moduleScopeContext, NLOptions options) const {
   assert(moduleScopeContext->isModuleScopeContext());
 
   QualifiedLookupResult decls;
   LookupByName lookup(moduleOrFile->getASTContext(), resolutionKind,
                       name, lookupKind);
-  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
+  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext, options);
   return decls;
 }
 
@@ -264,10 +266,11 @@ void namelookup::lookupInModule(const DeclContext *moduleOrFile,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
-                                const DeclContext *moduleScopeContext) {
+                                const DeclContext *moduleScopeContext,
+                                NLOptions options) {
   auto &ctx = moduleOrFile->getASTContext();
   LookupInModuleRequest req(moduleOrFile, name, lookupKind, resolutionKind,
-                            moduleScopeContext);
+                            moduleScopeContext, options);
   auto results = evaluateOrDefault(ctx.evaluator, req, {});
   decls.append(results.begin(), results.end());
 }
@@ -282,7 +285,8 @@ void namelookup::lookupVisibleDeclsInModule(
   assert(moduleScopeContext->isModuleScopeContext());
   auto &ctx = moduleOrFile->getASTContext();
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
-  lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext);
+  lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
+                        NL_QualifiedDefault);
 }
 
 void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {

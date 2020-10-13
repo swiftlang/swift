@@ -1,3 +1,4 @@
+set_swift_llvm_is_available()
 add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
@@ -17,6 +18,7 @@ add_swift_host_library(swiftSema STATIC
   ConstraintLocator.cpp
   ConstraintSystem.cpp
   DebuggerTestingTransform.cpp
+  DerivedConformanceActor.cpp
   DerivedConformanceAdditiveArithmetic.cpp
   DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
@@ -33,6 +35,7 @@ add_swift_host_library(swiftSema STATIC
   MiscDiagnostics.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
+  PreCheckExpr.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   TypeCheckAccess.cpp

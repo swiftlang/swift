@@ -1,0 +1,59 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printBool : $@convention(thin) (Bool) -> ()
+
+// CHECK-LL: define hidden swiftcc void @genericEquatableAndGenericEquatableToBool(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @genericEquatableAndGenericEquatableToBool : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool {
+bb0(%0 : $*T, %1 : $*T):
+  %4 = metatype $@thick T.Type
+  %5 = witness_method $T, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %6 = apply %5<T>(%0, %1, %4) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  return %6 : $Bool
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %int1_literal = integer_literal $Builtin.Int64, 42
+  %int1 = struct $Int64 (%int1_literal : $Builtin.Int64)
+  %int1_addr = alloc_stack $Int64
+  store %int1 to %int1_addr : $*Int64
+
+  %int2_literal = integer_literal $Builtin.Int64, 99
+  %int2 = struct $Int64 (%int2_literal : $Builtin.Int64)
+  %int2_addr = alloc_stack $Int64
+  store %int2 to %int2_addr : $*Int64
+
+  %genericEquatableAndGenericEquatableToBool = function_ref @genericEquatableAndGenericEquatableToBool : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+  %false = apply %genericEquatableAndGenericEquatableToBool<Int64>(%int1_addr, %int2_addr) : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+
+  %print_bool = function_ref @printBool : $@convention(thin) (Bool) -> ()
+  %print_false = apply %print_bool(%false) : $@convention(thin) (Bool) -> () // CHECK: false
+
+  %true = apply %genericEquatableAndGenericEquatableToBool<Int64>(%int1_addr, %int1_addr) : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+
+  %print_true = apply %print_bool(%true) : $@convention(thin) (Bool) -> () // CHECK: true
+
+  dealloc_stack %int2_addr : $*Int64
+  dealloc_stack %int1_addr : $*Int64
+
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32                              // id: %4
+}
+

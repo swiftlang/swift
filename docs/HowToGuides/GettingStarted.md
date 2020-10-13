@@ -97,7 +97,7 @@ toolchain as a one-off, there are a couple of differences:
    or a specific snapshot. You can update the branch/tag for all repositories
    as follows:
    ```sh
-   utils/update-checkout --branch mybranchname
+   utils/update-checkout --scheme mybranchname
    # OR
    utils/update-checkout --tag mytagname
    ```
@@ -246,15 +246,13 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --cmake-c-launcher="$(which sccache)" --cmake-cxx-launcher="$(which sccache)" \
-       --release-debuginfo --test
+       --sccache --release-debuginfo --test
      ```
    - Via Xcode:
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --cmake-c-launcher="$(which sccache)" --cmake-cxx-launcher="$(which sccache)" \
-       --release-debuginfo --test \
+       --sccache --release-debuginfo --test \
        --xcode
      ```
    This will create a directory

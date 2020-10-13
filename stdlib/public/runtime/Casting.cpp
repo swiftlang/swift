@@ -35,7 +35,7 @@
 # define SWIFT_CASTING_SUPPORTS_MUTEX 1
 # include "swift/Runtime/Mutex.h"
 #endif
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #if SWIFT_OBJC_INTEROP
@@ -1016,7 +1016,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
   }
 
-  swift_runtime_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
+  swift_unreachable("Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 /******************************************************************************/
@@ -1214,7 +1214,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     return nullptr;
   }
 
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+  swift_unreachable("Unhandled MetadataKind in switch.");
 }
 
 static const Metadata *
@@ -1424,7 +1424,7 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
   }
   }
 
-  swift_runtime_unreachable(
+  swift_unreachable(
       "Unhandled ExistentialTypeRepresentation in switch.");
 }
 

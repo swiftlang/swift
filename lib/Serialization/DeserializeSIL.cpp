@@ -683,6 +683,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   // Read and instantiate the specialize attributes.
+  bool shouldAddAtttributes = fn->getSpecializeAttrs().empty();
   while (numSpecAttrs--) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
         SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -701,18 +702,37 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     unsigned exported;
     unsigned specializationKindVal;
     GenericSignatureID specializedSigID;
-    SILSpecializeAttrLayout::readRecord(scratch, exported,
-                                        specializationKindVal,
-                                        specializedSigID);
+    IdentifierID targetFunctionID;
+    IdentifierID spiGroupID;
+    ModuleID spiModuleID;
+    SILSpecializeAttrLayout::readRecord(
+        scratch, exported, specializationKindVal, specializedSigID,
+        targetFunctionID, spiGroupID, spiModuleID);
+
+    SILFunction *target = nullptr;
+    if (targetFunctionID) {
+      target = getFuncForReference(MF->getIdentifier(targetFunctionID).str());
+    }
+
+    Identifier spiGroup;
+    const ModuleDecl *spiModule = nullptr;
+    if (spiGroupID) {
+      spiGroup = MF->getIdentifier(spiGroupID);
+      spiModule = MF->getModule(spiModuleID);
+    }
+
     SILSpecializeAttr::SpecializationKind specializationKind =
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
     auto specializedSig = MF->getGenericSignature(specializedSigID);
-
-    // Read the substitution list and construct a SILSpecializeAttr.
-    fn->addSpecializeAttr(SILSpecializeAttr::create(
-        SILMod, specializedSig, exported != 0, specializationKind));
+    // Only add the specialize attributes once.
+    if (shouldAddAtttributes) {
+      // Read the substitution list and construct a SILSpecializeAttr.
+      fn->addSpecializeAttr(SILSpecializeAttr::create(
+          SILMod, specializedSig, exported != 0, specializationKind, target,
+          spiGroup, spiModule));
+    }
   }
 
   GenericEnvironment *genericEnv = nullptr;
@@ -1201,6 +1221,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
+      
+  case SILInstructionKind::GetAsyncContinuationInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createGetAsyncContinuation(Loc,
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
+  
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
+           && "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createGetAsyncContinuationAddr(Loc,
+      getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                      (SILValueCategory)TyCategory2, Fn)),
+      getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
 
 #define ONETYPE_ONEOPERAND_INST(ID)                                            \
@@ -2155,6 +2190,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createCondBranch(
         Loc, Cond, getBBForReference(Fn, ListOfValues[1]), TrueArgs,
         getBBForReference(Fn, ListOfValues[2]), FalseArgs);
+    break;
+  }
+  case SILInstructionKind::AwaitAsyncContinuationInst: {
+    // Format: continuation, resume block ID, error block ID if given
+    SILValue Cont = getLocalValue(
+              ListOfValues[0],
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    
+    SILBasicBlock *resultBB = getBBForReference(Fn, ListOfValues[1]);
+    SILBasicBlock *errorBB = nullptr;
+    if (ListOfValues.size() >= 3) {
+      errorBB = getBBForReference(Fn, ListOfValues[2]);
+    }
+    
+    ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB, errorBB);
     break;
   }
   case SILInstructionKind::SwitchEnumInst:

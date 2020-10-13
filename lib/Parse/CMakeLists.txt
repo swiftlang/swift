@@ -1,3 +1,5 @@
+set_swift_llvm_is_available()
+
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
   set(SWIFT_GYB_FLAGS --line-directive "^\"#line %(line)d \\\"%(file)s\\\"^\"")
 else()

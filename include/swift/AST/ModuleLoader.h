@@ -75,6 +75,9 @@ enum class IntermoduleDepTrackingMode {
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
+  SmallVector<std::string, 8> incrementalDeps;
+  llvm::StringSet<> incrementalDepsUniquer;
+
 public:
   explicit DependencyTracker(
       IntermoduleDepTrackingMode Mode,
@@ -87,8 +90,18 @@ public:
   /// No path canonicalization is done.
   void addDependency(StringRef File, bool IsSystem);
 
+  /// Adds a file as an incremental dependency.
+  ///
+  /// No additional canonicalization or adulteration of the file path in
+  /// \p File is performed.
+  void addIncrementalDependency(StringRef File);
+
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
+
+  /// Fetches the list of dependencies that are known to have incremental swift
+  /// dependency information embedded inside of them.
+  ArrayRef<std::string> getIncrementalDependencies() const;
 
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
@@ -101,6 +114,23 @@ struct SubCompilerInstanceInfo {
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
   ArrayRef<StringRef> ExtraPCMArgs;
+};
+
+/// Abstract interface for a checker of module interfaces and prebuilt modules.
+class ModuleInterfaceChecker {
+public:
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) = 0;
+
+  /// Given a list of potential ready-to-use compiled modules for \p interfacePath,
+  /// check if any one of them is up-to-date. If so, emit a forwarding module
+  /// to the candidate binary module to \p outPath.
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                               StringRef interfacePath,
+                               ArrayRef<std::string> candidates,
+                               StringRef outPath) = 0;
+  virtual ~ModuleInterfaceChecker() = default;
 };
 
 /// Abstract interface to run an action in a sub ASTContext.

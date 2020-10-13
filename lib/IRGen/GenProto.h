@@ -40,12 +40,14 @@ namespace swift {
 namespace irgen {
   class Address;
   class DynamicMetadataRequest;
+  class EntryPointArgumentEmission;
   class Explosion;
   class FunctionPointer;
   class IRGenFunction;
   class IRGenModule;
   class MetadataPath;
   class MetadataResponse;
+  class NativeCCEntryPointArgumentEmission;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -120,9 +122,10 @@ namespace irgen {
 
   /// Collect any required metadata for a witness method from the end
   /// of the given parameter list.
-  void collectTrailingWitnessMetadata(IRGenFunction &IGF, SILFunction &fn,
-                                      Explosion &params,
-                                      WitnessMetadata &metadata);
+  void
+  collectTrailingWitnessMetadata(IRGenFunction &IGF, SILFunction &fn,
+                                 NativeCCEntryPointArgumentEmission &params,
+                                 WitnessMetadata &metadata);
 
   using GetParameterFn = llvm::function_ref<llvm::Value*(unsigned)>;
 
@@ -131,12 +134,11 @@ namespace irgen {
   ///
   /// \param witnessMetadata - can be omitted if the function is
   ///   definitely not a witness method
-  void emitPolymorphicParameters(IRGenFunction &IGF,
-                                 SILFunction &Fn,
-                                 Explosion &args,
+  void emitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn,
+                                 EntryPointArgumentEmission &emission,
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
- 
+
   void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
                                           NominalTypeDecl *typeDecl,
                                           Address array,

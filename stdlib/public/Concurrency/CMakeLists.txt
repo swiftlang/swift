@@ -11,6 +11,7 @@
 #===----------------------------------------------------------------------===#
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Actor.swift
   PartialAsyncTask.swift
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
@@ -28,5 +29,4 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  DARWIN_INSTALL_NAME_DIR "@rpath"
   INSTALL_IN_COMPONENT stdlib)

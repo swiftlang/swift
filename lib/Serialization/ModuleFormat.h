@@ -20,10 +20,11 @@
 #define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Bitstream/BitCodes.h"
-#include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
 namespace serialization {
@@ -55,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 579; // incremental deps info block
+const uint16_t SWIFTMODULE_VERSION_MINOR = 582; // sil specialize attribute module parameter
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -724,8 +725,10 @@ enum BlockID {
   /// This is part of a stable format and should not be renumbered.
   ///
   /// Though we strive to keep the format stable, breaking the format of
-  /// .swiftsourceinfo doesn't have consequences as serious as breaking the format
-  /// of .swiftdoc because .swiftsourceinfo file is for local development use only.
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the
+  /// format
+  /// of .swiftdoc because .swiftsourceinfo file is for local development use
+  /// only.
   ///
   /// \sa decl_locs_block
   DECL_LOCS_BLOCK_ID,
@@ -733,7 +736,8 @@ enum BlockID {
   /// The incremental dependency information block.
   ///
   /// This is part of a stable format and should not be renumbered.
-  INCREMENTAL_INFORMATION_BLOCK_ID = 196,
+  INCREMENTAL_INFORMATION_BLOCK_ID =
+      fine_grained_dependencies::INCREMENTAL_INFORMATION_BLOCK_ID,
 };
 
 /// The record types within the control block.
@@ -1844,7 +1848,11 @@ namespace decls_block {
     Specialize_DECL_ATTR,
     BCFixed<1>, // exported flag
     BCFixed<1>, // specialization kind
-    GenericSignatureIDField // specialized signature
+    GenericSignatureIDField, // specialized signature
+    DeclIDField, // target function
+    BCVBR<4>,   // # of arguments (+1) or 1 if simple decl name, 0 if no target
+    BCVBR<4>,   // # of SPI groups
+    BCArray<IdentifierIDField> // target function pieces, spi groups
   >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<

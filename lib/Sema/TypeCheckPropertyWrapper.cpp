@@ -13,7 +13,6 @@
 // This file implements semantic analysis for property wrappers.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -413,12 +412,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       
     // Check various restrictions on which properties can have wrappers
     // attached to them.
-
-    // Local properties do not yet support wrappers.
-    if (var->getDeclContext()->isLocalContext()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_local);
-      continue;
-    }
 
     // Nor does top-level code.
     if (var->getDeclContext()->isModuleScopeContext()) {

@@ -940,7 +940,7 @@ static SILValue projectLoadValue(SILValue addr, SILValue rootAddr,
     SILValue val = projectLoadValue(TEI->getOperand(), rootAddr, rootVal,
                                     beforeInst);
     SILBuilder B(beforeInst);
-    return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldNo(),
+    return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldIndex(),
                                 TEI->getType().getObjectType());
   }
   llvm_unreachable("unknown projection");

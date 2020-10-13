@@ -87,6 +87,7 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
+class ErrorExpr;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -600,9 +601,6 @@ public:
   bool hasOpaqueArchetype() const {
     return getRecursiveProperties().hasOpaqueArchetype();
   }
-  /// Determine whether the type has any stored properties or enum cases that
-  /// involve an opaque type.
-  bool hasOpaqueArchetypePropertiesOrCases();
 
   /// Determine whether the type is an opened existential type.
   ///
@@ -5741,7 +5739,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 /// constraint solver and transformed into UnresolvedType to be used in AST.
 class HoleType : public TypeBase {
   using Originator = llvm::PointerUnion<TypeVariableType *,
-                                        DependentMemberType *, VarDecl *>;
+                                        DependentMemberType *, VarDecl *,
+                                        ErrorExpr *>;
 
   Originator O;
 

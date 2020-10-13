@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -37,41 +38,6 @@ using namespace Lowering;
 
 void Initialization::_anchor() {}
 void SILDebuggerClient::anchor() {}
-
-namespace {
-  /// A "null" initialization that indicates that any value being initialized
-  /// into this initialization should be discarded. This represents AnyPatterns
-  /// (that is, 'var (_)') that bind to values without storing them.
-  class BlackHoleInitialization : public Initialization {
-  public:
-    BlackHoleInitialization() {}
-
-    bool canSplitIntoTupleElements() const override {
-      return true;
-    }
-    
-    MutableArrayRef<InitializationPtr>
-    splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
-                           CanType type,
-                           SmallVectorImpl<InitializationPtr> &buf) override {
-      // "Destructure" an ignored binding into multiple ignored bindings.
-      for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
-        (void) fieldType;
-        buf.push_back(InitializationPtr(new BlackHoleInitialization()));
-      }
-      return buf;
-    }
-
-    void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                             ManagedValue value, bool isInit) override {
-      /// This just ignores the provided value.
-    }
-
-    void finishUninitialized(SILGenFunction &SGF) override {
-      // do nothing
-    }
-  };
-} // end anonymous namespace
 
 static void copyOrInitValueIntoHelper(
     SILGenFunction &SGF, SILLocation loc, ManagedValue value, bool isInit,
@@ -1171,6 +1137,22 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
   if (auto *Init = PBD->getExecutableInit(idx)) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
+
+    auto *var = PBD->getSingleVar();
+    if (var && var->getDeclContext()->isLocalContext()) {
+      if (auto *orig = var->getOriginalWrappedProperty()) {
+        auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
+        Init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
+
+        auto value = emitRValue(Init);
+        emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
+                                                     getForwardingSubstitutionMap(),
+                                                     std::move(value))
+          .forwardInto(*this, SILLocation(PBD), initialization.get());
+        return;
+      }
+    }
+
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
     initialization->finishUninitialized(*this);
@@ -1188,6 +1170,18 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
+
+  // Emit the property wrapper backing initializer if necessary.
+  auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
+  if (wrapperInfo && wrapperInfo.initializeFromOriginal)
+    SGM.emitPropertyWrapperBackingInitializer(D);
+
+  D->visitAuxiliaryDecls([&](VarDecl *var) {
+    if (auto *patternBinding = var->getParentPatternBinding())
+      visitPatternBindingDecl(patternBinding);
+
+    visit(var);
+  });
 
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {
@@ -1261,7 +1255,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
       InitializationPtr initialization =
-      InitializationForPattern(*this, FalseDest).visit(elt.getPattern());
+        emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));

@@ -50,6 +50,9 @@ enum NLOptions : unsigned {
   /// Include synonyms declared with @_implements()
   NL_IncludeAttributeImplements = 1 << 5,
 
+  // Include @usableFromInline and @inlinable
+  NL_IncludeUsableFromInlineAndInlineable = 1 << 6,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the

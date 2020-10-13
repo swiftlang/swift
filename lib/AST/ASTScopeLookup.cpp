@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -36,21 +37,16 @@ using namespace namelookup;
 using namespace ast_scope;
 
 void ASTScopeImpl::unqualifiedLookup(
-    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
-    DeclConsumer consumer) {
+    SourceFile *sourceFile, const SourceLoc loc, DeclConsumer consumer) {
   const auto *start =
-      findStartingScopeForLookup(sourceFile, name, loc);
+      findStartingScopeForLookup(sourceFile, loc);
   if (start)
     start->lookup(nullptr, nullptr, consumer);
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc) {
+    SourceFile *sourceFile, const SourceLoc loc) {
   auto *const fileScope = sourceFile->getScope().impl;
-  // Parser may have added decls to source file, since previous lookup
-  if (name.isOperator())
-    return fileScope; // operators always at file scope
-
   const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
@@ -76,22 +72,14 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
                                                       scopeCreator);
 }
 
-bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
-  const auto r = getSourceRangeOfThisASTNode();
-  (void)r;
-  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start),
-                 "Range is backwards.");
-  return true;
-}
-
 /// If the \p loc is in a new buffer but \p range is not, consider the location
 /// is at the start of replaced range. Otherwise, returns \p loc as is.
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
-                                              SourceRange range,
+                                              CharSourceRange range,
                                               SourceLoc loc) {
   if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
     if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
-        !sourceMgr.rangeContains(replacedRange.New, range)) {
+        !sourceMgr.rangeContainsTokenLoc(replacedRange.New, range.getStart())) {
       return replacedRange.Original.Start;
     }
   }
@@ -105,17 +93,19 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
   auto *const *child = llvm::lower_bound(
       getChildren(), loc,
       [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
-        ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-        auto rangeOfScope = scope->getSourceRangeOfScope();
+        auto rangeOfScope = scope->getCharSourceRangeOfScope(sourceMgr);
+        ASTScopeAssert(!sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(),
+                                                   rangeOfScope.getStart()),
+                       "Source range is backwards");
         loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-        return -1 == ASTScopeImpl::compare(rangeOfScope, loc, sourceMgr,
-                                           /*ensureDisjoint=*/false);
+        return (rangeOfScope.getEnd() == loc ||
+                sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(), loc));
       });
 
   if (child != getChildren().end()) {
-    auto rangeOfScope = (*child)->getSourceRangeOfScope();
+    auto rangeOfScope = (*child)->getCharSourceRangeOfScope(sourceMgr);
     loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-    if (sourceMgr.rangeContainsTokenLoc(rangeOfScope, loc))
+    if (rangeOfScope.contains(loc))
       return *child;
   }
 
@@ -226,7 +216,7 @@ bool ASTScopeImpl::lookInGenericParametersOf(
   SmallVector<ValueDecl *, 32> bindings;
   for (auto *param : paramList.get()->getParams())
     bindings.push_back(param);
-  if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter))
+  if (consumer.consume(bindings))
     return true;
   return false;
 }
@@ -253,7 +243,7 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
     return false;
-  return consumer.lookInMembers(scope->getDeclContext().get(), nt);
+  return consumer.lookInMembers(scope->getGenericContext(), nt);
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
@@ -276,7 +266,8 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 NullablePtr<const ASTScopeImpl>
 PatternEntryInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  assert(parent->getClassName() == "PatternEntryDeclScope");
+  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+                 "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
   // scope that introduces bindings bound by the pattern, since we
@@ -289,32 +280,47 @@ PatternEntryInitializerScope::getLookupParent() const {
   return parent->getLookupParent();
 }
 
+NullablePtr<const ASTScopeImpl>
+ConditionalClauseInitializerScope::getLookupParent() const {
+  auto parent = getParent().get();
+  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+                 "ConditionalClauseInitializerScope in unexpected place");
+
+  // Lookups from inside a conditional clause initializer skip the parent
+  // scope that introduces bindings bound by the pattern, since we
+  // want this to work:
+  //
+  // func f(x: Int?) {
+  //   guard let x = x else { return }
+  //   print(x)
+  // }
+  return parent->getLookupParent();
+}
+
 #pragma mark looking in locals or members - locals
 
 bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   auto *param = paramList->getParams()[index];
-  return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
+  return consumer.consume({param});
 }
 
 bool PatternEntryDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  if (vis != DeclVisibilityKind::LocalVariable)
-    return false; // look in self type will find this later
-  return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
+  if (!isLocalBinding)
+    return false;
+  return lookupLocalBindingsInPattern(getPattern(), consumer);
 }
 
 bool ForEachPatternScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(
-      stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
+  return lookupLocalBindingsInPattern(stmt->getPattern(), consumer);
 }
 
 bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(
-      item.getPattern(), DeclVisibilityKind::LocalVariable, consumer);
+  return lookupLocalBindingsInPattern(item.getPattern(), consumer);
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
-    if (consumer.consume({var}, DeclVisibilityKind::LocalVariable))
+    if (consumer.consume({var}))
         return true;
 
   return false;
@@ -324,13 +330,12 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   if (auto *paramList = decl->getParameters()) {
     for (auto *paramDecl : *paramList)
-      if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter))
+      if (consumer.consume({paramDecl}))
         return true;
   }
 
   if (decl->getDeclContext()->isTypeContext()) {
-    return consumer.consume({decl->getImplicitSelfDecl()},
-                            DeclVisibilityKind::FunctionParameter);
+    return consumer.consume({decl->getImplicitSelfDecl()});
   }
 
   // Consider \c var t: T { (did/will/)get/set { ... t }}
@@ -339,7 +344,7 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
   // then t needs to be found as a local binding:
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     if (auto *storage = accessor->getStorage())
-      if (consumer.consume({storage}, DeclVisibilityKind::LocalVariable))
+      if (consumer.consume({storage}))
         return true;
   }
 
@@ -350,7 +355,7 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   if (auto *params = whatWasSpecialized->getGenericParams())
     for (auto *param : params->getParams())
-      if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
+      if (consumer.consume({param}))
         return true;
   return false;
 }
@@ -360,7 +365,7 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
   auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
     if (auto *params = afd->getGenericParams())
       for (auto *param : params->getParams())
-        if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
+        if (consumer.consume({param}))
           return true;
     return false;
   };
@@ -375,20 +380,16 @@ bool DifferentiableAttributeScope::lookupLocalsOrMembers(
 }
 
 bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  // All types and functions are visible anywhere within a brace statement
-  // scope. When ordering matters (i.e. var decl) we will have split the brace
-  // statement into nested scopes.
-  //
-  // Don't stop at the first one, there may be local funcs with same base name
-  // and want them all.
-  SmallVector<ValueDecl *, 32> localBindings;
-  for (auto braceElement : stmt->getElements()) {
-    if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-      if (auto *vd = dyn_cast<ValueDecl>(localBinding))
-        localBindings.push_back(vd);
-    }
-  }
-  return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
+  if (consumer.consume(localFuncsAndTypes))
+    return true;
+
+  if (consumer.consumePossiblyNotInScope(localVars))
+    return true;
+
+  if (consumer.finishLookupInBraceStmt(stmt))
+    return true;
+
+  return false;
 }
 
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
@@ -398,8 +399,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
       decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
-      return consumer.consume({selfParam},
-                              DeclVisibilityKind::FunctionParameter);
+      return consumer.consume({selfParam});
     }
   }
   return false;
@@ -407,9 +407,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
 
 bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto &e : expr->getCaptureList()) {
-    if (consumer.consume(
-            {e.Var},
-            DeclVisibilityKind::LocalVariable)) // or FunctionParameter??
+    if (consumer.consume({e.Var}))
       return true;
   }
   return false;
@@ -418,26 +416,24 @@ bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 bool ClosureParametersScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   for (auto param : *closureExpr->getParameters())
-    if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter))
+    if (consumer.consume({param}))
       return true;
   return false;
 }
 
 bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(
-      pattern, DeclVisibilityKind::LocalVariable, consumer);
+  return lookupLocalBindingsInPattern(sec.getPattern(), consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
-                                                DeclVisibilityKind vis,
                                                 DeclConsumer consumer) {
   if (!p)
     return false;
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
     if (!isDone)
-      isDone = consumer.consume({var}, vis);
+      isDone = consumer.consume({var});
   });
   return isDone;
 }
@@ -504,11 +500,7 @@ bool ASTScopeImpl::isLabeledStmtLookupTerminator() const {
   return true;
 }
 
-bool LookupParentDiversionScope::isLabeledStmtLookupTerminator() const {
-  return false;
-}
-
-bool ConditionalClauseScope::isLabeledStmtLookupTerminator() const {
+bool GuardStmtBodyScope::isLabeledStmtLookupTerminator() const {
   return false;
 }
 

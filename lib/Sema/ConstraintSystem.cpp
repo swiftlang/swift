@@ -15,17 +15,18 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
-#include "ConstraintGraph.h"
 #include "CSDiagnostics.h"
-#include "CSFix.h"
-#include "SolutionResult.h"
+#include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSFix.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -5214,4 +5215,40 @@ Type ConstraintSystem::getVarType(const VarDecl *var) {
       return type;
     return HoleType::get(Context, const_cast<VarDecl *>(var));
   });
+}
+
+bool ConstraintSystem::isReadOnlyKeyPathComponent(
+    const AbstractStorageDecl *storage, SourceLoc referenceLoc) {
+  // See whether key paths can store to this component. (Key paths don't
+  // get any special power from being formed in certain contexts, such
+  // as the ability to assign to `let`s in initialization contexts, so
+  // we pass null for the DC to `isSettable` here.)
+  if (!getASTContext().isSwiftVersionAtLeast(5)) {
+    // As a source-compatibility measure, continue to allow
+    // WritableKeyPaths to be formed in the same conditions we did
+    // in previous releases even if we should not be able to set
+    // the value in this context.
+    if (!storage->isSettable(DC)) {
+      // A non-settable component makes the key path read-only, unless
+      // a reference-writable component shows up later.
+      return true;
+    }
+  } else if (!storage->isSettable(nullptr) ||
+             !storage->isSetterAccessibleFrom(DC)) {
+    // A non-settable component makes the key path read-only, unless
+    // a reference-writable component shows up later.
+    return true;
+  }
+
+  // If the setter is unavailable, then the keypath ought to be read-only
+  // in this context.
+  if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
+    auto maybeUnavail =
+        TypeChecker::checkDeclarationAvailability(setter, referenceLoc, DC);
+    if (maybeUnavail.hasValue()) {
+      return true;
+    }
+  }
+
+  return false;
 }

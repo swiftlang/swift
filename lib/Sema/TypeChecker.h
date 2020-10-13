@@ -22,12 +22,14 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -111,48 +113,6 @@ public:
   }
 };
 
-/// This specifies the purpose of the contextual type, when specified to
-/// typeCheckExpression.  This is used for diagnostic generation to produce more
-/// specified error messages when the conversion fails.
-///
-enum ContextualTypePurpose {
-  CTP_Unused,           ///< No contextual type is specified.
-  CTP_Initialization,   ///< Pattern binding initialization.
-  CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
-  CTP_ReturnSingleExpr, ///< Value implicitly returned from a function.
-  CTP_YieldByValue,     ///< By-value yield operand.
-  CTP_YieldByReference, ///< By-reference yield operand.
-  CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
-  CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
-  CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
-
-  /// Default value in @autoclosure parameter
-  /// 'foo(a : @autoclosure () -> Int = 42)'.
-  CTP_AutoclosureDefaultParameter,
-
-  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
-  CTP_CallArgument,     ///< Call to function or operator requires type.
-  CTP_ClosureResult,    ///< Closure result expects a specific type.
-  CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
-  CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
-  CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
-  CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
-  CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
-  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
-                             ///< result type.
-  CTP_Condition,        ///< Condition expression of various statements e.g.
-                        ///< `if`, `for`, `while` etc.
-  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
-                        ///< is expected to conform to 'Sequence' protocol.
-  CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
-  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
-                               ///< former 'wrappedValue' type
-
-  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
-};
-
-
-
 /// Flags that can be used to control type checking.
 enum class TypeCheckExprFlags {
   /// Whether we know that the result of the expression is discarded.  This
@@ -192,6 +152,8 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 1 << 1,
+  // Whether to include results that are marked @inlinable or @usableFromInline.
+  IncludeInlineableAndUsableFromInline = 1 << 2,
 };
 
 /// A set of options that control name lookup.
@@ -220,17 +182,6 @@ enum class Comparison {
   Better,
   /// The first entity is worse than the second.
   Worse
-};
-
-/// Specify how we handle the binding of underconstrained (free) type variables
-/// within a solution to a constraint system.
-enum class FreeTypeVariableBinding {
-  /// Disallow any binding of such free type variables.
-  Disallow,
-  /// Allow the free type variables to persist in the solution.
-  Allow,
-  /// Bind the type variables to UnresolvedType to represent the ambiguity.
-  UnresolvedType
 };
 
 /// A conditional conformance that implied some other requirements. That is, \c
@@ -497,7 +448,11 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
-void checkParameterAttributes(ParameterList *params);
+void checkParameterList(ParameterList *params);
+
+void diagnoseDuplicateBoundVars(Pattern *pattern);
+
+void diagnoseDuplicateCaptureVars(CaptureListExpr *expr);
 
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
@@ -597,21 +552,18 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 /// \param expr The expression to type-check, which will be modified in
 /// place.
 ///
-/// \param convertTypePurpose When convertType is specified, this indicates
+/// \param contextualInfo The type that the expression is being converted to,
+/// or null if the expression is standalone. When convertType is specified, this indicates
 /// what the conversion is doing.  This allows diagnostics generation to
 /// produce more specific and helpful error messages when the conversion fails
 /// to be possible.
-///
-/// \param convertType The type that the expression is being converted to,
-/// or null if the expression is standalone.
 ///
 /// \param options Options that control how type checking is performed.
 ///
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                         Type convertType = Type(),
-                         ContextualTypePurpose convertTypePurpose = CTP_Unused,
+                         constraints::ContextualTypeInfo contextualInfo = {},
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
 Optional<constraints::SolutionApplicationTarget>

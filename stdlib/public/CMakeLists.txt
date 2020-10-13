@@ -15,7 +15,11 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
-list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
+list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
+
+if(SWIFT_STDLIB_SIL_DEBUGGING)
+  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-gsil")
+endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
@@ -87,7 +91,15 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(SwiftOnoneSupport)
 
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-    add_subdirectory(Differentiation)
+    if(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH)
+      # Use a different CMakeLists.txt for this configuration
+      # while sharing the bulk of the code
+      # This way we will reduce any side effect on the main configuration
+      # and increase the readability of the CMake code
+      add_subdirectory(Differentiation_NoTgMath)
+    else()
+      add_subdirectory(Differentiation)
+    endif()
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)

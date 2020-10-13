@@ -144,8 +144,13 @@ static bool isBetterThan(const AvailableAttr *newAttr,
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->Platform == newAttr->Platform)
+  if (prevAttr->Platform == newAttr->Platform) {
+    if (newAttr->isUnconditionallyUnavailable())
+      return true;
+    if (prevAttr->isUnconditionallyUnavailable())
+      return false;
     return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
+  }
 
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr->Platform,
@@ -158,10 +163,12 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
+    if (AvailAttr == nullptr ||
         !AvailAttr->isActivePlatform(Ctx) ||
         AvailAttr->isLanguageVersionSpecific() ||
-        AvailAttr->isPackageDescriptionVersionSpecific()) {
+        AvailAttr->isPackageDescriptionVersionSpecific() ||
+        (!AvailAttr->Introduced.hasValue() &&
+         !AvailAttr->isUnconditionallyUnavailable())) {
       continue;
     }
 
@@ -171,6 +178,9 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   if (!bestAvailAttr)
     return None;
+
+  if (bestAvailAttr->isUnconditionallyUnavailable())
+      return AvailabilityContext(VersionRange::empty());
 
   return AvailabilityContext{
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
@@ -321,6 +331,10 @@ ASTContext::getCompareProtocolConformanceDescriptorsAvailability() {
 AvailabilityContext
 ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
   return getSwift54Availability();
+}
+
+AvailabilityContext ASTContext::getConcurrencyAvailability() {
+  return getSwiftFutureAvailability();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {

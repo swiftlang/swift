@@ -1672,7 +1672,7 @@ public:
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
-  bool trySolverCompletion();
+  bool trySolverCompletion(bool MaybeFuncBody);
 };
 } // end anonymous namespace
 
@@ -2036,8 +2036,8 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
-    SmallVector<ModuleDecl::ImportedModule, 16> Imported;
-    SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
+    SmallVector<ImportedModule, 16> Imported;
+    SmallVector<ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(
         Imported,
         {ModuleDecl::ImportFilterKind::Exported,
@@ -5923,7 +5923,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
 
   for (auto &Request: Lookup.RequestedCachedResults) {
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
-    auto handleImport = [&](ModuleDecl::ImportedModule Import) {
+    auto handleImport = [&](ImportedModule Import) {
       ModuleDecl *TheModule = Import.importedModule;
       ImportPath::Access Path = Import.accessPath;
       if (TheModule->getFiles().empty())
@@ -5991,7 +5991,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
         Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
-      SmallVector<ModuleDecl::ImportedModule, 4> Imports;
+      SmallVector<ImportedModule, 4> Imports;
       SF.getImportedModules(
           Imports, {ModuleDecl::ImportFilterKind::Exported,
                     ModuleDecl::ImportFilterKind::Default,
@@ -6054,25 +6054,7 @@ void deliverDotExprResults(
   deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
 }
 
-bool CodeCompletionCallbacksImpl::trySolverCompletion() {
-  CompletionContext.CodeCompletionKind = Kind;
-
-  if (Kind == CompletionKind::None)
-    return true;
-
-  bool MaybeFuncBody = true;
-  if (CurDeclContext) {
-    auto *CD = CurDeclContext->getLocalContext();
-    if (!CD || CD->getContextKind() == DeclContextKind::Initializer ||
-        CD->getContextKind() == DeclContextKind::TopLevelCodeDecl)
-      MaybeFuncBody = false;
-  }
-
-  if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
-    if (DC->isChildContextOf(CurDeclContext))
-      CurDeclContext = DC;
-  }
-
+bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   assert(ParsedExpr || CurDeclContext);
 
   SourceLoc CompletionLoc = ParsedExpr
@@ -6111,11 +6093,41 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion() {
   }
 }
 
+// Undoes the single-expression closure/function body transformation on the
+// given DeclContext and its parent contexts if they have a single expression
+// body that contains the code completion location.
+//
+// FIXME: Remove this once all expression position completions are migrated
+// to work via TypeCheckCompletionCallback.
+static void undoSingleExpressionReturn(DeclContext *DC) {
+  auto updateBody = [](BraceStmt *BS, ASTContext &Ctx) -> bool {
+    ASTNode FirstElem = BS->getFirstElement();
+    auto *RS = dyn_cast_or_null<ReturnStmt>(FirstElem.dyn_cast<Stmt*>());
+
+    if (!RS || !RS->isImplicit())
+      return false;
+
+    BS->setFirstElement(RS->getResult());
+    return true;
+  };
+
+  while (ClosureExpr *CE = dyn_cast_or_null<ClosureExpr>(DC)) {
+    if (CE->hasSingleExpressionBody()) {
+      if (updateBody(CE->getBody(), CE->getASTContext()))
+        CE->setBody(CE->getBody(), false);
+    }
+    DC = DC->getParent();
+  }
+  if (FuncDecl *FD = dyn_cast_or_null<FuncDecl>(DC)) {
+    if (FD->hasSingleExpressionBody()) {
+      if (updateBody(FD->getBody(), FD->getASTContext()))
+        FD->setHasSingleExpressionBody(false);
+    }
+  }
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   CompletionContext.CodeCompletionKind = Kind;
-
-  if (trySolverCompletion())
-    return;
 
   if (Kind == CompletionKind::None) {
     return;
@@ -6134,6 +6146,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
+  if (trySolverCompletion(MaybeFuncBody))
+    return;
+
+  undoSingleExpressionReturn(CurDeclContext);
   typeCheckContextAt(
       CurDeclContext,
       ParsedExpr

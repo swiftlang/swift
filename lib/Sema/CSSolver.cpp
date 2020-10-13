@@ -14,12 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 #include "CSStep.h"
-#include "ConstraintGraph.h"
-#include "ConstraintSystem.h"
-#include "SolutionResult.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -44,13 +45,13 @@ STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(Overall##Name, Description);
-#include "ConstraintSolverStats.def"
+#include "swift/Sema/ConstraintSolverStats.def"
 
 #undef DEBUG_TYPE
 #define DEBUG_TYPE "Constraint solver largest system"
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(Largest##Name, Description);
-#include "ConstraintSolverStats.def"
+#include "swift/Sema/ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
 TypeVariableType *ConstraintSystem::createTypeVariable(
@@ -444,7 +445,7 @@ ConstraintSystem::SolverState::~SolverState() {
 
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
-  #include "ConstraintSolverStats.def"
+  #include "swift/Sema/ConstraintSolverStats.def"
 
 #if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
@@ -456,7 +457,7 @@ ConstraintSystem::SolverState::~SolverState() {
     #define CS_STATISTIC(Name, Description) \
       JOIN2(Largest,Name) = Name-1; \
       ++JOIN2(Largest,Name);
-    #include "ConstraintSolverStats.def"
+    #include "swift/Sema/ConstraintSolverStats.def"
   }
 #endif
 }

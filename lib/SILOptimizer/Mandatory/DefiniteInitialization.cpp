@@ -394,7 +394,7 @@ namespace {
 
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
-    llvm::SmallDenseMap<SILInstruction*, unsigned, 16> NonLoadUses;
+    llvm::SmallDenseMap<SILInstruction*, SmallVector<unsigned, 1>, 16> NonLoadUses;
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
@@ -472,7 +472,7 @@ namespace {
 
     void handleSelfInitUse(unsigned UseID);
 
-    void updateInstructionForInitState(DIMemoryUse &Use);
+    void updateInstructionForInitState(unsigned UseID);
 
 
     void processUninitializedRelease(SILInstruction *Release,
@@ -544,7 +544,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
       break;
     }
 
-    NonLoadUses[Use.Inst] = ui;
+    NonLoadUses[Use.Inst].push_back(ui);
 
     auto &BBInfo = getBlockInfo(Use.Inst->getParent());
     BBInfo.HasNonLoadUse = true;
@@ -562,9 +562,8 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     getBlockInfo(bb).markStoreToSelf();
   }
 
-  // If isn't really a use, but we account for the mark_uninitialized or
+  // It isn't really a use, but we account for the mark_uninitialized or
   // project_box as a use so we see it in our dataflow walks.
-  NonLoadUses[TheMemory.getUninitializedValue()] = ~0U;
   auto &MemBBInfo = getBlockInfo(TheMemory.getParentBlock());
   MemBBInfo.HasNonLoadUse = true;
 
@@ -826,7 +825,7 @@ void LifetimeChecker::doIt() {
   // postpone lowering of assignment instructions to avoid deleting
   // instructions that still appear in the Uses list.
   for (unsigned UseID : NeedsUpdateForInitState)
-    updateInstructionForInitState(Uses[UseID]);
+    updateInstructionForInitState(UseID);
 }
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
@@ -1911,7 +1910,8 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
 /// from being InitOrAssign to some concrete state, update it for that state.
 /// This includes rewriting them from assign instructions into their composite
 /// operations.
-void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
+void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
+  DIMemoryUse &Use = Uses[UseID];
   SILInstruction *Inst = Use.Inst;
 
   IsInitialization_t InitKind;
@@ -1945,10 +1945,11 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;
-    NonLoadUses.erase(Inst);
+    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
 
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
@@ -1966,7 +1967,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;
-    NonLoadUses.erase(Inst);
+    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
 
     switch (Use.Kind) {
     case DIUseKind::Initialization:
@@ -2819,17 +2820,17 @@ LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
       --BBI;
       SILInstruction *TheInst = &*BBI;
 
-      // If this instruction is unrelated to the memory, ignore it.
-      if (!NonLoadUses.count(TheInst))
-        continue;
+      if (TheInst == TheMemory.getUninitializedValue()) {
+        Result.set(0, DIKind::No);
+        return Result;
+      }
 
-      // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.  Otherwise, we've found a definition, or
-      // something else that will require that the memory is initialized at
-      // this point.
-      Result.set(0, TheInst == TheMemory.getUninitializedValue() ? DIKind::No
-                                                                 : DIKind::Yes);
-      return Result;
+      if (NonLoadUses.count(TheInst)) {
+        // We've found a definition, or something else that will require that
+        // the memory is initialized at this point.
+        Result.set(0, DIKind::Yes);
+        return Result;
+      }
     }
   }
 
@@ -2882,11 +2883,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
       --BBI;
       SILInstruction *TheInst = &*BBI;
 
-      // If this instruction is unrelated to the memory, ignore it.
-      auto It = NonLoadUses.find(TheInst);
-      if (It == NonLoadUses.end())
-        continue;
-      
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.  Scan no further.
       if (TheInst == TheMemory.getUninitializedValue()) {
@@ -2896,11 +2892,19 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
         return Result;
       }
 
+      // If this instruction is unrelated to the memory, ignore it.
+      auto It = NonLoadUses.find(TheInst);
+      if (It == NonLoadUses.end())
+        continue;
+
       // Check to see which tuple elements this instruction defines.  Clear them
       // from the set we're scanning from.
-      auto &TheInstUse = Uses[It->second];
-      NeededElements.reset(TheInstUse.FirstElement,
-                           TheInstUse.FirstElement+TheInstUse.NumElements);
+      for (unsigned TheUse : It->second) {
+        auto &TheInstUse = Uses[TheUse];
+        NeededElements.reset(TheInstUse.FirstElement,
+                             TheInstUse.FirstElement+TheInstUse.NumElements);
+      }
+
       // If that satisfied all of the elements we're looking for, then we're
       // done.  Otherwise, keep going.
       if (NeededElements.none()) {

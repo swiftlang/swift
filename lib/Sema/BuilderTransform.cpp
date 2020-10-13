@@ -15,9 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
-#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -28,6 +26,8 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <iterator>
@@ -1979,7 +1979,8 @@ void swift::printFunctionBuilderBuildFunction(
     componentTypeString = "<#Component#>";
 
   // Render the code.
-  ExtraIndentStreamPrinter printer(out, stubIndent.getValueOr(std::string()));
+  std::string stubIndentStr = stubIndent.getValueOr(std::string());
+  ExtraIndentStreamPrinter printer(out, stubIndentStr);
 
   // If we're supposed to provide a full stub, add a newline and the introducer
   // keywords.

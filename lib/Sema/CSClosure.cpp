@@ -16,7 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
+#include "TypeChecker.h"
+#include "swift/Sema/ConstraintSystem.h"
+
 using namespace swift;
 using namespace swift::constraints;
 

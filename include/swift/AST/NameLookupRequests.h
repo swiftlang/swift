@@ -160,6 +160,10 @@ private:
   evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
   // Caching
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
@@ -433,11 +437,12 @@ using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
 
 /// Performs a lookup into a given module and its imports.
 class LookupInModuleRequest
-    : public SimpleRequest<LookupInModuleRequest,
-                           QualifiedLookupResult(
-                               const DeclContext *, DeclName, NLKind,
-                               namelookup::ResolutionKind, const DeclContext *),
-                           RequestFlags::Uncached | RequestFlags::DependencySink> {
+    : public SimpleRequest<
+          LookupInModuleRequest,
+          QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+                                namelookup::ResolutionKind, const DeclContext *,
+                                NLOptions),
+          RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -448,7 +453,7 @@ private:
   QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
            NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
-           const DeclContext *moduleScopeContext) const;
+           const DeclContext *moduleScopeContext, NLOptions options) const;
 
 public:
   // Incremental dependencies

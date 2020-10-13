@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -368,6 +369,36 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   return true;
 }
 
+/// Actor-isolated declarations cannot be @objc.
+static bool checkObjCActorIsolation(const ValueDecl *VD,
+                                    ObjCReason Reason) {
+  // Check actor isolation.
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
+
+  switch (auto restriction = ActorIsolationRestriction::forDeclaration(
+              const_cast<ValueDecl *>(VD))) {
+  case ActorIsolationRestriction::ActorSelf:
+    // Actor-isolated functions cannot be @objc.
+    if (Diagnose) {
+      VD->diagnose(
+          diag::actor_isolated_objc, VD->getDescriptiveKind(),  VD->getName());
+      describeObjCReason(VD, Reason);
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        addAsyncNotes(const_cast<FuncDecl *>(FD));
+      }
+    }
+    return true;
+
+  case ActorIsolationRestriction::GlobalActor:
+    // FIXME: Consider whether to limit @objc on global-actor-qualified
+    // declarations.
+  case ActorIsolationRestriction::Unrestricted:
+  case ActorIsolationRestriction::LocalCapture:
+  case ActorIsolationRestriction::Unsafe:
+    return false;
+  }
+}
+
 static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   if (target.isMacOSX())
     return VersionRange::allGTE(llvm::VersionTuple(10, 15, 0));
@@ -511,6 +542,8 @@ bool swift::isRepresentableInObjC(
   if (checkObjCWithGenericParams(AFD, Reason))
     return false;
   if (checkObjCInExtensionContext(AFD, Diagnose))
+    return false;
+  if (checkObjCActorIsolation(AFD, Reason))
     return false;
 
   if (AFD->isOperator()) {
@@ -686,10 +719,12 @@ bool swift::isRepresentableInObjC(
     Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
-        addCompletionHandlerParam(tupleElt.getType());
+        if (addCompletionHandlerParam(tupleElt.getType()))
+          return false;
       }
     } else {
-      addCompletionHandlerParam(resultType);
+      if (addCompletionHandlerParam(resultType))
+        return false;
     }
 
     // For a throwing asynchronous function, an Error? parameter is added
@@ -939,6 +974,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
   if (checkObjCInForeignClassContext(VD, Reason))
     return false;
+  if (checkObjCActorIsolation(VD, Reason))
+    return false;
 
   if (!Diagnose || Result)
     return Result;
@@ -966,6 +1003,8 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
   if (checkObjCWithGenericParams(SD, Reason))
+    return false;
+  if (checkObjCActorIsolation(SD, Reason))
     return false;
 
   // ObjC doesn't support class subscripts.
@@ -2337,12 +2376,22 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     if (conflicts.empty())
       continue;
 
+    auto bestConflict = conflicts[0];
+    for (auto conflict : conflicts) {
+      if (conflict->getName().isCompoundName() &&
+          conflict->getName().getArgumentNames().size() ==
+            req->getName().getArgumentNames().size()) {
+        bestConflict = conflict;
+        break;
+      }
+    }
+
     // Diagnose the conflict.
     auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);
-    auto conflictDiagInfo = getObjCMethodDiagInfo(conflicts[0]);
+    auto conflictDiagInfo = getObjCMethodDiagInfo(bestConflict);
     auto protocolName
       = cast<ProtocolDecl>(req->getDeclContext())->getName();
-    Ctx.Diags.diagnose(conflicts[0],
+    Ctx.Diags.diagnose(bestConflict,
                        diag::objc_optional_requirement_conflict,
                        conflictDiagInfo.first,
                        conflictDiagInfo.second,
@@ -2352,9 +2401,9 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                        protocolName);
 
     // Fix the name of the witness, if we can.
-    if (req->getName() != conflicts[0]->getName() &&
-        req->getKind() == conflicts[0]->getKind() &&
-        isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
+    if (req->getName() != bestConflict->getName() &&
+        req->getKind() == bestConflict->getKind() &&
+        isa<AccessorDecl>(req) == isa<AccessorDecl>(bestConflict)) {
       // They're of the same kind: fix the name.
       unsigned kind;
       if (isa<ConstructorDecl>(req))
@@ -2367,29 +2416,29 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
         llvm_unreachable("unhandled @objc declaration kind");
       }
 
-      auto diag = Ctx.Diags.diagnose(conflicts[0],
+      auto diag = Ctx.Diags.diagnose(bestConflict,
                                      diag::objc_optional_requirement_swift_rename,
                                      kind, req->getName());
 
       // Fix the Swift name.
-      fixDeclarationName(diag, conflicts[0], req->getName());
+      fixDeclarationName(diag, bestConflict, req->getName());
 
       // Fix the '@objc' attribute, if needed.
-      if (!conflicts[0]->canInferObjCFromRequirement(req))
-        fixDeclarationObjCName(diag, conflicts[0],
-                               conflicts[0]->getObjCRuntimeName(),
+      if (!bestConflict->canInferObjCFromRequirement(req))
+        fixDeclarationObjCName(diag, bestConflict,
+                               bestConflict->getObjCRuntimeName(),
                                req->getObjCRuntimeName(),
                                /*ignoreImpliedName=*/true);
     }
 
     // @nonobjc will silence this warning.
     bool hasExplicitObjCAttribute = false;
-    if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
+    if (auto objcAttr = bestConflict->getAttrs().getAttribute<ObjCAttr>())
       hasExplicitObjCAttribute = !objcAttr->isImplicit();
     if (!hasExplicitObjCAttribute)
-      Ctx.Diags.diagnose(conflicts[0], diag::req_near_match_nonobjc, true)
+      Ctx.Diags.diagnose(bestConflict, diag::req_near_match_nonobjc, true)
         .fixItInsert(
-          conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
+          bestConflict->getAttributeInsertionLoc(/*forModifier=*/false),
           "@nonobjc ");
 
     Ctx.Diags.diagnose(getDeclContextLoc(unsatisfied.first),

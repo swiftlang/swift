@@ -21,6 +21,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -619,18 +620,17 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      llvm::interleave(ID->getImportPath(),
-                       [&](const ImportPath::Element &Elem) {
-                         OS << Elem.Item;
-                       },
-                       [&] { OS << '.'; });
+      ID->getImportPath().print(OS);
       OS << "')";
     }
 
     void visitExtensionDecl(ExtensionDecl *ED) {
       printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
-      ED->getExtendedType().print(OS);
+      if (ED->hasBeenBound())
+        ED->getExtendedType().print(OS);
+      else
+        ED->getExtendedTypeRepr()->print(OS);
       printCommonPost(ED);
     }
 
@@ -853,20 +853,22 @@ namespace {
       if (D->isStatic())
         PrintWithColorRAII(OS, DeclModifierColor) << " type";
 
-      auto impl = D->getImplInfo();
-      PrintWithColorRAII(OS, DeclModifierColor)
-        << " readImpl="
-        << getReadImplKindName(impl.getReadImpl());
-      if (!impl.supportsMutation()) {
+      if (D->hasInterfaceType()) {
+        auto impl = D->getImplInfo();
         PrintWithColorRAII(OS, DeclModifierColor)
-          << " immutable";
-      } else {
-        PrintWithColorRAII(OS, DeclModifierColor)
-          << " writeImpl="
-          << getWriteImplKindName(impl.getWriteImpl());
-        PrintWithColorRAII(OS, DeclModifierColor)
-          << " readWriteImpl="
-          << getReadWriteImplKindName(impl.getReadWriteImpl());
+          << " readImpl="
+          << getReadImplKindName(impl.getReadImpl());
+        if (!impl.supportsMutation()) {
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " immutable";
+        } else {
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " writeImpl="
+            << getWriteImplKindName(impl.getWriteImpl());
+          PrintWithColorRAII(OS, DeclModifierColor)
+            << " readWriteImpl="
+            << getReadWriteImplKindName(impl.getReadWriteImpl());
+        }
       }
     }
 
@@ -1992,7 +1994,7 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
     E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
-    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << "\n";
     printRec(E->getAppendingExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3517,6 +3519,8 @@ namespace {
         printRec("type_variable", typeVar);
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
+      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+        printFlag("error_expr");
       } else {
         printRec("dependent_member_type",
                  originator.get<DependentMemberType *>());

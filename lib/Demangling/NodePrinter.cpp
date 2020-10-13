@@ -18,6 +18,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
@@ -387,6 +388,7 @@ private:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
+    case Node::Kind::GenericSpecializationPrespecialized:
     case Node::Kind::InlinedGenericFunction:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
@@ -753,6 +755,35 @@ private:
       setInvalid();
       return;
     }
+
+    switch (node->getKind()) {
+    case Node::Kind::FunctionType:
+    case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::NoEscapeFunctionType:
+      break;
+    case Node::Kind::AutoClosureType:
+    case Node::Kind::EscapingAutoClosureType:
+      Printer << "@autoclosure "; break;
+    case Node::Kind::ThinFunctionType:
+      Printer << "@convention(thin) "; break;
+    case Node::Kind::CFunctionPointer:
+      Printer << "@convention(c) "; break;
+    case Node::Kind::ObjCBlock:
+      Printer << "@convention(block) "; break;
+    case Node::Kind::EscapingObjCBlock:
+      Printer << "@escaping @convention(block) "; break;
+    case Node::Kind::DifferentiableFunctionType:
+      Printer << "@differentiable "; break;
+    case Node::Kind::EscapingDifferentiableFunctionType:
+      Printer << "@escaping @differentiable "; break;
+    case Node::Kind::LinearFunctionType:
+      Printer << "@differentiable(linear) "; break;
+    case Node::Kind::EscapingLinearFunctionType:
+      Printer << "@escaping @differentiable(linear) "; break;
+    default:
+      assert(false && "Unhandled function type in printFunctionType!");
+    }
+
     unsigned startIndex = 0;
     bool isAsync = false, isThrows = false;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
@@ -1256,39 +1287,19 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::UnknownIndex:
     Printer << "unknown index";
     return nullptr;
-  case Node::Kind::NoEscapeFunctionType:
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::EscapingAutoClosureType:
-    Printer << "@autoclosure ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::AutoClosureType:
-    Printer << "@autoclosure ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::ThinFunctionType:
-    Printer << "@convention(thin) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::DifferentiableFunctionType:
-    Printer << "@differentiable ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::EscapingDifferentiableFunctionType:
-    Printer << "@escaping @differentiable ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::LinearFunctionType:
-    Printer << "@differentiable(linear) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::EscapingLinearFunctionType:
-    Printer << "@escaping @differentiable(linear) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
+  case Node::Kind::NoEscapeFunctionType:
+  case Node::Kind::AutoClosureType:
+  case Node::Kind::EscapingAutoClosureType:
+  case Node::Kind::ThinFunctionType:
+  case Node::Kind::CFunctionPointer:
+  case Node::Kind::ObjCBlock:
+  case Node::Kind::EscapingObjCBlock:
+  case Node::Kind::DifferentiableFunctionType:
+  case Node::Kind::EscapingDifferentiableFunctionType:
+  case Node::Kind::LinearFunctionType:
+  case Node::Kind::EscapingLinearFunctionType:
     printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::ArgumentTuple:
@@ -1378,6 +1389,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::GenericSpecialization:
     printSpecializationPrefix(Node, "generic specialization");
+    return nullptr;
+  case Node::Kind::GenericSpecializationPrespecialized:
+    printSpecializationPrefix(Node, "generic pre-specialization");
     return nullptr;
   case Node::Kind::GenericSpecializationNotReAbstracted:
     printSpecializationPrefix(Node, "generic not re-abstracted specialization");
@@ -1881,21 +1895,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::DynamicSelf:
     Printer << "Self";
     return nullptr;
-  case Node::Kind::CFunctionPointer: {
-    Printer << "@convention(c) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
-  case Node::Kind::ObjCBlock: {
-    Printer << "@convention(block) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
-  case Node::Kind::EscapingObjCBlock: {
-    Printer << "@escaping @convention(block) ";
-    printFunctionType(nullptr, Node);
-    return nullptr;
-  }
   case Node::Kind::SILBoxType: {
     Printer << "@box ";
     NodePointer type = Node->getChild(0);
@@ -2648,14 +2647,6 @@ void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
         Printer << ' ';
       type = dependentType->getFirstChild();
     }
-    if (type->getKind() == Node::Kind::DifferentiableFunctionType)
-      Printer << "@differentiable ";
-    else if (type->getKind() == Node::Kind::EscapingDifferentiableFunctionType)
-      Printer << "@escaping @differentiable ";
-    else if (type->getKind() == Node::Kind::LinearFunctionType)
-      Printer << "@differentiable(linear) ";
-    else if (type->getKind() == Node::Kind::EscapingLinearFunctionType)
-      Printer << "@escaping @differentiable(linear) ";
     printFunctionType(labelList, type);
   } else {
     print(type);

@@ -16,23 +16,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenCall.h"
-#include "Signature.h"
-
+#include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/Runtime/Config.h"
+#include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/SIL/SILType.h"
-#include "swift/ABI/MetadataValues.h"
-#include "swift/Runtime/Config.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Support/Compiler.h"
 
 #include "CallEmission.h"
+#include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
+#include "GenCall.h"
+#include "GenFunc.h"
+#include "GenHeap.h"
 #include "GenObjC.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
@@ -42,6 +44,8 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
+#include "Signature.h"
+#include "StructLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -71,6 +75,201 @@ static Size getCoroutineContextSize(IRGenModule &IGM,
     return getYieldManyCoroutineBufferSize(IGM);
   }
   llvm_unreachable("bad kind");
+}
+
+AsyncContextLayout irgen::getAsyncContextLayout(IRGenFunction &IGF,
+                                                SILFunction *function) {
+  SubstitutionMap forwardingSubstitutionMap =
+      function->getForwardingSubstitutionMap();
+  CanSILFunctionType originalType = function->getLoweredFunctionType();
+  CanSILFunctionType substitutedType = originalType->substGenericArgs(
+      IGF.IGM.getSILModule(), forwardingSubstitutionMap,
+      IGF.IGM.getMaximalTypeExpansionContext());
+  auto layout = getAsyncContextLayout(IGF, originalType, substitutedType,
+                                      forwardingSubstitutionMap);
+  return layout;
+}
+
+AsyncContextLayout irgen::getAsyncContextLayout(
+    IRGenFunction &IGF, CanSILFunctionType originalType,
+    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap) {
+  SmallVector<const TypeInfo *, 4> typeInfos;
+  SmallVector<SILType, 4> valTypes;
+  SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
+  SmallVector<SILResultInfo, 4> indirectReturnInfos;
+  SmallVector<SILResultInfo, 4> directReturnInfos;
+
+  auto parameters = substitutedType->getParameters();
+  SILFunctionConventions fnConv(substitutedType, IGF.getSILModule());
+
+  //   SwiftError *errorResult;
+  auto errorCanType = IGF.IGM.Context.getExceptionType();
+  auto errorType = SILType::getPrimitiveObjectType(errorCanType);
+  auto &errorTypeInfo = IGF.getTypeInfoForLowered(errorCanType);
+  typeInfos.push_back(&errorTypeInfo);
+  valTypes.push_back(errorType);
+
+  //   IndirectResultTypes *indirectResults...;
+  auto indirectResults = fnConv.getIndirectSILResults();
+  for (auto indirectResult : indirectResults) {
+    auto ty = fnConv.getSILType(indirectResult,
+                                IGF.IGM.getMaximalTypeExpansionContext());
+    auto retLoweringTy = CanInOutType::get(ty.getASTType());
+    auto &ti = IGF.getTypeInfoForLowered(retLoweringTy);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    indirectReturnInfos.push_back(indirectResult);
+  }
+
+  //   SelfType self?;
+  bool hasLocalContextParameter = hasSelfContextParameter(substitutedType);
+  bool canHaveValidError = substitutedType->hasErrorResult();
+  bool hasLocalContext = (hasLocalContextParameter || canHaveValidError ||
+                          substitutedType->getRepresentation() ==
+                              SILFunctionTypeRepresentation::Thick);
+  SILParameterInfo localContextParameter =
+      hasLocalContextParameter ? parameters.back() : SILParameterInfo();
+  if (hasLocalContextParameter) {
+    parameters = parameters.drop_back();
+  }
+  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
+  if (hasLocalContext) {
+    if (hasLocalContextParameter) {
+      SILType ty =
+          IGF.IGM.silConv.getSILType(localContextParameter, substitutedType,
+                                     IGF.IGM.getMaximalTypeExpansionContext());
+      auto argumentLoweringType =
+          getArgumentLoweringType(ty.getASTType(), localContextParameter,
+                                  /*isNoEscape*/ true);
+
+      auto &ti = IGF.getTypeInfoForLowered(argumentLoweringType);
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      localContextInfo = {ty, localContextParameter.getConvention()};
+    } else {
+      // TODO: DETERMINE: Is there a field in this case to match the sync ABI?
+      auto &ti = IGF.IGM.getNativeObjectTypeInfo();
+      SILType ty = SILType::getNativeObjectType(IGF.IGM.Context);
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      localContextInfo = {ty, substitutedType->getCalleeConvention()};
+    }
+  }
+
+  //   ArgTypes formalArguments...;
+  auto bindings = NecessaryBindings::forAsyncFunctionInvocation(
+      IGF.IGM, originalType, substitutionMap);
+  if (!bindings.empty()) {
+    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
+    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(
+        bindingsSize, IGF.IGM.getPointerAlignment());
+    valTypes.push_back(SILType());
+    typeInfos.push_back(&bindingsTI);
+  }
+  for (auto parameter : parameters) {
+    SILType ty = IGF.IGM.silConv.getSILType(
+        parameter, substitutedType, IGF.IGM.getMaximalTypeExpansionContext());
+
+    auto argumentLoweringType =
+        getArgumentLoweringType(ty.getASTType(), parameter,
+                                /*isNoEscape*/ true);
+
+    auto &ti = IGF.getTypeInfoForLowered(argumentLoweringType);
+
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    paramInfos.push_back({ty, parameter.getConvention()});
+  }
+
+  Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
+  if (originalType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    assert(getTrailingWitnessSignatureLength(IGF.IGM, originalType) == 2);
+
+    // First, the Self metadata.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getTypeMetadataPtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    // Then, the Self witness table.
+    {
+      auto ty = SILType();
+      auto &ti = IGF.IGM.getWitnessTablePtrTypeInfo();
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    }
+    trailingWitnessInfo = AsyncContextLayout::TrailingWitnessInfo();
+  }
+
+  //     ResultTypes directResults...;
+  auto directResults = fnConv.getDirectSILResults();
+  for (auto result : directResults) {
+    auto ty =
+        fnConv.getSILType(result, IGF.IGM.getMaximalTypeExpansionContext());
+    auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    directReturnInfos.push_back(result);
+  }
+
+  return AsyncContextLayout(
+      IGF.IGM, LayoutStrategy::Optimal, valTypes, typeInfos, IGF, originalType,
+      substitutedType, substitutionMap, std::move(bindings),
+      trailingWitnessInfo, errorType, canHaveValidError, paramInfos,
+      indirectReturnInfos, directReturnInfos, localContextInfo);
+}
+
+AsyncContextLayout::AsyncContextLayout(
+    IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
+    ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
+    CanSILFunctionType originalType, CanSILFunctionType substitutedType,
+    SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
+    Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
+    bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
+    ArrayRef<SILResultInfo> indirectReturnInfos,
+    ArrayRef<SILResultInfo> directReturnInfos,
+    Optional<AsyncContextLayout::ArgumentInfo> localContextInfo)
+    : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject, strategy,
+                   fieldTypeInfos, /*typeToFill*/ nullptr),
+      IGF(IGF), originalType(originalType), substitutedType(substitutedType),
+      substitutionMap(substitutionMap), errorType(errorType),
+      canHaveValidError(canHaveValidError),
+      directReturnInfos(directReturnInfos.begin(), directReturnInfos.end()),
+      indirectReturnInfos(indirectReturnInfos.begin(),
+                          indirectReturnInfos.end()),
+      localContextInfo(localContextInfo), bindings(std::move(bindings)),
+      trailingWitnessInfo(trailingWitnessInfo),
+      argumentInfos(argumentInfos.begin(), argumentInfos.end()) {
+#ifndef NDEBUG
+  assert(fieldTypeInfos.size() == fieldTypes.size() &&
+         "type infos don't match types");
+  if (!bindings.empty()) {
+    assert(fieldTypeInfos.size() >= 2 && "no field for bindings");
+    auto fixedBindingsField =
+        dyn_cast<FixedTypeInfo>(fieldTypeInfos[getBindingsIndex()]);
+    assert(fixedBindingsField && "bindings field is not fixed size");
+    assert(fixedBindingsField->getFixedSize() == bindings.getBufferSize(IGM) &&
+           fixedBindingsField->getFixedAlignment() ==
+               IGM.getPointerAlignment() &&
+           "bindings field doesn't fit bindings");
+  }
+  assert(this->isFixedLayout());
+#endif
+}
+
+static Size getAsyncContextSize(AsyncContextLayout layout) {
+  return layout.getSize();
+}
+
+static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
+  return IGM.getPointerAlignment();
+}
+
+static llvm::Value *getAsyncTask(IRGenFunction &IGF) {
+  // TODO: Return the appropriate task.
+  return llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy);
 }
 
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
@@ -288,6 +487,7 @@ namespace {
     }
 
     void addCoroutineContextParameter();
+    void addAsyncParameters();
 
     void expandResult();
     llvm::Type *expandDirectResult();
@@ -312,6 +512,12 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
 
 /// Expand all of the direct and indirect result types.
 void SignatureExpansion::expandResult() {
+  if (FnType->isAsync()) {
+    // The result will be stored within the SwiftContext that is passed to async
+    // functions.
+    ResultIRType = IGM.VoidTy;
+    return;
+  }
   if (FnType->isCoroutine()) {
     // This should be easy enough to support if we need to: use the
     // same algorithm but add the direct results to the results as if
@@ -480,6 +686,12 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
 
   // Whether this is an unwind resumption.
   ParamIRTypes.push_back(IGM.Int1Ty);
+}
+
+void SignatureExpansion::addAsyncParameters() {
+  ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
+  // TODO: Add actor.
+  // TODO: Add task.
 }
 
 void SignatureExpansion::addCoroutineContextParameter() {
@@ -1343,6 +1555,13 @@ void SignatureExpansion::expandParameters() {
   assert(FnType->getRepresentation() != SILFunctionTypeRepresentation::Block
          && "block with non-C calling conv?!");
 
+  if (FnType->isAsync()) {
+    addAsyncParameters();
+    // All other parameters will be passed inside the context added by the
+    // addAsyncParameters call.
+    return;
+  }
+
   // First, if this is a coroutine, add the coroutine-context parameter.
   switch (FnType->getCoroutineKind()) {
   case SILCoroutineKind::None:
@@ -1515,69 +1734,361 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
     out.add(returned);
 }
 
+static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
+                                 Explosion &in, Explosion &out,
+                                 TemporarySet &temporaries, bool isOutlined);
+
+namespace {
+
+class SyncCallEmission final : public CallEmission {
+  using super = CallEmission;
+
+public:
+  SyncCallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
+      : CallEmission(IGF, selfValue, std::move(callee)) {
+    setFromCallee();
+  }
+
+  SILType getParameterType(unsigned index) override {
+    SILFunctionConventions origConv(getCallee().getOrigFunctionType(),
+                                    IGF.getSILModule());
+    return origConv.getSILArgumentType(
+        index, IGF.IGM.getMaximalTypeExpansionContext());
+  }
+  void begin() override { super::begin(); }
+  void end() override { super::end(); }
+  void setFromCallee() override {
+    super::setFromCallee();
+
+    auto fnType = CurCallee.getOrigFunctionType();
+
+    if (fnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::WitnessMethod) {
+      unsigned n = getTrailingWitnessSignatureLength(IGF.IGM, fnType);
+      while (n--) {
+        Args[--LastArgWritten] = nullptr;
+      }
+    }
+
+    llvm::Value *contextPtr = CurCallee.getSwiftContext();
+
+    // Add the error result if we have one.
+    if (fnType->hasErrorResult()) {
+      // The invariant is that this is always zero-initialized, so we
+      // don't need to do anything extra here.
+      SILFunctionConventions fnConv(fnType, IGF.getSILModule());
+      Address errorResultSlot = IGF.getCalleeErrorResultSlot(
+          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+
+      assert(LastArgWritten > 0);
+      Args[--LastArgWritten] = errorResultSlot.getAddress();
+      addAttribute(LastArgWritten + llvm::AttributeList::FirstArgIndex,
+                   llvm::Attribute::NoCapture);
+      IGF.IGM.addSwiftErrorAttributes(CurCallee.getMutableAttributes(),
+                                      LastArgWritten);
+
+      // Fill in the context pointer if necessary.
+      if (!contextPtr) {
+        assert(!CurCallee.getOrigFunctionType()->getExtInfo().hasContext() &&
+               "Missing context?");
+        contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
+      }
+    }
+
+    // Add the data pointer if we have one.
+    // (Note that we're emitting backwards, so this correctly goes
+    // *before* the error pointer.)
+    if (contextPtr) {
+      assert(LastArgWritten > 0);
+      Args[--LastArgWritten] = contextPtr;
+      IGF.IGM.addSwiftSelfAttributes(CurCallee.getMutableAttributes(),
+                                     LastArgWritten);
+    }
+  }
+  void setArgs(Explosion &original, bool isOutlined,
+               WitnessMetadata *witnessMetadata) override {
+    // Convert arguments to a representation appropriate to the calling
+    // convention.
+    Explosion adjusted;
+
+    auto origCalleeType = CurCallee.getOrigFunctionType();
+    SILFunctionConventions fnConv(origCalleeType, IGF.getSILModule());
+
+    // Pass along the indirect result pointers.
+    original.transferInto(adjusted, fnConv.getNumIndirectSILResults());
+
+    // Pass along the coroutine buffer.
+    switch (origCalleeType->getCoroutineKind()) {
+    case SILCoroutineKind::YieldMany:
+    case SILCoroutineKind::YieldOnce:
+      original.transferInto(adjusted, 1);
+      break;
+
+    case SILCoroutineKind::None:
+      break;
+    }
+
+    // Translate the formal arguments and handle any special arguments.
+    switch (getCallee().getRepresentation()) {
+    case SILFunctionTypeRepresentation::ObjCMethod:
+      adjusted.add(getCallee().getObjCMethodReceiver());
+      adjusted.add(getCallee().getObjCMethodSelector());
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
+
+    case SILFunctionTypeRepresentation::Block:
+      adjusted.add(getCallee().getBlockObject());
+      LLVM_FALLTHROUGH;
+
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
+
+    case SILFunctionTypeRepresentation::WitnessMethod:
+      assert(witnessMetadata);
+      assert(witnessMetadata->SelfMetadata->getType() ==
+             IGF.IGM.TypeMetadataPtrTy);
+      assert(witnessMetadata->SelfWitnessTable->getType() ==
+             IGF.IGM.WitnessTablePtrTy);
+      Args.rbegin()[1] = witnessMetadata->SelfMetadata;
+      Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
+      LLVM_FALLTHROUGH;
+
+    case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::Thin:
+    case SILFunctionTypeRepresentation::Thick: {
+      // Check for value arguments that need to be passed indirectly.
+      // But don't expect to see 'self' if it's been moved to the context
+      // position.
+      auto params = origCalleeType->getParameters();
+      if (hasSelfContextParameter(origCalleeType)) {
+        params = params.drop_back();
+      }
+      for (auto param : params) {
+        addNativeArgument(IGF, original, origCalleeType, param, adjusted,
+                          isOutlined);
+      }
+
+      // Anything else, just pass along.  This will include things like
+      // generic arguments.
+      adjusted.add(original.claimAll());
+
+      break;
+    }
+    }
+    super::setArgs(adjusted, isOutlined, witnessMetadata);
+  }
+  void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
+    // Bail out immediately on a void result.
+    llvm::Value *result = call;
+    if (result->getType()->isVoidTy())
+      return;
+
+    SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                  IGF.getSILModule());
+
+    // If the result was returned autoreleased, implicitly insert the reclaim.
+    // This is only allowed on a single direct result.
+    if (fnConv.getNumDirectSILResults() == 1
+        && (fnConv.getDirectSILResults().begin()->getConvention()
+            == ResultConvention::Autoreleased)) {
+      result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+    }
+
+    auto origFnType = getCallee().getOrigFunctionType();
+
+    // Specially handle noreturn c function which would return a 'Never' SIL result
+    // type.
+    if (origFnType->getLanguage() == SILFunctionLanguage::C &&
+        origFnType->isNoReturnFunction(
+            IGF.getSILModule(), IGF.IGM.getMaximalTypeExpansionContext())) {
+      auto clangResultTy = result->getType();
+      extractScalarResults(IGF, clangResultTy, result, out);
+      return;
+    }
+
+    // Get the natural IR type in the body of the function that makes
+    // the call. This may be different than the IR type returned by the
+    // call itself due to ABI type coercion.
+    auto resultType =
+        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    auto &nativeSchema = IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
+
+    // For ABI reasons the result type of the call might not actually match the
+    // expected result type.
+    //
+    // This can happen when calling C functions, or class method dispatch thunks
+    // for methods that have covariant ABI-compatible overrides.
+    auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
+    if (result->getType() != expectedNativeResultType) {
+      result =
+          IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
+    }
+
+    // Gather the values.
+    Explosion nativeExplosion;
+    extractScalarResults(IGF, result->getType(), result, nativeExplosion);
+
+    out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
+  }
+  Address getCalleeErrorSlot(SILType errorType) override {
+    return IGF.getCalleeErrorResultSlot(errorType);
+  };
+};
+
+class AsyncCallEmission final : public CallEmission {
+  using super = CallEmission;
+
+  Address contextBuffer;
+  Size contextSize;
+  Address context;
+
+  AsyncContextLayout getAsyncContextLayout() {
+    return ::getAsyncContextLayout(IGF, getCallee().getOrigFunctionType(),
+                                   getCallee().getSubstFunctionType(),
+                                   getCallee().getSubstitutions());
+  }
+
+  void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {
+    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    ti.initialize(IGF, explosion, addr, isOutlined);
+  }
+  void loadValue(ElementLayout layout, Explosion &explosion) {
+    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    auto &ti = layout.getType();
+    cast<LoadableTypeInfo>(ti).loadAsTake(IGF, addr, explosion);
+  }
+
+public:
+  AsyncCallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
+      : CallEmission(IGF, selfValue, std::move(callee)) {
+    setFromCallee();
+  }
+
+  void begin() override {
+    super::begin();
+    assert(!contextBuffer.isValid());
+    assert(!context.isValid());
+    // Allocate space for the async arguments.
+    auto layout = getAsyncContextLayout();
+    std::tie(contextBuffer, contextSize) = emitAllocAsyncContext(IGF, layout);
+    context = layout.emitCastTo(IGF, contextBuffer.getAddress());
+    if (layout.canHaveError()) {
+      auto fieldLayout = layout.getErrorLayout();
+      auto addr = fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto &ti = fieldLayout.getType();
+      auto nullError = llvm::Constant::getNullValue(ti.getStorageType());
+      IGF.Builder.CreateStore(nullError, addr);
+    }
+  }
+  void end() override {
+    assert(contextBuffer.isValid());
+    assert(context.isValid());
+    emitDeallocAsyncContext(IGF, contextBuffer, contextSize);
+    super::end();
+  }
+  void setFromCallee() override { super::setFromCallee(); }
+  SILType getParameterType(unsigned index) override {
+    return getAsyncContextLayout().getParameterType(index);
+  }
+  void setArgs(Explosion &llArgs, bool isOutlined,
+               WitnessMetadata *witnessMetadata) override {
+    Explosion asyncExplosion;
+    asyncExplosion.add(contextBuffer.getAddress());
+    super::setArgs(asyncExplosion, false, witnessMetadata);
+    SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
+                                  IGF.getSILModule());
+
+    // Move all the arguments into the context.
+    if (selfValue) {
+      llArgs.add(selfValue);
+    }
+    auto layout = getAsyncContextLayout();
+    for (unsigned index = 0, count = layout.getIndirectReturnCount();
+         index < count; ++index) {
+      auto fieldLayout = layout.getIndirectReturnLayout(index);
+      saveValue(fieldLayout, llArgs, isOutlined);
+    }
+    for (unsigned index = 0, count = layout.getArgumentCount(); index < count;
+         ++index) {
+      auto fieldLayout = layout.getArgumentLayout(index);
+      saveValue(fieldLayout, llArgs, isOutlined);
+    }
+    if (layout.hasBindings()) {
+      auto bindingLayout = layout.getBindingsLayout();
+      auto bindingsAddr = bindingLayout.project(IGF, context, /*offsets*/ None);
+      layout.getBindings().save(IGF, bindingsAddr, llArgs);
+    }
+    if (selfValue) {
+      auto fieldLayout = layout.getLocalContextLayout();
+      saveValue(fieldLayout, llArgs, isOutlined);
+    }
+  }
+  void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
+    SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
+                                  IGF.getSILModule());
+    auto resultType =
+        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+    auto &nativeSchema =
+        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
+    auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
+    if (expectedNativeResultType->isVoidTy()) {
+      // If the async return is void, there is no return to move out of the
+      // argument buffer.
+      return;
+    }
+    // Gather the values.
+    Explosion nativeExplosion;
+    auto layout = getAsyncContextLayout();
+    for (unsigned index = 0, count = layout.getDirectReturnCount();
+         index < count; ++index) {
+      auto fieldLayout = layout.getDirectReturnLayout(index);
+      loadValue(fieldLayout, nativeExplosion);
+    }
+
+    out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
+  }
+  Address getCalleeErrorSlot(SILType errorType) override {
+    auto layout = getAsyncContextLayout();
+    auto errorLayout = layout.getErrorLayout();
+    auto address = errorLayout.project(IGF, context, /*offsets*/ llvm::None);
+    return address;
+  };
+};
+
+} // end anonymous namespace
+
+std::unique_ptr<CallEmission> irgen::getCallEmission(IRGenFunction &IGF,
+                                                     llvm::Value *selfValue,
+                                                     Callee &&callee) {
+  if (callee.getOrigFunctionType()->isAsync()) {
+    return std::make_unique<AsyncCallEmission>(IGF, selfValue,
+                                               std::move(callee));
+  } else {
+    return std::make_unique<SyncCallEmission>(IGF, selfValue,
+                                              std::move(callee));
+  }
+}
+
 /// Emit the unsubstituted result of this call into the given explosion.
 /// The unsubstituted result must be naturally returned directly.
 void CallEmission::emitToUnmappedExplosion(Explosion &out) {
+  assert(state == State::Emitting);
   assert(LastArgWritten == 0 && "emitting unnaturally to explosion");
 
   auto call = emitCallSite();
 
-  // Bail out immediately on a void result.
-  llvm::Value *result = call;
-  if (result->getType()->isVoidTy())
-    return;
-
-  SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                IGF.getSILModule());
-
-  // If the result was returned autoreleased, implicitly insert the reclaim.
-  // This is only allowed on a single direct result.
-  if (fnConv.getNumDirectSILResults() == 1
-      && (fnConv.getDirectSILResults().begin()->getConvention()
-          == ResultConvention::Autoreleased)) {
-    result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
-  }
-
-  auto origFnType = getCallee().getOrigFunctionType();
-
-  // Specially handle noreturn c function which would return a 'Never' SIL result
-  // type.
-  if (origFnType->getLanguage() == SILFunctionLanguage::C &&
-      origFnType->isNoReturnFunction(
-          IGF.getSILModule(), IGF.IGM.getMaximalTypeExpansionContext())) {
-    auto clangResultTy = result->getType();
-    extractScalarResults(IGF, clangResultTy, result, out);
-    return;
-  }
-
-  // Get the natural IR type in the body of the function that makes
-  // the call. This may be different than the IR type returned by the
-  // call itself due to ABI type coercion.
-  auto resultType =
-      fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-  auto &nativeSchema = IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
-
-  // For ABI reasons the result type of the call might not actually match the
-  // expected result type.
-  //
-  // This can happen when calling C functions, or class method dispatch thunks
-  // for methods that have covariant ABI-compatible overrides.
-  auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
-  if (result->getType() != expectedNativeResultType) {
-    result =
-        IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
-  }
-
-  // Gather the values.
-  Explosion nativeExplosion;
-  extractScalarResults(IGF, result->getType(), result, nativeExplosion);
-
-  out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
+  emitCallToUnmappedExplosion(call, out);
 }
 
 /// Emit the unsubstituted result of this call to the given address.
 /// The unsubstituted result must be naturally returned indirectly.
 void CallEmission::emitToUnmappedMemory(Address result) {
+  assert(state == State::Emitting);
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
@@ -1594,6 +2105,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 
 /// The private routine to ultimately emit a call or invoke instruction.
 llvm::CallInst *CallEmission::emitCallSite() {
+  assert(state == State::Emitting);
   assert(LastArgWritten == 0);
   assert(!EmittedCall);
   EmittedCall = true;
@@ -1681,6 +2193,7 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
 void CallEmission::emitToMemory(Address addr,
                                 const LoadableTypeInfo &indirectedResultTI,
                                 bool isOutlined) {
+  assert(state == State::Emitting);
   assert(LastArgWritten <= 1);
 
   // If the call is naturally to an explosion, emit it that way and
@@ -1742,6 +2255,7 @@ static void emitCastToSubstSchema(IRGenFunction &IGF, Explosion &in,
 }
 
 void CallEmission::emitYieldsToExplosion(Explosion &out) {
+  assert(state == State::Emitting);
   // Emit the call site.
   auto call = emitCallSite();
 
@@ -1820,6 +2334,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
 
 /// Emit the result of this call to an explosion.
 void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
+  assert(state == State::Emitting);
   assert(LastArgWritten <= 1);
 
   // For coroutine calls, we need to collect the yields, not the results;
@@ -1892,12 +2407,21 @@ CallEmission::CallEmission(CallEmission &&other)
   // Prevent other's destructor from asserting.
   LastArgWritten = 0;
   EmittedCall = true;
+  state = State::Finished;
 }
 
 CallEmission::~CallEmission() {
   assert(LastArgWritten == 0);
   assert(EmittedCall);
   assert(Temporaries.hasBeenCleared());
+  assert(state == State::Finished);
+}
+
+void CallEmission::begin() {}
+
+void CallEmission::end() {
+  assert(state == State::Emitting);
+  state = State::Finished;
 }
 
 Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
@@ -1982,6 +2506,7 @@ llvm::Value *Callee::getObjCMethodSelector() const {
 
 /// Set up this emitter afresh from the current callee specs.
 void CallEmission::setFromCallee() {
+  assert(state == State::Emitting);
   IsCoroutine = CurCallee.getSubstFunctionType()->isCoroutine();
   EmittedCall = false;
 
@@ -1992,51 +2517,6 @@ void CallEmission::setFromCallee() {
   Args.reserve(numArgs);
   Args.set_size(numArgs);
   LastArgWritten = numArgs;
-
-  auto fnType = CurCallee.getOrigFunctionType();
-
-  if (fnType->getRepresentation()
-        == SILFunctionTypeRepresentation::WitnessMethod) {
-    unsigned n = getTrailingWitnessSignatureLength(IGF.IGM, fnType);
-    while (n--) {
-      Args[--LastArgWritten] = nullptr;
-    }
-  }
-
-  llvm::Value *contextPtr = CurCallee.getSwiftContext();
-
-  // Add the error result if we have one.
-  if (fnType->hasErrorResult()) {
-    // The invariant is that this is always zero-initialized, so we
-    // don't need to do anything extra here.
-    SILFunctionConventions fnConv(fnType, IGF.getSILModule());
-    Address errorResultSlot = IGF.getErrorResultSlot(
-        fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-
-    assert(LastArgWritten > 0);
-    Args[--LastArgWritten] = errorResultSlot.getAddress();
-    addAttribute(LastArgWritten + llvm::AttributeList::FirstArgIndex,
-                 llvm::Attribute::NoCapture);
-    IGF.IGM.addSwiftErrorAttributes(CurCallee.getMutableAttributes(),
-                                    LastArgWritten);
-
-    // Fill in the context pointer if necessary.
-    if (!contextPtr) {
-      assert(!CurCallee.getOrigFunctionType()->getExtInfo().hasContext() &&
-             "Missing context?");
-      contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
-    }
-  }
-
-  // Add the data pointer if we have one.
-  // (Note that we're emitting backwards, so this correctly goes
-  // *before* the error pointer.)
-  if (contextPtr) {
-    assert(LastArgWritten > 0);
-    Args[--LastArgWritten] = contextPtr;
-    IGF.IGM.addSwiftSelfAttributes(CurCallee.getMutableAttributes(),
-                                   LastArgWritten);
-  }
 }
 
 bool irgen::canCoerceToSchema(IRGenModule &IGM,
@@ -2610,12 +3090,11 @@ irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
   llvm_unreachable("bad coroutine kind");
 }
 
-static void emitRetconCoroutineEntry(IRGenFunction &IGF,
-                                     CanSILFunctionType fnType,
-                                     Explosion &allParamValues,
-                                     llvm::Intrinsic::ID idIntrinsic,
-                                     Size bufferSize,
-                                     Alignment bufferAlignment) {
+static void
+emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
+                         NativeCCEntryPointArgumentEmission &emission,
+                         llvm::Intrinsic::ID idIntrinsic, Size bufferSize,
+                         Alignment bufferAlignment) {
   auto prototype =
     IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
 
@@ -2624,7 +3103,7 @@ static void emitRetconCoroutineEntry(IRGenFunction &IGF,
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
 
   // Call the right 'llvm.coro.id.retcon' variant.
-  llvm::Value *buffer = allParamValues.claimNext();
+  llvm::Value *buffer = emission.getCoroutineBuffer();
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
     llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
     llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
@@ -2645,19 +3124,19 @@ static void emitRetconCoroutineEntry(IRGenFunction &IGF,
   IGF.setCoroutineHandle(hdl);
 }
 
-void irgen::emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
-                                        CanSILFunctionType fnType,
-                                        Explosion &allParamValues) {
-  emitRetconCoroutineEntry(IGF, fnType, allParamValues,
+void irgen::emitYieldOnceCoroutineEntry(
+    IRGenFunction &IGF, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  emitRetconCoroutineEntry(IGF, fnType, emission,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM));
 }
 
-void irgen::emitYieldManyCoroutineEntry(IRGenFunction &IGF,
-                                        CanSILFunctionType fnType,
-                                        Explosion &allParamValues) {
-  emitRetconCoroutineEntry(IGF, fnType, allParamValues,
+void irgen::emitYieldManyCoroutineEntry(
+    IRGenFunction &IGF, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  emitRetconCoroutineEntry(IGF, fnType, emission,
                            llvm::Intrinsic::coro_id_retcon,
                            getYieldManyCoroutineBufferSize(IGF.IGM),
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
@@ -2694,9 +3173,49 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
 }
 
+Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
+                             Alignment alignment) {
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
+                                      {getAsyncTask(IGF), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  auto address = Address(call, alignment);
+  return address;
+}
+
+void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
+                            llvm::Value *size) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskDeallocFn(), {getAsyncTask(IGF), address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+}
+
+std::pair<Address, Size>
+irgen::emitAllocAsyncContext(IRGenFunction &IGF, AsyncContextLayout layout) {
+  auto size = getAsyncContextSize(layout);
+  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
+  auto alignment = getAsyncContextAlignment(IGF.IGM);
+  auto address = emitTaskAlloc(IGF, sizeValue, alignment);
+  IGF.Builder.CreateLifetimeStart(address, size);
+  return {address, size};
+}
+
+void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context,
+                                    Size size) {
+  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
+  emitTaskDealloc(IGF, context, sizeValue);
+  IGF.Builder.CreateLifetimeEnd(context, size);
+}
+
 llvm::Value *irgen::emitYield(IRGenFunction &IGF,
                               CanSILFunctionType coroutineType,
                               Explosion &substValues) {
+  // TODO: Handle async!
   auto coroSignature = IGF.IGM.getSignature(coroutineType);
   auto coroInfo = coroSignature.getCoroutineInfo();
 
@@ -2772,88 +3291,16 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
 }
 
 /// Add a new set of arguments to the function.
-void CallEmission::setArgs(Explosion &original, bool isOutlined,
+void CallEmission::setArgs(Explosion &adjusted, bool isOutlined,
                            WitnessMetadata *witnessMetadata) {
-  // Convert arguments to a representation appropriate to the calling
-  // convention.
-  Explosion adjusted;
-
-  auto origCalleeType = CurCallee.getOrigFunctionType();
-  SILFunctionConventions fnConv(origCalleeType, IGF.getSILModule());
-
-  // Pass along the indirect result pointers.
-  original.transferInto(adjusted, fnConv.getNumIndirectSILResults());
-
-  // Pass along the coroutine buffer.
-  switch (origCalleeType->getCoroutineKind()) {
-  case SILCoroutineKind::YieldMany:
-  case SILCoroutineKind::YieldOnce:
-    original.transferInto(adjusted, 1);
-    break;
-
-  case SILCoroutineKind::None:
-    break;
-  }
-
-  // Translate the formal arguments and handle any special arguments.
-  switch (getCallee().getRepresentation()) {
-  case SILFunctionTypeRepresentation::ObjCMethod:
-    adjusted.add(getCallee().getObjCMethodReceiver());
-    adjusted.add(getCallee().getObjCMethodSelector());
-    externalizeArguments(IGF, getCallee(), original, adjusted,
-                         Temporaries, isOutlined);
-    break;
-
-  case SILFunctionTypeRepresentation::Block:
-    adjusted.add(getCallee().getBlockObject());
-    LLVM_FALLTHROUGH;
-
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-    externalizeArguments(IGF, getCallee(), original, adjusted,
-                         Temporaries, isOutlined);
-    break;
-
-  case SILFunctionTypeRepresentation::WitnessMethod:
-    assert(witnessMetadata);
-    assert(witnessMetadata->SelfMetadata->getType() ==
-           IGF.IGM.TypeMetadataPtrTy);
-    assert(witnessMetadata->SelfWitnessTable->getType() ==
-           IGF.IGM.WitnessTablePtrTy);
-    Args.rbegin()[1] = witnessMetadata->SelfMetadata;
-    Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
-    LLVM_FALLTHROUGH;
-
-  case SILFunctionTypeRepresentation::Closure:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Thick: {
-    // Check for value arguments that need to be passed indirectly.
-    // But don't expect to see 'self' if it's been moved to the context
-    // position.
-    auto params = origCalleeType->getParameters();
-    if (hasSelfContextParameter(origCalleeType)) {
-      params = params.drop_back();
-    }
-    for (auto param : params) {
-      addNativeArgument(IGF, original,
-                        origCalleeType, param, adjusted, isOutlined);
-    }
-
-    // Anything else, just pass along.  This will include things like
-    // generic arguments.
-    adjusted.add(original.claimAll());
-
-    break;
-  }
-  }
-
+  assert(state == State::Emitting);
   // Add the given number of arguments.
   assert(LastArgWritten >= adjusted.size());
 
   size_t targetIndex = LastArgWritten - adjusted.size();
   assert(targetIndex <= 1);
   LastArgWritten = targetIndex;
-  
+
   auto argIterator = Args.begin() + targetIndex;
   for (auto value : adjusted.claimAll()) {
     *argIterator++ = value;
@@ -2862,6 +3309,7 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
 
 void CallEmission::addAttribute(unsigned index,
                                 llvm::Attribute::AttrKind attr) {
+  assert(state == State::Emitting);
   auto &attrs = CurCallee.getMutableAttributes();
   attrs = attrs.addAttribute(IGF.IGM.getLLVMContext(), index, attr);
 }
@@ -2877,8 +3325,8 @@ Explosion IRGenFunction::collectParameters() {
 }
 
 /// Fetch the error result slot.
-Address IRGenFunction::getErrorResultSlot(SILType errorType) {
-  if (!ErrorResultSlot) {
+Address IRGenFunction::getCalleeErrorResultSlot(SILType errorType) {
+  if (!CalleeErrorResultSlot) {
     auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
     IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
@@ -2902,23 +3350,28 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
                             cast<llvm::PointerType>(errorTI.getStorageType()));
     builder.CreateStore(nullError, addr);
 
-    ErrorResultSlot = addr.getAddress();
+    CalleeErrorResultSlot = addr.getAddress();
   }
-  return Address(ErrorResultSlot, IGM.getPointerAlignment());
+  return Address(CalleeErrorResultSlot, IGM.getPointerAlignment());
 }
 
 /// Fetch the error result slot received from the caller.
 Address IRGenFunction::getCallerErrorResultSlot() {
-  assert(ErrorResultSlot && "no error result slot!");
-  assert(isa<llvm::Argument>(ErrorResultSlot) && "error result slot is local!");
-  return Address(ErrorResultSlot, IGM.getPointerAlignment());
+  assert(CallerErrorResultSlot && "no error result slot!");
+  assert(isa<llvm::Argument>(CallerErrorResultSlot) && !isAsync() ||
+         isa<llvm::GetElementPtrInst>(CallerErrorResultSlot) && isAsync() &&
+             "error result slot is local!");
+  return Address(CallerErrorResultSlot, IGM.getPointerAlignment());
 }
 
 // Set the error result slot.  This should only be done in the prologue.
-void IRGenFunction::setErrorResultSlot(llvm::Value *address) {
-  assert(!ErrorResultSlot && "already have error result slot!");
+void IRGenFunction::setCallerErrorResultSlot(llvm::Value *address) {
+  assert(!CallerErrorResultSlot && "already have a caller error result slot!");
   assert(isa<llvm::PointerType>(address->getType()));
-  ErrorResultSlot = address;
+  CallerErrorResultSlot = address;
+  if (!isAsync()) {
+    CalleeErrorResultSlot = address;
+  }
 }
 
 /// Emit the basic block that 'return' should branch to and insert it into

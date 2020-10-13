@@ -2455,10 +2455,16 @@ NOTE(suggest_removing_override, none,
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
       (DeclBaseName))
+WARNING(override_less_available_warn,none,
+        "overriding %0 must be as available as declaration it overrides",
+        (DeclBaseName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
       (DescriptiveDeclKind, DeclBaseName))
+WARNING(override_accessor_less_available_warn,none,
+        "overriding %0 for %1 must be as available as declaration it overrides",
+        (DescriptiveDeclKind, DeclBaseName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
@@ -4101,6 +4107,9 @@ ERROR(not_objc_function_async,none,
       "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
+ERROR(actor_isolated_objc,none,
+      "actor-isolated %0 %1 cannot be @objc",
+       (DescriptiveDeclKind, DeclName))
 NOTE(protocol_witness_async_conflict,none,
      "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
      (bool))
@@ -4150,6 +4159,21 @@ ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be referenced from an "
         "'@actorIndependent' context",
         (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_global_actor_context,none,
+      "actor-isolated %0 %1 can not be referenced from context of global "
+      "actor %2",
+      (DescriptiveDeclKind, DeclName, Type))
+ERROR(global_actor_from_instance_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from actor %3",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
+ERROR(global_actor_from_other_global_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from "
+      "different global actor %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(global_actor_from_independent_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from an "
+      "'@actorIndependent' context",
+      (DescriptiveDeclKind, DeclName, Type))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4169,13 +4193,25 @@ NOTE(actor_mutable_state,none,
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
-NOTE(actor_isolated_witness,none,
+ERROR(actor_isolated_witness,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
      (DescriptiveDeclKind, DeclName))
-NOTE(actor_isolated_witness_could_be_async_handler,none,
+ERROR(actor_isolated_witness_could_be_async_handler,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
      "did you mean to make it an asychronous handler?",
      (DescriptiveDeclKind, DeclName))
+ERROR(global_actor_isolated_requirement,none,
+      "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_witness,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_requirement_witness_conflict,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3 isolated to global actor %4",
+      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 ERROR(actorisolated_let,none,
       "'@actorIsolated' is meaningless on 'let' declarations because "
@@ -4194,6 +4230,43 @@ ERROR(actorisolated_not_actor_member,none,
 ERROR(actorisolated_not_actor_instance_member,none,
       "'@actorIsolated' can only be applied to instance members of actors",
       ())
+
+ERROR(concurrency_lib_missing,none,
+      "missing '%0' declaration, probably because the '_Concurrency' "
+      "module was not imported", (StringRef))
+ERROR(enqueue_partial_task_not_in_context,none,
+      "'enqueue(partialTask:)' can only be implemented in the definition of "
+      "actor class %0", (Type))
+
+ERROR(global_actor_missing_shared,none,
+      "global actor %0 requires a static property 'shared' that produces an "
+      "actor instance", (Identifier))
+NOTE(global_actor_shared_not_static,none,
+     "'shared' property in global actor is not 'static'", ())
+NOTE(global_actor_shared_inaccessible,none,
+     "'shared' property has more restrictive access (%0) than its global actor "
+     "(%1)",
+     (StringRef, StringRef))
+NOTE(global_actor_shared_constrained_extension,none,
+     "'shared' property in global actor cannot be in a constrained extension",
+     ())
+NOTE(global_actor_shared_non_actor_type,none,
+     "'shared' property type %0 does not conform to the 'Actor' protocol",
+     (Type))
+
+ERROR(multiple_global_actors,none,
+      "declaration can not have multiple global actor attributes (%0 and %1)",
+      (Identifier, Identifier))
+ERROR(global_actor_disallowed,none,
+      "%0 cannot have a global actor", (DescriptiveDeclKind))
+ERROR(global_actor_on_actor_class,none,
+      "actor class %0 cannot have a global actor", (Identifier))
+ERROR(global_actor_on_local_variable,none,
+      "local variable %0 cannot have a global actor", (DeclName))
+
+ERROR(actor_isolation_multiple_attr,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
+      (DescriptiveDeclKind, DeclName, StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -4922,6 +4995,10 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in inlinable %0",
+      (DescriptiveDeclKind))
+
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
@@ -5054,6 +5131,12 @@ ERROR(specialize_attr_missing_constraint,none,
       "Missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
       "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+ERROR(specialize_target_function_not_found, none,
+     "target function %0 could not be found", (DeclNameRef))
+ERROR(specialize_target_function_of_type_not_found, none,
+      "target function %0 of type %1 could not be found", (DeclNameRef, Type))
+NOTE(specialize_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Variable usage diagnostics
@@ -5206,8 +5289,6 @@ ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
       "get-only property wrapper %1", (TypeLoc, TypeLoc))
 
-ERROR(property_wrapper_local,none,
-      "property wrappers are not yet supported on local properties", ())
 ERROR(property_wrapper_top_level,none,
       "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,

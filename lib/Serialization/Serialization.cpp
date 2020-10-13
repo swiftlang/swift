@@ -689,6 +689,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
   return addDeclBaseNameRef(exportedModuleID);
 }
 
+IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
+  if (module == this->M)
+    return CURRENT_MODULE_ID;
+  if (module == this->M->getASTContext().TheBuiltinModule)
+    return BUILTIN_MODULE_ID;
+  auto moduleName =
+      module->getASTContext().getIdentifier(module->getName().str());
+  return addDeclBaseNameRef(moduleName);
+}
+
 SILLayoutID Serializer::addSILLayoutRef(const SILLayout *layout) {
   return SILLayoutsToSerialize.addRef(layout);
 }
@@ -861,6 +871,13 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
 
+  BLOCK(INCREMENTAL_INFORMATION_BLOCK);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, METADATA);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, SOURCE_FILE_DEP_GRAPH_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, FINGERPRINT_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, DEPENDS_ON_DEFINITION_NODE);
+  BLOCK_RECORD(fine_grained_dependencies::record_block, IDENTIFIER_NODE);
+
 #undef BLOCK
 #undef BLOCK_RECORD
 }
@@ -946,7 +963,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-static void flattenImportPath(const ModuleDecl::ImportedModule &import,
+static void flattenImportPath(const ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
   import.importedModule->getReverseFullModuleName().printForward(
@@ -967,11 +984,10 @@ uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
   return dep.getModificationTime();
 }
 
-using ImportSet = llvm::SmallSet<ModuleDecl::ImportedModule, 8,
-                                 ModuleDecl::OrderImportedModules>;
+using ImportSet = llvm::SmallSet<ImportedModule, 8, ImportedModule::Order>;
 static ImportSet getImportsAsSet(const ModuleDecl *M,
                                  ModuleDecl::ImportFilter filter) {
-  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  SmallVector<ImportedModule, 8> imports;
   M->getImportedModules(imports, filter);
   ImportSet importSet;
   importSet.insert(imports.begin(), imports.end());
@@ -980,7 +996,7 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
-  input_block::ImportedModuleLayout ImportedModule(Out);
+  input_block::ImportedModuleLayout importedModule(Out);
   input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
@@ -1024,13 +1040,13 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
-  SmallVector<ModuleDecl::ImportedModule, 8> allImports;
+  SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports,
                         {ModuleDecl::ImportFilterKind::Exported,
                          ModuleDecl::ImportFilterKind::Default,
                          ModuleDecl::ImportFilterKind::ImplementationOnly,
                          ModuleDecl::ImportFilterKind::SPIAccessControl});
-  ModuleDecl::removeDuplicateImports(allImports);
+  ImportedModule::removeDuplicates(allImports);
 
   // Collect the public and private imports as a subset so that we can
   // distinguish them.
@@ -1048,8 +1064,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{ImportPath::Access(),
-                                                  bridgingHeaderModule};
+  ImportedModule bridgingHeaderImport{ImportPath::Access(),
+                                      bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
@@ -1097,7 +1113,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    ImportedModule.emit(ScratchRecord,
+    importedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
                         !import.accessPath.empty(), !spis.empty(), importPath);
 
@@ -2356,13 +2372,39 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DAK_Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-      auto SA = cast<SpecializeAttr>(DA);
+      auto attr = cast<SpecializeAttr>(DA);
+      auto targetFun = attr->getTargetFunctionName();
+      auto *targetFunDecl = attr->getTargetFunctionDecl(cast<ValueDecl>(D));
+
+      SmallVector<IdentifierID, 4> pieces;
+
+      // encodes whether this a a simple or compound name by adding one.
+      size_t numArgs = 0;
+      if (targetFun) {
+        pieces.push_back(S.addDeclBaseNameRef(targetFun.getBaseName()));
+        for (auto argName : targetFun.getArgumentNames())
+          pieces.push_back(S.addDeclBaseNameRef(argName));
+        if (targetFun.isSimpleName()) {
+          assert(pieces.size() == 1);
+          numArgs = 1;
+        } else
+          numArgs = pieces.size() + 1;
+      }
+
+      for (auto spi : attr->getSPIGroups()) {
+        assert(!spi.empty() && "Empty SPI name");
+        pieces.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      auto numSPIGroups = attr->getSPIGroups().size();
+      assert(pieces.size() == numArgs + numSPIGroups ||
+             pieces.size() == (numArgs - 1 + numSPIGroups));
 
       SpecializeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          (unsigned)SA->isExported(),
-          (unsigned)SA->getSpecializationKind(),
-          S.addGenericSignatureRef(SA->getSpecializedSignature()));
+          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
+          (unsigned)attr->getSpecializationKind(),
+          S.addGenericSignatureRef(attr->getSpecializedSignature()),
+          S.addDeclRef(targetFunDecl), numArgs, numSPIGroups, pieces);
       return;
     }
 
@@ -2489,11 +2531,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     auto *storage = dyn_cast<AbstractStorageDecl>(value);
     auto access = value->getFormalAccess();
-    // Emit the private descriminator for private decls.
+    // Emit the private discriminator for private decls.
     // FIXME: We shouldn't need to encode this for /all/ private decls.
     // In theory we can follow the same rules as mangling and only include
     // the outermost private context.
-    bool shouldEmitPrivateDescriminator =
+    bool shouldEmitPrivateDiscriminator =
         access <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext();
 
@@ -2507,10 +2549,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           storage->getFormalAccess() >= swift::AccessLevel::Internal &&
           storage->hasPrivateAccessor()));
 
-    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {
+    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDiscriminator) {
       auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
-        if (shouldEmitPrivateDescriminator) {
+        if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
               enclosingFile->getDiscriminatorForPrivateValue(value);
           unsigned abbrCode =
@@ -4140,7 +4182,10 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
+    auto clangType =
+      S.getASTContext().LangOpts.UseClangFunctionTypes
+      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+      : ClangTypeID(0);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -5228,8 +5273,9 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo) {
-      S.writeIncrementalInfo(DepGraph);
+    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+      fine_grained_dependencies::writeFineGrainedDependencyGraph(
+          S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
   }
 

@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
@@ -397,6 +396,28 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
     .fixItReplace(args->getSourceRange(), "([])");
 }
 
+template<typename T>
+static void diagnoseDuplicateDecls(const T &decls) {
+  llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
+  for (auto *current : decls) {
+    if (!current->getASTContext().LangOpts.DisableParserLookup)
+      return;
+
+    if (!current->hasName() || current->isImplicit())
+      continue;
+
+    auto found = names.insert(std::make_pair(current->getBaseName(), current));
+    if (!found.second) {
+      auto *other = found.first->second;
+
+      current->getASTContext().Diags.diagnoseWithNotes(
+        current->diagnose(diag::invalid_redecl,
+                          current->getName()), [&]() {
+        other->diagnose(diag::invalid_redecl_prev, other->getName());
+      });
+    }
+  }
+}
 
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
@@ -410,10 +431,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     checkInheritanceClause(gp);
   }
 
-  // Force visitation of each of the requirements here.
+  // Force resolution of interface types written in requirements here.
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+
+  // Check for duplicate generic parameter names.
+  diagnoseDuplicateDecls(*genericParams);
 }
 
 template <typename T>
@@ -489,8 +513,10 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
   SourceFile *currentFile = currentDC->getParentSourceFile();
-  if (!currentFile || currentDC->isLocalContext())
+  if (!currentFile)
     return std::make_tuple<>();
+
+  auto &ctx = current->getASTContext();
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
@@ -500,7 +526,17 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
     }
+  } else if (currentDC->isLocalContext()) {
+    if (ctx.LangOpts.DisableParserLookup) {
+      if (!current->isImplicit()) {
+        ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+                                   current->getLoc(),
+                                   /*stopAfterInnermostBraceStmt=*/true,
+                                   otherDefinitions);
+      }
+    }
   } else {
+    assert(currentDC->isModuleScopeContext());
     // Look within a module context.
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
@@ -512,7 +548,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   OverloadSignature currentSig = current->getOverloadSignature();
   CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
-  auto &ctx = current->getASTContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
     //
@@ -536,6 +571,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
       continue;
 
+    // In local context, only consider exact name matches.
+    if (currentDC->isLocalContext() &&
+        current->getName() != other->getName())
+      continue;
+
     // Check whether the overload signatures conflict (ignoring the type for
     // now).
     auto otherSig = other->getOverloadSignature();
@@ -547,7 +587,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     // shadows a non-private one, but only in the file where the shadowing
     // happens. We will warn on conflicting non-private declarations in both
     // files.
-    if (!other->isAccessibleFrom(currentDC))
+    if (!currentDC->isLocalContext() &&
+        !other->isAccessibleFrom(currentDC))
       continue;
 
     // Skip invalid declarations.
@@ -573,18 +614,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                                        &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
     if (isRedeclaration || wouldBeSwift5Redeclaration) {
-      // If the two declarations occur in the same source file, make sure
-      // we get the diagnostic ordering to be sensible.
-      if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
-        if (currentFile == otherFile &&
-            current->getLoc().isValid() &&
-            other->getLoc().isValid() &&
-            ctx.SourceMgr.isBeforeInBuffer(current->getLoc(),
-                                           other->getLoc())) {
-          std::swap(current, other);
-        }
-      }
-
       // If we're currently looking at a .sil and the conflicting declaration
       // comes from a .sib, don't error since we won't be considering the sil
       // from the .sib. So it's fine for the .sil to shadow it, since that's the
@@ -798,11 +827,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
         }
       }
 
-      // Make sure we don't do this checking again for the same decl. We also
-      // set this at the beginning of the function, but we might have swapped
-      // the decls for diagnostics; so ensure we also set this for the actual
-      // decl we diagnosed on.
-      current->setCheckedRedeclaration();
       break;
     }
   }
@@ -1293,6 +1317,30 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
+void TypeChecker::checkParameterList(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+
+  // Check for duplicate parameter names.
+  diagnoseDuplicateDecls(*params);
+}
+
+void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
+  SmallVector<VarDecl *, 2> boundVars;
+  pattern->collectVariables(boundVars);
+
+  diagnoseDuplicateDecls(boundVars);
+}
+
+void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
+  SmallVector<VarDecl *, 2> captureListVars;
+  for (auto &capture : expr->getCaptureList())
+    captureListVars.push_back(capture.Var);
+
+  diagnoseDuplicateDecls(captureListVars);
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1417,6 +1465,11 @@ public:
     (void) VD->isSetterMutating();
     (void) VD->getPropertyWrapperBackingProperty();
     (void) VD->getImplInfo();
+
+    // Visit auxiliary decls first
+    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+      this->visitBoundVariable(var);
+    });
 
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
@@ -1714,7 +1767,7 @@ public:
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TypeChecker::checkParameterAttributes(SD->getIndices());
+    TypeChecker::checkParameterList(SD->getIndices());
 
     checkDefaultArguments(SD->getIndices());
 
@@ -1740,6 +1793,7 @@ public:
 
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
+    checkGenericParams(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -1860,7 +1914,6 @@ public:
         if (!rawTy->is<ErrorType>()) {
           DE.diagnose(ED->getInherited().front().getSourceRange().Start,
                       diag::raw_type_not_literal_convertible, rawTy);
-          ED->getInherited().front().setType(ErrorType::get(getASTContext()));
         }
       }
       
@@ -2011,7 +2064,7 @@ public:
     checkGenericParams(CD);
 
     // Check for circular inheritance.
-    (void)CD->hasCircularInheritance();
+    (void)CD->getSuperclassDecl();
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
@@ -2265,15 +2318,18 @@ public:
     (void) FD->getOperatorDecl();
     (void) FD->getDynamicallyReplacedDecl();
     
-    if (!FD->isInvalid()) {
-      checkGenericParams(FD);
-      TypeChecker::checkReferencedGenericParams(FD);
-      TypeChecker::checkProtocolSelfRequirements(FD);
+    if (!isa<AccessorDecl>(FD)) {
+      if (!FD->isInvalid()) {
+        checkGenericParams(FD);
+        TypeChecker::checkReferencedGenericParams(FD);
+        TypeChecker::checkProtocolSelfRequirements(FD);
+      }
+
+      checkAccessControl(FD);
+
+      TypeChecker::checkParameterList(FD->getParameters());
     }
 
-    checkAccessControl(FD);
-
-    TypeChecker::checkParameterAttributes(FD->getParameters());
     TypeChecker::checkDeclAttributes(FD);
 
     if (!checkOverrides(FD)) {
@@ -2304,6 +2360,7 @@ public:
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)FD->getTypecheckedBody();
+      TypeChecker::computeCaptures(FD);
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
@@ -2381,7 +2438,7 @@ public:
     TypeChecker::checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TypeChecker::checkParameterAttributes(PL);
+      TypeChecker::checkParameterList(PL);
 
       checkDefaultArguments(PL);
     }
@@ -2537,7 +2594,7 @@ public:
     }
 
     TypeChecker::checkDeclAttributes(CD);
-    TypeChecker::checkParameterAttributes(CD->getParameters());
+    TypeChecker::checkParameterList(CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.

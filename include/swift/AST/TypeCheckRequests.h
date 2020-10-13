@@ -19,6 +19,7 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
@@ -125,10 +126,9 @@ public:
 };
 
 /// Request the raw type of the given enum.
-class EnumRawTypeRequest :
-    public SimpleRequest<EnumRawTypeRequest,
-                         Type(EnumDecl *, TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+class EnumRawTypeRequest
+    : public SimpleRequest<EnumRawTypeRequest, Type(EnumDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -136,18 +136,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type
-  evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
-           TypeResolutionStage stage) const;
+  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 
-  // Separate caching.
-  bool isCached() const;
-  Optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
+  bool isCached() const { return true; }
 };
 
 /// Request to determine the set of declarations that were are overridden
@@ -210,6 +206,29 @@ private:
   // Evaluation.
   CtorInitializerKind
   evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
+// Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyInitKind initKind);
+void simple_display(llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr);
+
+/// Computes the kind of initializer call (self.init or super.init) performed
+/// in the body of a \c ConstructorDecl
+class BodyInitKindRequest :
+    public SimpleRequest<BodyInitKindRequest,
+                         BodyInitKindAndExpr(ConstructorDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BodyInitKindAndExpr evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
 
 public:
   // Caching.
@@ -828,6 +847,55 @@ private:
   friend SimpleRequest;
 
   bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the static "shared" property within a global actor that provides
+/// the actor instance representing the global actor.
+///
+/// Global actors can be applied to a declaration to indicate that the
+/// declaration operations on state that is protected by the global actor.
+class GlobalActorInstanceRequest :
+    public SimpleRequest<GlobalActorInstanceRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
+
+/// Request the custom attribute which denotes the global actor for the given
+/// declaration.
+///
+/// This is the "raw" global actor attribute as written directly on the
+/// declaration, with any inference rules applied.
+class GlobalActorAttributeRequest :
+    public SimpleRequest<
+        GlobalActorAttributeRequest,
+        Optional<CustomAttrNominalPair>(Decl *),
+        RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   // Caching
@@ -1963,29 +2031,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Computes whether a class has a circular reference in its inheritance
-/// hierarchy.
-class HasCircularInheritanceRequest
-    : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, ClassDecl *decl) const;
-
-public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
-  // Cached.
-  bool isCached() const { return true; }
-};
-
 /// Computes whether a protocol has a circular reference in its list of
 /// inherited protocols.
 class HasCircularInheritedProtocolsRequest
@@ -2126,6 +2171,25 @@ private:
 
   // Evaluation.
   ValueDecl * evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class SpecializeAttrTargetDeclRequest
+    : public SimpleRequest<SpecializeAttrTargetDeclRequest,
+                           ValueDecl *(const ValueDecl *, SpecializeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *vd,
+                      SpecializeAttr *attr) const;
 
 public:
   // Caching.
@@ -2493,30 +2557,11 @@ public:
   }
 };
 
-/// A module which has been implicitly imported.
-struct ImplicitImport {
-  using ImportOptions = SourceFile::ImportOptions;
-
-  ModuleDecl *Module;
-  ImportOptions Options;
-
-  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
-      : Module(module), Options(opts) {}
-
-  friend bool operator==(const ImplicitImport &lhs,
-                         const ImplicitImport &rhs) {
-    return lhs.Module == rhs.Module &&
-           lhs.Options.toRaw() == rhs.Options.toRaw();
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
-
 /// Computes the loaded modules that should be implicitly imported by each file
 /// of a given module.
 class ModuleImplicitImportsRequest
     : public SimpleRequest<ModuleImplicitImportsRequest,
-                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           ImplicitImportList(ModuleDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2524,8 +2569,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<ImplicitImport>
-  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+  ImplicitImportList evaluate(Evaluator &evaluator, ModuleDecl *module) const;
 
 public:
   // Cached.

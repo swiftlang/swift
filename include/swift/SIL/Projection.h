@@ -152,13 +152,13 @@ struct ProjectionIndex {
     }
     case ValueKind::StructElementAddrInst: {
       StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::RefElementAddrInst: {
       RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
-      Index = REA->getFieldNo();
+      Index = REA->getFieldIndex();
       Aggregate = REA->getOperand();
       break;
     }
@@ -177,19 +177,19 @@ struct ProjectionIndex {
     }
     case ValueKind::TupleElementAddrInst: {
       TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
     case ValueKind::StructExtractInst: {
       StructExtractInst *SEA = cast<StructExtractInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::TupleExtractInst: {
       TupleExtractInst *TEA = cast<TupleExtractInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
@@ -302,10 +302,9 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    assert(BaseType.getNominalOrBoundGenericNominal() &&
-           "This should only be called with a nominal type");
-    auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    return NDecl->getStoredProperties()[getIndex()];
+    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    assert(nominalDecl && "This should only be called with a nominal type");
+    return getIndexedField(nominalDecl, getIndex());
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {

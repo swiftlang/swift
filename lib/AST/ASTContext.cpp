@@ -191,10 +191,10 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
 
-#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+#define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of MODULE.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
-#include "swift/AST/KnownObjCTypes.def"
+#include "swift/AST/KnownSDKTypes.def"
 
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
@@ -255,6 +255,9 @@ struct ASTContext::Implementation {
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
+  /// The module interface checker owned by the ASTContext.
+  std::unique_ptr<ModuleInterfaceChecker> InterfaceChecker;
+
   /// The various module loaders that import external modules into this
   /// ASTContext.
   SmallVector<std::unique_ptr<swift::ModuleLoader>, 4> ModuleLoaders;
@@ -267,9 +270,6 @@ struct ASTContext::Implementation {
 
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
-
-  /// The module loader used to load Swift textual interface.
-  ModuleLoader *TheModuleInterfaceLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
@@ -894,7 +894,7 @@ CanType ASTContext::getNeverType() const {
   return neverDecl->getDeclaredInterfaceType()->getCanonicalType();
 }
 
-#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECLTYPE) \
+#define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECLTYPE, GENERIC_ARGS) \
 DECLTYPE *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
     if (ModuleDecl *M = getLoadedModule(Id_##MODULE)) { \
@@ -905,7 +905,8 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
                          decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
-        if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \
+        if (isa<ProtocolDecl>(decl) \
+            || (bool)decl->getGenericParams() == (bool)GENERIC_ARGS) { \
           getImpl().NAME##Decl = decl; \
         } \
       } \
@@ -922,7 +923,7 @@ Type ASTContext::get##NAME##Type() const { \
   return decl->getDeclaredInterfaceType(); \
 }
 
-#include "swift/AST/KnownObjCTypes.def"
+#include "swift/AST/KnownSDKTypes.def"
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -946,6 +947,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::Differentiable:
     M = getLoadedModule(Id_Differentiation);
+    break;
+  case KnownProtocolKind::Actor:
+    M = getLoadedModule(Id_Concurrency);
     break;
   default:
     M = getStdlibModule();
@@ -1519,9 +1523,13 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
-  if (IsInterface && !getImpl().TheModuleInterfaceLoader)
-    getImpl().TheModuleInterfaceLoader = loader.get();
   getImpl().ModuleLoaders.push_back(std::move(loader));
+}
+
+void ASTContext::addModuleInterfaceChecker(
+    std::unique_ptr<ModuleInterfaceChecker> checker) {
+  assert(!getImpl().InterfaceChecker && "Checker has been set already");
+  getImpl().InterfaceChecker = std::move(checker);
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
@@ -1610,8 +1618,10 @@ ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
   return getImpl().TheDWARFModuleLoader;
 }
 
-ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
-  return getImpl().TheModuleInterfaceLoader;
+ModuleInterfaceChecker *ASTContext::getModuleInterfaceChecker() const {
+  auto *result = getImpl().InterfaceChecker.get();
+  assert(result);
+  return result;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(
