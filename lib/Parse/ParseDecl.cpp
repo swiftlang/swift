@@ -581,16 +581,23 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 bool Parser::parseSpecializeAttributeArguments(
     swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
     Optional<SpecializeAttr::SpecializationKind> &Kind,
-    swift::TrailingWhereClause *&TrailingWhereClause) {
+    swift::TrailingWhereClause *&TrailingWhereClause,
+    DeclNameRef &targetFunction, SmallVectorImpl<Identifier> &spiGroups,
+    llvm::function_ref<bool(Parser &)> parseSILTargetName,
+    llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
   while (!Tok.is(tok::kw_where)) {
-    SyntaxParsingContext ArgumentContext(SyntaxContext,
-                                         SyntaxKind::LabeledSpecializeEntry);
     if (Tok.is(tok::identifier)) {
       auto ParamLabel = Tok.getText();
-      if (ParamLabel != "exported" && ParamLabel != "kind") {
+      SyntaxParsingContext ArgumentContext(
+          SyntaxContext, ParamLabel == "target"
+                             ? SyntaxKind::TargetFunctionEntry
+                             : SyntaxKind::LabeledSpecializeEntry);
+      if (ParamLabel != "exported" && ParamLabel != "kind" &&
+          ParamLabel != "target" && ParamLabel != "spi" &&
+          ParamLabel != "spiModule") {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
                  ParamLabel);
       }
@@ -611,16 +618,14 @@ bool Parser::parseSpecializeAttributeArguments(
         return false;
       }
       if ((ParamLabel == "exported" && Exported.hasValue()) ||
-          (ParamLabel == "kind" && Kind.hasValue())) {
+          (ParamLabel == "kind" && Kind.hasValue()) ||
+          (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
                  ParamLabel);
       }
       if (ParamLabel == "exported") {
         auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
-        if (isTrue) {
-          diagnose(trueLoc, diag::attr_specialize_export_true_no_op);
-        }
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
           diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
@@ -659,6 +664,35 @@ bool Parser::parseSpecializeAttributeArguments(
                    diag::attr_specialize_expected_partial_or_full);
         }
       }
+      if (ParamLabel == "target") {
+        if (!parseSILTargetName(*this)) {
+          SyntaxParsingContext ContentContext(SyntaxContext,
+                                              SyntaxKind::DeclName);
+          DeclNameLoc loc;
+          targetFunction = parseDeclNameRef(
+              loc, diag::attr_specialize_expected_function,
+              DeclNameFlag::AllowZeroArgCompoundNames |
+                  DeclNameFlag::AllowKeywordsUsingSpecialNames |
+                  DeclNameFlag::AllowOperators);
+        }
+      }
+      if (ParamLabel == "spiModule") {
+        if (!parseSILSIPModule(*this)) {
+          diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
+                   ParamLabel);
+          return false;
+        }
+      }
+      if (ParamLabel == "spi") {
+        if (!Tok.is(tok::identifier)) {
+          diagnose(Tok.getLoc(), diag::attr_specialize_expected_spi_name);
+          consumeToken();
+          return false;
+        }
+        auto text = Tok.getText();
+        spiGroups.push_back(Context.getIdentifier(text));
+        consumeToken();
+      }
       if (!consumeIf(tok::comma)) {
         diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
         skipUntil(tok::comma, tok::kw_where);
@@ -695,8 +729,11 @@ bool Parser::parseSpecializeAttributeArguments(
   return true;
 }
 
-bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
-                                      SourceLoc Loc, SpecializeAttr *&Attr) {
+bool Parser::parseSpecializeAttribute(
+    swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
+    SpecializeAttr *&Attr,
+    llvm::function_ref<bool(Parser &)> parseSILTargetName,
+    llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
 
   SourceLoc lParenLoc = consumeToken();
@@ -708,8 +745,11 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
 
   TrailingWhereClause *trailingWhereClause = nullptr;
 
-  if (!parseSpecializeAttributeArguments(ClosingBrace, DiscardAttribute,
-                                         exported, kind, trailingWhereClause)) {
+  DeclNameRef targetFunction;
+  SmallVector<Identifier, 4> spiGroups;
+  if (!parseSpecializeAttributeArguments(
+          ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
+          targetFunction, spiGroups, parseSILTargetName, parseSILSIPModule)) {
     return false;
   }
 
@@ -738,7 +778,7 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.getValue(),
-                                kind.getValue());
+                                kind.getValue(), targetFunction, spiGroups);
   return true;
 }
 

@@ -2520,7 +2520,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
-  if (auto *derivativeId = c.derivativeFunctionIdentifier) {
+  if (auto *derivativeId = c.getDerivativeFunctionIdentifier()) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(

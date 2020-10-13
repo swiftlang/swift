@@ -103,6 +103,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationPrespecialized:
     case Node::Kind::InlinedGenericFunction:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericPartialSpecialization:
@@ -2268,6 +2269,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted);
+    case 's':
+      return demangleGenericSpecialization(
+          Node::Kind::GenericSpecializationPrespecialized);
     case 'i':
       return demangleGenericSpecialization(Node::Kind::InlinedGenericFunction);
     case'p': {
