@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILParserFunctionBuilder.h"
+#include "SILParserState.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -44,40 +45,6 @@ using namespace swift::syntax;
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
-
-namespace {
-class SILParserState : public SILParserStateBase {
-public:
-  explicit SILParserState(SILModule &M) : M(M) {}
-  ~SILParserState();
-
-  SILModule &M;
-
-  /// This is all of the forward referenced functions with
-  /// the location for where the reference is.
-  llvm::DenseMap<Identifier,
-                 Located<SILFunction*>> ForwardRefFns;
-  /// A list of all functions forward-declared by a sil_scope.
-  llvm::DenseSet<SILFunction *> PotentialZombieFns;
-
-  /// A map from textual .sil scope number to SILDebugScopes.
-  llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
-
-  /// Did we parse a sil_stage for this module?
-  bool DidParseSILStage = false;
-
-  bool parseDeclSIL(Parser &P) override;
-  bool parseDeclSILStage(Parser &P) override;
-  bool parseSILVTable(Parser &P) override;
-  bool parseSILGlobal(Parser &P) override;
-  bool parseSILWitnessTable(Parser &P) override;
-  bool parseSILDefaultWitnessTable(Parser &P) override;
-  bool parseSILDifferentiabilityWitness(Parser &P) override;
-  bool parseSILCoverageMap(Parser &P) override;
-  bool parseSILProperty(Parser &P) override;
-  bool parseSILScope(Parser &P) override;
-};
-} // end anonymous namespace
 
 SILParserState::~SILParserState() {
   if (!ForwardRefFns.empty()) {
