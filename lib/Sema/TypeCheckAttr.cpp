@@ -290,10 +290,17 @@ public:
         return;
       }
 
-      // @actorIndependent can not be applied to stored properties.
+      // @actorIndependent can not be applied to stored properties, unless if
+      // the 'unsafe' option was specified
       if (var->hasStorage()) {
-        diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
-        return;
+        switch (attr->getKind()) {
+          case ActorIndependentKind::Safe:
+            diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
+            return;
+            
+          case ActorIndependentKind::Unsafe:
+            break;
+        }
       }
 
       // @actorIndependent can not be applied to local properties.

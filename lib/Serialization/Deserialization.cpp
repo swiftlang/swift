@@ -4136,6 +4136,14 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::ActorIndependent_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ActorIndependentDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ActorIndependentAttr((ActorIndependentKind)kind);
+        break;
+      }
+
       case decls_block::Optimize_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::OptimizeDeclAttrLayout::readRecord(

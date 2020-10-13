@@ -1618,7 +1618,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "releasenone")
       kind = EffectsKind::ReleaseNone;
     else {
-      diagnose(Loc, diag::effects_attribute_unknown_option,
+      diagnose(Loc, diag::attr_unknown_option,
                Tok.getText(), AttrName);
       return false;
     }
@@ -1644,8 +1644,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
-               "none");
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "none");
       return false;
     }
 
@@ -1655,8 +1654,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "__always")
       kind = InlineKind::Always;
     else {
-      diagnose(Loc, diag::optimization_attribute_unknown_option,
-               Tok.getText(), AttrName);
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
       return false;
     }
     consumeToken(tok::identifier);
@@ -1674,6 +1672,45 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_ActorIndependent: {
+    // if no option is provided, then it's the 'safe' version.
+    if (!consumeIf(tok::l_paren)) {
+      if (!DiscardAttribute) {
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+        Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
+                                                  ActorIndependentKind::Safe));
+      }
+      break;
+    }
+
+    // otherwise, make sure it looks like an identifier.
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "unsafe");
+      return false;
+    }
+
+    // make sure the identifier is 'unsafe'
+    if (Tok.getText() != "unsafe") {
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
+      return false;
+    }
+
+    consumeToken(tok::identifier);
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
+                                                ActorIndependentKind::Unsafe));
+
+    break;
+  }
+
   case DAK_Optimize: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -1682,8 +1719,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
-               "speed");
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "speed");
       return false;
     }
 
@@ -1695,8 +1731,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "size")
       optMode = OptimizationMode::ForSize;
     else {
-      diagnose(Loc, diag::optimization_attribute_unknown_option,
-               Tok.getText(), AttrName);
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
       return false;
     }
     consumeToken(tok::identifier);
