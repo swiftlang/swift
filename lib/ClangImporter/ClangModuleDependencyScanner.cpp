@@ -245,6 +245,15 @@ void ClangImporter::recordModuleDependencies(
       }
     }
 
+    // Add all args the non-path arguments required to be passed in, according
+    // to the Clang scanner
+    for (const auto &clangArg : clangModuleDep.NonPathCommandLine) {
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back("-Xclang");
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back(clangArg);
+    }
+
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
