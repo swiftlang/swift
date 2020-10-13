@@ -903,8 +903,9 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              unsigned index,
                              TypeResolutionStage stage) const {
   // Figure out the type resolution.
-  const auto options =
-      TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  auto options = TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  if (owner.dc->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowInlinable;
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:

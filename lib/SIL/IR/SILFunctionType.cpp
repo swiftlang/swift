@@ -3266,7 +3266,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   //   preserving SIL typing invariants.
   //
   // Always use (ad) to compute lowered derivative function types.
-  if (auto *derivativeId = constant.derivativeFunctionIdentifier) {
+  if (auto *derivativeId = constant.getDerivativeFunctionIdentifier()) {
     // Get lowered original function type.
     auto origFnConstantInfo = getConstantInfo(
         TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());

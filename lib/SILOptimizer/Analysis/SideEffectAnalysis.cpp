@@ -222,11 +222,6 @@ FunctionSideEffects::getMemBehavior(RetainObserveKind ScanKind) const {
 MemoryBehavior
 FunctionSideEffects::getArgumentBehavior(FullApplySite applySite,
                                          unsigned argIdx) {
-  // Rule out trivial non-address argument types.
-  SILType argType = applySite.getArgument(argIdx)->getType();
-  if (!argType.isAddress() && argType.isTrivial(*applySite.getFunction()))
-    return MemoryBehavior::None;
-
   // The overall argument effect is the combination of the argument and the
   // global effects.
   MemoryBehavior behavior =

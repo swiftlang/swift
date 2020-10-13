@@ -103,6 +103,9 @@ namespace {
     ArrayRef<RequirementRepr> requirements;
     bool exported;
     SILSpecializeAttr::SpecializationKind kind;
+    SILFunction *target = nullptr;
+    Identifier spiGroupID;
+    ModuleDecl *spiModule;
   };
 
   class SILParser {
@@ -1017,10 +1020,44 @@ static bool parseDeclSILOptional(bool *isTransparent,
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
       SpecializeAttr *Attr;
+      StringRef targetFunctionName;
+      ModuleDecl *module = nullptr;
 
-      if (!SP.P.parseSpecializeAttribute(tok::r_square, AtLoc, Loc, Attr))
+      if (!SP.P.parseSpecializeAttribute(
+              tok::r_square, AtLoc, Loc, Attr,
+              [&targetFunctionName](Parser &P) -> bool {
+                if (P.Tok.getKind() != tok::string_literal) {
+                  P.diagnose(P.Tok, diag::expected_in_attribute_list);
+                  return true;
+                }
+                // Drop the double quotes.
+                targetFunctionName = P.Tok.getText().drop_front().drop_back();
+
+                P.consumeToken(tok::string_literal);
+                return true;
+              },
+              [&module](Parser &P) -> bool {
+                if (P.Tok.getKind() != tok::identifier) {
+                  P.diagnose(P.Tok, diag::expected_in_attribute_list);
+                  return true;
+                }
+                auto ident = P.Context.getIdentifier(P.Tok.getText());
+                module = P.Context.getModuleByIdentifier(ident);
+                assert(module);
+                P.consumeToken();
+                return true;
+              }))
         return true;
-
+      SILFunction *targetFunction = nullptr;
+      if (!targetFunctionName.empty()) {
+        targetFunction = M.lookUpFunction(targetFunctionName.str());
+        if (!targetFunction) {
+          Identifier Id = SP.P.Context.getIdentifier(targetFunctionName);
+          SP.P.diagnose(SP.P.Tok, diag::sil_specialize_target_func_not_found,
+                        Id);
+          return true;
+        }
+      }
       // Convert SpecializeAttr into ParsedSpecAttr.
       SpecAttr.requirements = Attr->getTrailingWhereClause()->getRequirements();
       SpecAttr.kind = Attr->getSpecializationKind() ==
@@ -1028,7 +1065,11 @@ static bool parseDeclSILOptional(bool *isTransparent,
                           ? SILSpecializeAttr::SpecializationKind::Full
                           : SILSpecializeAttr::SpecializationKind::Partial;
       SpecAttr.exported = Attr->isExported();
+      SpecAttr.target = targetFunction;
       SpecAttrs->emplace_back(SpecAttr);
+      if (!Attr->getSPIGroups().empty()) {
+        SpecAttr.spiGroupID = Attr->getSPIGroups()[0];
+      }
       continue;
     }
     else if (ClangDecl && SP.P.Tok.getText() == "clang") {
@@ -5815,7 +5856,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                 GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
-              Attr.kind));
+              Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule));
         }
       }
 

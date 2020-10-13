@@ -123,6 +123,8 @@ class ReabstractionInfo {
   // It uses interface types.
   SubstitutionMap CallerInterfaceSubs;
 
+  bool isPrespecialization = false;
+
   // Is the generated specialization going to be serialized?
   IsSerialized_t Serialized;
   
@@ -147,8 +149,9 @@ class ReabstractionInfo {
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
-  ReabstractionInfo() {}
 public:
+  ReabstractionInfo() {}
+
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
@@ -164,7 +167,10 @@ public:
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// a specialization signature.
   ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
-                    SILFunction *Callee, GenericSignature SpecializedSig);
+                    SILFunction *Callee, GenericSignature SpecializedSig,
+                    bool isPrespecialization = false);
+
+  bool isPrespecialized() const { return isPrespecialization; }
 
   IsSerialized_t isSerialized() const {
     return Serialized;
@@ -306,17 +312,17 @@ public:
   SILFunction *lookupSpecialization();
 
   /// Return a newly created specialized function.
-  SILFunction *tryCreateSpecialization();
+  SILFunction *tryCreateSpecialization(bool forcePrespecialization = false);
 
   /// Try to specialize GenericFunc given a list of ParamSubs.
   /// Returns either a new or existing specialized function, or nullptr.
-  SILFunction *trySpecialization() {
+  SILFunction *trySpecialization(bool forcePrespecialization = false) {
     if (!ReInfo.getSpecializedType())
       return nullptr;
 
     SILFunction *SpecializedF = lookupSpecialization();
     if (!SpecializedF)
-      SpecializedF = tryCreateSpecialization();
+      SpecializedF = tryCreateSpecialization(forcePrespecialization);
 
     return SpecializedF;
   }

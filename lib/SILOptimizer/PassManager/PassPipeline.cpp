@@ -807,6 +807,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
+  // Create pre-specializations.
+  P.addOnonePrespecializations();
+
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 

@@ -12,11 +12,13 @@
 // CHECK-IR: define swiftcc void @"$s10spi_helper8SPIClassC0A6MethodyyF"
 // CHECK-IR: define swiftcc void @"$s10spi_helper7SPIEnumO0A6MethodyyF"
 // CHECK-IR: define swiftcc void @"$s10spi_helper12PublicStructV0A6MethodyyF"
+// CHECK-IR: define swiftcc void @"$s10spi_helper12PublicStructV20prespecializedMethodyyxlFSi_Ts5"
 // CHECK-IR: define swiftcc void @"$s10spi_helper12otherApiFuncyyF"
 
 // Look for the SPI symbols in the TBD file, these are sorted
 // CHECK-TBD: _$s10spi_helper0A4FuncyyF
 // CHECK-TBD: _$s10spi_helper12PublicStructV0A6MethodyyF
+// CHECK-TBD: _$s10spi_helper12PublicStructV20prespecializedMethodyyxlFSi_Ts5
 // CHECK-TBD: _$s10spi_helper12otherApiFuncyyF
 // CHECK-TBD: _$s10spi_helper7SPIEnumO0A6MethodyyF
 // CHECK-TBD: _$s10spi_helper8SPIClassC0A6MethodyyF

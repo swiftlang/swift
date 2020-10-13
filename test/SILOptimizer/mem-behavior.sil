@@ -35,6 +35,13 @@ bb0(%0 : $X):
   return %r : $()
 }
 
+sil @read_from_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> UInt8 {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %2 = load %1 : $*UInt8
+  return %2 : $UInt8
+}
+
 // CHECK-LABEL: @call_unknown_func
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
@@ -224,6 +231,21 @@ bb0(%0 : $*Int32):
   return %5 : $Int32
 }
 
+// CHECK-LABEL:  @escaping_allocstack_to_known_function
+// CHECK:        PAIR #1.
+// CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8 // user: %7
+// CHECK-NEXT:       %1 = alloc_stack $UInt8                         // users: %6, %3, %2
+// CHECK-NEXT:     r=1,w=0
+sil @escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8 {
+bb0(%0 : $UInt8):
+  %1 = alloc_stack $UInt8
+  store %0 to %1 : $*UInt8
+  %3 = address_to_pointer %1 : $*UInt8 to $Builtin.RawPointer
+  %4 = function_ref @read_from_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> UInt8
+  %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8
+  dealloc_stack %1 : $*UInt8
+  return %5 : $UInt8
+}
 
 // CHECK-LABEL:  @tryapply_allocstack_and_copyaddr
 // CHECK:        PAIR #0.
