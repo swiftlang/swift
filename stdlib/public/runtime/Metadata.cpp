@@ -998,8 +998,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.Class);
     }
 
-    int compareWithKey(const ClassMetadata *theClass) const {
-      return comparePointers(theClass, Data.Class);
+    bool matchesKey(const ClassMetadata *theClass) const {
+      return theClass == Data.Class;
+    }
+
+    friend llvm::hash_code hash_value(const ObjCClassCacheEntry &value) {
+      return llvm::hash_value(value.Data.Class);
     }
 
     static size_t getExtraAllocationSize(const ClassMetadata *key) {
@@ -1094,6 +1098,15 @@ public:
       auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
       return ParameterFlags::fromIntValue(flags);
     }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+        hash = llvm::hash_combine(hash, key.getParameter(i));
+        hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
+      }
+      return hash;
+    }
   };
 
   FunctionCacheEntry(const Key &key);
@@ -1102,28 +1115,27 @@ public:
     return 0; // No single meaningful value here.
   }
 
-  int compareWithKey(const Key &key) const {
-    auto keyFlags = key.getFlags();
-    if (auto result = compareIntegers(keyFlags.getIntValue(),
-                                      Data.Flags.getIntValue()))
-      return result;
-
-    if (auto result = comparePointers(key.getResult(), Data.ResultType))
-      return result;
-
-    for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
-      if (auto result =
-              comparePointers(key.getParameter(i), Data.getParameter(i)))
-        return result;
-
-      if (auto result =
-              compareIntegers(key.getParameterFlags(i).getIntValue(),
-                              Data.getParameterFlags(i).getIntValue()))
-        return result;
+  bool matchesKey(const Key &key) const {
+    if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
+      return false;
+    if (key.getResult() != Data.ResultType)
+      return false;
+    for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+      if (key.getParameter(i) != Data.getParameter(i))
+        return false;
+      if (key.getParameterFlags(i).getIntValue() !=
+          Data.getParameterFlags(i).getIntValue())
+        return false;
     }
-
-    return 0;
+    return true;
   }
+
+  friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
+    Key key = {value.Data.Flags, value.Data.getParameters(),
+               value.Data.getParameterFlags(), value.Data.ResultType};
+    return hash_value(key);
+  }
+
   static size_t getExtraAllocationSize(const Key &key) {
     return getExtraAllocationSize(key.Flags);
   }
@@ -1985,6 +1997,9 @@ namespace {
 
     bool operator==(const TypeContextIdentity &other) const {
       return Name == other.Name;
+    }
+    friend llvm::hash_code hash_value(const TypeContextIdentity &value) {
+      return llvm::hash_value(value.Name);
     }
     int compare(const TypeContextIdentity &other) const {
       return Name.compare(other.Name);
@@ -3261,8 +3276,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.InstanceType);
     }
 
-    int compareWithKey(const Metadata *instanceType) const {
-      return comparePointers(instanceType, Data.InstanceType);
+    bool matchesKey(const Metadata *instanceType) const {
+      return instanceType == Data.InstanceType;
+    }
+
+    friend llvm::hash_code hash_value(const MetatypeCacheEntry &value) {
+      return llvm::hash_value(value.Data.InstanceType);
     }
 
     static size_t getExtraAllocationSize(const Metadata *instanceType) {
@@ -3306,8 +3325,11 @@ public:
     return static_cast<intptr_t>(getNumWitnessTables());
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3328,8 +3350,13 @@ public:
     return reinterpret_cast<intptr_t>(Data.InstanceType);
   }
 
-  int compareWithKey(const Metadata *instanceType) const {
-    return comparePointers(instanceType, Data.InstanceType);
+  bool matchesKey(const Metadata *instanceType) const {
+    return instanceType == Data.InstanceType;
+  }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeCacheEntry &value) {
+    return llvm::hash_value(value.Data.InstanceType);
   }
 
   static size_t getExtraAllocationSize(const Metadata *key) {
@@ -3442,6 +3469,14 @@ public:
     ProtocolClassConstraint ClassConstraint : 1;
     uint32_t NumProtocols : 31;
     const ProtocolDescriptorRef *Protocols;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.SuperclassConstraint,
+                                     key.ClassConstraint, key.NumProtocols);
+      for (size_t i = 0; i != key.NumProtocols; i++)
+        hash = llvm::hash_combine(hash, key.Protocols[i].getRawData());
+      return hash;
+    }
   };
 
   ExistentialCacheEntry(Key key);
@@ -3450,27 +3485,30 @@ public:
     return 0;
   }
 
-  int compareWithKey(Key key) const {
-    if (auto result = compareIntegers(key.ClassConstraint,
-                                      Data.Flags.getClassConstraint()))
-      return result;
+  bool matchesKey(Key key) const {
+    if (key.ClassConstraint != Data.Flags.getClassConstraint())
+      return false;
 
-    if (auto result = comparePointers(key.SuperclassConstraint,
-                                      Data.getSuperclassConstraint()))
-      return result;
+    if (key.SuperclassConstraint != Data.getSuperclassConstraint())
+      return false;
 
-    if (auto result = compareIntegers(key.NumProtocols,
-                                      Data.NumProtocols))
-      return result;
+    if (key.NumProtocols != Data.NumProtocols)
+      return false;
 
     auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result = compareIntegers(key.Protocols[i].getRawData(),
-                                        dataProtocols[i].getRawData()))
-        return result;
+      if (key.Protocols[i].getRawData() != dataProtocols[i].getRawData())
+        return false;
     }
 
-    return 0;
+    return true;
+  }
+
+  friend llvm::hash_code hash_value(const ExistentialCacheEntry &value) {
+    Key key = {value.Data.getSuperclassConstraint(),
+               value.Data.Flags.getClassConstraint(), value.Data.NumProtocols,
+               value.Data.getProtocols().data()};
+    return hash_value(key);
   }
 
   static size_t getExtraAllocationSize(Key key) {
@@ -3501,8 +3539,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const OpaqueExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3528,8 +3569,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ClassExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -4146,24 +4190,34 @@ namespace {
     struct Key {
       const TypeContextDescriptor *type;
       const ProtocolDescriptor *protocol;
+
+      friend llvm::hash_code hash_value(const Key &value) {
+        return llvm::hash_combine(value.protocol,
+                                  TypeContextIdentity(value.type));
+      }
     };
 
-    const Key key;
+    const TypeContextDescriptor *type;
+    const ProtocolDescriptor *protocol;
     const WitnessTable *data;
 
     ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
                                   const WitnessTable *d)
-        : key(k), data(d) {}
+        : type(k.type), protocol(k.protocol), data(d) {}
 
     intptr_t getKeyIntValueForDump() {
-      return reinterpret_cast<intptr_t>(key.type);
+      return reinterpret_cast<intptr_t>(type);
     }
 
-    int compareWithKey(const Key other) const {
-      if (auto r = comparePointers(other.protocol, key.protocol))
-        return r;
+    bool matchesKey(const Key other) const {
+      return other.protocol == protocol &&
+             TypeContextIdentity(other.type) == TypeContextIdentity(type);
+    }
 
-      return TypeContextIdentity(other.type).compare(TypeContextIdentity(key.type));
+    friend llvm::hash_code
+    hash_value(const ForeignWitnessTableCacheEntry &value) {
+      Key key{value.type, value.protocol};
+      return hash_value(key);
     }
 
     static size_t getExtraAllocationSize(const Key,
@@ -4177,19 +4231,23 @@ namespace {
   };
 }
 
-static SimpleGlobalCache<ForeignWitnessTableCacheEntry,
-                         ForeignWitnessTablesTag> ForeignWitnessTables;
+static ConcurrentReadableHashMap<ForeignWitnessTableCacheEntry>
+    ForeignWitnessTables;
 
 static const WitnessTable *_getForeignWitnessTable(
     const WitnessTable *witnessTableCandidate,
     const TypeContextDescriptor *contextDescriptor,
     const ProtocolDescriptor *protocol) {
-  auto result =
-      ForeignWitnessTables
-          .getOrInsert(
-              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
-              witnessTableCandidate)
-          .first->data;
+  const WitnessTable *result = nullptr;
+  ForeignWitnessTableCacheEntry::Key key{contextDescriptor, protocol};
+  ForeignWitnessTables.getOrInsert(
+      key, [&](ForeignWitnessTableCacheEntry *entryPtr, bool created) {
+        if (created)
+          new (entryPtr)
+              ForeignWitnessTableCacheEntry(key, witnessTableCandidate);
+        result = entryPtr->data;
+        return true;
+      });
   return result;
 }
 
