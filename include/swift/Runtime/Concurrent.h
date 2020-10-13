@@ -579,6 +579,11 @@ using llvm::hash_value;
 /// ensure that readers which started before the clear see valid (pre-clear)
 /// data. Readers which see any array as empty will produce no results, thus
 /// providing valid post-clear data.
+///
+/// This is intended to be used for tables that exist for the life of the
+/// process. It has no destructor, to avoid generating useless global destructor
+/// calls. The memory it allocates can be freed by calling clear() with no
+/// outstanding readers, but this won't destroy the static mutex it uses.
 template <class ElemTy> struct ConcurrentReadableHashMap {
   // We use memcpy and don't call destructors. Make sure the elements will put
   // up with this.
@@ -724,7 +729,7 @@ private:
   std::atomic<IndexStorage *> Indices{nullptr};
 
   /// The writer lock, which must be taken before any mutation of the table.
-  Mutex WriterLock;
+  StaticMutex WriterLock;
 
   /// The maximum number of elements that the current elements array can hold.
   uint32_t ElementCapacity{0};
@@ -841,20 +846,19 @@ private:
   }
 
 public:
+  // Implicitly trivial constructor/destructor.
+  ConcurrentReadableHashMap() = default;
+  ~ConcurrentReadableHashMap() = default;
+
   // This type cannot be safely copied or moved.
   ConcurrentReadableHashMap(const ConcurrentReadableHashMap &) = delete;
   ConcurrentReadableHashMap(ConcurrentReadableHashMap &&) = delete;
   ConcurrentReadableHashMap &
   operator=(const ConcurrentReadableHashMap &) = delete;
 
-  ConcurrentReadableHashMap()
-      : ReaderCount(0), ElementCount(0), Elements(nullptr), Indices(nullptr),
-        ElementCapacity(0) {}
-
-  ~ConcurrentReadableHashMap() {
-    assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
-           "deallocating ConcurrentReadableHashMap with outstanding snapshots");
-    FreeListNode::freeAll(&FreeList);
+  /// Returns whether there are outstanding readers. For testing purposes only.
+  bool hasActiveReaders() {
+    return ReaderCount.load(std::memory_order_relaxed) > 0;
   }
 
   /// Readers take a snapshot of the hash map, then work with the snapshot.
@@ -945,7 +949,7 @@ public:
   /// The return value is ignored when `created` is `false`.
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
-    ScopedLock guard(WriterLock);
+    StaticScopedLock guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     if (!indices)
@@ -955,7 +959,7 @@ public:
     auto elementCount = ElementCount.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
 
-    auto found = find(key, indices, elementCount, elements);
+    auto found = this->find(key, indices, elementCount, elements);
     if (found.first) {
       call(found.first, false);
       deallocateFreeListIfSafe();
@@ -996,7 +1000,7 @@ public:
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
   void clear() {
-    ScopedLock guard(WriterLock);
+    StaticScopedLock guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
@@ -1013,6 +1017,66 @@ public:
 
     deallocateFreeListIfSafe();
   }
+};
+
+/// A wrapper type for indirect hash map elements. Stores a pointer to the real
+/// element and forwards key matching and hashing.
+template <class ElemTy> struct HashMapElementWrapper {
+  ElemTy *Ptr;
+
+  template <class KeyTy> bool matchesKey(const KeyTy &key) {
+    return Ptr->matchesKey(key);
+  }
+
+  friend llvm::hash_code hash_value(const HashMapElementWrapper &wrapper) {
+    return hash_value(*wrapper.Ptr);
+  }
+};
+
+/// A ConcurrentReadableHashMap that provides stable addresses for the elements
+/// by allocating them separately and storing pointers to them. The elements of
+/// the hash table are instances of HashMapElementWrapper. A new getOrInsert
+/// method is provided that directly returns the stable element pointer.
+template <class ElemTy, class Allocator>
+struct StableAddressConcurrentReadableHashMap
+    : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>> {
+  // Implicitly trivial destructor.
+  ~StableAddressConcurrentReadableHashMap() = default;
+
+  /// Get or insert an element for the given key and arguments. Returns the
+  /// pointer to the existing or new element, and a bool indicating whether the
+  /// element was created. When false, the element already existed before the
+  /// call.
+  template <class KeyTy, class... ArgTys>
+  std::pair<ElemTy *, bool> getOrInsert(KeyTy key, ArgTys &&...args) {
+    // Optimize for the case where the value already exists.
+    if (auto wrapper = this->snapshot().find(key))
+      return {wrapper->Ptr, false};
+
+    // No such element. Insert if needed. Note: another thread may have inserted
+    // it in the meantime, so we still have to handle both cases!
+    ElemTy *ptr = nullptr;
+    bool outerCreated = false;
+    ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>>::getOrInsert(
+        key, [&](HashMapElementWrapper<ElemTy> *wrapper, bool created) {
+          if (created) {
+            // Created the indirect entry. Allocate the actual storage.
+            size_t allocSize =
+                sizeof(ElemTy) + ElemTy::getExtraAllocationSize(key, args...);
+            void *memory = Allocator().Allocate(allocSize, alignof(ElemTy));
+            new (memory) ElemTy(key, std::forward<ArgTys>(args)...);
+            wrapper->Ptr = reinterpret_cast<ElemTy *>(memory);
+          }
+          ptr = wrapper->Ptr;
+          outerCreated = created;
+          return true; // Keep the new entry.
+        });
+    return {ptr, outerCreated};
+  }
+
+private:
+  // Clearing would require deallocating elements, which we don't support.
+  void clear() = delete;
 };
 
 } // end namespace swift
