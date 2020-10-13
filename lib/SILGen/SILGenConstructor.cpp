@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -901,72 +902,71 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                          SGFAccessKind::Write);
 }
 
-static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
-                                      VarDecl *selfDecl,
-                                      VarDecl *property) {
-  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
-  auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
-  return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
-                                LValueOptions(), SGFAccessKind::Write,
-                                AccessSemantics::DirectToStorage);
-}
-
-/// Emit a member initialization for the members described in the
-/// given pattern from the given source value.
-static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
-                           Pattern *pattern, RValue &&src) {
+// FIXME: Can emitMemberInit() share code with InitializationForPattern in
+// SILGenDecl.cpp? Note that this version operates on stored properties of
+// types, whereas the former only knows how to handle local bindings, but
+// we could generalize it.
+static InitializationPtr
+emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Paren:
     return emitMemberInit(SGF, selfDecl,
-                          cast<ParenPattern>(pattern)->getSubPattern(),
-                          std::move(src));
+                          cast<ParenPattern>(pattern)->getSubPattern());
 
   case PatternKind::Tuple: {
+    TupleInitialization *init = new TupleInitialization();
     auto tuple = cast<TuplePattern>(pattern);
-    auto fields = tuple->getElements();
-
-    SmallVector<RValue, 4> elements;
-    std::move(src).extractElements(elements);
-    for (unsigned i = 0, n = fields.size(); i != n; ++i) {
-      emitMemberInit(SGF, selfDecl, fields[i].getPattern(),
-                     std::move(elements[i]));
+    for (auto &elt : tuple->getElements()) {
+      init->SubInitializations.push_back(
+        emitMemberInit(SGF, selfDecl, elt.getPattern()));
     }
-    break;
+    return InitializationPtr(init);
   }
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    // Form the lvalue referencing this member.
-    FormalEvaluationScope scope(SGF);
-    LValue memberRef = emitLValueForMemberInit(SGF, pattern, selfDecl,
-                                               named->getDecl());
 
-    // Assign to it.
-    SGF.emitAssignToLValue(pattern, std::move(src), std::move(memberRef));
-    return;
+    auto self = emitSelfForMemberInit(SGF, pattern, selfDecl);
+
+    auto *field = named->getDecl();
+
+    auto selfTy = self.getType();
+    auto fieldTy =
+      selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
+    SILValue slot;
+
+    if (auto *structDecl = dyn_cast<StructDecl>(field->getDeclContext())) {
+      slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
+                                           fieldTy.getAddressType());
+    } else {
+      assert(isa<ClassDecl>(field->getDeclContext()));
+      slot = SGF.B.createRefElementAddr(pattern, self.forward(SGF), field,
+                                        fieldTy.getAddressType());
+    }
+
+    return InitializationPtr(new KnownAddressInitialization(slot));
   }
 
   case PatternKind::Any:
-    return;
+    return InitializationPtr(new BlackHoleInitialization());;
 
   case PatternKind::Typed:
     return emitMemberInit(SGF, selfDecl,
-                          cast<TypedPattern>(pattern)->getSubPattern(),
-                          std::move(src));
+                          cast<TypedPattern>(pattern)->getSubPattern());
 
   case PatternKind::Binding:
     return emitMemberInit(SGF, selfDecl,
-                          cast<BindingPattern>(pattern)->getSubPattern(),
-                          std::move(src));
+                          cast<BindingPattern>(pattern)->getSubPattern());
 
 #define PATTERN(Name, Parent)
 #define REFUTABLE_PATTERN(Name, Parent) case PatternKind::Name:
 #include "swift/AST/PatternNodes.def"
-    llvm_unreachable("Refutable pattern in pattern binding");
+    llvm_unreachable("Refutable pattern in stored property pattern binding");
   }
 }
 
-static Type getInitializationTypeInContext(
+static std::pair<AbstractionPattern, CanType>
+getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
   auto interfaceType = pattern->getType()->mapTypeOutOfContext();
@@ -981,9 +981,53 @@ static Type getInitializationTypeInContext(
     }
   }
 
-  auto resultType = toDC->mapTypeIntoContext(interfaceType);
+  AbstractionPattern origType(
+    fromDC->getGenericSignatureOfContext().getCanonicalSignature(),
+    interfaceType->getCanonicalType());
 
-  return resultType;
+  auto substType = toDC->mapTypeIntoContext(interfaceType)->getCanonicalType();
+
+  return std::make_pair(origType, substType);
+}
+
+static void
+emitAndStoreInitialValueInto(SILGenFunction &SGF,
+                             SILLocation loc,
+                             PatternBindingDecl *pbd, unsigned i,
+                             SubstitutionMap subs,
+                             AbstractionPattern origType,
+                             CanType substType,
+                             Initialization *init) {
+  bool injectIntoWrapper = false;
+  if (auto singleVar = pbd->getSingleVar()) {
+    auto originalVar = singleVar->getOriginalWrappedProperty();
+    if (originalVar &&
+        originalVar->isPropertyMemberwiseInitializedWithWrappedType()) {
+      injectIntoWrapper = true;
+    }
+  }
+
+  SGFContext C = (injectIntoWrapper ? SGFContext() : SGFContext(init));
+
+  RValue result = SGF.emitApplyOfStoredPropertyInitializer(
+                            pbd->getExecutableInit(i),
+                            pbd->getAnchoringVarDecl(i),
+                            subs, substType, origType, C);
+
+  // need to store result into the init if its in context
+
+  // If we have the backing storage for a property with an attached
+  // property wrapper initialized with `=`, inject the value into an
+  // instance of the wrapper.
+  if (injectIntoWrapper) {
+    auto *singleVar = pbd->getSingleVar();
+    result = maybeEmitPropertyWrapperInitFromValue(
+        SGF, pbd->getExecutableInit(i),
+        singleVar, subs, std::move(result));
+  }
+
+  if (!result.isInContext())
+    std::move(result).forwardInto(SGF, loc, init);
 }
 
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
@@ -1001,35 +1045,51 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         if (!init) continue;
 
         auto *varPattern = pbd->getPattern(i);
+
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, varPattern);
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
-        CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, varPattern)->getCanonicalType();
-        AbstractionPattern origResultType(resultType);
+        auto resultType = getInitializationTypeInContext(
+            pbd->getDeclContext(), dc, varPattern);
+        AbstractionPattern origType = resultType.first;
+        CanType substType = resultType.second;
 
-        // FIXME: Can emitMemberInit() share code with
-        // InitializationForPattern in SILGenDecl.cpp?
-        RValue result = emitApplyOfStoredPropertyInitializer(
-                                  init, pbd->getAnchoringVarDecl(i), subs,
-                                  resultType, origResultType,
-                                  SGFContext());
+        // Figure out what we're initializing.
+        auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
 
-        // If we have the backing storage for a property with an attached
-        // property wrapper initialized with `=`, inject the value into an
-        // instance of the wrapper.
-        if (auto singleVar = pbd->getSingleVar()) {
-          auto originalVar = singleVar->getOriginalWrappedProperty();
-          if (originalVar &&
-              originalVar->isPropertyMemberwiseInitializedWithWrappedType()) {
-            result = maybeEmitPropertyWrapperInitFromValue(
-                *this, init, singleVar, subs, std::move(result));
-          }
+        // This whole conversion thing is about eliminating the
+        // paired orig-to-subst subst-to-orig conversions that
+        // will happen if the storage is at a different abstraction
+        // level than the constructor. When emitApply() is used
+        // to call the stored property initializer, it naturally
+        // wants to convert the result back to the most substituted
+        // abstraction level. To undo this, we use a converting
+        // initialization and rely on the peephole that optimizes
+        // out the redundant conversion.
+        auto loweredResultTy = getLoweredType(origType, substType);
+        auto loweredSubstTy = getLoweredType(substType);
+
+        if (loweredResultTy != loweredSubstTy) {
+          Conversion conversion = Conversion::getSubstToOrig(
+              origType, substType,
+              loweredResultTy);
+
+          ConvertingInitialization convertingInit(conversion,
+                                                  SGFContext(memberInit.get()));
+
+          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
+                                       origType, substType, &convertingInit);
+
+          auto finalValue = convertingInit.finishEmission(
+              *this, varPattern, ManagedValue::forInContext());
+          if (!finalValue.isInContext())
+            finalValue.forwardInto(*this, varPattern, memberInit.get());
+        } else {
+          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
+                                       origType, substType, memberInit.get());
         }
-
-        emitMemberInit(*this, selfDecl, varPattern, std::move(result));
       }
     }
   }

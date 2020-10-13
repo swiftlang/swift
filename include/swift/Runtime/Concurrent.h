@@ -588,10 +588,6 @@ template <class ElemTy> struct ConcurrentReadableHashMap {
                 "Elements must not have destructors (they won't be called).");
 
 private:
-  /// The type of the elements of the indices array. TODO: use one or two byte
-  /// indices for smaller tables to save more memory.
-  using Index = unsigned;
-
   /// The reciprocal of the load factor at which we expand the table. A value of
   /// 4 means that we resize at 1/4 = 75% load factor.
   static const size_t ResizeProportion = 4;
@@ -619,20 +615,77 @@ private:
   /// is stored inline. We work around this contradiction by considering the
   /// first index to always be occupied with a value that never matches any key.
   struct IndexStorage {
-    std::atomic<Index> Mask;
+    // Index size is variable based on capacity, either 8, 16, or 32 bits.
+    //
+    // This is somewhat conservative. We could have, for example, a capacity of
+    // 512 but a maximum index of only 200, which would still allow for 8-bit
+    // indices. However, taking advantage of this would require reallocating
+    // the index storage when the element count crossed a threshold, which is
+    // more complex, and the advantages are minimal. This keeps it simple.
+    //
+    // The first byte of the storage is the log 2 of the capacity. The remaining
+    // storage is then an array of 8, 16, or 32 bit integers, depending on the
+    // capacity number. This union allows us to access the capacity, and then
+    // access the rest of the storage by taking the address of one of the
+    // IndexZero members and indexing into it (always avoiding index 0).
+    union {
+      uint8_t CapacityLog2;
+      std::atomic<uint8_t> IndexZero8;
+      std::atomic<uint16_t> IndexZero16;
+      std::atomic<uint32_t> IndexZero32;
+    };
 
-    static IndexStorage *allocate(size_t capacity) {
-      assert((capacity & (capacity - 1)) == 0 &&
-             "Capacity must be a power of 2");
-      auto *ptr =
-          reinterpret_cast<IndexStorage *>(calloc(capacity, sizeof(Mask)));
+    // Get the size, in bytes, of the index needed for the given capacity.
+    static unsigned indexSize(uint8_t capacityLog2) {
+      if (capacityLog2 <= sizeof(uint8_t) * CHAR_BIT)
+        return sizeof(uint8_t);
+      if (capacityLog2 <= sizeof(uint16_t) * CHAR_BIT)
+        return sizeof(uint16_t);
+      return sizeof(uint32_t);
+    }
+
+    unsigned indexSize() { return indexSize(CapacityLog2); }
+
+    static IndexStorage *allocate(size_t capacityLog2) {
+      assert(capacityLog2 > 0);
+      size_t capacity = 1UL << capacityLog2;
+      auto *ptr = reinterpret_cast<IndexStorage *>(
+          calloc(capacity, indexSize(capacityLog2)));
       if (!ptr)
         swift::crash("Could not allocate memory.");
-      ptr->Mask.store(capacity - 1, std::memory_order_relaxed);
+      ptr->CapacityLog2 = capacityLog2;
       return ptr;
     }
 
-    std::atomic<Index> &at(size_t i) { return (&Mask)[i]; }
+    unsigned loadIndexAt(size_t i, std::memory_order order) {
+      assert(i > 0 && "index zero is off-limits, used to store capacity");
+
+      switch (indexSize()) {
+      case sizeof(uint8_t):
+        return (&IndexZero8)[i].load(order);
+      case sizeof(uint16_t):
+        return (&IndexZero16)[i].load(order);
+      case sizeof(uint32_t):
+        return (&IndexZero32)[i].load(order);
+      default:
+        swift_unreachable("unknown index size");
+      }
+    }
+
+    void storeIndexAt(unsigned value, size_t i, std::memory_order order) {
+      assert(i > 0 && "index zero is off-limits, used to store capacity");
+
+      switch (indexSize()) {
+      case sizeof(uint8_t):
+        return (&IndexZero8)[i].store(value, order);
+      case sizeof(uint16_t):
+        return (&IndexZero16)[i].store(value, order);
+      case sizeof(uint32_t):
+        return (&IndexZero32)[i].store(value, order);
+      default:
+        swift_unreachable("unknown index size");
+      }
+    }
   };
 
   /// A simple linked list representing pointers that need to be freed.
@@ -720,17 +773,18 @@ private:
   /// returning the new array with all existing indices copied into it. This
   /// operation performs a rehash, so that the indices are in the correct
   /// location in the new array.
-  IndexStorage *resize(IndexStorage *indices, Index indicesMask,
+  IndexStorage *resize(IndexStorage *indices, uint8_t indicesCapacityLog2,
                        ElemTy *elements) {
-    // Mask is size - 1. Double the size. Start with 4 (fits into 16-byte malloc
-    // bucket).
-    size_t newCount = indices ? 2 * (indicesMask + 1) : 4;
-    size_t newMask = newCount - 1;
+    // Double the size. Start with 16 (fits into 16-byte malloc
+    // bucket), which is 2^4.
+    size_t newCapacityLog2 = indices ? indicesCapacityLog2 + 1 : 4;
+    size_t newMask = (1UL << newCapacityLog2) - 1;
 
-    IndexStorage *newIndices = IndexStorage::allocate(newCount);
+    IndexStorage *newIndices = IndexStorage::allocate(newCapacityLog2);
 
-    for (size_t i = 1; i <= indicesMask; i++) {
-      Index index = indices->at(i).load(std::memory_order_relaxed);
+    size_t indicesCount = 1UL << indicesCapacityLog2;
+    for (size_t i = 1; i < indicesCount; i++) {
+      unsigned index = indices->loadIndexAt(i, std::memory_order_relaxed);
       if (index == 0)
         continue;
 
@@ -738,9 +792,12 @@ private:
       auto hash = hash_value(*element);
 
       size_t newI = hash & newMask;
-      while (newIndices->at(newI) != 0)
+      // Index 0 is unusable (occupied by the capacity), so always skip it.
+      while (newI == 0 ||
+             newIndices->loadIndexAt(newI, std::memory_order_relaxed) != 0) {
         newI = (newI + 1) & newMask;
-      newIndices->at(newI).store(index, std::memory_order_relaxed);
+      }
+      newIndices->storeIndexAt(index, newI, std::memory_order_relaxed);
     }
 
     Indices.store(newIndices, std::memory_order_release);
@@ -752,16 +809,16 @@ private:
 
   /// Search for the given key within the given indices and elements arrays. If
   /// an entry already exists for that key, return a pointer to the element. If
-  /// no entry exists, return a pointer to the location in the indices array
-  /// where the index of the new element would be stored.
+  /// no entry exists, return the location in the indices array where the index
+  /// of the new element would be stored.
   template <class KeyTy>
-  static std::pair<ElemTy *, std::atomic<Index> *>
+  static std::pair<ElemTy *, unsigned>
   find(const KeyTy &key, IndexStorage *indices, size_t elementCount,
        ElemTy *elements) {
     if (!indices)
-      return {nullptr, nullptr};
+      return {nullptr, 0};
     auto hash = hash_value(key);
-    auto indicesMask = indices->Mask.load(std::memory_order_relaxed);
+    auto indicesMask = (1UL << indices->CapacityLog2) - 1;
 
     auto i = hash & indicesMask;
     while (true) {
@@ -769,15 +826,14 @@ private:
       if (i == 0)
         i++;
 
-      auto *indexPtr = &indices->at(i);
-      auto index = indexPtr->load(std::memory_order_acquire);
+      auto index = indices->loadIndexAt(i, std::memory_order_acquire);
       // Element indices are 1-based, 0 means no entry.
       if (index == 0)
-        return {nullptr, indexPtr};
+        return {nullptr, i};
       if (index - 1 < elementCount) {
         auto *candidate = &elements[index - 1];
         if (candidate->matchesKey(key))
-          return {candidate, nullptr};
+          return {candidate, 0};
       }
 
       i = (i + 1) & indicesMask;
@@ -895,7 +951,7 @@ public:
     if (!indices)
       indices = resize(indices, 0, nullptr);
 
-    auto indicesMask = indices->Mask.load(std::memory_order_relaxed);
+    auto indicesCapacityLog2 = indices->CapacityLog2;
     auto elementCount = ElementCount.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
 
@@ -906,12 +962,14 @@ public:
       return;
     }
 
-    // The actual capacity is indicesMask + 1. The number of slots in use is
-    // elementCount + 1, since the mask also takes a slot.
-    auto emptyCount = (indicesMask + 1) - (elementCount + 1);
-    auto proportion = (indicesMask + 1) / emptyCount;
+    auto indicesCapacity = 1UL << indicesCapacityLog2;
+
+    // The number of slots in use is elementCount + 1, since the capacity also
+    // takes a slot.
+    auto emptyCount = indicesCapacity - (elementCount + 1);
+    auto proportion = indicesCapacity / emptyCount;
     if (proportion >= ResizeProportion) {
-      indices = resize(indices, indicesMask, elements);
+      indices = resize(indices, indicesCapacityLog2, elements);
       found = find(key, indices, elementCount, elements);
       assert(!found.first && "Shouldn't suddenly find the key after rehashing");
     }
@@ -928,7 +986,8 @@ public:
       assert(hash_value(key) == hash_value(*element) &&
              "Element must have the same hash code as its key.");
       ElementCount.store(elementCount + 1, std::memory_order_release);
-      found.second->store(elementCount + 1, std::memory_order_release);
+      indices->storeIndexAt(elementCount + 1, found.second,
+                            std::memory_order_release);
     }
 
     deallocateFreeListIfSafe();

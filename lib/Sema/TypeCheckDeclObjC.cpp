@@ -375,8 +375,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   // Check actor isolation.
   bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
 
-  switch (getActorIsolation(const_cast<ValueDecl *>(VD))) {
-  case ActorIsolation::ActorInstance:
+  switch (auto restriction = ActorIsolationRestriction::forDeclaration(
+              const_cast<ValueDecl *>(VD))) {
+  case ActorIsolationRestriction::ActorSelf:
     // Actor-isolated functions cannot be @objc.
     if (Diagnose) {
       VD->diagnose(
@@ -388,9 +389,12 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     }
     return true;
 
-  case ActorIsolation::ActorPrivileged:
-  case ActorIsolation::Independent:
-  case ActorIsolation::Unspecified:
+  case ActorIsolationRestriction::GlobalActor:
+    // FIXME: Consider whether to limit @objc on global-actor-qualified
+    // declarations.
+  case ActorIsolationRestriction::Unrestricted:
+  case ActorIsolationRestriction::LocalCapture:
+  case ActorIsolationRestriction::Unsafe:
     return false;
   }
 }

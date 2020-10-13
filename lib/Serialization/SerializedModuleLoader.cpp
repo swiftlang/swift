@@ -1109,14 +1109,14 @@ void SerializedModuleLoaderBase::verifyAllModules() {
 //-----------------------------------------------------------------------------
 
 void SerializedASTFile::getImportedModules(
-    SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+    SmallVectorImpl<ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
   File.getImportedModules(imports, filter);
 }
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
-  llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  llvm::SmallVector<ImportedModule, 8> Imports;
   File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Exported,
                                     ModuleDecl::ImportFilterKind::Default});
 

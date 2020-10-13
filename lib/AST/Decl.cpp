@@ -672,6 +672,14 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   llvm_unreachable("invalid file kind");
 }
 
+Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<Decl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           GlobalActorAttributeRequest{mutableThis},
+                           None);
+}
+
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();
@@ -1106,7 +1114,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
-                             MutableArrayRef<TypeLoc> inherited,
+                             ArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
@@ -1123,7 +1131,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
-                                     MutableArrayRef<TypeLoc> inherited,
+                                     ArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
@@ -3704,7 +3712,7 @@ PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
-                                 MutableArrayRef<TypeLoc> inherited,
+                                 ArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
     GenericContext(DeclContextKind::GenericTypeDecl, DC, GenericParams),
     TypeDecl(K, DC, name, nameLoc, inherited) {}
@@ -3914,7 +3922,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
                      Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<TypeLoc> Inherited,
+                     ArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Enum, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -3928,13 +3936,17 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    EnumRawTypeRequest{const_cast<EnumDecl *>(this),
-                       TypeResolutionStage::Interface}, Type());
+  return evaluateOrDefault(
+      ctx.evaluator, EnumRawTypeRequest{const_cast<EnumDecl *>(this)}, Type());
+}
+
+void EnumDecl::setRawType(Type rawType) {
+  getASTContext().evaluator.cacheOutput(EnumRawTypeRequest{this},
+                                        std::move(rawType));
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       MutableArrayRef<TypeLoc> Inherited,
+                       ArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4044,8 +4056,15 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   }
 }
 
+VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GlobalActorInstanceRequest{mutableThis},
+                           nullptr);
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<TypeLoc> Inherited,
+                     ArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
                     GenericParams),
@@ -4509,9 +4528,7 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
 }
       
 void EnumDecl::setHasFixedRawValues() {
-  auto flags = LazySemanticInfo.RawTypeAndFlags.getInt() |
-      EnumDecl::HasFixedRawValues;
-  LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+  SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{EnumDecl::HasFixedRawValues};
 }
 
 bool EnumDecl::hasCircularRawValue() const {
@@ -4523,7 +4540,7 @@ bool EnumDecl::hasCircularRawValue() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           MutableArrayRef<TypeLoc> Inherited,
+                           ArrayRef<TypeLoc> Inherited,
                            TrailingWhereClause *TrailingWhere)
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),
@@ -4828,19 +4845,17 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
 
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // Check the requirements of a generic subscript.
-    if (subscript->isGeneric()) {
-      if (auto result =
-            ::findProtocolSelfReferences(this,
-                                         subscript->getGenericSignature()))
-        return result;
-    }
-
-    return ::findProtocolSelfReferences(this, type,
-                                        skipAssocTypes);
   } else {
-    assert(isa<VarDecl>(value));
+    assert(isa<AbstractStorageDecl>(value));
+
+    if (auto *const subscript = dyn_cast<SubscriptDecl>(value)) {
+      // Check the requirements of a generic subscript.
+      if (subscript->isGeneric()) {
+        if (auto result = ::findProtocolSelfReferences(
+                this, subscript->getGenericSignature()))
+          return result;
+      }
+    }
 
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
@@ -4857,6 +4872,12 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
                                              /*skipAssocTypes=*/false);
   if (selfKind.parameter || selfKind.other)
     return false;
+
+  // FIXME: Appropriately diagnose assignments instead.
+  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (selfKind.result && storageDecl->supportsMutation())
+      return false;
+  }
 
   return true;
 }

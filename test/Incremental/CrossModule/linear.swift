@@ -4,6 +4,9 @@
 // rdar://problem/70012853
 // XFAIL: OS=windows-msvc
 
+// rdar://70175753
+// REQUIRES: rdar70175753
+
 //
 // This test establishes a "linear" chain of modules that import one another
 // and ensures that a cross-module incremental build does not needlessly
@@ -38,4 +41,21 @@
 // MODULE-B: Job finished: {merge-module: B.swiftmodule <= B.o}
 
 // MODULE-A: Job skipped: {compile: A.o <= A.swift}
-// MODULE-A: Job finished: {merge-module: A.swiftmodule <= A.o}
+// MODULE-A: Job skipped: {merge-module: A.swiftmodule <= A.o}
+
+//
+// And ensure that the null build really is null.
+//
+
+// RUN: cd %t && %swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/C.swiftmodule -enable-experimental-cross-module-incremental-build -module-name C -I %t -output-file-map %t/C.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle -DNEW %t/C.swift 2>&1 | %FileCheck -check-prefix MODULE-C-NULL %s
+// RUN: cd %t && %swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/B.swiftmodule -enable-experimental-cross-module-incremental-build -module-name B -I %t -output-file-map %t/B.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle %t/B.swift 2>&1 | %FileCheck -check-prefix MODULE-B-NULL %s
+// RUN: cd %t && %swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/A.swiftmodule -enable-experimental-cross-module-incremental-build -module-name A -I %t -output-file-map %t/A.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle %t/A.swift 2>&1 | %FileCheck -check-prefix MODULE-A-NULL %s
+
+// MODULE-C-NULL: Job skipped: {compile: C.o <= C.swift}
+// MODULE-C-NULL: Job skipped: {merge-module: C.swiftmodule <= C.o}
+
+// MODULE-B-NULL: Job skipped: {compile: B.o <= B.swift}
+// MODULE-B-NULL: Job skipped: {merge-module: B.swiftmodule <= B.o}
+
+// MODULE-A-NULL: Job skipped: {compile: A.o <= A.swift}
+// MODULE-A-NULL: Job skipped: {merge-module: A.swiftmodule <= A.o}

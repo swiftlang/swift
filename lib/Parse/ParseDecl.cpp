@@ -1372,6 +1372,125 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
   }
 }
 
+bool Parser::peekAvailabilityMacroName() {
+  parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap Map = AvailabilityMacros;
+
+  StringRef MacroName = Tok.getText();
+  return Map.find(MacroName) != Map.end();
+}
+
+ParserStatus
+Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
+  // Get the macros from the compiler arguments.
+  parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap Map = AvailabilityMacros;
+
+  StringRef MacroName = Tok.getText();
+  auto NameMatch = Map.find(MacroName);
+  if (NameMatch == Map.end())
+    return makeParserSuccess(); // No match, it could be a standard platform.
+
+  consumeToken();
+
+  llvm::VersionTuple Version;
+  SourceRange VersionRange;
+  if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    if (parseVersionTuple(Version, VersionRange,
+                          diag::avail_query_expected_version_number))
+      return makeParserError();
+  }
+
+  auto VersionMatch = NameMatch->getSecond().find(Version);
+  if (VersionMatch == NameMatch->getSecond().end()) {
+    diagnose(PreviousLoc, diag::attr_availability_unknown_version,
+        Version.getAsString(), MacroName);
+    return makeParserError(); // Failed to match the version, that's an error.
+  }
+
+  // Make a copy of the specs to add the macro source location
+  // for the diagnostic about the use of macros in inlinable code.
+  SourceLoc MacroLoc = Tok.getLoc();
+  for (auto *Spec : VersionMatch->getSecond())
+    if (auto *PlatformVersionSpec =
+          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+      auto SpecCopy =
+        new (Context) PlatformVersionConstraintAvailabilitySpec(
+                                                       *PlatformVersionSpec);
+      SpecCopy->setMacroLoc(MacroLoc);
+      Specs.push_back(SpecCopy);
+    }
+
+  return makeParserSuccess();
+}
+
+void Parser::parseAllAvailabilityMacroArguments() {
+
+  if (AvailabilityMacrosComputed) return;
+
+  AvailabilityMacroMap Map;
+
+  SourceManager &SM = Context.SourceMgr;
+  const LangOptions &LangOpts = Context.LangOpts;
+
+  for (StringRef macro: LangOpts.AvailabilityMacros) {
+
+    // Create temporary parser.
+    int bufferID = SM.addMemBufferCopy(macro,
+                                       "-define-availability argument");
+    swift::ParserUnit PU(SM,
+                         SourceFileKind::Main, bufferID,
+                         LangOpts,
+                         TypeCheckerOptions(), "unknown");
+
+    ForwardingDiagnosticConsumer PDC(Context.Diags);
+    PU.getDiagnosticEngine().addConsumer(PDC);
+
+    // Parse the argument.
+    AvailabilityMacroDefinition ParsedMacro;
+    ParserStatus Status =
+      PU.getParser().parseAvailabilityMacroDefinition(ParsedMacro);
+    if (Status.isError())
+      continue;
+
+    // Copy the Specs to the requesting ASTContext from the temporary context
+    // that parsed the argument.
+    auto SpecsCopy = SmallVector<AvailabilitySpec*, 4>();
+    for (auto *Spec : ParsedMacro.Specs)
+      if (auto *PlatformVersionSpec =
+          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+        auto SpecCopy =
+          new (Context) PlatformVersionConstraintAvailabilitySpec(
+                                                         *PlatformVersionSpec);
+        SpecsCopy.push_back(SpecCopy);
+      }
+
+    ParsedMacro.Specs = SpecsCopy;
+
+    // Find the macro info by name.
+    AvailabilityMacroVersionMap MacroDefinition;
+    auto NameMatch = Map.find(ParsedMacro.Name);
+    if (NameMatch != Map.end()) {
+      MacroDefinition = NameMatch->getSecond();
+    }
+
+    // Set the macro info by version.
+    auto PreviousEntry =
+      MacroDefinition.insert({ParsedMacro.Version, ParsedMacro.Specs});
+    if (!PreviousEntry.second) {
+      diagnose(PU.getParser().PreviousLoc, diag::attr_availability_duplicate,
+               ParsedMacro.Name, ParsedMacro.Version.getAsString());
+    }
+
+    // Save back the macro spec.
+    Map.erase(ParsedMacro.Name);
+    Map.insert({ParsedMacro.Name, MacroDefinition});
+  }
+
+  AvailabilityMacros = Map;
+  AvailabilityMacrosComputed = true;
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -1975,7 +2094,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     StringRef Platform = Tok.getText();
 
     if (Platform != "*" &&
-        peekToken().isAny(tok::integer_literal, tok::floating_literal)) {
+        (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
+         peekAvailabilityMacroName())) {
       // We have the short form of available: @available(iOS 8.0.1, *)
       SmallVector<AvailabilitySpec *, 5> Specs;
       ParserStatus Status = parseAvailabilitySpecList(Specs);
@@ -6468,11 +6588,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
 
   // If the body consists of a single expression, turn it into a return
   // statement.
-  //
-  // But don't do this transformation when performing certain kinds of code
-  // completion, as the source may be incomplete and the type mismatch in return
-  // statement will just confuse the type checker.
-  if (shouldSuppressSingleExpressionBodyTransform(Body, BS->getElements()))
+  if (BS->getNumElements() != 1)
     return BS;
 
   auto Element = BS->getFirstElement();

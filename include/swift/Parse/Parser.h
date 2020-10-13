@@ -397,6 +397,22 @@ public:
   /// Current syntax parsing context where call backs should be directed to.
   SyntaxParsingContext *SyntaxContext;
 
+  /// Maps of macro name and version to availability specifications.
+  typedef llvm::DenseMap<llvm::VersionTuple,
+                         SmallVector<AvailabilitySpec *, 4>>
+                        AvailabilityMacroVersionMap;
+  typedef llvm::DenseMap<StringRef, AvailabilityMacroVersionMap>
+                        AvailabilityMacroMap;
+
+  /// Cache of the availability macros parsed from the command line arguments.
+  /// Organized as two nested \c DenseMap keyed first on the macro name then
+  /// the macro version. This structure allows to peek at macro names before
+  /// parsing a version tuple.
+  AvailabilityMacroMap AvailabilityMacros;
+
+  /// Has \c AvailabilityMacros been computed?
+  bool AvailabilityMacrosComputed = false;
+
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState,
@@ -692,15 +708,6 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency ||
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
-
-  /// If a function or closure body consists of a single expression, determine
-  /// whether we should turn wrap it in a return statement or not.
-  ///
-  /// We don't do this transformation for non-solver-based code completion
-  /// positions, as the source may be incomplete and the type mismatch in the
-  /// return statement will just confuse the type checker.
-  bool shouldSuppressSingleExpressionBodyTransform(
-      ParserStatus Status, MutableArrayRef<ASTNode> BodyElems);
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -1682,9 +1689,38 @@ public:
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
 
-  /// Parse a comma-separated list of availability specifications.
+  /// Parse a comma-separated list of availability specifications. Try to
+  /// expand availability macros when /p ParsingMacroDefinition is false.
   ParserStatus
-  parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
+  parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
+                            bool ParsingMacroDefinition = false);
+
+  /// Does the current matches an argument macro name? Parsing compiler
+  /// arguments as required without consuming tokens from the source file
+  /// parser.
+  bool peekAvailabilityMacroName();
+
+  /// Try to parse a reference to an availability macro and append its result
+  /// to \p Specs. If the current token doesn't match a macro name, return
+  /// a success without appending anything to \c Specs.
+  ParserStatus
+  parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
+
+  /// Parse the availability macros definitions passed as arguments.
+  void parseAllAvailabilityMacroArguments();
+
+  /// Result of parsing an availability macro definition.
+  struct AvailabilityMacroDefinition {
+    StringRef Name;
+    llvm::VersionTuple Version;
+    SmallVector<AvailabilitySpec *, 4> Specs;
+  };
+
+  /// Parse an availability macro definition from a command line argument.
+  /// This function should be called on a Parser set up on the command line
+  /// argument code.
+  ParserStatus
+  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>

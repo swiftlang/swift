@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -317,11 +318,22 @@ public:
       return;
     }
 
-    if (!cast<ValueDecl>(D)->isInstanceMember()) {
+    auto VD = cast<ValueDecl>(D);
+    if (!VD->isInstanceMember()) {
       diagnoseAndRemoveAttr(
           attr, diag::actorisolated_not_actor_instance_member);
       return;
     }
+
+    (void)getActorIsolation(VD);
+  }
+
+  void visitGlobalActorAttr(GlobalActorAttr *attr) {
+    auto nominal = dyn_cast<NominalTypeDecl>(D);
+    if (!nominal)
+      return; // already diagnosed
+
+    (void)nominal->isGlobalActor();
   }
 };
 } // end anonymous namespace
@@ -3054,6 +3066,15 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       (void) decl->getFunctionBuilderType();
     }
 
+    return;
+  }
+
+  // If the nominal type is a global actor, let the global actor attribute
+  // retrieval request perform checking for us.
+  if (nominal->isGlobalActor()) {
+    (void)D->getGlobalActorAttr();
+    if (auto value = dyn_cast<ValueDecl>(D))
+      (void)getActorIsolation(value);
     return;
   }
 

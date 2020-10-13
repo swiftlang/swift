@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckProtocol.h"
-#include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
@@ -4338,8 +4337,9 @@ void ConformanceChecker::resolveValueWitnesses() {
       }
 
       // Check for actor-isolation consistency.
-      switch (getActorIsolation(witness)) {
-      case ActorIsolation::ActorInstance: {
+      switch (auto restriction =
+                  ActorIsolationRestriction::forDeclaration(witness)) {
+      case ActorIsolationRestriction::ActorSelf: {
         // Actor-isolated witnesses cannot conform to protocol requirements.
         bool canBeAsyncHandler = false;
         if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
@@ -4359,9 +4359,14 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
       }
 
-      case ActorIsolation::ActorPrivileged:
-      case ActorIsolation::Independent:
-      case ActorIsolation::Unspecified:
+      case ActorIsolationRestriction::GlobalActor: {
+        // FIXME: Check against the requirement. This needs serious refactoring.
+        break;
+      }
+
+      case ActorIsolationRestriction::Unrestricted:
+      case ActorIsolationRestriction::Unsafe:
+      case ActorIsolationRestriction::LocalCapture:
         break;
       }
 

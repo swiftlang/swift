@@ -66,13 +66,11 @@ class SwiftGizmo : Gizmo {
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
+  // CHECK:        [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+  // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK:        [[XINIT:%[0-9]+]] = function_ref @$s12objc_dealloc10SwiftGizmoC1xAA1XCvpfi
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
-  // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
-  // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*X
-  // CHECK-NEXT:   assign [[XOBJ]] to [[WRITE]] : $*X
-  // CHECK-NEXT:   end_access [[WRITE]] : $*X
+  // CHECK-NEXT:   store [[XOBJ]] to [init] [[X]] : $*X
   // CHECK-NEXT:   end_borrow [[BORROWED_SELF]]
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 

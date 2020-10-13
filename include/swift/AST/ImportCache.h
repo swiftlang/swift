@@ -49,7 +49,7 @@ namespace namelookup {
 /// it was explicitly imported (or re-exported).
 class ImportSet final :
     public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<ImportSet, ModuleDecl::ImportedModule> {
+    private llvm::TrailingObjects<ImportSet, ImportedModule> {
   friend TrailingObjects;
   friend class ImportCache;
 
@@ -58,8 +58,8 @@ class ImportSet final :
   unsigned NumTransitiveImports;
 
   ImportSet(bool hasHeaderImportModule,
-            ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
-            ArrayRef<ModuleDecl::ImportedModule> transitiveImports);
+            ArrayRef<ImportedModule> topLevelImports,
+            ArrayRef<ImportedModule> transitiveImports);
 
   ImportSet(const ImportSet &) = delete;
   void operator=(const ImportSet &) = delete;
@@ -70,9 +70,9 @@ public:
   }
   static void Profile(
       llvm::FoldingSetNodeID &ID,
-      ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
+      ArrayRef<ImportedModule> topLevelImports);
 
-  size_t numTrailingObjects(OverloadToken<ModuleDecl::ImportedModule>) const {
+  size_t numTrailingObjects(OverloadToken<ImportedModule>) const {
     return NumTopLevelImports + NumTransitiveImports;
   }
 
@@ -83,24 +83,24 @@ public:
     return HasHeaderImportModule;
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getTopLevelImports() const {
-    return {getTrailingObjects<ModuleDecl::ImportedModule>(),
+  ArrayRef<ImportedModule> getTopLevelImports() const {
+    return {getTrailingObjects<ImportedModule>(),
             NumTopLevelImports};
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getTransitiveImports() const {
-    return {getTrailingObjects<ModuleDecl::ImportedModule>() +
+  ArrayRef<ImportedModule> getTransitiveImports() const {
+    return {getTrailingObjects<ImportedModule>() +
               NumTopLevelImports,
             NumTransitiveImports};
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getAllImports() const {
-      return {getTrailingObjects<ModuleDecl::ImportedModule>(),
+  ArrayRef<ImportedModule> getAllImports() const {
+      return {getTrailingObjects<ImportedModule>(),
               NumTopLevelImports + NumTransitiveImports};
   }
 };
 
-class alignas(ModuleDecl::ImportedModule) ImportCache {
+class alignas(ImportedModule) ImportCache {
   ImportCache(const ImportCache &) = delete;
   void operator=(const ImportCache &) = delete;
 
@@ -121,7 +121,7 @@ class alignas(ModuleDecl::ImportedModule) ImportCache {
       SmallVectorImpl<ImportPath::Access> &results);
 
   ImportSet &getImportSet(ASTContext &ctx,
-                          ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
+                          ArrayRef<ImportedModule> topLevelImports);
 
 public:
   ImportCache() {}
@@ -154,7 +154,7 @@ public:
   }
 };
 
-ArrayRef<ModuleDecl::ImportedModule> getAllImports(const DeclContext *dc);
+ArrayRef<ImportedModule> getAllImports(const DeclContext *dc);
 
 }  // namespace namelookup
 

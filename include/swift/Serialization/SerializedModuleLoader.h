@@ -414,7 +414,7 @@ public:
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+  getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
   virtual void

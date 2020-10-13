@@ -3828,6 +3828,8 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
+      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+        Printer << "error_expr";
       } else {
         visit(originator.get<DependentMemberType *>());
       }

@@ -421,6 +421,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       isType = canParseType();
     }
     if (isType) {
+      SyntaxParsingContext TyExprCtx(SyntaxContext, SyntaxKind::TypeExpr);
       ParserResult<TypeRepr> ty = parseType();
       if (ty.isNonNull())
         return makeParserResult(
@@ -2841,13 +2842,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // If the body consists of a single expression, turn it into a return
   // statement.
-  //
-  // But don't do this transformation when performing certain kinds of code
-  // completion, as the source may be incomplete and the type mismatch in return
-  // statement will just confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace &&
-      !shouldSuppressSingleExpressionBodyTransform(Status, bodyElements)) {
+  if (!missingRBrace && bodyElements.size() == 1) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
     Expr *returnExpr = nullptr;

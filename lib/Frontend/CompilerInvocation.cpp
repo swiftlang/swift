@@ -498,6 +498,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  for (const Arg *A : Args.filtered(OPT_define_availability)) {
+    Opts.AvailabilityMacros.push_back(A->getValue());
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {

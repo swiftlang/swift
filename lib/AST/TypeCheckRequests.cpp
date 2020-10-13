@@ -179,21 +179,10 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   diags.diagnose(enumDecl, diag::circular_enum_inheritance, enumDecl->getName());
 }
 
-bool EnumRawTypeRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-Optional<Type> EnumRawTypeRequest::getCachedResult() const {
-  auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.hasRawType())
-    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
-
-  return None;
-}
-
-void EnumRawTypeRequest::cacheResult(Type value) const {
-  auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.cacheRawType(value);
+void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
 }
 
 //----------------------------------------------------------------------------//
@@ -854,17 +843,15 @@ bool EnumRawValuesRequest::isCached() const {
 
 Optional<evaluator::SideEffect> EnumRawValuesRequest::getCachedResult() const {
   auto *ED = std::get<0>(getStorage());
-  if (ED->LazySemanticInfo.hasCheckedRawValues())
+  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
     return std::make_tuple<>();
   return None;
 }
 
 void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
   auto *ED = std::get<0>(getStorage());
-  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
-      EnumDecl::HasFixedRawValues |
-      EnumDecl::HasFixedRawValuesAndTypes;
-  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
+      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
 }
 
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
@@ -1392,9 +1379,62 @@ TypeCheckFunctionBodyRequest::readDependencySource(
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ImplicitImport &import) {
-  out << "implicit import of ";
-  simple_display(out, import.Module);
+                           const ImportedModule &module) {
+  out << "import of ";
+  if (!module.accessPath.empty()) {
+    module.accessPath.print(out);
+    out << " in ";
+  }
+  simple_display(out, module.importedModule);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const UnloadedImportedModule &module) {
+  out << "import of ";
+  if (!module.getAccessPath().empty()) {
+    module.getAccessPath().print(out);
+    out << " in ";
+  }
+  out << "unloaded ";
+  module.getModulePath().print(out);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const AttributedImport<std::tuple<>> &import) {
+  out << " [";
+
+  if (import.options.contains(ImportFlags::Exported))
+    out << " exported";
+  if (import.options.contains(ImportFlags::Testable))
+    out << " testable";
+  if (import.options.contains(ImportFlags::ImplementationOnly))
+    out << " implementation-only";
+  if (import.options.contains(ImportFlags::PrivateImport))
+    out << " private(" << import.sourceFileArg << ")";
+
+  if (import.options.contains(ImportFlags::SPIAccessControl)) {
+    out << " spi(";
+    llvm::interleaveComma(import.spiGroups, out, [&out](Identifier name) {
+                                                   simple_display(out, name);
+                                                 });
+    out << ")";
+  }
+
+  out << " ]";
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ImplicitImportList &importList) {
+  llvm::interleaveComma(importList.imports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
+  if (!importList.imports.empty() && !importList.unloadedImports.empty())
+    out << ", ";
+  llvm::interleaveComma(importList.unloadedImports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
 }
 
 //----------------------------------------------------------------------------//
@@ -1455,10 +1495,6 @@ void swift::simple_display(
       out << "actor-isolated to instance of " << state.getActor()->getName();
       break;
 
-    case ActorIsolation::ActorPrivileged:
-      out << "actor-privileged to instance of " << state.getActor()->getName();
-      break;
-
     case ActorIsolation::Independent:
       out << "actor-independent";
       break;
@@ -1466,7 +1502,19 @@ void swift::simple_display(
     case ActorIsolation::Unspecified:
       out << "unspecified actor isolation";
       break;
+
+    case ActorIsolation::GlobalActor:
+      out << "actor-isolated to global actor "
+          << state.getGlobalActor().getString();
+      break;
   }
+}
+
+bool swift::areTypesEqual(Type type1, Type type2) {
+  if (!type1 || !type2)
+    return !type1 && !type2;
+
+  return type1->isEqual(type2);
 }
 
 void swift::simple_display(

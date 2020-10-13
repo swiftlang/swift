@@ -124,7 +124,7 @@ public:
   }
 
   void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
+  getImportedModules(SmallVectorImpl<ImportedModule> &Modules) const {
     constexpr ModuleDecl::ImportFilter ImportFilter = {
         ModuleDecl::ImportFilterKind::Exported,
         ModuleDecl::ImportFilterKind::Default,
@@ -715,7 +715,7 @@ bool IndexSwiftASTWalker::visitImports(
   if (!IsNew)
     return true;
 
-  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  SmallVector<ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 
   llvm::SmallPtrSet<ModuleDecl *, 8> Reported;
@@ -1602,7 +1602,7 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   ImportFilter |= ModuleDecl::ImportFilterKind::Exported;
   ImportFilter |= ModuleDecl::ImportFilterKind::Default;
   // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
-  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  SmallVector<ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {

@@ -149,8 +149,8 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     // Collect implicitly imported modules in case they are not explicitly
     // printed in the interface file, e.g. SwiftOnoneSupport.
     auto &imInfo = mainMod->getImplicitImportInfo();
-    for (auto name: imInfo.ModuleNames) {
-      Result->addModuleDependency(name.str(), &alreadyAddedModules);
+    for (auto import: imInfo.AdditionalUnloadedImports) {
+      Result->addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
     }
     return std::error_code();
   });
