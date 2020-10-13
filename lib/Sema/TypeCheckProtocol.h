@@ -740,6 +740,11 @@ private:
                                    Type type,
                                    TypeDecl *typeDecl);
 
+  /// Check that the witness and requirement have compatible actor contexts.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool checkActorIsolation(ValueDecl *requirement, ValueDecl *witness);
+
   /// Record a type witness.
   ///
   /// \param assocType The associated type whose witness is being recorded.
