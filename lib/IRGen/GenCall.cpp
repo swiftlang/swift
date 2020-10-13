@@ -338,12 +338,10 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
 static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
-                                        unsigned paramIndex, bool allowSRet,
-                                        bool noCapture = true) {
+                                        unsigned paramIndex, bool allowSRet) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::NoAlias);
-  if (noCapture)
-    b.addAttribute(llvm::Attribute::NoCapture);
+  b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet)
     b.addAttribute(llvm::Attribute::StructRet);
   attrs = attrs.addAttributes(IGM.getLLVMContext(),
@@ -1427,18 +1425,6 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::InAlloca:
       llvm_unreachable("Need to handle InAlloca during signature expansion");
     }
-  }
-
-  if (formalIndirectResult) {
-    // If the result is a formal indirect result in SIL, that means that the
-    // Clang function has an explicit output parameter (e.g. it's a C++
-    // constructor). This means:
-    // - Don't mark it `sret`, as this should only be used for C++ return
-    //   values.
-    // - The Clang function might capture the pointer, so don't specify
-    //   `nocapture`.
-    addIndirectResultAttributes(IGM, Attrs, 0, /* allowSRet = */ false,
-                                /* noCapture = */ false);
   }
 
   if (returnInfo.isIndirect() || returnInfo.isIgnore()) {

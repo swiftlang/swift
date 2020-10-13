@@ -11,6 +11,6 @@ public func createConstructorWithNSArrayParam() -> ConstructorWithNSArrayParam {
   // CHECK: [[VAR:%[0-9]+]] = alloca %TSo27ConstructorWithNSArrayParamV, align 1
   // CHECK: %{{[0-9]+}} = call swiftcc %TSo7NSArrayC* @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(%swift.bridge* %{{[0-9]+}}, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sypN", i32 0, i32 1))
   // CHECK: [[CAST_VAR:%[0-9]+]] = bitcast %TSo27ConstructorWithNSArrayParamV* [[VAR]] to %struct.ConstructorWithNSArrayParam*
-  // CHECK: call void @_ZN27ConstructorWithNSArrayParamC1EP7NSArray(%struct.ConstructorWithNSArrayParam* noalias [[CAST_VAR]], [[VAR]]* %{{[0-9]+}})
+  // CHECK: call void @_ZN27ConstructorWithNSArrayParamC1EP7NSArray(%struct.ConstructorWithNSArrayParam* [[CAST_VAR]], [[VAR]]* %{{[0-9]+}})
   return ConstructorWithNSArrayParam([])
 }

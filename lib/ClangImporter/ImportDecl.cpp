@@ -3522,9 +3522,6 @@ namespace {
       if (decl->getDefinition() && !decl->isBeingDefined() &&
           !decl->isDependentContext() &&
           decl->needsImplicitDefaultConstructor()) {
-        // Casting away const here should be OK because
-        // SwiftDeclConverter::Visit() is in practice called with a non-const
-        // argument.
         clang::CXXConstructorDecl *ctor =
             clangSema.DeclareImplicitDefaultConstructor(
                 const_cast<clang::CXXRecordDecl *>(decl));
@@ -3927,7 +3924,7 @@ namespace {
         FuncDecl *func =
             createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
                                  nameLoc, bodyParams, resultTy,
-                                 /*async*/ false, /*throws*/ false, dc, decl);
+                                 /*async=*/false, /*throws=*/false, dc, decl);
         result = func;
 
         if (!dc->isModuleScopeContext()) {
