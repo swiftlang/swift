@@ -9,7 +9,7 @@ func test() {
 
   // Enum name remapping.
   var color: ColorKind = CT_red
-  var color2: ColorType = CT_Red // expected-error{{'ColorType' has been renamed to 'ColorKind'}}{{15-24=ColorKind}}
+  var color2: ColorType = CT_red // expected-error{{'ColorType' has been renamed to 'ColorKind'}}{{15-24=ColorKind}}
 
   // Enumerator remapping.
   var excuse: HomeworkExcuse = .dogAteIt

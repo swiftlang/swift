@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAccess.h"
+#include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1772,7 +1774,11 @@ public:
       checkOverride(VD);
     }
 
-    DeclVisitor<ExportabilityChecker>::visit(D);
+    // Note: references to @_spi and @_implementationOnly declarations from
+    // @inlinable code are diagnosed by DeclAvailabilityChecker below.
+    auto *DC = D->getInnermostDeclContext();
+    if (DC->getFragileFunctionKind().kind == FragileFunctionKind::None)
+      DeclVisitor<ExportabilityChecker>::visit(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -2035,6 +2041,261 @@ public:
     });
   }
 };
+
+/// Diagnose declarations whose signatures refer to unavailable types.
+class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
+  DeclContext *DC;
+
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+                 bool allowUnavailableProtocol=false) {
+    // Don't bother checking errors.
+    if (type && type->hasError())
+      return;
+
+    // Check the TypeRepr for references to unavailable declarations.
+    if (typeRepr) {
+      DeclAvailabilityFlags flags = None;
+
+      // We allow a type to conform to a protocol that is less available than
+      // the type itself. This enables a type to retroactively model or directly
+      // conform to a protocol only available on newer OSes and yet still be used on
+      // older OSes.
+      //
+      // To support this, inside inheritance clauses we allow references to
+      // protocols that are unavailable in the current type refinement context.
+      if (allowUnavailableProtocol)
+        flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
+      diagnoseTypeReprAvailability(typeRepr, DC, flags);
+    }
+
+    // Check the type for references to unavailable conformances.
+    if (type)
+      if (!context->getDeclContext()->isLocalContext())
+        diagnoseTypeAvailability(type, context->getLoc(), DC);
+  }
+
+  void checkGenericParams(const GenericContext *ownerCtx,
+                          const ValueDecl *ownerDecl) {
+    // FIXME: What if we have a where clause and no generic params?
+    const auto params = ownerCtx->getGenericParams();
+    if (!params)
+      return;
+
+    for (auto param : *params) {
+      if (param->getInherited().empty())
+        continue;
+      assert(param->getInherited().size() == 1);
+      auto inherited = param->getInherited().front();
+      checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+    }
+
+    forAllRequirementTypes(WhereClauseOwner(
+                             const_cast<GenericContext *>(ownerCtx)),
+                           [&](Type type, TypeRepr *typeRepr) {
+      checkType(type, typeRepr, ownerDecl);
+    });
+  }
+
+public:
+  explicit DeclAvailabilityChecker(Decl *D)
+    : DC(D->getInnermostDeclContext()) {}
+
+  void visit(Decl *D) {
+    if (D->isImplicit())
+      return;
+
+    DeclVisitor<DeclAvailabilityChecker>::visit(D);
+  }
+
+  // Force all kinds to be handled at a lower level.
+  void visitDecl(Decl *D) = delete;
+  void visitValueDecl(ValueDecl *D) = delete;
+
+#define UNREACHABLE(KIND, REASON) \
+  void visit##KIND##Decl(KIND##Decl *D) { \
+    llvm_unreachable(REASON); \
+  }
+  UNREACHABLE(Import, "not applicable")
+  UNREACHABLE(TopLevelCode, "not applicable")
+  UNREACHABLE(Module, "not applicable")
+
+  UNREACHABLE(Param, "handled by the enclosing declaration")
+  UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
+  UNREACHABLE(MissingMember, "handled by the enclosing declaration")
+#undef UNREACHABLE
+
+#define UNINTERESTING(KIND) \
+  void visit##KIND##Decl(KIND##Decl *D) {}
+
+  UNINTERESTING(PrefixOperator) // Does not reference other decls.
+  UNINTERESTING(PostfixOperator) // Does not reference other decls.
+  UNINTERESTING(InfixOperator) // Does not reference other decls.
+  UNINTERESTING(IfConfig) // Not applicable.
+  UNINTERESTING(PoundDiagnostic) // Not applicable.
+  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
+  UNINTERESTING(Destructor) // Always correct.
+  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+  UNINTERESTING(OpaqueType) // TODO
+  UNINTERESTING(PrecedenceGroup) // Doesn't reference anything with availability.
+
+  // Handled at the PatternBinding level; if the pattern has a simple
+  // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
+  UNINTERESTING(Var)
+
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+
+    // Only check the type of individual variables if we didn't check an
+    // enclosing TypedPattern.
+    if (seenVars.count(theVar))
+      return;
+
+    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar);
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkTypedPattern(PatternBindingDecl *PBD,
+                         const TypedPattern *TP,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    // FIXME: We need to figure out if this is a stored or computed property,
+    // so we pull out some random VarDecl in the pattern. They're all going to
+    // be the same, but still, ick.
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+
+    checkType(TP->hasType() ? TP->getType() : Type(),
+              TP->getTypeRepr(), PBD);
+
+    // Check the property wrapper types.
+    if (anyVar)
+      for (auto attr : anyVar->getAttachedPropertyWrappers())
+        checkType(attr->getType(), attr->getTypeRepr(), anyVar);
+  }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    llvm::DenseSet<const VarDecl *> seenVars;
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          checkNamedPattern(NP, seenVars);
+          return;
+        }
+
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+        checkTypedPattern(PBD, TP, seenVars);
+      });
+      seenVars.clear();
+    }
+  }
+
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    checkGenericParams(TAD, TAD);
+    checkType(TAD->getUnderlyingType(),
+              TAD->getUnderlyingTypeRepr(), TAD);
+  }
+
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    llvm::for_each(assocType->getInherited(),
+                   [&](TypeLoc requirement) {
+      checkType(requirement.getType(), requirement.getTypeRepr(),
+                assocType);
+    });
+    checkType(assocType->getDefaultDefinitionType(),
+              assocType->getDefaultDefinitionTypeRepr(), assocType);
+
+    if (assocType->getTrailingWhereClause()) {
+      forAllRequirementTypes(assocType,
+                             [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, assocType);
+      });
+    }
+  }
+
+  void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
+    checkGenericParams(nominal, nominal);
+
+    llvm::for_each(nominal->getInherited(),
+                   [&](TypeLoc inherited) {
+      checkType(inherited.getType(), inherited.getTypeRepr(),
+                nominal, /*allowUnavailableProtocol=*/true);
+    });
+  }
+
+  void visitProtocolDecl(ProtocolDecl *proto) {
+    llvm::for_each(proto->getInherited(),
+                  [&](TypeLoc requirement) {
+      checkType(requirement.getType(), requirement.getTypeRepr(), proto,
+                /*allowUnavailableProtocol=*/true);
+    });
+
+    if (proto->getTrailingWhereClause()) {
+      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, proto);
+      });
+    }
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    checkGenericParams(SD, SD);
+
+    for (auto &P : *SD->getIndices()) {
+      checkType(P->getInterfaceType(), P->getTypeRepr(), SD);
+    }
+    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD);
+  }
+
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
+    checkGenericParams(fn, fn);
+
+    for (auto *P : *fn->getParameters())
+      checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
+  }
+
+  void visitFuncDecl(FuncDecl *FD) {
+    visitAbstractFunctionDecl(FD);
+    checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD);
+  }
+
+  void visitEnumElementDecl(EnumElementDecl *EED) {
+    if (!EED->hasAssociatedValues())
+      return;
+    for (auto &P : *EED->getParameterList())
+      checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+  }
+
+  void checkConstrainedExtensionRequirements(ExtensionDecl *ED) {
+    if (!ED->getTrailingWhereClause())
+      return;
+    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+      checkType(type, typeRepr, ED);
+    });
+  }
+
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    auto extendedType = ED->getExtendedNominal();
+    assert(extendedType && "valid extension with no extended type?");
+    if (!extendedType)
+      return;
+
+    llvm::for_each(ED->getInherited(),
+                   [&](TypeLoc inherited) {
+      checkType(inherited.getType(), inherited.getTypeRepr(),
+                ED, /*allowUnavailableProtocol=*/true);
+    });
+
+    checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED);
+    checkConstrainedExtensionRequirements(ED);
+  }
+};
+
 } // end anonymous namespace
 
 static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
@@ -2086,4 +2347,5 @@ void swift::checkAccessControl(Decl *D) {
   }
 
   ExportabilityChecker().visit(D);
+  DeclAvailabilityChecker(D).visit(D);
 }

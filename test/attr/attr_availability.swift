@@ -54,8 +54,8 @@ typealias YourCollection<Element> = MyCollection<Element> // expected-note {{'Yo
 
 var x : YourCollection<Int> // expected-error {{'YourCollection' has been renamed to 'MyCollection'}}{{9-23=MyCollection}}
 
-var x : int // expected-error {{'int' is unavailable: oh no you don't}}
-var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
+var y : int // expected-error {{'int' is unavailable: oh no you don't}}
+var z : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
 // Encoded message
 @available(*, unavailable, message: "This message has a double quote \"")

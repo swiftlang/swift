@@ -19,8 +19,10 @@ public func publicFunction() {}
 
 private struct PrivateStruct {}
 // expected-note@-1 3{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
+// expected-note@-2 {{initializer 'init()' is not '@usableFromInline' or public}}
 struct InternalStruct {}
 // expected-note@-1 3{{struct 'InternalStruct' is not '@usableFromInline' or public}}
+// expected-note@-2 {{initializer 'init()' is not '@usableFromInline' or public}}
 @usableFromInline struct VersionedStruct {
   @usableFromInline init() {}
 }
@@ -75,8 +77,10 @@ public struct Struct {
     let _ = VersionedStruct()
     let _ = InternalStruct()
     // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inlinable' function}}
+    // expected-error@-2 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
     let _ = PrivateStruct()
     // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
+    // expected-error@-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
   }
 
   private func privateMethod() {}
@@ -107,7 +111,7 @@ public struct Struct {
   private func privateInlinableMethod() {
   // expected-error@-2 {{'@inlinable' attribute can only be applied to public declarations, but 'privateInlinableMethod' is private}}
     struct Nested {}
-    // OK
+    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
   }
 
   @inline(__always)
@@ -143,14 +147,18 @@ enum InternalEnum {
   // expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
   // expected-note@-2 {{type declared here}}
   case apple
+  // expected-note@-1 {{enum case 'apple' is not '@usableFromInline' or public}}
   case orange
+  // expected-note@-1 {{enum case 'orange' is not '@usableFromInline' or public}}
 }
 
 @inlinable public func usesInternalEnum() {
   _ = InternalEnum.apple
   // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{enum case 'apple' is internal and cannot be referenced from an '@inlinable' function}}
   let _: InternalEnum = .orange
   // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{enum case 'orange' is internal and cannot be referenced from an '@inlinable' function}}
 }
 
 @usableFromInline enum VersionedEnum {

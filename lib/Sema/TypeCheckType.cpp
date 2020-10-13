@@ -1598,26 +1598,6 @@ resolveIdentTypeComponent(TypeResolution resolution,
                                          comp);
 }
 
-static bool diagnoseAvailability(IdentTypeRepr *IdType,
-                                 DeclContext *DC,
-                                 bool AllowPotentiallyUnavailableProtocol) {
-  DeclAvailabilityFlags flags =
-    DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-  if (AllowPotentiallyUnavailableProtocol)
-    flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
-  auto componentRange = IdType->getComponentRange();
-  for (auto comp : componentRange) {
-    if (auto *typeDecl = comp->getBoundDecl()) {
-      if (diagnoseDeclAvailability(typeDecl, DC,
-                                   comp->getNameLoc().getSourceRange(), flags)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 // Hack to apply context-specific @escaping to an AST function type.
 static Type applyNonEscapingIfNecessary(Type ty,
                                         TypeResolutionOptions options) {
@@ -3330,24 +3310,6 @@ Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
   // function type.
   if (result->is<FunctionType>())
     result = applyNonEscapingIfNecessary(result, options);
-
-  // Check the availability of the type.
-
-  // We allow a type to conform to a protocol that is less available than
-  // the type itself. This enables a type to retroactively model or directly
-  // conform to a protocol only available on newer OSes and yet still be used on
-  // older OSes.
-  // To support this, inside inheritance clauses we allow references to
-  // protocols that are unavailable in the current type refinement context.
-
-  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
-      diagnoseAvailability(
-          IdType, getDeclContext(),
-          options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
-    Components.back()->setInvalid();
-    return ErrorType::get(getASTContext());
-  }
 
   return result;
 }
