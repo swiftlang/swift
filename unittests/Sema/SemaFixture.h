@@ -38,7 +38,7 @@ public:
   DiagnosticEngine Diags;
 
   SemaTestBase() : Diags(SourceMgr) {
-    LangOpts.Target = llvm::Triple(llvm::sys::getProcessTriple());
+    LangOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
 
     llvm::SmallString<128> libDir(SWIFTLIB_DIR);
     llvm::sys::path::append(libDir, getPlatformNameForTriple(LangOpts.Target));
