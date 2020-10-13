@@ -215,11 +215,7 @@ public:
   SIMPLE_MEMBEHAVIOR_INST(CondFailInst, None)
 #undef SIMPLE_MEMBEHAVIOR_INST
 
-  // If we are asked to treat ref count increments as being inert, return None
-  // for these.
-  //
-  // FIXME: Once we separate the notion of ref counts from reading/writing
-  // memory this will be unnecessary.
+  // Incrementing reference counts doesn't have an observable memory effect.
 #define REFCOUNTINC_MEMBEHAVIOR_INST(Name)                                     \
   MemBehavior visit##Name(Name *I) {                                           \
     return MemBehavior::None;                                                \
@@ -455,7 +451,7 @@ MemBehavior MemoryBehaviorVisitor::getApplyBehavior(FullApplySite AS) {
       behavior = MemBehavior::MayRead;
 
     // Ask escape analysis.
-    if (!nonEscapingAddress && !EA->canEscapeTo(V, AS))
+    if (!EA->canEscapeTo(V, AS))
       behavior = MemBehavior::None;
   }
   LLVM_DEBUG(llvm::dbgs() << "  Found apply, returning " << behavior << '\n');
