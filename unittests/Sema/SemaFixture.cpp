@@ -12,6 +12,7 @@
 
 #include "SemaFixture.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
@@ -24,8 +25,6 @@
 
 using namespace swift;
 using namespace swift::unittest;
-
-using ModuleDecl = SourceFile::ImportedModuleDesc;
 
 SemaTest::SemaTest()
     : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
@@ -47,8 +46,8 @@ SemaTest::SemaTest()
   MainFile = new (Context) SourceFile(*module, SourceFileKind::Main,
                                       /*buffer=*/None);
 
-  auto stdlibImport =
-      ModuleDesc({ImportPath::Access(), stdlib}, /*options=*/{});
+  AttributedImport<ImportedModule> stdlibImport{{ImportPath::Access(), stdlib},
+                                                /*options=*/{}};
 
   MainFile->setImports(stdlibImport);
   module->addFile(*MainFile);
