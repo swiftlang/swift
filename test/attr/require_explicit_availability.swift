@@ -164,3 +164,11 @@ extension SomeClass { // expected-warning {{public declarations should have an a
     set(newValue) { }
   }
 }
+
+@available(iOS 13.0, macOS 10.15, watchOS 6.0, tvOS 13.0, macCatalyst 13.0, *)
+public struct StructWithImplicitMembers { }
+
+extension StructWithImplicitMembers: Hashable { }
+// expected-note @-1 {{add @available attribute to enclosing extension}}
+// expected-warning @-2 {{public declarations should have an availability attribute when building with -require-explicit-availability}}
+// expected-error @-3 {{'StructWithImplicitMembers' is only available in macOS 10.15 or newer}}
