@@ -845,11 +845,11 @@ class SubWithUnavailableMembers : SuperWithAlwaysAvailableMembers {
   required init() {}
 
   @available(OSX, unavailable)
-  override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
+  override func shouldAlwaysBeAvailableMethod() { // expected-warning {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
   }
 
   @available(OSX, unavailable)
-  override var shouldAlwaysBeAvailableProperty: Int { // expected-error {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+  override var shouldAlwaysBeAvailableProperty: Int { // expected-warning {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     get { return 10 }
     set(newVal) {}
   }
@@ -857,13 +857,13 @@ class SubWithUnavailableMembers : SuperWithAlwaysAvailableMembers {
   override var setterShouldAlwaysBeAvailableProperty: Int {
     get { return 9 }
     @available(OSX, unavailable)
-    set(newVal) {} // expected-error {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    set(newVal) {} // expected-warning {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     // This is a terrible diagnostic. rdar://problem/20427938
   }
 
   override var getterShouldAlwaysBeAvailableProperty: Int {
     @available(OSX, unavailable)
-    get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
+    get { return 9 } // expected-warning {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
   }
 }
