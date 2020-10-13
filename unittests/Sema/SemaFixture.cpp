@@ -11,9 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "SemaFixture.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -51,4 +54,24 @@ SemaTest::SemaTest()
   module->addFile(*MainFile);
 
   DC = module;
+}
+
+Type SemaTest::getStdlibType(StringRef name) const {
+  auto typeName = Context.getIdentifier(name);
+
+  auto *stdlib = Context.getStdlibModule();
+
+  llvm::SmallVector<ValueDecl *, 4> results;
+  stdlib->lookupValue(typeName, NLKind::UnqualifiedLookup, results);
+
+  if (results.size() != 1)
+    return Type();
+
+  if (auto *decl = dyn_cast<TypeDecl>(results.front())) {
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(decl))
+      return NTD->getDeclaredType();
+    return decl->getDeclaredInterfaceType();
+  }
+
+  return Type();
 }
