@@ -21,7 +21,6 @@ class C : B {
 // CHECK:   #A.bar: {{.*}} : @$s7vtables1CC3bar{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.bas: {{.*}} : @$s7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.qux: {{.*}} : @$s7vtables1CC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.flux: {{.*}} : @$s7vtables1BC4flux{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.init!allocator: {{.*}} : @$s7vtables1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:   #B.zim: {{.*}} : @$s7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.zang: {{.*}} : @$s7vtables1CC4zang{{[_0-9a-zA-Z]*}}F
@@ -35,7 +34,7 @@ class A {
   func bar() {}
   func bas() {}
   func qux() {}
-  func flux() {}
+  @available(*, unavailable) func flux() {}
 }
 
 // CHECK: sil_vtable A {
@@ -54,7 +53,6 @@ class B : A {
   // bar inherited from A
   // bas inherited from A
   override func qux() {}
-  @available(*, unavailable) override func flux() {}
 
   func zim() {}
   func zang() {}
@@ -65,7 +63,6 @@ class B : A {
 // CHECK:   #A.bar: {{.*}} : @$s7vtables1AC3bar{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.bas: {{.*}} : @$s7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.qux: {{.*}} : @$s7vtables1BC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.flux: {{.*}} : @$s7vtables1BC4flux{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.init!allocator: {{.*}} : @$s7vtables1BC{{[_0-9a-zA-Z]*}}fC
 // CHECK:   #B.zim: {{.*}} : @$s7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.zang: {{.*}} : @$s7vtables1BC4zang{{[_0-9a-zA-Z]*}}F
