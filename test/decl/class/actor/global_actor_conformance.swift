@@ -18,7 +18,7 @@ struct GenericGlobalActor<T> {
 protocol P1 {
   associatedtype Assoc
 
-  @GlobalActor func method1() // expected-note{{declared here}}
+  @GlobalActor func method1()
   @GenericGlobalActor<Int> func method2()  // expected-note{{declared here}}
   @GenericGlobalActor<Assoc> func method3()
   func method4() // expected-note{{declared here}}
@@ -33,8 +33,7 @@ protocol P2 {
 class C1 : P1, P2 {
   typealias Assoc = String
 
-  // FIXME: This will be inferred
-  func method1() { } // expected-error{{instance method 'method1()' must be isolated to the global actor 'GlobalActor' to satisfy corresponding requirement from protocol 'P1'}}{{3-3=@GlobalActor}}
+  func method1() { }
 
   @GenericGlobalActor<String> func method2() { } // expected-error{{instance method 'method2()' isolated to global actor 'GenericGlobalActor<String>' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'GenericGlobalActor<Int>'}}
   @GenericGlobalActor<String >func method3() { }

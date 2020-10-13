@@ -84,6 +84,8 @@ public:
 
   operator Kind() const { return getKind(); }
 
+  bool isUnspecified() const { return kind == Unspecified; }
+
   ClassDecl *getActor() const {
     assert(getKind() == ActorInstance);
     return actor;
