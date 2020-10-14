@@ -57,7 +57,7 @@ void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
 ///        being performed, for checking access. This must be either a
 ///        FileUnit or a Module.
 /// \param options name lookup options. Currently only used to communicate the
-/// NL_IncludeUsableFromInlineAndInlineable option.
+/// NL_IncludeUsableFromInline option.
 void lookupInModule(const DeclContext *moduleOrFile,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,

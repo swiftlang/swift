@@ -145,7 +145,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
-  bool includeInlineable = options & NL_IncludeUsableFromInlineAndInlineable;
+  bool includeInlineable = options & NL_IncludeUsableFromInline;
 
   auto updateNewDecls = [&](const DeclContext *moduleScopeContext) {
     if (decls.size() == currentCount)
