@@ -35,9 +35,6 @@ EDUCATIONAL_NOTES(cannot_construct_dangling_pointer, "temporary-pointers.md")
 EDUCATIONAL_NOTES(cannot_construct_dangling_pointer_warning,
                   "temporary-pointers.md")
 
-
-
-EDUCATIONAL_NOTES(non_nominal_no_initializers, "nominal-types.md")
 EDUCATIONAL_NOTES(non_nominal_extension, "nominal-types.md")
 EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
                   "nominal-types.md")

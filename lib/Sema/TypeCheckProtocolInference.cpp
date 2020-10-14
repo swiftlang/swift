@@ -1760,6 +1760,8 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
                            assocType->getName(), failed.TypeWitness,
+                           failed.TypeWitness->getCanonicalType()->getKind(),
+                           !failed.TypeWitness->isExistentialType(),
                            failed.Result.getRequirement());
             continue;
           }

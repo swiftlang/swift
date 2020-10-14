@@ -660,6 +660,24 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;
+  case DiagnosticArgumentKind::TypeKind:
+    assert(Modifier.empty() && "Improper modifier for TypeKind argument");
+    auto kind = Arg.getAsTypeKind();
+    switch (kind) {
+    case TypeKind::Hole:
+    case TypeKind::TypeVariable:
+    case TypeKind::WeakStorage:
+    case TypeKind::UnownedStorage:
+    case TypeKind::UnmanagedStorage:
+    case TypeKind::LValue:
+    case TypeKind::InOut:
+    case TypeKind::Paren:
+      assert(false && "These types should never appear in diagnostics!");
+    default:
+      break;
+    }
+    Out << TypeBase::getKindName(kind);
+    break;
   }
 }
 

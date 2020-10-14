@@ -12,7 +12,7 @@ let x = 1 +
 
 // A diagnostic with an educational note using supported markdown features
 extension (Int, Int) {}
-// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mnon-nominal type '(Int, Int)' cannot be extended
+// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mtuple type '(Int, Int)' cannot be extended
 // CHECK-NEXT:[0mextension (Int, Int) {}
 // CHECK-NEXT:[0;1;32m^         ~~~~~~~~~~
 // CHECK-NEXT:[0m[0m[1mNominal Types[0m
@@ -40,7 +40,7 @@ extension (Int, Int) {}
 // CHECK-NEXT:[0m[1mHeader 1[0m
 // CHECK-NEXT:[0m[1mHeader 3[0m
 
-// NO-COLOR:{{.*}}error: non-nominal type '(Int, Int)' cannot be extended
+// NO-COLOR:{{.*}}error: tuple type '(Int, Int)' cannot be extended
 // NO-COLOR-NEXT:extension (Int, Int) {}
 // NO-COLOR-NEXT:^         ~~~~~~~~~~
 // NO-COLOR-NEXT:Nominal Types
@@ -78,7 +78,7 @@ extension (Int, Int) {}
 // CHECK-DESCRIPTIVE-NEXT:  | // A diagnostic with an educational note
 // CHECK-DESCRIPTIVE-NEXT:  | extension (Int, Int) {}
 // CHECK-DESCRIPTIVE-NEXT:  |           ~~~~~~~~~~
-// CHECK-DESCRIPTIVE-NEXT:  | ^ error: non-nominal type '(Int, Int)' cannot be extended
+// CHECK-DESCRIPTIVE-NEXT:  | ^ error: tuple type '(Int, Int)' cannot be extended
 // CHECK-DESCRIPTIVE-NEXT:  |
 // CHECK-DESCRIPTIVE-NEXT: Nominal Types
 // CHECK-DESCRIPTIVE-NEXT: -------------
