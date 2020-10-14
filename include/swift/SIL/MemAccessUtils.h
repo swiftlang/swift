@@ -1201,8 +1201,8 @@ SILBasicBlock::iterator removeBeginAccess(BeginAccessInst *beginAccess);
 
 namespace swift {
 
-/// Return true if \p value is a cast that preserves the identity of the
-/// reference at operand zero.
+/// Return true if \p svi is a cast that preserves the identity and
+/// reference-counting equivalence of the reference at operand zero.
 bool isRCIdentityPreservingCast(SingleValueInstruction *svi);
 
 /// If \p svi is an access projection, return an address-type operand for the

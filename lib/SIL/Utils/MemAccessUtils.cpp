@@ -365,6 +365,14 @@ bool swift::isLetAddress(SILValue address) {
 //                          MARK: FindReferenceRoot
 //===----------------------------------------------------------------------===//
 
+// On some platforms, casting from a metatype to a reference type dynamically
+// allocates a ref-counted box for the metatype. Naturally that is the place
+// where RC-identity begins. Considering the source of such a casts to be
+// RC-identical would confuse ARC optimization, which might eliminate a retain
+// of such an object completely.
+//
+// The SILVerifier checks that none of these operations cast a nontrivial value
+// to a reference except unconditional_checked_cast[_value].
 bool swift::isRCIdentityPreservingCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
@@ -375,11 +383,14 @@ bool swift::isRCIdentityPreservingCast(SingleValueInstruction *svi) {
   // Ignore class type casts
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
     return true;
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::UnconditionalCheckedCastValueInst:
+    // If the source is nontrivial, then this checked cast may actually create a
+    // new object, so its source is not ref-count equivalent.
+    return !svi->getOperand(0)->getType().isTrivial(*svi->getFunction());
   }
 }
 
