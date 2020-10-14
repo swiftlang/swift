@@ -16,6 +16,11 @@ struct GS<Base> {
 
 class Klass {}
 
+struct Two {
+  var a: Klass
+  var b: Klass
+}
+
 sil @unknown : $@convention(thin) () -> ()
 
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
@@ -208,6 +213,26 @@ bb0(%0 : $*Builtin.NativeObject):
   %v = tuple ()
   return %v : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_allow_copy_take_from_projection
+// CHECK:   [[STK:%[0-9]+]] = alloc_stack
+// CHECK:   copy_addr [take] %1 to [initialization] [[STK]]
+// CHECK: } // end sil function 'dont_allow_copy_take_from_projection'
+sil [ossa] @dont_allow_copy_take_from_projection : $@convention(thin) (@in Two) -> @out Two {
+bb0(%0 : $*Two, %1 : $*Two):
+  %a0 = struct_element_addr %0 : $*Two, #Two.a
+  %b0 = struct_element_addr %0 : $*Two, #Two.b
+  %s = alloc_stack $Two
+  copy_addr [take] %1 to [initialization] %s : $*Two
+  %as = struct_element_addr %s : $*Two, #Two.a
+  %bs = struct_element_addr %s : $*Two, #Two.b
+  copy_addr [take] %as to [initialization] %a0 : $*Klass
+  copy_addr [take] %bs to [initialization] %b0 : $*Klass
+  dealloc_stack %s : $*Two
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @load_in_wrong_block
 // CHECK:      bb0(%0 : $*GS<B>):
 // CHECK-NEXT:   alloc_stack

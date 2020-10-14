@@ -282,6 +282,10 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
       LLVM_DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
       return false;
     }
+    // As with load [take], only accept copy_addr [take] if it takes the whole
+    // temporary object.
+    if (copyFromTmp->isTakeOfSrc() && address != originalCopy->getDest())
+      return false;
     loadInsts.insert(copyFromTmp);
     return true;
   }
