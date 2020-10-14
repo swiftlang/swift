@@ -664,8 +664,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
       currentChoice->getOverloadChoice().getDecl()->isOperator() &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
       lastSuccessfulChoice->getOverloadChoice().getDecl()->isOperator()) {
-    return true;
-  }
 
     // If we have a SIMD operator, and the prior choice was not a SIMD
     // Operator, we're done.
@@ -690,14 +688,14 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
           continue;
 
         auto choiceTyvar =
-            CS.getType(simplifyLocatorToAnchor(CS, overload.getFirst()))
+            CS.getType(simplifyLocatorToAnchor(overload.getFirst()))
                 ->getAs<TypeVariableType>();
         if (!choiceTyvar)
           continue;
 
         auto rep = CS.getRepresentative(choiceTyvar);
         if (lastRep != rep) {
-          CS.mergeEquivalenceClasses(rep, lastRep);
+          CS.mergeEquivalenceClasses(rep, lastRep, /*updateWorkList=*/false);
           lastRep = CS.getRepresentative(lastRep);
         }
       }

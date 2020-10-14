@@ -711,12 +711,12 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto *resolved = getResolvedOverloads(); resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
+    for (auto overload : CS.getResolvedOverloads()) {
+      auto resolved = overload.second;
+      if (!resolved.boundType->isEqual(repr))
         continue;
 
-      auto &representative = resolved->Choice;
+      auto &representative = resolved.choice;
       if (!representative.isDecl())
         return;
 
