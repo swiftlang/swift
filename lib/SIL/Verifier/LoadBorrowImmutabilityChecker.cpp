@@ -313,11 +313,6 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
 //===----------------------------------------------------------------------===//
 
 bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
-  // Find either the enclosing access scope or a single base address.
-
-  // FIXME: To be reenabled separately in a follow-on commit.
-  return true;
-
   AccessPath accessPath = AccessPath::computeInScope(lbi->getOperand());
   // Bail on an invalid AccessPath. AccessPath completeness is verified
   // independently--it may be invalid in extraordinary situations. When
