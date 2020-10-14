@@ -144,6 +144,70 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   dealloc_stack %stk : $*Builtin.NativeObject
   return %obj : $Builtin.NativeObject
 }
+
+// CHECK-LABEL: sil [ossa] @copy_with_take_and_copy_from_src
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'copy_with_take_and_copy_from_src'
+sil [ossa] @copy_with_take_and_copy_from_src : $@convention(thin) (@inout Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  %stk = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %0 to [initialization] %stk : $*Builtin.NativeObject
+  copy_addr [take] %1 to [initialization] %0 : $*Builtin.NativeObject
+  destroy_addr %stk : $*Builtin.NativeObject
+  dealloc_stack %stk : $*Builtin.NativeObject
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_take_and_try_apply
+// CHECK-NOT: copy_addr
+// CHECK:   try_apply {{%[0-9]+}}(%0)
+// CHECK: bb1({{.*}}):
+// CHECK:   destroy_addr %0
+// CHECK: bb2({{.*}}):
+// CHECK:   destroy_addr %0
+// CHECK: bb3:
+// CHECK:   store %1 to [init] %0
+// CHECK: } // end sil function 'copy_take_and_try_apply'
+sil [ossa] @copy_take_and_try_apply : $@convention(thin) (@inout Klass, @owned Klass) -> () {
+bb0(%0 : $*Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  copy_addr [take] %0 to [initialization] %2 : $*Klass
+  %5 = function_ref @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
+  try_apply %5(%2) : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error), normal bb1, error bb2
+bb1(%r : $()):
+  br bb3
+bb2(%e : $Error):
+  br bb3
+bb3:
+  store %1 to [init] %0 : $*Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Currently we cannot optimize this. But in theory it's possible to eliminate
+// both copies.
+//
+// CHECK-LABEL: sil [ossa] @copy_and_copy_back
+// CHECK:   [[STK:%[0-9]+]] = alloc_stack
+// CHECK:   copy_addr [take] %0 to [initialization] [[STK]]
+// CHECK:   copy_addr [take] [[STK]] to [initialization] %0
+// CHECK: } // end sil function 'copy_and_copy_back'
+sil [ossa] @copy_and_copy_back : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %stk = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %0 to [initialization] %stk : $*Builtin.NativeObject
+  copy_addr [take] %stk to [initialization] %0 : $*Builtin.NativeObject
+  dealloc_stack %stk : $*Builtin.NativeObject
+  %v = tuple ()
+  return %v : $()
+}
 // CHECK-LABEL: sil [ossa] @load_in_wrong_block
 // CHECK:      bb0(%0 : $*GS<B>):
 // CHECK-NEXT:   alloc_stack
@@ -654,7 +718,8 @@ bb0(%0 : $*Builtin.NativeObject):
 //
 // CHECK-LABEL: sil [ossa] @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK:   [[V:%.*]] = load [take] %0 : $*Builtin.NativeObject
+// CHECK:   [[V:%.*]] = load [copy] %0 : $*Builtin.NativeObject
+// CHECK:   destroy_addr %0 : $*Builtin.NativeObject
 // CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK:   destroy_value [[V]] : $Builtin.NativeObject
 // CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
