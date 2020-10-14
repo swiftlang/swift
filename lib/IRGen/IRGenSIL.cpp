@@ -1219,6 +1219,13 @@ public:
   llvm::Value *getCoroutineBuffer() override {
     return allParamValues.claimNext();
   }
+
+public:
+  using SyncEntryPointArgumentEmission::requiresIndirectResult;
+  using SyncEntryPointArgumentEmission::getIndirectResultForFormallyDirectResult;
+  using SyncEntryPointArgumentEmission::getIndirectResult;
+  using SyncEntryPointArgumentEmission::getNextPolymorphicParameterAsMetadata;
+  using SyncEntryPointArgumentEmission::getNextPolymorphicParameter;
 };
 
 class AsyncNativeCCEntryPointArgumentEmission final
