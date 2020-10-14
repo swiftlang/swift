@@ -75,3 +75,22 @@ actor class A {
   // expected-error@+1{{'@actorIndependent' can only be applied to instance members of actors}}
   @actorIndependent static func staticFunc() { }
 }
+
+actor class FromProperty {
+  // expected-note@+3{{mutable state is only available within the actor instance}}
+  // expected-note@+2{{mutable state is only available within the actor instance}}
+  // expected-note@+1{{mutable state is only available within the actor instance}}
+  var counter : Int = 0
+
+  // expected-error@+2{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+  @actorIndependent
+  var halfCounter : Int { counter / 2 }
+
+  @actorIndependent
+  var ticks : Int {
+    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    get { counter }
+    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    set { counter = newValue }
+  }
+}
