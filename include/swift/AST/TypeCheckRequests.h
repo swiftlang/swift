@@ -2693,9 +2693,9 @@ enum class CustomAttrTypeKind {
   /// any contextual type parameters.
   NonGeneric,
 
-  /// Property delegates have some funky rules, like allowing
+  /// Property wrappers have some funky rules, like allowing
   /// unbound generic types.
-  PropertyDelegate,
+  PropertyWrapper,
 
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.

@@ -513,7 +513,7 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   auto ty = evaluateOrDefault(
       evaluator,
       CustomAttrTypeRequest{customAttr, var->getDeclContext(),
-                            CustomAttrTypeKind::PropertyDelegate},
+                            CustomAttrTypeKind::PropertyWrapper},
       Type());
   if (!ty || ty->hasError()) {
     return ErrorType::get(var->getASTContext());

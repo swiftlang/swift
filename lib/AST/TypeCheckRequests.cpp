@@ -1427,8 +1427,8 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "non-generic";
     return;
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
+  case CustomAttrTypeKind::PropertyWrapper:
+    out << "property-wrapper";
     return;
 
   case CustomAttrTypeKind::GlobalActor:
