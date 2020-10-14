@@ -430,7 +430,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   Optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
-  if (!availability.isAlwaysAvailable()) {
+  if (!availability.isAlwaysAvailable() &&
+      !availability.isKnownUnreachable()) {
     available = availability.getOSVersion().getLowerEndpoint();
   }
   ENCODE_VER_TUPLE(available, available)
@@ -452,11 +453,23 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
+    IdentifierID targetFunctionNameID = 0;
+    if (auto *target = SA->getTargetFunction()) {
+      addReferencedSILFunction(target, true);
+      targetFunctionNameID = S.addUniquedStringRef(target->getName());
+    }
+    IdentifierID spiGroupID = 0;
+    IdentifierID spiModuleDeclID = 0;
+    auto ident = SA->getSPIGroup();
+    if (!ident.empty()) {
+      spiGroupID = S.addUniquedStringRef(ident.str());
+      spiModuleDeclID = S.addModuleRef(SA->getSPIModule());
+    }
     SILSpecializeAttrLayout::emitRecord(
-        Out, ScratchRecord, specAttrAbbrCode,
-        (unsigned)SA->isExported(),
+        Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
-        S.addGenericSignatureRef(SA->getSpecializedSignature()));
+        S.addGenericSignatureRef(SA->getSpecializedSignature()),
+        targetFunctionNameID, spiGroupID, spiModuleDeclID);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

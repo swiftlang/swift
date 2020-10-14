@@ -13,8 +13,6 @@
 // This file implements constraint generation for the type checker.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintGraph.h"
-#include "ConstraintSystem.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -25,6 +23,8 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -1003,8 +1003,21 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      // FIXME: Can we do anything with error expressions at this point?
-      return nullptr;
+      if (!CS.isForCodeCompletion())
+        return nullptr;
+
+      // For code completion, treat error expressions that don't contain
+      // the completion location itself as holes. If an ErrorExpr contains the
+      // code completion location, a fallback typecheck is called on the
+      // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
+      // independent of the wider expression containing the ErrorExpr, so
+      // there's no point attempting to produce a solution for it.
+      SourceRange range = E->getSourceRange();
+      if (range.isInvalid() ||
+          CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
+        return nullptr;
+
+      return HoleType::get(CS.getASTContext(), E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {

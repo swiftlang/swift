@@ -39,41 +39,6 @@ using namespace Lowering;
 void Initialization::_anchor() {}
 void SILDebuggerClient::anchor() {}
 
-namespace {
-  /// A "null" initialization that indicates that any value being initialized
-  /// into this initialization should be discarded. This represents AnyPatterns
-  /// (that is, 'var (_)') that bind to values without storing them.
-  class BlackHoleInitialization : public Initialization {
-  public:
-    BlackHoleInitialization() {}
-
-    bool canSplitIntoTupleElements() const override {
-      return true;
-    }
-    
-    MutableArrayRef<InitializationPtr>
-    splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
-                           CanType type,
-                           SmallVectorImpl<InitializationPtr> &buf) override {
-      // "Destructure" an ignored binding into multiple ignored bindings.
-      for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
-        (void) fieldType;
-        buf.push_back(InitializationPtr(new BlackHoleInitialization()));
-      }
-      return buf;
-    }
-
-    void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                             ManagedValue value, bool isInit) override {
-      /// This just ignores the provided value.
-    }
-
-    void finishUninitialized(SILGenFunction &SGF) override {
-      // do nothing
-    }
-  };
-} // end anonymous namespace
-
 static void copyOrInitValueIntoHelper(
     SILGenFunction &SGF, SILLocation loc, ManagedValue value, bool isInit,
     ArrayRef<InitializationPtr> subInitializations,
@@ -1290,7 +1255,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
       InitializationPtr initialization =
-      InitializationForPattern(*this, FalseDest).visit(elt.getPattern());
+        emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));

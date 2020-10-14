@@ -161,6 +161,8 @@ PASS(DifferentiabilityWitnessDevirtualizer,
      "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
+PASS(OnonePrespecializations, "onone-prespecializer",
+     "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
 PASS(EarlyInliner, "early-inline",

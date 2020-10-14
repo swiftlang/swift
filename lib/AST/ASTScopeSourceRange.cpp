@@ -128,19 +128,14 @@ SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
 
 SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (auto *dv = decl->getStructuralDefaultExpr())
-    return dv->getSourceRange();
-  return SourceRange();
+  return decl->getStructuralDefaultExpr()->getSourceRange();
 }
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   SourceRange range = getPatternEntry().getSourceRange();
-  if (endLoc.hasValue()) {
-    ASTScopeAssert(endLoc->isValid(),
-                   "BraceStmt ends before pattern binding entry?");
+  if (endLoc.hasValue())
     range.End = *endLoc;
-  }
   return range;
 }
 
@@ -244,20 +239,7 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
 
 SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  auto rangeForGoodInput = params->getSourceRange();
-  auto r = SourceRange(rangeForGoodInput.Start,
-                       fixupEndForBadInput(rangeForGoodInput));
-  ASTScopeAssert(getSourceManager().rangeContains(
-                     getParent().get()->getSourceRangeOfThisASTNode(true), r),
-                 "Parameters not within function?!");
-  return r;
-}
-
-SourceLoc ParameterListScope::fixupEndForBadInput(
-    const SourceRange rangeForGoodInput) const {
-  const auto s = rangeForGoodInput.Start;
-  const auto e = rangeForGoodInput.End;
-  return getSourceManager().isBeforeInBuffer(s, e) ? e : s;
+  return params->getSourceRange();
 }
 
 SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
@@ -371,35 +353,4 @@ SourceLoc ast_scope::extractNearestSourceLoc(
     std::tuple<ASTScopeImpl *, ScopeCreator *> scopeAndCreator) {
   const ASTScopeImpl *scope = std::get<0>(scopeAndCreator);
   return scope->getSourceRangeOfThisASTNode().Start;
-}
-
-int ASTScopeImpl::compare(const SourceRange lhs, const SourceRange rhs,
-                          const SourceManager &SM, const bool ensureDisjoint) {
-  ASTScopeAssert(!SM.isBeforeInBuffer(lhs.End, lhs.Start),
-                 "Range is backwards.");
-  ASTScopeAssert(!SM.isBeforeInBuffer(rhs.End, rhs.Start),
-                 "Range is backwards.");
-
-  auto cmpLoc = [&](const SourceLoc lhs, const SourceLoc rhs) {
-    return lhs == rhs ? 0 : SM.isBeforeInBuffer(lhs, rhs) ? -1 : 1;
-  };
-  // Establish that we use end locations throughout ASTScopes here
-  const int endOrder = cmpLoc(lhs.End, rhs.End);
-
-#ifndef NDEBUG
-  if (ensureDisjoint) {
-    const int startOrder = cmpLoc(lhs.Start, rhs.Start);
-
-    if (startOrder * endOrder == -1) {
-      llvm::errs() << "*** Start order contradicts end order between: ***\n";
-      lhs.print(llvm::errs(), SM, false);
-      llvm::errs() << "\n*** and: ***\n";
-      rhs.print(llvm::errs(), SM, false);
-    }
-    ASTScopeAssert(startOrder * endOrder != -1,
-                   "Start order contradicts end order");
-  }
-#endif
-
-  return endOrder;
 }

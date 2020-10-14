@@ -97,7 +97,7 @@ toolchain as a one-off, there are a couple of differences:
    or a specific snapshot. You can update the branch/tag for all repositories
    as follows:
    ```sh
-   utils/update-checkout --branch mybranchname
+   utils/update-checkout --scheme mybranchname
    # OR
    utils/update-checkout --tag mytagname
    ```

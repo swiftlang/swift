@@ -74,6 +74,7 @@ class SwiftDriver(product.Product):
 
 
 def run_build_script_helper(action, host_target, product, args):
+    build_root = os.path.dirname(product.build_dir)
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
@@ -84,6 +85,15 @@ def run_build_script_helper(action, host_target, product, args):
                                                               product.build_dir)
     toolchain_path = targets.toolchain_path(install_destdir,
                                             args.install_prefix)
+
+    # Pass Dispatch directory down if we built it
+    dispatch_build_dir = os.path.join(
+        build_root, '%s-%s' % ('libdispatch', host_target))
+
+    # Pass Foundation directory down if we built it
+    foundation_build_dir = os.path.join(
+        build_root, '%s-%s' % ('foundation', host_target))
+
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
     helper_cmd = [
@@ -96,6 +106,14 @@ def run_build_script_helper(action, host_target, product, args):
         '--ninja-bin', product.toolchain.ninja,
         '--cmake-bin', product.toolchain.cmake,
     ]
+    if os.path.exists(dispatch_build_dir):
+        helper_cmd += [
+            '--dispatch-build-dir', dispatch_build_dir
+        ]
+    if os.path.exists(foundation_build_dir):
+        helper_cmd += [
+            '--foundation-build-dir', foundation_build_dir
+        ]
     if args.verbose_build:
         helper_cmd.append('--verbose')
 

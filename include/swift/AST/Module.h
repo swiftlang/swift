@@ -56,7 +56,6 @@ namespace swift {
   class FuncDecl;
   class InfixOperatorDecl;
   class LinkLibrary;
-  struct ImplicitImport;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -154,42 +153,6 @@ enum class ResilienceStrategy : unsigned {
   Resilient
 };
 
-/// The kind of stdlib that should be imported.
-enum class ImplicitStdlibKind {
-  /// No standard library should be implicitly imported.
-  None,
-
-  /// The Builtin module should be implicitly imported.
-  Builtin,
-
-  /// The regular Swift standard library should be implicitly imported.
-  Stdlib
-};
-
-struct ImplicitImportInfo {
-  /// The implicit stdlib to import.
-  ImplicitStdlibKind StdlibKind;
-
-  /// Whether we should attempt to import an underlying Clang half of this
-  /// module.
-  bool ShouldImportUnderlyingModule;
-
-  /// The bridging header path for this module, empty if there is none.
-  StringRef BridgingHeaderPath;
-
-  /// The names of additional modules to be implicitly imported.
-  SmallVector<Identifier, 4> ModuleNames;
-
-  /// An additional list of already-loaded modules which should be implicitly
-  /// imported.
-  SmallVector<std::pair<ModuleDecl *, /*exported*/ bool>, 4>
-      AdditionalModules;
-
-  ImplicitImportInfo()
-      : StdlibKind(ImplicitStdlibKind::None),
-        ShouldImportUnderlyingModule(false) {}
-};
-
 class OverlayFile;
 
 /// The minimum unit of compilation.
@@ -203,42 +166,6 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectPrecedenceGroupLookupRequest;
 
 public:
-  /// Convenience struct to keep track of a module along with its access path.
-  struct alignas(uint64_t) ImportedModule {
-    /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
-    ImportPath::Access accessPath;
-    /// The actual module corresponding to the import.
-    ///
-    /// Invariant: The pointer is non-null.
-    ModuleDecl *importedModule;
-
-    ImportedModule(ImportPath::Access accessPath,
-                   ModuleDecl *importedModule)
-        : accessPath(accessPath), importedModule(importedModule) {
-      assert(this->importedModule);
-    }
-
-    bool operator==(const ModuleDecl::ImportedModule &other) const {
-      return (this->importedModule == other.importedModule) &&
-             (this->accessPath == other.accessPath);
-    }
-  };
-
-  /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
-  class OrderImportedModules {
-  public:
-    bool operator()(const ImportedModule &lhs,
-                    const ImportedModule &rhs) const {
-      if (lhs.importedModule != rhs.importedModule)
-        return std::less<const ModuleDecl *>()(lhs.importedModule,
-                                               rhs.importedModule);
-      if (lhs.accessPath.getRaw().data() != rhs.accessPath.getRaw().data())
-        return std::less<ImportPath::Raw::iterator>()(lhs.accessPath.begin(),
-                                                   rhs.accessPath.begin());
-      return lhs.accessPath.size() < rhs.accessPath.size();
-    }
-  };
-
   /// Produces the components of a given module's full name in reverse order.
   ///
   /// For a Swift module, this will only ever have one component, but an
@@ -350,7 +277,7 @@ public:
 
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
-  ArrayRef<ImplicitImport> getImplicitImports() const;
+  ImplicitImportList getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
@@ -651,6 +578,13 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  // Is \p attr accessible as an explictly imported SPI from this module?
+  bool isImportedAsSPI(const SpecializeAttr *attr,
+                       const ValueDecl *targetDecl) const;
+
+  // Is \p spiGroup accessible as an explictly imported SPI from this module?
+  bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -714,12 +648,6 @@ public:
   ///
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
-
-  /// Uniques the items in \p imports, ignoring the source locations of the
-  /// access paths.
-  ///
-  /// The order of items in \p imports is \e not preserved.
-  static void removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports);
 
   /// Finds all top-level decls of this module.
   ///
@@ -886,30 +814,5 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
 }
 
 } // end namespace swift
-
-namespace llvm {
-  template <>
-  class DenseMapInfo<swift::ModuleDecl::ImportedModule> {
-    using ModuleDecl = swift::ModuleDecl;
-  public:
-    static ModuleDecl::ImportedModule getEmptyKey() {
-      return {{}, llvm::DenseMapInfo<ModuleDecl *>::getEmptyKey()};
-    }
-    static ModuleDecl::ImportedModule getTombstoneKey() {
-      return {{}, llvm::DenseMapInfo<ModuleDecl *>::getTombstoneKey()};
-    }
-
-    static unsigned getHashValue(const ModuleDecl::ImportedModule &val) {
-      auto pair = std::make_pair(val.accessPath.size(), val.importedModule);
-      return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
-    }
-
-    static bool isEqual(const ModuleDecl::ImportedModule &lhs,
-                        const ModuleDecl::ImportedModule &rhs) {
-      return lhs.importedModule == rhs.importedModule &&
-             lhs.accessPath.isSameAs(rhs.accessPath);
-    }
-  };
-}
 
 #endif

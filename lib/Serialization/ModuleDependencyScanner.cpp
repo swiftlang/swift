@@ -149,8 +149,8 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     // Collect implicitly imported modules in case they are not explicitly
     // printed in the interface file, e.g. SwiftOnoneSupport.
     auto &imInfo = mainMod->getImplicitImportInfo();
-    for (auto name: imInfo.ModuleNames) {
-      Result->addModuleDependency(name.str(), &alreadyAddedModules);
+    for (auto import: imInfo.AdditionalUnloadedImports) {
+      Result->addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
     }
     return std::error_code();
   });
@@ -166,10 +166,13 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
     InterfaceSubContextDelegate &delegate) {
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::Swift))
+          moduleName, ModuleDependenciesKind::SwiftTextual))
     return found;
-  if (auto found =
-          cache.findDependencies(moduleName, ModuleDependenciesKind::SwiftPlaceholder))
+  if (auto found = cache.findDependencies(
+          moduleName, ModuleDependenciesKind::SwiftBinary))
+    return found;
+  if (auto found = cache.findDependencies(
+          moduleName, ModuleDependenciesKind::SwiftPlaceholder))
     return found;
 
   auto moduleId = Ctx.getIdentifier(moduleName);
@@ -191,8 +194,7 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   for (auto &scanner : scanners) {
     if (scanner->canImportModule({moduleId, SourceLoc()})) {
       // Record the dependencies.
-      cache.recordDependencies(moduleName, *(scanner->dependencies),
-                               scanner->dependencyKind);
+      cache.recordDependencies(moduleName, *(scanner->dependencies));
       return std::move(scanner->dependencies);
     }
   }

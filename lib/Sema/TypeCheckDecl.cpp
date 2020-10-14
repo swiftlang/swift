@@ -1162,7 +1162,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (uncheckedRawValueOf(elt)) {
       if (!uncheckedRawValueOf(elt)->isImplicit())
         lastExplicitValueElt = elt;
-    } else if (!ED->LazySemanticInfo.hasFixedRawValues()) {
+    } else if (!ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues)) {
       // Try to pull out the automatic enum value kind.  If that fails, bail.
       if (!valueKind) {
         valueKind = computeAutomaticEnumValueKind(ED);
@@ -1217,7 +1217,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     // to have set things up correctly.  This comes up with imported enums
     // and deserialized @objc enums which always have their raw values setup
     // beforehand.
-    if (ED->LazySemanticInfo.hasFixedRawValues())
+    if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues))
       continue;
 
     // Using magic literals like #file as raw value is not supported right now.
@@ -1271,73 +1271,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     }
   }
   return std::make_tuple<>();
-}
-
-bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
-                                   AccessorDecl *decl) const {
-
-  class OldValueFinder : public ASTWalker {
-    const ParamDecl *OldValueParam;
-    bool foundOldValueRef = false;
-
-  public:
-    OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
-
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (!E)
-        return {true, E};
-      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
-        if (auto decl = DRE->getDecl()) {
-          if (decl == OldValueParam) {
-            foundOldValueRef = true;
-            return {false, nullptr};
-          }
-        }
-      }
-
-      return {true, E};
-    }
-
-    bool didFindOldValueRef() { return foundOldValueRef; }
-  };
-
-  // If this is not a didSet accessor, bail out.
-  if (decl->getAccessorKind() != AccessorKind::DidSet) {
-    return false;
-  }
-
-  // Always assume non-simple 'didSet' in code completion mode.
-  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
-    return false;
-
-  // didSet must have a single parameter.
-  if (decl->getParameters()->size() != 1) {
-    return false;
-  }
-
-  auto param = decl->getParameters()->get(0);
-  // If this parameter is not implicit, then it means it has been explicitly
-  // provided by the user (i.e. 'didSet(oldValue)'). This means we cannot
-  // consider this a "simple" didSet because we have to fetch the oldValue
-  // regardless of whether it's referenced in the body or not.
-  if (!param->isImplicit()) {
-    return false;
-  }
-
-  // If we find a reference to the implicit 'oldValue' parameter, then it is
-  // not a "simple" didSet because we need to fetch it.
-  auto walker = OldValueFinder(param);
-  decl->getTypecheckedBody()->walk(walker);
-  auto hasOldValueRef = walker.didFindOldValueRef();
-  if (!hasOldValueRef) {
-    // If the body does not refer to implicit 'oldValue', it means we can
-    // consider this as a "simple" didSet. Let's also erase the implicit
-    // oldValue as it is never used.
-    auto &ctx = decl->getASTContext();
-    decl->setParameters(ParameterList::createEmpty(ctx));
-    return true;
-  }
-  return false;
 }
 
 const ConstructorDecl *
@@ -2256,6 +2189,9 @@ static Type validateParameterType(ParamDecl *decl) {
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
+  if (dc->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowInlinable;
+
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener);
   auto Ty = resolution.resolveType(decl->getTypeRepr());
@@ -2789,9 +2725,11 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
 
   // Compute the extended type.
-  const TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  if (ext->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowInlinable;
   const auto resolution = TypeResolution::forStructural(
-      ext->getDeclContext(), TypeResolverContext::ExtensionBinding,
+      ext->getDeclContext(), options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.

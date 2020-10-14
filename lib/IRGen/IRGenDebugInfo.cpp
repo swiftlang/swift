@@ -661,7 +661,7 @@ private:
   }
 
   void createImportedModule(llvm::DIScope *Context,
-                            ModuleDecl::ImportedModule M, llvm::DIFile *File,
+                            ImportedModule M, llvm::DIFile *File,
                             unsigned Line) {
     // For overlays of Clang modules also emit an import of the underlying Clang
     // module. The helps the debugger resolve types that are present only in the
@@ -761,7 +761,7 @@ private:
     return None;
   }
 
-  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
+  llvm::DIModule *getOrCreateModule(ImportedModule IM) {
     ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
@@ -1882,7 +1882,7 @@ void IRGenDebugInfoImpl::finalize() {
 
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
-  SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
+  SmallVector<ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(
       ModuleWideImports, {ModuleDecl::ImportFilterKind::Exported,
                           ModuleDecl::ImportFilterKind::Default,
@@ -2129,7 +2129,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     return;
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
-  ModuleDecl::ImportedModule Imported = { D->getAccessPath(), D->getModule() };
+  ImportedModule Imported = { D->getAccessPath(), D->getModule() };
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
   createImportedModule(File, Imported, File, L.Line);

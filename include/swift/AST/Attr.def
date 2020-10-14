@@ -578,6 +578,17 @@ SIMPLE_DECL_ATTR(actorIndependent, ActorIndependent,
   APIStableToAdd | APIBreakingToRemove,
   103)
 
+SIMPLE_DECL_ATTR(globalActor, GlobalActor,
+  OnClass | OnStruct | OnEnum | ConcurrencyOnly |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  104)
+
+SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
+  OnExtension | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  105)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

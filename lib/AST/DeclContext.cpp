@@ -764,10 +764,43 @@ ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
       ArrayRef<Decl *>());
 }
 
+void IterableDeclContext::addMemberPreservingSourceOrder(Decl *member) {
+  auto &SM = getASTContext().SourceMgr;
+
+  SourceLoc start = member->getStartLoc();
+  Decl *hint = nullptr;
+
+  for (auto *existingMember : getMembers()) {
+    if (existingMember->isImplicit())
+      continue;
+
+    // An EnumCaseDecl contains one or more EnumElementDecls,
+    // but the EnumElementDecls are also added as members of
+    // the parent enum. We ignore the EnumCaseDecl since its
+    // source range overlaps with that of the EnumElementDecls.
+    if (isa<EnumCaseDecl>(existingMember))
+      continue;
+
+    // The elements of the active clause of an IfConfigDecl
+    // are added to the parent type. We ignore the IfConfigDecl
+    // since its source range overlaps with the source ranges
+    // of the active elements.
+    if (isa<IfConfigDecl>(existingMember))
+      continue;
+
+    if (!SM.isBeforeInBuffer(existingMember->getEndLoc(), start))
+      break;
+
+    hint = existingMember;
+  }
+
+  addMember(member, hint, /*insertAtHead=*/hint == nullptr);
+}
+
 /// Add a member to this context.
-void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
+void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead) {
   // Add the member to the list of declarations without notification.
-  addMemberSilently(member, Hint);
+  addMemberSilently(member, hint, insertAtHead);
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -790,29 +823,95 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   }
 }
 
-void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
+void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
+                                            bool insertAtHead) const {
   assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
   assert(!member->NextDecl && "Already added to a container");
 
-  // If there is a hint decl that specifies where to add this, just
-  // link into the chain immediately following it.
-  if (hint) {
+#ifndef NDEBUG
+  // Assert that new declarations are always added in source order.
+  auto checkSourceRange = [&](Decl *prev, Decl *next) {
+    // SKip these checks for imported and deserialized decls.
+    if (!member->getDeclContext()->getParentSourceFile())
+      return;
+
+    auto shouldSkip = [](Decl *d) {
+      // PatternBindingDecl source ranges overlap with VarDecls,
+      // EnumCaseDecl source ranges overlap with EnumElementDecls,
+      // and IfConfigDecl source ranges overlap with the elements
+      // of the active clause. Skip them all here to avoid
+      // spurious assertions.
+      if (isa<PatternBindingDecl>(d) ||
+          isa<EnumCaseDecl>(d) ||
+          isa<IfConfigDecl>(d))
+        return true;
+
+      // Ignore source location information of implicit declarations.
+      if (d->isImplicit())
+        return true;
+
+      return false;
+    };
+
+    if (shouldSkip(prev) || shouldSkip(next))
+      return;
+
+    SourceLoc prevEnd = prev->getEndLoc();
+    SourceLoc nextStart = next->getStartLoc();
+
+    assert(prevEnd.isValid() &&
+           "Only implicit decls can have invalid source location");
+    assert(nextStart.isValid() &&
+           "Only implicit decls can have invalid source location");
+
+    if (getASTContext().SourceMgr.isBeforeInBuffer(prevEnd, nextStart))
+      return;
+
+    llvm::errs() << "Source ranges out of order in addMember():\n";
+    prev->dump(llvm::errs());
+    next->dump(llvm::errs());
+    abort();
+  };
+#endif
+
+  // Empty list.
+  if (!FirstDeclAndLazyMembers.getPointer()) {
+    assert(hint == nullptr);
+
+    FirstDeclAndLazyMembers.setPointer(member);
+    LastDeclAndKind.setPointer(member);
+
+  // Insertion at the head.
+  } else if (insertAtHead) {
+    assert(hint == nullptr);
+
+    member->NextDecl = FirstDeclAndLazyMembers.getPointer();
+    FirstDeclAndLazyMembers.setPointer(member);
+
+  // Insertion at the tail.
+  } else if (hint == nullptr) {
+    auto *last = LastDeclAndKind.getPointer();
+
+#ifndef NDEBUG
+    checkSourceRange(last, member);
+#endif
+
+    last->NextDecl = member;
+    LastDeclAndKind.setPointer(member);
+
+  // Insertion after 'hint' (which may be the tail).
+  } else {
+#ifndef NDEBUG
+    checkSourceRange(hint, member);
+#endif
+
     member->NextDecl = hint->NextDecl;
     hint->NextDecl = member;
 
-    // If the hint was the last in the parent context's chain, update it.
+    // Handle case where the 'hint' is the tail.
     if (LastDeclAndKind.getPointer() == hint)
       LastDeclAndKind.setPointer(member);
-    return;
   }
-
-  if (auto last = LastDeclAndKind.getPointer()) {
-    last->NextDecl = member;
-    assert(last != member && "Simple cycle in decl list");
-  } else {
-    FirstDeclAndLazyMembers.setPointer(member);
-  }
-  LastDeclAndKind.setPointer(member);
 }
 
 void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
@@ -1169,4 +1268,19 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(const IterableDeclContext *idc) {
   return extractNearestSourceLoc(idc->getDecl());
+}
+
+static bool isSpecializeExtensionContext(const DeclContext *dc) {
+  if (dc->isModuleScopeContext())
+    return false;
+  if (auto *extCtx = dyn_cast<ExtensionDecl>(dc)) {
+    // and has specialized attr ...
+    return extCtx->getAttrs().hasAttribute<SpecializeExtensionAttr>();
+  }
+  auto *parentDecl = dc->getParent();
+  return isSpecializeExtensionContext(parentDecl);
+}
+
+bool DeclContext::isInSpecializeExtensionContext() const {
+   return isSpecializeExtensionContext(this);
 }

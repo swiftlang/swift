@@ -626,6 +626,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_specialize_target_func_not_found,none,
+      "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
       "expected version number in 'available' attribute", ())
 
@@ -1431,6 +1433,22 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// availability macro
+ERROR(attr_availability_wildcard_in_macro, none,
+      "future platforms identified by '*' cannot be used in "
+      "an availability macro definition", ())
+ERROR(attr_availability_missing_macro_name,none,
+      "expected an identifier to begin an availability macro definition", ())
+ERROR(attr_availability_expected_colon_macro,none,
+      "expected ':' after '%0' in availability macro definition",
+      (StringRef))
+ERROR(attr_availability_unknown_version,none,
+      "reference to undefined version '%0' for availability macro '%1'",
+      (StringRef, StringRef))
+ERROR(attr_availability_duplicate,none,
+      "duplicate definition of availability macro '%0' for version '%1'",
+      (StringRef, StringRef))
+
 // originallyDefinedIn
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
@@ -1563,6 +1581,10 @@ ERROR(attr_specialize_parameter_already_defined,none,
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_function,none,
+      "expected a function name as the value of the 'target' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_spi_name,none,
+      "expected an SPI identifier as the value of the 'spi' parameter in '_specialize' attribute", ())
 
 // _implements
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,

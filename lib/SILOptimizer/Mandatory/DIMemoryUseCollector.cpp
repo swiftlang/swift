@@ -467,48 +467,6 @@ void DIElementUseInfo::trackStoreToSelf(SILInstruction *I) {
 }
 
 //===----------------------------------------------------------------------===//
-//                          Scalarization Logic
-//===----------------------------------------------------------------------===//
-
-/// Given a pointer to a tuple type, compute the addresses of each element and
-/// add them to the ElementAddrs vector.
-static void
-getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
-                              SmallVectorImpl<SILValue> &ElementAddrs) {
-  TupleType *TT = Pointer->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer, Index));
-  }
-}
-
-/// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a destructure.
-static void getScalarizedElements(SILValue V,
-                                  SmallVectorImpl<SILValue> &ElementVals,
-                                  SILLocation Loc, SILBuilder &B) {
-  auto *DTI = B.createDestructureTuple(Loc, V);
-  llvm::copy(DTI->getResults(), std::back_inserter(ElementVals));
-}
-
-/// Scalarize a load down to its subelements.  If NewLoads is specified, this
-/// can return the newly generated sub-element loads.
-static SILValue scalarizeLoad(LoadInst *LI,
-                              SmallVectorImpl<SILValue> &ElementAddrs) {
-  SILBuilderWithScope B(LI);
-  SmallVector<SILValue, 4> ElementTmps;
-
-  for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
-                                        LI->getOwnershipQualifier());
-    ElementTmps.push_back(SubLI);
-  }
-
-  if (LI->getType().is<TupleType>())
-    return B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
-  return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
-}
-
-//===----------------------------------------------------------------------===//
 //                     ElementUseCollector Implementation
 //===----------------------------------------------------------------------===//
 
@@ -671,11 +629,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer->getType().getObjectType();
 
-  // This keeps track of instructions in the use list that touch multiple tuple
-  // elements and should be scalarized.  This is done as a second phase to
-  // avoid invalidating the use iterator.
-  SmallVector<SILInstruction *, 4> UsesToScalarize;
-
   for (auto *Op : Pointer->getUses()) {
     auto *User = Op->getUser();
 
@@ -705,10 +658,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Loads are a use of the value.
     if (isa<LoadInst>(User)) {
-      if (PointeeType.is<TupleType>())
-        UsesToScalarize.push_back(User);
-      else
-        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
+      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
       continue;
     }
 
@@ -730,13 +680,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
          isa<AssignByWrapperInst>(User)) &&
         Op->getOperandNumber() == 1) {
-      if (PointeeType.is<TupleType>()) {
-        assert(!isa<AssignByWrapperInst>(User) &&
-               "cannot assign a typle with assign_by_wrapper");
-        UsesToScalarize.push_back(User);
-        continue;
-      }
-
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
       DIUseKind Kind;
@@ -769,13 +712,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      // If this is a copy of a tuple, we should scalarize it so that we don't
-      // have an access that crosses elements.
-      if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(CAI);
-        continue;
-      }
-
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load
@@ -987,88 +923,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
-  }
-
-  // Now that we've walked all of the immediate uses, scalarize any operations
-  // working on tuples if we need to for canonicalization or analysis reasons.
-  if (!UsesToScalarize.empty()) {
-    SILInstruction *PointerInst = Pointer->getDefiningInstruction();
-    SmallVector<SILValue, 4> ElementAddrs;
-    SILBuilderWithScope AddrBuilder(++SILBasicBlock::iterator(PointerInst),
-                                    PointerInst);
-    getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
-                                  ElementAddrs);
-
-    SmallVector<SILValue, 4> ElementTmps;
-    for (auto *User : UsesToScalarize) {
-      ElementTmps.clear();
-
-      LLVM_DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
-
-      // Scalarize LoadInst
-      if (auto *LI = dyn_cast<LoadInst>(User)) {
-        SILValue Result = scalarizeLoad(LI, ElementAddrs);
-        LI->replaceAllUsesWith(Result);
-        LI->eraseFromParent();
-        continue;
-      }
-
-      // Scalarize AssignInst
-      if (auto *AI = dyn_cast<AssignInst>(User)) {
-        SILBuilderWithScope B(User, AI);
-        getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
-
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                         AssignOwnershipQualifier::Unknown);
-        AI->eraseFromParent();
-        continue;
-      }
-
-      // Scalarize StoreInst
-      if (auto *SI = dyn_cast<StoreInst>(User)) {
-        SILBuilderWithScope B(User, SI);
-        getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
-
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                                 SI->getOwnershipQualifier());
-        SI->eraseFromParent();
-        continue;
-      }
-
-      // Scalarize CopyAddrInst.
-      auto *CAI = cast<CopyAddrInst>(User);
-      SILBuilderWithScope B(User, CAI);
-
-      // Determine if this is a copy *from* or *to* "Pointer".
-      if (CAI->getSrc() == Pointer) {
-        // Copy from pointer.
-        getScalarizedElementAddresses(CAI->getDest(), B, CAI->getLoc(),
-                                      ElementTmps);
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createCopyAddr(CAI->getLoc(), ElementAddrs[i], ElementTmps[i],
-                           CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
-
-      } else {
-        getScalarizedElementAddresses(CAI->getSrc(), B, CAI->getLoc(),
-                                      ElementTmps);
-        for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createCopyAddr(CAI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                           CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
-      }
-      CAI->eraseFromParent();
-    }
-
-    // Now that we've scalarized some stuff, recurse down into the newly created
-    // element address computations to recursively process it.  This can cause
-    // further scalarization.
-    for (SILValue EltPtr : ElementAddrs) {
-      if (auto *TEAI = dyn_cast<TupleElementAddrInst>(EltPtr)) {
-        collectTupleElementUses(TEAI, BaseEltNo);
-        continue;
-      }
-    }
   }
 }
 

@@ -754,7 +754,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
   // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
-  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  SmallVector<ImportedModule, 8> Imports;
   TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {

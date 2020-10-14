@@ -13,6 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 #define SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 
+#include "swift/SIL/GenericSpecializationMangler.h"
+
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/NullablePtr.h"
@@ -23,65 +25,6 @@
 namespace swift {
 namespace Mangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
-
-enum class SpecializationKind : uint8_t {
-  Generic,
-  NotReAbstractedGeneric,
-  FunctionSignature,
-};
-  
-/// Inject SpecializationPass into the Mangle namespace.
-using SpecializationPass = Demangle::SpecializationPass;
-
-/// The base class for specialization mangles.
-class SpecializationMangler : public Mangle::ASTMangler {
-protected:
-  /// The specialization pass.
-  SpecializationPass Pass;
-
-  IsSerialized_t Serialized;
-
-  /// The original function which is specialized.
-  SILFunction *Function;
-
-  llvm::SmallVector<char, 32> ArgOpStorage;
-  llvm::raw_svector_ostream ArgOpBuffer;
-
-protected:
-  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
-                        SILFunction *F)
-      : Pass(P), Serialized(Serialized), Function(F),
-        ArgOpBuffer(ArgOpStorage) {}
-
-  SILFunction *getFunction() const { return Function; }
-
-  void beginMangling();
-
-  /// Finish the mangling of the symbol and return the mangled name.
-  std::string finalize();
-
-  void appendSpecializationOperator(StringRef Op) {
-    appendOperator(Op, StringRef(ArgOpStorage.data(), ArgOpStorage.size()));
-  }
-};
-
-// The mangler for specialized generic functions.
-class GenericSpecializationMangler : public SpecializationMangler {
-
-  SubstitutionMap SubMap;
-  bool isReAbstracted;
-  bool isInlined;
-
-public:
-  GenericSpecializationMangler(SILFunction *F, SubstitutionMap SubMap,
-                               IsSerialized_t Serialized, bool isReAbstracted,
-                               bool isInlined = false)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
-                              Serialized, F),
-        SubMap(SubMap), isReAbstracted(isReAbstracted), isInlined(isInlined) {}
-
-  std::string mangle(GenericSignature Sig = GenericSignature());
-};
 
 class PartialSpecializationMangler : public SpecializationMangler {
 

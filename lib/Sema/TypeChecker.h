@@ -17,7 +17,6 @@
 #ifndef TYPECHECKING_H
 #define TYPECHECKING_H
 
-#include "ConstraintSystem.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -30,6 +29,7 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -152,6 +152,8 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 1 << 1,
+  // Whether to include results that are marked @inlinable or @usableFromInline.
+  IncludeInlineableAndUsableFromInline = 1 << 2,
 };
 
 /// A set of options that control name lookup.

@@ -1472,6 +1472,7 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(SpecializeExtension)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
@@ -1514,6 +1515,7 @@ namespace  {
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
     UNINTERESTING_ATTR(ActorIndependent)
+    UNINTERESTING_ATTR(GlobalActor)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1687,16 +1689,37 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
   if (isRedundantAccessorOverrideAvailabilityDiagnostic(override, base))
     return false;
 
-  auto &diags = override->getASTContext().Diags;
+  auto &ctx = override->getASTContext();
+  auto &diags = ctx.Diags;
   if (auto *accessor = dyn_cast<AccessorDecl>(override)) {
-    diags.diagnose(override, diag::override_accessor_less_available,
+    bool downgradeToWarning = override->getAttrs().isUnavailable(ctx);
+    diags.diagnose(override,
+                   downgradeToWarning?
+                     diag::override_accessor_less_available_warn :
+                     diag::override_accessor_less_available,
                    accessor->getDescriptiveKind(),
                    accessor->getStorage()->getBaseName());
     diags.diagnose(base, diag::overridden_here);
     return true;
   }
 
-  diags.diagnose(override, diag::override_less_available,
+  bool downgradeToWarning = false;
+  if (override->getAttrs().isUnavailable(ctx)) {
+    // Don't report constructors that are marked unavailable as being less
+    // available than their introduction. This was previously allowed and
+    // can be used to forbid the direct use of a constructor in a subclass.
+    // Note that even when marked unavailable the constructor could be called
+    // by other inherited constructors.
+    if (isa<ConstructorDecl>(override))
+      return false;
+
+    // Report as a warning other unavailable overrides.
+    downgradeToWarning = true;
+  }
+
+  diags.diagnose(override,
+                 downgradeToWarning? diag::override_less_available_warn :
+                                     diag::override_less_available,
                  override->getBaseName());
   diags.diagnose(base, diag::overridden_here);
 

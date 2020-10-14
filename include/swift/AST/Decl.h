@@ -950,6 +950,18 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// Returns true if this Decl cannot be seen by any other source file
+  bool isPrivateToEnclosingFile() const;
+
+  /// Retrieve the global actor attribute that applies to this declaration,
+  /// if any.
+  ///
+  /// This is the "raw" global actor attribute as written directly on the
+  /// declaration, along with the nominal type declaration to which it refers,
+  /// without any inference rules applied.
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  getGlobalActorAttr() const;
+
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
@@ -1193,7 +1205,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// extended nominal.
   llvm::PointerIntPair<NominalTypeDecl *, 1, bool> ExtendedNominal;
 
-  MutableArrayRef<TypeLoc> Inherited;
+  ArrayRef<TypeLoc> Inherited;
 
   /// The next extension in the linked list of extensions.
   ///
@@ -1212,7 +1224,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class IterableDeclContext;
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
-                MutableArrayRef<TypeLoc> inherited,
+                ArrayRef<TypeLoc> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
 
@@ -1237,7 +1249,7 @@ public:
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
                                TypeRepr *extendedType,
-                               MutableArrayRef<TypeLoc> inherited,
+                               ArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
                                ClangNode clangNode = ClangNode());
@@ -1289,10 +1301,9 @@ public:
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
-  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -2176,7 +2187,8 @@ public:
   /// implementations for the requirements of a public protocol, even when
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
-                        bool forConformance = false) const;
+                        bool forConformance = false,
+                        bool includeInlineable = false) const;
 
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes
@@ -2405,12 +2417,12 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
-  MutableArrayRef<TypeLoc> Inherited;
+  ArrayRef<TypeLoc> Inherited;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
-           MutableArrayRef<TypeLoc> inherited) :
+           ArrayRef<TypeLoc> inherited) :
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
@@ -2428,10 +2440,9 @@ public:
 
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
-  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+  void setInherited(ArrayRef<TypeLoc> i) { Inherited = i; }
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -2456,7 +2467,7 @@ class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
-                  MutableArrayRef<TypeLoc> inherited,
+                  ArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams);
 
   // Resolve ambiguity due to multiple base classes.
@@ -2982,7 +2993,7 @@ protected:
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
-                  MutableArrayRef<TypeLoc> inherited,
+                  ArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
@@ -3172,6 +3183,20 @@ public:
 
   void synthesizeSemanticMembersIfNeeded(DeclName member);
 
+  /// Retrieves the static 'shared' property of a global actor type, which
+  /// is used to extract the actor instance.
+  ///
+  /// \returns the static 'shared' property for a global actor, or \c nullptr
+  /// for types that are not global actors.
+  VarDecl *getGlobalActorInstance() const;
+
+  /// Whether this type is a global actor, which can be used as an
+  /// attribute to decorate declarations for inclusion in the actor-isolated
+  /// state denoted by this type.
+  bool isGlobalActor() const {
+    return getGlobalActorInstance() != nullptr;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -3224,34 +3249,14 @@ class EnumDecl final : public NominalTypeDecl {
     // Is the complete set of raw values type checked?
     HasFixedRawValuesAndTypes  = 1 << 2,
   };
-  
-  struct {
-    /// The raw type and a bit to indicate whether the
-    /// raw was computed yet or not.
-    llvm::PointerIntPair<Type, 3, OptionSet<SemanticInfoFlags>> RawTypeAndFlags;
-    
-    bool hasRawType() const {
-      return RawTypeAndFlags.getInt().contains(HasComputedRawType);
-    }
-    void cacheRawType(Type ty) {
-      auto flags = RawTypeAndFlags.getInt() | HasComputedRawType;
-      RawTypeAndFlags.setPointerAndInt(ty, flags);
-    }
-    
-    bool hasFixedRawValues() const {
-      return RawTypeAndFlags.getInt().contains(HasFixedRawValues);
-    }
-    bool hasCheckedRawValues() const {
-      return RawTypeAndFlags.getInt().contains(HasFixedRawValuesAndTypes);
-    }
-  } LazySemanticInfo;
+  OptionSet<SemanticInfoFlags> SemanticFlags;
 
   friend class EnumRawValuesRequest;
   friend class EnumRawTypeRequest;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<TypeLoc> Inherited,
+            ArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return EnumLoc; }
@@ -3326,11 +3331,7 @@ public:
   Type getRawType() const;
 
   /// Set the raw type of the enum from its inheritance clause.
-  void setRawType(Type rawType) {
-    auto flags = LazySemanticInfo.RawTypeAndFlags.getInt();
-    LazySemanticInfo.RawTypeAndFlags.setPointerAndInt(
-        rawType, flags | HasComputedRawType);
-  }
+  void setRawType(Type rawType);
 
   /// True if none of the enum cases have associated values.
   ///
@@ -3387,7 +3388,7 @@ class StructDecl final : public NominalTypeDecl {
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             MutableArrayRef<TypeLoc> Inherited,
+             ArrayRef<TypeLoc> Inherited,
              GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
@@ -3526,7 +3527,7 @@ class ClassDecl final : public NominalTypeDecl {
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<TypeLoc> Inherited,
+            ArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return ClassLoc; }
@@ -3741,62 +3742,79 @@ public:
   }
 };
 
+/// A convenience wrapper around the \c SelfReferencePosition::Kind enum.
+struct SelfReferencePosition final {
+  enum Kind : uint8_t { None, Covariant, Contravariant, Invariant };
 
-/// Describes whether a requirement refers to 'Self', for use in the
-/// is-inheritable and is-available-existential checks.
-struct SelfReferenceKind {
-  bool result;
-  bool parameter;
-  bool requirement;
-  bool other;
+private:
+  Kind kind;
 
-  /// The type does not refer to 'Self' at all.
-  static SelfReferenceKind None() {
-    return SelfReferenceKind(false, false, false, false);
+public:
+  SelfReferencePosition(Kind kind) : kind(kind) {}
+
+  SelfReferencePosition flipped() const {
+    switch (kind) {
+    case None:
+    case Invariant:
+      return *this;
+    case Covariant:
+      return Contravariant;
+    case Contravariant:
+      return Covariant;
+    }
   }
 
-  /// The type refers to 'Self', but only as the type of a property or
-  /// the result type of a method/subscript.
-  static SelfReferenceKind Result() {
-    return SelfReferenceKind(true, false, false, false);
+  explicit operator bool() const { return kind > None; }
+
+  operator Kind() const { return kind; }
+};
+
+/// Describes the least favorable positions at which a requirement refers
+/// to 'Self' in terms of variance, for use in the is-inheritable and
+/// is-available-existential checks.
+struct SelfReferenceInfo final {
+  using Position = SelfReferencePosition;
+
+  bool hasCovariantSelfResult;
+  Position selfRef;
+  Position assocTypeRef;
+
+  /// A reference to 'Self'.
+  static SelfReferenceInfo forSelfRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, position, Position::None);
   }
 
-  /// The type refers to 'Self', but only as the parameter type
-  /// of a method/subscript.
-  static SelfReferenceKind Parameter() {
-    return SelfReferenceKind(false, true, false, false);
+  /// A reference to 'Self' through an associated type.
+  static SelfReferenceInfo forAssocTypeRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, Position::None, position);
   }
 
-  /// The type refers to 'Self' within a same-type requiement.
-  static SelfReferenceKind Requirement() {
-    return SelfReferenceKind(false, false, true, false);
-  }
-
-  /// The type refers to 'Self' in a position that is invariant.
-  static SelfReferenceKind Other() {
-    return SelfReferenceKind(false, false, false, true);
-  }
-
-  SelfReferenceKind flip() const {
-    return SelfReferenceKind(parameter, result, requirement, other);
-  }
-
-  SelfReferenceKind operator|=(SelfReferenceKind kind) {
-    result |= kind.result;
-    requirement |= kind.requirement;
-    parameter |= kind.parameter;
-    other |= kind.other;
+  SelfReferenceInfo operator|=(const SelfReferenceInfo &pos) {
+    hasCovariantSelfResult |= pos.hasCovariantSelfResult;
+    if (pos.selfRef > selfRef) {
+      selfRef = pos.selfRef;
+    }
+    if (pos.assocTypeRef > assocTypeRef) {
+      assocTypeRef = pos.assocTypeRef;
+    }
     return *this;
   }
 
-  operator bool() const {
-    return result || parameter || requirement || other;
+  explicit operator bool() const {
+    return hasCovariantSelfResult || selfRef || assocTypeRef;
   }
 
+  SelfReferenceInfo()
+      : hasCovariantSelfResult(false), selfRef(Position::None),
+        assocTypeRef(Position::None) {}
+
 private:
-  SelfReferenceKind(bool result, bool parameter, bool requirement, bool other)
-    : result(result), parameter(parameter), requirement(requirement),
-      other(other) { }
+  SelfReferenceInfo(bool hasCovariantSelfResult, Position selfRef,
+                    Position assocTypeRef)
+      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
+        assocTypeRef(assocTypeRef) {}
 };
 
 /// The set of known protocols for which derived conformances are supported.
@@ -3907,7 +3925,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, MutableArrayRef<TypeLoc> Inherited,
+               Identifier Name, ArrayRef<TypeLoc> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
@@ -3978,15 +3996,12 @@ public:
 
   /// Find direct Self references within the given requirement.
   ///
-  /// \param allowCovariantParameters If true, 'Self' is assumed to be
-  /// covariant anywhere; otherwise, only in the return type of the top-level
-  /// function type.
-  ///
-  /// \param skipAssocTypes If true, associated types of 'Self' are ignored;
-  /// otherwise, they count as an 'other' usage of 'Self'.
-  SelfReferenceKind findProtocolSelfReferences(const ValueDecl *decl,
-                                               bool allowCovariantParameters,
-                                               bool skipAssocTypes) const;
+  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' is only
+  /// assumed to be covariant in a top-level non-function type, or in the
+  /// eventual result type of a top-level function type.
+  SelfReferenceInfo
+  findProtocolSelfReferences(const ValueDecl *decl,
+                             bool treatNonResultCovariantSelfAsInvariant) const;
 
   /// Determine whether we are allowed to refer to an existential type
   /// conforming to this protocol. This is only permitted if the type of

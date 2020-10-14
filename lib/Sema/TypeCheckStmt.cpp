@@ -20,6 +20,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -464,6 +465,24 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   for (auto &elt : cond) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       hadAnyFalsable = true;
+
+      // Reject inlinable code using availability macros.
+      PoundAvailableInfo *info = elt.getAvailability();
+      if (auto *decl = dc->getAsDecl()) {
+        if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
+            decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          for (auto queries : info->getQueries())
+            if (auto availSpec =
+                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
+              if (availSpec->getMacroLoc().isValid()) {
+                Context.Diags.diagnose(
+                    availSpec->getMacroLoc(),
+                    swift::diag::availability_macro_in_inlinable,
+                    decl->getDescriptiveKind());
+                break;
+              }
+      }
+
       continue;
     }
 
@@ -1892,6 +1911,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->isBodyTypeChecked())
       return false;
+
+    ASTScope::expandFunctionBody(AFD);
   }
 
   // Function builder function doesn't support partial type checking.

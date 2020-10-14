@@ -446,7 +446,7 @@ namespace driver {
 
     std::vector<const Job*>
     reloadAndRemarkDeps(const Job *FinishedCmd, int ReturnCode,
-                             const bool forRanges) {
+                        const bool forRanges) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -458,7 +458,8 @@ namespace driver {
         // coarse dependencies that always affect downstream nodes), but we're
         // not using either of those right now, and this logic should probably
         // be revisited when we are.
-        assert(FinishedCmd->getCondition() == Job::Condition::Always);
+        assert(isa<MergeModuleJobAction>(FinishedCmd->getSource()) ||
+               FinishedCmd->getCondition() == Job::Condition::Always);
         return {};
       }
       const bool compileExitedNormally =
@@ -907,12 +908,26 @@ namespace driver {
         return everyIncrementalJob;
       };
 
+      bool sawModuleWrapJob = false;
+      const Job *mergeModulesJob = nullptr;
       CommandSet jobsToSchedule;
       CommandSet initialCascadingCommands;
       for (const Job *cmd : Comp.getJobs()) {
+        // A modulewrap job consumes the output of merge-modules. If it is
+        // in the queue, we must run merge-modules or empty temporary files
+        // will be consumed by the job instead.
+        // FIXME: We should be able to ditch this if we compare the timestamps
+        // of the temporary file to the build record, if it exists.
+        sawModuleWrapJob |= isa<ModuleWrapJobAction>(cmd->getSource());
+
         // Skip jobs that have no associated incremental info.
         if (!isa<IncrementalJobAction>(cmd->getSource())) {
           continue;
+        }
+
+        if (isa<MergeModuleJobAction>(cmd->getSource())) {
+          assert(!mergeModulesJob && "multiple scheduled merge-modules jobs?");
+          mergeModulesJob = cmd;
         }
 
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
@@ -936,6 +951,15 @@ namespace driver {
            collectIncrementalExternallyDependentJobsFromDependencyGraph(
                forRanges))
         jobsToSchedule.insert(cmd);
+
+      // The merge-modules job is special: it *must* be scheduled if any other
+      // job has been scheduled because any other job can influence the
+      // structure of the resulting module. Additionally, the initial scheduling
+      // predicate above is only aware of intra-module changes. External
+      // dependencies changing *must* cause merge-modules to be scheduled.
+      if ((!jobsToSchedule.empty() || sawModuleWrapJob) && mergeModulesJob) {
+        jobsToSchedule.insert(mergeModulesJob);
+      }
       return jobsToSchedule;
     }
 
@@ -1031,6 +1055,13 @@ namespace driver {
     /// But returns None if there was a dependency read error.
     Optional<std::pair<Job::Condition, bool>>
     loadDependenciesAndComputeCondition(const Job *const Cmd, bool forRanges) {
+      // merge-modules Jobs do not have .swiftdeps files associated with them,
+      // however, their compilation condition is computed as a function of their
+      // inputs, so their condition can be used as normal.
+      if (isa<MergeModuleJobAction>(Cmd->getSource())) {
+        return std::make_pair(Cmd->getCondition(), true);
+      }
+
       // Try to load the dependencies file for this job. If there isn't one, we
       // always have to run the job, but it doesn't affect any other jobs. If
       // there should be one but it's not present or can't be loaded, we have to
@@ -1163,7 +1194,12 @@ namespace driver {
           continue;
         }
 
-        // Can we run a cross-module incremental build at all? If not, fallback.
+        // Is this module out of date? If not, just keep searching.
+        if (Comp.getLastBuildTime() >= depStatus.getLastModificationTime())
+          continue;
+
+        // Can we run a cross-module incremental build at all?
+        // If not, fall back.
         if (!Comp.getEnableCrossModuleIncrementalBuild()) {
           fallbackToExternalBehavior(external);
           continue;
@@ -1609,8 +1645,8 @@ namespace driver {
           CompileJobAction::InputInfo info;
           info.previousModTime = entry.first->getInputModTime();
           info.status = entry.second ?
-            CompileJobAction::InputInfo::NeedsCascadingBuild :
-            CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+            CompileJobAction::InputInfo::Status::NeedsCascadingBuild :
+            CompileJobAction::InputInfo::Status::NeedsNonCascadingBuild;
           inputs[&inputFile->getInputArg()] = info;
         }
       }
@@ -1627,7 +1663,7 @@ namespace driver {
 
           CompileJobAction::InputInfo info;
           info.previousModTime = entry->getInputModTime();
-          info.status = CompileJobAction::InputInfo::UpToDate;
+          info.status = CompileJobAction::InputInfo::Status::UpToDate;
           inputs[&inputFile->getInputArg()] = info;
         }
       }

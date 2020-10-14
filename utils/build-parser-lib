@@ -74,6 +74,7 @@ class Builder(object):
             shell.call(command, env=env, dry_run=self.dry_run, echo=self.verbose)
 
     def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
+        environment = {}
         cmake_args = [self.toolchain.cmake, "-G", "Ninja"]
         cmake_args += ["-DCMAKE_MAKE_PROGRAM=" + self.ninja_path]
 
@@ -90,6 +91,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=" + deployment_version,
             ]
+            environment["SDKROOT"] = "macosx"
 
         elif self.host == "linux":
             host_triple = "%s-unknown-linux" % (self.arch)
@@ -252,7 +254,7 @@ class Builder(object):
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
         cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")]
-        self.call(cmake_args)
+        self.call(cmake_args, env=environment)
 
     def build_target(self, build_dir, target, env=None):
         invocation = [self.toolchain.cmake, "--build", build_dir]
@@ -441,6 +443,7 @@ Example invocations:
         help="space-separated list of architectures to build for. (default = %s)"
         % default_architectures,
     )
+    option("--no-install", store_true, help="disable install step")
     option(
         "--install-symroot", store_path, help="the path to install debug symbols into"
     )
@@ -467,7 +470,7 @@ Example invocations:
     parser = optbuilder.build()
     args = parser.parse_args()
 
-    if not args.install_destdir:
+    if not args.install_destdir and not args.no_install:
         args.install_destdir = os.path.join(args.build_dir, "install")
 
     swift_src_path = os.path.join(SWIFT_SOURCE_ROOT, "swift")
@@ -503,8 +506,9 @@ Example invocations:
             arch = architectures.pop(0)
             tmpargs = copy.copy(args)
             tmpargs.build_dir = os.path.join(objroot, arch, "obj")
-            tmpargs.install_destdir = os.path.join(objroot, arch, "dst")
-            tmpargs.install_prefix = "/"
+            if not args.no_install:
+                tmpargs.install_destdir = os.path.join(objroot, arch, "dst")
+                tmpargs.install_prefix = "/"
 
             native_build_dir = tmpargs.build_dir
             dst_dirs.append(tmpargs.install_destdir)
@@ -544,8 +548,9 @@ Example invocations:
 
         for arch in architectures:
             args.build_dir = os.path.join(objroot, arch, "obj")
-            args.install_destdir = os.path.join(objroot, arch, "dst")
-            args.install_prefix = "/"
+            if not args.no_install:
+                args.install_destdir = os.path.join(objroot, arch, "dst")
+                args.install_prefix = "/"
 
             dst_dirs.append(args.install_destdir)
 
@@ -559,11 +564,12 @@ Example invocations:
             )
             builder.run()
 
-        lipo = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "recursive-lipo")
-        shell.call(
-            [lipo, "-v", "--destination", os.path.join(dstroot, "./" + prefix)]
-            + dst_dirs
-        )
+        if not args.no_install:
+            lipo = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "recursive-lipo")
+            shell.call(
+                [lipo, "-v", "--destination", os.path.join(dstroot, "./" + prefix)]
+                + dst_dirs
+            )
 
         if args.install_symroot:
             extract_symbols(dstroot, prefix, symroot, args.build_jobs)

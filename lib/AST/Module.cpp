@@ -487,13 +487,12 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasIncrementalInfo = 0;
 }
 
-ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
+ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto &evaluator = getASTContext().evaluator;
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
 }
-
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // If this is a LoadedFile, make sure it loaded without error.
@@ -1175,7 +1174,7 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 }
 
 void
-SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
+SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   // FIXME: Ideally we should assert that the file has had its imports resolved
   // before calling this function. However unfortunately that can cause issues
@@ -1191,14 +1190,14 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
 
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
-    if (desc.importOptions.contains(ImportFlags::Exported))
+    if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
-    else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Default;
 
-    if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+    if (desc.options.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
     if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
@@ -1281,7 +1280,7 @@ ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
 }
 
 void
-ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
+ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
@@ -1451,7 +1450,7 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
-  SmallVector<ModuleDecl::ImportedModule, 32> stack;
+  SmallVector<ImportedModule, 32> stack;
 
   ModuleDecl::ImportFilter filter = {
       ModuleDecl::ImportFilterKind::Exported,
@@ -1465,9 +1464,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  auto topLevelModule =
-      ModuleDecl::ImportedModule{ImportPath::Access(), topLevel};
-  stack.emplace_back(topLevelModule);
+  stack.emplace_back(ImportPath::Access(), topLevel);
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val().importedModule;
@@ -1685,8 +1682,8 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
   SmallPtrSet<ModuleDecl *, 16> seen;
-  SmallVector<ModuleDecl::ImportedModule, 16> imported;
-  SmallVector<ModuleDecl::ImportedModule, 16> furtherImported;
+  SmallVector<ImportedModule, 16> imported;
+  SmallVector<ImportedModule, 16> furtherImported;
   ModuleDecl *overlayModule = this;
 
   getImportedModules(imported, ModuleDecl::ImportFilterKind::Exported);
@@ -1884,17 +1881,17 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
+void
+SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
 }
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
-  using ModuleDesc = SourceFile::ImportedModuleDesc;
-  return llvm::any_of(SF->getImports(), [](ModuleDesc desc) {
-    return desc.importOptions.contains(
-        SourceFile::ImportFlags::ImplementationOnly);
+  return llvm::any_of(SF->getImports(),
+                      [](AttributedImport<ImportedModule> desc) {
+    return desc.options.contains(ImportFlags::ImplementationOnly);
   });
 }
 
@@ -1915,20 +1912,19 @@ bool SourceFile::hasTestableOrPrivateImport(
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
-    return std::any_of(
-        Imports->begin(), Imports->end(),
-        [module, queryKind](ImportedModuleDesc desc) -> bool {
+    return llvm::any_of(*Imports,
+        [module, queryKind](AttributedImport<ImportedModule> desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
             return desc.module.importedModule == module &&
-                   (desc.importOptions.contains(ImportFlags::PrivateImport) ||
-                    desc.importOptions.contains(ImportFlags::Testable));
+                   (desc.options.contains(ImportFlags::PrivateImport) ||
+                    desc.options.contains(ImportFlags::Testable));
           else if (queryKind == ImportQueryKind::TestableOnly)
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::Testable);
+                   desc.options.contains(ImportFlags::Testable);
           else {
             assert(queryKind == ImportQueryKind::PrivateOnly);
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::PrivateImport);
+                   desc.options.contains(ImportFlags::PrivateImport);
           }
         });
   case AccessLevel::Open:
@@ -1958,13 +1954,12 @@ bool SourceFile::hasTestableOrPrivateImport(
   if (filename.empty())
     return false;
 
-  return std::any_of(Imports->begin(), Imports->end(),
-                     [module, filename](ImportedModuleDesc desc) -> bool {
-                       return desc.module.importedModule == module &&
-                              desc.importOptions.contains(
-                                  ImportFlags::PrivateImport) &&
-                              desc.filename == filename;
-                     });
+  return llvm::any_of(*Imports,
+      [module, filename](AttributedImport<ImportedModule> desc) {
+        return desc.module.importedModule == module &&
+              desc.options.contains(ImportFlags::PrivateImport) &&
+              desc.sourceFileArg == filename;
+      });
 }
 
 bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
@@ -1978,7 +1973,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
-    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    if (desc.options.contains(ImportFlags::ImplementationOnly))
       continue;
 
     // If the module is imported this way, it's not imported
@@ -2001,7 +1996,7 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
     ModuleDecl::ImportFilterKind::Default,
     ModuleDecl::ImportFilterKind::SPIAccessControl,
     ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
-  SmallVector<ModuleDecl::ImportedModule, 4> results;
+  SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
 
   for (auto &desc : results) {
@@ -2016,7 +2011,7 @@ void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
-    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+    if (import.options.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
       spiGroups.insert(importedSpis.begin(), importedSpis.end());
@@ -2037,6 +2032,31 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
       return true;
 
   return false;
+}
+
+bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+                                 const ValueDecl *targetDecl) const {
+  auto targetModule = targetDecl->getModuleContext();
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(targetModule, importedSPIGroups);
+  if (importedSPIGroups.empty()) return false;
+
+  auto declSPIGroups = attr->getSPIGroups();
+
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
+
+  return false;
+}
+
+bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
+                                 const ModuleDecl *fromModule) const {
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(fromModule, importedSPIGroups);
+  if (importedSPIGroups.empty())
+    return false;
+  return importedSPIGroups.count(spiGroup);
 }
 
 bool Decl::isSPI() const {

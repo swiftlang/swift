@@ -234,7 +234,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  MutableArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
@@ -799,8 +799,10 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
               diag::decodable_property_init_or_codingkeys_explicit,
               varDecl->getName());
         }
-        varDecl->diagnose(diag::decodable_make_property_mutable)
-            .fixItReplace(varDecl->getAttributeInsertionLoc(true), "var");
+        if (auto *PBD = varDecl->getParentPatternBinding()) {
+          varDecl->diagnose(diag::decodable_make_property_mutable)
+              .fixItReplace(PBD->getLoc(), "var");
+        }
 
         continue;
       }

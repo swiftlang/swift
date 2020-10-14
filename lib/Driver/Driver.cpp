@@ -1876,6 +1876,54 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   return OutputInfo::Mode::StandardCompile;
 }
 
+namespace {
+/// Encapsulates the computation of input jobs that are relevant to the
+/// merge-modules job the scheduler can insert if we are not in a single compile
+/// mode.
+class ModuleInputs final {
+private:
+  using InputInfo = IncrementalJobAction::InputInfo;
+  SmallVector<const Action *, 2> AllModuleInputs;
+  InputInfo StatusBound;
+
+public:
+  explicit ModuleInputs()
+      : StatusBound
+            {InputInfo::Status::UpToDate, llvm::sys::TimePoint<>::min()} {}
+
+public:
+  void addInput(const Action *inputAction) {
+    if (auto *IJA = dyn_cast<IncrementalJobAction>(inputAction)) {
+      // Take the upper bound of the status of any incremental inputs to
+      // ensure that the merge-modules job gets run if *any* input job is run.
+      const auto conservativeStatus =
+          std::max(StatusBound.status, IJA->getInputInfo().status);
+      // The modification time here is not important to the rest of the
+      // incremental build. We take the upper bound in case an attempt to
+      // compare the swiftmodule output's mod time and any input files is
+      // made. If the compilation has been correctly scheduled, the
+      // swiftmodule's mod time will always strictly exceed the mod time of
+      // any of its inputs when we are able to skip it.
+      const auto conservativeModTime = std::max(
+          StatusBound.previousModTime, IJA->getInputInfo().previousModTime);
+      StatusBound = InputInfo{conservativeStatus, conservativeModTime};
+    }
+    AllModuleInputs.push_back(inputAction);
+  }
+
+public:
+  /// Returns \c true if no inputs have been registered with this instance.
+  bool empty() const { return AllModuleInputs.empty(); }
+
+public:
+  /// Consumes this \c ModuleInputs instance and returns a merge-modules action
+  /// from the list of input actions and status it has computed thus far.
+  JobAction *intoAction(Compilation &C) && {
+    return C.createAction<MergeModuleJobAction>(AllModuleInputs, StatusBound);
+  }
+};
+} // namespace
+
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
                           const InputInfoMap *OutOfDateMap,
@@ -1888,7 +1936,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     return;
   }
 
-  SmallVector<const Action *, 2> AllModuleInputs;
+  ModuleInputs AllModuleInputs;
   SmallVector<const Action *, 2> AllLinkerInputs;
 
   switch (OI.CompilerMode) {
@@ -1929,10 +1977,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Source inputs always need to be compiled.
         assert(file_types::isPartOfSwiftCompilation(InputType));
 
-        CompileJobAction::InputInfo previousBuildState = {
-          CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimePoint<>::min()
-        };
+        auto previousBuildState =
+            IncrementalJobAction::InputInfo::makeNeedsCascadingRebuild();
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
         if (Args.hasArg(options::OPT_embed_bitcode)) {
@@ -1940,7 +1986,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
               Current, file_types::TY_LLVM_BC, previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           Current = C.createAction<BackendJobAction>(Current,
                                                      OI.CompilerOutputType, 0);
         } else {
@@ -1949,7 +1995,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                                                      previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
         }
         AllLinkerInputs.push_back(Current);
         break;
@@ -1961,7 +2007,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
           // inputs to a MergeModule action.
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           break;
         } else if (OI.shouldLink()) {
           // Otherwise, if linking, pass .swiftmodule files as inputs to the
@@ -2043,7 +2089,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Create a single CompileJobAction and a single BackendJobAction.
         JobAction *CA =
             C.createAction<CompileJobAction>(file_types::TY_LLVM_BC);
-        AllModuleInputs.push_back(CA);
+        AllModuleInputs.addInput(CA);
 
         int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
@@ -2079,7 +2125,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
       CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
     }
-    AllModuleInputs.push_back(CA);
+    AllModuleInputs.addInput(CA);
     AllLinkerInputs.push_back(CA);
     break;
   }
@@ -2128,7 +2174,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       !AllModuleInputs.empty()) {
     // We're performing multiple compilations; set up a merge module step
     // so we generate a single swiftmodule as output.
-    MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
+    MergeModuleAction = std::move(AllModuleInputs).intoAction(C);
   }
 
   bool shouldPerformLTO = OI.LTOVariant != OutputInfo::LTOKind::None;
@@ -2703,42 +2749,49 @@ static void addDiagFileOutputForPersistentPCHAction(
 
 /// If the file at \p input has not been modified since the last build (i.e. its
 /// mtime has not changed), adjust the Job's condition accordingly.
-static void
-handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
-                          StringRef input, bool alwaysRebuildDependents) {
-  if (inputInfo.status == CompileJobAction::InputInfo::NewlyAdded) {
+static void handleCompileJobCondition(Job *J,
+                                      CompileJobAction::InputInfo inputInfo,
+                                      Optional<StringRef> input,
+                                      bool alwaysRebuildDependents) {
+  using InputStatus = CompileJobAction::InputInfo::Status;
+
+  if (inputInfo.status == InputStatus::NewlyAdded) {
     J->setCondition(Job::Condition::NewlyAdded);
     return;
   }
 
+  auto output = J->getOutput().getPrimaryOutputFilename();
   bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (!llvm::sys::fs::status(input, inputStatus)) {
+  if (input.hasValue() && !llvm::sys::fs::status(*input, inputStatus)) {
+    J->setInputModTime(inputStatus.getLastModificationTime());
+    hasValidModTime = J->getInputModTime() == inputInfo.previousModTime;
+  } else if (!llvm::sys::fs::status(output, inputStatus)) {
     J->setInputModTime(inputStatus.getLastModificationTime());
     hasValidModTime = true;
   }
 
   Job::Condition condition;
-  if (hasValidModTime && J->getInputModTime() == inputInfo.previousModTime) {
+  if (hasValidModTime) {
     switch (inputInfo.status) {
-    case CompileJobAction::InputInfo::UpToDate:
-      if (llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+    case InputStatus::UpToDate:
+      if (llvm::sys::fs::exists(output))
         condition = Job::Condition::CheckDependencies;
       else
         condition = Job::Condition::RunWithoutCascading;
       break;
-    case CompileJobAction::InputInfo::NeedsCascadingBuild:
+    case InputStatus::NeedsCascadingBuild:
       condition = Job::Condition::Always;
       break;
-    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+    case InputStatus::NeedsNonCascadingBuild:
       condition = Job::Condition::RunWithoutCascading;
       break;
-    case CompileJobAction::InputInfo::NewlyAdded:
+    case InputStatus::NewlyAdded:
       llvm_unreachable("handled above");
     }
   } else {
     if (alwaysRebuildDependents ||
-        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
+        inputInfo.status == InputStatus::NeedsCascadingBuild) {
       condition = Job::Condition::Always;
     } else {
       condition = Job::Condition::RunWithoutCascading;
@@ -2895,14 +2948,18 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
-  if (!J->getOutput()
-           .getAdditionalOutputForType(file_types::TY_SwiftDeps)
-           .empty()) {
-    if (InputActions.size() == 1) {
-      auto compileJob = cast<CompileJobAction>(JA);
-      bool alwaysRebuildDependents =
-          C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
-      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput,
+  if (auto incrementalJob = dyn_cast<IncrementalJobAction>(JA)) {
+    const bool alwaysRebuildDependents =
+        C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
+    if (!J->getOutput()
+             .getAdditionalOutputForType(file_types::TY_SwiftDeps)
+             .empty()) {
+      if (InputActions.size() == 1) {
+        handleCompileJobCondition(J, incrementalJob->getInputInfo(), BaseInput,
+                                  alwaysRebuildDependents);
+      }
+    } else if (isa<MergeModuleJobAction>(JA)) {
+      handleCompileJobCondition(J, incrementalJob->getInputInfo(), None,
                                 alwaysRebuildDependents);
     }
   }

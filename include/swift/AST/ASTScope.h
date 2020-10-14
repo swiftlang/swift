@@ -194,10 +194,6 @@ public:
 #pragma mark - source ranges
 
 public:
-  /// Return signum of ranges. Centralize the invariant that ASTScopes use ends.
-  static int compare(SourceRange, SourceRange, const SourceManager &,
-                     bool ensureDisjoint);
-
   CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
                                             bool omitAssertions = false) const;
   bool isCharSourceRangeCached() const;
@@ -224,7 +220,6 @@ public:
   virtual NullablePtr<DeclAttribute> getDeclAttributeIfAny() const {
     return nullptr;
   }
-  virtual NullablePtr<const void> getReferrent() const { return nullptr; }
 
 #pragma mark - debugging and printing
 
@@ -402,7 +397,6 @@ class ASTSourceFileScope final : public ASTScopeImpl {
 public:
   SourceFile *const SF;
   ScopeCreator *const scopeCreator;
-  ASTScopeImpl *insertionPoint;
 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
@@ -470,9 +464,6 @@ public:
   virtual NullablePtr<const ASTScopeImpl>
   getLookupLimitFor(const GenericTypeOrExtensionScope *) const;
 
-  virtual const Decl *
-  getReferrentOfScope(const GenericTypeOrExtensionScope *s) const;
-
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
   };
@@ -492,9 +483,6 @@ public:
 
     NullablePtr<const ASTScopeImpl>
     getLookupLimitFor(const GenericTypeOrExtensionScope *) const override;
-
-    const Decl *
-    getReferrentOfScope(const GenericTypeOrExtensionScope *s) const override;
 
     NullablePtr<ASTScopeImpl>
     insertionPointForDeferredExpansion(IterableTypeScope *) const override;
@@ -570,7 +558,6 @@ public:
 
   virtual Decl *getDecl() const = 0;
   NullablePtr<Decl> getDeclIfAny() const override { return getDecl(); }
-  NullablePtr<const void> getReferrent() const override;
 
 private:
   AnnotatedInsertionPoint
@@ -745,7 +732,6 @@ public:
 
   /// Actually holder is always a GenericContext, need to test if
   /// ProtocolDecl or SubscriptDecl but will refactor later.
-  NullablePtr<const void> getReferrent() const override;
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
@@ -788,8 +774,6 @@ public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
 
-  NullablePtr<const void> getReferrent() const override;
-
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
 };
@@ -813,7 +797,6 @@ protected:
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-  SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
   std::string getClassName() const override;
@@ -902,7 +885,6 @@ public:
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return attr;
   }
-  NullablePtr<const void> getReferrent() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -969,8 +951,6 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
@@ -1072,7 +1052,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
-  NullablePtr<const void> getReferrent() const override;
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 };
 
@@ -1094,7 +1073,6 @@ public:
   }
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1128,7 +1106,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-  NullablePtr<const void> getReferrent() const override;
 };
 
 /// The \c _@specialize attribute.
@@ -1153,7 +1130,6 @@ public:
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return specializeAttr;
   }
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1183,7 +1159,6 @@ public:
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return differentiableAttr;
   }
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1214,7 +1189,6 @@ protected:
 public:
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
@@ -1244,7 +1218,6 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual Stmt *getStmt() const = 0;
   NullablePtr<Stmt> getStmtIfAny() const override { return getStmt(); }
-  NullablePtr<const void> getReferrent() const override;
 
 protected:
   bool isLabeledStmtLookupTerminator() const override;
@@ -1559,11 +1532,11 @@ class BraceStmtScope final : public AbstractStmtScope {
   BraceStmt *const stmt;
 
   /// Declarations which are in scope from the beginning of the statement.
-  SmallVector<ValueDecl *, 2> localFuncsAndTypes;
+  ArrayRef<ValueDecl *> localFuncsAndTypes;
 
   /// Declarations that are normally in scope only after their
   /// definition.
-  SmallVector<VarDecl *, 2> localVars;
+  ArrayRef<VarDecl *> localVars;
 
   /// The end location for bindings introduced in this scope. This can
   /// extend past the actual end of the BraceStmt in top-level code,
@@ -1573,8 +1546,8 @@ class BraceStmtScope final : public AbstractStmtScope {
 
 public:
   BraceStmtScope(BraceStmt *e,
-                 SmallVector<ValueDecl *, 2> localFuncsAndTypes,
-                 SmallVector<VarDecl *, 2> localVars,
+                 ArrayRef<ValueDecl *> localFuncsAndTypes,
+                 ArrayRef<VarDecl *> localVars,
                  SourceLoc endLoc)
       : stmt(e),
         localFuncsAndTypes(localFuncsAndTypes),

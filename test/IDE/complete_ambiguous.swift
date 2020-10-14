@@ -4,6 +4,9 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=NOCALLBACK_FALLBACK | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FALLBACK | %FileCheck %s --check-prefix=MULTICLOSURE_FALLBACK
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=ERROR_IN_BASE | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC_MISSINGARG | %FileCheck %s --check-prefix=NORESULTS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=CLOSURE_MISSINGARG | %FileCheck %s --check-prefix=POINT_MEMBER
@@ -34,6 +37,11 @@ struct HasMembers {
 
 HasMembers().overloadedReturn().#^SIMPLE_MEMBERS^#
 
+func givenErrorExpr(_ a: String) -> A {}
+func givenErrorExpr(_ b: Int) -> B {}
+
+givenErrorExpr(undefined).#^ERROR_IN_BASE^#
+
 // SIMPLE: Begin completions, 4 items
 // SIMPLE-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
 // SIMPLE-DAG: Decl[InstanceMethod]/CurrNominal:   doAThings()[#A#]{{; name=.+$}}
@@ -55,6 +63,27 @@ func takesA(_ callback: () -> A) -> B {}
 func takesB(_ item: B) {}
 
 takesB((takesA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
+
+switch undefined {
+  case takesA { return overloadedReturn().#^NOCALLBACK_FALLBACK^# }:
+    break
+}
+
+
+func takesClosureA(_ arg: (A) -> ()) {}
+func takesClosureB(_ arg: (B) -> ()) {}
+
+takesClosureA { arg in
+  takesClosureB { arg in
+    arg.#^MULTICLOSURE_FALLBACK^#
+  }
+  print() + 10
+} + 10
+
+// MULTICLOSURE_FALLBACK: Begin completions, 2 items
+// MULTICLOSURE_FALLBACK-DAG: Keyword[self]/CurrNominal:        self[#B#]{{; name=.+$}}
+// MULTICLOSURE_FALLBACK-DAG: Decl[InstanceMethod]/CurrNominal: doBThings()[#Void#]{{; name=.+$}}
+// MULTICLOSURE_FALLBACK: End completions
 
 protocol C {
   associatedtype Element

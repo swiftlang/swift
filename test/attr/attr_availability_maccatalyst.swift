@@ -1,6 +1,6 @@
 // RUN: %swift -typecheck -verify -parse-stdlib -target x86_64-apple-ios51.0-macabi %s
 
-// REQUIRES: OS=maccatalyst
+// REQUIRES: VENDOR=apple
 
 @available(macCatalyst, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
            message: "you don't want to do that anyway")
@@ -52,6 +52,16 @@ func introducedLaterOnMacCatalyst() {
 func introducedLaterOnIOS() {
 }
 
+@available(iOS, introduced: 1.0)
+@available(macCatalyst, unavailable)
+func unavailableOnMacCatalyst() { // expected-note 3 {{'unavailableOnMacCatalyst()' has been explicitly marked unavailable here}}
+}
+
+@available(iOS, unavailable)
+@available(macCatalyst, introduced: 1.0)
+func unavailableOnIOS() {
+}
+
 // expected-note@+1 *{{add @available attribute to enclosing global function}}
 func testPoundAvailable() {
 
@@ -60,6 +70,9 @@ func testPoundAvailable() {
     // expected-note@-1 {{add 'if #available' version check}}
     introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+
+    unavailableOnMacCatalyst() // expected-error {{'unavailableOnMacCatalyst()' is unavailable in Mac Catalyst}}
+    unavailableOnIOS()
   }
 
   // macCatalyst should win over iOS when present
@@ -69,6 +82,9 @@ func testPoundAvailable() {
     // expected-note@-1 {{add 'if #available' version check}}
     introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+
+    unavailableOnMacCatalyst() // expected-error {{'unavailableOnMacCatalyst()' is unavailable in Mac Catalyst}}
+    unavailableOnIOS()
   }
 
   if #available(iOS 55.0, macCatalyst 56.0, *) {
@@ -88,6 +104,9 @@ func testPoundAvailable() {
     // expected-note@-1 {{add 'if #available' version check}}
     introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+
+    unavailableOnMacCatalyst() // expected-error {{'unavailableOnMacCatalyst()' is unavailable in Mac Catalyst}}
+    unavailableOnIOS()
   }
 
   if #available(iOS 56.0, *) {

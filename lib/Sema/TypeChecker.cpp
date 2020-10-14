@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"

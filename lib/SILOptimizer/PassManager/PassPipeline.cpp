@@ -393,6 +393,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+  P.addTempRValueOpt();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
@@ -805,6 +806,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Create pre-specializations.
+  P.addOnonePrespecializations();
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();

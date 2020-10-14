@@ -16,9 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
-#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -30,6 +28,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"

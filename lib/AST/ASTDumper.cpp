@@ -620,11 +620,7 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      llvm::interleave(ID->getImportPath(),
-                       [&](const ImportPath::Element &Elem) {
-                         OS << Elem.Item;
-                       },
-                       [&] { OS << '.'; });
+      ID->getImportPath().print(OS);
       OS << "')";
     }
 
@@ -1998,7 +1994,7 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
     E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
-    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << "\n";
     printRec(E->getAppendingExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3523,6 +3519,8 @@ namespace {
         printRec("type_variable", typeVar);
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
+      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+        printFlag("error_expr");
       } else {
         printRec("dependent_member_type",
                  originator.get<DependentMemberType *>());

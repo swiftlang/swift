@@ -225,6 +225,9 @@ enum class UnqualifiedLookupFlags {
   /// This lookup should include results from outside the innermost scope with
   /// results.
   IncludeOuterResults   = 1 << 4,
+  // This lookup should include results that are @inlinable or
+  // @usableFromInline.
+  IncludeInlineableAndUsableFromInline = 1 << 5,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
