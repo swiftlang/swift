@@ -121,6 +121,17 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     indirectReturnInfos.push_back(indirectResult);
   }
 
+  //     ResultTypes directResults...;
+  auto directResults = fnConv.getDirectSILResults();
+  for (auto result : directResults) {
+    auto ty =
+        fnConv.getSILType(result, IGF.IGM.getMaximalTypeExpansionContext());
+    auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    directReturnInfos.push_back(result);
+  }
+
   //   SelfType self?;
   bool hasLocalContextParameter = hasSelfContextParameter(substitutedType);
   bool canHaveValidError = substitutedType->hasErrorResult();
@@ -201,17 +212,6 @@ AsyncContextLayout irgen::getAsyncContextLayout(
       typeInfos.push_back(&ti);
     }
     trailingWitnessInfo = AsyncContextLayout::TrailingWitnessInfo();
-  }
-
-  //     ResultTypes directResults...;
-  auto directResults = fnConv.getDirectSILResults();
-  for (auto result : directResults) {
-    auto ty =
-        fnConv.getSILType(result, IGF.IGM.getMaximalTypeExpansionContext());
-    auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-    directReturnInfos.push_back(result);
   }
 
   return AsyncContextLayout(

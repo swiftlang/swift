@@ -115,13 +115,21 @@ namespace irgen {
     unsigned getFirstIndirectReturnIndex() {
       return getErrorIndex() + getErrorCount();
     }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
+    unsigned getIndexAfterIndirectReturns() {
       return getFirstIndirectReturnIndex() + getIndirectReturnCount();
     }
+    unsigned getFirstDirectReturnIndex() {
+      return getIndexAfterIndirectReturns();
+    }
+    unsigned getIndexAfterDirectReturns() {
+      return getFirstDirectReturnIndex() + getDirectReturnCount();
+    }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getIndexAfterDirectReturns();
+    }
     unsigned getIndexAfterLocalContext() {
-      return getFirstIndirectReturnIndex() + getIndirectReturnCount() +
-             (hasLocalContext() ? 1 : 0);
+      return getIndexAfterDirectReturns() + (hasLocalContext() ? 1 : 0);
     }
     unsigned getBindingsIndex() {
       assert(hasBindings());
@@ -144,9 +152,6 @@ namespace irgen {
     }
     unsigned getIndexAfterTrailingWitnesses() {
       return getIndexAfterArguments() + (hasTrailingWitnesses() ? 2 : 0);
-    }
-    unsigned getFirstDirectReturnIndex() {
-      return getIndexAfterTrailingWitnesses();
     }
 
   public:
