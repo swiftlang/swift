@@ -1031,15 +1031,18 @@ static Optional<ActorIsolation> getIsolationFromAttributes(Decl *decl) {
   // If the declaration is marked with a global actor, report it as being
   // part of that global actor.
   if (globalActorAttr) {
-    TypeResolutionOptions options(TypeResolverContext::None);
-    TypeResolution resolver = TypeResolution::forInterface(
-        decl->getInnermostDeclContext(), options, nullptr);
-    Type globalActorType = resolver.resolveType(
-        globalActorAttr->first->getTypeRepr(), nullptr);
+    ASTContext &ctx = decl->getASTContext();
+    auto dc = decl->getInnermostDeclContext();
+    Type globalActorType = evaluateOrDefault(
+        ctx.evaluator,
+        CustomAttrTypeRequest{
+          globalActorAttr->first, dc, CustomAttrTypeKind::GlobalActor},
+        Type());
     if (!globalActorType || globalActorType->hasError())
       return ActorIsolation::forUnspecified();
 
-    return ActorIsolation::forGlobalActor(globalActorType);
+    return ActorIsolation::forGlobalActor(
+        globalActorType->mapTypeOutOfContext());
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -1158,6 +1161,27 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred) {
+    // Add an implicit attribute to capture the actor isolation that was
+    // inferred, so that (e.g.) it will be printed and serialized.
+    ASTContext &ctx = value->getASTContext();
+    switch (inferred) {
+    case ActorIsolation::Independent:
+      value->getAttrs().add(new (ctx) ActorIndependentAttr(true));
+      break;
+
+    case ActorIsolation::GlobalActor: {
+      auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
+      auto attr = CustomAttr::create(
+          ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+      value->getAttrs().add(attr);
+      break;
+    }
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+      // Nothing to do.
+      break;
+    }
     return inferred;
   };
 

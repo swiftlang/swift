@@ -2696,6 +2696,10 @@ enum class CustomAttrTypeKind {
   /// Property delegates have some funky rules, like allowing
   /// unbound generic types.
   PropertyDelegate,
+
+  /// Global actors are represented as custom type attributes. They don't
+  /// have any particularly interesting semantics.
+  GlobalActor,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);

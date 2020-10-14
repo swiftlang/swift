@@ -1430,6 +1430,10 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
   case CustomAttrTypeKind::PropertyDelegate:
     out << "property-delegate";
     return;
+
+  case CustomAttrTypeKind::GlobalActor:
+    out << "global-actor";
+    return;
   }
   llvm_unreachable("bad kind");
 }
