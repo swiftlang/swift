@@ -1155,8 +1155,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
-    if (auto isolation = getActorIsolation(overriddenValue))
-      return inferredIsolation(isolation);
+    if (auto isolation = getActorIsolation(overriddenValue)) {
+      SubstitutionMap subs;
+      if (auto env = value->getInnermostDeclContext()
+              ->getGenericEnvironmentOfContext()) {
+        subs = SubstitutionMap::getOverrideSubstitutions(
+            overriddenValue, value, subs);
+      }
+
+      return inferredIsolation(isolation.subst(subs));
+    }
   }
 
   // If the declaration witnesses a protocol requirement that is isolated,
@@ -1209,4 +1217,66 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
   return evaluateOrDefault(
       ctx.evaluator, ActorIsolationRequest{value},
       ActorIsolation::forUnspecified());
+}
+
+void swift::checkOverrideActorIsolation(ValueDecl *value) {
+  if (isa<TypeDecl>(value))
+    return;
+
+  auto overridden = value->getOverriddenDecl();
+  if (!overridden)
+    return;
+
+  // Determine the actor isolation of this declaration.
+  auto isolation = getActorIsolation(value);
+
+  // Determine the actor isolation of the overridden function.=
+  auto overriddenIsolation = getActorIsolation(overridden);
+
+  if (overriddenIsolation.requiresSubstitution()) {
+    SubstitutionMap subs;
+    if (auto env = value->getInnermostDeclContext()
+            ->getGenericEnvironmentOfContext()) {
+      subs = SubstitutionMap::getOverrideSubstitutions(overridden, value, subs);
+      overriddenIsolation = overriddenIsolation.subst(subs);
+    }
+  }
+
+  // If the isolation matches, we're done.
+  if (isolation == overriddenIsolation)
+    return;
+
+  // Isolation mismatch. Diagnose it.
+  value->diagnose(
+      diag::actor_isolation_override_mismatch, isolation,
+      value->getDescriptiveKind(), value->getName(), overriddenIsolation);
+  overridden->diagnose(diag::overridden_here);
+}
+
+void swift::checkSubclassActorIsolation(ClassDecl *classDecl) {
+  auto superclassDecl = classDecl->getSuperclassDecl();
+  if (!superclassDecl)
+    return;
+
+  auto isolation = getActorIsolation(classDecl);
+  auto superclassIsolation = getActorIsolation(superclassDecl);
+
+  if (superclassIsolation.requiresSubstitution()) {
+    Type superclassType = classDecl->getSuperclass();
+    if (!superclassType)
+      return;
+
+    SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
+        classDecl->getModuleContext(), classDecl);
+    superclassIsolation = superclassIsolation.subst(subs);
+  }
+
+  if (isolation == superclassIsolation)
+    return;
+
+  // Diagnose mismatch.
+  classDecl->diagnose(
+      diag::actor_isolation_superclass_mismatch, isolation,
+      classDecl->getName(), superclassIsolation, superclassDecl->getName());
+  superclassDecl->diagnose(diag::decl_declared_here, superclassDecl->getName());
 }

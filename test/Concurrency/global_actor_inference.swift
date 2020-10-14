@@ -15,6 +15,11 @@ struct OtherGlobalActor {
   static let shared = SomeActor()
 }
 
+@globalActor
+struct GenericGlobalActor<T> {
+  static var shared: SomeActor { SomeActor() }
+}
+
 // ----------------------------------------------------------------------
 // Global actor inference for protocols
 // ----------------------------------------------------------------------
@@ -25,10 +30,9 @@ protocol P1 {
 }
 
 protocol P2 {
-  @SomeGlobalActor func method1()
+  @SomeGlobalActor func method1() // expected-note {{'method1()' declared here}}
   func method2()
 }
-
 
 class C1: P1 {
   func method() { } // expected-note{{only asynchronous methods can be used outside the actor instance}}
@@ -87,4 +91,56 @@ class C5 {
   // Propagation in an extension.
   c5.method1() // OK: no propagation
   c5.method2() // expected-error{{instance method 'method2()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+}
+
+protocol P3 {
+  @OtherGlobalActor func method1() // expected-note{{'method1()' declared here}}
+  func method2()
+}
+
+class C6: P2, P3 {
+  func method1() { }
+    // expected-error@-1{{instance method 'method1()' must be isolated to the global actor 'SomeGlobalActor' to satisfy corresponding requirement from protocol 'P2'}}
+    // expected-error@-2{{instance method 'method1()' must be isolated to the global actor 'OtherGlobalActor' to satisfy corresponding requirement from protocol 'P3'}}
+  func method2() { }
+
+  func testMethod() {
+    method1() // okay: no inference
+    method2() // okay: no inference
+  }
+}
+
+// ----------------------------------------------------------------------
+// Global actor checking for overrides
+// ----------------------------------------------------------------------
+actor class GenericSuper<T> {
+  @GenericGlobalActor<T> func method() { }
+
+  @GenericGlobalActor<T> func method2() { } // expected-note {{overridden declaration is here}}
+  @GenericGlobalActor<T> func method3() { } // expected-note {{overridden declaration is here}}
+  @GenericGlobalActor<T> func method4() { }
+  @GenericGlobalActor<T> func method5() { }
+}
+
+actor class GenericSub<T> : GenericSuper<[T]> {
+  override func method() { } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+
+  @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+  @actorIndependent override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+
+  @OtherGlobalActor func testMethod() {
+    method() // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[T]>' can not be referenced from different global actor 'OtherGlobalActor'}}
+  }
+}
+
+// ----------------------------------------------------------------------
+// Global actor checking for supeclasses
+// ----------------------------------------------------------------------
+struct Container<T> {
+  @GenericGlobalActor<T> class Superclass { } // expected-note{{'Superclass' declared here}}
+}
+
+struct OtherContainer<U> {
+  @GenericGlobalActor<[U]> class Subclass1 : Container<[U]>.Superclass { }
+  @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { } // expected-error{{global actor 'GenericGlobalActor<U>'-isolated class 'Subclass2' has different actor isolation from global actor 'GenericGlobalActor<[U]>'-isolated superclass 'Superclass'}}
 }

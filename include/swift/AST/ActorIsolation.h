@@ -25,6 +25,7 @@ class raw_ostream;
 
 namespace swift {
 class ClassDecl;
+class SubstitutionMap;
 class Type;
 
 /// Determine whether the given types are (canonically) equal, declared here
@@ -96,6 +97,13 @@ public:
     assert(getKind() == GlobalActor);
     return globalActor;
   }
+
+  /// Determine whether this isolation will require substitution to be
+  /// evaluated.
+  bool requiresSubstitution() const;
+
+  /// Substitute into types within the actor isolation.
+  ActorIsolation subst(SubstitutionMap subs) const;
 
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
