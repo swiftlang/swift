@@ -2041,11 +2041,12 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-bool
-IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
-                                       DeclContext *dc) const {
+bool IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
+                                            bool ignoreAccessControl,
+                                            DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
-  options |= NameLookupFlags::IgnoreAccessControl;
+  if (ignoreAccessControl)
+    options |= NameLookupFlags::IgnoreAccessControl;
 
   // Look for a callAsFunction method.
   auto &ctx = ty->getASTContext();

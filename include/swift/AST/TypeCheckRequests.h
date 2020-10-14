@@ -2145,7 +2145,8 @@ public:
 /// implementation of a \c callAsFunction method.
 class IsCallableNominalTypeRequest
     : public SimpleRequest<IsCallableNominalTypeRequest,
-                           bool(CanType, DeclContext *), RequestFlags::Cached> {
+                           bool(CanType, bool, DeclContext *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2153,7 +2154,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType ty, DeclContext *dc) const;
+  bool evaluate(Evaluator &evaluator, CanType ty, bool ignoreAccessControl,
+                DeclContext *dc) const;
 
 public:
   // Cached.

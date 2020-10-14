@@ -135,7 +135,7 @@ SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsCallableNominalTypeRequest,
-              bool(CanType, DeclContext *), Cached, NoLocationInfo)
+              bool(CanType, bool, DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
