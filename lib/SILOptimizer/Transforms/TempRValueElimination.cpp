@@ -61,6 +61,17 @@ namespace {
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
+///
+/// As a second optimization, also stores into temporaries are handled. This is
+/// a simple form of redundant-load-elimination (RLE).
+///
+///   %temp = alloc_stack $T
+///   store %src to [initialization] %temp : $*T
+///   // no writes to %temp
+///   %v = load [take] %temp : $*T
+///   dealloc_stack %temp : $*T
+///
+/// TODO: Check if we still need to handle stores when RLE supports OSSA.
 class TempRValueOptPass : public SILFunctionTransform {
   AliasAnalysis *aa = nullptr;
 
@@ -94,14 +105,6 @@ class TempRValueOptPass : public SILFunctionTransform {
 bool TempRValueOptPass::collectLoadsFromProjection(
     SingleValueInstruction *projection, SILValue srcAddr,
     SmallPtrSetImpl<SILInstruction *> &loadInsts) {
-  if (!srcAddr) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "  Temp has addr_projection use?! Can not yet promote to value"
-        << *projection);
-    return false;
-  }
-
   // Transitively look through projections on stack addresses.
   for (auto *projUseOper : projection->getUses()) {
     auto *user = projUseOper->getUser();
@@ -127,28 +130,15 @@ bool TempRValueOptPass::canApplyBeTreatedAsLoad(
     return false;
   }
 
-  if (srcAddr) {
-    // If the function may write to the source of the copy_addr, the apply
-    // cannot be treated as a load: all (potential) writes of the source must
-    // appear _after_ all loads of the temporary. But in case of a function call
-    // we don't know in which order the writes and loads are executed inside the
-    // called function. The source may be written before the temporary is
-    // loaded, which would make the optization invalid.
-    if (aa->mayWriteToMemory(apply.getInstruction(), srcAddr))
-      return false;
-  } else {
-    // If we do not have an src address, but are indirect, bail. We would need
-    // to perform function signature specialization to change the functions
-    // signature to pass something direct.
-    if (convention.isIndirectConvention()) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "  Temp used to materialize value for indirect convention?! Can "
-             "not remove temporary without func sig opts"
-          << *apply.getInstruction());
-      return false;
-    }
-  }
+  // If the function may write to the source of the copy_addr, the apply
+  // cannot be treated as a load: all (potential) writes of the source must
+  // appear _after_ all loads of the temporary. But in case of a function call
+  // we don't know in which order the writes and loads are executed inside the
+  // called function. The source may be written before the temporary is
+  // loaded, which would make the optization invalid.
+  if (aa->mayWriteToMemory(apply.getInstruction(), srcAddr))
+    return false;
+
   return true;
 }
 
@@ -237,14 +227,6 @@ bool TempRValueOptPass::collectLoads(
     return true;
   }
   case SILInstructionKind::OpenExistentialAddrInst: {
-    // If we do not have an srcAddr, bail. We do not support promoting this yet.
-    if (!srcAddr) {
-      LLVM_DEBUG(llvm::dbgs() << "  Temp has open_existential_addr use?! Can "
-                                 "not yet promote to value"
-                              << *user);
-      return false;
-    }
-
     // We only support open existential addr if the access is immutable.
     auto *oeai = cast<OpenExistentialAddrInst>(user);
     if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
@@ -294,11 +276,6 @@ bool TempRValueOptPass::collectLoads(
     return true;
 
   case SILInstructionKind::LoadBorrowInst:
-    // If we do not have a source addr, we must be trying to eliminate a
-    // store. Until we check that the source object is not destroyed within the
-    // given range, we need bail.
-    if (!srcAddr)
-      return false;
     loadInsts.insert(user);
     return true;
   case SILInstructionKind::FixLifetimeInst:
@@ -598,29 +575,21 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     if (user == si)
       continue;
 
-    // Destroys and deallocations are allowed to be in a different block.
-    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
-      continue;
-
-    // Same for load [take] on the top level temp object. SILGen always takes
-    // whole values from temporaries. If we have load [take] on projections from
-    // our base, we fail since those would be re-initializations.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
-      }
-    }
-
-    // We pass in SILValue() since we do not have a source address.
-    if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
-      return {std::next(si->getIterator()), false};
-
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {
-      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::LoadInst:
       case SILInstructionKind::FixLifetimeInst:
+        break;
+      case SILInstructionKind::CopyAddrInst:
+        if (cast<CopyAddrInst>(user)->getDest() == tempObj)
+          return {std::next(si->getIterator()), false};
+        break;
       case SILInstructionKind::MarkDependenceInst:
-        continue;
+        if (cast<MarkDependenceInst>(user)->getValue() == tempObj)
+          return {std::next(si->getIterator()), false};
+        break;
       default:
         return {std::next(si->getIterator()), false};
     }
@@ -690,11 +659,13 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       break;
     }
     case SILInstructionKind::MarkDependenceInst: {
-      SILBuilderWithScope builder(user);
       auto mdi = cast<MarkDependenceInst>(user);
-      auto newInst = builder.createMarkDependence(user->getLoc(), mdi->getValue(), si->getSrc());
+      assert(mdi->getBase() == tempObj);
+      SILBuilderWithScope builder(user);
+      auto newInst = builder.createMarkDependence(user->getLoc(),
+                       mdi->getValue(), si->getSrc());
       mdi->replaceAllUsesWith(newInst);
-      toDelete.push_back(user);
+      toDelete.push_back(mdi);
       break;
     }
     // ASSUMPTION: no operations that may be handled by this default clause can
