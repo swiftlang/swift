@@ -1510,7 +1510,8 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
-bool TypeBase::isCallableNominalType(DeclContext *dc) {
+bool TypeBase::isCallableNominalType(DeclContext *dc,
+                                     bool ignoreAccessControl) {
   // Don't allow callAsFunction to be used with dynamic lookup.
   if (isAnyObject())
     return false;
@@ -1521,8 +1522,9 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
 
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           IsCallableNominalTypeRequest{canTy, dc}, false);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      IsCallableNominalTypeRequest{canTy, ignoreAccessControl, dc}, false);
 }
 
 bool TypeBase::hasDynamicMemberLookupAttribute() {
