@@ -262,6 +262,7 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
       case DynamicReplacement:
         return dynamicReplacement->getName();
       }
+      llvm_unreachable("unhandled decl name kind!");
     }
   };
 

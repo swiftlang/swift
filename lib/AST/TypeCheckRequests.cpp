@@ -1497,6 +1497,7 @@ bool ActorIsolation::requiresSubstitution() const {
   case GlobalActor:
     return getGlobalActor()->hasTypeParameter();
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
@@ -1509,6 +1510,7 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case GlobalActor:
     return forGlobalActor(getGlobalActor().subst(subs));
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 void swift::simple_display(

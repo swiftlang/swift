@@ -984,6 +984,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   }
+  llvm_unreachable("unhandled apply inst kind!");
 }
 
 static void rewriteApplySites(AllocBoxToStackState &pass) {
