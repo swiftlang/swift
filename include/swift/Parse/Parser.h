@@ -943,17 +943,6 @@ public:
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
-  /// FIXME: Remove this, it's vestigial.
-  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
-
-  void markWasHandled(Decl *D) {
-    AlreadyHandledDecls.insert(D);
-  }
-
-  bool declWasHandledAlready(Decl *D) {
-    return AlreadyHandledDecls.erase(D);
-  }
-
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
@@ -1014,14 +1003,22 @@ public:
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
-  bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
-                                SourceLoc Loc, SpecializeAttr *&Attr);
+  bool parseSpecializeAttribute(
+      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
+      SpecializeAttr *&Attr,
+      llvm::function_ref<bool(Parser &)> parseSILTargetName =
+          [](Parser &) { return false; },
+      llvm::function_ref<bool(Parser &)> parseSILSIPModule =
+          [](Parser &) { return false; });
 
   /// Parse the arguments inside the @_specialize attribute
   bool parseSpecializeAttributeArguments(
       swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
       Optional<SpecializeAttr::SpecializationKind> &Kind,
-      TrailingWhereClause *&TrailingWhereClause);
+      TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
+      SmallVectorImpl<Identifier> &spiGroups,
+      llvm::function_ref<bool(Parser &)> parseSILTargetName,
+      llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
   /// Parse the @_implements attribute.
   /// \p Attr is where to store the parsed attribute

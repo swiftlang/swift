@@ -71,7 +71,9 @@ public:
 
   static SILSpecializeAttr *create(SILModule &M,
                                    GenericSignature specializedSignature,
-                                   bool exported, SpecializationKind kind);
+                                   bool exported, SpecializationKind kind,
+                                   SILFunction *target, Identifier spiGroup,
+                                   const ModuleDecl *spiModule);
 
   bool isExported() const {
     return exported;
@@ -97,16 +99,32 @@ public:
     return F;
   }
 
+  SILFunction *getTargetFunction() const {
+    return targetFunction;
+  }
+
+  Identifier getSPIGroup() const {
+    return spiGroup;
+  }
+
+  const ModuleDecl *getSPIModule() const {
+    return spiModule;
+  }
+
   void print(llvm::raw_ostream &OS) const;
 
 private:
   SpecializationKind kind;
   bool exported;
   GenericSignature specializedSignature;
+  Identifier spiGroup;
+  const ModuleDecl *spiModule = nullptr;
   SILFunction *F = nullptr;
+  SILFunction *targetFunction = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
-                    GenericSignature specializedSignature);
+                    GenericSignature specializedSignature, SILFunction *target,
+                    Identifier spiGroup, const ModuleDecl *spiModule);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -593,6 +611,9 @@ public:
   /// Returns true if this is a definition of a function defined in this module.
   bool isDefinition() const { return !isExternalDeclaration(); }
 
+  /// Returns true if there exist pre-specializations.
+  bool hasPrespecialization() const;
+
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
 
@@ -722,10 +743,18 @@ public:
   }
 
   /// Removes all specialize attributes from this function.
-  void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
+  void clearSpecializeAttrs() {
+    forEachSpecializeAttrTargetFunction(
+        [](SILFunction *targetFun) { targetFun->decrementRefCount(); });
+    SpecializeAttrSet.clear();
+  }
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
+  void removeSpecializeAttr(SILSpecializeAttr *attr);
+
+  void forEachSpecializeAttrTargetFunction(
+      llvm::function_ref<void(SILFunction *)> action);
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.

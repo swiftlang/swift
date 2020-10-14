@@ -170,13 +170,30 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    AvailabilityContext DeclInfo =
+    AvailabilityContext ExplicitDeclInfo =
         swift::AvailabilityInference::availableRange(D, Context);
-    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+    ExplicitDeclInfo.intersectWith(
+        getCurrentTRC()->getAvailabilityInfoExplicit());
+    AvailabilityContext DeclInfo = ExplicitDeclInfo;
+
+    // When the body is inlinable consider only the explicitly declared range
+    // for checking availability. Otherwise, use the parent range which may
+    // begin at the minimum deployment target.
+    //
+    // Also use the parent range when reading swiftinterfaces for
+    // retrocompatibility.
+    bool isInlinable = D->getAttrs().hasAttribute<InlinableAttr>() ||
+                       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    SourceFile *SF = D->getDeclContext()->getParentSourceFile();
+    if (!isInlinable || (SF && SF->Kind == SourceFileKind::Interface)) {
+      DeclInfo.intersectWith(
+          getCurrentTRC()->getAvailabilityInfo());
+    }
 
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
                                              DeclInfo,
+                                             ExplicitDeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -190,19 +207,27 @@ private:
     
     return NewTRC;
   }
-  
+
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-    
+
+    // Explicit inlinability may to the decl being used on an earlier OS
+    // version when inlined on the client side. This check assumes that
+    // implicit decls are handled elsewhere.
+    bool isExplicitlyInlinable = !D->isImplicit() &&
+      (D->getAttrs().hasAttribute<InlinableAttr>() ||
+       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>());
+
     // No need to introduce a context if the declaration does not have an
-    // availability attribute.
-    if (!hasActiveAvailableAttribute(D, Context)) {
+    // availability or non-implicit inlinable attribute.
+    if (!hasActiveAvailableAttribute(D, Context) &&
+        !isExplicitlyInlinable) {
       return false;
     }
-    
+
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
@@ -213,7 +238,7 @@ private:
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -674,9 +699,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  // We can assume we are running on at least the minimum deployment target.
-  auto OverApproximateContext =
-    AvailabilityContext::forDeploymentTarget(Context);
+  auto OverApproximateContext = AvailabilityContext::alwaysAvailable();
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
@@ -705,6 +728,14 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     if (MostRefined) {
       *MostRefined = TRC;
     }
+  }
+
+  // If we still don't have an introduction version, use the current deployment
+  // target. This covers cases where an inlinable function and its parent
+  // contexts don't have explicit availability attributes.
+  if (!OverApproximateContext.getOSVersion().hasLowerEndpoint()) {
+    auto currentOS = AvailabilityContext::forDeploymentTarget(Context);
+    OverApproximateContext.constrainWith(currentOS);
   }
 
   return OverApproximateContext;

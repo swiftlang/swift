@@ -2455,10 +2455,16 @@ NOTE(suggest_removing_override, none,
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
       (DeclBaseName))
+WARNING(override_less_available_warn,none,
+        "overriding %0 must be as available as declaration it overrides",
+        (DeclBaseName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
       (DescriptiveDeclKind, DeclBaseName))
+WARNING(override_accessor_less_available_warn,none,
+        "overriding %0 for %1 must be as available as declaration it overrides",
+        (DescriptiveDeclKind, DeclBaseName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
@@ -4194,6 +4200,18 @@ ERROR(actor_isolated_witness_could_be_async_handler,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
      "did you mean to make it an asychronous handler?",
      (DescriptiveDeclKind, DeclName))
+ERROR(global_actor_isolated_requirement,none,
+      "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_witness,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_requirement_witness_conflict,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3 isolated to global actor %4",
+      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 ERROR(actorisolated_let,none,
       "'@actorIsolated' is meaningless on 'let' declarations because "
@@ -5113,6 +5131,12 @@ ERROR(specialize_attr_missing_constraint,none,
       "Missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
       "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+ERROR(specialize_target_function_not_found, none,
+     "target function %0 could not be found", (DeclNameRef))
+ERROR(specialize_target_function_of_type_not_found, none,
+      "target function %0 of type %1 could not be found", (DeclNameRef, Type))
+NOTE(specialize_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Variable usage diagnostics

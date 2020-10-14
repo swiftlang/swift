@@ -318,6 +318,14 @@ bool SILPerformanceInliner::isProfitableToInline(
     return false;
   }
 
+  // Bail out if this is a generic call of a `@_specialize(exported:)` function
+  // and we are in the early inliner. We want to give the generic specializer
+  // the opportunity to see specialized call sites.
+  if (IsGeneric && WhatToInline == InlineSelection::NoSemanticsAndGlobalInit  &&
+      Callee->hasPrespecialization()) {
+    return false;
+  }
+
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
   assert(SPA->isValid());

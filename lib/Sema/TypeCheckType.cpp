@@ -1321,8 +1321,11 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     }
   }
 
+  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  if (options.contains(TypeResolutionFlags::AllowInlinable))
+    lookupOptions |= NameLookupFlags::IncludeInlineableAndUsableFromInline;
   auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
-                                                    defaultUnqualifiedLookupOptions);
+                                                    lookupOptions);
 
   // Process the names we found.
   Type current;
@@ -1400,7 +1403,7 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(ctx);
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
-                               defaultUnqualifiedLookupOptions);
+                               lookupOptions);
   }
 
   comp->setValue(currentDecl, currentDC);
@@ -1522,11 +1525,13 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   // Phase 1: Find and bind the component decl.
 
   // Look for member types with the given name.
+  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  if (options.contains(TypeResolutionFlags::AllowInlinable))
+    lookupOptions |= NameLookupFlags::IncludeInlineableAndUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
-    memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
-                                                comp->getNameRef(),
-                                                defaultMemberLookupOptions);
+    memberTypes = TypeChecker::lookupMemberType(
+        DC, parentTy, comp->getNameRef(), lookupOptions);
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether
@@ -1549,7 +1554,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(ctx);
 
     memberType = diagnoseUnknownType(resolution, parentTy, parentRange, comp,
-                                     defaultMemberLookupOptions);
+                                     lookupOptions);
     member = comp->getBoundDecl();
     if (!member)
       return ErrorType::get(ctx);

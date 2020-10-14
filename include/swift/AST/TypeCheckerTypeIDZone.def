@@ -67,6 +67,9 @@ SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SpecializeAttrTargetDeclRequest,
+              ValueDecl *(const ValueDecl *, SpecializeAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
               evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
               SeparatelyCached, NoLocationInfo)

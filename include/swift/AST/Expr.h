@@ -613,6 +613,9 @@ public:
 
 /// LiteralExpr - Common base class between the literals.
 class LiteralExpr : public Expr {
+  // Set by Sema:
+  ConcreteDeclRef Initializer;
+
 public:
   LiteralExpr(ExprKind Kind, bool Implicit) : Expr(Kind, Implicit) {}
 
@@ -620,13 +623,55 @@ public:
     return E->getKind() >= ExprKind::First_LiteralExpr &&
            E->getKind() <= ExprKind::Last_LiteralExpr;
   }
+
+  /// Retrieve the initializer that will be used to construct the
+  /// literal from the result of the initializer.
+  ///
+  /// Only literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
+};
+
+/// BuiltinLiteralExpr - Common base class between all literals
+/// that provides BuiltinInitializer
+class BuiltinLiteralExpr : public LiteralExpr {
+  // Set by Seam:
+  ConcreteDeclRef BuiltinInitializer;
+
+public:
+  BuiltinLiteralExpr(ExprKind Kind, bool Implicit)
+      : LiteralExpr(Kind, Implicit) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_BuiltinLiteralExpr &&
+           E->getKind() <= ExprKind::Last_BuiltinLiteralExpr;
+  }
+
+  /// Retrieve the builtin initializer that will be used to construct the
+  /// literal.
+  ///
+  /// Any type-checked literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
 };
 
 /// The 'nil' literal.
 ///
 class NilLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
-  ConcreteDeclRef Initializer;
+
 public:
   NilLiteralExpr(SourceLoc Loc, bool Implicit = false)
   : LiteralExpr(ExprKind::NilLiteral, Implicit), Loc(Loc) {
@@ -635,15 +680,6 @@ public:
   SourceRange getSourceRange() const {
     return Loc;
   }
-
-  /// Retrieve the initializer that will be used to construct the 'nil'
-  /// literal from the result of the initializer.
-  ConcreteDeclRef getInitializer() const { return Initializer; }
-
-  /// Set the initializer that will be used to construct the 'nil' literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
-  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::NilLiteral;
@@ -651,26 +687,23 @@ public:
 };
 
 /// Abstract base class for numeric literals, potentially with a sign.
-class NumberLiteralExpr : public LiteralExpr {
+class NumberLiteralExpr : public BuiltinLiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt or APFloat, which leak.
-  ConcreteDeclRef BuiltinInitializer;
-  ConcreteDeclRef Initializer;
 
 protected:
   SourceLoc MinusLoc;
   SourceLoc DigitsLoc;
   
 public:
-   NumberLiteralExpr(ExprKind Kind,
-                     StringRef Val, SourceLoc DigitsLoc, bool Implicit)
-       : LiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc)
-   {
-     Bits.NumberLiteralExpr.IsNegative = false;
-     Bits.NumberLiteralExpr.IsExplicitConversion = false;
-   }
-  
+  NumberLiteralExpr(ExprKind Kind, StringRef Val, SourceLoc DigitsLoc,
+                    bool Implicit)
+      : BuiltinLiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc) {
+    Bits.NumberLiteralExpr.IsNegative = false;
+    Bits.NumberLiteralExpr.IsExplicitConversion = false;
+  }
+
   bool isNegative() const { return Bits.NumberLiteralExpr.IsNegative; }
   void setNegative(SourceLoc Loc) {
     MinusLoc = Loc;
@@ -699,32 +732,6 @@ public:
 
   SourceLoc getDigitsLoc() const {
     return DigitsLoc;
-  }
-
-  /// Retrieve the builtin initializer that will be used to construct the
-  /// boolean literal.
-  ///
-  /// Any type-checked boolean literal will have a builtin initializer, which is
-  /// called first to form a concrete Swift type.
-  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
-
-  /// Set the builtin initializer that will be used to construct the boolean
-  /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
-
-  /// Retrieve the initializer that will be used to construct the boolean
-  /// literal from the result of the initializer.
-  ///
-  /// Only boolean literals that have no builtin literal conformance will have
-  /// this initializer, which will be called on the result of the builtin
-  /// initializer.
-  ConcreteDeclRef getInitializer() const { return Initializer; }
-
-  /// Set the initializer that will be used to construct the boolean literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
   }
 
   static bool classof(const Expr *E) {
@@ -790,14 +797,12 @@ public:
 
 /// A Boolean literal ('true' or 'false')
 ///
-class BooleanLiteralExpr : public LiteralExpr {
+class BooleanLiteralExpr : public BuiltinLiteralExpr {
   SourceLoc Loc;
-  ConcreteDeclRef BuiltinInitializer;
-  ConcreteDeclRef Initializer;
 
 public:
   BooleanLiteralExpr(bool Value, SourceLoc Loc, bool Implicit = false)
-    : LiteralExpr(ExprKind::BooleanLiteral, Implicit), Loc(Loc) {
+      : BuiltinLiteralExpr(ExprKind::BooleanLiteral, Implicit), Loc(Loc) {
     Bits.BooleanLiteralExpr.Value = Value;
   }
 
@@ -808,43 +813,15 @@ public:
     return Loc;
   }
 
-  /// Retrieve the builtin initializer that will be used to construct the
-  /// boolean literal.
-  ///
-  /// Any type-checked boolean literal will have a builtin initializer, which is
-  /// called first to form a concrete Swift type.
-  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
-
-  /// Set the builtin initializer that will be used to construct the boolean
-  /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
-
-  /// Retrieve the initializer that will be used to construct the boolean
-  /// literal from the result of the initializer.
-  ///
-  /// Only boolean literals that have no builtin literal conformance will have
-  /// this initializer, which will be called on the result of the builtin
-  /// initializer.
-  ConcreteDeclRef getInitializer() const { return Initializer; }
-
-  /// Set the initializer that will be used to construct the boolean literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::BooleanLiteral;
   }
 };
-  
+
 /// StringLiteralExpr - String literal, like '"foo"'.
-class StringLiteralExpr : public LiteralExpr {
+class StringLiteralExpr : public BuiltinLiteralExpr {
   StringRef Val;
   SourceRange Range;
-  ConcreteDeclRef BuiltinInitializer;
-  ConcreteDeclRef Initializer;
 
 public:
   /// The encoding that should be used for the string literal.
@@ -877,32 +854,6 @@ public:
 
   bool isSingleExtendedGraphemeCluster() const {
     return Bits.StringLiteralExpr.IsSingleExtendedGraphemeCluster;
-  }
-
-  /// Retrieve the builtin initializer that will be used to construct the string
-  /// literal.
-  ///
-  /// Any type-checked string literal will have a builtin initializer, which is
-  /// called first to form a concrete Swift type.
-  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
-
-  /// Set the builtin initializer that will be used to construct the string
-  /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
-
-  /// Retrieve the initializer that will be used to construct the string
-  /// literal from the result of the initializer.
-  ///
-  /// Only string literals that have no builtin literal conformance will have
-  /// this initializer, which will be called on the result of the builtin
-  /// initializer.
-  ConcreteDeclRef getInitializer() const { return Initializer; }
-
-  /// Set the initializer that will be used to construct the string literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
   }
 
   static bool classof(const Expr *E) {
@@ -973,7 +924,6 @@ class InterpolatedStringLiteralExpr : public LiteralExpr {
   // Set by Sema:
   OpaqueValueExpr *interpolationExpr = nullptr;
   ConcreteDeclRef builderInit;
-  ConcreteDeclRef resultInit;
   Expr *interpolationCountExpr = nullptr;
   Expr *literalCapacityExpr = nullptr;
 
@@ -994,11 +944,6 @@ public:
   // Sets the constructor for the interpolation type.
   void setBuilderInit(ConcreteDeclRef decl) { builderInit = decl; }
   ConcreteDeclRef getBuilderInit() const { return builderInit; }
-
-  /// Sets the decl that constructs the final result type after the
-  /// AppendingExpr has been evaluated.
-  void setResultInit(ConcreteDeclRef decl) { resultInit = decl; }
-  ConcreteDeclRef getResultInit() const { return resultInit; }
 
   /// Sets the OpaqueValueExpr that is passed into AppendingExpr as the SubExpr
   /// that the tap operates on.
@@ -1059,7 +1004,7 @@ public:
   
 /// MagicIdentifierLiteralExpr - A magic identifier like #file which expands
 /// out to a literal at SILGen time.
-class MagicIdentifierLiteralExpr : public LiteralExpr {
+class MagicIdentifierLiteralExpr : public BuiltinLiteralExpr {
 public:
   enum Kind : unsigned {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) NAME,
@@ -1077,17 +1022,16 @@ public:
 
 private:
   SourceLoc Loc;
-  ConcreteDeclRef BuiltinInitializer;
-  ConcreteDeclRef Initializer;
 
 public:
   MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit = false)
-    : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc) {
+      : BuiltinLiteralExpr(ExprKind::MagicIdentifierLiteral, implicit),
+        Loc(loc) {
     Bits.MagicIdentifierLiteralExpr.Kind = static_cast<unsigned>(kind);
     Bits.MagicIdentifierLiteralExpr.StringEncoding
       = static_cast<unsigned>(StringLiteralExpr::UTF8);
   }
-  
+
   Kind getKind() const {
     return static_cast<Kind>(Bits.MagicIdentifierLiteralExpr.Kind);
   }
@@ -1123,35 +1067,6 @@ public:
       = static_cast<unsigned>(encoding);
   }
 
-  /// Retrieve the builtin initializer that will be used to construct the
-  /// literal.
-  ///
-  /// Any type-checked literal will have a builtin initializer, which is
-  /// called first to form a concrete Swift type.
-  ConcreteDeclRef getBuiltinInitializer() const {
-    return BuiltinInitializer;
-  }
-
-  /// Set the builtin initializer that will be used to construct the literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
-
-  /// Retrieve the initializer that will be used to construct the literal from
-  /// the result of the initializer.
-  ///
-  /// Only literals that have no builtin literal conformance will have
-  /// this initializer, which will be called on the result of the builtin
-  /// initializer.
-  ConcreteDeclRef getInitializer() const {
-    return Initializer;
-  }
-
-  /// Set the initializer that will be used to construct the literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MagicIdentifierLiteral;
   }
@@ -1174,7 +1089,6 @@ public:
 private:
   Expr *Arg;
   SourceLoc PoundLoc;
-  ConcreteDeclRef Initializer;
 
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                     Expr *Arg,
@@ -1236,15 +1150,6 @@ public:
   StringRef getLiteralKindRawName() const;
 
   StringRef getLiteralKindPlainName() const;
-
-  /// Retrieve the initializer that will be used to construct the 'object'
-  /// literal from the result of the initializer.
-  ConcreteDeclRef getInitializer() const { return Initializer; }
-
-  /// Set the initializer that will be used to construct the 'object' literal.
-  void setInitializer(ConcreteDeclRef initializer) {
-    Initializer = initializer;
-  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;

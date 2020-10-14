@@ -1,8 +1,4 @@
-:orphan:
-
-=================================
-Swift Binary Serialization Format
-=================================
+# Swift Binary Serialization Format
 
 The fundamental unit of distribution for Swift code is a *module.* A module
 contains declarations as an interface for clients to write code against. It may
@@ -33,10 +29,9 @@ tied to the compiler internals to be useful for this purpose, and it is likely
 we'll invent a new format instead.
 
 
-Why LLVM bitcode?
-=================
+## Why LLVM bitcode?
 
-The `LLVM bitstream <http://llvm.org/docs/BitCodeFormat.html>`_ format was
+The [LLVM bitstream](http://llvm.org/docs/BitCodeFormat.html) format was
 invented as a container format for LLVM IR. It is a binary format supporting
 two basic structures: *blocks,* which define regions of the file, and
 *records,* which contain data fields that can be up to 64 bits. It has a few
@@ -60,10 +55,9 @@ have most of these properties as well. But we're already linking against
 LLVM...might as well use it!
 
 
-Versioning
-==========
+## Versioning
 
-.. warning::
+#### _Warning_
 
   This section is relevant to any forward-compatible format used for a
   library's public interface. However, as mentioned above this may not be
@@ -101,13 +95,11 @@ requires extra work on the compiler's part to detect which features are in use;
 a simpler implementation would just use the latest version number supported:
 1.9.
 
-*This versioning scheme was inspired by* `Semantic Versioning
-<http://semver.org>`_. *However, it is not compatible with Semantic Versioning
+*This versioning scheme was inspired by* [Semantic Versioning](http://semver.org). *However, it is not compatible with Semantic Versioning
 because it promises* forward-compatibility *rather than* backward-compatibility.
 
 
-A High-Level Tour of the Current Module Format
-==============================================
+## A High-Level Tour of the Current Module Format
 
 Every serialized module is represented as a single block called the "module
 block". The module block is made up of several other block kinds, largely for
@@ -132,7 +124,7 @@ organizational purposes.
 - The **SIL block** contains SIL-level implementations that can be imported
   into a client's SILModule context. In most cases this is just a performance
   concern, but sometimes it affects language semantics as well, as in the case
-  of ``@_transparent``. The SIL block precedes the AST block because it affects
+  of `@_transparent`. The SIL block precedes the AST block because it affects
   which AST nodes get serialized.
 
 - The **SIL index block** contains tables for accessing various SIL entities by
@@ -145,9 +137,7 @@ organizational purposes.
   Nodes are accessed by a file-unique "DeclIDs" (also covering DeclContexts)
   and "TypeIDs"; the two sets of IDs use separate numbering schemes.
 
-.. note::
-
-  The AST block is currently referred to as the "decls block" in the source.
+  _note_: The AST block is currently referred to as the "decls block" in the source.
 
 - The **identifier block** contains a single blob of strings. This is intended
   for Identifiers---strings uniqued by the ASTContext---but can in theory
@@ -160,13 +150,11 @@ organizational purposes.
   top-level declarations.
 
 
-SIL
-===
+## SIL
 
 [to be written]
 
 
-Cross-reference resilience
-==========================
+## Cross-reference resilience
 
 [to be written]

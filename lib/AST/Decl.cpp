@@ -3295,13 +3295,14 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 /// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
 static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
                                          const ValueDecl *VD,
-                                         AccessLevel access) {
+                                         AccessLevel access,
+                                         bool includeInlineable) {
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
-  AccessScope accessScope =
-      getAccessScopeForFormalAccess(VD, access, useDC,
-                                    /*treatUsableFromInlineAsPublic*/false);
+  AccessScope accessScope = getAccessScopeForFormalAccess(
+      VD, access, useDC,
+      /*treatUsableFromInlineAsPublic*/ includeInlineable);
   if (accessScope.getDeclContext() == useDC) return true;
   if (!AccessScope(useDC).isChildOf(accessScope)) return false;
 
@@ -3324,6 +3325,7 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 /// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
 static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         bool forConformance,
+                        bool includeInlineable,
                         llvm::function_ref<AccessLevel()> getAccessLevel) {
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
@@ -3336,7 +3338,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   // check declarations inside inaccessible members via slower
   // access scope based check, which is helpful for diagnostics.
   if (!(sourceDC->getSelfProtocolDecl() || VD->isOperator()))
-    return checkAccessUsingAccessScopes(useDC, VD, access);
+    return checkAccessUsingAccessScopes(useDC, VD, access, includeInlineable);
 
   if (!forConformance) {
     if (auto *proto = sourceDC->getSelfProtocolDecl()) {
@@ -3351,7 +3353,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
       }
 
       // Skip the fast path below and just compare access scopes.
-      return checkAccessUsingAccessScopes(useDC, VD, access);
+      return checkAccessUsingAccessScopes(useDC, VD, access, includeInlineable);
     }
   }
 
@@ -3391,8 +3393,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
-                                 bool forConformance) const {
-  return checkAccess(useDC, this, forConformance,
+                                 bool forConformance,
+                                 bool includeInlineable) const {
+  return checkAccess(useDC, this, forConformance, includeInlineable,
                      [&]() { return getFormalAccess(); });
 }
 
@@ -3409,7 +3412,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
   if (isa<ParamDecl>(this))
     return true;
 
-  return checkAccess(DC, this, forConformance,
+  return checkAccess(DC, this, forConformance, /*includeInlineable*/ false,
                      [&]() { return getSetterFormalAccess(); });
 }
 
@@ -4699,183 +4702,172 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 }
 
 /// Classify usages of Self in the given type.
-static SelfReferenceKind
+///
+/// \param position The position we are currently at, in terms of variance.
+static SelfReferenceInfo
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
-                           bool skipAssocTypes) {
+                           SelfReferencePosition position) {
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
-    auto kind = SelfReferenceKind::None();
+    auto info = SelfReferenceInfo();
     for (auto &elt : tuple->getElements()) {
-      kind |= findProtocolSelfReferences(proto, elt.getType(), skipAssocTypes);
+      info |= findProtocolSelfReferences(proto, elt.getType(), position);
     }
-    return kind;
+
+    // A covariant Self result inside a tuple will not be bona fide.
+    info.hasCovariantSelfResult = false;
+
+    return info;
   } 
 
   // Function preserve variance in the result type, and flip variance in
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    auto inputKind = SelfReferenceKind::None();
+    auto inputInfo = SelfReferenceInfo();
     for (auto param : funcTy->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        if (findProtocolSelfReferences(proto, param.getPlainType(),
-                                       skipAssocTypes)) {
-          return SelfReferenceKind::Other();
-        }
+        inputInfo |= findProtocolSelfReferences(
+            proto, param.getPlainType(), SelfReferencePosition::Invariant);
+        continue;
       }
-      inputKind |= findProtocolSelfReferences(proto, param.getParameterType(),
-                                              skipAssocTypes);
+      inputInfo |= findProtocolSelfReferences(proto, param.getParameterType(),
+                                              position.flipped());
     }
-    auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
-                                                 skipAssocTypes);
 
-    auto kind = inputKind.flip();
-    kind |= resultKind;
-    return kind;
+    // A covariant Self result inside a parameter will not be bona fide.
+    inputInfo.hasCovariantSelfResult = false;
+
+    auto resultInfo =
+        findProtocolSelfReferences(proto, funcTy->getResult(), position);
+    if (resultInfo.selfRef == SelfReferencePosition::Covariant) {
+      resultInfo.hasCovariantSelfResult = true;
+    }
+    return inputInfo |= resultInfo;
   }
 
   // Metatypes preserve variance.
   if (auto metaTy = type->getAs<MetatypeType>()) {
     return findProtocolSelfReferences(proto, metaTy->getInstanceType(),
-                                      skipAssocTypes);
+                                      position);
   }
 
   // Optionals preserve variance.
   if (auto optType = type->getOptionalObjectType()) {
-    return findProtocolSelfReferences(proto, optType,
-                                      skipAssocTypes);
+    return findProtocolSelfReferences(proto, optType, position);
   }
 
   // DynamicSelfType preserves variance.
   // FIXME: This shouldn't ever appear in protocol requirement
   // signatures.
   if (auto selfType = type->getAs<DynamicSelfType>()) {
-    return findProtocolSelfReferences(proto, selfType->getSelfType(),
-                                      skipAssocTypes);
+    return findProtocolSelfReferences(proto, selfType->getSelfType(), position);
   }
 
   // Bound generic types are invariant.
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
+    auto info = SelfReferenceInfo();
     for (auto paramType : boundGenericType->getGenericArgs()) {
-      if (findProtocolSelfReferences(proto, paramType,
-                                     skipAssocTypes)) {
-        return SelfReferenceKind::Other();
-      }
+      info |= findProtocolSelfReferences(proto, paramType,
+                                         SelfReferencePosition::Invariant);
     }
+
+    return info;
   }
 
-  // A direct reference to 'Self' is covariant.
+  // A direct reference to 'Self'.
   if (proto->getSelfInterfaceType()->isEqual(type))
-    return SelfReferenceKind::Result();
+    return SelfReferenceInfo::forSelfRef(position);
 
-  // Special handling for associated types.
-  if (!skipAssocTypes && type->is<DependentMemberType>()) {
+  // A reference to an associated type rooted on 'Self'.
+  if (type->is<DependentMemberType>()) {
     type = type->getRootGenericParam();
     if (proto->getSelfInterfaceType()->isEqual(type))
-      return SelfReferenceKind::Other();
+      return SelfReferenceInfo::forAssocTypeRef(position);
   }
 
-  return SelfReferenceKind::None();
-}
-
-/// Find Self references in a generic signature's same-type requirements.
-static SelfReferenceKind
-findProtocolSelfReferences(const ProtocolDecl *protocol,
-                           GenericSignature genericSig){
-  if (!genericSig) return SelfReferenceKind::None();
-
-  auto selfTy = protocol->getSelfInterfaceType();
-  for (const auto &req : genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::SameType)
-      continue;
-
-    if (req.getFirstType()->isEqual(selfTy) ||
-        req.getSecondType()->isEqual(selfTy))
-      return SelfReferenceKind::Requirement();
-  }
-
-  return SelfReferenceKind::None();
+  return SelfReferenceInfo();
 }
 
 /// Find Self references within the given requirement.
-SelfReferenceKind
-ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
-                                         bool allowCovariantParameters,
-                                         bool skipAssocTypes) const {
+SelfReferenceInfo ProtocolDecl::findProtocolSelfReferences(
+    const ValueDecl *value, bool treatNonResultCovariantSelfAsInvariant) const {
   // Types never refer to 'Self'.
   if (isa<TypeDecl>(value))
-    return SelfReferenceKind::None();
+    return SelfReferenceInfo();
 
   auto type = value->getInterfaceType();
 
   // Skip invalid declarations.
   if (type->hasError())
-    return SelfReferenceKind::None();
+    return SelfReferenceInfo();
 
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    // Skip the 'self' parameter.
-    type = type->castTo<AnyFunctionType>()->getResult();
+  if (isa<AbstractFunctionDecl>(value) || isa<SubscriptDecl>(value)) {
+    // For a method, skip the 'self' parameter.
+    if (isa<AbstractFunctionDecl>(value))
+      type = type->castTo<AnyFunctionType>()->getResult();
 
+    auto inputInfo = SelfReferenceInfo();
+    for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
+      // inout parameters are invariant.
+      if (param.isInOut()) {
+        inputInfo |= ::findProtocolSelfReferences(
+            this, param.getPlainType(), SelfReferencePosition::Invariant);
+        continue;
+      }
+      inputInfo |= ::findProtocolSelfReferences(
+          this, param.getParameterType(), SelfReferencePosition::Contravariant);
+    }
+
+    // A covariant Self result inside a parameter will not be bona fide.
+    inputInfo.hasCovariantSelfResult = false;
+
+    // FIXME: Rather than having a special flag for the is-inheritable check,
+    // ensure non-result covariant Self is always diagnosed during type
+    // resolution.
+    //
     // Methods of non-final classes can only contain a covariant 'Self'
-    // as a function result type.
-    if (!allowCovariantParameters) {
-      auto inputKind = SelfReferenceKind::None();
-      for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
-        // inout parameters are invariant.
-        if (param.isInOut()) {
-          if (::findProtocolSelfReferences(this, param.getPlainType(),
-                                           skipAssocTypes)) {
-            return SelfReferenceKind::Other();
-          }
-        }
-        inputKind |= ::findProtocolSelfReferences(this, param.getParameterType(),
-                                                  skipAssocTypes);
-      }
-
-      if (inputKind.parameter)
-        return SelfReferenceKind::Other();
+    // as their result type.
+    if (treatNonResultCovariantSelfAsInvariant &&
+        inputInfo.selfRef == SelfReferencePosition::Covariant) {
+      inputInfo.selfRef = SelfReferencePosition::Invariant;
     }
 
-    // Check the requirements of a generic function.
-    if (func->isGeneric()) {
-      if (auto result =
-            ::findProtocolSelfReferences(this, func->getGenericSignature()))
-        return result;
+    auto resultInfo = ::findProtocolSelfReferences(
+        this, type->castTo<AnyFunctionType>()->getResult(),
+        SelfReferencePosition::Covariant);
+    if (resultInfo.selfRef == SelfReferencePosition::Covariant) {
+      resultInfo.hasCovariantSelfResult = true;
     }
 
-    return ::findProtocolSelfReferences(this, type,
-                                        skipAssocTypes);
+    return inputInfo |= resultInfo;
   } else {
-    assert(isa<AbstractStorageDecl>(value));
+    assert(isa<VarDecl>(value));
 
-    if (auto *const subscript = dyn_cast<SubscriptDecl>(value)) {
-      // Check the requirements of a generic subscript.
-      if (subscript->isGeneric()) {
-        if (auto result = ::findProtocolSelfReferences(
-                this, subscript->getGenericSignature()))
-          return result;
-      }
+    auto info = ::findProtocolSelfReferences(this, type,
+                                             SelfReferencePosition::Covariant);
+    if (info.selfRef == SelfReferencePosition::Covariant) {
+      info.hasCovariantSelfResult = true;
     }
 
-    return ::findProtocolSelfReferences(this, type,
-                                        skipAssocTypes);
+    return info;
   }
 
-  return SelfReferenceKind::None();
+  return SelfReferenceInfo();
 }
 
 bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
-  // If the member type uses 'Self' in non-covariant position,
-  // we cannot use the existential type.
-  auto selfKind = findProtocolSelfReferences(decl,
-                                             /*allowCovariantParameters=*/true,
-                                             /*skipAssocTypes=*/false);
-  if (selfKind.parameter || selfKind.other)
+  // If the member type references 'Self' in non-covariant position, or an
+  // associated type in any position, we cannot use the existential type.
+  const auto info = findProtocolSelfReferences(
+      decl, /*treatNonResultCovariantSelfAsInvariant=*/false);
+  if (info.selfRef > SelfReferencePosition::Covariant || info.assocTypeRef) {
     return false;
+  }
 
   // FIXME: Appropriately diagnose assignments instead.
   if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
-    if (selfKind.result && storageDecl->supportsMutation())
+    if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
       return false;
   }
 
