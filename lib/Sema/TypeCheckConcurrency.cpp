@@ -1252,31 +1252,3 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
       value->getDescriptiveKind(), value->getName(), overriddenIsolation);
   overridden->diagnose(diag::overridden_here);
 }
-
-void swift::checkSubclassActorIsolation(ClassDecl *classDecl) {
-  auto superclassDecl = classDecl->getSuperclassDecl();
-  if (!superclassDecl)
-    return;
-
-  auto isolation = getActorIsolation(classDecl);
-  auto superclassIsolation = getActorIsolation(superclassDecl);
-
-  if (superclassIsolation.requiresSubstitution()) {
-    Type superclassType = classDecl->getSuperclass();
-    if (!superclassType)
-      return;
-
-    SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
-        classDecl->getModuleContext(), classDecl);
-    superclassIsolation = superclassIsolation.subst(subs);
-  }
-
-  if (isolation == superclassIsolation)
-    return;
-
-  // Diagnose mismatch.
-  classDecl->diagnose(
-      diag::actor_isolation_superclass_mismatch, isolation,
-      classDecl->getName(), superclassIsolation, superclassDecl->getName());
-  superclassDecl->diagnose(diag::decl_declared_here, superclassDecl->getName());
-}

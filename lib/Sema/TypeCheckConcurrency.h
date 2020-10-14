@@ -148,9 +148,6 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
-/// Check that the actor isolation of a class matches that of its superclass.
-void checkSubclassActorIsolation(ClassDecl *classDecl);
-
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

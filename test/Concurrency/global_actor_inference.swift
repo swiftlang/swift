@@ -134,13 +134,14 @@ actor class GenericSub<T> : GenericSuper<[T]> {
 }
 
 // ----------------------------------------------------------------------
-// Global actor checking for supeclasses
+// Global actor inference for superclasses
 // ----------------------------------------------------------------------
 struct Container<T> {
-  @GenericGlobalActor<T> class Superclass { } // expected-note{{'Superclass' declared here}}
+  @GenericGlobalActor<T> class Superclass { }
 }
 
 struct OtherContainer<U> {
+  // Okay to change the global actor in a subclass.
   @GenericGlobalActor<[U]> class Subclass1 : Container<[U]>.Superclass { }
-  @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { } // expected-error{{global actor 'GenericGlobalActor<U>'-isolated class 'Subclass2' has different actor isolation from global actor 'GenericGlobalActor<[U]>'-isolated superclass 'Superclass'}}
+  @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { }
 }

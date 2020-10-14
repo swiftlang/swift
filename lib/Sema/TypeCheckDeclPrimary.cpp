@@ -1390,10 +1390,6 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // For a class, check actor isolation.
-      if (auto classDecl = dyn_cast<ClassDecl>(VD))
-        checkSubclassActorIsolation(classDecl);
-
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
