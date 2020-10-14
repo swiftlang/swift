@@ -1064,7 +1064,9 @@ NOTE(note_call_to_initializer,none,
 NOTE(note_init_parameter,none,
      "in initialization of parameter %0", (Identifier))
 
-
+ERROR(missing_explicit_call_callable_value, none,
+      "value of callable type %0 can be called to produce expected type %1; "
+      "did you mean to call it with '()'?", (Type, Type))
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
