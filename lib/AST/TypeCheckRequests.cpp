@@ -1487,6 +1487,29 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
   attr->setType(value);
 }
 
+bool ActorIsolation::requiresSubstitution() const {
+  switch (kind) {
+  case ActorInstance:
+  case Independent:
+  case Unspecified:
+    return false;
+
+  case GlobalActor:
+    return getGlobalActor()->hasTypeParameter();
+  }
+}
+
+ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
+  switch (kind) {
+  case ActorInstance:
+  case Independent:
+  case Unspecified:
+    return *this;
+
+  case GlobalActor:
+    return forGlobalActor(getGlobalActor().subst(subs));
+  }
+}
 
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {

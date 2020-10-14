@@ -20,6 +20,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckObjC.h"
@@ -1381,7 +1382,8 @@ public:
       (void) VD->getFormalAccess();
 
       // Compute overrides.
-      (void) VD->getOverriddenDecls();
+      if (!VD->getOverriddenDecls().empty())
+        checkOverrideActorIsolation(VD);
 
       // Check whether the member is @objc or dynamic.
       (void) VD->isObjC();

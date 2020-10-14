@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
@@ -93,6 +94,7 @@ namespace swift {
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
+    ActorIsolation,
   };
 
   namespace diag {
@@ -122,6 +124,7 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
+      ActorIsolation ActorIsolationVal;
     };
     
   public:
@@ -209,6 +212,12 @@ namespace swift {
     DiagnosticArgument(LayoutConstraint L)
       : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
     }
+
+    DiagnosticArgument(ActorIsolation AI)
+      : Kind(DiagnosticArgumentKind::ActorIsolation),
+        ActorIsolationVal(AI) {
+    }
+
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -298,6 +307,11 @@ namespace swift {
     LayoutConstraint getAsLayoutConstraint() const {
       assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
       return LayoutConstraintVal;
+    }
+
+    ActorIsolation getAsActorIsolation() const {
+      assert(Kind == DiagnosticArgumentKind::ActorIsolation);
+      return ActorIsolationVal;
     }
   };
   
