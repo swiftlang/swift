@@ -908,10 +908,18 @@ namespace driver {
         return everyIncrementalJob;
       };
 
+      bool sawModuleWrapJob = false;
       const Job *mergeModulesJob = nullptr;
       CommandSet jobsToSchedule;
       CommandSet initialCascadingCommands;
       for (const Job *cmd : Comp.getJobs()) {
+        // A modulewrap job consumes the output of merge-modules. If it is
+        // in the queue, we must run merge-modules or empty temporary files
+        // will be consumed by the job instead.
+        // FIXME: We should be able to ditch this if we compare the timestamps
+        // of the temporary file to the build record, if it exists.
+        sawModuleWrapJob |= isa<ModuleWrapJobAction>(cmd->getSource());
+
         // Skip jobs that have no associated incremental info.
         if (!isa<IncrementalJobAction>(cmd->getSource())) {
           continue;
@@ -949,7 +957,7 @@ namespace driver {
       // structure of the resulting module. Additionally, the initial scheduling
       // predicate above is only aware of intra-module changes. External
       // dependencies changing *must* cause merge-modules to be scheduled.
-      if (!jobsToSchedule.empty() && mergeModulesJob) {
+      if ((!jobsToSchedule.empty() || sawModuleWrapJob) && mergeModulesJob) {
         jobsToSchedule.insert(mergeModulesJob);
       }
       return jobsToSchedule;
