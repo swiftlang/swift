@@ -1689,37 +1689,16 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
   if (isRedundantAccessorOverrideAvailabilityDiagnostic(override, base))
     return false;
 
-  auto &ctx = override->getASTContext();
-  auto &diags = ctx.Diags;
+  auto &diags = override->getASTContext().Diags;
   if (auto *accessor = dyn_cast<AccessorDecl>(override)) {
-    bool downgradeToWarning = override->getAttrs().isUnavailable(ctx);
-    diags.diagnose(override,
-                   downgradeToWarning?
-                     diag::override_accessor_less_available_warn :
-                     diag::override_accessor_less_available,
+    diags.diagnose(override, diag::override_accessor_less_available,
                    accessor->getDescriptiveKind(),
                    accessor->getStorage()->getBaseName());
     diags.diagnose(base, diag::overridden_here);
     return true;
   }
 
-  bool downgradeToWarning = false;
-  if (override->getAttrs().isUnavailable(ctx)) {
-    // Don't report constructors that are marked unavailable as being less
-    // available than their introduction. This was previously allowed and
-    // can be used to forbid the direct use of a constructor in a subclass.
-    // Note that even when marked unavailable the constructor could be called
-    // by other inherited constructors.
-    if (isa<ConstructorDecl>(override))
-      return false;
-
-    // Report as a warning other unavailable overrides.
-    downgradeToWarning = true;
-  }
-
-  diags.diagnose(override,
-                 downgradeToWarning? diag::override_less_available_warn :
-                                     diag::override_less_available,
+  diags.diagnose(override, diag::override_less_available,
                  override->getBaseName());
   diags.diagnose(base, diag::overridden_here);
 
