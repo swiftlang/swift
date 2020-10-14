@@ -454,6 +454,9 @@ bool LoadBorrowNeverInvalidatedAnalysis::
 bool LoadBorrowNeverInvalidatedAnalysis::isNeverInvalidated(
     LoadBorrowInst *lbi) {
 
+  // FIXME: To be reenabled separately in a follow-on commit.
+  return true;
+
   SILValue address = getAccessScope(lbi->getOperand());
   if (!address)
     return false;
