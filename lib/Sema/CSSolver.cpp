@@ -2026,11 +2026,11 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRe
   if (!decl->isOperator())
     return;
 
-  for (auto *resolved = CS.getResolvedOverloadSets(); resolved;
-       resolved = resolved->Previous) {
-    if (!resolved->Choice.isDecl())
+  for (auto overload : CS.getResolvedOverloads()) {
+    auto resolved = overload.second;
+    if (!resolved.choice.isDecl())
       continue;
-    auto representativeDecl = resolved->Choice.getDecl();
+    auto representativeDecl = resolved.choice.getDecl();
 
     if (!representativeDecl->isOperator())
       continue;
@@ -2174,29 +2174,28 @@ Constraint *ConstraintSystem::selectDisjunction() {
 
   // Pick the disjunction with the smallest number of favored, then active choices.
   auto cs = this;
-  auto minDisjunction =
-      std::min_element(disjunctions.begin(), disjunctions.end(),
-                       [&](Constraint *first, Constraint *second) -> bool {
-                         unsigned firstFavored = first->countFavoredNestedConstraints();
-                         unsigned secondFavored = second->countFavoredNestedConstraints();
+  auto minDisjunction = std::min_element(disjunctions.begin(), disjunctions.end(),
+      [&](Constraint *first, Constraint *second) -> bool {
+        unsigned firstFavored = first->countFavoredNestedConstraints();
+        unsigned secondFavored = second->countFavoredNestedConstraints();
 
-                         if (firstFavored == secondFavored) {
-                           // Look for additional choices to favor
-                           SmallVector<Constraint *, 4> firstExisting;
-                           SmallVector<Constraint *, 4> secondExisting;
+        if (firstFavored == secondFavored) {
+          // Look for additional choices to favor
+          SmallVector<Constraint *, 4> firstExisting;
+          SmallVector<Constraint *, 4> secondExisting;
 
-                           existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
-                           firstFavored = firstExisting.size() ?: first->countActiveNestedConstraints();
-                           existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
-                           secondFavored = secondExisting.size() ?: second->countActiveNestedConstraints();
+          existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
+          firstFavored = firstExisting.size() ? firstExisting.size() : first->countActiveNestedConstraints();
+          existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
+          secondFavored = secondExisting.size() ? secondExisting.size() : second->countActiveNestedConstraints();
 
-                           return firstFavored < secondFavored;
-                         } else {
-                           firstFavored = firstFavored ?: first->countActiveNestedConstraints();
-                           secondFavored = secondFavored ?: second->countActiveNestedConstraints();
-                           return firstFavored < secondFavored;
-                         }
-                       });
+          return firstFavored < secondFavored;
+        } else {
+          firstFavored = firstFavored ? firstFavored : first->countActiveNestedConstraints();
+          secondFavored = secondFavored ? secondFavored : second->countActiveNestedConstraints();
+          return firstFavored < secondFavored;
+        }
+      });
 
   if (minDisjunction != disjunctions.end())
     return *minDisjunction;
