@@ -4268,6 +4268,10 @@ ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
 
+ERROR(actor_isolation_override_mismatch,none,
+      "%0 %1 %2 has different actor isolation from %3 overridden declaration",
+      (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
 //------------------------------------------------------------------------------
