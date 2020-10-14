@@ -1817,27 +1817,18 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
   if (info.isAlwaysAvailable())
     return;
 
-  PlatformAgnosticAvailabilityKind platformAgnosticAvailability;
-  llvm::VersionTuple introducedVersion;
-  if (info.isKnownUnreachable()) {
-    platformAgnosticAvailability = PlatformAgnosticAvailabilityKind::Unavailable;
-  } else {
-    platformAgnosticAvailability = PlatformAgnosticAvailabilityKind::None;
-    introducedVersion = info.getOSVersion().getLowerEndpoint();
-  }
-
   llvm::VersionTuple noVersion;
   auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                       targetPlatform(C.LangOpts),
                                       /*Message=*/StringRef(),
                                       /*Rename=*/StringRef(),
-                                      introducedVersion,
+                                      info.getOSVersion().getLowerEndpoint(),
                                       /*IntroducedRange*/SourceRange(),
                                       /*Deprecated=*/noVersion,
                                       /*DeprecatedRange*/SourceRange(),
                                       /*Obsoleted=*/noVersion,
                                       /*ObsoletedRange*/SourceRange(),
-                                      platformAgnosticAvailability,
+                                      PlatformAgnosticAvailabilityKind::None,
                                       /*Implicit=*/false);
 
   decl->getAttrs().add(AvAttr);
