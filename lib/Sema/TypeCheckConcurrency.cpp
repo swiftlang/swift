@@ -1035,6 +1035,9 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
   if (!idc)
     return None;
 
+  if (dc->getSelfProtocolDecl())
+    return None;
+
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
   auto conformances = evaluateOrDefault(
@@ -1167,6 +1170,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
+  // If this is an accessor, use the actor isolation of its storage
+  // declaration.
+  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    return getActorIsolation(accessor->getStorage());
+  }
+
   // If the declaration witnesses a protocol requirement that is isolated,
   // use that.
   if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
@@ -1192,14 +1201,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
         return inferredIsolation(superclassIsolation);
       }
     }
-  }
-
-  // If this is an accessor, use the actor isolation of its storage
-  // declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    auto storageIsolation = getActorIsolation(accessor->getStorage());
-    if (!storageIsolation.isUnspecified())
-      return inferredIsolation(storageIsolation);
   }
 
   // If the declaration is in an extension that has one of the isolation
