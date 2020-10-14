@@ -2394,11 +2394,6 @@ public:
     FragileKind = DC->getFragileFunctionKind();
   }
 
-  // FIXME: Remove this
-  bool shouldWalkAccessorsTheOldWay() override {
-    return true;
-  }
-
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
