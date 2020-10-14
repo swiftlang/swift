@@ -138,10 +138,20 @@ actor class GenericSub<T> : GenericSuper<[T]> {
 // ----------------------------------------------------------------------
 struct Container<T> {
   @GenericGlobalActor<T> class Superclass { }
+  @GenericGlobalActor<[T]> class Superclass2 { }
 }
 
 struct OtherContainer<U> {
   // Okay to change the global actor in a subclass.
   @GenericGlobalActor<[U]> class Subclass1 : Container<[U]>.Superclass { }
   @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { }
+
+  // Ensure that substitutions work properly when inheriting.
+  class Subclass3<V> : Container<(U, V)>.Superclass2 {
+    func method() { } // expected-note{{only asynchronous methods can be used outside the actor instance}}
+
+    @OtherGlobalActor func testMethod() {
+      method() // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[(U, V)]>' can not be referenced from different global actor 'OtherGlobalActor'}}
+    }
+  }
 }

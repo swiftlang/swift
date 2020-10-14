@@ -1178,8 +1178,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (auto classDecl = dyn_cast<ClassDecl>(value)) {
     if (auto superclassDecl = classDecl->getSuperclassDecl()) {
       auto superclassIsolation = getActorIsolation(superclassDecl);
-      if (!superclassIsolation.isUnspecified())
+      if (!superclassIsolation.isUnspecified()) {
+        if (superclassIsolation.requiresSubstitution()) {
+          Type superclassType = classDecl->getSuperclass();
+          if (!superclassType)
+            return ActorIsolation::forUnspecified();
+
+          SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
+              classDecl->getModuleContext(), classDecl);
+          superclassIsolation = superclassIsolation.subst(subs);
+        }
+
         return inferredIsolation(superclassIsolation);
+      }
     }
   }
 
