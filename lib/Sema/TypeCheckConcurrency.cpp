@@ -25,6 +25,24 @@
 
 using namespace swift;
 
+/// Determine whether it makes sense to infer an attribute in the given
+/// context.
+static bool shouldInferAttributeInContext(const DeclContext *dc) {
+  auto sourceFile = dc->getParentSourceFile();
+  if (!sourceFile)
+    return false;
+
+  switch (sourceFile->Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+    return false;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return true;
+  }
+}
+
 /// Check whether the @asyncHandler attribute can be applied to the given
 /// function declaration.
 ///
@@ -108,7 +126,7 @@ bool IsAsyncHandlerRequest::evaluate(
     return true;
   }
 
-  if (!func->getASTContext().LangOpts.EnableExperimentalConcurrency)
+  if (!shouldInferAttributeInContext(func->getDeclContext()))
     return false;
 
   // Are we in a context where inference is possible?
@@ -1135,20 +1153,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Disable inference of actor attributes outside of normal Swift source files.
-  if (auto sourceFile = value->getDeclContext()->getParentSourceFile()) {
-    switch (sourceFile->Kind) {
-    case SourceFileKind::Interface:
-    case SourceFileKind::SIL:
-      return defaultIsolation;
-
-    case SourceFileKind::Library:
-    case SourceFileKind::Main:
-      // Attempt inference below.
-      break;
-    }
-  } else {
+  if (!shouldInferAttributeInContext(value->getDeclContext()))
     return defaultIsolation;
-  }
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred) {
