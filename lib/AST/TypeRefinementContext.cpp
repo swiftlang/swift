@@ -28,14 +28,12 @@ using namespace swift;
 TypeRefinementContext::TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                                              TypeRefinementContext *Parent,
                                              SourceRange SrcRange,
-                                             const AvailabilityContext &Info,
-                                             const AvailabilityContext &InfoExplicit)
-    : Node(Node), SrcRange(SrcRange), AvailabilityInfo(Info),
-      AvailabilityInfoExplicit(InfoExplicit) {
+                                             const AvailabilityContext &Info)
+    : Node(Node), SrcRange(SrcRange), AvailabilityInfo(Info) {
   if (Parent) {
     assert(SrcRange.isValid());
     Parent->addChild(this);
-    assert(InfoExplicit.isContainedIn(Parent->getAvailabilityInfoExplicit()));
+    assert(Info.isContainedIn(Parent->getAvailabilityInfo()));
   }
   Ctx.addDestructorCleanup(Children);
 }
@@ -48,20 +46,18 @@ TypeRefinementContext::createRoot(SourceFile *SF,
   ASTContext &Ctx = SF->getASTContext();
   return new (Ctx)
       TypeRefinementContext(Ctx, SF,
-                            /*Parent=*/nullptr, SourceRange(), Info,
-                            AvailabilityContext::alwaysAvailable());
+                            /*Parent=*/nullptr, SourceRange(), Info);
 }
 
 TypeRefinementContext *
 TypeRefinementContext::createForDecl(ASTContext &Ctx, Decl *D,
                                      TypeRefinementContext *Parent,
                                      const AvailabilityContext &Info,
-                                     const AvailabilityContext &InfoExplicit,
                                      SourceRange SrcRange) {
   assert(D);
   assert(Parent);
   return new (Ctx)
-      TypeRefinementContext(Ctx, D, Parent, SrcRange, Info, InfoExplicit);
+      TypeRefinementContext(Ctx, D, Parent, SrcRange, Info);
 }
 
 TypeRefinementContext *
@@ -72,7 +68,7 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
   assert(Parent);
   return new (Ctx)
       TypeRefinementContext(Ctx, IntroNode(S, /*IsThen=*/true), Parent,
-                            S->getThenStmt()->getSourceRange(), Info, Info);
+                            S->getThenStmt()->getSourceRange(), Info);
 }
 
 TypeRefinementContext *
@@ -83,7 +79,7 @@ TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
   assert(Parent);
   return new (Ctx)
       TypeRefinementContext(Ctx, IntroNode(S, /*IsThen=*/false), Parent,
-                            S->getElseStmt()->getSourceRange(), Info, Info);
+                            S->getElseStmt()->getSourceRange(), Info);
 }
 
 TypeRefinementContext *
@@ -96,7 +92,7 @@ TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
   assert(Parent);
   SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
   return new (Ctx) TypeRefinementContext(Ctx, PAI, Parent, Range,
-                                         Info, Info);
+                                         Info);
 }
 
 TypeRefinementContext *
@@ -111,7 +107,7 @@ TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
   SourceRange Range(RS->getEndLoc(), ContainingBraceStmt->getEndLoc());
   return new (Ctx) TypeRefinementContext(Ctx,
                                          IntroNode(RS, /*IsFallthrough=*/true),
-                                         Parent, Range, Info, Info);
+                                         Parent, Range, Info);
 }
 
 TypeRefinementContext *
@@ -122,7 +118,7 @@ TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
   assert(Parent);
   return new (Ctx)
       TypeRefinementContext(Ctx, IntroNode(RS, /*IsFallthrough=*/false), Parent,
-                            RS->getBody()->getSourceRange(), Info, Info);
+                            RS->getBody()->getSourceRange(), Info);
 }
 
 TypeRefinementContext *
@@ -132,7 +128,7 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
   assert(S);
   assert(Parent);
   return new (Ctx) TypeRefinementContext(
-      Ctx, S, Parent, S->getBody()->getSourceRange(), Info, Info);
+      Ctx, S, Parent, S->getBody()->getSourceRange(), Info);
 }
 
 // Only allow allocation of TypeRefinementContext using the allocator in
@@ -300,7 +296,6 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS << "(" << getReasonName(getReason());
 
   OS << " versions=" << AvailabilityInfo.getOSVersion().getAsString();
-  OS << " explicit=" << AvailabilityInfoExplicit.getOSVersion().getAsString();
 
   if (getReason() == Reason::Decl) {
     Decl *D = Node.getAsDecl();
