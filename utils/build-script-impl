@@ -2030,7 +2030,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_ENABLE_PYTHON=ON
                     -DLLDB_ENABLE_LZMA=OFF
                     -DLLDB_ENABLE_LUA=OFF
-                    -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
