@@ -66,7 +66,7 @@ enum class TypeResolutionFlags : uint16_t {
   AllowModule = 1 << 9,
 
   /// Make internal @usableFromInline and @inlinable decls visible.
-  AllowInlinable = 1 << 10,
+  AllowUsableFromInline = 1 << 10,
 };
 
 /// Type resolution contexts that require special handling.

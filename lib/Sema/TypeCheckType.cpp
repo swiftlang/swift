@@ -1322,7 +1322,7 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   }
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  if (options.contains(TypeResolutionFlags::AllowInlinable))
+  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
     lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
                                                     lookupOptions);
@@ -1526,7 +1526,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
   // Look for member types with the given name.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (options.contains(TypeResolutionFlags::AllowInlinable))
+  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
     lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
