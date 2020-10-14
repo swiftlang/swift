@@ -16,6 +16,7 @@
 #ifndef SWIFT_AST_ACTORISOLATIONSTATE_H
 #define SWIFT_AST_ACTORISOLATIONSTATE_H
 
+#include "swift/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 
 namespace llvm {

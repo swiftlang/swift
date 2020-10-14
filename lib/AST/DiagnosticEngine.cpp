@@ -660,6 +660,26 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
     break;
+  case DiagnosticArgumentKind::ActorIsolation:
+    switch (auto isolation = Arg.getAsActorIsolation()) {
+    case ActorIsolation::ActorInstance:
+      Out << "actor-isolated";
+      break;
+
+    case ActorIsolation::GlobalActor:
+      Out << "global actor " << FormatOpts.OpeningQuotationMark
+        << isolation.getGlobalActor().getString()
+        << FormatOpts.ClosingQuotationMark << "-isolated";
+      break;
+
+    case ActorIsolation::Independent:
+      Out << "actor-independent";
+      break;
+
+    case ActorIsolation::Unspecified:
+      Out << "non-actor-isolated";
+      break;
+    }
   }
 }
 
