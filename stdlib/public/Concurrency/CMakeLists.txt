@@ -29,4 +29,5 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib)
+  INSTALL_IN_COMPONENT stdlib
+)
