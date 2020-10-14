@@ -4097,9 +4097,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   interleave(
       SynthesizedArgs,
-      [&](const std::pair<unsigned, AnyFunctionType::Param> &e) {
-        const auto paramIdx = e.first;
-        const auto &arg = e.second;
+      [&](const SynthesizedArg &e) {
+        const auto paramIdx = e.paramIdx;
+        const auto &arg = e.param;
 
         if (arg.hasLabel()) {
           arguments << "'" << arg.getLabel().str() << "'";
@@ -4126,8 +4126,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     llvm::raw_svector_ostream fixIt(scratch);
     interleave(
         SynthesizedArgs,
-        [&](const std::pair<unsigned, AnyFunctionType::Param> &arg) {
-          forFixIt(fixIt, arg.second);
+        [&](const SynthesizedArg &arg) {
+          forFixIt(fixIt, arg.param);
         },
         [&] { fixIt << ", "; });
 
@@ -4176,8 +4176,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
     return false;
 
   const auto &argument = SynthesizedArgs.front();
-  auto position = argument.first;
-  auto label = argument.second.getLabel();
+  auto position = argument.paramIdx;
+  auto label = argument.param.getLabel();
 
   Expr *fnExpr = nullptr;
   Expr *argExpr = nullptr;
@@ -4192,7 +4192,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   }
 
   // Will the parameter accept a trailing closure?
-  Type paramType = resolveType(argument.second.getPlainType());
+  Type paramType = resolveType(argument.param.getPlainType());
   bool paramAcceptsTrailingClosure = paramType
       ->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
 
@@ -4208,7 +4208,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   else if (position != 0)
     insertText << ", ";
 
-  forFixIt(insertText, argument.second);
+  forFixIt(insertText, argument.param);
 
   if (position == 0 && numArgs > 0 &&
       (!firstTrailingClosure || position < *firstTrailingClosure))
@@ -6036,7 +6036,7 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   auto anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
-      solution, {std::make_pair(0, param)},
+      solution, {SynthesizedArg{0, param}},
       getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();
