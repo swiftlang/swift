@@ -241,7 +241,8 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   case SILInstructionKind::UncheckedAddrCastInst:
     return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
                                       originalCopy, loadInsts);
-  case SILInstructionKind::LoadInst:
+
+  case SILInstructionKind::LoadInst: {
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
     //
@@ -251,14 +252,17 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     // function. So if we have such a load [take], we /must/ have a
     // reinitialization or an alloc_stack that does not fit the pattern we are
     // expecting from SILGen. Be conservative and return false.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        return false;
-      }
+    auto *li = cast<LoadInst>(user);
+    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
+        // Only accept load [take] if it takes the whole temporary object.
+        // load [take] from a projection would destroy only a part of the
+        // temporary and we don't handle this.
+        address != originalCopy->getDest()) {
+      return false;
     }
     loadInsts.insert(user);
     return true;
-
+  }
   case SILInstructionKind::LoadBorrowInst:
     loadInsts.insert(user);
     return true;
@@ -431,15 +435,6 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     // Destroys and deallocations are allowed to be in a different block.
     if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
       continue;
-
-    // Same for load [take] on the top level temp object. SILGen always takes
-    // whole values from temporaries. If we have load [take] on projections from
-    // our base, we fail since those would be re-initializations.
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
-      }
-    }
 
     if (!collectLoads(useOper, copyInst, loadInsts))
       return false;
