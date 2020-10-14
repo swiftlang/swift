@@ -4340,6 +4340,16 @@ public:
     if (!T->mayHaveMembers())
       return;
 
+    if (auto objT = T->getOptionalObjectType()) {
+      // Add 'nil' keyword with erasing '.' instruction.
+      unsigned bytesToErase = 0;
+      auto &SM = CurrDeclContext->getASTContext().SourceMgr;
+      if (DotLoc.isValid())
+        bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
+      addKeyword("nil", T, SemanticContextKind::None,
+                 CodeCompletionKeywordKind::kw_nil, bytesToErase);
+    }
+
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
@@ -4378,14 +4388,6 @@ public:
         objT = objT->lookThroughAllOptionalTypes();
         if (seenTypes.insert(objT->getCanonicalType()).second)
           getUnresolvedMemberCompletions(objT);
-
-        // Add 'nil' keyword with erasing '.' instruction.
-        unsigned bytesToErase = 0;
-        auto &SM = CurrDeclContext->getASTContext().SourceMgr;
-        if (DotLoc.isValid())
-          bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
-        addKeyword("nil", T, SemanticContextKind::None,
-                   CodeCompletionKeywordKind::kw_nil, bytesToErase);
       }
       getUnresolvedMemberCompletions(T);
     }
@@ -6083,6 +6085,45 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                    DCForModules);
 }
 
+void deliverUnresolvedMemberResults(
+    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::Result> Results,
+    DeclContext *DC, SourceLoc DotLoc,
+    ide::CodeCompletionContext &CompletionCtx,
+    CodeCompletionConsumer &Consumer) {
+  ASTContext &Ctx = DC->getASTContext();
+  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
+                          &CompletionCtx);
+
+  assert(DotLoc.isValid());
+  Lookup.setHaveDot(DotLoc);
+  Lookup.shouldCheckForDuplicates(Results.size() > 1);
+
+  // Get the canonical versions of the top-level types
+  SmallPtrSet<CanType, 4> originalTypes;
+  for (auto &Result: Results)
+    originalTypes.insert(Result.ExpectedTy->getCanonicalType());
+
+  for (auto &Result: Results) {
+    Lookup.setExpectedTypes({Result.ExpectedTy},
+                            Result.IsSingleExpressionBody,
+                            /*expectsNonVoid*/true);
+    Lookup.setIdealExpectedType(Result.ExpectedTy);
+
+    // For optional types, also get members of the unwrapped type if it's not
+    // already equivalent to one of the top-level types. Handling it via the top
+    // level type and not here ensures we give the correct type relation
+    // (identical, rather than convertible).
+    if (Result.ExpectedTy->getOptionalObjectType()) {
+      Type Unwrapped = Result.ExpectedTy->lookThroughAllOptionalTypes();
+      if (originalTypes.insert(Unwrapped->getCanonicalType()).second)
+        Lookup.getUnresolvedMemberCompletions(Unwrapped);
+    }
+    Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
+  }
+  SourceFile *SF = DC->getParentSourceFile();
+  deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
+}
+
 void deliverDotExprResults(
     ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
     Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
@@ -6156,6 +6197,23 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     deliverDotExprResults(Lookup.getResults(), CheckedBase, CurDeclContext,
                           DotLoc, isInsideObjCSelector(), CompletionContext,
                           Consumer);
+    return true;
+  }
+  case CompletionKind::UnresolvedMember: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
+      CompletionCollector(Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(CurDeclContext, CompletionLoc);
+
+    if (!Lookup.gotCallback())
+      Lookup.fallbackTypeCheck(CurDeclContext);
+
+    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+    deliverUnresolvedMemberResults(Lookup.getResults(), CurDeclContext, DotLoc,
+                                   CompletionContext, Consumer);
     return true;
   }
   default:
@@ -6277,6 +6335,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   switch (Kind) {
   case CompletionKind::None:
   case CompletionKind::DotExpr:
+  case CompletionKind::UnresolvedMember:
     llvm_unreachable("should be already handled");
     return;
 
@@ -6476,15 +6535,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.addSubModuleNames(SubModuleNameVisibilityPairs);
     else
       Lookup.addImportModuleNames();
-    break;
-  }
-  case CompletionKind::UnresolvedMember: {
-    Lookup.setHaveDot(DotLoc);
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
-    Lookup.setIdealExpectedType(CodeCompleteTokenExpr->getType());
-    Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
     break;
   }
   case CompletionKind::CallArg: {

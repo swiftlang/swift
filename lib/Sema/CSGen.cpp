@@ -1020,7 +1020,7 @@ namespace {
       // independent of the wider expression containing the ErrorExpr, so
       // there's no point attempting to produce a solution for it.
       SourceRange range = E->getSourceRange();
-      if (range.isInvalid() ||
+      if (range.isValid() &&
           CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
         return nullptr;
 
