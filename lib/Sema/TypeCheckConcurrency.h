@@ -144,6 +144,10 @@ public:
   operator Kind() const { return kind; };
 };
 
+/// Check that the actor isolation of an override matches that of its
+/// overridden declaration.
+void checkOverrideActorIsolation(ValueDecl *value);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

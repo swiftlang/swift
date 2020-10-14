@@ -16,6 +16,7 @@
 #ifndef SWIFT_AST_ACTORISOLATIONSTATE_H
 #define SWIFT_AST_ACTORISOLATIONSTATE_H
 
+#include "swift/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 
 namespace llvm {
@@ -24,6 +25,7 @@ class raw_ostream;
 
 namespace swift {
 class ClassDecl;
+class SubstitutionMap;
 class Type;
 
 /// Determine whether the given types are (canonically) equal, declared here
@@ -84,6 +86,8 @@ public:
 
   operator Kind() const { return getKind(); }
 
+  bool isUnspecified() const { return kind == Unspecified; }
+
   ClassDecl *getActor() const {
     assert(getKind() == ActorInstance);
     return actor;
@@ -93,6 +97,13 @@ public:
     assert(getKind() == GlobalActor);
     return globalActor;
   }
+
+  /// Determine whether this isolation will require substitution to be
+  /// evaluated.
+  bool requiresSubstitution() const;
+
+  /// Substitute into types within the actor isolation.
+  ActorIsolation subst(SubstitutionMap subs) const;
 
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
