@@ -213,11 +213,6 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
-  getResolvedOverloads() const {
-    return CS.ResolvedOverloads;
-  }
-
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
     CS.recordDisjunctionChoice(disjunctionLocator, index);
