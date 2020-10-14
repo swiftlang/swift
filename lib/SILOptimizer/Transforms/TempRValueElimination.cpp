@@ -89,9 +89,6 @@ class TempRValueOptPass : public SILFunctionTransform {
   checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst,
                          ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
 
-  bool canApplyBeTreatedAsLoad(Operand *tempObjUser, ApplySite apply,
-                               SILValue srcAddr);
-
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
   std::pair<SILBasicBlock::iterator, bool>
   tryOptimizeStoreIntoTemp(StoreInst *si);
@@ -113,31 +110,6 @@ bool TempRValueOptPass::collectLoadsFromProjection(
     if (!collectLoads(projUseOper, originalCopy, loadInsts))
       return false;
   }
-  return true;
-}
-
-/// Check if \p tempObjUser, passed to the apply instruction, is only loaded,
-/// but not modified and if \p srcAddr is not modified as well.
-bool TempRValueOptPass::canApplyBeTreatedAsLoad(
-    Operand *tempObjUser, ApplySite apply, SILValue srcAddr) {
-  // Check if the function can just read from tempObjUser.
-  auto convention = apply.getArgumentConvention(*tempObjUser);
-  if (!convention.isGuaranteedConvention()) {
-    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
-                               "its source"
-                            << *apply.getInstruction());
-    return false;
-  }
-
-  // If the function may write to the source of the copy_addr, the apply
-  // cannot be treated as a load: all (potential) writes of the source must
-  // appear _after_ all loads of the temporary. But in case of a function call
-  // we don't know in which order the writes and loads are executed inside the
-  // called function. The source may be written before the temporary is
-  // loaded, which would make the optization invalid.
-  if (aa->mayWriteToMemory(apply.getInstruction(), srcAddr))
-    return false;
-
   return true;
 }
 
@@ -204,28 +176,23 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
       return false;
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
-  case SILInstructionKind::TryApplyInst: {
-    if (!canApplyBeTreatedAsLoad(addressUse, ApplySite(user),
-                                 originalCopy->getSrc()))
-      return false;
-    // Everything is okay with the function call. Register it as a "load".
-    loadInsts.insert(user);
-    return true;
-  }
+  case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst: {
-    if (!canApplyBeTreatedAsLoad(addressUse, ApplySite(user),
-                                 originalCopy->getSrc()))
+    auto convention = ApplySite(user).getArgumentConvention(*addressUse);
+    if (!convention.isGuaranteedConvention())
       return false;
 
-    auto beginApply = cast<BeginApplyInst>(user);
-    // Register 'end_apply'/'abort_apply' as loads as well
-    // 'checkNoSourceModification' should check instructions until
-    // 'end_apply'/'abort_apply'.
-    for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
-      SILInstruction *user = tokenUse->getUser();
-      if (user->getParent() != block)
-        return false;
-      loadInsts.insert(tokenUse->getUser());
+    loadInsts.insert(user);
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      // Register 'end_apply'/'abort_apply' as loads as well
+      // 'checkNoSourceModification' should check instructions until
+      // 'end_apply'/'abort_apply'.
+      for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
+        SILInstruction *tokenUser = tokenUse->getUser();
+        if (tokenUser->getParent() != block)
+          return false;
+        loadInsts.insert(tokenUser);
+      }
     }
     return true;
   }
@@ -321,8 +288,17 @@ bool TempRValueOptPass::checkNoSourceModification(
 
     // If this is the last use of the temp we are ok. After this point,
     // modifications to the source don't matter anymore.
-    if (numLoadsFound == useInsts.size())
+    // Note that we are assuming here that if an instruction loads and writes
+    // to copySrc at the same time (like a copy_addr could do), the write
+    // takes effect after the load.
+    if (numLoadsFound == useInsts.size()) {
+      // Function calls are an exception: in a called function a potential
+      // modification of copySrc could occur _before_ the read of the temporary.
+      if (FullApplySite::isa(inst) && aa->mayWriteToMemory(inst, copySrc))
+        return false;
+
       return true;
+    }
 
     if (aa->mayWriteToMemory(inst, copySrc)) {
       LLVM_DEBUG(llvm::dbgs() << "  Source modified by" << *iter);
