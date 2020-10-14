@@ -610,15 +610,12 @@ bb3:
 
 sil [ossa] @takeGuaranteedObj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-// Now that we support ossa, eliminate the alloc_stack and change the load
-// [take] to a load [copy] in the process.
+// We do not support this in 5.3.
 //
 // CHECK-LABEL: sil [ossa] @copyWithLoadRelease : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK-NOT: alloc_stack
-// CHECK:   [[VAL:%.*]] = load [copy] %0 : $*Builtin.NativeObject
-// CHECK:   apply %{{.*}}([[VAL]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-// CHECK:   destroy_value [[VAL]] : $Builtin.NativeObject
+// CHECK: alloc_stack
+// CHECK: load [take]
 // CHECK-LABEL: } // end sil function 'copyWithLoadRelease'
 sil [ossa] @copyWithLoadRelease : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
@@ -633,14 +630,11 @@ bb0(%0 : $*Builtin.NativeObject):
   return %v : $()
 }
 
-// Remove a copy that is released via a load. Leave the load [take] alone since
-// our copy_addr is taking from source.
+// We do not support this in 5.3.
 //
 // CHECK-LABEL: sil [ossa] @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK:   [[V:%.*]] = load [take] %0 : $*Builtin.NativeObject
-// CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-// CHECK:   destroy_value [[V]] : $Builtin.NativeObject
+// CHECK:   alloc_stack
 // CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
 sil [ossa] @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
@@ -675,12 +669,11 @@ bb0(%0 : $*GS<Builtin.NativeObject>):
   return %v : $()
 }
 
-// Make sure that when we convert the load [take] to a load [copy], we hoist the
-// load of src /before/ the destroy of %0.
+// We do not support this on 5.3.
+//
 // CHECK-LABEL: sil [ossa] @hoist_load_copy_to_src_copy_addr_site : $@convention(thin) (@owned GS<Builtin.NativeObject>) -> @owned GS<Builtin.NativeObject> {
 // CHECK: bb0([[ARG:%.*]] : @owned
-// CHECK:   apply {{%.*}}([[ARG]])
-// CHECK:   return [[ARG]]
+// CHECK: alloc_stack
 // CHECK: } // end sil function 'hoist_load_copy_to_src_copy_addr_site'
 sil [ossa] @hoist_load_copy_to_src_copy_addr_site : $@convention(thin) (@owned GS<Builtin.NativeObject>) -> @owned GS<Builtin.NativeObject> {
 bb0(%0 : @owned $GS<Builtin.NativeObject>):
@@ -693,24 +686,11 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
   return %obj : $GS<Builtin.NativeObject>
 }
 
+// We do not support this on 5.3.
+//
 // CHECK-LABEL: sil [ossa] @hoist_load_copy_to_src_copy_addr_site_two_takes : $@convention(thin) (@in GS<Builtin.NativeObject>) -> @owned GS<Builtin.NativeObject> {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[COPY_1:%.*]] = load [copy] [[ARG]]
-// CHECK:   [[COPY_2:%.*]] = load [copy] [[ARG]]
-// CHECK:   destroy_addr [[ARG]]
-// CHECK:   cond_br undef, bb1, bb2
-//
-// CHECK: bb1:
-// CHECK:   destroy_value [[COPY_1]]
-// CHECK:   br bb3([[COPY_2]] :
-//
-// CHECK: bb2:
-// CHECK:   destroy_value [[COPY_2]]
-// CHECK:   br bb3([[COPY_1]] :
-//
-// CHECK: bb3([[RESULT:%.*]] : @owned
-// CHECK:   apply {{%.*}}([[RESULT]])
-// CHECK:   return [[RESULT]]
+// CHECK: alloc_stack
 // CHECK: } // end sil function 'hoist_load_copy_to_src_copy_addr_site_two_takes'
 sil [ossa] @hoist_load_copy_to_src_copy_addr_site_two_takes : $@convention(thin) (@in GS<Builtin.NativeObject>) -> @owned GS<Builtin.NativeObject> {
 bb0(%0 : $*GS<Builtin.NativeObject>):
@@ -1016,12 +996,11 @@ bb0(%0 : $*Klass):
 sil [ossa] @store_getP : $@convention(thin) () -> @out Optional<P>
 sil [ossa] @store_takeGuaranteedObj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-// Now that we support ossa, eliminate the alloc_stack and change the load
-// [take] to a load [copy] in the process.
+// We do not support this on 5.3.
 //
 // CHECK-LABEL: sil [ossa] @store_copyWithLoadRelease : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : @guaranteed $Builtin.NativeObject):
-// CHECK-NOT: alloc_stack
+// CHECK: alloc_stack
 // CHECK-LABEL: } // end sil function 'store_copyWithLoadRelease'
 sil [ossa] @store_copyWithLoadRelease : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
@@ -1037,11 +1016,10 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %v : $()
 }
 
-// Remove a copy that is released via a load. Leave the load [take] alone since
-// our copy_addr is taking from source.
+// We do not support this on 5.3.
 //
 // CHECK-LABEL: sil [ossa] @store_takeWithLoadRelease : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK-NOT: alloc_stack
+// CHECK: alloc_stack
 // CHECK-LABEL: } // end sil function 'store_takeWithLoadRelease'
 sil [ossa] @store_takeWithLoadRelease : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
