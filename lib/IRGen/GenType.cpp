@@ -1216,7 +1216,7 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Alignment align,
                                                 Alignment pointerAlignment) {
   SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
-  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
+  for (unsigned bit = 0; Alignment(1ull << bit) != pointerAlignment; ++bit) {
     spareBits.setBit(bit);
   }
 
