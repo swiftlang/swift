@@ -75,11 +75,10 @@ namespace {
 class TempRValueOptPass : public SILFunctionTransform {
   AliasAnalysis *aa = nullptr;
 
-  bool collectLoads(Operand *userOp, SILInstruction *userInst,
-                    SingleValueInstruction *addr, SILValue srcObject,
+  bool collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
                     SmallPtrSetImpl<SILInstruction *> &loadInsts);
   bool collectLoadsFromProjection(SingleValueInstruction *projection,
-                                  SILValue srcAddr,
+                                  CopyAddrInst *originalCopy,
                                   SmallPtrSetImpl<SILInstruction *> &loadInsts);
 
   bool
@@ -103,7 +102,7 @@ class TempRValueOptPass : public SILFunctionTransform {
 } // anonymous namespace
 
 bool TempRValueOptPass::collectLoadsFromProjection(
-    SingleValueInstruction *projection, SILValue srcAddr,
+    SingleValueInstruction *projection, CopyAddrInst *originalCopy,
     SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // Transitively look through projections on stack addresses.
   for (auto *projUseOper : projection->getUses()) {
@@ -111,7 +110,7 @@ bool TempRValueOptPass::collectLoadsFromProjection(
     if (user->isTypeDependentOperand(*projUseOper))
       continue;
 
-    if (!collectLoads(projUseOper, user, projection, srcAddr, loadInsts))
+    if (!collectLoads(projUseOper, originalCopy, loadInsts))
       return false;
   }
   return true;
@@ -155,12 +154,15 @@ bool TempRValueOptPass::canApplyBeTreatedAsLoad(
 /// location at \address. The temporary must be initialized by the original copy
 /// and never written to again. Therefore, collectLoads disallows any operation
 /// that may write to memory at \p address.
-bool TempRValueOptPass::collectLoads(
-    Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
-    SILValue srcAddr, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+bool TempRValueOptPass::
+collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
+             SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+  SILInstruction *user = addressUse->getUser();
+  SILValue address = addressUse->get();
+
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
-  SILBasicBlock *block = address->getParent();
+  SILBasicBlock *block = originalCopy->getParent();
   if (user->getParent() != block)
     return false;
 
@@ -192,8 +194,7 @@ bool TempRValueOptPass::collectLoads(
     // If the user is the value operand of the MarkDependenceInst we have to
     // transitively explore its uses until we reach a load or return false
     for (auto *mdiUseOper : mdi->getUses()) {
-      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcAddr,
-                        loadInsts))
+      if (!collectLoads(mdiUseOper, originalCopy, loadInsts))
         return false;
     }
     return true;
@@ -204,14 +205,16 @@ bool TempRValueOptPass::collectLoads(
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
-    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
+    if (!canApplyBeTreatedAsLoad(addressUse, ApplySite(user),
+                                 originalCopy->getSrc()))
       return false;
     // Everything is okay with the function call. Register it as a "load".
     loadInsts.insert(user);
     return true;
   }
   case SILInstructionKind::BeginApplyInst: {
-    if (!canApplyBeTreatedAsLoad(userOp, ApplySite(user), srcAddr))
+    if (!canApplyBeTreatedAsLoad(addressUse, ApplySite(user),
+                                 originalCopy->getSrc()))
       return false;
 
     auto beginApply = cast<BeginApplyInst>(user);
@@ -235,7 +238,7 @@ bool TempRValueOptPass::collectLoads(
                               << *user);
       return false;
     }
-    return collectLoadsFromProjection(oeai, srcAddr, loadInsts);
+    return collectLoadsFromProjection(oeai, originalCopy, loadInsts);
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
     // In certain cases, unchecked_take_enum_data_addr invalidates the
@@ -249,14 +252,13 @@ bool TempRValueOptPass::collectLoads(
       return false;
     }
 
-    return collectLoadsFromProjection(utedai, srcAddr, loadInsts);
+    return collectLoadsFromProjection(utedai, originalCopy, loadInsts);
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::UncheckedAddrCastInst: {
+  case SILInstructionKind::UncheckedAddrCastInst:
     return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
-                                      srcAddr, loadInsts);
-  }
+                                      originalCopy, loadInsts);
   case SILInstructionKind::LoadInst:
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
@@ -448,7 +450,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       }
     }
 
-    if (!collectLoads(useOper, user, tempObj, copySrc, loadInsts))
+    if (!collectLoads(useOper, copyInst, loadInsts))
       return false;
   }
 
