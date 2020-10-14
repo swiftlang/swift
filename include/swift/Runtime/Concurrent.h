@@ -451,17 +451,17 @@ private:
   };
   
   size_t Capacity;
-  std::atomic<size_t> ReaderCount;
+//   std::atomic<size_t> ReaderCount;
   std::atomic<Storage *> Elements;
   Mutex WriterLock;
   std::vector<Storage *> FreeList;
   
   void incrementReaders() {
-    ReaderCount.fetch_add(1, std::memory_order_acquire);
+//     ReaderCount.fetch_add(1, std::memory_order_acquire);
   }
   
   void decrementReaders() {
-    ReaderCount.fetch_sub(1, std::memory_order_release);
+//     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
   
   void deallocateFreeList() {
@@ -499,11 +499,11 @@ public:
   ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
   ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
   
-  ConcurrentReadableArray() : Capacity(0), ReaderCount(0), Elements(nullptr) {}
+  ConcurrentReadableArray() : Capacity(0), /*ReaderCount(0),*/ Elements(nullptr) {}
   
   ~ConcurrentReadableArray() {
-    assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
-           "deallocating ConcurrentReadableArray with outstanding snapshots");
+//     assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
+//            "deallocating ConcurrentReadableArray with outstanding snapshots");
     deallocateFreeList();
   }
   
@@ -529,8 +529,8 @@ public:
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
-      deallocateFreeList();
+//     if (ReaderCount.load(std::memory_order_acquire) == 0)
+//       deallocateFreeList();
   }
 
   Snapshot snapshot() {
@@ -717,7 +717,7 @@ private:
 
   /// The number of readers currently active, equal to the number of snapshot
   /// objects currently alive.
-  std::atomic<uint32_t> ReaderCount{0};
+//   std::atomic<uint32_t> ReaderCount{0};
 
   /// The number of elements in the elements array.
   std::atomic<uint32_t> ElementCount{0};
@@ -738,18 +738,18 @@ private:
   FreeListNode *FreeList{nullptr};
 
   void incrementReaders() {
-    ReaderCount.fetch_add(1, std::memory_order_acquire);
+//     ReaderCount.fetch_add(1, std::memory_order_acquire);
   }
 
   void decrementReaders() {
-    ReaderCount.fetch_sub(1, std::memory_order_release);
+//     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
 
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
-      FreeListNode::freeAll(&FreeList);
+//     if (ReaderCount.load(std::memory_order_acquire) == 0)
+//       FreeListNode::freeAll(&FreeList);
   }
 
   /// Grow the elements array, adding the old array to the free list and
@@ -858,7 +858,7 @@ public:
 
   /// Returns whether there are outstanding readers. For testing purposes only.
   bool hasActiveReaders() {
-    return ReaderCount.load(std::memory_order_relaxed) > 0;
+    return false;//ReaderCount.load(std::memory_order_relaxed) > 0;
   }
 
   /// Readers take a snapshot of the hash map, then work with the snapshot.
