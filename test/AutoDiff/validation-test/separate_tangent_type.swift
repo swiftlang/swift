@@ -7,7 +7,7 @@ import StdlibUnittest
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
-  import ucrt
+  import CRT
 #else
 #error("Unsupported platform")
 #endif

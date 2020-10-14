@@ -10,7 +10,7 @@ import Swift
   import Glibc
   typealias CGFloat = Double
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
   #if arch(x86_64) || arch(arm64)
     typealias CGFloat = Double
   #else
