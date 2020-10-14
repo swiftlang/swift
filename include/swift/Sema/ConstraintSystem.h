@@ -66,6 +66,12 @@ class SolutionApplicationTarget;
 
 } // end namespace constraints
 
+namespace unittest {
+
+class SemaTest;
+
+} // end namespace unittest
+
 // Forward declare some TypeChecker related functions
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
@@ -2017,6 +2023,8 @@ enum class SolutionApplicationToFunctionResult {
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
   ASTContext &Context;
+
+  friend class swift::unittest::SemaTest;
 
 public:
   DeclContext *DC;
