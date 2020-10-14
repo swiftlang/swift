@@ -759,6 +759,27 @@ bb0(%0 : $*Klass):
   return %9999 : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @dont_optimize_with_modify_inside_access
+// CHECK:   [[STK:%[0-9]+]] = alloc_stack $Klass
+// CHECK:   copy_addr %0 to [initialization] [[STK]]
+// CHECK:   begin_access [read] [static] [[STK]]
+// CHECK-LABEL: } // end sil function 'dont_optimize_with_modify_inside_access'
+sil [ossa] @dont_optimize_with_modify_inside_access : $@convention(thin) (@inout Klass, @owned Klass) -> () {
+bb0(%0 : $*Klass, %1 : @owned $Klass):
+  %stack = alloc_stack $Klass
+  copy_addr %0 to [initialization] %stack : $*Klass
+  %f = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %access = begin_access [read] [static] %stack : $*Klass
+  store %1 to [assign] %0 : $*Klass // This store prevents the optimization
+  %call = apply %f(%access) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_access %access : $*Klass
+  destroy_addr %stack : $*Klass
+  dealloc_stack %stack : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 /////////////////
 // Store Tests //
 /////////////////

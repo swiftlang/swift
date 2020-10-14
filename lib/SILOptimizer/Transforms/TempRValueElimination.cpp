@@ -153,9 +153,24 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     LLVM_DEBUG(llvm::dbgs()
                << "  Temp use may write/destroy its source" << *user);
     return false;
-  case SILInstructionKind::BeginAccessInst:
-    return cast<BeginAccessInst>(user)->getAccessKind() == SILAccessKind::Read;
-
+  case SILInstructionKind::BeginAccessInst: {
+    auto *beginAccess = cast<BeginAccessInst>(user);
+    if (beginAccess->getAccessKind() != SILAccessKind::Read)
+      return false;
+    // We don't have to recursively call collectLoads for the beginAccess
+    // result, because a SILAccessKind::Read already guarantees that there are
+    // no writes to the beginAccess result address (or any projection from it).
+    // But we have to register the end-accesses as loads to correctly mark the
+    // end-of-lifetime of the temporary object.
+    for (Operand *accessUse : beginAccess->getUses()) {
+      if (auto *endAccess = dyn_cast<EndAccessInst>(accessUse->getUser())) {
+        if (endAccess->getParent() != block)
+          return false;
+        loadInsts.insert(endAccess);
+      }
+    }
+    return true;
+  }
   case SILInstructionKind::MarkDependenceInst: {
     auto mdi = cast<MarkDependenceInst>(user);
     // If the user is the base operand of the MarkDependenceInst we can return
