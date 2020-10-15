@@ -44,6 +44,11 @@ bool ReachableBlocks::visit(SILFunction *f,
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
+
+  for (SILArgument *arg : bb->getArguments()) {
+    arg->replaceAllUsesWithUndef();
+  }
+
   // Instructions in the dead block may be used by other dead blocks.  Replace
   // any uses of them with undef values.
   while (!bb->empty()) {
