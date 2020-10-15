@@ -414,6 +414,7 @@ ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
   case MethodInfo::Kind::DirectImpl:
     return MethodInfo(stored.TheImpl);
   }
+  llvm_unreachable("unhandled method info kind!");
 }
 
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,

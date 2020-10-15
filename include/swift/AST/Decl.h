@@ -3762,6 +3762,7 @@ public:
     case Contravariant:
       return Covariant;
     }
+    llvm_unreachable("unhandled self reference position!");
   }
 
   explicit operator bool() const { return kind > None; }

@@ -207,6 +207,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case SILFunctionType::Representation::Closure:
     llvm_unreachable("Expected a C-compatible representation.");
   }
+  llvm_unreachable("unhandled representation!");
 }
 
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,

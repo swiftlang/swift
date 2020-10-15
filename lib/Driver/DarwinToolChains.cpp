@@ -364,6 +364,7 @@ bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
   case BackDeployLibFilter::all:
     return true;
   }
+  llvm_unreachable("unhandled back deploy lib filter!");
 }
 
 }

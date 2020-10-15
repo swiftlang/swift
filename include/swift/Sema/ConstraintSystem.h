@@ -1907,6 +1907,7 @@ public:
     case Kind::patternBinding:
       return patternBinding;
     }
+    llvm_unreachable("invalid case label type");
   }
 
   VarDecl *getAsUninitializedWrappedVar() const {
@@ -1921,6 +1922,7 @@ public:
     case Kind::uninitializedWrappedVar:
       return uninitializedWrappedVar;
     }
+    llvm_unreachable("invalid case label type");
   }
 
   BraceStmt *getFunctionBody() const {

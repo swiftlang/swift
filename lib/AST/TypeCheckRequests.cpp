@@ -1467,8 +1467,12 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "non-generic";
     return;
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
+  case CustomAttrTypeKind::PropertyWrapper:
+    out << "property-wrapper";
+    return;
+
+  case CustomAttrTypeKind::GlobalActor:
+    out << "global-actor";
     return;
   }
   llvm_unreachable("bad kind");
@@ -1497,6 +1501,7 @@ bool ActorIsolation::requiresSubstitution() const {
   case GlobalActor:
     return getGlobalActor()->hasTypeParameter();
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
@@ -1509,6 +1514,7 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case GlobalActor:
     return forGlobalActor(getGlobalActor().subst(subs));
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 void swift::simple_display(

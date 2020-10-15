@@ -2638,8 +2638,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isAlwaysWeakImported())
     OS << "[weak_imported] ";
   auto availability = getAvailabilityForLinkage();
-  if (!availability.isAlwaysAvailable() &&
-      !availability.isKnownUnreachable()) {
+  if (!availability.isAlwaysAvailable()) {
     auto version = availability.getOSVersion().getLowerEndpoint();
     OS << "[available " << version.getAsString() << "] ";
   }

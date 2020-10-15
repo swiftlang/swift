@@ -154,23 +154,16 @@ private:
 
   SourceRange SrcRange;
 
-  /// Runtime availability information for the code in this context.
   AvailabilityContext AvailabilityInfo;
-
-  /// Runtime availability information as explicitly declared by attributes
-  /// for the inlinable code in this context. Compared to AvailabilityInfo,
-  /// this is not bounded to the minimum deployment OS version.
-  AvailabilityContext AvailabilityInfoExplicit;
 
   std::vector<TypeRefinementContext *> Children;
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityContext &Info,
-                        const AvailabilityContext &InfoExplicit);
+                        const AvailabilityContext &Info);
 
 public:
-
+  
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *createRoot(SourceFile *SF,
                                            const AvailabilityContext &Info);
@@ -179,9 +172,8 @@ public:
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
                                               const AvailabilityContext &Info,
-                                              const AvailabilityContext &InfoExplicit,
                                               SourceRange SrcRange);
-
+  
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
@@ -248,17 +240,9 @@ public:
   SourceRange getSourceRange() const { return SrcRange; }
 
   /// Returns the information on what can be assumed present at run time when
-  /// running code contained in this context, taking into account the minimum
-  /// deployment target.
+  /// running code contained in this context.
   const AvailabilityContext &getAvailabilityInfo() const {
     return AvailabilityInfo;
-  }
-
-  /// Returns the information on what can be assumed present at run time when
-  /// running code contained in this context if it were to be inlined,
-  /// without considering the minimum deployment target.
-  const AvailabilityContext &getAvailabilityInfoExplicit() const {
-    return AvailabilityInfoExplicit;
   }
 
   /// Adds a child refinement context.

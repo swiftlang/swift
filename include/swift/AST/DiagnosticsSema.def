@@ -2455,16 +2455,10 @@ NOTE(suggest_removing_override, none,
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
       (DeclBaseName))
-WARNING(override_less_available_warn,none,
-        "overriding %0 must be as available as declaration it overrides",
-        (DeclBaseName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
       (DescriptiveDeclKind, DeclBaseName))
-WARNING(override_accessor_less_available_warn,none,
-        "overriding %0 for %1 must be as available as declaration it overrides",
-        (DescriptiveDeclKind, DeclBaseName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",

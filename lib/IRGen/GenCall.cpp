@@ -1015,7 +1015,7 @@ namespace {
     llvm::Type *convertVectorType(clang::CanQual<clang::VectorType> type) {
       auto eltTy =
         convertBuiltinType(type->getElementType().castAs<clang::BuiltinType>());
-      return llvm::VectorType::get(eltTy, type->getNumElements());
+      return llvm::FixedVectorType::get(eltTy, type->getNumElements());
     }
 
     llvm::Type *convertBuiltinType(clang::CanQual<clang::BuiltinType> type) {
