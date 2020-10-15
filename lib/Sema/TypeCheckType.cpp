@@ -813,13 +813,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   const auto result = TypeChecker::applyUnboundGenericArguments(
       decl, unboundType->getParent(), loc, resolution, args);
 
-  const auto genericOptions = genericResolution.getOptions();
-  if (!genericOptions.contains(TypeResolutionFlags::AllowUnavailable)) {
-    if (genericOptions.isAnyExpr() || dc->getParent()->isLocalContext())
-      if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        TypeChecker::diagnoseGenericTypeExportability(loc, result, dc);
-  }
-
   // Migration hack.
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {

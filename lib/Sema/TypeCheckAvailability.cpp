@@ -2458,6 +2458,20 @@ public:
       walkInOutExpr(IO);
       return skipChildren();
     }
+    if (auto T = dyn_cast<TypeExpr>(E)) {
+      if (!T->isImplicit())
+        if (auto type = T->getType())
+          diagnoseTypeAvailability(type, E->getLoc(), DC);
+    }
+    if (auto CE = dyn_cast<ClosureExpr>(E)) {
+      for (auto *param : *CE->getParameters()) {
+        diagnoseTypeAvailability(param->getInterfaceType(), E->getLoc(), DC);
+      }
+      diagnoseTypeAvailability(CE->getResultType(), E->getLoc(), DC);
+    }
+    if (auto IE = dyn_cast<IsExpr>(E)) {
+      diagnoseTypeAvailability(IE->getCastType(), E->getLoc(), DC);
+    }
 
     return visitChildren();
   }
@@ -2893,6 +2907,14 @@ public:
   bool walkToTypeReprPre(TypeRepr *T) override {
     diagnoseTypeReprAvailability(T, DC);
     return false;
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+    if (auto *IP = dyn_cast<IsPattern>(P))
+      if (auto T = IP->getCastType())
+        diagnoseTypeAvailability(T, P->getLoc(), DC);
+
+    return std::make_pair(true, P);
   }
 };
 

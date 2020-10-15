@@ -2071,8 +2071,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
     // Check the type for references to unavailable conformances.
     if (type)
-      if (!context->getDeclContext()->isLocalContext())
-        diagnoseTypeAvailability(type, context->getLoc(), DC);
+      diagnoseTypeAvailability(type, context->getLoc(), DC);
   }
 
   void checkGenericParams(const GenericContext *ownerCtx,
