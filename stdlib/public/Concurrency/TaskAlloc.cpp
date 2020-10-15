@@ -1,4 +1,4 @@
-//===------------ Concurrency.cpp - Swift Concurrency Support ------------===//
+//===--- TaskAlloc.cpp - Task-local stack allocator -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,28 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implementations of the concurrency runtime functions.
+// A task-local allocator that obeys a stack discipline.
 //
-// void *swift_taskAlloc(SwiftTask *task, size_t size);
-// void swift_taskDealloc(SwiftTask *task, void *ptr);
+// Because allocation is task-local, and there's at most one thread
+// running a task at once, no synchronization is required.
 //
 //===----------------------------------------------------------------------===//
 
-#include "../SwiftShims/Visibility.h"
-#include "swift/Runtime/Config.h"
-#include <cstddef>
+#include "swift/Runtime/Concurrency.h"
 #include <stdlib.h>
 
-struct SwiftTask;
+using namespace swift;
 
-SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift)
-void *swift_taskAlloc(SwiftTask *task, size_t size) {
+void *swift::swift_task_alloc(AsyncTask *task, size_t size) {
   return malloc(size);
 }
 
-SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift)
-void swift_taskDealloc(SwiftTask *task, void *ptr) {
+void swift::swift_task_dealloc(AsyncTask *task, void *ptr) {
   free(ptr);
 }

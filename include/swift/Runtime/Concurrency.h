@@ -21,6 +21,22 @@
 
 namespace swift {
 
+/// Allocate memory in a task.
+///
+/// This must be called synchronously with the task.
+///
+/// All allocations will be rounded to a multiple of MAX_ALIGNMENT.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_task_alloc(AsyncTask *task, size_t size);
+
+/// Deallocate memory in a task.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_dealloc(AsyncTask *task, void *ptr);
+
 /// Cancel a task and all of its child tasks.
 ///
 /// This can be called from any thread.
