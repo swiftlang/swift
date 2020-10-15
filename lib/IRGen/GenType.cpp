@@ -1216,7 +1216,7 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Alignment align,
                                                 Alignment pointerAlignment) {
   SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
-  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
+  for (unsigned bit = 0; Alignment(1ull << bit) != pointerAlignment; ++bit) {
     spareBits.setBit(bit);
   }
 
@@ -1872,7 +1872,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
       = convertPrimitiveBuiltin(IGM,
                                 vecTy->getElementType()->getCanonicalType());
 
-    auto llvmVecTy = llvm::VectorType::get(elementTy, vecTy->getNumElements());
+    auto llvmVecTy = llvm::FixedVectorType::get(elementTy, vecTy->getNumElements());
     unsigned bitSize = size.getValue() * vecTy->getNumElements() * 8;
     if (!llvm::isPowerOf2_32(bitSize))
       bitSize = llvm::NextPowerOf2(bitSize);

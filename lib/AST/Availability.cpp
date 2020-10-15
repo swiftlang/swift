@@ -144,13 +144,8 @@ static bool isBetterThan(const AvailableAttr *newAttr,
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->Platform == newAttr->Platform) {
-    if (newAttr->isUnconditionallyUnavailable())
-      return true;
-    if (prevAttr->isUnconditionallyUnavailable())
-      return false;
+  if (prevAttr->Platform == newAttr->Platform)
     return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
-  }
 
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr->Platform,
@@ -163,12 +158,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr ||
+    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx) ||
         AvailAttr->isLanguageVersionSpecific() ||
-        AvailAttr->isPackageDescriptionVersionSpecific() ||
-        (!AvailAttr->Introduced.hasValue() &&
-         !AvailAttr->isUnconditionallyUnavailable())) {
+        AvailAttr->isPackageDescriptionVersionSpecific()) {
       continue;
     }
 
@@ -178,9 +171,6 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 
   if (!bestAvailAttr)
     return None;
-
-  if (bestAvailAttr->isUnconditionallyUnavailable())
-      return AvailabilityContext(VersionRange::empty());
 
   return AvailabilityContext{
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};

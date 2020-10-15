@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -170,30 +171,13 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    AvailabilityContext ExplicitDeclInfo =
+    AvailabilityContext DeclInfo =
         swift::AvailabilityInference::availableRange(D, Context);
-    ExplicitDeclInfo.intersectWith(
-        getCurrentTRC()->getAvailabilityInfoExplicit());
-    AvailabilityContext DeclInfo = ExplicitDeclInfo;
-
-    // When the body is inlinable consider only the explicitly declared range
-    // for checking availability. Otherwise, use the parent range which may
-    // begin at the minimum deployment target.
-    //
-    // Also use the parent range when reading swiftinterfaces for
-    // retrocompatibility.
-    bool isInlinable = D->getAttrs().hasAttribute<InlinableAttr>() ||
-                       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
-    SourceFile *SF = D->getDeclContext()->getParentSourceFile();
-    if (!isInlinable || (SF && SF->Kind == SourceFileKind::Interface)) {
-      DeclInfo.intersectWith(
-          getCurrentTRC()->getAvailabilityInfo());
-    }
+    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
                                              DeclInfo,
-                                             ExplicitDeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -207,27 +191,19 @@ private:
     
     return NewTRC;
   }
-
+  
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-
-    // Explicit inlinability may to the decl being used on an earlier OS
-    // version when inlined on the client side. This check assumes that
-    // implicit decls are handled elsewhere.
-    bool isExplicitlyInlinable = !D->isImplicit() &&
-      (D->getAttrs().hasAttribute<InlinableAttr>() ||
-       D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>());
-
+    
     // No need to introduce a context if the declaration does not have an
-    // availability or non-implicit inlinable attribute.
-    if (!hasActiveAvailableAttribute(D, Context) &&
-        !isExplicitlyInlinable) {
+    // availability attribute.
+    if (!hasActiveAvailableAttribute(D, Context)) {
       return false;
     }
-
+    
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
@@ -238,7 +214,7 @@ private:
         return false;
       }
     }
-
+    
     return true;
   }
 
@@ -699,7 +675,9 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  auto OverApproximateContext = AvailabilityContext::alwaysAvailable();
+  // We can assume we are running on at least the minimum deployment target.
+  auto OverApproximateContext =
+    AvailabilityContext::forDeploymentTarget(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
@@ -728,14 +706,6 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     if (MostRefined) {
       *MostRefined = TRC;
     }
-  }
-
-  // If we still don't have an introduction version, use the current deployment
-  // target. This covers cases where an inlinable function and its parent
-  // contexts don't have explicit availability attributes.
-  if (!OverApproximateContext.getOSVersion().hasLowerEndpoint()) {
-    auto currentOS = AvailabilityContext::forDeploymentTarget(Context);
-    OverApproximateContext.constrainWith(currentOS);
   }
 
   return OverApproximateContext;
@@ -2394,11 +2364,6 @@ public:
     FragileKind = DC->getFragileFunctionKind();
   }
 
-  // FIXME: Remove this
-  bool shouldWalkAccessorsTheOldWay() override {
-    return true;
-  }
-
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
   }
@@ -2462,6 +2427,20 @@ public:
       walkInOutExpr(IO);
       return skipChildren();
     }
+    if (auto T = dyn_cast<TypeExpr>(E)) {
+      if (!T->isImplicit())
+        if (auto type = T->getType())
+          diagnoseTypeAvailability(type, E->getLoc(), DC);
+    }
+    if (auto CE = dyn_cast<ClosureExpr>(E)) {
+      for (auto *param : *CE->getParameters()) {
+        diagnoseTypeAvailability(param->getInterfaceType(), E->getLoc(), DC);
+      }
+      diagnoseTypeAvailability(CE->getResultType(), E->getLoc(), DC);
+    }
+    if (auto IE = dyn_cast<IsExpr>(E)) {
+      diagnoseTypeAvailability(IE->getCastType(), E->getLoc(), DC);
+    }
 
     return visitChildren();
   }
@@ -2471,6 +2450,11 @@ public:
     ExprStack.pop_back();
 
     return E;
+  }
+
+  bool walkToTypeReprPre(TypeRepr *T) override {
+    diagnoseTypeReprAvailability(T, DC);
+    return false;
   }
 
   bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
@@ -2874,6 +2858,178 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 void swift::diagAvailability(const Expr *E, DeclContext *DC) {
   AvailabilityWalker walker(DC);
   const_cast<Expr*>(E)->walk(walker);
+}
+
+namespace {
+
+class StmtAvailabilityWalker : public ASTWalker {
+  DeclContext *DC;
+
+public:
+  explicit StmtAvailabilityWalker(DeclContext *DC) : DC(DC) {}
+
+  /// We'll visit the expression from performSyntacticExprDiagnostics().
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    return std::make_pair(false, E);
+  }
+
+  bool walkToTypeReprPre(TypeRepr *T) override {
+    diagnoseTypeReprAvailability(T, DC);
+    return false;
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+    if (auto *IP = dyn_cast<IsPattern>(P))
+      if (auto T = IP->getCastType())
+        diagnoseTypeAvailability(T, P->getLoc(), DC);
+
+    return std::make_pair(true, P);
+  }
+};
+
+}
+
+void swift::diagAvailability(const Stmt *S, DeclContext *DC) {
+  // We'll visit the individual statements when we check them.
+  if (isa<BraceStmt>(S))
+    return;
+
+  StmtAvailabilityWalker walker(DC);
+  const_cast<Stmt*>(S)->walk(walker);
+}
+
+namespace {
+
+class TypeReprAvailabilityWalker : public ASTWalker {
+  DeclContext *DC;
+  DeclAvailabilityFlags flags;
+
+  bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
+    if (auto *typeDecl = ITR->getBoundDecl()) {
+      auto range = ITR->getNameLoc().getSourceRange();
+      if (diagnoseDeclAvailability(typeDecl, DC, range, flags))
+        return true;
+    }
+
+    bool foundAnyIssues = false;
+
+    if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(ITR)) {
+      auto genericFlags = flags;
+      genericFlags -= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
+      for (auto *genericArg : GTR->getGenericArgs()) {
+        if (diagnoseTypeReprAvailability(genericArg, DC, genericFlags))
+          foundAnyIssues = true;
+      }
+    }
+
+    return foundAnyIssues;
+  }
+
+public:
+  bool foundAnyIssues = false;
+
+  TypeReprAvailabilityWalker(DeclContext *DC,
+                             DeclAvailabilityFlags flags)
+      : DC(DC), flags(flags) {}
+
+  bool walkToTypeReprPre(TypeRepr *T) override {
+    if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
+      if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(ITR)) {
+        for (auto *comp : CTR->getComponents()) {
+          // If a parent type is unavailable, don't go on to diagnose
+          // the member since that will just produce a redundant
+          // diagnostic.
+          if (checkComponentIdentTypeRepr(comp)) {
+            foundAnyIssues = true;
+            break;
+          }
+        }
+      } else if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(T)) {
+        if (checkComponentIdentTypeRepr(GTR))
+          foundAnyIssues = true;
+      } else if (auto *STR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        if (checkComponentIdentTypeRepr(STR))
+          foundAnyIssues = true;
+      }
+
+      // We've already visited all the children above, so we don't
+      // need to recurse.
+      return false;
+    }
+
+    return true;
+  }
+};
+
+}
+
+bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
+                                         DeclAvailabilityFlags flags) {
+  TypeReprAvailabilityWalker walker(DC, flags);
+  const_cast<TypeRepr*>(T)->walk(walker);
+  return walker.foundAnyIssues;
+}
+
+namespace {
+
+class ProblematicTypeFinder : public TypeDeclFinder {
+  DeclContext *DC;
+  FragileFunctionKind FragileKind;
+  SourceLoc Loc;
+
+public:
+  ProblematicTypeFinder(DeclContext *DC, SourceLoc Loc)
+      : DC(DC), Loc(Loc) {
+    FragileKind = DC->getFragileFunctionKind();
+  }
+
+  Action visitNominalType(NominalType *ty) override {
+    if (FragileKind.kind != FragileFunctionKind::None)
+      TypeChecker::diagnoseGenericTypeExportability(Loc, ty, DC);
+    return Action::Continue;
+  }
+
+  Action visitBoundGenericType(BoundGenericType *ty) override {
+    if (FragileKind.kind != FragileFunctionKind::None)
+      TypeChecker::diagnoseGenericTypeExportability(Loc, ty, DC);
+    return Action::Continue;
+  }
+
+  Action visitTypeAliasType(TypeAliasType *ty) override {
+    if (FragileKind.kind != FragileFunctionKind::None)
+      TypeChecker::diagnoseGenericTypeExportability(Loc, ty, DC);
+    return Action::Continue;
+  }
+
+  // We diagnose unserializable Clang function types in the
+  // post-visitor so that we diagnose any unexportable component
+  // types first.
+  Action walkToTypePost(Type T) override {
+    if (FragileKind.kind != FragileFunctionKind::None) {
+      if (auto fnType = T->getAs<AnyFunctionType>()) {
+        if (auto clangType = fnType->getClangTypeInfo().getType()) {
+          auto &ctx = DC->getASTContext();
+          auto loader = ctx.getClangModuleLoader();
+          // Serialization will serialize the sugared type if it can,
+          // but we need the canonical type to be serializable or else
+          // canonicalization (e.g. in SIL) might break things.
+          if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
+            ctx.Diags.diagnose(Loc, diag::unexportable_clang_function_type,
+                               fnType);
+          }
+        }
+      }
+    }
+
+    return TypeDeclFinder::walkToTypePost(T);
+  }
+};
+
+}
+
+void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC) {
+  T.walk(ProblematicTypeFinder(DC, loc));
 }
 
 /// Run the Availability-diagnostics algorithm otherwise used in an expr

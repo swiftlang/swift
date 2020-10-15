@@ -2015,17 +2015,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${lldb_cmake_options[@]}"
                     )
 
-                # Figure out if we think this is a buildbot build.
-                # This will influence the lldb version line.
-                if [ ! -z "${JENKINS_HOME}" -a ! -z "${JOB_NAME}" -a ! -z "${BUILD_NUMBER}" ]; then
-                    LLDB_IS_BUILDBOT_BUILD=1
-                else
-                    LLDB_IS_BUILDBOT_BUILD=0
-                fi
-
-                # Get the build date.
-                LLDB_BUILD_DATE=$(date +%Y-%m-%d)
-
                 # Pick the right cache.
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                   cmake_cache="Apple-lldb-macOS.cmake"
@@ -2096,9 +2085,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_ENABLE_PYTHON=ON
                     -DLLDB_ENABLE_LZMA=OFF
                     -DLLDB_ENABLE_LUA=OFF
-                    -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                    -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
-                    -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
