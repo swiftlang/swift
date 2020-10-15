@@ -15,6 +15,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -65,6 +66,9 @@ public:
 
 protected:
   Type getStdlibType(StringRef name) const;
+
+  ProtocolType *createProtocol(llvm::StringRef protocolName,
+                               Type parent = Type());
 
   static ConstraintSystem::PotentialBindings
   inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar);

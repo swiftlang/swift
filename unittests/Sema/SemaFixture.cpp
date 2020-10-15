@@ -76,6 +76,17 @@ Type SemaTest::getStdlibType(StringRef name) const {
   return Type();
 }
 
+ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
+                                       Type parent) {
+  auto *PD = new (Context)
+      ProtocolDecl(DC, SourceLoc(), SourceLoc(),
+                   Context.getIdentifier(protocolName), /*Inherited=*/{},
+                   /*trailingWhere=*/nullptr);
+  PD->setImplicit();
+
+  return ProtocolType::get(PD, parent, Context);
+}
+
 ConstraintSystem::PotentialBindings
 SemaTest::inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar) {
   llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
