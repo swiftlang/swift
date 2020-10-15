@@ -20,7 +20,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                            MARK: General Helpers
+//                          MARK: FindAccessVisitor
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -146,8 +146,6 @@ public:
   }
 };
 
-enum NestedAccessTy { StopAtAccessBegin, IgnoreAccessBegin };
-
 // Find the origin of an access while skipping projections and casts and
 // handling phis.
 template <typename Impl>
@@ -155,14 +153,14 @@ class FindAccessVisitorImpl : public AccessUseDefChainVisitor<Impl, SILValue> {
   using SuperTy = AccessUseDefChainVisitor<Impl, SILValue>;
 
 protected:
-  NestedAccessTy nestedAccessTy;
+  NestedAccessType nestedAccessTy;
   StorageCastTy storageCastTy;
 
   SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
   bool hasUnknownOffset = false;
 
 public:
-  FindAccessVisitorImpl(NestedAccessTy nestedAccessTy,
+  FindAccessVisitorImpl(NestedAccessType nestedAccessTy,
                         StorageCastTy storageCastTy)
       : nestedAccessTy(nestedAccessTy), storageCastTy(storageCastTy) {}
 
@@ -188,7 +186,7 @@ public:
   // Override AccessUseDefChainVisitor to ignore access markers and find the
   // outer access base.
   SILValue visitNestedAccess(BeginAccessInst *access) {
-    if (nestedAccessTy == IgnoreAccessBegin)
+    if (nestedAccessTy == NestedAccessType::IgnoreAccessBegin)
       return access->getSource();
 
     return SuperTy::visitNestedAccess(access);
@@ -245,10 +243,10 @@ protected:
       return;
     }
     llvm::errs() << "Visiting ";
-    sourceAddr->dump();
+    sourceAddr->print(llvm::errs());
     llvm::errs() << "  not an address ";
-    nextAddr->dump();
-    nextAddr->getFunction()->dump();
+    nextAddr->print(llvm::errs());
+    nextAddr->getFunction()->print(llvm::errs());
     assert(false);
   }
 };
@@ -262,7 +260,7 @@ protected:
   Optional<SILValue> base;
 
 public:
-  FindAccessBaseVisitor(NestedAccessTy nestedAccessTy,
+  FindAccessBaseVisitor(NestedAccessType nestedAccessTy,
                         StorageCastTy storageCastTy)
       : FindAccessVisitorImpl(nestedAccessTy, storageCastTy) {}
 
@@ -315,10 +313,15 @@ public:
 
 } // end anonymous namespace
 
-SILValue swift::getAccessAddress(SILValue address) {
+//===----------------------------------------------------------------------===//
+//                            MARK: Standalone API
+//===----------------------------------------------------------------------===//
+
+SILValue swift::getTypedAccessAddress(SILValue address) {
   assert(address->getType().isAddress());
   SILValue accessAddress =
-      FindAccessBaseVisitor(StopAtAccessBegin, StopAtStorageCast)
+      FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
+                            StopAtStorageCast)
           .findBase(address);
   assert(accessAddress->getType().isAddress());
   return accessAddress;
@@ -327,15 +330,17 @@ SILValue swift::getAccessAddress(SILValue address) {
 // TODO: When the optimizer stops stripping begin_access markers and SILGen
 // protects all memory operations with at least an "unsafe" access scope, then
 // we should be able to assert that this returns a BeginAccessInst.
-SILValue swift::getAccessBegin(SILValue address) {
+SILValue swift::getAccessScope(SILValue address) {
   assert(address->getType().isAddress());
-  return FindAccessBaseVisitor(StopAtAccessBegin, IgnoreStorageCast)
+  return FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
+                               IgnoreStorageCast)
       .findBase(address);
 }
 
 // This is allowed to be called on a non-address pointer type.
 SILValue swift::getAccessBase(SILValue address) {
-  return FindAccessBaseVisitor(IgnoreAccessBegin, IgnoreStorageCast)
+  return FindAccessBaseVisitor(NestedAccessType::IgnoreAccessBegin,
+                               IgnoreStorageCast)
       .findBase(address);
 }
 
@@ -357,7 +362,7 @@ bool swift::isLetAddress(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
-//                            MARK: FindReferenceRoot
+//                          MARK: FindReferenceRoot
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -432,6 +437,18 @@ static SILValue findReferenceRoot(SILValue ref) {
 //                            MARK: AccessedStorage
 //===----------------------------------------------------------------------===//
 
+SILGlobalVariable *getReferencedGlobal(SILInstruction *inst) {
+  if (auto *gai = dyn_cast<GlobalAddrInst>(inst)) {
+    return gai->getReferencedGlobal();
+  }
+  if (auto apply = FullApplySite::isa(inst)) {
+    if (auto *funcRef = apply.getReferencedFunctionOrNull()) {
+      return getVariableOfGlobalInit(funcRef);
+    }
+  }
+  return nullptr;
+}
+
 constexpr unsigned AccessedStorage::TailIndex;
 
 AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
@@ -463,19 +480,13 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     setElementIndex(cast<SILFunctionArgument>(base)->getIndex());
     break;
   case Global:
-    if (auto *GAI = dyn_cast<GlobalAddrInst>(base))
-      global = GAI->getReferencedGlobal();
-    else {
-      FullApplySite apply(cast<ApplyInst>(base));
-      auto *funcRef = apply.getReferencedFunctionOrNull();
-      assert(funcRef);
-      global = getVariableOfGlobalInit(funcRef);
-      assert(global);
-      // Require a decl for all formally accessed globals defined in this
-      // module. (Access of globals defined elsewhere has Unidentified storage).
-      // AccessEnforcementWMO requires this.
-      assert(global->getDecl());
-    }
+    global = getReferencedGlobal(cast<SingleValueInstruction>(base));
+    // Require a decl for all formally accessed globals defined in this
+    // module. AccessEnforcementWMO requires this. Swift globals defined in
+    // another module either use an addressor, which has Unidentified
+    // storage. Imported non-Swift globals are accessed via global_addr but have
+    // no declaration.
+    assert(global->getDecl() || isa<GlobalAddrInst>(base));
     break;
   case Class: {
     // Do a best-effort to find the identity of the object being projected
@@ -493,6 +504,27 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     value = findReferenceRoot(RTA->getOperand());
     break;
   }
+  }
+}
+
+void AccessedStorage::visitRoots(
+    SILFunction *function,
+    llvm::function_ref<bool(SILValue)> visitor) const {
+  if (SILValue root = getRoot()) {
+    visitor(root);
+    return;
+  }
+  if (getKind() == Unidentified) {
+    return;
+  }
+  assert(getKind() == Global && function);
+  SILGlobalVariable *global = getGlobal();
+  for (auto &block : *function) {
+    for (auto &instruction : block) {
+      if (global == getReferencedGlobal(&instruction)) {
+        visitor(cast<SingleValueInstruction>(&instruction));
+      }
+    }
   }
 }
 
@@ -633,7 +665,7 @@ private:
   }
 
 public:
-  FindAccessedStorageVisitor(NestedAccessTy nestedAccessTy)
+  FindAccessedStorageVisitor(NestedAccessType nestedAccessTy)
       : FindAccessVisitorImpl(nestedAccessTy, IgnoreStorageCast) {}
 
   // Main entry point
@@ -676,41 +708,43 @@ public:
 
 } // end anonymous namespace
 
-AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
-  FindAccessedStorageVisitor visitor(IgnoreAccessBegin);
-  visitor.findStorage(sourceAddr);
+AccessedStorage AccessedStorage::compute(SILValue sourceAddress) {
+  FindAccessedStorageVisitor visitor(NestedAccessType::IgnoreAccessBegin);
+  visitor.findStorage(sourceAddress);
   return visitor.getStorage();
 }
 
-AccessedStorage swift::identifyAccessedStorageImpl(SILValue sourceAddr) {
-  FindAccessedStorageVisitor visitor(StopAtAccessBegin);
-  visitor.findStorage(sourceAddr);
+AccessedStorage AccessedStorage::computeInScope(SILValue sourceAddress) {
+  FindAccessedStorageVisitor visitor(NestedAccessType::StopAtAccessBegin);
+  visitor.findStorage(sourceAddress);
   return visitor.getStorage();
 }
 
 //===----------------------------------------------------------------------===//
-//                               AccessPath
+//                              MARK: AccessPath
 //===----------------------------------------------------------------------===//
 
 bool AccessPath::contains(AccessPath subPath) const {
-  assert(isValid() && subPath.isValid());
-
-  if (!storage.hasIdenticalBase(subPath.storage))
+  if (!isValid() || !subPath.isValid()) {
     return false;
-
+  }
+  if (!storage.hasIdenticalBase(subPath.storage)) {
+    return false;
+  }
   // Does the offset index match?
-  if (offset != subPath.offset || offset == UnknownOffset)
+  if (offset != subPath.offset || offset == UnknownOffset) {
     return false;
-
+  }
   return pathNode.node->isPrefixOf(subPath.pathNode.node);
 }
 
 bool AccessPath::mayOverlap(AccessPath otherPath) const {
-  assert(isValid() && otherPath.isValid());
+  if (!isValid() || !otherPath.isValid())
+    return true;
 
-  if (storage.isDistinctFrom(otherPath.storage))
+  if (storage.isDistinctFrom(otherPath.storage)) {
     return false;
-
+  }
   // If subpaths are disjoint, they do not overlap regardless of offset.
   if (!pathNode.node->isPrefixOf(otherPath.pathNode.node)
       && !otherPath.pathNode.node->isPrefixOf(pathNode.node)) {
@@ -752,9 +786,9 @@ class AccessPathVisitor : public FindAccessVisitorImpl<AccessPathVisitor> {
   int pendingOffset = 0;
 
 public:
-  AccessPathVisitor(SILModule *module)
-      : FindAccessVisitorImpl(IgnoreAccessBegin, IgnoreStorageCast),
-        module(module), storageVisitor(IgnoreAccessBegin) {}
+  AccessPathVisitor(SILModule *module, NestedAccessType nestedAccessTy)
+      : FindAccessVisitorImpl(nestedAccessTy, IgnoreStorageCast),
+        module(module), storageVisitor(NestedAccessType::IgnoreAccessBegin) {}
 
   // Main entry point.
   AccessPathWithBase findAccessPath(SILValue sourceAddr) && {
@@ -862,411 +896,15 @@ public:
 } // end anonymous namespace
 
 AccessPathWithBase AccessPathWithBase::compute(SILValue address) {
-  return AccessPathVisitor(address->getModule()).findAccessPath(address);
+  return AccessPathVisitor(address->getModule(),
+                           NestedAccessType::IgnoreAccessBegin)
+      .findAccessPath(address);
 }
 
-namespace {
-
-// Perform def-use DFS traversal along a given AccessPath. DFS terminates at
-// each discovered use.
-//
-// If \p collectOverlappingUses is false, then the collected uses all have the
-// same AccessPath. Uses that exactly match the AccessPath may either be exact
-// uses, or may be subobject projections within that access path, including
-// struct_element_addr and tuple_element_addr. The transitive uses of those
-// subobject projections are not included.
-//
-// If \p collectOverlappingUses is true, then the collected uses also include
-// uses that access an object that contains the given AccessPath. As before,
-// overlapping uses do not include transitive uses of subobject projections
-// contained by the current path; the def-use traversal stops at those
-// projections regardless of collectOverlappingUses. However, overlapping uses
-// may be at an unknown offset relative to the current path, so they don't
-// necessarily contain the current path.
-//
-// Example: path = "(#2)"
-//   %base = ...                            // access base
-//   load %base                             // containing use
-//   %elt1 = struct_element_addr %base, #1  // non-use (ignored)
-//   load %elt1                             // non-use (unseen)
-//   %elt2 = struct_element_addr %base, #2  // chained use (ignored)
-//   load %elt2                             // exact use
-//   %sub = struct_element_addr %elt2,  #i  // projection use
-//   load %sub                              // interior use (ignored)
-//
-// A use may be a BranchInst if the corresponding phi does not have common
-// AccessedStorage.
-//
-// For class storage, the def-use traversal starts at the reference
-// root. Eventually, traversal reach the base address of the formal access:
-//
-//   %ref = ...                        // reference root
-//   %base = ref_element_addr %refRoot // formal access address
-//   load %base                        // use
-class CollectAccessPathUses {
-  // Origin of the def-use traversal
-  AccessedStorage storage;
-
-  // Result: Exact uses, projection uses, and containing uses.
-  SmallVectorImpl<Operand *> &uses;
-
-  bool collectOverlappingUses;
-  unsigned useLimit;
-
-  // Access path indices from storage to exact uses
-  SmallVector<AccessPath::Index, 4> pathIndices; // in use-def order
-
-  // A point in the def-use traversal. isRef() is true only for object access
-  // prior to reaching the base address.
-  struct DFSEntry {
-    // Next potential use to visit and flag indicating whether traversal has
-    // reachaed the access base yet.
-    llvm::PointerIntPair<Operand *, 1, bool> useAndIsRef;
-    unsigned pathCursor; // position within pathIndices
-    int offset;          // index_addr offsets seen prior to this use
-
-    DFSEntry(Operand *use, bool isRef, unsigned pathCursor, int offset)
-        : useAndIsRef(use, isRef), pathCursor(pathCursor), offset(offset) {}
-
-    Operand *getUse() const { return useAndIsRef.getPointer(); }
-    // Is this pointer a reference?
-    bool isRef() const { return useAndIsRef.getInt(); }
-  };
-  SmallVector<DFSEntry, 16> dfsStack;
-
-  SmallPtrSet<const SILPhiArgument *, 4> visitedPhis;
-
-public:
-  CollectAccessPathUses(AccessPath accessPath, SmallVectorImpl<Operand *> &uses,
-                        bool collectOverlappingUses, unsigned useLimit)
-      : storage(accessPath.getStorage()), uses(uses),
-        collectOverlappingUses(collectOverlappingUses), useLimit(useLimit) {
-    assert(accessPath.isValid());
-    for (AccessPath::PathNode currentNode = accessPath.getPathNode();
-         !currentNode.isRoot(); currentNode = currentNode.getParent()) {
-      assert(currentNode.getIndex().isSubObjectProjection() &&
-             "a valid AccessPath does not contain any intermediate offsets");
-      pathIndices.push_back(currentNode.getIndex());
-    }
-    if (int offset = accessPath.getOffset())
-      pathIndices.push_back(AccessPath::Index::forOffset(offset));
-
-    // The search will start from the object root, not the formal access base,
-    // so add the class index to the front.
-    auto storage = accessPath.getStorage();
-    if (storage.getKind() == AccessedStorage::Class) {
-      pathIndices.push_back(AccessPath::Index::forSubObjectProjection(
-          storage.getPropertyIndex()));
-    }
-    if (storage.getKind() == AccessedStorage::Tail) {
-      pathIndices.push_back(AccessPath::Index::forSubObjectProjection(
-          ProjectionIndex::TailIndex));
-    }
-  }
-
-  // Return true if all uses were collected. This is always true as long as the
-  // access has a single root, or globalBase is provided, and there is no
-  // useLimit.
-  //
-  // For Global storage \p globalBase must be provided as the head of the
-  // def-use search.
-  bool collectUses(SILValue globalBase = SILValue()) && {
-    SILValue root = storage.getRoot();
-    if (!root) {
-      assert(storage.getKind() == AccessedStorage::Global);
-      if (!globalBase)
-        return false;
-
-      root = globalBase;
-    }
-    // If the expected path has an unknown offset, then none of the uses are
-    // exact.
-    if (!collectOverlappingUses && !pathIndices.empty()
-        && pathIndices.back().isUnknownOffset()) {
-      return true;
-    }
-    pushUsers(root,
-              DFSEntry(nullptr, storage.isReference(), pathIndices.size(), 0));
-    while (!dfsStack.empty()) {
-      if (!visitUser(dfsStack.pop_back_val()))
-        return false;
-    }
-    return true;
-  }
-
-protected:
-  void pushUsers(SILValue def, const DFSEntry &dfs) {
-    for (auto *use : def->getUses())
-      pushUser(DFSEntry(use, dfs.isRef(), dfs.pathCursor, dfs.offset));
-  }
-
-  void pushUser(DFSEntry dfs) {
-    Operand *use = dfs.getUse();
-    if (auto *bi = dyn_cast<BranchInst>(use->getUser())) {
-      if (pushPhiUses(bi->getArgForOperand(use), dfs))
-        return;
-    }
-    // If we didn't find and process a phi, continue DFS.
-    dfsStack.emplace_back(dfs);
-  }
-
-  // Return true if this phi has been processed and does not need to be
-  // considered as a separate use.
-  bool pushPhiUses(const SILPhiArgument *phi, DFSEntry dfs) {
-    if (!visitedPhis.insert(phi).second)
-      return true;
-
-    // If this phi has a common base, continue to follow the access path. This
-    // check is different for reference types vs pointer types.
-    if (dfs.isRef()) {
-      assert(!dfs.offset && "index_addr not allowed on reference roots");
-      // When isRef is true, the address access hasn't been seen yet and
-      // we're still following the reference root's users. Check if all phi
-      // inputs have the same reference root before looking through it.
-      if (findReferenceRoot(phi) == storage.getObject()) {
-        pushUsers(phi, dfs);
-        return true;
-      }
-      // The branch will be pushed onto the normal user list.
-      return false;
-    }
-    // Check if all phi inputs have the same accessed storage before
-    // looking through it. If the phi input differ the its storage is invalid.
-    auto phiPath = AccessPath::compute(phi);
-    if (phiPath.isValid()) {
-      assert(phiPath.getStorage().hasIdenticalBase(storage)
-             && "inconsistent phi storage");
-      // If the phi paths have different offsets, its path has unknown offset.
-      if (phiPath.getOffset() == AccessPath::UnknownOffset) {
-        if (!collectOverlappingUses)
-          return true;
-        dfs.offset = AccessPath::UnknownOffset;
-      }
-      pushUsers(phi, dfs);
-      return true;
-    }
-    // The branch will be pushed onto the normal user list.
-    return false;
-  }
-
-  // Return the offset at the current DFS path cursor, or zero.
-  int getPathOffset(const DFSEntry &dfs) const {
-    if (dfs.pathCursor == 0
-        || pathIndices[dfs.pathCursor - 1].isSubObjectProjection()) {
-      return 0;
-    }
-    return pathIndices[dfs.pathCursor - 1].getOffset();
-  }
-
-  // Returns true as long as the useLimit is not reached.
-  bool visitUser(DFSEntry dfs) {
-    Operand *use = dfs.getUse();
-    assert(!(dfs.isRef() && use->get()->getType().isAddress()));
-    if (auto *svi = dyn_cast<SingleValueInstruction>(use->getUser())) {
-      if (use->getOperandNumber() == 0
-          && visitSingleValueUser(svi, dfs) == IgnoredUse) {
-        return true;
-      }
-    }
-    // We weren't able to "see through" any more address conversions; so
-    // record this as a use.
-
-    // Do the path offsets match?
-    if (!checkAndUpdateOffset(dfs))
-      return true;
-
-    // Is this a full or partial path match?
-    if (!collectOverlappingUses && dfs.pathCursor > 0)
-      return true;
-
-    // Record the use if we haven't reached the limit.
-    if (uses.size() == useLimit)
-      return false;
-
-    uses.push_back(use);
-    return true;
-  }
-
-  // Return true if the accumulated offset matches the current path index.
-  // Update the DFSEntry and pathCursor to skip remaining offsets.
-  bool checkAndUpdateOffset(DFSEntry &dfs) {
-    int pathOffset = getPathOffset(dfs);
-    if (pathOffset == 0) {
-      // No offset is on the expected path.
-      if (collectOverlappingUses && dfs.offset == AccessPath::UnknownOffset) {
-        dfs.offset = 0;
-      }
-      return dfs.offset == 0;
-    }
-    // pop the offset from the expected path; there should only be one.
-    --dfs.pathCursor;
-    assert(getPathOffset(dfs) == 0 && "only one offset index allowed");
-
-    int useOffset = dfs.offset;
-    dfs.offset = 0;
-
-    // Ignore all uses on this path unless we're collecting containing uses.
-    // UnknownOffset appears to overlap with all offsets and subobject uses.
-    if (pathOffset == AccessPath::UnknownOffset
-        || useOffset == AccessPath::UnknownOffset) {
-      return collectOverlappingUses;
-    }
-    // A known offset must match regardless of collectOverlappingUses.
-    return pathOffset == useOffset;
-  }
-
-  enum UseKind { LeafUse, IgnoredUse };
-  UseKind visitSingleValueUser(SingleValueInstruction *svi, DFSEntry dfs);
-
-  // Handle non-index_addr projections.
-  UseKind followProjection(SingleValueInstruction *svi, DFSEntry dfs) {
-    if (!checkAndUpdateOffset(dfs))
-      return IgnoredUse;
-
-    if (dfs.pathCursor == 0)
-      return LeafUse;
-
-    AccessPath::Index pathIndex = pathIndices[dfs.pathCursor - 1];
-    auto projIdx = ProjectionIndex(svi);
-    assert(projIdx.isValid());
-    // Only subobjects indices are expected because offsets are handled above.
-    if (projIdx.Index == pathIndex.getSubObjectIndex()) {
-      --dfs.pathCursor;
-      pushUsers(svi, dfs);
-    }
-    return IgnoredUse;
-  }
-};
-
-} // end anonymous namespace
-
-// During the def-use traversal, visit a single-value instruction in which the
-// used address is at operand zero.
-//
-// This must handle the def-use side of all operations that
-// AccessUseDefChainVisitor::visit can handle.
-//
-// Return IgnoredUse if the def-use traversal either continues past \p
-// svi or ignores this use.
-//
-// FIXME: Reuse getAccessProjectionOperand() instead of using special cases once
-// the unchecked_take_enum_data_addr -> load -> project_box pattern is fixed.
-CollectAccessPathUses::UseKind
-CollectAccessPathUses::visitSingleValueUser(SingleValueInstruction *svi,
-                                            DFSEntry dfs) {
-  if (isAccessedStorageCast(svi)) {
-    pushUsers(svi, dfs);
-    return IgnoredUse;
-  }
-  switch (svi->getKind()) {
-  default:
-    return LeafUse;
-
-  case SILInstructionKind::BeginAccessInst:
-    pushUsers(svi, dfs);
-    return IgnoredUse;
-
-  // Handle ref_element_addr since we start at the object root instead of
-  // the access base.
-  case SILInstructionKind::RefElementAddrInst:
-    assert(dfs.isRef());
-    assert(dfs.pathCursor > 0 && "ref_element_addr cannot occur within access");
-    dfs.useAndIsRef.setInt(false);
-    return followProjection(svi, dfs);
-
-  case SILInstructionKind::RefTailAddrInst: {
-    assert(dfs.isRef());
-    assert(dfs.pathCursor > 0 && "ref_tail_addr cannot occur within an access");
-    dfs.useAndIsRef.setInt(false);
-    --dfs.pathCursor;
-    AccessPath::Index pathIndex = pathIndices[dfs.pathCursor];
-    assert(pathIndex.isSubObjectProjection());
-    if (pathIndex.getSubObjectIndex() == AccessedStorage::TailIndex)
-      pushUsers(svi, dfs);
-
-    return IgnoredUse;
-  }
-
-  // MARK: Access projections
-
-  case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst:
-    return followProjection(svi, dfs);
-
-  case SILInstructionKind::IndexAddrInst:
-  case SILInstructionKind::TailAddrInst: {
-    auto projIdx = ProjectionIndex(svi);
-    if (projIdx.isValid()) {
-      if (dfs.offset != AccessPath::UnknownOffset)
-        dfs.offset += projIdx.Index;
-      else
-        assert(collectOverlappingUses);
-    } else if (collectOverlappingUses) {
-      dfs.offset = AccessPath::UnknownOffset;
-    } else {
-      return IgnoredUse;
-    }
-    pushUsers(svi, dfs);
-    return IgnoredUse;
-  }
-
-  // open_existential_addr and unchecked_take_enum_data_addr are classified as
-  // access projections, but they also modify memory. Both see through them and
-  // also report them as uses.
-  case SILInstructionKind::OpenExistentialAddrInst:
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-    pushUsers(svi, dfs);
-    return LeafUse;
-
-  case SILInstructionKind::StructExtractInst:
-    // Handle nested access to a KeyPath projection. The projection itself
-    // uses a Builtin. However, the returned UnsafeMutablePointer may be
-    // converted to an address and accessed via an inout argument.
-    if (isUnsafePointerExtraction(cast<StructExtractInst>(svi))) {
-      pushUsers(svi, dfs);
-      return IgnoredUse;
-    }
-    return LeafUse;
-
-  case SILInstructionKind::LoadInst:
-    // Load a box from an indirect payload of an opaque enum. See comments
-    // in AccessUseDefChainVisitor::visit. Record this load as a leaf-use even
-    // when we look through its project_box because anyone inspecting the load
-    // itself will see the same AccessPath.
-    // FIXME: if this doesn't go away with opaque values, add a new instruction
-    // for load+project_box.
-    if (svi->getType().is<SILBoxType>()) {
-      Operand *addrOper = &cast<LoadInst>(svi)->getOperandRef();
-      assert(isa<UncheckedTakeEnumDataAddrInst>(addrOper->get()));
-      // Push the project_box uses
-      for (auto *use : svi->getUses()) {
-        if (isa<ProjectBoxInst>(use->getUser()))
-          pushUser(DFSEntry(use, dfs.isRef(), dfs.pathCursor, dfs.offset));
-      }
-    }
-    return LeafUse;
-  }
-}
-
-bool AccessPath::collectUses(SmallVectorImpl<Operand *> &uses,
-                             bool collectOverlappingUses,
-                             unsigned useLimit) const {
-  return CollectAccessPathUses(*this, uses, collectOverlappingUses, useLimit)
-      .collectUses();
-}
-
-bool AccessPathWithBase::collectUses(SmallVectorImpl<Operand *> &uses,
-                                     bool collectOverlappingUses,
-                                     unsigned useLimit) const {
-  CollectAccessPathUses collector(accessPath, uses, collectOverlappingUses,
-                                  useLimit);
-  if (accessPath.getRoot())
-    return std::move(collector).collectUses();
-
-  if (!base)
-    return false;
-
-  return std::move(collector).collectUses(base);
+AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
+  return AccessPathVisitor(address->getModule(),
+                           NestedAccessType::StopAtAccessBegin)
+      .findAccessPath(address);
 }
 
 void AccessPath::Index::print(raw_ostream &os) const {
@@ -1333,6 +971,480 @@ void AccessPathWithBase::print(raw_ostream &os) const {
 
 LLVM_ATTRIBUTE_USED void AccessPathWithBase::dump() const {
   print(llvm::dbgs());
+}
+
+//===----------------------------------------------------------------------===//
+//                      MARK: AccessPathDefUseTraversal
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Perform def-use DFS traversal along a given AccessPath. DFS terminates at
+// each discovered use.
+//
+// For useTy == Exact, the collected uses all have the same AccessPath.
+// Subobject projections within that access path and their transitive uses are
+// not included.
+//
+// For useTy == Inner, the collected uses to subobjects contained by the
+// current access path.
+//
+// For useTy == Overlapping, the collected uses also include uses that
+// access an object that contains the given AccessPath as well as uses at
+// an unknown offset relative to the current path.
+//
+// Example, where AccessPath == (#2):
+//   %base = ...                            // access base
+//   load %base                             // containing use
+//   %elt1 = struct_element_addr %base, #1  // non-use (ignored)
+//   load %elt1                             // non-use (unseen)
+//   %elt2 = struct_element_addr %base, #2  // outer projection (followed)
+//   load %elt2                             // exact use
+//   %sub = struct_element_addr %elt2,  #i  // inner projection (followed)
+//   load %sub                              // inner use
+//
+// A use may be a BranchInst if the corresponding phi does not have common
+// AccessedStorage.
+//
+// For class storage, the def-use traversal starts at the reference
+// root. Eventually, traversal reach the base address of the formal access:
+//
+//   %ref = ...                        // reference root
+//   %base = ref_element_addr %refRoot // formal access address
+//   load %base                        // use
+class AccessPathDefUseTraversal {
+  AccessUseVisitor &visitor;
+
+  // The origin of the def-use traversal.
+  AccessedStorage storage;
+
+  // Remaining access path indices from the most recently visited def to any
+  // exact use in def-use order.
+  SmallVector<AccessPath::Index, 4> pathIndices;
+
+  // A point in the def-use traversal. isRef() is true only for object access
+  // prior to reaching the base address.
+  struct DFSEntry {
+    // Next potential use to visit and flag indicating whether traversal has
+    // reachaed the access base yet.
+    llvm::PointerIntPair<Operand *, 1, bool> useAndIsRef;
+    int pathCursor; // position within pathIndices
+    int offset;     // index_addr offsets seen prior to this use
+
+    DFSEntry(Operand *use, bool isRef, int pathCursor, int offset)
+        : useAndIsRef(use, isRef), pathCursor(pathCursor), offset(offset) {}
+
+    Operand *getUse() const { return useAndIsRef.getPointer(); }
+    // Is this pointer a reference?
+    bool isRef() const { return useAndIsRef.getInt(); }
+  };
+  SmallVector<DFSEntry, 16> dfsStack;
+
+  SmallPtrSet<const SILPhiArgument *, 4> visitedPhis;
+
+  // Transient traversal data should not be copied.
+  AccessPathDefUseTraversal(const AccessPathDefUseTraversal &) = delete;
+  AccessPathDefUseTraversal &
+  operator=(const AccessPathDefUseTraversal &) = delete;
+
+public:
+  AccessPathDefUseTraversal(AccessUseVisitor &visitor, AccessPath accessPath,
+                            SILFunction *function)
+    : visitor(visitor), storage(accessPath.getStorage()) {
+    assert(accessPath.isValid());
+
+    initializePathIndices(accessPath);
+
+    storage.visitRoots(function, [this](SILValue root) {
+      initializeDFS(root);
+      return true;
+    });
+  }
+
+  // Return true is all uses have been visited.
+  bool visitUses() {
+    // Return false if initialization failed.
+    if (!storage) {
+      return false;
+    }
+    while (!dfsStack.empty()) {
+      if (!visitUser(dfsStack.pop_back_val()))
+        return false;
+    }
+    return true;
+  }
+
+protected:
+  void initializeDFS(SILValue root) {
+    // If root is a phi, record it so that its uses aren't visited twice.
+    if (auto *phi = dyn_cast<SILPhiArgument>(root)) {
+      if (phi->isPhiArgument())
+        visitedPhis.insert(phi);
+    }
+    pushUsers(root,
+              DFSEntry(nullptr, storage.isReference(), pathIndices.size(), 0));
+  }
+
+  void pushUsers(SILValue def, const DFSEntry &dfs) {
+    for (auto *use : def->getUses())
+      pushUser(DFSEntry(use, dfs.isRef(), dfs.pathCursor, dfs.offset));
+  }
+
+  void pushUser(DFSEntry dfs) {
+    Operand *use = dfs.getUse();
+    if (auto *bi = dyn_cast<BranchInst>(use->getUser())) {
+      if (pushPhiUses(bi->getArgForOperand(use), dfs))
+        return;
+    }
+    // If we didn't find and process a phi, continue DFS.
+    dfsStack.emplace_back(dfs);
+  }
+
+  bool pushPhiUses(const SILPhiArgument *phi, DFSEntry dfs);
+
+  void initializePathIndices(AccessPath accessPath);
+
+  // Return the offset at the current DFS path cursor, or zero.
+  int getPathOffset(const DFSEntry &dfs) const;
+
+  // Return true if the accumulated offset matches the current path index.
+  // Update the DFSEntry and pathCursor to skip remaining offsets.
+  bool checkAndUpdateOffset(DFSEntry &dfs);
+
+  // Handle non-index_addr projections.
+  void followProjection(SingleValueInstruction *svi, DFSEntry dfs);
+
+  enum UseKind { LeafUse, IgnoredUse };
+  UseKind visitSingleValueUser(SingleValueInstruction *svi, DFSEntry dfs);
+
+  // Returns true as long as the visitor returns true.
+  bool visitUser(DFSEntry dfs);
+};
+
+} // end anonymous namespace
+
+// Initialize the array of remaining path indices.
+void AccessPathDefUseTraversal::initializePathIndices(AccessPath accessPath) {
+  for (AccessPath::PathNode currentNode = accessPath.getPathNode();
+       !currentNode.isRoot(); currentNode = currentNode.getParent()) {
+    assert(currentNode.getIndex().isSubObjectProjection()
+           && "a valid AccessPath does not contain any intermediate offsets");
+    pathIndices.push_back(currentNode.getIndex());
+  }
+  if (int offset = accessPath.getOffset()) {
+    pathIndices.push_back(AccessPath::Index::forOffset(offset));
+  }
+  // The search will start from the object root, not the formal access base,
+  // so add the class index to the front.
+  if (storage.getKind() == AccessedStorage::Class) {
+    pathIndices.push_back(
+        AccessPath::Index::forSubObjectProjection(storage.getPropertyIndex()));
+  }
+  if (storage.getKind() == AccessedStorage::Tail) {
+    pathIndices.push_back(
+        AccessPath::Index::forSubObjectProjection(ProjectionIndex::TailIndex));
+  }
+  // If the expected path has an unknown offset, then none of the uses are
+  // exact.
+  if (!visitor.findOverlappingUses() && !pathIndices.empty()
+      && pathIndices.back().isUnknownOffset()) {
+    return;
+  }
+}
+
+// Return true if this phi has been processed and does not need to be
+// considered as a separate use.
+bool AccessPathDefUseTraversal::pushPhiUses(const SILPhiArgument *phi,
+                                            DFSEntry dfs) {
+  if (!visitedPhis.insert(phi).second)
+    return true;
+
+  // If this phi has a common base, continue to follow the access path. This
+  // check is different for reference types vs pointer types.
+  if (dfs.isRef()) {
+    assert(!dfs.offset && "index_addr not allowed on reference roots");
+    // When isRef is true, the address access hasn't been seen yet and
+    // we're still following the reference root's users. Check if all phi
+    // inputs have the same reference root before looking through it.
+    if (findReferenceRoot(phi) == storage.getObject()) {
+      pushUsers(phi, dfs);
+      return true;
+    }
+    // The branch will be pushed onto the normal user list.
+    return false;
+  }
+  // Check if all phi inputs have the same accessed storage before
+  // looking through it. If the phi input differ the its storage is invalid.
+  auto phiPath = AccessPath::compute(phi);
+  if (phiPath.isValid()) {
+    assert(phiPath.getStorage().hasIdenticalBase(storage)
+           && "inconsistent phi storage");
+    // If the phi paths have different offsets, its path has unknown offset.
+    if (phiPath.getOffset() == AccessPath::UnknownOffset) {
+      if (!visitor.findOverlappingUses())
+        return true;
+      dfs.offset = AccessPath::UnknownOffset;
+    }
+    pushUsers(phi, dfs);
+    return true;
+  }
+  // The branch will be pushed onto the normal user list.
+  return false;
+}
+
+// Return the offset at the current DFS path cursor, or zero.
+int AccessPathDefUseTraversal::getPathOffset(const DFSEntry &dfs) const {
+  if (dfs.pathCursor <= 0
+      || pathIndices[dfs.pathCursor - 1].isSubObjectProjection()) {
+    return 0;
+  }
+  return pathIndices[dfs.pathCursor - 1].getOffset();
+}
+
+// Return true if the accumulated offset matches the current path index.
+// Update the DFSEntry and pathCursor to skip remaining offsets.
+bool AccessPathDefUseTraversal::checkAndUpdateOffset(DFSEntry &dfs) {
+  int pathOffset = getPathOffset(dfs);
+  if (dfs.offset == AccessPath::UnknownOffset) {
+    if (pathOffset > 0) {
+      // Pop the offset from the expected path; there should only be
+      // one. Continue matching subobject indices even after seeing an unknown
+      // offset. A subsequent mismatching subobject index is still considered
+      // non-overlapping. This is valid for aliasing since an offset from a
+      // subobject is considered an invalid access path.
+      --dfs.pathCursor;
+      assert(getPathOffset(dfs) == 0 && "only one offset index allowed");
+    }
+    // Continue searching only if we need to find overlapping uses. Preserve the
+    // unknown dfs offset so we don't consider any dependent operations to be
+    // exact or inner uses.
+    return visitor.findOverlappingUses();
+  }
+  if (pathOffset == 0) {
+    return dfs.offset == 0;
+  }
+  // pop the offset from the expected path; there should only be one.
+  --dfs.pathCursor;
+  assert(getPathOffset(dfs) == 0 && "only one offset index allowed");
+
+  // Ignore all uses on this path unless we're collecting containing uses.
+  // UnknownOffset appears to overlap with all offsets and subobject uses.
+  if (pathOffset == AccessPath::UnknownOffset) {
+    // Set the dfs offset to unknown to avoid considering any dependent
+    // operations as exact or inner uses.
+    dfs.offset = AccessPath::UnknownOffset;
+    return visitor.findOverlappingUses();
+  }
+  int useOffset = dfs.offset;
+  dfs.offset = 0;
+  // A known offset must match regardless of findOverlappingUses.
+  return pathOffset == useOffset;
+}
+
+// Handle non-index_addr projections.
+void AccessPathDefUseTraversal::followProjection(SingleValueInstruction *svi,
+                                                 DFSEntry dfs) {
+  if (!checkAndUpdateOffset(dfs)) {
+    return;
+  }
+  if (dfs.pathCursor <= 0) {
+    if (visitor.useTy == AccessUseType::Exact) {
+      assert(dfs.pathCursor == 0);
+      return;
+    }
+    --dfs.pathCursor;
+    pushUsers(svi, dfs);
+    return;
+  }
+  AccessPath::Index pathIndex = pathIndices[dfs.pathCursor - 1];
+  auto projIdx = ProjectionIndex(svi);
+  assert(projIdx.isValid());
+  // Only subobjects indices are expected because offsets are handled above.
+  if (projIdx.Index == pathIndex.getSubObjectIndex()) {
+    --dfs.pathCursor;
+    pushUsers(svi, dfs);
+  }
+  return;
+}
+
+// During the def-use traversal, visit a single-value instruction in which the
+// used address is at operand zero.
+//
+// This must handle the def-use side of all operations that
+// AccessUseDefChainVisitor::visit can handle.
+//
+// Return IgnoredUse if the def-use traversal either continues past \p
+// svi or ignores this use.
+//
+// FIXME: Reuse getAccessProjectionOperand() instead of using special cases once
+// the unchecked_take_enum_data_addr -> load -> project_box pattern is fixed.
+AccessPathDefUseTraversal::UseKind
+AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
+                                                DFSEntry dfs) {
+  if (isAccessedStorageCast(svi)) {
+    pushUsers(svi, dfs);
+    return IgnoredUse;
+  }
+  switch (svi->getKind()) {
+  default:
+    return LeafUse;
+
+  case SILInstructionKind::BeginAccessInst:
+    if (visitor.nestedAccessTy == NestedAccessType::StopAtAccessBegin) {
+      return LeafUse;
+    }
+    pushUsers(svi, dfs);
+    return IgnoredUse;
+
+  // Handle ref_element_addr since we start at the object root instead of
+  // the access base.
+  case SILInstructionKind::RefElementAddrInst:
+    assert(dfs.isRef());
+    assert(dfs.pathCursor > 0 && "ref_element_addr cannot occur within access");
+    dfs.useAndIsRef.setInt(false);
+    followProjection(svi, dfs);
+    return IgnoredUse;
+
+  case SILInstructionKind::RefTailAddrInst: {
+    assert(dfs.isRef());
+    assert(dfs.pathCursor > 0 && "ref_tail_addr cannot occur within an access");
+    dfs.useAndIsRef.setInt(false);
+    --dfs.pathCursor;
+    AccessPath::Index pathIndex = pathIndices[dfs.pathCursor];
+    assert(pathIndex.isSubObjectProjection());
+    if (pathIndex.getSubObjectIndex() == AccessedStorage::TailIndex)
+      pushUsers(svi, dfs);
+
+    return IgnoredUse;
+  }
+
+  // MARK: Access projections
+
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
+    followProjection(svi, dfs);
+    return IgnoredUse;
+
+  case SILInstructionKind::IndexAddrInst:
+  case SILInstructionKind::TailAddrInst: {
+    auto projIdx = ProjectionIndex(svi);
+    if (projIdx.isValid()) {
+      if (dfs.offset != AccessPath::UnknownOffset)
+        dfs.offset += projIdx.Index;
+      else
+        assert(visitor.findOverlappingUses());
+    } else if (visitor.findOverlappingUses()) {
+      dfs.offset = AccessPath::UnknownOffset;
+    } else {
+      return IgnoredUse;
+    }
+    pushUsers(svi, dfs);
+    return IgnoredUse;
+  }
+
+  // open_existential_addr and unchecked_take_enum_data_addr are classified as
+  // access projections, but they also modify memory. Both see through them and
+  // also report them as uses.
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+    pushUsers(svi, dfs);
+    return LeafUse;
+
+  case SILInstructionKind::StructExtractInst:
+    // Handle nested access to a KeyPath projection. The projection itself
+    // uses a Builtin. However, the returned UnsafeMutablePointer may be
+    // converted to an address and accessed via an inout argument.
+    if (isUnsafePointerExtraction(cast<StructExtractInst>(svi))) {
+      pushUsers(svi, dfs);
+      return IgnoredUse;
+    }
+    return LeafUse;
+
+  case SILInstructionKind::LoadInst:
+    // Load a box from an indirect payload of an opaque enum. See comments
+    // in AccessUseDefChainVisitor::visit. Record this load as a leaf-use even
+    // when we look through its project_box because anyone inspecting the load
+    // itself will see the same AccessPath.
+    // FIXME: if this doesn't go away with opaque values, add a new instruction
+    // for load+project_box.
+    if (svi->getType().is<SILBoxType>()) {
+      Operand *addrOper = &cast<LoadInst>(svi)->getOperandRef();
+      assert(isa<UncheckedTakeEnumDataAddrInst>(addrOper->get()));
+      // Push the project_box uses
+      for (auto *use : svi->getUses()) {
+        if (isa<ProjectBoxInst>(use->getUser()))
+          pushUser(DFSEntry(use, dfs.isRef(), dfs.pathCursor, dfs.offset));
+      }
+    }
+    return LeafUse;
+  }
+}
+
+bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
+  Operand *use = dfs.getUse();
+  assert(!(dfs.isRef() && use->get()->getType().isAddress()));
+  if (auto *svi = dyn_cast<SingleValueInstruction>(use->getUser())) {
+    if (use->getOperandNumber() == 0
+        && visitSingleValueUser(svi, dfs) == IgnoredUse) {
+      return true;
+    }
+  }
+  // We weren't able to "see through" any more address conversions; so
+  // record this as a use.
+
+  // Do the path offsets match?
+  if (!checkAndUpdateOffset(dfs))
+    return true;
+
+  // Is this a partial path match?
+  if (dfs.pathCursor > 0 || dfs.offset == AccessPath::UnknownOffset) {
+    return visitor.visitOverlappingUse(use);
+  }
+  if (dfs.pathCursor < 0) {
+    return visitor.visitInnerUse(use);
+  }
+  return visitor.visitExactUse(use);
+}
+
+bool swift::visitAccessPathUses(AccessUseVisitor &visitor,
+                                AccessPath accessPath, SILFunction *function) {
+  return AccessPathDefUseTraversal(visitor, accessPath, function).visitUses();
+}
+
+bool swift::visitAccessedStorageUses(AccessUseVisitor &visitor,
+                                     AccessedStorage storage,
+                                     SILFunction *function) {
+  IndexTrieNode *emptyPath = function->getModule().getIndexTrieRoot();
+  return visitAccessPathUses(visitor, AccessPath(storage, emptyPath, 0),
+                             function);
+}
+
+class CollectAccessPathUses : public AccessUseVisitor {
+  // Result: Exact uses, projection uses, and containing uses.
+  SmallVectorImpl<Operand *> &uses;
+
+  unsigned useLimit;
+
+public:
+  CollectAccessPathUses(SmallVectorImpl<Operand *> &uses, AccessUseType useTy,
+                        unsigned useLimit)
+    : AccessUseVisitor(useTy, NestedAccessType::IgnoreAccessBegin), uses(uses),
+      useLimit(useLimit) {}
+
+  bool visitUse(Operand *use, AccessUseType useTy) {
+    if (uses.size() == useLimit) {
+      return false;
+    }
+    uses.push_back(use);
+    return true;
+  }
+};
+
+bool AccessPath::collectUses(SmallVectorImpl<Operand *> &uses,
+                             AccessUseType useTy, SILFunction *function,
+                             unsigned useLimit) const {
+  CollectAccessPathUses collector(uses, useTy, useLimit);
+  return visitAccessPathUses(collector, *this, function);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1566,7 +1678,7 @@ SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
 }
 
 //===----------------------------------------------------------------------===//
-//                            Verification
+//                             MARK: Verification
 //===----------------------------------------------------------------------===//
 
 // Helper for visitApplyAccesses that visits address-type call arguments,
