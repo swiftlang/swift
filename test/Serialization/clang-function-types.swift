@@ -10,8 +10,7 @@ import def_clang_function_types
 
 // CHECK-LABEL: sil hidden @$s4main5test1yyF
 func test1() {
-  // FIXME: this mangling will have to change
-  // CHECK: global_addr @$s24def_clang_function_types11has_fp_types13OpaquePointerVSgyXCSgvp : $*Optional<@convention(c, cType: "struct ForwardInTypedefForFP *(*)(void)") () -> Optional<OpaquePointer>>
+  // CHECK: global_addr @$s24def_clang_function_types11has_fp_types13OpaquePointerVSgyXzC32_ZTSPFP21ForwardInTypedefForFPvESgvp : $*Optional<@convention(c, cType: "struct ForwardInTypedefForFP *(*)(void)") () -> Optional<OpaquePointer>>
   let fp = has_fp_type
   _ = fp?()
 }

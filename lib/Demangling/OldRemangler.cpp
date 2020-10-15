@@ -1241,17 +1241,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
 
 void Remangler::mangleImplFunctionAttribute(Node *node) {
   StringRef text = node->getText();
-  if (text == "@convention(block)") {
-    Buffer << "Cb";
-  } else if (text == "@convention(c)") {
-    Buffer << "Cc";
-  } else if (text == "@convention(method)") {
-    Buffer << "Cm";
-  } else if (text == "@convention(objc_method)") {
-    Buffer << "CO";
-  } else if (text == "@convention(witness_method)") {
-    Buffer << "Cw";
-  } else if (text == "@yield_once") {
+  if (text == "@yield_once") {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
@@ -1261,6 +1251,29 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     unreachable("bad impl-function-attribute");
   }
 }
+
+void Remangler::mangleImplFunctionConvention(Node *node) {
+  mangle(node->getChild(0));
+}
+
+void Remangler::mangleImplFunctionConventionName(Node *node) {
+  StringRef text = node->getText();
+  if (text == "block") {
+    Buffer << "Cb";
+  } else if (text == "c") {
+    Buffer << "Cc";
+  } else if (text == "method") {
+    Buffer << "Cm";
+  } else if (text == "objc_method") {
+    Buffer << "CO";
+  } else if (text == "witness_method") {
+    Buffer << "Cw";
+  } else {
+    unreachable("bad impl-function-convention-name");
+  }
+}
+
+void Remangler::mangleClangType(Node *node) { unreachable("unsupported"); }
 
 void Remangler::mangleImplParameter(Node *node) {
   assert(node->getNumChildren() == 2);

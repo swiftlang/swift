@@ -30,24 +30,27 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/CommandLine.h"
+
+#include <memory>
 
 using namespace swift;
 using namespace swift::Mangle;
@@ -1653,15 +1656,35 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back('t');
   }
 
+  bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
+                         fn->hasNonDerivableClangType();
+
+  auto appendClangTypeToVec = [this, fn](auto &Vec) {
+    llvm::raw_svector_ostream OpArgsOS(Vec);
+    appendClangType(fn, OpArgsOS);
+  };
+
   switch (fn->getRepresentation()) {
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
       break;
     case SILFunctionTypeRepresentation::Block:
+      if (!mangleClangType) {
+        OpArgs.push_back('B');
+        break;
+      }
+      OpArgs.push_back('z');
       OpArgs.push_back('B');
+      appendClangTypeToVec(OpArgs);
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
+      if (!mangleClangType) {
+        OpArgs.push_back('C');
+        break;
+      }
+      OpArgs.push_back('z');
       OpArgs.push_back('C');
+      appendClangTypeToVec(OpArgs);
       break;
     case SILFunctionTypeRepresentation::ObjCMethod:
       OpArgs.push_back('O');
@@ -2244,6 +2267,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
 
   appendFunctionSignature(fn, forDecl);
 
+  bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
+                         fn->hasNonDerivableClangType();
+
   // Note that we do not currently use thin representations in the AST
   // for the types of function decls.  This may need to change at some
   // point, in which case the uncurry logic can probably migrate to that
@@ -2256,6 +2282,10 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   // changes to better support thin functions.
   switch (fn->getRepresentation()) {
   case AnyFunctionType::Representation::Block:
+    if (mangleClangType) {
+      appendOperator("XzB");
+      return appendClangType(fn);
+    }
     // We distinguish escaping and non-escaping blocks, but only in the DWARF
     // mangling, because the ABI is already set.
     if (!fn->isNoEscape() && DWARFMangling)
@@ -2287,8 +2317,29 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
+    if (mangleClangType) {
+      appendOperator("XzC");
+      return appendClangType(fn);
+    }
     return appendOperator("XC");
   }
+}
+
+template <typename FnType>
+void ASTMangler::appendClangType(FnType *fn, llvm::raw_svector_ostream &out) {
+  auto clangType = fn->getClangTypeInfo().getType();
+  SmallString<64> scratch;
+  llvm::raw_svector_ostream scratchOS(scratch);
+  clang::ASTContext &clangCtx =
+      fn->getASTContext().getClangModuleLoader()->getClangASTContext();
+  std::unique_ptr<clang::ItaniumMangleContext> mangler{
+      clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
+  mangler->mangleTypeName(clang::QualType(clangType, 0), scratchOS);
+  out << scratchOS.str().size() << scratchOS.str();
+}
+
+void ASTMangler::appendClangType(AnyFunctionType *fn) {
+  appendClangType(fn, Buffer);
 }
 
 void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,

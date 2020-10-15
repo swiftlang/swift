@@ -232,6 +232,10 @@ typedef OpaqueTypedefForFP (*FunctionPointerReturningOpaqueTypedef)(void);
 typedef struct ForwardInTypedefForFP2 *OpaqueTypedefForFP2;
 typedef OpaqueTypedefForFP2 (*FunctionPointerReturningOpaqueTypedef2)(void);
 
+// Functions that get Swift types which cannot be used to re-derive the
+// Clang type.
+size_t returns_size_t();
+
 // This will probably never be serializable.
 typedef struct { int x; int y; } *(*UnserializableFunctionPointer)(void);
 
