@@ -14,11 +14,64 @@ struct MyStruct {
   @_hasStorage @_hasInitialValue var j: Int64 { get set }
 }
 
+// CHECK-LABEL: @testInnerUse
+// CHECK: ###For MemOp:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Inner Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK: }
+// CHECK: ###For MemOp:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (#0)
+// CHECK: Exact Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK-NEXT: }
+// CHECK: Inner Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK: }
+sil [serialized] [ossa] @testInnerUse : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*MyStruct
+  %3 = load [trivial] %2 : $*MyStruct
+  %4 = struct_element_addr %2 : $*MyStruct, #MyStruct.i
+  %5 = load [trivial] %4 : $*Int64
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // unknown offset contains subobject indices
 // CHECK-LABEL: @testDynamicIndexWithSubObject
 // CHECK: ###For MemOp: %{{.*}} = load [trivial] %{{.*}} : $*Int64
 // CHECK: Path: (#0)
 // CHECK: Exact Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: (#0)
+// CHECK-NEXT: }
+// CHECK: Inner Uses {
 // CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
 // CHECK-NEXT:   Path: (#0)
 // CHECK-NEXT: }
@@ -32,9 +85,11 @@ struct MyStruct {
 // CHECK: Path: (@Unknown)
 // CHECK-NEXT: Exact Uses {
 // CHECK-NEXT: }
+// CHECK-NEXT: Inner Uses {
+// CHECK-NEXT: }
 // CHECK-NEXT: Overlapping Uses {
-// CHECK-NEXT:   %{{.*}} = struct_element_addr %{{.*}} : $*MyStruct, #MyStruct.i
-// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %{{.*}} = load [trivial] %3 : $*Int64
+// CHECK-NEXT:   Path: (#0)
 // CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT:   Path: (@Unknown)
 // CHECK-NEXT: }
@@ -49,28 +104,69 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %7 : $()
 }
 
+// The index load should be reported as an overlapping uses, not an
+// exact or inner use.
+// CHECK: ###For MemOp:   %3 = load [trivial] %2 : $*MyStruct
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK-NEXT: Inner Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK-NEXT: Overlapping Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK-NEXT:   Path: INVALID
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: INVALID
+sil [serialized] [ossa] @testDynamicIndexInsideSubObject : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*MyStruct
+  %3 = load [trivial] %2 : $*MyStruct
+  %4 = struct_element_addr %2 : $*MyStruct, #MyStruct.i
+  %5 = index_addr %4 : $*Int64, %1 : $Builtin.Word
+  %6 = load [trivial] %5 : $*Int64
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // An unknown offset contains known offsets.
 // CHECK-LABEL: @testDynamicIndexWithStaticIndex
-// CHECK: ###For MemOp:   %5 = load [trivial] %4 : $*MyStruct
+// CHECK: ###For MemOp:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK: Path: (@1)
 // CHECK: Exact Uses {
-// CHECK-NEXT:   %5 = load [trivial] %4 : $*MyStruct
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK-NEXT:   Path: (@1)
+// CHECK-NEXT: }
+// CHECK: Inner Uses {
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT:   Path: (@1)
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:   %5 = load [trivial] %4 : $*MyStruct
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT:   Path: (@1)
-// CHECK-NEXT:   %7 = load [trivial] %6 : $*MyStruct
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT:   Path: (@Unknown)
 // CHECK-NEXT: }
-// CHECK: ###For MemOp:   %7 = load [trivial] %6 : $*MyStruct
+// CHECK: ###For MemOp:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK: Path: (@Unknown)
 // CHECK: Exact Uses {
 // CHECK-NEXT: }
+// CHECK: Inner Uses {
+// CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:   %5 = load [trivial] %4 : $*MyStruct
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT: Path: (@1)
-// CHECK-NEXT:   %7 = load [trivial] %6 : $*MyStruct
+// CHECK-NEXT:   %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
 // CHECK-NEXT: Path: (@Unknown)
 // CHECK-NEXT: }
 sil [serialized] [ossa] @testDynamicIndexWithStaticIndex : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
@@ -93,7 +189,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK-NEXT:   %3 = load [trivial] %2 : $*MyStruct
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
-// CHECK-NEXT: Overlapping Uses {
+// CHECK: Overlapping Uses {
 // CHECK-NEXT:   %3 = load [trivial] %2 : $*MyStruct
 // CHECK-NEXT: Path: ()
 // CHECK-NEXT:   %8 = load [trivial] %7 : $*MyStruct
@@ -116,6 +212,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
 // CHECK: Path: (@Unknown)
 // CHECK: Exact Uses {
+// CHECK-NEXT: }
+// CHECK: Inner Uses {
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
 // CHECK-NEXT:  %3 = load [trivial] %2 : $*MyStruct
@@ -304,6 +402,13 @@ bb3(%15 : $Builtin.RawPointer):
   return %17 : $AnyObject
 }
 
+enum IntTEnum<T> {
+  indirect case int(Int)
+  case other(T)
+
+  var getValue: Int {get }
+}
+
 // CHECK-LABEL: @testEnumUses
 // CHECK: ###For MemOp:   copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
 // CHECK: Storage: Argument %0 = argument of bb0 : $*IntTEnum<T>
@@ -457,13 +562,6 @@ bb3(%15 : $Builtin.RawPointer):
 // CHECK:  %8 = load [trivial] %7 : $*Int
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
-enum IntTEnum<T> {
-  indirect case int(Int)
-  case other(T)
-
-  var getValue: Int {get }
-}
-
 sil hidden [ossa] @testEnumUses : $@convention(method) <T> (@in_guaranteed IntTEnum<T>) -> Int {
 bb0(%0 : $*IntTEnum<T>):
   debug_value_addr %0 : $*IntTEnum<T>, let, name "self", argno 1
@@ -529,4 +627,82 @@ bb0(%0 : @guaranteed $Storage):
   end_access %5 : $*Int
   end_access %2 : $*UInt
   return %8 : $Int
+}
+
+// CHECK-LABEL: @testBeginAccessUses
+// CHECK: ###For MemOp:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK: Storage: Argument %1 = argument of bb0 : $*T
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Storage: Stack   %{{.*}} = alloc_stack $T, var, name "$value"
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   end_access %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   destroy_addr %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   dealloc_stack %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   end_access %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   destroy_addr %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   dealloc_stack %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK: Storage: Stack   %{{.*}} = alloc_stack $T, var, name "$value"
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   end_access %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   destroy_addr %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   dealloc_stack %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   end_access %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   destroy_addr %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   dealloc_stack %{{.*}} : $*T
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+sil [ossa] @testBeginAccessUses : $@convention(thin) <T where T : Comparable> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = alloc_stack $T, var, name "$value"
+  copy_addr [take] %1 to [initialization] %2 : $*T
+  %4 = begin_access [modify] [static] %2 : $*T
+  copy_addr %4 to [initialization] %0 : $*T
+  end_access %4 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %10 = tuple ()
+  return %10 : $()
 }

@@ -84,7 +84,8 @@ public:
   /// If 'V' is an address, then the returned value is also an address.
   SILValue getValueAddress() {
     if (!cachedValueAddress) {
-      cachedValueAddress = V->getType().isAddress() ? getAccessAddress(V) : V;
+      cachedValueAddress =
+          V->getType().isAddress() ? getTypedAccessAddress(V) : V;
     }
     return cachedValueAddress;
   }

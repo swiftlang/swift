@@ -47,8 +47,7 @@ class AccessPathVerification : public SILModuleTransform {
 
 public:
   void verifyAccessPath(Operand *operand) {
-    auto pathAndBase = AccessPathWithBase::compute(operand->get());
-    auto accessPath = pathAndBase.accessPath;
+    auto accessPath = AccessPath::compute(operand->get());
     if (!accessPath.isValid())
       return;
 
@@ -70,28 +69,19 @@ public:
     }
     // This is a new path, so map all its uses.
     assert(uses.empty());
-    pathAndBase.collectUses(uses, /*collectContainingUses*/ false);
+    accessPath.collectUses(uses, AccessUseType::Exact,
+                           operand->getParentFunction());
     bool foundOperandUse = false;
     for (Operand *use : uses) {
       if (use == operand) {
         foundOperandUse = true;
         continue;
       }
-      // (live) subobject projections within an access will be mapped later as a
-      // separate path.
-      switch (use->getUser()->getKind()) {
-      default:
-        break;
-      case SILInstructionKind::StructElementAddrInst:
-      case SILInstructionKind::TupleElementAddrInst:
-      case SILInstructionKind::IndexAddrInst:
-        continue;
-      }
       auto iterAndInserted = useToPathMap.try_emplace(use, accessPath);
       if (!iterAndInserted.second) {
         llvm::errs() << "Address use: " << *operand->getUser()
                      << "  with path...\n";
-        pathAndBase.dump();
+        accessPath.dump();
         llvm::errs() << "  was not collected for: " << *use->getUser();
         llvm::errs() << "  with path...\n";
         auto computedPath = iterAndInserted.first->second;

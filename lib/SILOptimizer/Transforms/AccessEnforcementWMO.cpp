@@ -169,13 +169,13 @@ void GlobalAccessRemoval::perform() {
 
 void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    auto storage = AccessedStorage::compute(BAI->getSource());
     const VarDecl *decl = getDisjointAccessLocation(storage);
     recordAccess(BAI, decl, storage.getKind(), BAI->hasNoNestedConflict());
     return;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    auto storage = AccessedStorage::compute(BUAI->getSource());
     const VarDecl *decl = getDisjointAccessLocation(storage);
     recordAccess(BUAI, decl, storage.getKind(), BUAI->hasNoNestedConflict());
     return;

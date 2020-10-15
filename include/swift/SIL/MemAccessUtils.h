@@ -27,16 +27,16 @@
 /// memory operation, there are three levels of APIs that inspect the origin of
 /// that address:
 ///
-/// 1. getAccessAddress(): Find the originating address as close as possible to
-/// the address of the formal access *without* looking past any storage
-/// casts. This is useful when the type of the returned access address must be
-/// consistent with the memory operation's type (the same type or a parent
-/// type). For a formal access, this typically returns the begin_access, but it
-/// is not guaranteed to because some accesses contain storage casts. For
+/// 1. getTypedAccessAddress(): Find the originating address as close as
+/// possible to the address of the formal access *without* looking past any
+/// storage casts. This is useful when the type of the returned access address
+/// must be consistent with the memory operation's type (the same type or a
+/// parent type). For a formal access, this typically returns the begin_access,
+/// but it is not guaranteed to because some accesses contain storage casts. For
 /// non-formal access, it returns a best-effort address corresponding to the
 /// base of an access.
 ///
-/// 2. getAccessBegin(): If the memory operation is part of a formal access,
+/// 2. getAccessScope(): If the memory operation is part of a formal access,
 /// then this is guaranteed to return the begin_access marker. Otherwise, it
 /// returns the best-effort address or pointer corresponding to the base of an
 /// access. Useful to find the scope of a formal access.
@@ -47,42 +47,43 @@
 /// address type, pointer type, or box type, but never a reference type.
 /// Each object's property or its tail storage is separately accessed.
 ///
-/// For better identification an access base, use findAccessedStorage(). It
-/// returns an AccessedStorage value that identifies the storage location of a
-/// memory access. It provides APIs for inspecting type of accessed storage and
-/// allows for disambiguation between different types of storage and different
-/// properties within a class.
+/// For better identification an access base, use
+/// AccessedStorage::compute(). It returns an AccessedStorage value
+/// that identifies the storage location of a memory access. It provides APIs
+/// for inspecting type of accessed storage and allows for disambiguation
+/// between different types of storage and different properties within a class.
 ///
-/// findAccessedStorage() follows the same logic as getAccessBase(), but if the
-/// base is not recognized as a valid access, it returns invalid
+/// AccessedStorage::compute() follows the same logic as getAccessBase(), but if
+/// the base is not recognized as a valid access, it returns invalid
 /// AccessedStorage. It also performs further analysis to determine the root
 /// reference of an object access.
 ///
-/// findAccessedStorage() returns the outermost AccessedStorage for any memory
-/// address. It can be called on the address of a memory operation, the address
-/// of a begin_access, or any other address value. If the address is from an
-/// enforced begin_access or from any memory operation that is part of a formal
-/// access, then it returns a valid AccessedStorage value. If the memory
+/// AccessedStorage::compute() returns the outermost AccessedStorage for any
+/// memory address. It can be called on the address of a memory operation, the
+/// address of a begin_access, or any other address value. If the address is
+/// from an enforced begin_access or from any memory operation that is part of a
+/// formal access, then it returns a valid AccessedStorage value. If the memory
 /// operation is not part of a formal access, then it still identifies the
 /// accessed location as a best effort, but the result may be invalid storage.
 ///
-///    An active goal is to require findAccessedStorage() to always return a
+///    An active goal is to require compute() to always return a
 ///    valid AccessedStorage value even for operations that aren't part of a
 ///    formal access.
 ///
 /// The AccessEnforcementWMO pass is an example of an optimistic optimization
-/// that relies on this requirement for correctness. If findAccessedStorage()
-/// simply bailed out on an unrecognized memory address by returning an invalid
-/// AccessedStorage, then the optimization could make incorrect assumptions
-/// about the absence of access to globals or class properties.
+/// that relies on this requirement for correctness. If
+/// AccessedStorage::compute() simply bailed out on an unrecognized memory
+/// address by returning an invalid AccessedStorage, then the optimization could
+/// make incorrect assumptions about the absence of access to globals or class
+/// properties.
 ///
-/// identifyFormalAccess() is similar to findAccessedStorage(), but returns the
-/// formally accessed storage of a begin_access instruction. This must return a
-/// valid AccessedStorage value unless the access has "Unsafe" enforcement. The
-/// formal access location may be nested within an outer begin_access. For the
-/// purpose of exclusivity, nested accesses are considered distinct formal
-/// accesses so they return distinct AccessedStorage values even though they may
-/// access the same memory.
+/// identifyFormalAccess() is similar to AccessedStorage::compute(), but returns
+/// the formally accessed storage of a begin_access instruction. This must
+/// return a valid AccessedStorage value unless the access has "Unsafe"
+/// enforcement. The formal access location may be nested within an outer
+/// begin_access. For the purpose of exclusivity, nested accesses are considered
+/// distinct formal accesses so they return distinct AccessedStorage values even
+/// though they may access the same memory.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -100,7 +101,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 //===----------------------------------------------------------------------===//
-//                            MARK: General Helpers
+//                            MARK: Standalone API
 //===----------------------------------------------------------------------===//
 
 namespace swift {
@@ -127,7 +128,7 @@ inline SILValue stripAccessMarkers(SILValue v) {
 /// corresponding to the accessed variable. This never looks through
 /// pointer_to_address or other conversions that may change the address type
 /// other than via type-safe (TBAA-compatible) projection.
-SILValue getAccessAddress(SILValue address);
+SILValue getTypedAccessAddress(SILValue address);
 
 /// Return the source address or pointer after stripping all access projections
 /// and storage casts.
@@ -138,7 +139,7 @@ SILValue getAccessAddress(SILValue address);
 /// If there is no access marker, then it returns a "best effort" address
 /// corresponding to the accessed variable. In this case, the returned value
 /// could be a non-address pointer type.
-SILValue getAccessBegin(SILValue address);
+SILValue getAccessScope(SILValue address);
 
 /// Return the source address or pointer after stripping access projections,
 /// access markers, and storage casts.
@@ -173,6 +174,20 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 //===----------------------------------------------------------------------===//
 
 namespace swift {
+
+/// Control def-use traversals, allowing them to remain with an access scope or
+/// consider operations across scope boundaries.
+enum class NestedAccessType { StopAtAccessBegin, IgnoreAccessBegin };
+
+/// Exact uses only include uses whose AccessPath is identical to this one.
+/// Inner uses have an AccessPath the same as or contained by this one.
+/// Overlapping uses may contain, be contained by, or have an unknown
+/// relationship with this one. An unknown relationship typically results from
+/// a dynamic index_addr offset.
+///
+/// The enum values are ordered. Each successive use type is a superset of the
+/// previous.
+enum class AccessUseType { Exact, Inner, Overlapping };
 
 /// Represents the identity of a storage object being accessed.
 ///
@@ -258,6 +273,32 @@ public:
     storage.value = object;
     return storage;
   }
+
+  /// Return an AccessedStorage value that best identifies a formally accessed
+  /// variable pointed to by \p sourceAddress, looking through any nested
+  /// formal accesses to find the underlying storage.
+  ///
+  /// \p sourceAddress may be an address, pointer, or box type.
+  ///
+  /// If \p sourceAddress is within a formal access scope, which does not have
+  /// "Unsafe" enforcement, then this always returns valid storage.
+  ///
+  /// If \p sourceAddress is not within a formal access scope, or within an
+  /// "Unsafe" scope, then this finds the formal storage if possible, otherwise
+  /// returning invalid storage.
+  static AccessedStorage compute(SILValue sourceAddress);
+
+  /// Return an AccessedStorage object that identifies formal access scope that
+  /// immediately encloses \p sourceAddress.
+  ///
+  /// \p sourceAddress may be an address, pointer, or box type.
+  ///
+  /// If \p sourceAddress is within a formal access scope, this always returns a
+  /// valid "Nested" storage value.
+  ///
+  /// If \p sourceAddress is not within a formal access scope, then this finds
+  /// the formal storage if possible, otherwise returning invalid storage.
+  static AccessedStorage computeInScope(SILValue sourceAddress);
 
 protected:
   // Checking the storage kind is far more common than other fields. Make sure
@@ -394,6 +435,7 @@ public:
     switch (getKind()) {
     case AccessedStorage::Box:
     case AccessedStorage::Stack:
+    case AccessedStorage::Nested:
     case AccessedStorage::Argument:
     case AccessedStorage::Yield:
     case AccessedStorage::Unidentified:
@@ -403,11 +445,21 @@ public:
     case AccessedStorage::Class:
     case AccessedStorage::Tail:
       return getObject();
-    case AccessedStorage::Nested:
-      assert(false && "AccessPath cannot identify nested access");
-      return SILValue();
     }
   }
+
+  /// Visit all access roots. If any roots are visited then the original memory
+  /// operation access must be reachable from one of those roots. Unidentified
+  /// storage might not have any root. Identified storage always has at least
+  /// one root. Identified non-global storage always has a single root. For
+  /// Global storage, this visits all global_addr instructions in the function
+  /// that reference the same SILGlobalVariable.
+  ///
+  /// \p function must be non-null for Global storage (global_addr cannot
+  /// occur in a static initializer).
+  void
+  visitRoots(SILFunction *function,
+             llvm::function_ref<bool(SILValue)> visitor) const;
 
   /// Return true if the given storage objects have identical storage locations.
   ///
@@ -507,6 +559,21 @@ public:
   /// checking via the ValueDecl if we are processing a `let` variable.
   const ValueDecl *getDecl() const;
 
+  /// Get all leaf uses of all address, pointer, or box values that have a this
+  /// AccessedStorage in common. Return true if all uses were found before
+  /// reaching the limit.
+  ///
+  /// The caller of 'collectUses' can determine the use type (exact, inner, or
+  /// overlapping) from the resulting \p uses list by checking 'accessPath ==
+  /// usePath', accessPath.contains(usePath)', and
+  /// 'accessPath.mayOverlap(usePath)'. Alternatively, the client may call
+  /// 'visitAccessedStorageUses' with its own AccessUseVisitor subclass to
+  /// sort the use types.
+  bool
+  collectUses(SmallVectorImpl<Operand *> &uses, AccessUseType useTy,
+              SILFunction *function,
+              unsigned useLimit = std::numeric_limits<unsigned>::max()) const;
+
   void print(raw_ostream &os) const;
   void dump() const;
 
@@ -567,6 +634,7 @@ private:
 } // end namespace swift
 
 namespace llvm {
+
 /// Enable using AccessedStorage as a key in DenseMap.
 /// Do *not* include any extra pass data in key equality.
 ///
@@ -617,54 +685,33 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     return LHS.hasIdenticalBase(RHS);
   }
 };
+
 } // namespace llvm
 
 namespace swift {
 
-/// Given an address used by an instruction that reads or writes memory, return
-/// the AccessedStorage value that identifies the formally accessed memory,
-/// looking through any nested formal accesses to find the underlying storage.
-///
-/// This may return invalid storage for a memory operation that is not part of
-/// a formal access or when the outermost formal access has Unsafe enforcement.
-AccessedStorage findAccessedStorage(SILValue sourceAddr);
-
-// Helper for identifyFormalAccess.
-AccessedStorage identifyAccessedStorageImpl(SILValue sourceAddr);
-
-/// Return an AccessedStorage object that identifies the formal access
-/// represented by \p beginAccess.
-///
-/// If the given access is nested within an outer access, return a Nested
-/// AccessedStorage kind. This is useful for exclusivity checking to distinguish
-/// between nested access vs. conflicting access on the same storage.
+/// Return an AccessedStorage value that identifies formally accessed storage
+/// for \p beginAccess, considering any outer access scope as having distinct
+/// storage from this access scope. This is useful for exclusivity checking
+/// to distinguish between nested access vs. conflicting access on the same
+/// storage.
 ///
 /// May return an invalid storage for either:
 /// - A \p beginAccess with Unsafe enforcement
 /// - Non-OSSA form in which address-type block args are allowed
 inline AccessedStorage identifyFormalAccess(BeginAccessInst *beginAccess) {
-  return identifyAccessedStorageImpl(beginAccess->getSource());
+  return AccessedStorage::computeInScope(beginAccess->getSource());
 }
 
 inline AccessedStorage
 identifyFormalAccess(BeginUnpairedAccessInst *beginAccess) {
-  return identifyAccessedStorageImpl(beginAccess->getSource());
-}
-
-/// Return a valid AccessedStorage object for an address captured by a no-escape
-/// closure. A no-escape closure may capture a regular storage address without
-/// guarding it with an access marker. If the captured address does come from an
-/// access marker, then this returns a Nested AccessedStorage kind.
-inline AccessedStorage identifyCapturedStorage(SILValue capturedAddress) {
-  auto storage = identifyAccessedStorageImpl(capturedAddress);
-  assert(storage && "captured access has invalid storage");
-  return storage;
+  return AccessedStorage::computeInScope(beginAccess->getSource());
 }
 
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//
-//                               AccessPath
+//                              MARK: AccessPath
 //===----------------------------------------------------------------------===//
 
 namespace swift {
@@ -700,7 +747,7 @@ namespace swift {
 /// convert a subobject address into a pointer (for example, via implicit
 /// conversion), then advance that pointer. Since we can't absolutely prevent
 /// this, we instead consider it an invalid AccessPath. This is the only case in
-/// which AccessPath::storage can differ from findAccessedStorage().
+/// which AccessPath::storage can differ from AccessedStorage::compute().
 ///
 /// Storing an AccessPath ammortizes to constant space. To cache identification
 /// of address locations, AccessPath should be used rather than the
@@ -712,8 +759,22 @@ namespace swift {
 /// compatible type. TODO: add enforcement for this rule.
 class AccessPath {
 public:
-  /// Create the AccessPath for any memory operation on the given address.
+  /// Compute the access path at \p address. This ignores begin_access markers,
+  /// returning the outermost AccessedStorage.
+  ///
+  /// The computed access path corresponds to the subobject for a memory
+  /// operation that directly operates on \p address; so, for an indexable
+  /// address, this implies an operation at index zero.
   static AccessPath compute(SILValue address);
+
+  /// Compute the access path at \p address. If \p address is within a formal
+  /// access, then AccessStorage will have a nested type and base will be a
+  /// begin_access marker.
+  ///
+  /// This is primarily useful for recovering the access scope. The original
+  /// storage kind will only be discovered when \p address is part of a formal
+  /// access, thus not within an access scope.
+  static AccessPath computeInScope(SILValue address);
 
   // Encode a dynamic index_addr as an UnknownOffset.
   static constexpr int UnknownOffset = std::numeric_limits<int>::min() >> 1;
@@ -848,25 +909,34 @@ public:
   bool hasUnknownOffset() const { return offset == UnknownOffset; }
 
   /// Return true if this path contains \p subPath.
+  ///
+  /// Identical AccessPath's contain each other.
+  ///
+  /// Returns false if either path is invalid.
   bool contains(AccessPath subPath) const;
 
   /// Return true if this path may overlap with \p otherPath.
+  ///
+  /// Returns true if either path is invalid.
   bool mayOverlap(AccessPath otherPath) const;
 
   /// Return the address root that the access path was based on. Returns
   /// an invalid SILValue for globals or invalid storage.
   SILValue getRoot() const { return storage.getRoot(); }
 
-  /// Get all uses of all address values that have a common AccessPath. Return
-  /// true if all uses were found before reaching the limit.
+  /// Get all leaf uses of all address, pointer, or box values that have a this
+  /// AccessedStorage in common. Return true if all uses were found before
+  /// reaching the limit.
   ///
-  /// This should find all uses for which calling AccessPath::compute() would
-  /// yield an identical AccessPath.
-  ///
-  /// This fails on global variables which have no root. To collect all uses,
-  /// including global variable uses, use AccessPathWithBase::collectUses.
+  /// The caller of 'collectUses' can determine the use type (exact, inner, or
+  /// overlapping) from the resulting \p uses list by checking 'accessPath ==
+  /// usePath', accessPath.contains(usePath)', and
+  /// 'accessPath.mayOverlap(usePath)'. Alternatively, the client may call
+  /// 'visitAccessPathUses' with its own AccessUseVisitor subclass to
+  /// sort the use types.
   bool
-  collectUses(SmallVectorImpl<Operand *> &uses, bool collectOverlappingUses,
+  collectUses(SmallVectorImpl<Operand *> &uses, AccessUseType useTy,
+              SILFunction *function,
               unsigned useLimit = std::numeric_limits<unsigned>::max()) const;
 
   void printPath(raw_ostream &os) const;
@@ -877,10 +947,7 @@ public:
 // Encapsulate the result of computing an AccessPath. AccessPath does not store
 // the base address of the formal access because it does not always uniquely
 // indentify the access, but AccessPath users may use the base address to to
-// recover the def-use chain.
-//
-// AccessPathWithBase::collectUses is guaranteed to be complete for all storage
-// types, while AccessPath::collectUses cannot handle globals.
+// recover the def-use chain for a specific global_addr or ref_element_addr.
 struct AccessPathWithBase {
   AccessPath accessPath;
   // The address-type value that is the base of the formal access. For
@@ -888,15 +955,20 @@ struct AccessPathWithBase {
   // global_addr or initializer apply. For other storage, it is the same as
   // accessPath.getRoot().
   //
-  // base may be invalid for global_addr -> address_to_pointer -> phi patterns.
+  // Note: base may be invalid for global_addr -> address_to_pointer -> phi
+  // patterns, while the accessPath is still valid.
+  //
   // FIXME: add a structural requirement to SIL so base is always valid in OSSA.
-  // !!! make this a PtrIntPair with a the access kind
   SILValue base;
 
-  /// \p address identifies the object seen by any memory operation that
-  /// directly operates on the address. For indexable addresses, this implies an
-  /// operation at index zero.
+  /// Compute the access path at \p address, and record the access base. This
+  /// ignores begin_access markers, returning the outermost AccessedStorage.
   static AccessPathWithBase compute(SILValue address);
+
+  /// Compute the access path at \p address, and record the access base. If \p
+  /// address is within a formal access, then AccessStorage will have a nested
+  /// type and base will be a begin_access marker.
+  static AccessPathWithBase computeInScope(SILValue address);
 
   AccessPathWithBase(AccessPath accessPath, SILValue base)
       : accessPath(accessPath), base(base) {}
@@ -906,16 +978,6 @@ struct AccessPathWithBase {
   }
   bool operator!=(AccessPathWithBase other) const { return !(*this == other); }
 
-  /// Get all uses of all address values that have a common AccessPath. Return
-  /// true if all uses were found before reaching the limit.
-  ///
-  /// This should find all uses for which calling AccessPath::compute() would
-  /// yield an identical AccessPath and, for global variables, have the same
-  /// access base (e.g. from the same global_addr instruction).
-  bool collectUses(SmallVectorImpl<Operand *> &uses,
-                   bool collectOverlappingUses,
-                   unsigned useLimit = std::numeric_limits<int>::max()) const;
-
   void print(raw_ostream &os) const;
   void dump() const;
 };
@@ -924,9 +986,14 @@ inline AccessPath AccessPath::compute(SILValue address) {
   return AccessPathWithBase::compute(address).accessPath;
 }
 
+inline AccessPath AccessPath::computeInScope(SILValue address) {
+  return AccessPathWithBase::compute(address).accessPath;
+}
+
 } // end namespace swift
 
 namespace llvm {
+
 /// Allow AccessPath to be used in DenseMap.
 template <> struct DenseMapInfo<swift::AccessPath> {
   static inline swift::AccessPath getEmptyKey() {
@@ -972,7 +1039,63 @@ template <> struct DenseMapInfo<swift::AccessPathWithBase> {
     return lhs == rhs;
   }
 };
+
 } // end namespace llvm
+
+//===----------------------------------------------------------------------===//
+//                        MARK: Use visitors
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Interface to the customizable use visitor.
+struct AccessUseVisitor {
+  AccessUseType useTy;
+  NestedAccessType nestedAccessTy;
+
+  AccessUseVisitor(AccessUseType useTy, NestedAccessType nestedTy)
+    : useTy(useTy), nestedAccessTy(nestedTy) {}
+
+  virtual ~AccessUseVisitor() {}
+
+  bool findInnerUses() const { return useTy >= AccessUseType::Inner; }
+  bool findOverlappingUses() const {
+    return useTy == AccessUseType::Overlapping;
+  }
+
+  bool visitExactUse(Operand *use) {
+    return visitUse(use, AccessUseType::Exact);
+  }
+  bool visitInnerUse(Operand *use) {
+    return findInnerUses() ? visitUse(use, AccessUseType::Inner) : true;
+  }
+  bool visitOverlappingUse(Operand *use) {
+    return
+      findOverlappingUses() ? visitUse(use, AccessUseType::Overlapping) : true;
+  }
+
+  virtual bool visitUse(Operand *use, AccessUseType useTy) = 0;
+};
+
+/// Visit all uses of \p storage.
+///
+/// Return true if all uses were collected. This is always true as long the \p
+/// visitor's visitUse method returns true.
+bool visitAccessedStorageUses(AccessUseVisitor &visitor,
+                              AccessedStorage storage,
+                              SILFunction *function);
+
+/// Visit the uses of \p accessPath.
+///
+/// If the storage kind is Global, then function must be non-null (global_addr
+/// only occurs inside SILFunction).
+///
+/// Return true if all uses were collected. This is always true as long the \p
+/// visitor's visitUse method returns true.
+bool visitAccessPathUses(AccessUseVisitor &visitor, AccessPath accessPath,
+                         SILFunction *function);
+
+} // end namespace swift
 
 //===----------------------------------------------------------------------===//
 //             MARK: Helper API for specific formal access patterns
@@ -1031,7 +1154,8 @@ void checkSwitchEnumBlockArg(SILPhiArgument *arg);
 /// This is not a member of AccessedStorage because it only makes sense to use
 /// in SILGen before access markers are emitted, or when verifying access
 /// markers.
-bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
+bool isPossibleFormalAccessBase(const AccessedStorage &storage,
+                                SILFunction *F);
 
 /// Perform a RAUW operation on begin_access with it's own source operand.
 /// Then erase the begin_access and all associated end_access instructions.

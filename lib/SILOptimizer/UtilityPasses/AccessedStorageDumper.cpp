@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-accessed-storage-dumper"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -33,33 +34,49 @@ class AccessedStorageDumper : public SILModuleTransform {
   llvm::SmallVector<Operand *, 32> uses;
 
   void dumpAccessedStorage(Operand *operand) {
-    findAccessedStorage(operand->get()).print(llvm::outs());
+    SILFunction *function = operand->getParentFunction();
+    // Print storage itself first, for comparison against AccessPath. They can
+    // differ in rare cases of unidentified storage with phis.
+    AccessedStorage::compute(operand->get()).print(llvm::outs());
+    // Now print the access path and base.
     auto pathAndBase = AccessPathWithBase::compute(operand->get());
     pathAndBase.print(llvm::outs());
-
-    if (!pathAndBase.accessPath.isValid() || !EnableDumpUses)
+    // If enable-accessed-storage-dump-uses is set, dump all types of uses.
+    auto accessPath = pathAndBase.accessPath;
+    if (!accessPath.isValid() || !EnableDumpUses)
       return;
 
     uses.clear();
-    pathAndBase.collectUses(uses, /*collectContainingUses*/ false);
+    accessPath.collectUses(uses, AccessUseType::Exact, function);
     llvm::outs() << "Exact Uses {\n";
     for (auto *useOperand : uses) {
       llvm::outs() << *useOperand->getUser() << "  ";
-      auto usePathAndBase = AccessPathWithBase::compute(useOperand->get());
-      usePathAndBase.accessPath.printPath(llvm::outs());
-      assert(pathAndBase.accessPath.contains(usePathAndBase.accessPath)
+      auto usePath = AccessPath::compute(useOperand->get());
+      usePath.printPath(llvm::outs());
+      assert(accessPath == usePath
+             && "access path does not match use access path");
+    }
+    llvm::outs() << "}\n";
+    uses.clear();
+    accessPath.collectUses(uses, AccessUseType::Inner, function);
+    llvm::outs() << "Inner Uses {\n";
+    for (auto *useOperand : uses) {
+      llvm::outs() << *useOperand->getUser() << "  ";
+      auto usePath = AccessPath::compute(useOperand->get());
+      usePath.printPath(llvm::outs());
+      assert(accessPath.contains(usePath)
              && "access path does not contain use access path");
     }
     llvm::outs() << "}\n";
     uses.clear();
-    pathAndBase.collectUses(uses, /*collectContainingUses*/ true);
+    accessPath.collectUses(uses, AccessUseType::Overlapping, function);
     llvm::outs() << "Overlapping Uses {\n";
     for (auto *useOperand : uses) {
       llvm::outs() << *useOperand->getUser() << "  ";
-      auto usePathAndBase = AccessPathWithBase::compute(useOperand->get());
-      usePathAndBase.accessPath.printPath(llvm::outs());
-      assert(pathAndBase.accessPath.mayOverlap(usePathAndBase.accessPath)
-             && "access path does not contain use access path");
+      auto usePath = AccessPath::compute(useOperand->get());
+      usePath.printPath(llvm::outs());
+      assert(accessPath.mayOverlap(usePath)
+             && "access path does not overlap with use access path");
     }
     llvm::outs() << "}\n";
   }
@@ -71,6 +88,7 @@ class AccessedStorageDumper : public SILModuleTransform {
         llvm::outs() << "<unknown>\n";
         continue;
       }
+      PrettyStackTraceSILFunction functionDumper("...", &fn);
       for (auto &bb : fn) {
         for (auto &inst : bb) {
           if (inst.mayReadOrWriteMemory()) {

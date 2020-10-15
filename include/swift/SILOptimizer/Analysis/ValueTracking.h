@@ -59,7 +59,7 @@ bool pointsToLocalObject(SILValue V);
 inline bool isUniquelyIdentified(SILValue V) {
   SILValue objectRef = V;
   if (V->getType().isAddress()) {
-    auto storage = findAccessedStorage(V);
+    auto storage = AccessedStorage::compute(V);
     if (!storage)
       return false;
 
