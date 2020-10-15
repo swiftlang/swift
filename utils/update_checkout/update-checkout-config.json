@@ -306,6 +306,30 @@
                 "sourcekit-lsp": "release/5.3",
                 "swift-format": "main"
             }
+        },
+       "release/5.3-20201012": {
+            "aliases": ["release/5.3-20201012"],
+            "repos": {
+                "llvm-project": "swift/release/5.3",
+                "swift": "release/5.3-20201012",
+                "cmark": "release/5.3",
+                "llbuild": "release/5.3",
+                "swift-tools-support-core": "release/5.3",
+                "swiftpm": "release/5.3",
+                "swift-syntax": "release/5.3",
+                "swift-stress-tester": "release/5.3",
+                "swift-corelibs-xctest": "release/5.3",
+                "swift-corelibs-foundation": "release/5.3",
+                "swift-corelibs-libdispatch": "release/5.3",
+                "swift-integration-tests": "release/5.3",
+                "swift-xcode-playground-support": "release/5.3",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.16.5",
+                "indexstore-db": "release/5.3-20201012",
+                "sourcekit-lsp": "release/5.3-20201012",
+                "swift-format": "main"
+            }
         }
     }
 }
