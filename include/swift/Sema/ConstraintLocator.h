@@ -871,13 +871,12 @@ public:
   /// Checks whether this locator is describing an anchor that produces a value of a
   /// callable type that could be implicit called using "()" either by defining
   /// a \c callAsFunction or by being a @dynamicCallable type.
-  bool isForImplicitCallableValue() const {
+  bool isForImplicitCallOfCallableValue() const {
     SmallVector<LocatorPathElt, 8> path;
     getLocatorParts(path);
 
-    return std::any_of(
-        path.rbegin(), path.rend(), [](LocatorPathElt &elt) {
-      return elt.getKind() == ConstraintLocator::ImplicitCallableValue;
+    return std::any_of(path.rbegin(), path.rend(), [](LocatorPathElt &elt) {
+      return elt.getKind() == ConstraintLocator::ImplicitCallOfCallableValue;
     });
   }
 

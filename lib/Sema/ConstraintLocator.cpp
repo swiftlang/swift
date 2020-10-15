@@ -82,7 +82,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PatternMatch:
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
-  case ConstraintLocator::ImplicitCallableValue:
+  case ConstraintLocator::ImplicitCallOfCallableValue:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -481,7 +481,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "unresolved chain result";
       break;
 
-    case ImplicitCallableValue:
+    case ImplicitCallOfCallableValue:
       out << "implicit callable value";
       break;
     }
