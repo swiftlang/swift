@@ -153,7 +153,7 @@ enum class NameLookupFlags {
   /// result.
   IncludeOuterResults = 1 << 1,
   // Whether to include results that are marked @inlinable or @usableFromInline.
-  IncludeInlineableAndUsableFromInline = 1 << 2,
+  IncludeUsableFromInline = 1 << 2,
 };
 
 /// A set of options that control name lookup.
