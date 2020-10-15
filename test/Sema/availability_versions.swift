@@ -928,6 +928,14 @@ func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error 
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
+struct GenericType<T> { // expected-note {{add @available attribute to enclosing generic struct}}
+  func nonGenericWhereClause() where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 {{add @available attribute to enclosing instance method}}
+
+  struct NestedType where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 2{{add @available attribute to enclosing struct}}
+}
+
 // Extensions
 
 extension ClassAvailableOn10_51 { } // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}

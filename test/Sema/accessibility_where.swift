@@ -87,3 +87,12 @@ protocol Protocol7 : BaseProtocol where T == (PrivateStruct) -> Void {
   associatedtype X : BaseProtocol where X.T == (PrivateStruct) -> Void
   // expected-error@-1 {{associated type in an internal protocol uses a private type in its requirement}}
 }
+
+private protocol PrivateProtocol {} // expected-note 2{{type declared here}}
+
+struct GenericStruct<T> {
+  struct Inner where T : PrivateProtocol {}
+  // expected-error@-1 {{struct must be declared private because its generic requirement uses a private type}}
+  func nonGenericWhereClause() where T : PrivateProtocol {}
+  // expected-error@-1 {{instance method must be declared private because its generic requirement uses a private type}}
+}
