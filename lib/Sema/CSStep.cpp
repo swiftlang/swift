@@ -660,8 +660,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getKind() == ConstraintKind::BindOverload &&
       isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
-      !ctx.TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
+      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl())) {
     return true;
   }
 
