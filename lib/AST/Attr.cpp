@@ -986,8 +986,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<TypeEraserAttr>(this);
     if (auto *repr = attr->getParsedTypeEraserTypeRepr())
       repr->print(Printer, Options);
-    else
-      attr->getTypeWithoutResolving()->print(Printer, Options);
+    else if (auto proto = dyn_cast<ProtocolDecl>(D))
+      attr->getResolvedType(proto)->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     Printer << ")";
     break;
