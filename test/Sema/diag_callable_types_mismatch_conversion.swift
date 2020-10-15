@@ -23,6 +23,15 @@ struct SR13503Default {
   func callAsFunction(a: Int = 0) -> Int { 0 }
 }
 
+// A single overload with parameters.
+struct SR13503Param {
+  func callAsFunction(a: Int) -> Int { 0 }
+}
+struct SR13503Param2 {
+  func callAsFunction(a: Int, b: Int) -> Int { 0 }
+}
+
+
 struct SR13503 {
   func callAsFunction() -> Int { 0 }
   func callAsFunction(a: Int = 0) -> Int { 0 }
@@ -54,6 +63,8 @@ let valuesub = SR13503Sub()
 let valuea = SR13503A()
 let valueM = SR13503Match()
 let valueD = SR13503Default()
+let valueP = SR13503Param()
+let valueP2 = SR13503Param2()
 
 func fSR13503(class: Root) {}
 
@@ -73,6 +84,8 @@ fSR13503(arg: valueM) // expected-error {{value of callable type 'SR13503Match' 
 fSR13503_S(arg: valueM) // expected-error {{cannot convert value of type 'SR13503Match' to expected argument type 'String'}}
 fSR13503(arg: valueD) // expected-error {{value of callable type 'SR13503Default' can be called to produce expected type 'Int'; did you mean to call it with '()'?}} {{21-21=()}}
 fSR13503_S(arg: valueD) // expected-error {{cannot convert value of type 'SR13503Default' to expected argument type 'String'}}
+fSR13503(arg: valueP) // expected-error {{cannot convert value of type 'SR13503Param' to expected argument type 'Int'}}
+fSR13503_S(arg: valueP) // expected-error {{cannot convert value of type 'SR13503Param' to expected argument type 'String'}}
 
 // Access control no visible callAsFunction
 fSR13503(arg: valuea) // expected-error {{cannot convert value of type 'SR13503A' to expected argument type 'Int'}}
@@ -139,6 +152,13 @@ fSR13503(arg: valueg_dc) // expected-error {{value of callable type 'SR13503G_DC
 fSR13503(arg: valueg1_dc) // expected-error {{cannot convert value of type 'SR13503G_DC<String>' to expected argument type 'Int'}}
 fSR13503(arg: testReturn_DC()) // expected-error {{value of callable type 'SR13503_DC' can be called to produce expected type 'Int'; did you mean to call it with '()'?}} {{30-30=()}}
 fSR13503_S(arg: testReturn_DC()) // expected-error {{cannot convert value of type 'SR13503_DC' to expected argument type 'String'}}
+
+// Values that cannot be called with () because they have only callAsFunction definitions that expect parameters.
+fSR13503(arg: valueP) // expected-error {{cannot convert value of type 'SR13503Param' to expected argument type 'Int'}}
+fSR13503_S(arg: valueP) // expected-error {{cannot convert value of type 'SR13503Param' to expected argument type 'String'}}
+
+fSR13503(arg: valueP2) // expected-error {{cannot convert value of type 'SR13503Param2' to expected argument type 'Int'}}
+fSR13503_S(arg: valueP2) // expected-error {{cannot convert value of type 'SR13503Param2' to expected argument type 'String'}}
 
 // Access control no visible dynamicallyCall
 fSR13503(arg: valuea_dc) // expected-error {{cannot convert value of type 'SR13503A_DC' to expected argument type 'Int'}}

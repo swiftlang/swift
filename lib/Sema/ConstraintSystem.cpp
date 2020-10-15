@@ -456,6 +456,19 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       return getConstraintLocator(anchor, newPath);
     }
   }
+  
+  // We checkinng if it's possible to make a nominal callAsFunction callable value an
+  // explicit call, we need to drop the inserted ApplyArgument and add the extra
+  // apply function and implicit call to match it as the callee locator recorded when
+  // resolving the overload.
+  if (locator->findLast<LocatorPathElt::ImplicitCallableValue>() &&
+      !locator->findLast<LocatorPathElt::DynamicCallable>()) {
+    SmallVector<LocatorPathElt, 4> newPath;
+    newPath.append(path.begin(), path.end() - 1);
+    newPath.append({ConstraintLocator::ApplyFunction,
+                    ConstraintLocator::ImplicitCallAsFunction});
+    return getConstraintLocator(anchor, newPath);
+  }
 
   if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
     return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());

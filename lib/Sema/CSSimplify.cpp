@@ -1044,6 +1044,8 @@ public:
     }
   }
 
+  bool hasMissingArguments() const { return !MissingArguments.empty(); }
+
   Optional<unsigned> missingArgument(unsigned paramIdx,
                                      unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
@@ -1268,6 +1270,18 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         argInfo->UnlabeledTrailingClosureIndex,
         cs.shouldAttemptFixes(), listener, trailingClosureMatching);
     if (!callArgumentMatch)
+      return cs.getTypeMatchFailure(locator);
+
+    // When checking to see if the callable value can be explicit called to
+    // produce the expected type, we need to make sure that we fail here for
+    // missing argument (which normally have fix recorded in argument tracker)
+    // except if all parameters have a default values.
+    if (locator.isForImplicitCallableValue() &&
+        listener.hasMissingArguments() &&
+        llvm::any_of(indices(params),
+                     [&paramInfo](const unsigned paramIdx) -> bool {
+                       return !paramInfo.hasDefaultArgument(paramIdx);
+                     }))
       return cs.getTypeMatchFailure(locator);
 
     // If there are different results for both the forward and backward
@@ -8969,8 +8983,15 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         trailingClosureMatching);
 
     switch (matchCallResult) {
-    case SolutionKind::Error:
+    case SolutionKind::Error: {
+      if (locator.isForImplicitCallableValue()) {
+        if (auto *fix =
+                fixImplicitCallableValue(*this, func1->getResult(), locator))
+          return recordFix(fix, /*impact=*/5) ? SolutionKind::Error
+                                              : SolutionKind::Solved;
+      }
       return SolutionKind::Error;
+    }
 
     case SolutionKind::Unsolved: {
       // Only occurs when there is an ambiguity between forward scanning and
