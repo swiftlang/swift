@@ -83,8 +83,28 @@ void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
     for (const auto &entry : bindings.SubtypeOf)
       addToWorkList(currentVar, entry.first);
 
-    for (const auto &entry : bindings.EquivalentTo)
-      addToWorkList(currentVar, entry.first);
+    // If current type variable is part of an equivalence
+    // class, make it a "representative" and let's it infer
+    // supertypes and direct protocol requirements from
+    // other members.
+    for (const auto &entry : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(entry.first);
+      if (eqBindings != inferredBindings.end()) {
+        const auto &bindings = eqBindings->getSecond();
+
+        llvm::SmallPtrSet<Constraint *, 2> placeholder;
+        // Add any direct protocols from members of the
+        // equivalence class, so they could be propagated
+        // to all of the members.
+        propagateProtocolsTo(currentVar, bindings.Protocols, placeholder);
+
+        // Since type variables are equal, current type variable
+        // becomes a subtype to any supertype found in the current
+        // equivalence  class.
+        for (const auto &eqEntry : bindings.SubtypeOf)
+          addToWorkList(currentVar, eqEntry.first);
+      }
+    }
 
     // More subtype/equivalences relations have been added.
     if (workList.back().second != currentVar)
@@ -100,9 +120,36 @@ void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
       propagateProtocolsTo(parent, bindings.Protocols, protocols[currentVar]);
     }
 
+    auto inferredProtocols = std::move(protocols[currentVar]);
+
+    llvm::SmallPtrSet<Constraint *, 4> protocolsForEquivalence;
+
+    // Equivalence class should contain both:
+    // - direct protocol requirements of the current type
+    //   variable;
+    // - all of the transitive protocols inferred through
+    //   the members of the equivalence class.
+    {
+      protocolsForEquivalence.insert(bindings.Protocols.begin(),
+                                     bindings.Protocols.end());
+
+      protocolsForEquivalence.insert(inferredProtocols.begin(),
+                                     inferredProtocols.end());
+    }
+
+    // Propogate inferred protocols to all of the members of the
+    // equivalence class.
+    for (const auto &equivalence : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(equivalence.first);
+      if (eqBindings != inferredBindings.end()) {
+        auto &bindings = eqBindings->getSecond();
+        bindings.TransitiveProtocols.emplace(protocolsForEquivalence);
+      }
+    }
+
     // Update the bindings associated with current type variable,
     // to avoid repeating this inference process.
-    bindings.TransitiveProtocols.emplace(std::move(protocols[currentVar]));
+    bindings.TransitiveProtocols.emplace(std::move(inferredProtocols));
   } while (!workList.empty());
 }
 
