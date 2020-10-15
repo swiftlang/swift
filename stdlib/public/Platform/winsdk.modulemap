@@ -102,6 +102,8 @@ module WinSDK [system] {
     module path {
       header "PathCch.h"
       export *
+
+      link "pathcch.lib"
     }
 
     // api-ms-win-core-processthreads-l1-1-2.dll
