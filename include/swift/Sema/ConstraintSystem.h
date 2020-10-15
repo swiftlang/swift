@@ -5032,8 +5032,6 @@ private:
   /// \returns The selected disjunction.
   Constraint *selectDisjunction();
 
-  Constraint *selectApplyDisjunction();
-
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.

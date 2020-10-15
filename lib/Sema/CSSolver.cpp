@@ -1929,30 +1929,6 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   return result->first;
 }
 
-// Find a disjunction associated with an ApplicableFunction constraint
-// where we have some information about all of the types of in the
-// function application (even if we only know something about what the
-// types conform to and not actually a concrete type).
-Constraint *ConstraintSystem::selectApplyDisjunction() {
-  for (auto &constraint : InactiveConstraints) {
-    if (constraint.getKind() != ConstraintKind::ApplicableFunction)
-      continue;
-
-    auto *applicable = &constraint;
-    if (haveTypeInformationForAllArguments(
-            applicable->getFirstType()->castTo<FunctionType>())) {
-      auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
-
-      // If we have created the disjunction for this apply, find it.
-      auto *disjunction = getUnboundBindOverloadDisjunction(tyvar);
-      if (disjunction)
-        return disjunction;
-    }
-  }
-
-  return nullptr;
-}
-
 static bool isOperatorBindOverload(Constraint *bindOverload) {
   if (bindOverload->getKind() != ConstraintKind::BindOverload)
     return false;
