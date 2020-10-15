@@ -37,3 +37,9 @@ struct HasVirtualBase : public virtual Base {
   HasVirtualBase(ArgType Arg) {}
   int i;
 };
+
+struct EmptyStruct {};
+
+struct IntWrapper {
+  int x;
+};
