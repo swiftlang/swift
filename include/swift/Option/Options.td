@@ -672,7 +672,7 @@ def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
 def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Add directory to library link search path">;
-def L_EQ : Joined<["-"], "L=">,
+def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<L>;
 
