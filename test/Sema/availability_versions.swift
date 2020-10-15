@@ -883,7 +883,7 @@ protocol ProtocolAvailableOn10_51 {
 }
 
 @available(OSX, introduced: 10.9)
-protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 {
+protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 { // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
 }
 
 @available(OSX, introduced: 10.51)

@@ -2232,7 +2232,7 @@ public:
     llvm::for_each(proto->getInherited(),
                   [&](TypeLoc requirement) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                /*allowUnavailableProtocol=*/true);
+                /*allowUnavailableProtocol=*/false);
     });
 
     if (proto->getTrailingWhereClause()) {
