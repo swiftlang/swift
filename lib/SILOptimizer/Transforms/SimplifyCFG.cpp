@@ -1248,21 +1248,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     LLVM_DEBUG(llvm::dbgs() << "merge bb" << BB->getDebugID() << " with bb"
                             << DestBB->getDebugID() << '\n');
 
-    // If there are any BB arguments in the destination, replace them with the
-    // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-      if (DestBB->getArgument(i) != BI->getArg(i)) {
-        SILValue Val = BI->getArg(i);
-        DestBB->getArgument(i)->replaceAllUsesWith(Val);
-        if (!isVeryLargeFunction) {
-          if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
-            // Replacing operands may trigger constant folding which then could
-            // trigger other simplify-CFG optimizations.
-            ConstFolder.addToWorklist(I);
-            ConstFolder.processWorkList();
-          }
-        }
-      } else {
+      if (DestBB->getArgument(i) == BI->getArg(i)) {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
         //   br bb2
@@ -1273,6 +1260,23 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
         // bb3: // preds: bb2
         //   br bb1(arg1)
         assert(!isReachable(BB) && "Should only occur in unreachable block");
+        return Simplified;
+      }
+    }
+    
+    // If there are any BB arguments in the destination, replace them with the
+    // branch operands, since they must dominate the dest block.
+    for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+      assert(DestBB->getArgument(i) != BI->getArg(i));
+      SILValue Val = BI->getArg(i);
+      DestBB->getArgument(i)->replaceAllUsesWith(Val);
+      if (!isVeryLargeFunction) {
+        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+          // Replacing operands may trigger constant folding which then could
+          // trigger other simplify-CFG optimizations.
+          ConstFolder.addToWorklist(I);
+          ConstFolder.processWorkList();
+        }
       }
     }
 
