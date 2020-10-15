@@ -6,6 +6,7 @@
 
 import Swift
 import StdlibUnittest
+import _Structural
 
 struct Dummy: Structural, Equatable {
     typealias StructuralRepresentation = Void

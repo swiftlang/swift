@@ -403,10 +403,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
   FALSE)
 
-option(SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL
-  "Enable experimental Swift automatic requirement satisfication features"
-  FALSE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable experimental Swift concurrency model"
   FALSE)
