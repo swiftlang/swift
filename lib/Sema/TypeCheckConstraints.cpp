@@ -254,7 +254,7 @@ public:
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-    performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
+    performStmtDiagnostics(stmt, dcStack.back());
     return {true, stmt};
   }
 

@@ -103,8 +103,8 @@ func makeSureAnyObject(_: AnyObject) {}
 
 #if !IRGEN
 func testUnavailableRefs() {
-  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' has been renamed to '__PrivCFType'}}
-  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' has been renamed to '__PrivCFSub'}}
+  var _: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' has been renamed to '__PrivCFType'}}
+  var _: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' has been renamed to '__PrivCFSub'}}
 }
 #endif
 

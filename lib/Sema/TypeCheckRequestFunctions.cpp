@@ -30,31 +30,27 @@ Type InheritedTypeRequest::evaluate(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index, TypeResolutionStage stage) const {
   // Figure out how to resolve types.
-  TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = (DeclContext *)nominal;
-
-      options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
     }
   } else {
     dc = (DeclContext *)decl.get<const ExtensionDecl *>();
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
-        TypeResolution::forStructural(dc, options, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forStructural(dc, None, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
-        TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forInterface(dc, None, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual: {

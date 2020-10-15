@@ -107,6 +107,7 @@ func testRenamedTopLevelDiags() {
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE-1]]:
   _ = s.value
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE-1]]:
+  _ = t
 }
 
 func testAKA(structValue: ImportantCStruct, aliasValue: ImportantCAlias) {
