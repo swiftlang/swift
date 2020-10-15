@@ -35,15 +35,6 @@ using namespace swift;
 
 namespace {
 
-/// A uniquely-typed boolean to reduce the chances of accidentally inverting
-/// a check.
-///
-/// \see checkTypeAccess
-enum class DowngradeToWarning: bool {
-  No,
-  Yes
-};
-
 /// Calls \p callback for each type in each requirement provided by
 /// \p source.
 static void forAllRequirementTypes(
@@ -1464,15 +1455,17 @@ public:
   }
 };
 
+} // end anonymous namespace
+
 /// Returns the kind of origin, implementation-only import or SPI declaration,
 /// that restricts exporting \p decl from the given file and context.
 ///
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
-getDisallowedOriginKind(const Decl *decl,
-                        const SourceFile &userSF,
-                        const Decl *userContext,
-                        DowngradeToWarning &downgradeToWarning) {
+swift::getDisallowedOriginKind(const Decl *decl,
+                               const SourceFile &userSF,
+                               const Decl *userContext,
+                               DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
   if (userSF.isImportedImplementationOnly(M)) {
@@ -1492,6 +1485,8 @@ getDisallowedOriginKind(const Decl *decl,
 
   return DisallowedOriginKind::None;
 };
+
+namespace {
 
 // Diagnose public APIs exposing types that are either imported as
 // implementation-only or declared as SPI.
@@ -2015,6 +2010,8 @@ public:
 /// Diagnose declarations whose signatures refer to unavailable types.
 class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
   DeclContext *DC;
+  Optional<ExportabilityReason> ExportReason;
+  FragileFunctionKind FragileKind;
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  bool allowUnavailableProtocol=false) {
@@ -2036,12 +2033,14 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
       if (allowUnavailableProtocol)
         flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-      diagnoseTypeReprAvailability(typeRepr, DC, flags);
+      diagnoseTypeReprAvailability(typeRepr, DC, ExportReason, FragileKind,
+                                   flags);
     }
 
     // Check the type for references to unavailable conformances.
     if (type)
-      diagnoseTypeAvailability(type, context->getLoc(), DC);
+      diagnoseTypeAvailability(type, context->getLoc(), DC,
+                               ExportReason, FragileKind);
   }
 
   void checkGenericParams(const GenericContext *ownerCtx,
@@ -2070,7 +2069,9 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
 public:
   explicit DeclAvailabilityChecker(Decl *D)
-    : DC(D->getInnermostDeclContext()) {}
+    : DC(D->getInnermostDeclContext()) {
+    FragileKind = DC->getFragileFunctionKind();
+  }
 
   void visit(Decl *D) {
     if (D->isImplicit())

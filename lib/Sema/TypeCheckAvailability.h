@@ -28,7 +28,10 @@ namespace swift {
   class Expr;
   class InFlightDiagnostic;
   class Decl;
+  struct FragileFunctionKind;
+  class ProtocolConformanceRef;
   class Stmt;
+  class SubstitutionMap;
   class Type;
   class TypeRepr;
   class ValueDecl;
@@ -57,6 +60,16 @@ enum class DeclAvailabilityFlag : uint8_t {
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
+// This enum must be kept in sync with
+// diag::decl_from_hidden_module and
+// diag::conformance_from_implementation_only_module.
+enum class ExportabilityReason : unsigned {
+  General,
+  PropertyWrapper,
+  ExtensionWithPublicMembers,
+  ExtensionWithConditionalConformances
+};
+
 /// Diagnose uses of unavailable declarations in expressions.
 void diagAvailability(const Expr *E, DeclContext *DC);
 
@@ -66,17 +79,37 @@ void diagAvailability(const Stmt *S, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in types.
 bool diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
+                                  Optional<ExportabilityReason> reason,
+                                  FragileFunctionKind fragileKind,
                                   DeclAvailabilityFlags flags = None);
 
 /// Diagnose uses of unavailable conformances in types.
-void diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC);
+void diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC,
+                              Optional<ExportabilityReason> reason,
+                              FragileFunctionKind fragileKind);
+
+bool
+diagnoseConformanceAvailability(SourceLoc loc,
+                                ProtocolConformanceRef conformance,
+                                const DeclContext *DC,
+                                Optional<ExportabilityReason> reason,
+                                FragileFunctionKind fragileKind);
+
+bool
+diagnoseSubstitutionMapAvailability(SourceLoc loc,
+                                    SubstitutionMap subs,
+                                    const DeclContext *DC,
+                                    Optional<ExportabilityReason> reason,
+                                    FragileFunctionKind fragileKind);
 
 /// Run the Availability-diagnostics algorithm otherwise used in an expr
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
 bool diagnoseDeclAvailability(const ValueDecl *Decl,
-                              DeclContext *DC,
                               SourceRange R,
+                              DeclContext *DC,
+                              Optional<ExportabilityReason> reason,
+                              FragileFunctionKind fragileKind,
                               DeclAvailabilityFlags Options);
 
 void diagnoseUnavailableOverride(ValueDecl *override,

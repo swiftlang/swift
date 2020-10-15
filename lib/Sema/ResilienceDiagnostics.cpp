@@ -27,13 +27,6 @@
 
 using namespace swift;
 
-/// A uniquely-typed boolean to reduce the chances of accidentally inverting
-/// a check.
-enum class DowngradeToWarning: bool {
-  No,
-  Yes
-};
-
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            ConcreteDeclRef declRef,
                                            const DeclContext *DC,
@@ -55,16 +48,17 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   // Skip this check for accessors because the associated property or subscript
   // will also be checked, and will provide a better error message.
   if (!isa<AccessorDecl>(D))
-    if (diagnoseDeclRefExportability(loc, declRef, DC, Kind))
+    if (diagnoseDeclRefExportability(loc, declRef, DC,
+                                     None, Kind))
       return true;
 
   return false;
 }
 
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
-                                           const ValueDecl *D,
-                                           const DeclContext *DC,
-                                           FragileFunctionKind Kind) {
+                                                 const ValueDecl *D,
+                                                 const DeclContext *DC,
+                                                 FragileFunctionKind Kind) {
   assert(Kind.kind != FragileFunctionKind::None);
 
   // Local declarations are OK.
@@ -150,84 +144,79 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
                                       const DeclContext *userDC,
+                                      Optional<ExportabilityReason> reason,
                                       FragileFunctionKind fragileKind) {
-  assert(fragileKind.kind != FragileFunctionKind::None);
+  if (fragileKind.kind == FragileFunctionKind::None && !reason.hasValue())
+    return false;
 
   auto definingModule = D->getModuleContext();
 
+  auto downgradeToWarning = DowngradeToWarning::No;
   auto originKind = getDisallowedOriginKind(
-      D, userSF, userDC->getInnermostDeclarationDeclContext());
+      D, userSF, userDC->getInnermostDeclarationDeclContext(),
+      downgradeToWarning);
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
-  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
-                     D->getDescriptiveKind(), D->getName(),
-                     static_cast<unsigned>(fragileKind.kind),
-                     definingModule->getName(),
-                     static_cast<unsigned>(originKind));
+
+  if (fragileKind.kind == FragileFunctionKind::None) {
+    auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
+                              diag::decl_from_hidden_module_warn:
+                              diag::decl_from_hidden_module;
+    ctx.Diags.diagnose(loc, errorOrWarning,
+                       D->getDescriptiveKind(),
+                       D->getName(),
+                       static_cast<unsigned>(*reason),
+                       definingModule->getName(),
+                       static_cast<unsigned>(originKind));
+
+    D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+  } else {
+    ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
+                       D->getDescriptiveKind(), D->getName(),
+                       static_cast<unsigned>(fragileKind.kind),
+                       definingModule->getName(),
+                       static_cast<unsigned>(originKind));
+  }
   return true;
 }
 
-static bool
-diagnoseGenericArgumentsExportability(SourceLoc loc,
-                                      SubstitutionMap subs,
-                                      const SourceFile &userSF,
-                                      const DeclContext *userDC) {
-  bool hadAnyIssues = false;
-  for (ProtocolConformanceRef conformance : subs.getConformances()) {
-    if (!conformance.isConcrete())
-      continue;
-    const ProtocolConformance *concreteConf = conformance.getConcrete();
+bool
+TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
+                                              const RootProtocolConformance *rootConf,
+                                              const SourceFile &userSF,
+                                              const DeclContext *userDC,
+                                              Optional<ExportabilityReason> reason,
+                                              FragileFunctionKind fragileKind) {
+  if (fragileKind.kind == FragileFunctionKind::None && !reason.hasValue())
+    return false;
 
-    SubstitutionMap subConformanceSubs =
-        concreteConf->getSubstitutions(userSF.getParentModule());
-    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF, userDC);
+  auto originKind = getDisallowedOriginKind(
+      rootConf->getDeclContext()->getAsDecl(),
+      userSF, userDC->getInnermostDeclarationDeclContext());
+  if (originKind == DisallowedOriginKind::None)
+    return false;
 
-    const RootProtocolConformance *rootConf =
-        concreteConf->getRootConformance();
-    ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+  if (!reason.hasValue())
+    reason = ExportabilityReason::General;
 
-    auto originKind = getDisallowedOriginKind(
-        rootConf->getDeclContext()->getAsDecl(),
-        userSF, userDC->getInnermostDeclarationDeclContext());
-    if (originKind == DisallowedOriginKind::None)
-      continue;
-
-    ASTContext &ctx = M->getASTContext();
-    ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
-                       rootConf->getType(),
-                       rootConf->getProtocol()->getName(), 0, M->getName(),
-                       static_cast<unsigned>(originKind));
-    hadAnyIssues = true;
-  }
-  return hadAnyIssues;
-}
-
-void TypeChecker::diagnoseGenericTypeExportability(SourceLoc Loc, Type T,
-                                                   const DeclContext *DC) {
-  const SourceFile *SF = DC->getParentSourceFile();
-  if (!SF)
-    return;
-
-  // FIXME: It would be nice to highlight just the part of the type that's
-  // problematic, but unfortunately the TypeRepr doesn't have the
-  // information we need and the Type doesn't easily map back to it.
-  if (auto *BGT = dyn_cast<BoundGenericType>(T.getPointer())) {
-    ModuleDecl *useModule = SF->getParentModule();
-    auto subs = T->getContextSubstitutionMap(useModule, BGT->getDecl());
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
-  } else if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer())) {
-    auto subs = TAT->getSubstitutionMap();
-    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF, DC);
-  }
+  ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+  ASTContext &ctx = M->getASTContext();
+  ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
+                     rootConf->getType(),
+                     rootConf->getProtocol()->getName(),
+                     static_cast<unsigned>(*reason),
+                     M->getName(),
+                     static_cast<unsigned>(originKind));
+  return true;
 }
 
 bool
 TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                                           ConcreteDeclRef declRef,
                                           const DeclContext *DC,
+                                          Optional<ExportabilityReason> reason,
                                           FragileFunctionKind fragileKind) {
   // We're only interested in diagnosing uses from source files.
   auto userSF = DC->getParentSourceFile();
@@ -235,11 +224,7 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
     return false;
 
   const ValueDecl *D = declRef.getDecl();
-  if (diagnoseDeclExportability(loc, D, *userSF, DC, fragileKind))
+  if (diagnoseDeclExportability(loc, D, *userSF, DC, reason, fragileKind))
     return true;
-  if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
-                                            *userSF, DC)) {
-    return true;
-  }
   return false;
 }

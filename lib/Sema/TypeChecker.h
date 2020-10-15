@@ -40,11 +40,13 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
+class RootProtocolConformance;
 class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
 enum class TypeResolutionStage : uint8_t;
+enum class ExportabilityReason : unsigned;
 
 namespace constraints {
   enum class ConstraintKind : char;
@@ -959,17 +961,18 @@ bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
 /// reasonably be shared.
 bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
                                   const DeclContext *DC,
+                                  Optional<ExportabilityReason> exportability,
                                   FragileFunctionKind fragileKind);
 
-/// Given that a type is used from a particular context which
-/// exposes it in the interface of the current module, diagnose if its
-/// generic arguments require the use of conformances that cannot reasonably
-/// be shared.
-///
-/// This method \e only checks how generic arguments are used; it is assumed
-/// that the declarations involved have already been checked elsewhere.
-void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
-                                      const DeclContext *DC);
+/// Given that a conformance is used from a particular context which
+/// exposes it in the interface of the current module, diagnose if the
+/// conformance is SPI or visible via an implementation-only import.
+bool diagnoseConformanceExportability(SourceLoc loc,
+                                      const RootProtocolConformance *rootConf,
+                                      const SourceFile &userSF,
+                                      const DeclContext *userDC,
+                                      Optional<ExportabilityReason> reason,
+                                      FragileFunctionKind fragileKind);
 
 /// \name Availability checking
 ///

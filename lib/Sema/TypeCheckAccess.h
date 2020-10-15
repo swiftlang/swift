@@ -43,11 +43,25 @@ enum class DisallowedOriginKind : uint8_t {
   None
 };
 
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+///
+/// \see checkTypeAccess
+enum class DowngradeToWarning: bool {
+  No,
+  Yes
+};
+
 /// Returns the kind of origin, implementation-only import or SPI declaration,
 /// that restricts exporting \p decl from the given file and context.
 DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
                                              const SourceFile &userSF,
                                              const Decl *userContext);
+
+DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
+                                             const SourceFile &userSF,
+                                             const Decl *userContext,
+                                             DowngradeToWarning &downgradeToWarning);
 
 } // end namespace swift
 
