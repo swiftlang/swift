@@ -25,6 +25,24 @@
 
 using namespace swift;
 
+/// Determine whether it makes sense to infer an attribute in the given
+/// context.
+static bool shouldInferAttributeInContext(const DeclContext *dc) {
+  auto sourceFile = dc->getParentSourceFile();
+  if (!sourceFile)
+    return false;
+
+  switch (sourceFile->Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+    return false;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return true;
+  }
+}
+
 /// Check whether the @asyncHandler attribute can be applied to the given
 /// function declaration.
 ///
@@ -108,7 +126,7 @@ bool IsAsyncHandlerRequest::evaluate(
     return true;
   }
 
-  if (!func->getASTContext().LangOpts.EnableExperimentalConcurrency)
+  if (!shouldInferAttributeInContext(func->getDeclContext()))
     return false;
 
   // Are we in a context where inference is possible?
@@ -1016,15 +1034,18 @@ static Optional<ActorIsolation> getIsolationFromAttributes(Decl *decl) {
   // If the declaration is marked with a global actor, report it as being
   // part of that global actor.
   if (globalActorAttr) {
-    TypeResolutionOptions options(TypeResolverContext::None);
-    TypeResolution resolver = TypeResolution::forInterface(
-        decl->getInnermostDeclContext(), options, nullptr);
-    Type globalActorType = resolver.resolveType(
-        globalActorAttr->first->getTypeRepr(), nullptr);
+    ASTContext &ctx = decl->getASTContext();
+    auto dc = decl->getInnermostDeclContext();
+    Type globalActorType = evaluateOrDefault(
+        ctx.evaluator,
+        CustomAttrTypeRequest{
+          globalActorAttr->first, dc, CustomAttrTypeKind::GlobalActor},
+        Type());
     if (!globalActorType || globalActorType->hasError())
       return ActorIsolation::forUnspecified();
 
-    return ActorIsolation::forGlobalActor(globalActorType);
+    return ActorIsolation::forGlobalActor(
+        globalActorType->mapTypeOutOfContext());
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -1138,23 +1159,32 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Disable inference of actor attributes outside of normal Swift source files.
-  if (auto sourceFile = value->getDeclContext()->getParentSourceFile()) {
-    switch (sourceFile->Kind) {
-    case SourceFileKind::Interface:
-    case SourceFileKind::SIL:
-      return defaultIsolation;
-
-    case SourceFileKind::Library:
-    case SourceFileKind::Main:
-      // Attempt inference below.
-      break;
-    }
-  } else {
+  if (!shouldInferAttributeInContext(value->getDeclContext()))
     return defaultIsolation;
-  }
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred) {
+    // Add an implicit attribute to capture the actor isolation that was
+    // inferred, so that (e.g.) it will be printed and serialized.
+    ASTContext &ctx = value->getASTContext();
+    switch (inferred) {
+    case ActorIsolation::Independent:
+      value->getAttrs().add(new (ctx) ActorIndependentAttr(true));
+      break;
+
+    case ActorIsolation::GlobalActor: {
+      auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
+      auto attr = CustomAttr::create(
+          ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+      value->getAttrs().add(attr);
+      break;
+    }
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+      // Nothing to do.
+      break;
+    }
     return inferred;
   };
 
