@@ -1114,15 +1114,24 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 llvm::StringRef
 DiagnosticEngine::diagnosticStringFor(const DiagID id,
                                       bool printDiagnosticName) {
-  // TODO: Print diagnostic names from `localization`.
-  if (printDiagnosticName) {
-    return debugDiagnosticStrings[(unsigned)id];
-  }
   auto defaultMessage = diagnosticStrings[(unsigned)id];
+  auto diagnosticName = diagnosticNameStrings[(unsigned)id];
   if (localization) {
     auto localizedMessage =
         localization.get()->getMessageOr(id, defaultMessage);
+    if (printDiagnosticName) {
+      std::string debugDiagnosticString = localizedMessage.str().c_str();
+      debugDiagnosticString += diagnosticName;
+      const std::string &localizedDebugDiagnosticString = debugDiagnosticString;
+      return localizedDebugDiagnosticString;
+    }
     return localizedMessage;
+  }
+
+  if (printDiagnosticName) {
+    const std::string &debugDiagnosticString =
+        std::string(defaultMessage) + diagnosticName;
+    return debugDiagnosticString;
   }
   return defaultMessage;
 }

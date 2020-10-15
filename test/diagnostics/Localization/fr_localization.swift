@@ -15,4 +15,4 @@ var self1 = self1 // expected-note 2{{through reference here}}
 struct Broken {
   var b : Bool = True // expected-error{{impossible de trouver 'True' portée}}
 }
-var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+// CHECK_NAMES: error: impossible de trouver 'True' portée [cannot_find_in_scope]{{$}}
