@@ -120,8 +120,7 @@ DECL_ATTR(_silgen_name, SILGenName,
   0)
 DECL_ATTR(available, Available,
   OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement |
-  OnExtension | OnGenericTypeParam |
-  AllowMultipleAttributes | LongAttribute |
+  OnExtension | AllowMultipleAttributes | LongAttribute |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
