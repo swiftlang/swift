@@ -825,6 +825,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         // Okay.
         return false;
       }
+      llvm_unreachable("unhandled actor isolation kind!");
     }
 
     /// Check a reference to a local or global.
@@ -868,6 +869,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafe(value, loc);
       }
+      llvm_unreachable("unhandled actor isolation kind!");
     }
 
     /// Check a reference with the given base expression to the given member.
@@ -964,6 +966,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafe(member, memberLoc);
       }
+      llvm_unreachable("unhandled actor isolation kind!");
     }
   };
 

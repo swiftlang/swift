@@ -616,6 +616,7 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
     return MetadataResponse::handle(IGF, request, call);
   }
   }
+  llvm_unreachable("unhandled metadata canonicality");
 }
 
 static llvm::Value *
