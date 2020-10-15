@@ -761,10 +761,10 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   HelpText<"Emit full DWARF type info.">;
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
-    HelpText<"Remap source paths in debug info">;
+    HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
-  HelpText<"Remap source paths in coverage info">;
+  HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
