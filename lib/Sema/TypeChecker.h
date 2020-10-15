@@ -591,7 +591,7 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` othrewise.
 bool typeCheckForCodeCompletion(
-    constraints::SolutionApplicationTarget &target,
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
