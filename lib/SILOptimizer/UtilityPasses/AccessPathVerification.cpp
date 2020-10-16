@@ -59,10 +59,10 @@ public:
       if (collectedFromPath != accessPath) {
         llvm::errs() << "Address use: " << *operand->getUser()
                      << "  collected from path\n  ";
-        collectedFromPath.dump();
+        collectedFromPath.print(llvm::errs());
         llvm::errs() << "  has different path\n  ";
-        accessPath.dump();
-        operand->getUser()->getFunction()->dump();
+        accessPath.print(llvm::errs());
+        operand->getUser()->getFunction()->print(llvm::errs());
         assert(false && "computed path does not match collected path");
       }
       return;
@@ -81,19 +81,19 @@ public:
       if (!iterAndInserted.second) {
         llvm::errs() << "Address use: " << *operand->getUser()
                      << "  with path...\n";
-        accessPath.dump();
+        accessPath.print(llvm::errs());
         llvm::errs() << "  was not collected for: " << *use->getUser();
         llvm::errs() << "  with path...\n";
         auto computedPath = iterAndInserted.first->second;
-        computedPath.dump();
-        use->getUser()->getFunction()->dump();
+        computedPath.print(llvm::errs());
+        use->getUser()->getFunction()->print(llvm::errs());
         assert(false && "missing collected use");
       }
     }
     if (!foundOperandUse && !accessPath.hasUnknownOffset()) {
       llvm::errs() << "Address use: " << *operand->getUser()
                    << "  is not a use of path\n  ";
-      accessPath.dump();
+      accessPath.print(llvm::errs());
       assert(false && "not a user of its own computed path ");
     }
     uses.clear();
