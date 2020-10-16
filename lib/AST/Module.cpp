@@ -1363,6 +1363,10 @@ bool ModuleDecl::isOnoneSupportModule() const {
   return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
 }
 
+bool ModuleDecl::isFoundationModule() const {
+  return !getParent() && getName() == getASTContext().Id_Foundation;
+}
+
 bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
