@@ -3158,8 +3158,7 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
-  void recordPotentialHole(TypeVariableType *typeVar);
-  void recordPotentialHole(FunctionType *fnType);
+  void recordPotentialHole(Type type);
 
   void recordTrailingClosureMatch(
       ConstraintLocator *locator,
