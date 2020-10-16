@@ -44,6 +44,7 @@ class ProtocolConformance;
 namespace constraints {
 
 class ConstraintSystem;
+enum class ConversionRestrictionKind;
 
 /// Locates a given constraint within the expression being
 /// type-checked, which may refer down into subexpressions and parts of
@@ -798,6 +799,22 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PlaceholderType;
+  }
+};
+
+class LocatorPathElt::ImplicitConversion final
+    : public StoredIntegerElement<1> {
+public:
+  ImplicitConversion(ConversionRestrictionKind kind)
+      : StoredIntegerElement(ConstraintLocator::ImplicitConversion,
+                             static_cast<unsigned>(kind)) {}
+
+  ConversionRestrictionKind getConversionKind() const {
+    return static_cast<ConversionRestrictionKind>(getValue());
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ImplicitConversion;
   }
 };
 
