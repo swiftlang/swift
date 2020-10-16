@@ -19,19 +19,33 @@
 
 #include "TaskPrivate.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Debug.h"
 #include <stdlib.h>
+#include <vector>
 
 using namespace swift;
 
 namespace {
 
 class TaskAllocator {
+  // Just keep track of all allocations in a vector so that we can
+  // verify stack discipline.  We should make sure the allocator
+  // implementation strictly verifies allocation order at least
+  // until we've stabilized the compiler implementation.
+  std::vector<void*> Allocations;
+
 public:
   void *alloc(size_t size) {
-    return malloc(size);
+    void *ptr = malloc(size);
+    Allocations.push_back(ptr);
+    return ptr;
   }
 
   void dealloc(void *ptr) {
+    if (Allocations.empty() || Allocations.back() != ptr)
+      fatalError(0, "pointer was not the last allocation on this task");
+
+    Allocations.pop_back();
     free(ptr);
   }
 };
@@ -50,7 +64,14 @@ void swift::_swift_task_alloc_initialize(AsyncTask *task) {
 }
 
 static TaskAllocator &allocator(AsyncTask *task) {
-  return reinterpret_cast<TaskAllocator &>(task->AllocatorPrivate);
+  if (task)
+    return reinterpret_cast<TaskAllocator &>(task->AllocatorPrivate);
+
+  // FIXME: this fall-back shouldn't be necessary, but it's useful
+  // for now, since the current execution tests aren't setting up a task
+  // properly.
+  static TaskAllocator global;
+  return global;
 }
 
 void swift::_swift_task_alloc_destroy(AsyncTask *task) {
