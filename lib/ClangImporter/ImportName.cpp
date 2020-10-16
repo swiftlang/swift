@@ -1608,14 +1608,18 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> selectorSplitScratch;
   ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
-  case clang::DeclarationName::CXXConstructorName:
+  case clang::DeclarationName::CXXConstructorName: {
     isInitializer = true;
     isFunction = true;
     result.info.initKind = CtorInitializerKind::Designated;
     baseName = "init";
-    addEmptyArgNamesForClangFunction(cast<clang::CXXConstructorDecl>(D),
-                                     argumentNames);
+    auto ctor = dyn_cast<clang::CXXConstructorDecl>(D);
+    if (auto templateCtor = dyn_cast<clang::FunctionTemplateDecl>(D))
+      ctor = cast<clang::CXXConstructorDecl>(templateCtor->getAsFunction());
+    assert(ctor && "Unkown decl with CXXConstructorName.");
+    addEmptyArgNamesForClangFunction(ctor, argumentNames);
     break;
+  }
 
   case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
