@@ -296,9 +296,9 @@ class Derived : Base { }
 
 
 switch [Derived(), Derived(), Base()] {
-case let ds as [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
+case let ds as [Derived]:
   ()
-case is [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
+case is [Derived]:
   ()
 
 default:

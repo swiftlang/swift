@@ -1322,10 +1322,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast: {
-      diags.diagnose(IP->getLoc(),
-                     diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastType());
-      IP->setType(ErrorType::get(Context));
       if (Pattern *sub = IP->getSubPattern())
         sub->forEachVariable([](VarDecl *VD) { VD->setInvalid(); });
       return P;
