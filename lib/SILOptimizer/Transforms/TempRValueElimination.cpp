@@ -85,8 +85,7 @@ class TempRValueOptPass : public SILFunctionTransform {
     CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts);
 
   bool
-  checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst,
-                         ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
+  checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst);
 
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
   std::pair<SILBasicBlock::iterator, bool>
@@ -357,8 +356,7 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
 /// releasing it. Rather than detecting unbalanced load releases, simply check
 /// that tempObj is destroyed directly on all paths.
 bool TempRValueOptPass::checkTempObjectDestroy(
-    AllocStackInst *tempObj, CopyAddrInst *copyInst,
-    ValueLifetimeAnalysis::Frontier &tempAddressFrontier) {
+    AllocStackInst *tempObj, CopyAddrInst *copyInst) {
   // ValueLifetimeAnalysis is not normally used for address types. It does not
   // reason about the lifetime of the in-memory object. However the utility can
   // be abused here to check that the address is directly destroyed on all
@@ -377,6 +375,7 @@ bool TempRValueOptPass::checkTempObjectDestroy(
   }
   // Find the boundary of tempObj's address lifetime, starting at copyInst.
   ValueLifetimeAnalysis vla(copyInst, users);
+  ValueLifetimeAnalysis::Frontier tempAddressFrontier;
   if (!vla.computeFrontier(tempAddressFrontier,
                            ValueLifetimeAnalysis::DontModifyCFG)) {
     return false;
@@ -483,8 +482,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       aa->mayWriteToMemory(lastLoadInst, copySrc))
     return false;
 
-  ValueLifetimeAnalysis::Frontier tempAddressFrontier;
-  if (!checkTempObjectDestroy(tempObj, copyInst, tempAddressFrontier))
+  if (!isOSSA && !checkTempObjectDestroy(tempObj, copyInst))
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
