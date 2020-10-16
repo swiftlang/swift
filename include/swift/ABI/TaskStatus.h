@@ -82,7 +82,7 @@ public:
   }
 };
 
-TaskStatusRecord *
+inline TaskStatusRecord *
 ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
   return ptr->getParent();
 }
