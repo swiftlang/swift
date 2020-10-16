@@ -131,27 +131,27 @@ namespace irgen {
     unsigned getIndexAfterLocalContext() {
       return getIndexAfterDirectReturns() + (hasLocalContext() ? 1 : 0);
     }
-    unsigned getBindingsIndex() {
-      assert(hasBindings());
-      return getIndexAfterLocalContext();
-    }
-    unsigned getIndexAfterBindings() {
-      return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
-    }
-    unsigned getFirstArgumentIndex() { return getIndexAfterBindings(); }
+    unsigned getFirstArgumentIndex() { return getIndexAfterLocalContext(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
+    unsigned getBindingsIndex() {
+      assert(hasBindings());
+      return getIndexAfterArguments();
+    }
+    unsigned getIndexAfterBindings() {
+      return getIndexAfterArguments() + (hasBindings() ? 1 : 0);
+    }
     unsigned getSelfMetadataIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterArguments();
+      return getIndexAfterBindings();
     }
     unsigned getSelfWitnessTableIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterArguments() + 1;
+      return getIndexAfterBindings() + 1;
     }
     unsigned getIndexAfterTrailingWitnesses() {
-      return getIndexAfterArguments() + (hasTrailingWitnesses() ? 2 : 0);
+      return getIndexAfterBindings() + (hasTrailingWitnesses() ? 2 : 0);
     }
 
   public:

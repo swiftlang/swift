@@ -168,15 +168,6 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   }
 
   //   ArgTypes formalArguments...;
-  auto bindings = NecessaryBindings::forAsyncFunctionInvocation(
-      IGF.IGM, originalType, substitutionMap);
-  if (!bindings.empty()) {
-    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
-    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(
-        bindingsSize, IGF.IGM.getPointerAlignment());
-    valTypes.push_back(SILType());
-    typeInfos.push_back(&bindingsTI);
-  }
   for (auto parameter : parameters) {
     SILType ty = IGF.IGM.silConv.getSILType(
         parameter, substitutedType, IGF.IGM.getMaximalTypeExpansionContext());
@@ -190,6 +181,15 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
     paramInfos.push_back({ty, parameter.getConvention()});
+  }
+  auto bindings = NecessaryBindings::forAsyncFunctionInvocation(
+      IGF.IGM, originalType, substitutionMap);
+  if (!bindings.empty()) {
+    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
+    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(
+        bindingsSize, IGF.IGM.getPointerAlignment());
+    valTypes.push_back(SILType());
+    typeInfos.push_back(&bindingsTI);
   }
 
   Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
