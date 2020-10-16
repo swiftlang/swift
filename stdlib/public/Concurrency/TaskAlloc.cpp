@@ -17,15 +17,50 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TaskPrivate.h"
 #include "swift/Runtime/Concurrency.h"
 #include <stdlib.h>
 
 using namespace swift;
 
+namespace {
+
+class TaskAllocator {
+public:
+  void *alloc(size_t size) {
+    return malloc(size);
+  }
+
+  void dealloc(void *ptr) {
+    free(ptr);
+  }
+};
+
+static_assert(sizeof(TaskAllocator) <= sizeof(AsyncTask::AllocatorPrivate),
+              "task allocator must fit in allocator-private slot");
+
+static_assert(alignof(TaskAllocator) <= alignof(decltype(AsyncTask::AllocatorPrivate)),
+              "task allocator must not be more aligned than "
+              "allocator-private slot");
+
+} // end anonymous namespace
+
+void swift::_swift_task_alloc_initialize(AsyncTask *task) {
+  new (task->AllocatorPrivate) TaskAllocator();
+}
+
+static TaskAllocator &allocator(AsyncTask *task) {
+  return reinterpret_cast<TaskAllocator &>(task->AllocatorPrivate);
+}
+
+void swift::_swift_task_alloc_destroy(AsyncTask *task) {
+  allocator(task).~TaskAllocator();
+}
+
 void *swift::swift_task_alloc(AsyncTask *task, size_t size) {
-  return malloc(size);
+  return allocator(task).alloc(size);
 }
 
 void swift::swift_task_dealloc(AsyncTask *task, void *ptr) {
-  free(ptr);
+  return allocator(task).dealloc(ptr);
 }
