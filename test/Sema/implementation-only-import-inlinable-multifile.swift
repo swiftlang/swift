@@ -12,6 +12,7 @@
 @inlinable
 public func testStructFromDirect() {
   _ = StructFromDirect() // expected-error {{struct 'StructFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
+  // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -22,6 +23,7 @@ public func testStructFromIndirect() {
 @inlinable
 public func testAliasFromDirect() {
   _ = AliasFromDirect() // expected-error {{type alias 'AliasFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
+  // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -31,7 +33,7 @@ public func testAliasFromIndirect() {
 
 @inlinable
 public func testGenericAliasFromDirect() {
-  _ = GenericAliasFromDirect<Int>() // expected-error {{type alias 'GenericAliasFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
+  _ = GenericAliasFromDirect<Int>.self // expected-error {{type alias 'GenericAliasFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable

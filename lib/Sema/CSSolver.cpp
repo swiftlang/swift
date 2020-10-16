@@ -1929,30 +1929,6 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   return result->first;
 }
 
-// Find a disjunction associated with an ApplicableFunction constraint
-// where we have some information about all of the types of in the
-// function application (even if we only know something about what the
-// types conform to and not actually a concrete type).
-Constraint *ConstraintSystem::selectApplyDisjunction() {
-  for (auto &constraint : InactiveConstraints) {
-    if (constraint.getKind() != ConstraintKind::ApplicableFunction)
-      continue;
-
-    auto *applicable = &constraint;
-    if (haveTypeInformationForAllArguments(
-            applicable->getFirstType()->castTo<FunctionType>())) {
-      auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
-
-      // If we have created the disjunction for this apply, find it.
-      auto *disjunction = getUnboundBindOverloadDisjunction(tyvar);
-      if (disjunction)
-        return disjunction;
-    }
-  }
-
-  return nullptr;
-}
-
 static bool isOperatorBindOverload(Constraint *bindOverload) {
   if (bindOverload->getKind() != ConstraintKind::BindOverload)
     return false;
@@ -1963,165 +1939,6 @@ static bool isOperatorBindOverload(Constraint *bindOverload) {
 
   auto *funcDecl = dyn_cast<FuncDecl>(choice.getDecl());
   return funcDecl && funcDecl->getOperatorDecl();
-}
-
-// Given a bind overload constraint for an operator, return the
-// protocol designated as the first place to look for overloads of the
-// operator.
-static ArrayRef<NominalTypeDecl *>
-getOperatorDesignatedNominalTypes(Constraint *bindOverload) {
-  auto choice = bindOverload->getOverloadChoice();
-  auto *funcDecl = cast<FuncDecl>(choice.getDecl());
-  auto *operatorDecl = funcDecl->getOperatorDecl();
-  return operatorDecl->getDesignatedNominalTypes();
-}
-
-void ConstraintSystem::sortDesignatedTypes(
-    SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
-    Constraint *bindOverload) {
-  auto *tyvar = bindOverload->getFirstType()->castTo<TypeVariableType>();
-  auto applicableFns = getConstraintGraph().gatherConstraints(
-      tyvar, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *match) {
-        return match->getKind() == ConstraintKind::ApplicableFunction;
-      });
-
-  // FIXME: This is not true when we run the constraint optimizer.
-  // assert(applicableFns.size() <= 1);
-
-  // We have a disjunction for an operator but no application of it,
-  // so it's being passed as an argument.
-  if (applicableFns.size() == 0)
-    return;
-
-  // FIXME: We have more than one applicable per disjunction as a
-  //        result of merging disjunction type variables. We may want
-  //        to rip that out at some point.
-  Constraint *foundApplicable = nullptr;
-  SmallVector<Optional<Type>, 2> argumentTypes;
-  for (auto *applicableFn : applicableFns) {
-    argumentTypes.clear();
-    auto *fnTy = applicableFn->getFirstType()->castTo<FunctionType>();
-    ArgumentInfoCollector argInfo(*this, fnTy);
-    // Stop if we hit anything with concrete types or conformances to
-    // literals.
-    if (!argInfo.getTypes().empty() || !argInfo.getLiteralProtocols().empty()) {
-      foundApplicable = applicableFn;
-      break;
-    }
-  }
-
-  if (!foundApplicable)
-    return;
-
-  // FIXME: It would be good to avoid this redundancy.
-  auto *fnTy = foundApplicable->getFirstType()->castTo<FunctionType>();
-  ArgumentInfoCollector argInfo(*this, fnTy);
-
-  size_t nextType = 0;
-  for (auto argType : argInfo.getTypes()) {
-    auto *nominal = argType->getAnyNominal();
-    for (size_t i = nextType; i < nominalTypes.size(); ++i) {
-      if (nominal == nominalTypes[i]) {
-        std::swap(nominalTypes[nextType], nominalTypes[i]);
-        ++nextType;
-        break;
-      } else if (auto *protoDecl = dyn_cast<ProtocolDecl>(nominalTypes[i])) {
-        if (TypeChecker::conformsToProtocol(argType, protoDecl, DC)) {
-          std::swap(nominalTypes[nextType], nominalTypes[i]);
-          ++nextType;
-          break;
-        }
-      }
-    }
-  }
-
-  if (nextType + 1 >= nominalTypes.size())
-    return;
-
-  for (auto *protocol : argInfo.getLiteralProtocols()) {
-    auto defaultType = TypeChecker::getDefaultType(protocol, DC);
-    // ExpressibleByNilLiteral does not have a default type.
-    if (!defaultType)
-      continue;
-    auto *nominal = defaultType->getAnyNominal();
-    for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
-      if (nominal == nominalTypes[i]) {
-        std::swap(nominalTypes[nextType], nominalTypes[i]);
-        ++nextType;
-        break;
-      }
-    }
-  }
-}
-
-void ConstraintSystem::partitionForDesignatedTypes(
-    ArrayRef<Constraint *> Choices, ConstraintMatchLoop forEachChoice,
-    PartitionAppendCallback appendPartition) {
-
-  auto types = getOperatorDesignatedNominalTypes(Choices[0]);
-  if (types.empty())
-    return;
-
-  SmallVector<NominalTypeDecl *, 4> designatedNominalTypes(types.begin(),
-                                                           types.end());
-
-  if (designatedNominalTypes.size() > 1)
-    sortDesignatedTypes(designatedNominalTypes, Choices[0]);
-
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
-
-  auto examineConstraint =
-    [&](unsigned constraintIndex, Constraint *constraint) -> bool {
-    auto *decl = constraint->getOverloadChoice().getDecl();
-    auto *funcDecl = cast<FuncDecl>(decl);
-
-    auto *parentDC = funcDecl->getParent();
-    auto *parentDecl = parentDC->getSelfNominalTypeDecl();
-
-    // Skip anything not defined in a nominal type.
-    if (!parentDecl)
-      return false;
-
-    for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
-      auto *designatedNominal =
-        designatedNominalTypes[designatedTypeIndex];
-
-      if (parentDecl != designatedNominal)
-        continue;
-
-      auto &constraints =
-          isa<ExtensionDecl>(parentDC)
-              ? definedInExtensionOfDesignatedType[designatedTypeIndex]
-              : definedInDesignatedType[designatedTypeIndex];
-
-      constraints.push_back(constraintIndex);
-      return true;
-    }
-
-    return false;
-  };
-
-  definedInDesignatedType.resize(designatedNominalTypes.size());
-  definedInExtensionOfDesignatedType.resize(designatedNominalTypes.size());
-
-  forEachChoice(Choices, examineConstraint);
-
-  // Now collect the overload choices that are defined within the type
-  // that was designated in the operator declaration.
-  // Add partitions for each of the overloads we found in types that
-  // were designated as part of the operator declaration.
-  for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
-    if (designatedTypeIndex < definedInDesignatedType.size()) {
-      auto &primary = definedInDesignatedType[designatedTypeIndex];
-      appendPartition(primary);
-    }
-    if (designatedTypeIndex < definedInExtensionOfDesignatedType.size()) {
-      auto &secondary = definedInExtensionOfDesignatedType[designatedTypeIndex];
-      appendPartition(secondary);
-    }
-  }
 }
 
 // Performance hack: if there are two generic overloads, and one is
@@ -2266,8 +2083,7 @@ void ConstraintSystem::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (!getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes &&
-      isOperatorBindOverload(Choices[0])) {
+  if (isOperatorBindOverload(Choices[0])) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (!isOperatorBindOverload(constraint))
         return false;
@@ -2290,11 +2106,6 @@ void ConstraintSystem::partitionDisjunction(
           Ordering.insert(Ordering.end(), options.begin(), options.end());
         }
       };
-
-  if (getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes &&
-      isOperatorBindOverload(Choices[0])) {
-    partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
-  }
 
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
@@ -2319,17 +2130,6 @@ Constraint *ConstraintSystem::selectDisjunction() {
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
     return nullptr;
-
-  // Attempt apply disjunctions first. When we have operators with
-  // designated types, this is important, because it allows us to
-  // select all the preferred operator overloads prior to other
-  // disjunctions that we may not be able to short-circuit, allowing
-  // us to eliminate behavior that is exponential in the number of
-  // operators in the expression.
-  if (getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
-    if (auto *disjunction = selectApplyDisjunction())
-      return disjunction;
-  }
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;

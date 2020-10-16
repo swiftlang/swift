@@ -742,8 +742,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
 

@@ -13,6 +13,8 @@
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.swift
   PartialAsyncTask.swift
+  TaskStatus.cpp
+  Mutex.cpp
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin
@@ -25,6 +27,10 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
 
+  LINK_LIBRARIES swiftCore
+
+  C_COMPILE_FLAGS
+    -Dswift_Concurrency_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib

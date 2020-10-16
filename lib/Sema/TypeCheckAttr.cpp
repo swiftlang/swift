@@ -2458,7 +2458,7 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
 
   auto options = NL_QualifiedDefault;
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NL_IncludeUsableFromInlineAndInlineable;
+    options |= NL_IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName, options,

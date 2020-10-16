@@ -480,10 +480,6 @@ def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
   HelpText<"Enable operator designated types">;
 
-def solver_enable_operator_designated_types :
-  Flag<["-"], "solver-enable-operator-designated-types">,
-  HelpText<"Enable operator designated types in constraint solver">;
-
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
   HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;

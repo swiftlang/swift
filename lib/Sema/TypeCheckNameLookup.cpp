@@ -211,8 +211,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
-  if (options.contains(NameLookupFlags::IncludeInlineableAndUsableFromInline))
-    newOptions |= UnqualifiedLookupFlags::IncludeInlineableAndUsableFromInline;
+  if (options.contains(NameLookupFlags::IncludeUsableFromInline))
+    newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
 
   return newOptions;
 }
@@ -388,8 +388,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
-  if (options.contains(NameLookupFlags::IncludeInlineableAndUsableFromInline))
-    subOptions |= NL_IncludeUsableFromInlineAndInlineable;
+  if (options.contains(NameLookupFlags::IncludeUsableFromInline))
+    subOptions |= NL_IncludeUsableFromInline;
 
   // Make sure we've resolved implicit members, if we need them.
   if (auto *current = type->getAnyNominal()) {

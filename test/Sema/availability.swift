@@ -19,12 +19,16 @@ struct Outer {
 
 func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
      let y : NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
+     // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'NSUInteger'}}
 
   let z : MyModule.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'NSUInteger'}}
 
-  let z2 : Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}  
+  let z2 : Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
 
-  let z3 : MyModule.Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}  
+  let z3 : MyModule.Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
 }
 
 // Test preventing overrides (but allowing shadowing) of unavailable methods.
