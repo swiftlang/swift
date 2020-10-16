@@ -42,7 +42,7 @@ entry(%box : $WeakBox<τ_0_0>):
   return %result : $()
 }
 
-sil public @bind_polymorphic_param_from_context : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> () {
+sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingQ : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
@@ -52,12 +52,12 @@ bb0(%0 : $*τ_0_1):
 
 sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %bind_polymorphic_param_from_context = function_ref @bind_polymorphic_param_from_context : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
+  %bind_polymorphic_param_from_context = function_ref @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
   %int_literal = integer_literal $Builtin.Int64, 9999
   %int = struct $Int64 (%int_literal : $Builtin.Int64)
   %int_addr = alloc_stack $Int64
   store %int to %int_addr : $*Int64
-  %partiallyApplied = apply %bind_polymorphic_param_from_context<Int64>(%int_addr) :  $@convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
+  %partiallyApplied = apply %bind_polymorphic_param_from_context<Int64>(%int_addr) :  $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
   dealloc_stack %int_addr : $*Int64
 
   %result = apply %partiallyApplied() : $@async @callee_owned () -> ()

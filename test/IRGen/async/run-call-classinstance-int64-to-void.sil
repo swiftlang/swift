@@ -30,12 +30,12 @@ class S {
 // CHECK-LL: define hidden swiftcc void @classinstanceSInt64ToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
 sil hidden @classinstanceSInt64ToVoid : $@async @convention(method) (Int64, @guaranteed S) -> () {
 bb0(%int : $Int64, %instance : $S):
-  %take_s = function_ref @take_S : $@convention(thin) (@guaranteed S) -> ()
-  %result = apply %take_s(%instance) : $@convention(thin) (@guaranteed S) -> ()
+  %take_s = function_ref @take_S : $@async @convention(thin) (@guaranteed S) -> ()
+  %result = apply %take_s(%instance) : $@async @convention(thin) (@guaranteed S) -> ()
   return %result : $()
 }
 
-sil hidden @take_S : $@convention(thin) (@guaranteed S) -> () {
+sil hidden @take_S : $@async @convention(thin) (@guaranteed S) -> () {
 bb0(%instance : $S):
   %any = alloc_stack $Any
   strong_retain %instance : $S

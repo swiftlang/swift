@@ -109,7 +109,7 @@ bb0:
   return %2 : $Big
 }
 
-sil hidden @printBig : $@convention(thin) () -> () {
+sil hidden @printBig : $@async @convention(thin) () -> () {
     %getBig = function_ref @getBig : $@async @convention(thin) () -> Big
     %big = apply %getBig() : $@async @convention(thin) () -> Big
     %big_addr = alloc_stack $Big
@@ -123,8 +123,8 @@ sil hidden @printBig : $@convention(thin) () -> () {
 
 sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %printBig = function_ref @printBig : $@convention(thin) () -> ()
-  %result = apply %printBig() : $@convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)
+  %printBig = function_ref @printBig : $@async @convention(thin) () -> ()
+  %result = apply %printBig() : $@async @convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)
 
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)

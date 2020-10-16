@@ -49,7 +49,7 @@ bb0(%existential : $*P):
   return %result : $()
 }
 
-sil hidden @call : $@convention(thin) () -> () {
+sil hidden @call : $@async @convention(thin) () -> () {
 bb0:
   %S_type = metatype $@thin S.Type
   %int_literal = integer_literal $Builtin.Int64, 7384783
@@ -68,8 +68,8 @@ bb0:
 
 sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 7384783
-  %result = apply %call() : $@convention(thin) () -> ()
+  %call = function_ref @call : $@async @convention(thin) () -> () // CHECK: 7384783
+  %result = apply %call() : $@async @convention(thin) () -> ()
 
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)

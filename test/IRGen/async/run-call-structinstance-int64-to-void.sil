@@ -26,13 +26,13 @@ struct S {
 // CHECK-LL: define hidden swiftcc void @structinstanceSInt64ToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
 sil hidden @structinstanceSInt64ToVoid : $@async @convention(method) (Int64, S) -> () {
 bb0(%int : $Int64, %self : $S):
-  %takeSAndInt64 = function_ref @takeSAndInt64 : $@convention(thin) (S, Int64) -> ()
-  %takeSAndInt64_result = apply %takeSAndInt64(%self, %int) : $@convention(thin) (S, Int64) -> ()
+  %takeSAndInt64 = function_ref @takeSAndInt64 : $@async @convention(thin) (S, Int64) -> ()
+  %takeSAndInt64_result = apply %takeSAndInt64(%self, %int) : $@async @convention(thin) (S, Int64) -> ()
   %out = tuple ()
   return %out : $()
 }
 
-sil hidden @takeSAndInt64 : $@convention(thin) (S, Int64) -> () {
+sil hidden @takeSAndInt64 : $@async @convention(thin) (S, Int64) -> () {
 bb0(%self : $S, %int : $Int64):
   %s_addr = alloc_stack $S
   store %self to %s_addr : $*S
