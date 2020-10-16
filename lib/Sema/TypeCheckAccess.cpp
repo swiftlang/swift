@@ -1737,40 +1737,6 @@ public:
     return true;
   }
 
-  void checkOverride(const ValueDecl *VD) {
-    const ValueDecl *overridden = VD->getOverriddenDecl();
-    if (!overridden)
-      return;
-
-    auto *SF = VD->getDeclContext()->getParentSourceFile();
-    assert(SF && "checking a non-source declaration?");
-
-    ModuleDecl *M = overridden->getModuleContext();
-    if (SF->isImportedImplementationOnly(M)) {
-      VD->diagnose(diag::implementation_only_override_import_without_attr,
-                   overridden->getDescriptiveKind())
-          .fixItInsert(VD->getAttributeInsertionLoc(false),
-                       "@_implementationOnly ");
-      overridden->diagnose(diag::overridden_here);
-      return;
-    }
-
-    if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
-      VD->diagnose(diag::implementation_only_override_without_attr,
-                   overridden->getDescriptiveKind())
-          .fixItInsert(VD->getAttributeInsertionLoc(false),
-                       "@_implementationOnly ");
-      overridden->diagnose(diag::overridden_here);
-      return;
-    }
-
-    // FIXME: Check storage decls where the setter is in a separate module from
-    // the getter, which is a thing Objective-C can do. The ClangImporter
-    // doesn't make this easy, though, because it just gives the setter the same
-    // DeclContext as the property or subscript, which means we've lost the
-    // information about whether its module was implementation-only imported.
-  }
-
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
       return;
@@ -1778,7 +1744,6 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (shouldSkipChecking(VD))
         return;
-      checkOverride(VD);
     }
 
     // Note: references to @_spi and @_implementationOnly declarations from
@@ -1827,8 +1792,6 @@ public:
     const VarDecl *theVar = NP->getDecl();
     if (shouldSkipChecking(theVar))
       return;
-
-    checkOverride(theVar);
 
     // Only check the type of individual variables if we didn't check an
     // enclosing TypedPattern.
