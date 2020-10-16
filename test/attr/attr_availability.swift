@@ -257,11 +257,6 @@ func TextOutputStreamTest(message: String, to: inout TextOutputStream) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
 
-// expected-note@+1{{'T' has been explicitly marked unavailable here}}
-struct UnavailableGenericParam<@available(*, unavailable, message: "nope") T> {
-  func f(t: T) { } // expected-error{{'T' is unavailable: nope}}
-}
-
 
 struct DummyType {}
 
@@ -1119,3 +1114,6 @@ func testBadRename() {
   _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: replaced by 'init(range:step:)'}}
   // expected-note@-1{{use 'init(range:step:)' instead}}
 }
+
+struct AvailableGenericParam<@available(*, deprecated) T> {}
+// expected-error@-1 {{'@available' attribute cannot be applied to this declaration}}

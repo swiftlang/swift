@@ -323,11 +323,10 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     const Decl *ownerDecl,
     AccessScope accessScope,
     AccessLevel contextAccess) {
-  auto params = ownerCtx->getGenericParams();
-  if (!params)
+  if (!ownerCtx->isGenericContext())
     return;
 
-  // This must stay in sync with diag::generic_param_access.
+ // This must stay in sync with diag::generic_param_access.
   enum class ACEK {
     Parameter = 0,
     Requirement
@@ -355,20 +354,25 @@ void AccessControlCheckerBase::checkGenericParamAccess(
 
   auto *DC = ownerDecl->getDeclContext();
 
-  for (auto param : *params) {
-    if (param->getInherited().empty())
-      continue;
-    assert(param->getInherited().size() == 1);
-    checkTypeAccessImpl(param->getInherited().front().getType(),
-                        param->getInherited().front().getTypeRepr(),
-                        accessScope, DC, /*mayBeInferred*/false,
-                        callback);
+  if (auto params = ownerCtx->getGenericParams()) {
+    for (auto param : *params) {
+      if (param->getInherited().empty())
+        continue;
+      assert(param->getInherited().size() == 1);
+      checkTypeAccessImpl(param->getInherited().front().getType(),
+                          param->getInherited().front().getTypeRepr(),
+                          accessScope, DC, /*mayBeInferred*/false,
+                          callback);
+    }
   }
+
   callbackACEK = ACEK::Requirement;
 
-  checkRequirementAccess(WhereClauseOwner(
-                           const_cast<GenericContext *>(ownerCtx)),
-                         accessScope, DC, callback);
+  if (ownerCtx->getTrailingWhereClause()) {
+    checkRequirementAccess(WhereClauseOwner(
+                             const_cast<GenericContext *>(ownerCtx)),
+                           accessScope, DC, callback);
+  }
 
   if (minAccessScope.isPublic())
     return;
@@ -1624,23 +1628,26 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
   void checkGenericParams(const GenericContext *ownerCtx,
                           const ValueDecl *ownerDecl) {
-    const auto params = ownerCtx->getGenericParams();
-    if (!params)
+    if (!ownerCtx->isGenericContext())
       return;
 
-    for (auto param : *params) {
-      if (param->getInherited().empty())
-        continue;
-      assert(param->getInherited().size() == 1);
-      checkType(param->getInherited().front(), ownerDecl,
-                getDiagnoser(ownerDecl));
+    if (auto params = ownerCtx->getGenericParams()) {
+      for (auto param : *params) {
+        if (param->getInherited().empty())
+          continue;
+        assert(param->getInherited().size() == 1);
+        checkType(param->getInherited().front(), ownerDecl,
+                  getDiagnoser(ownerDecl));
+      }
     }
 
-    forAllRequirementTypes(WhereClauseOwner(
-                             const_cast<GenericContext *>(ownerCtx)),
-                           [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ownerDecl, getDiagnoser(ownerDecl));
-    });
+    if (ownerCtx->getTrailingWhereClause()) {
+      forAllRequirementTypes(WhereClauseOwner(
+                               const_cast<GenericContext *>(ownerCtx)),
+                             [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, ownerDecl, getDiagnoser(ownerDecl));
+      });
+    }
   }
 
   // This enum must be kept in sync with
@@ -2076,24 +2083,26 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
   void checkGenericParams(const GenericContext *ownerCtx,
                           const ValueDecl *ownerDecl) {
-    // FIXME: What if we have a where clause and no generic params?
-    const auto params = ownerCtx->getGenericParams();
-    if (!params)
+    if (!ownerCtx->isGenericContext())
       return;
 
-    for (auto param : *params) {
-      if (param->getInherited().empty())
-        continue;
-      assert(param->getInherited().size() == 1);
-      auto inherited = param->getInherited().front();
-      checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+    if (auto params = ownerCtx->getGenericParams()) {
+      for (auto param : *params) {
+        if (param->getInherited().empty())
+          continue;
+        assert(param->getInherited().size() == 1);
+        auto inherited = param->getInherited().front();
+        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+      }
     }
 
-    forAllRequirementTypes(WhereClauseOwner(
-                             const_cast<GenericContext *>(ownerCtx)),
-                           [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ownerDecl);
-    });
+    if (ownerCtx->getTrailingWhereClause()) {
+      forAllRequirementTypes(WhereClauseOwner(
+                               const_cast<GenericContext *>(ownerCtx)),
+                             [&](Type type, TypeRepr *typeRepr) {
+        checkType(type, typeRepr, ownerDecl);
+      });
+    }
   }
 
 public:
@@ -2232,7 +2241,7 @@ public:
     llvm::for_each(proto->getInherited(),
                   [&](TypeLoc requirement) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                /*allowUnavailableProtocol=*/true);
+                /*allowUnavailableProtocol=*/false);
     });
 
     if (proto->getTrailingWhereClause()) {
