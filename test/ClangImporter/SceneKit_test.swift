@@ -10,91 +10,91 @@ import Foundation
 // wrapper types with nestest values.
 @available(macOS 10.11, *)
 func testNestingRenames() {
-  let _ = SCNGeometrySourceSemantic
+  let _ = SCNGeometrySourceSemantic.self
     // expected-error@-1{{'SCNGeometrySourceSemantic' has been renamed to 'SCNGeometrySource.Semantic'}}
-  let _ = SCNLightType
+  let _ = SCNLightType.self
     // expected-error@-1{{'SCNLightType' has been renamed to 'SCNLight.LightType'}}
-  let _ = SCNLightingModel
+  let _ = SCNLightingModel.self
     // expected-error@-1{{'SCNLightingModel' has been renamed to 'SCNMaterial.LightingModel'}}
-  let _ = SCNParticleProperty
+  let _ = SCNParticleProperty.self
     // expected-error@-1{{'SCNParticleProperty' has been renamed to 'SCNParticleSystem.ParticleProperty'}}
-  let _ = SCNPhysicsShapeOption
+  let _ = SCNPhysicsShapeOption.self
     // expected-error@-1{{'SCNPhysicsShapeOption' has been renamed to 'SCNPhysicsShape.Option'}}
-  let _ = SCNPhysicsShapeType
+  let _ = SCNPhysicsShapeType.self
     // expected-error@-1{{'SCNPhysicsShapeType' has been renamed to 'SCNPhysicsShape.ShapeType'}}
-  let _ = SCNPhysicsTestOption
+  let _ = SCNPhysicsTestOption.self
     // expected-error@-1{{'SCNPhysicsTestOption' has been renamed to 'SCNPhysicsWorld.TestOption'}}
-  let _ = SCNPhysicsTestSearchMode
+  let _ = SCNPhysicsTestSearchMode.self
     // expected-error@-1{{'SCNPhysicsTestSearchMode' has been renamed to 'SCNPhysicsWorld.TestSearchMode'}}
-  let _ = SCNSceneAttribute
+  let _ = SCNSceneAttribute.self
     // expected-error@-1{{'SCNSceneAttribute' has been renamed to 'SCNScene.Attribute'}}
-  let _ = SCNSceneSourceAnimationImportPolicy
+  let _ = SCNSceneSourceAnimationImportPolicy.self
     // expected-error@-1{{'SCNSceneSourceAnimationImportPolicy' has been renamed to 'SCNSceneSource.AnimationImportPolicy'}}
-  let _ = SCNSceneSourceLoadingOption
+  let _ = SCNSceneSourceLoadingOption.self
     // expected-error@-1{{'SCNSceneSourceLoadingOption' has been renamed to 'SCNSceneSource.LoadingOption'}}
-  let _ = SCNViewOption
+  let _ = SCNViewOption.self
     // expected-error@-1{{'SCNViewOption' has been renamed to 'SCNView.Option'}}
-  let _ = SCNHitTestFirstFoundOnlyKey
+  let _ = SCNHitTestFirstFoundOnlyKey.self
     // expected-error@-1{{'SCNHitTestFirstFoundOnlyKey' has been renamed to 'SCNHitTestOption.firstFoundOnly'}}
-  let _ = SCNHitTestSortResultsKey
+  let _ = SCNHitTestSortResultsKey.self
     // expected-error@-1{{'SCNHitTestSortResultsKey' has been renamed to 'SCNHitTestOption.sortResults'}}
-  let _ = SCNHitTestClipToZRangeKey
+  let _ = SCNHitTestClipToZRangeKey.self
     // expected-error@-1{{'SCNHitTestClipToZRangeKey' has been renamed to 'SCNHitTestOption.clipToZRange'}}
-  let _ = SCNHitTestBackFaceCullingKey
+  let _ = SCNHitTestBackFaceCullingKey.self
     // expected-error@-1{{'SCNHitTestBackFaceCullingKey' has been renamed to 'SCNHitTestOption.backFaceCulling'}}
-  let _ = SCNHitTestBoundingBoxOnlyKey
+  let _ = SCNHitTestBoundingBoxOnlyKey.self
     // expected-error@-1{{'SCNHitTestBoundingBoxOnlyKey' has been renamed to 'SCNHitTestOption.boundingBoxOnly'}}
-  let _ = SCNHitTestIgnoreChildNodesKey
+  let _ = SCNHitTestIgnoreChildNodesKey.self
     // expected-error@-1{{'SCNHitTestIgnoreChildNodesKey' has been renamed to 'SCNHitTestOption.ignoreChildNodes'}}
-  let _ = SCNHitTestRootNodeKey
+  let _ = SCNHitTestRootNodeKey.self
     // expected-error@-1{{'SCNHitTestRootNodeKey' has been renamed to 'SCNHitTestOption.rootNode'}}
-  let _ = SCNHitTestIgnoreHiddenNodesKey
+  let _ = SCNHitTestIgnoreHiddenNodesKey.self
     // expected-error@-1{{'SCNHitTestIgnoreHiddenNodesKey' has been renamed to 'SCNHitTestOption.ignoreHiddenNodes'}}
-  let _ = SCNPhysicsShapeTypeKey
+  let _ = SCNPhysicsShapeTypeKey.self
     // expected-error@-1{{'SCNPhysicsShapeTypeKey' has been renamed to 'SCNPhysicsShape.Option.type'}}
-  let _ = SCNPhysicsShapeKeepAsCompoundKey
+  let _ = SCNPhysicsShapeKeepAsCompoundKey.self
     // expected-error@-1{{'SCNPhysicsShapeKeepAsCompoundKey' has been renamed to 'SCNPhysicsShape.Option.keepAsCompound'}}
-  let _ = SCNPhysicsShapeScaleKey
+  let _ = SCNPhysicsShapeScaleKey.self
     // expected-error@-1{{'SCNPhysicsShapeScaleKey' has been renamed to 'SCNPhysicsShape.Option.scale'}}
-  let _ = SCNPhysicsTestCollisionBitMaskKey
+  let _ = SCNPhysicsTestCollisionBitMaskKey.self
     // expected-error@-1{{'SCNPhysicsTestCollisionBitMaskKey' has been renamed to 'SCNPhysicsWorld.TestOption.collisionBitMask'}}
-  let _ = SCNPhysicsTestSearchModeKey
+  let _ = SCNPhysicsTestSearchModeKey.self
     // expected-error@-1{{'SCNPhysicsTestSearchModeKey' has been renamed to 'SCNPhysicsWorld.TestOption.searchMode'}}
-  let _ = SCNPhysicsTestBackfaceCullingKey
+  let _ = SCNPhysicsTestBackfaceCullingKey.self
     // expected-error@-1{{'SCNPhysicsTestBackfaceCullingKey' has been renamed to 'SCNPhysicsWorld.TestOption.backfaceCulling'}}
-  let _ = SCNSceneStartTimeAttributeKey
+  let _ = SCNSceneStartTimeAttributeKey.self
     // expected-error@-1{{'SCNSceneStartTimeAttributeKey' has been renamed to 'SCNScene.Attribute.startTime'}}
-  let _ = SCNSceneEndTimeAttributeKey
+  let _ = SCNSceneEndTimeAttributeKey.self
     // expected-error@-1{{'SCNSceneEndTimeAttributeKey' has been renamed to 'SCNScene.Attribute.endTime'}}
-  let _ = SCNSceneFrameRateAttributeKey
+  let _ = SCNSceneFrameRateAttributeKey.self
     // expected-error@-1{{'SCNSceneFrameRateAttributeKey' has been renamed to 'SCNScene.Attribute.frameRate'}}
-  let _ = SCNSceneUpAxisAttributeKey
+  let _ = SCNSceneUpAxisAttributeKey.self
     // expected-error@-1{{'SCNSceneUpAxisAttributeKey' has been renamed to 'SCNScene.Attribute.upAxis'}}
-  let _ = SCNSceneSourceCreateNormalsIfAbsentKey
+  let _ = SCNSceneSourceCreateNormalsIfAbsentKey.self
     // expected-error@-1{{'SCNSceneSourceCreateNormalsIfAbsentKey' has been renamed to 'SCNSceneSource.LoadingOption.createNormalsIfAbsent'}}
-  let _ = SCNSceneSourceCheckConsistencyKey
+  let _ = SCNSceneSourceCheckConsistencyKey.self
     // expected-error@-1{{'SCNSceneSourceCheckConsistencyKey' has been renamed to 'SCNSceneSource.LoadingOption.checkConsistency'}}
-  let _ = SCNSceneSourceFlattenSceneKey
+  let _ = SCNSceneSourceFlattenSceneKey.self
     // expected-error@-1{{'SCNSceneSourceFlattenSceneKey' has been renamed to 'SCNSceneSource.LoadingOption.flattenScene'}}
-  let _ = SCNSceneSourceUseSafeModeKey
+  let _ = SCNSceneSourceUseSafeModeKey.self
     // expected-error@-1{{'SCNSceneSourceUseSafeModeKey' has been renamed to 'SCNSceneSource.LoadingOption.useSafeMode'}}
-  let _ = SCNSceneSourceAssetDirectoryURLsKey
+  let _ = SCNSceneSourceAssetDirectoryURLsKey.self
     // expected-error@-1{{'SCNSceneSourceAssetDirectoryURLsKey' has been renamed to 'SCNSceneSource.LoadingOption.assetDirectoryURLs'}}
-  let _ = SCNSceneSourceOverrideAssetURLsKey
+  let _ = SCNSceneSourceOverrideAssetURLsKey.self
     // expected-error@-1{{'SCNSceneSourceOverrideAssetURLsKey' has been renamed to 'SCNSceneSource.LoadingOption.overrideAssetURLs'}}
-  let _ = SCNSceneSourceStrictConformanceKey
+  let _ = SCNSceneSourceStrictConformanceKey.self
     // expected-error@-1{{'SCNSceneSourceStrictConformanceKey' has been renamed to 'SCNSceneSource.LoadingOption.strictConformance'}}
-  let _ = SCNSceneSourceConvertUnitsToMetersKey
+  let _ = SCNSceneSourceConvertUnitsToMetersKey.self
     // expected-error@-1{{'SCNSceneSourceConvertUnitsToMetersKey' has been renamed to 'SCNSceneSource.LoadingOption.convertUnitsToMeters'}}
-  let _ = SCNSceneSourceConvertToYUpKey
+  let _ = SCNSceneSourceConvertToYUpKey.self
     // expected-error@-1{{'SCNSceneSourceConvertToYUpKey' has been renamed to 'SCNSceneSource.LoadingOption.convertToYUp'}}
-  let _ = SCNSceneSourceAnimationImportPolicyKey
+  let _ = SCNSceneSourceAnimationImportPolicyKey.self
     // expected-error@-1{{'SCNSceneSourceAnimationImportPolicyKey' has been renamed to 'SCNSceneSource.LoadingOption.animationImportPolicy'}}
-  let _ = SCNPreferredRenderingAPIKey
+  let _ = SCNPreferredRenderingAPIKey.self
     // expected-error@-1{{'SCNPreferredRenderingAPIKey' has been renamed to 'SCNView.Option.preferredRenderingAPI'}}
-  let _ = SCNPreferredDeviceKey
+  let _ = SCNPreferredDeviceKey.self
     // expected-error@-1{{'SCNPreferredDeviceKey' has been renamed to 'SCNView.Option.preferredDevice'}}
-  let _ = SCNPreferLowPowerDeviceKey
+  let _ = SCNPreferLowPowerDeviceKey.self
     // expected-error@-1{{'SCNPreferLowPowerDeviceKey' has been renamed to 'SCNView.Option.preferLowPowerDevice'}}
 }
 

@@ -28,10 +28,10 @@ namespace swift {
   class Expr;
   class InFlightDiagnostic;
   class Decl;
+  class Stmt;
+  class Type;
+  class TypeRepr;
   class ValueDecl;
-
-/// Diagnose uses of unavailable declarations.
-void diagAvailability(const Expr *E, DeclContext *DC);
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
@@ -56,6 +56,20 @@ enum class DeclAvailabilityFlag : uint8_t {
   ForObjCKeyPath = 1 << 4
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
+
+/// Diagnose uses of unavailable declarations in expressions.
+void diagAvailability(const Expr *E, DeclContext *DC);
+
+/// Diagnose uses of unavailable declarations in statements (via patterns, etc),
+/// without walking into expressions.
+void diagAvailability(const Stmt *S, DeclContext *DC);
+
+/// Diagnose uses of unavailable declarations in types.
+bool diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
+                                  DeclAvailabilityFlags flags = None);
+
+/// Diagnose uses of unavailable conformances in types.
+void diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC);
 
 /// Run the Availability-diagnostics algorithm otherwise used in an expr
 /// context, but for non-expr contexts such as TypeDecls referenced from

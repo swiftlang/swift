@@ -20,6 +20,7 @@ __attribute__((objc_root_class))
 
 __attribute__((objc_root_class))
 @interface Base
+-(nonnull instancetype)init;
 @end
 
 @interface B : A

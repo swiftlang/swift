@@ -2190,7 +2190,7 @@ static Type validateParameterType(ParamDecl *decl) {
   options |= TypeResolutionFlags::Direct;
 
   if (dc->isInSpecializeExtensionContext())
-    options |= TypeResolutionFlags::AllowInlinable;
+    options |= TypeResolutionFlags::AllowUsableFromInline;
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener);
@@ -2727,7 +2727,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   if (ext->isInSpecializeExtensionContext())
-    options |= TypeResolutionFlags::AllowInlinable;
+    options |= TypeResolutionFlags::AllowUsableFromInline;
   const auto resolution = TypeResolution::forStructural(
       ext->getDeclContext(), options,
       [](auto unboundTy) {

@@ -70,11 +70,11 @@ func genericFunctionSigilArray<T>(
 }
 
 protocol P {
-  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
-  associatedtype U // expected-note {{protocol requires nested type 'U'; do you want to add it?}}
+  associatedtype T
+  associatedtype U
 }
 
-struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
+struct S : P {
   typealias T = ImplicitlyUnwrappedOptional<Int> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{17-44=Optional}}
   typealias U = Optional<ImplicitlyUnwrappedOptional<Int>> // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{26-53=Optional}}
 
