@@ -614,25 +614,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
 
-  // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".  If it was only temporarily favored because it matched other
-  // operator bindings, we can even short-circuit other favored constraints.
-  if (lastSuccessfulChoice->isFavored() &&
-      (!currentChoice->isFavored() ||
-       (CS.solverState->isTemporarilyFavored(lastSuccessfulChoice) &&
-        !CS.solverState->isTemporarilyFavored(currentChoice)))) {
-#if !defined(NDEBUG)
-    if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
-      auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();
-      assert((!overloadChoice.isDecl() ||
-              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
-             "Unavailable decl should not be favored!");
-    }
-#endif
-
-    return true;
-  }
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
@@ -670,36 +651,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     if (isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
         !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()))
       return true;
-
-    // Otherwise if we have an existing solution, bind tyvars bound to the same
-    // decl in the solution to the choice tyvar. We can continue finding more
-    // solutions, but all the instances of the operator that chose the same
-    // overload as this successful choice will be bound togeter.
-    if (Solutions.size()) {
-      auto lastTyvar =
-          lastSuccessfulChoice->getFirstType()->getAs<TypeVariableType>();
-      auto lastRep = CS.getRepresentative(lastTyvar);
-
-      for (auto overload : Solutions[0].overloadChoices) {
-        auto overloadChoice = overload.getSecond().choice;
-        if (!overloadChoice.isDecl() ||
-            overloadChoice.getDecl() !=
-                lastSuccessfulChoice->getOverloadChoice().getDecl())
-          continue;
-
-        auto choiceTyvar =
-            CS.getType(simplifyLocatorToAnchor(overload.getFirst()))
-                ->getAs<TypeVariableType>();
-        if (!choiceTyvar)
-          continue;
-
-        auto rep = CS.getRepresentative(choiceTyvar);
-        if (lastRep != rep) {
-          CS.mergeEquivalenceClasses(rep, lastRep, /*updateWorkList=*/false);
-          lastRep = CS.getRepresentative(lastRep);
-        }
-      }
-    }
   }
   return false;
 }
