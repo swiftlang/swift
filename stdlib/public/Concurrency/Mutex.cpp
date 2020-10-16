@@ -16,6 +16,10 @@
 #include "../runtime/MutexPThread.cpp"
 #include "../runtime/MutexWin32.cpp"
 
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  #include "swift/Runtime/MutexSingleThreaded.h"
+#endif
+
 SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
   abort();
 }
