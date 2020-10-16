@@ -13,9 +13,9 @@
 @_spi() public func emptyParensSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(set) public func keywordSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 
-@_spi(S) public class SPIClass { // expected-note 5 {{type declared here}}
-  // expected-note @-1 3 {{class 'SPIClass' is not '@usableFromInline' or public}}
-  // expected-note @-2 {{class 'SPIClass' is not public}}
+@_spi(S) public class SPIClass { // expected-note 6 {{type declared here}}
+  // expected-note@-1 3 {{class 'SPIClass' is not '@usableFromInline' or public}}
+  // expected-note@-2 {{class 'SPIClass' is not public}}
   public init() {}
   // expected-note@-1 2 {{initializer 'init()' is not '@usableFromInline' or public}}
   // expected-note@-2 {{initializer 'init()' is not public}}
@@ -38,6 +38,7 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' a
 }
 
 @_spi(S) public struct SPIStruct { // expected-note 2 {{struct 'SPIStruct' is not '@usableFromInline' or public}}
+// expected-note@-1 2 {{type declared here}}
   // FIXME: Misleading diagnostic here
   public init() {}
   // expected-note@-1 2 {{initializer 'init()' is not '@usableFromInline' or public}}

@@ -22,7 +22,7 @@ extension NormalClass: NormalProto {
 }
 
 @_spi(X)
-public struct BadStruct {} // expected-note 27 {{type declared here}}
+public struct BadStruct {} // expected-note 34 {{type declared here}}
 @_spi(X)
 public protocol BadProto {} // expected-note 20 {{type declared here}}
 @_spi(X)

@@ -86,7 +86,16 @@ bool diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
 /// Diagnose uses of unavailable conformances in types.
 void diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC,
                               Optional<ExportabilityReason> reason,
-                              FragileFunctionKind fragileKind);
+                              FragileFunctionKind fragileKind,
+                              DeclAvailabilityFlags flags = None);
+
+/// Checks both a TypeRepr and a Type, but avoids emitting duplicate
+/// diagnostics by only checking the Type if the TypeRepr succeeded.
+void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+                              DeclContext *DC,
+                              Optional<ExportabilityReason> reason,
+                              FragileFunctionKind fragileKind,
+                              DeclAvailabilityFlags flags = None);
 
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
@@ -110,7 +119,7 @@ bool diagnoseDeclAvailability(const ValueDecl *Decl,
                               DeclContext *DC,
                               Optional<ExportabilityReason> reason,
                               FragileFunctionKind fragileKind,
-                              DeclAvailabilityFlags Options);
+                              DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
                                  const ValueDecl *base,

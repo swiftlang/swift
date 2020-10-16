@@ -20,14 +20,11 @@
 #include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
 
@@ -1486,561 +1483,93 @@ swift::getDisallowedOriginKind(const Decl *decl,
   return DisallowedOriginKind::None;
 };
 
-namespace {
+static bool isExported(const ValueDecl *VD) {
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
 
-// Diagnose public APIs exposing types that are either imported as
-// implementation-only or declared as SPI.
-class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
-  class Diagnoser;
-
-  void checkTypeImpl(
-      Type type, const TypeRepr *typeRepr, const SourceFile &SF,
-      const Decl *context,
-      const Diagnoser &diagnoser) {
-    // Don't bother checking errors.
-    if (type && type->hasError())
-      return;
-
-    bool foundAnyIssues = false;
-
-    // Check the TypeRepr first (if present), because that will give us a
-    // better diagnostic.
-    if (typeRepr) {
-      const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
-          [&](const ComponentIdentTypeRepr *component) {
-        TypeDecl *typeDecl = component->getBoundDecl();
-        auto downgradeToWarning = DowngradeToWarning::No;
-        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
-        if (originKind != DisallowedOriginKind::None) {
-          diagnoser.diagnoseType(typeDecl, component, originKind, downgradeToWarning);
-          foundAnyIssues = true;
-        }
-
-        // We still continue even in the diagnostic case to report multiple
-        // violations.
-        return true;
-      }));
-    }
-
-    // Note that if we have a type, we can't skip checking it even if the
-    // TypeRepr is okay, because that's how we check what conformances are
-    // being used.
-    //
-    // We still don't want to do this if we found issues with the TypeRepr,
-    // though, because that would result in some issues being reported twice.
-    if (foundAnyIssues || !type)
-      return;
-
-    class ProblematicTypeFinder : public TypeDeclFinder {
-      const SourceFile &SF;
-      const Decl *context;
-      const Diagnoser &diagnoser;
-    public:
-      ProblematicTypeFinder(const SourceFile &SF, const Decl *context, const Diagnoser &diagnoser)
-        : SF(SF), context(context), diagnoser(diagnoser) {}
-
-      void visitTypeDecl(const TypeDecl *typeDecl) {
-        auto downgradeToWarning = DowngradeToWarning::No;
-        auto originKind = getDisallowedOriginKind(typeDecl, SF, context, downgradeToWarning);
-        if (originKind != DisallowedOriginKind::None)
-          diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr, originKind, downgradeToWarning);
-      }
-
-      void visitSubstitutionMap(SubstitutionMap subs) {
-        for (ProtocolConformanceRef conformance : subs.getConformances()) {
-          if (!conformance.isConcrete())
-            continue;
-          const ProtocolConformance *concreteConf = conformance.getConcrete();
-
-          SubstitutionMap subConformanceSubs =
-              concreteConf->getSubstitutions(SF.getParentModule());
-          visitSubstitutionMap(subConformanceSubs);
-
-          const RootProtocolConformance *rootConf =
-              concreteConf->getRootConformance();
-          auto originKind = getDisallowedOriginKind(
-              rootConf->getDeclContext()->getAsDecl(),
-              SF, context);
-          if (originKind == DisallowedOriginKind::None)
-            continue;
-          diagnoser.diagnoseConformance(rootConf, originKind);
-        }
-      }
-
-      Action visitNominalType(NominalType *ty) override {
-        visitTypeDecl(ty->getDecl());
-        return Action::Continue;
-      }
-
-      Action visitBoundGenericType(BoundGenericType *ty) override {
-        visitTypeDecl(ty->getDecl());
-        SubstitutionMap subs =
-            ty->getContextSubstitutionMap(SF.getParentModule(), ty->getDecl());
-        visitSubstitutionMap(subs);
-        return Action::Continue;
-      }
-
-      Action visitTypeAliasType(TypeAliasType *ty) override {
-        visitTypeDecl(ty->getDecl());
-        visitSubstitutionMap(ty->getSubstitutionMap());
-        return Action::Continue;
-      }
-
-      // We diagnose unserializable Clang function types in the
-      // post-visitor so that we diagnose any unexportable component
-      // types first.
-      Action walkToTypePost(Type T) override {
-        if (auto fnType = T->getAs<AnyFunctionType>()) {
-          if (auto clangType = fnType->getClangTypeInfo().getType()) {
-            auto loader = T->getASTContext().getClangModuleLoader();
-            // Serialization will serialize the sugared type if it can,
-            // but we need the canonical type to be serializable or else
-            // canonicalization (e.g. in SIL) might break things.
-            if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
-              diagnoser.diagnoseClangFunctionType(T, clangType);
-            }
-          }
-        }
-        return TypeDeclFinder::walkToTypePost(T);
-      }
-    };
-
-    type.walk(ProblematicTypeFinder(SF, context, diagnoser));
-  }
-
-  void checkType(
-      Type type, const TypeRepr *typeRepr, const Decl *context,
-      const Diagnoser &diagnoser) {
-    auto *SF = context->getDeclContext()->getParentSourceFile();
-    assert(SF && "checking a non-source declaration?");
-    return checkTypeImpl(type, typeRepr, *SF, context, diagnoser);
-  }
-
-  void checkType(
-      const TypeLoc &TL, const Decl *context, const Diagnoser &diagnoser) {
-    checkType(TL.getType(), TL.getTypeRepr(), context, diagnoser);
-  }
-
-  void checkGenericParams(const GenericContext *ownerCtx,
-                          const ValueDecl *ownerDecl) {
-    if (!ownerCtx->isGenericContext())
-      return;
-
-    if (auto params = ownerCtx->getGenericParams()) {
-      for (auto param : *params) {
-        if (param->getInherited().empty())
-          continue;
-        assert(param->getInherited().size() == 1);
-        checkType(param->getInherited().front(), ownerDecl,
-                  getDiagnoser(ownerDecl));
-      }
-    }
-
-    if (ownerCtx->getTrailingWhereClause()) {
-      forAllRequirementTypes(WhereClauseOwner(
-                               const_cast<GenericContext *>(ownerCtx)),
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, ownerDecl, getDiagnoser(ownerDecl));
-      });
-    }
-  }
-
-  // This enum must be kept in sync with
-  // diag::decl_from_hidden_module and
-  // diag::conformance_from_implementation_only_module.
-  enum class Reason : unsigned {
-    General,
-    PropertyWrapper,
-    ExtensionWithPublicMembers,
-    ExtensionWithConditionalConformances
-  };
-
-  class Diagnoser {
-    const Decl *D;
-    Reason reason;
-  public:
-    Diagnoser(const Decl *D, Reason reason) : D(D), reason(reason) {}
-
-    void diagnoseType(const TypeDecl *offendingType,
-                      const TypeRepr *complainRepr,
-                      DisallowedOriginKind originKind,
-                      DowngradeToWarning downgradeToWarning) const {
-      ModuleDecl *M = offendingType->getModuleContext();
-      auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
-                            diag::decl_from_hidden_module_warn:
-                            diag::decl_from_hidden_module;
-      auto diag = D->diagnose(errorOrWarning,
-                              offendingType->getDescriptiveKind(),
-                              offendingType->getName(),
-                              static_cast<unsigned>(reason), M->getName(),
-                              static_cast<unsigned>(originKind));
-      highlightOffendingType(diag, complainRepr);
-    }
-
-    void diagnoseConformance(const ProtocolConformance *offendingConformance,
-                             DisallowedOriginKind originKind) const {
-      ModuleDecl *M = offendingConformance->getDeclContext()->getParentModule();
-      D->diagnose(diag::conformance_from_implementation_only_module,
-                  offendingConformance->getType(),
-                  offendingConformance->getProtocol()->getName(),
-                  static_cast<unsigned>(reason), M->getName(),
-                  static_cast<unsigned>(originKind));
-    }
-
-    void diagnoseClangFunctionType(Type fnType, const clang::Type *type) const {
-      D->diagnose(diag::unexportable_clang_function_type, fnType);
-    }
-  };
-
-  Diagnoser getDiagnoser(const Decl *D, Reason reason = Reason::General) {
-    return Diagnoser(D, reason);
-  }
-
-public:
-  ExportabilityChecker() {}
-
-  static bool shouldSkipChecking(const ValueDecl *VD) {
-    if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-      return true;
-
-    // Accessors are handled as part of their Var or Subscript, and we don't
-    // want to redo extension signature checking for them.
-    if (isa<AccessorDecl>(VD))
-      return true;
-
-    // Is this part of the module's API or ABI?
-    AccessScope accessScope =
-        VD->getFormalAccessScope(nullptr,
-                                 /*treatUsableFromInlineAsPublic*/true);
-    if (accessScope.isPublic())
-      return false;
-
-    // Is this a stored property in a non-resilient struct or class?
-    auto *property = dyn_cast<VarDecl>(VD);
-    if (!property || !property->hasStorage() || property->isStatic())
-      return true;
-    auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
-    if (!parentNominal || parentNominal->isResilient())
-      return true;
-
-    // Is that struct or class part of the module's API or ABI?
-    AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
-        nullptr, /*treatUsableFromInlineAsPublic*/true);
-    if (parentAccessScope.isPublic())
-      return false;
-
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  if (accessScope.isPublic())
     return true;
+
+  // Is this a stored property in a non-resilient struct or class?
+  auto *property = dyn_cast<VarDecl>(VD);
+  if (!property || !property->hasStorage() || property->isStatic())
+    return false;
+  auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
+  if (!parentNominal || parentNominal->isResilient())
+    return false;
+
+  // Is that struct or class part of the module's API or ABI?
+  AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
+      nullptr, /*treatUsableFromInlineAsPublic*/true);
+  if (parentAccessScope.isPublic())
+    return true;
+
+  return false;
+}
+
+static bool isExported(Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    return isExported(VD);
   }
-
-  void visit(Decl *D) {
-    if (D->isInvalid() || D->isImplicit())
-      return;
-
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (shouldSkipChecking(VD))
-        return;
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        return isExported(VD);
     }
 
-    // Note: references to @_spi and @_implementationOnly declarations from
-    // @inlinable code are diagnosed by DeclAvailabilityChecker below.
-    auto *DC = D->getInnermostDeclContext();
-    if (DC->getFragileFunctionKind().kind == FragileFunctionKind::None)
-      DeclVisitor<ExportabilityChecker>::visit(D);
+    return false;
+  }
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *NTD = ED->getExtendedNominal())
+      return isExported(NTD);
+
+    return false;
   }
 
-  // Force all kinds to be handled at a lower level.
-  void visitDecl(Decl *D) = delete;
-  void visitValueDecl(ValueDecl *D) = delete;
+  return true;
+}
 
-#define UNREACHABLE(KIND, REASON) \
-  void visit##KIND##Decl(KIND##Decl *D) { \
-    llvm_unreachable(REASON); \
-  }
-  UNREACHABLE(Import, "not applicable")
-  UNREACHABLE(TopLevelCode, "not applicable")
-  UNREACHABLE(Module, "not applicable")
-
-  UNREACHABLE(Param, "handled by the enclosing declaration")
-  UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
-  UNREACHABLE(MissingMember, "handled by the enclosing declaration")
-#undef UNREACHABLE
-
-#define UNINTERESTING(KIND) \
-  void visit##KIND##Decl(KIND##Decl *D) {}
-
-  UNINTERESTING(PrefixOperator) // Does not reference other decls.
-  UNINTERESTING(PostfixOperator) // Does not reference other decls.
-  UNINTERESTING(IfConfig) // Not applicable.
-  UNINTERESTING(PoundDiagnostic) // Not applicable.
-  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
-  UNINTERESTING(Destructor) // Always correct.
-  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
-  UNINTERESTING(OpaqueType) // TODO
-
-  // Handled at the PatternBinding level; if the pattern has a simple
-  // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
-  UNINTERESTING(Var)
-
-  /// \see visitPatternBindingDecl
-  void checkNamedPattern(const NamedPattern *NP,
-                         const llvm::DenseSet<const VarDecl *> &seenVars) {
-    const VarDecl *theVar = NP->getDecl();
-    if (shouldSkipChecking(theVar))
-      return;
-
-    // Only check the type of individual variables if we didn't check an
-    // enclosing TypedPattern.
-    if (seenVars.count(theVar) || theVar->isInvalid())
-      return;
-
-    checkType(theVar->getInterfaceType(), /*typeRepr*/nullptr, theVar,
-              getDiagnoser(theVar));
-  }
-
-  /// \see visitPatternBindingDecl
-  void checkTypedPattern(const TypedPattern *TP,
-                         llvm::DenseSet<const VarDecl *> &seenVars) {
-    // FIXME: We need to figure out if this is a stored or computed property,
-    // so we pull out some random VarDecl in the pattern. They're all going to
-    // be the same, but still, ick.
-    const VarDecl *anyVar = nullptr;
-    TP->forEachVariable([&](VarDecl *V) {
-      seenVars.insert(V);
-      anyVar = V;
-    });
-    if (!anyVar)
-      return;
-    if (shouldSkipChecking(anyVar))
-      return;
-
-    checkType(TP->hasType() ? TP->getType() : Type(),
-              TP->getTypeRepr(), anyVar, getDiagnoser(anyVar));
-
-    // Check the property wrapper types.
-    for (auto attr : anyVar->getAttachedPropertyWrappers())
-      checkType(attr->getType(), attr->getTypeRepr(), anyVar,
-                getDiagnoser(anyVar, Reason::PropertyWrapper));
-  }
-
-  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto idx : range(PBD->getNumPatternEntries())) {
-      PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
-        if (auto *NP = dyn_cast<NamedPattern>(P)) {
-          checkNamedPattern(NP, seenVars);
-          return;
-        }
-
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-        checkTypedPattern(TP, seenVars);
-      });
-      seenVars.clear();
-    }
-  }
-
-  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkGenericParams(TAD, TAD);
-    checkType(TAD->getUnderlyingType(),
-              TAD->getUnderlyingTypeRepr(), TAD, getDiagnoser(TAD));
-  }
-
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    llvm::for_each(assocType->getInherited(),
-                   [&](TypeLoc requirement) {
-      checkType(requirement, assocType, getDiagnoser(assocType));
-    });
-    checkType(assocType->getDefaultDefinitionType(),
-              assocType->getDefaultDefinitionTypeRepr(), assocType,
-              getDiagnoser(assocType));
-
-    if (assocType->getTrailingWhereClause()) {
-      forAllRequirementTypes(assocType,
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType, getDiagnoser(assocType));
-      });
-    }
-  }
-
-  void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
-    checkGenericParams(nominal, nominal);
-
-    llvm::for_each(nominal->getInherited(),
-                   [&](TypeLoc nextInherited) {
-      checkType(nextInherited, nominal, getDiagnoser(nominal));
-    });
-  }
-
-  void visitProtocolDecl(ProtocolDecl *proto) {
-    llvm::for_each(proto->getInherited(),
-                  [&](TypeLoc requirement) {
-      checkType(requirement, proto, getDiagnoser(proto));
-    });
-
-    if (proto->getTrailingWhereClause()) {
-      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto, getDiagnoser(proto));
-      });
-    }
-  }
-
-  void visitSubscriptDecl(SubscriptDecl *SD) {
-    checkGenericParams(SD, SD);
-
-    for (auto &P : *SD->getIndices()) {
-      checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
-                getDiagnoser(SD));
-    }
-    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD,
-              getDiagnoser(SD));
-  }
-
-  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
-    checkGenericParams(fn, fn);
-
-    for (auto *P : *fn->getParameters())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), fn,
-                getDiagnoser(fn));
-  }
-
-  void visitFuncDecl(FuncDecl *FD) {
-    visitAbstractFunctionDecl(FD);
-    checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD,
-              getDiagnoser(FD));
-  }
-
-  void visitEnumElementDecl(EnumElementDecl *EED) {
-    if (!EED->hasAssociatedValues())
-      return;
-    for (auto &P : *EED->getParameterList())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), EED,
-                getDiagnoser(EED));
-  }
-
-  void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
-                                             Reason reason) {
-    if (!ED->getTrailingWhereClause())
-      return;
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, getDiagnoser(ED, reason));
-    });
-  }
-
-  void visitExtensionDecl(ExtensionDecl *ED) {
-    auto extendedType = ED->getExtendedNominal();
-    assert(extendedType && "valid extension with no extended type?");
-    if (!extendedType || shouldSkipChecking(extendedType))
-      return;
-
-    // FIXME: We should allow conforming to implementation-only protocols,
-    // but just hide that from interfaces.
-    llvm::for_each(ED->getInherited(),
-                   [&](TypeLoc nextInherited) {
-      checkType(nextInherited, ED, getDiagnoser(ED));
-    });
-
-    bool hasPublicMembers = llvm::any_of(ED->getMembers(),
-                                         [](const Decl *member) -> bool {
-      auto *valueMember = dyn_cast<ValueDecl>(member);
-      if (!valueMember)
-        return false;
-      return !shouldSkipChecking(valueMember);
-    });
-
-    if (hasPublicMembers) {
-      checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
-                getDiagnoser(ED, Reason::ExtensionWithPublicMembers));
-    }
-
-    if (hasPublicMembers || !ED->getInherited().empty()) {
-      Reason reason =
-          hasPublicMembers ? Reason::ExtensionWithPublicMembers
-                           : Reason::ExtensionWithConditionalConformances;
-      checkConstrainedExtensionRequirements(ED, reason);
-    }
-  }
-
-  void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
-                            const Decl *refDecl, SourceLoc diagLoc,
-                            SourceRange refRange) {
-    const SourceFile *SF = refDecl->getDeclContext()->getParentSourceFile();
-    ModuleDecl *M = PGD->getModuleContext();
-    if (!SF->isImportedImplementationOnly(M))
-      return;
-
-    auto &DE = PGD->getASTContext().Diags;
-    auto diag =
-        DE.diagnose(diagLoc, diag::decl_from_hidden_module,
-                    PGD->getDescriptiveKind(), PGD->getName(),
-                    static_cast<unsigned>(Reason::General), M->getName(),
-                    static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
-                    );
-    if (refRange.isValid())
-      diag.highlight(refRange);
-    diag.flush();
-    PGD->diagnose(diag::decl_declared_here, PGD->getName());
-  }
-
-  void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
-    // FIXME: Handle operator designated types (which also applies to prefix
-    // and postfix operators).
-    if (auto *precedenceGroup = IOD->getPrecedenceGroup()) {
-      if (!IOD->getIdentifiers().empty()) {
-        checkPrecedenceGroup(precedenceGroup, IOD, IOD->getLoc(),
-                             IOD->getIdentifiers().front().Loc);
-      }
-    }
-  }
-
-  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    llvm::for_each(PGD->getLowerThan(),
-                   [&](const PrecedenceGroupDecl::Relation &relation) {
-      checkPrecedenceGroup(relation.Group, PGD, PGD->getLowerThanLoc(),
-                           relation.NameLoc);
-    });
-    llvm::for_each(PGD->getHigherThan(),
-                   [&](const PrecedenceGroupDecl::Relation &relation) {
-      checkPrecedenceGroup(relation.Group, PGD, PGD->getHigherThanLoc(),
-                           relation.NameLoc);
-    });
-  }
-};
+namespace {
 
 /// Diagnose declarations whose signatures refer to unavailable types.
 class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
   DeclContext *DC;
-  Optional<ExportabilityReason> ExportReason;
   FragileFunctionKind FragileKind;
+  bool Exported;
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+                 ExportabilityReason reason=ExportabilityReason::General,
                  bool allowUnavailableProtocol=false) {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
 
-    // Check the TypeRepr for references to unavailable declarations.
-    if (typeRepr) {
-      DeclAvailabilityFlags flags = None;
+    Optional<ExportabilityReason> optReason;
+    if (Exported)
+      optReason = reason;
 
-      // We allow a type to conform to a protocol that is less available than
-      // the type itself. This enables a type to retroactively model or directly
-      // conform to a protocol only available on newer OSes and yet still be used on
-      // older OSes.
-      //
-      // To support this, inside inheritance clauses we allow references to
-      // protocols that are unavailable in the current type refinement context.
-      if (allowUnavailableProtocol)
-        flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    DeclAvailabilityFlags flags = None;
 
-      diagnoseTypeReprAvailability(typeRepr, DC, ExportReason, FragileKind,
-                                   flags);
-    }
+    // We allow a type to conform to a protocol that is less available than
+    // the type itself. This enables a type to retroactively model or directly
+    // conform to a protocol only available on newer OSes and yet still be used on
+    // older OSes.
+    //
+    // To support this, inside inheritance clauses we allow references to
+    // protocols that are unavailable in the current type refinement context.
+    if (allowUnavailableProtocol)
+      flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-    // Check the type for references to unavailable conformances.
-    if (type)
-      diagnoseTypeAvailability(type, context->getLoc(), DC,
-                               ExportReason, FragileKind);
+    auto loc = context->getLoc();
+    if (auto *varDecl = dyn_cast<VarDecl>(context))
+      loc = varDecl->getNameLoc();
+
+    diagnoseTypeAvailability(typeRepr, type, loc, DC,
+                             optReason, FragileKind, flags);
   }
 
   void checkGenericParams(const GenericContext *ownerCtx,
@@ -2071,13 +1600,7 @@ public:
   explicit DeclAvailabilityChecker(Decl *D)
     : DC(D->getInnermostDeclContext()) {
     FragileKind = DC->getFragileFunctionKind();
-  }
-
-  void visit(Decl *D) {
-    if (D->isImplicit())
-      return;
-
-    DeclVisitor<DeclAvailabilityChecker>::visit(D);
+    Exported = isExported(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -2102,14 +1625,12 @@ public:
 
   UNINTERESTING(PrefixOperator) // Does not reference other decls.
   UNINTERESTING(PostfixOperator) // Does not reference other decls.
-  UNINTERESTING(InfixOperator) // Does not reference other decls.
   UNINTERESTING(IfConfig) // Not applicable.
   UNINTERESTING(PoundDiagnostic) // Not applicable.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // TODO
-  UNINTERESTING(PrecedenceGroup) // Doesn't reference anything with availability.
 
   // Handled at the PatternBinding level; if the pattern has a simple
   // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
@@ -2142,12 +1663,13 @@ public:
     });
 
     checkType(TP->hasType() ? TP->getType() : Type(),
-              TP->getTypeRepr(), PBD);
+              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD);
 
     // Check the property wrapper types.
     if (anyVar)
       for (auto attr : anyVar->getAttachedPropertyWrappers())
-        checkType(attr->getType(), attr->getTypeRepr(), anyVar);
+        checkType(attr->getType(), attr->getTypeRepr(), anyVar,
+                  ExportabilityReason::PropertyWrapper);
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -2197,7 +1719,8 @@ public:
     llvm::for_each(nominal->getInherited(),
                    [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(),
-                nominal, /*allowUnavailableProtocol=*/true);
+                nominal, ExportabilityReason::General,
+                /*allowUnavailableProtocol=*/true);
     });
   }
 
@@ -2205,6 +1728,7 @@ public:
     llvm::for_each(proto->getInherited(),
                   [&](TypeLoc requirement) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
+                ExportabilityReason::General,
                 /*allowUnavailableProtocol=*/false);
     });
 
@@ -2243,11 +1767,17 @@ public:
       checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
   }
 
-  void checkConstrainedExtensionRequirements(ExtensionDecl *ED) {
+  void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
+                                             bool hasExportedMembers) {
     if (!ED->getTrailingWhereClause())
       return;
+
+    ExportabilityReason reason =
+        hasExportedMembers ? ExportabilityReason::ExtensionWithPublicMembers
+                           : ExportabilityReason::ExtensionWithConditionalConformances;
+
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED);
+      checkType(type, typeRepr, ED, reason);
     });
   }
 
@@ -2257,14 +1787,83 @@ public:
     if (!extendedType)
       return;
 
+    // The rules here are tricky.
+    //
+    // 1) If the extension defines conformances, the conformed-to protocols
+    // must be exported.
     llvm::for_each(ED->getInherited(),
                    [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(),
-                ED, /*allowUnavailableProtocol=*/true);
+                ED, ExportabilityReason::General,
+                /*allowUnavailableProtocol=*/true);
     });
 
-    checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED);
-    checkConstrainedExtensionRequirements(ED);
+    bool wasExported = Exported;
+
+    // 2) If the extension contains exported members, the as-written
+    // extended type should be exportable.
+    bool hasExportedMembers = llvm::any_of(ED->getMembers(),
+                                           [](const Decl *member) -> bool {
+      auto *valueMember = dyn_cast<ValueDecl>(member);
+      if (!valueMember)
+        return false;
+      return isExported(valueMember);
+    });
+
+    Exported = wasExported && hasExportedMembers;
+    checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
+              ExportabilityReason::ExtensionWithPublicMembers);
+
+    // 3) If the extension contains exported members or defines conformances,
+    // the 'where' clause must only name exported types.
+    Exported = wasExported && (hasExportedMembers ||
+                               !ED->getInherited().empty());
+    checkConstrainedExtensionRequirements(ED, hasExportedMembers);
+  }
+
+  void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
+                            const Decl *refDecl, SourceLoc diagLoc,
+                            SourceRange refRange) {
+    const SourceFile *SF = refDecl->getDeclContext()->getParentSourceFile();
+    ModuleDecl *M = PGD->getModuleContext();
+    if (!SF->isImportedImplementationOnly(M))
+      return;
+
+    auto &DE = PGD->getASTContext().Diags;
+    auto diag =
+        DE.diagnose(diagLoc, diag::decl_from_hidden_module,
+                    PGD->getDescriptiveKind(), PGD->getName(),
+                    static_cast<unsigned>(ExportabilityReason::General), M->getName(),
+                    static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
+                    );
+    if (refRange.isValid())
+      diag.highlight(refRange);
+    diag.flush();
+    PGD->diagnose(diag::decl_declared_here, PGD->getName());
+  }
+
+  void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
+    // FIXME: Handle operator designated types (which also applies to prefix
+    // and postfix operators).
+    if (auto *precedenceGroup = IOD->getPrecedenceGroup()) {
+      if (!IOD->getIdentifiers().empty()) {
+        checkPrecedenceGroup(precedenceGroup, IOD, IOD->getLoc(),
+                             IOD->getIdentifiers().front().Loc);
+      }
+    }
+  }
+
+  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+    llvm::for_each(PGD->getLowerThan(),
+                   [&](const PrecedenceGroupDecl::Relation &relation) {
+      checkPrecedenceGroup(relation.Group, PGD, PGD->getLowerThanLoc(),
+                           relation.NameLoc);
+    });
+    llvm::for_each(PGD->getHigherThan(),
+                   [&](const PrecedenceGroupDecl::Relation &relation) {
+      checkPrecedenceGroup(relation.Group, PGD, PGD->getHigherThanLoc(),
+                           relation.NameLoc);
+    });
   }
 };
 
@@ -2318,6 +1917,9 @@ void swift::checkAccessControl(Decl *D) {
     checkExtensionGenericParamAccess(ED);
   }
 
-  ExportabilityChecker().visit(D);
+  //ExportabilityChecker().visit(D);
+  if (D->isImplicit() || isa<AccessorDecl>(D))
+    return;
+
   DeclAvailabilityChecker(D).visit(D);
 }

@@ -2432,22 +2432,25 @@ public:
       return skipChildren();
     }
     if (auto T = dyn_cast<TypeExpr>(E)) {
-      if (!T->isImplicit())
-        if (auto type = T->getType())
-          diagnoseTypeAvailability(type, E->getLoc(), DC,
-                                   ExportReason, FragileKind);
+      if (!T->isImplicit()) {
+        diagnoseTypeAvailability(T->getTypeRepr(), T->getType(), E->getLoc(),
+                                 DC, ExportReason, FragileKind);
+      }
     }
     if (auto CE = dyn_cast<ClosureExpr>(E)) {
       for (auto *param : *CE->getParameters()) {
-        diagnoseTypeAvailability(param->getInterfaceType(), E->getLoc(), DC,
-                                 ExportReason, FragileKind);
+        diagnoseTypeAvailability(param->getTypeRepr(), param->getInterfaceType(),
+                                 E->getLoc(), DC, ExportReason, FragileKind);
       }
-      diagnoseTypeAvailability(CE->getResultType(), E->getLoc(), DC,
+      diagnoseTypeAvailability(CE->hasExplicitResultType()
+                               ? CE->getExplicitResultTypeRepr()
+                               : nullptr,
+                               CE->getResultType(), E->getLoc(), DC,
                                ExportReason, FragileKind);
     }
-    if (auto IE = dyn_cast<IsExpr>(E)) {
-      diagnoseTypeAvailability(IE->getCastType(), E->getLoc(), DC,
-                               ExportReason, FragileKind);
+    if (auto CE = dyn_cast<ExplicitCastExpr>(E)) {
+      diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
+                               E->getLoc(), DC, ExportReason, FragileKind);
     }
 
     return visitChildren();
@@ -2458,11 +2461,6 @@ public:
     ExprStack.pop_back();
 
     return E;
-  }
-
-  bool walkToTypeReprPre(TypeRepr *T) override {
-    diagnoseTypeReprAvailability(T, DC, ExportReason, FragileKind);
-    return false;
   }
 
   bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
@@ -2907,9 +2905,8 @@ public:
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
     if (auto *IP = dyn_cast<IsPattern>(P))
-      if (auto T = IP->getCastType())
-        diagnoseTypeAvailability(T, P->getLoc(), DC,
-                                 ExportReason, FragileKind);
+      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), DC,
+                               ExportReason, FragileKind);
 
     return std::make_pair(true, P);
   }
@@ -3004,6 +3001,8 @@ bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
                                          Optional<ExportabilityReason> reason,
                                          FragileFunctionKind fragileKind,
                                          DeclAvailabilityFlags flags) {
+  if (!T)
+    return false;
   TypeReprAvailabilityWalker walker(DC, reason, fragileKind, flags);
   const_cast<TypeRepr*>(T)->walk(walker);
   return walker.foundAnyIssues;
@@ -3016,21 +3015,38 @@ class ProblematicTypeFinder : public TypeDeclFinder {
   DeclContext *DC;
   Optional<ExportabilityReason> ExportReason;
   FragileFunctionKind FragileKind;
+  DeclAvailabilityFlags Flags;
 
 public:
   ProblematicTypeFinder(SourceLoc Loc, DeclContext *DC,
                         Optional<ExportabilityReason> ExportReason,
-                        FragileFunctionKind FragileKind)
+                        FragileFunctionKind FragileKind,
+                        DeclAvailabilityFlags Flags)
       : Loc(Loc), DC(DC),
         ExportReason(ExportReason),
-        FragileKind(FragileKind) {}
+        FragileKind(FragileKind),
+        Flags(Flags) {}
+
+  void visitTypeDecl(TypeDecl *decl) {
+    // We only need to diagnose exportability here. Availability was
+    // already checked on the TypeRepr.
+    if (FragileKind.kind != FragileFunctionKind::None ||
+        ExportReason.hasValue()) {
+      TypeChecker::diagnoseDeclRefExportability(Loc, decl, DC,
+                                                ExportReason, FragileKind);
+    }
+  }
 
   Action visitNominalType(NominalType *ty) override {
+    visitTypeDecl(ty->getDecl());
+
     /// FIXME
     return Action::Continue;
   }
 
   Action visitBoundGenericType(BoundGenericType *ty) override {
+    visitTypeDecl(ty->getDecl());
+
     ModuleDecl *useModule = DC->getParentModule();
     auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, DC,
@@ -3040,6 +3056,8 @@ public:
   }
 
   Action visitTypeAliasType(TypeAliasType *ty) override {
+    visitTypeDecl(ty->getDecl());
+
     auto subs = ty->getSubstitutionMap();
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, DC,
                                                ExportReason,
@@ -3075,8 +3093,21 @@ public:
 
 void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC,
                                      Optional<ExportabilityReason> reason,
-                                     FragileFunctionKind fragileKind) {
-  T.walk(ProblematicTypeFinder(loc, DC, reason, fragileKind));
+                                     FragileFunctionKind fragileKind,
+                                     DeclAvailabilityFlags flags) {
+  if (!T)
+    return;
+  T.walk(ProblematicTypeFinder(loc, DC, reason, fragileKind, flags));
+}
+
+void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+                                     DeclContext *DC,
+                                     Optional<ExportabilityReason> reason,
+                                     FragileFunctionKind fragileKind,
+                                     DeclAvailabilityFlags flags) {
+  if (diagnoseTypeReprAvailability(TR, DC, reason, fragileKind, flags))
+    return;
+  diagnoseTypeAvailability(T, loc, DC, reason, fragileKind, flags);
 }
 
 bool
