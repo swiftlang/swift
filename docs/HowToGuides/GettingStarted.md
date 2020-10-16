@@ -126,7 +126,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 ### macOS
 
-1. Install [Xcode 12 beta 3][Xcode] or newer:
+1. Install [Xcode 12.2 beta 3][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
    Check this document or the host information on <https://ci.swift.org> for the
    current required version.
