@@ -125,3 +125,4 @@ merge_toolchains
 
 cd "$DIST_TOOLCHAIN_DESTDIR"
 tar cfz "$PACKAGE_ARTIFACT" "$TOOLCHAIN_NAME"
+echo "Toolchain archive created successfully!"
