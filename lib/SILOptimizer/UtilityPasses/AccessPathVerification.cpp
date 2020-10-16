@@ -78,7 +78,7 @@ public:
         continue;
       }
       auto iterAndInserted = useToPathMap.try_emplace(use, accessPath);
-      if (!iterAndInserted.second) {
+      if (!iterAndInserted.second || operand->getUser()->getFunction()->hasName("testEnumUses")) {
         llvm::errs() << "Address use: " << *operand->getUser()
                      << "  with path...\n";
         accessPath.print(llvm::errs());
