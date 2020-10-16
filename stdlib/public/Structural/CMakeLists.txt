@@ -10,7 +10,7 @@
 #
 #===----------------------------------------------------------------------===#
 
-add_swift_target_library(swift_Structural ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
+add_swift_target_library(swift_Structural ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Structural.swift
 
   SWIFT_COMPILE_FLAGS
