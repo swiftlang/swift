@@ -112,9 +112,7 @@ def run_command(args, dry_run):
         raise
 
 
-def make_dirs_if_needed(path, dry_run):
-    if dry_run:
-        return
+def make_dirs_if_needed(path):
     try:
         os.makedirs(path)
     except OSError as e:
@@ -232,7 +230,7 @@ def log_output_to_file(content, module_name, interface_base, label, log_path):
         return
     if not content:
         return
-    make_dirs_if_needed(log_path, dry_run=False)
+    make_dirs_if_needed(log_path)
     log_name = module_name + "-" + interface_base + "-" + label + ".txt"
     with open(os.path.join(log_path, log_name), "w") as output_file:
         output_file.write(content)
@@ -296,7 +294,7 @@ def process_module(module_file):
                                    module_file.name + ".swiftmodule")
 
         if interface_base != module_file.name:
-            make_dirs_if_needed(output_path, args.dry_run)
+            make_dirs_if_needed(output_path)
             output_path = os.path.join(output_path,
                                        interface_base + ".swiftmodule")
 
@@ -408,7 +406,7 @@ def main():
         with open(args.xfails) as xfails_file:
             xfails = json.load(xfails_file)
 
-    make_dirs_if_needed(args.output_dir, args.dry_run)
+    make_dirs_if_needed(args.output_dir)
 
     # Copy a file containing SDK build version into the prebuilt module dir,
     # so we can keep track of the SDK version we built from.
