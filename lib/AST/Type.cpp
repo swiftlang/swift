@@ -812,6 +812,19 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
+bool TypeBase::isCGFloatType() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  return module->getName().is("CoreGraphics") && NTD->getName().is("CGFloat");
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (auto *structType = getAs<BoundGenericStructType>()) {
     auto &ctx = getASTContext();

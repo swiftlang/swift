@@ -799,7 +799,10 @@ public:
   
   /// Check if this is a nominal type defined at the top level of the Swift module
   bool isStdlibType();
-  
+
+  /// Check if this is a CGFloat type from `CoreGraphics` module.
+  bool isCGFloatType();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();
