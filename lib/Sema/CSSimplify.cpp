@@ -9913,16 +9913,11 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   return false;
 }
 
-void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
-  assert(typeVar);
-  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
-}
-
-void ConstraintSystem::recordPotentialHole(FunctionType *fnType) {
-  assert(fnType);
-  Type(fnType).visit([&](Type type) {
+void ConstraintSystem::recordPotentialHole(Type type) {
+  assert(type->hasTypeVariable());
+  type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>())
-      recordPotentialHole(typeVar);
+      typeVar->getImpl().enableCanBindToHole(getSavedBindings());
   });
 }
 
@@ -10024,7 +10019,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          recordPotentialHole(largerElt.getType()->getAs<TypeVariableType>());
+          recordPotentialHole(largerElt.getType());
       }
     }
     auto matchingType =
