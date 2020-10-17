@@ -56,13 +56,7 @@ HOME = os.environ.get("HOME", "/")
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
-    ("12.0 beta 3", "12A8169g"),
-    ("12.0 beta 4", "12A8179i"),
-    ("12.0 beta 5", "12A8189h"),
-    ("12.0 beta 6", "12A8189n"),
-    ("12.0 GM 1", "12A7208"),
-    ("12.0 GM 2", "12A7209"),
-    ("12.0.1", "12A7300"),
+    ("12.2 beta 3", "12B5035g"),
 ]
 
 # -----------------------------------------------------------------------------
