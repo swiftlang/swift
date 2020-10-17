@@ -251,3 +251,16 @@ func sr_11402_func2(_ x: SR_11402_P) {
     print(y)
   }
 }
+
+// https://bugs.swift.org/browse/SR-13654
+
+func sr_13654_func() throws -> String {}
+
+func sr_13654_invalid_interpolation() {
+  _ = try "\(sr_13654_func())" // expected-error {{errors thrown from here are not handled}}
+  _ = "\(try sr_13654_func())" // expected-error {{errors thrown from here are not handled}}
+}
+func sr_13654_valid_interpolation() throws {
+  _ = try "\(sr_13654_func())"
+  _ = "\(try sr_13654_func())"
+}
