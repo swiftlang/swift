@@ -241,3 +241,28 @@ func wump<T>(to: T, _ body: (G<T>) -> ()) {}
 
 wump(to: 0, { $0[] = 0 })
 // expected-error@-1 {{missing argument for parameter #1 in call}}
+
+// SR-13732
+extension MutableCollection {
+  public mutating func writePrefix<I: IteratorProtocol>(from source: inout I)
+    -> (writtenCount: Int, afterLastWritten: Index)
+    where I.Element == Element
+  {
+    fatalError()
+  }
+  
+  public mutating func writePrefix<Source: Collection>(from source: Source)
+    -> (writtenCount: Int, afterLastWritten: Index, afterLastRead: Source.Index)
+    where Source.Element == Element
+  {
+    fatalError()
+  }
+
+}
+
+func testWritePrefixIterator() {
+  var a = Array(0..<10)
+  
+  var underflow = (1..<10).makeIterator()
+  var (writtenCount, afterLastWritten) = a.writePrefix(from: underflow) // expected-error {{passing value of type 'IndexingIterator<(Range<Int>)>' to an inout parameter requires explicit '&'}} {{62-62=&}}
+}
