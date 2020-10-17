@@ -4704,6 +4704,10 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 static SelfReferenceInfo
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
                            SelfReferencePosition position) {
+  // If there are no type parameters, we're done.
+  if (!type->hasTypeParameter())
+    return SelfReferenceInfo();
+
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
     auto info = SelfReferenceInfo();
