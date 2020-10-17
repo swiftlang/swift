@@ -2230,6 +2230,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    //!!!
+    require(false, "Intentionally break verification");
     require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
             "Found load borrow that is invalidated by a local write?!");
   }
