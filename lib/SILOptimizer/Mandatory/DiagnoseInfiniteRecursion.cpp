@@ -52,8 +52,11 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
 
     if (FullApplySite FAI = FullApplySite::isa(&I)) {
       // Don't touch dynamic dispatch.
-      if (isa<ObjCMethodInst>(FAI.getCallee()))
+      if (isa<SuperMethodInst>(FAI.getCallee()) ||
+          isa<ObjCSuperMethodInst>(FAI.getCallee()) ||
+          isa<ObjCMethodInst>(FAI.getCallee())) {
         continue;
+      }
 
       auto &M = FAI.getModule();
       if (auto *CMI = dyn_cast<ClassMethodInst>(FAI.getCallee())) {
@@ -68,6 +71,18 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
         // alone cross-module IPA, this is all well and good.
         auto *CD = ClassType.getClassOrBoundGenericClass();
         if (CD && CD->getModuleContext() != TargetModule) {
+          continue;
+        }
+
+        if (!calleesAreStaticallyKnowable(FAI.getModule(), CMI->getMember())) {
+          continue;
+        }
+
+        // The "statically knowable" check just means that we have all the
+        // callee candidates available for analysis. We still need to check
+        // if the current function has a known override point.
+        auto *method = CMI->getMember().getAbstractFunctionDecl();
+        if (method->isOverridden()) {
           continue;
         }
 
