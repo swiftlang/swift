@@ -8958,7 +8958,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       if (locator.isForImplicitCallOfCallableValue()) {
         // This overload can be trivially called to produce a value of expected
         // type record the insert explicit call fix.
-        if (recordFix(InsertCallableValueExplicitCall::create(
+        if (recordFix(InsertExplicitCall::createWithResult(
                 *this, func1->getResult(), getConstraintLocator(locator))))
           return SolutionKind::Error;
       }
@@ -9133,7 +9133,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       if (locator.isForImplicitCallOfCallableValue()) {
         // If this overload can be called to produce a value of expected type
         // record the insert explicit call fix.
-        if (recordFix(InsertCallableValueExplicitCall::create(
+        if (recordFix(InsertExplicitCall::createWithResult(
                 *this, func1->getResult(), getConstraintLocator(locator))))
           return SolutionKind::Error;
       }
@@ -9428,7 +9428,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     if (locator.isForImplicitCallOfCallableValue()) {
       // This overload of dynamicCall can be called to produce a value of
       // expected type, so we record the insert explicit call fix.
-      if (recordFix(InsertCallableValueExplicitCall::create(
+      if (recordFix(InsertExplicitCall::createWithResult(
               *this, func1->getResult(), getConstraintLocator(locator))))
         return SolutionKind::Error;
     }

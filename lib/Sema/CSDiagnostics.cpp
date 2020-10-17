@@ -3113,6 +3113,22 @@ ASTNode MissingCallFailure::getAnchor() const {
   return anchor;
 }
 
+bool MissingCallFailure::diagnoseForCallableValue() const {
+  auto locator = getLocator();
+  if (!locator->findLast<LocatorPathElt::ImplicitCallOfCallableValue>())
+    return false;
+
+  auto baseType = getType(getAnchor());
+  assert((baseType->isCallableNominalType(getDC()) ||
+          baseType->hasDynamicCallableAttribute()) &&
+         "A non-callable nominal type?");
+
+  emitDiagnostic(diag::missing_explicit_call_callable_value, baseType,
+                 ResultType)
+      .fixItInsertAfter(getSourceRange().End, "()");
+  return true;
+}
+
 bool MissingCallFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   SourceLoc insertLoc = getSourceRange().End;
@@ -3123,6 +3139,9 @@ bool MissingCallFailure::diagnoseAsError() {
   // reference.
   if (isExpr<KeyPathExpr>(anchor))
     return false;
+
+  if (diagnoseForCallableValue())
+    return true;
 
   auto path = getLocator()->getPath();
   if (!path.empty()) {

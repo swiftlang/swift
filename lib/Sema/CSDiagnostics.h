@@ -963,13 +963,21 @@ public:
 };
 
 class MissingCallFailure final : public FailureDiagnostic {
+  Type ResultType;
+
 public:
-  MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator) {}
+  MissingCallFailure(const Solution &solution, Type resultType,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ResultType(resultType) {}
 
   ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
+
+  /// Tailored diagnose insert an explicit call to a value of a type that
+  /// supports being called either by defining a \c callAsFunction method or by
+  /// being a @dynamicCallable type.
+  bool diagnoseForCallableValue() const;
 };
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {

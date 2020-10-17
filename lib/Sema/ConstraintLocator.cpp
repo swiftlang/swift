@@ -482,7 +482,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       break;
 
     case ImplicitCallOfCallableValue:
-      out << "implicit callable value";
+      out << "implicit call callable value";
       break;
     }
   }

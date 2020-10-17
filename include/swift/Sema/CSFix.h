@@ -789,8 +789,12 @@ public:
 };
 
 class InsertExplicitCall final : public ConstraintFix {
-  InsertExplicitCall(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::InsertCall, locator) {}
+  Type ResultType;
+
+  InsertExplicitCall(ConstraintSystem &cs, Type resultType,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertCall, locator),
+        ResultType(resultType) {}
 
 public:
   std::string getName() const override {
@@ -801,6 +805,9 @@ public:
 
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
+  static InsertExplicitCall *createWithResult(ConstraintSystem &cs,
+                                              Type resultType,
+                                              ConstraintLocator *locator);
 };
 
 class UsePropertyWrapper final : public ConstraintFix {

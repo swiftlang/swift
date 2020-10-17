@@ -523,13 +523,19 @@ RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool InsertExplicitCall::diagnose(const Solution &solution, bool asNote) const {
-  MissingCallFailure failure(solution, getLocator());
+  MissingCallFailure failure(solution, ResultType, getLocator());
   return failure.diagnose(asNote);
 }
 
 InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
+  return new (cs.getAllocator()) InsertExplicitCall(cs, Type(), locator);
+}
+
+InsertExplicitCall *
+InsertExplicitCall::createWithResult(ConstraintSystem &cs, Type resultType,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) InsertExplicitCall(cs, resultType, locator);
 }
 
 bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
