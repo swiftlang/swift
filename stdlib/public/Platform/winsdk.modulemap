@@ -282,6 +282,11 @@ module WinSDK [system] {
       header "winioctl.h"
       export *
     }
+
+    module MCX {
+      header "mcx.h"
+      export *
+    }
   }
 
   module OLE32 {
