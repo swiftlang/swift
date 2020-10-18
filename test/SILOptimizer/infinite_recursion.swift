@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 func a() {  // expected-warning {{all paths through this function will call itself}}
   a()
@@ -123,7 +123,7 @@ class S {
     return a()
   }
 
-  func b() { // expected-warning {{all paths through this function will call itself}}
+  func b() { // No warning - has a known override.
     var i = 0
     repeat {
       i += 1
@@ -170,4 +170,15 @@ func factorial(_ n : UInt) -> UInt { // expected-warning {{all paths through thi
 
 func tr(_ key: String) -> String { // expected-warning {{all paths through this function will call itself}}
   return tr(key) ?? key // expected-warning {{left side of nil coalescing operator '??' has non-optional type}}
+}
+
+class Node {
+  var parent: Node?
+  var rootNode: RootNode {
+    return parent!.rootNode // No warning - has an override.
+  }
+}
+
+class RootNode: Node {
+  override var rootNode: RootNode { return self }
 }
