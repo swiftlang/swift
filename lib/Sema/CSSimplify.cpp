@@ -10490,7 +10490,28 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   case ConversionRestrictionKind::TypeToCGFloat:
   case ConversionRestrictionKind::CGFloatToType: {
-    llvm_unreachable("not yet implemented");
+    increaseScore(SK_ImplicitValueConversion);
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+
+    auto *applicationLoc = getConstraintLocator(
+        locator, {LocatorPathElt::ImplicitConversion(restriction),
+                  ConstraintLocator::ApplyFunction});
+
+    auto *memberLoc = getConstraintLocator(
+        applicationLoc, ConstraintLocator::ConstructorMember);
+
+    auto *memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+
+    addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
+                             DeclNameRef(DeclBaseName::createConstructor()),
+                             memberTy, DC, FunctionRefKind::DoubleApply,
+                             /*outerAlternatives=*/{}, memberLoc);
+
+    addConstraint(ConstraintKind::ApplicableFunction,
+                  FunctionType::get({FunctionType::Param(type1)}, type2),
+                  memberTy, applicationLoc);
+    return SolutionKind::Solved;
   }
   }
   
