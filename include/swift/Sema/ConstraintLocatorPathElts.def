@@ -195,8 +195,8 @@ CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
 /// The result of a chain of member accesses off an UnresolvedMemberExpr
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMemberChainResult)
 
-/// A reference or expression that results in value of a callable type either @dynamicCallable
-/// or that defines one or more \c callAsFunction methods.
+/// A reference or expression that results in value of a callable type that is
+/// either @dynamicCallable or defines one or more \c callAsFunction methods.
 SIMPLE_LOCATOR_PATH_ELT(ImplicitCallOfCallableValue)
 
 #undef LOCATOR_PATH_ELT

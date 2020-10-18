@@ -974,7 +974,7 @@ public:
 
   bool diagnoseAsError() override;
 
-  /// Tailored diagnose insert an explicit call to a value of a type that
+  /// Tailored diagnostic to insert an explicit call to a value of a type that
   /// supports being called either by defining a \c callAsFunction method or by
   /// being a @dynamicCallable type.
   bool diagnoseForCallableValue() const;

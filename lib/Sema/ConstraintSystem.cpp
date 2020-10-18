@@ -456,11 +456,11 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       return getConstraintLocator(anchor, newPath);
     }
   }
-  
-  // We checkinng if it's possible to make a nominal callAsFunction callable value an
-  // explicit call, we need to drop the inserted ApplyArgument and add the extra
-  // apply function and implicit call to match it as the callee locator recorded when
-  // resolving the overload.
+
+  // We checking if it's possible to make a nominal callAsFunction callable
+  // value an explicit call, we need to drop the inserted ApplyArgument and add
+  // the extra apply function and implicit call to match it as the callee
+  // locator recorded when resolving the overload.
   if (locator->findLast<LocatorPathElt::ImplicitCallOfCallableValue>() &&
       !locator->findLast<LocatorPathElt::DynamicCallable>()) {
     SmallVector<LocatorPathElt, 4> newPath;
@@ -4309,7 +4309,7 @@ ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
     return None;
 
   // Since we are only attempting to check if it's possible to insert an
-  // explicit call in an anchor expr it doesn't explicitly have an argument
+  // explicit call in an anchor expr, it doesn't explicitly have an argument
   // info, so we just fake one for this situation.
   if (locator->findLast<LocatorPathElt::ImplicitCallOfCallableValue>())
     return ConstraintSystem::ArgumentInfo();

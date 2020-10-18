@@ -3400,13 +3400,13 @@ bool ConstraintSystem::repairFailures(
     auto *loc = getConstraintLocator(locator);
     auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
     // In cases where we have an extension with @dynamicCallable or
-    // callAsFunction on types that can be expressed as literal e.g. String,
-    // Interger, etc. and the mismatches are let _: Int = "foo" let's prefer to
-    // still produce a conversion mismatch diagnostic.
+    // callAsFunction on types that can be expressed by a literal (e.g., String
+    // or Int) and the mismatches are of the form let _: Int = "foo" let's
+    // prefer to still produce a conversion mismatch diagnostic.
     if (anchor && isa<LiteralExpr>(anchor))
       return false;
 
-    // Let's attempt to see if the callable value can be explicit called to
+    // Let's attempt to see if the callable value can be explicitly called to
     // produce the expected dstType with an ApplicableFnConstraint and record
     // the fixes accordingly.
     auto applyLoc = getConstraintLocator(
@@ -3744,9 +3744,12 @@ bool ConstraintSystem::repairFailures(
       
       auto *loc = getConstraintLocator(locator);
       if (getType(destExpr)->is<LValueType>() || result.isFailure()) {
-        // Let this asignment failure be diagnosed by the AllowTupleTypeMismatch
+        // Let this assignment failure be diagnosed by the AllowTupleTypeMismatch
         // fix already recorded.
         if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
+          return true;
+
+        if (repairByInsertingExplicitCallOnCallableValue(lhs, rhs))
           return true;
 
         conversionsOrFixes.push_back(
@@ -4019,6 +4022,9 @@ bool ConstraintSystem::repairFailures(
     if (repairOutOfOrderArgumentsInBinaryFunction(*this, conversionsOrFixes,
                                                   loc))
       return true;
+    
+    if (repairByInsertingExplicitCallOnCallableValue(lhs, rhs))
+      return true;
 
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
@@ -4236,7 +4242,10 @@ bool ConstraintSystem::repairFailures(
     // `lhs` - is an result type and `rhs` is a contextual type.
     if (repairByConstructingRawRepresentableType(lhs, rhs))
       break;
-
+    
+    if (repairByInsertingExplicitCallOnCallableValue(lhs, rhs))
+      return true;
+    
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -8956,8 +8965,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   if (type1.getPointer() == desugar2) {
     if (!isOperator || !hasInOut()) {
       if (locator.isForImplicitCallOfCallableValue()) {
-        // This overload can be trivially called to produce a value of expected
-        // type record the insert explicit call fix.
+        // This overload has no parameters and the result type is obviously
+        // equivalent to the expected type, so we can record a insert explicit
+        // call fix for it.
         if (recordFix(InsertExplicitCall::createWithResult(
                 *this, func1->getResult(), getConstraintLocator(locator))))
           return SolutionKind::Error;
@@ -9121,13 +9131,14 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             .isFailure()) {
       if (locator.isForImplicitCallOfCallableValue()) {
         // This means overload cannot be called to produce a value of the
-        // expected type, so we fallback to record the actual mismatch.
+        // expected type, so we fall back to record the actual mismatch.
         if (auto *fix = fixImplicitCallOfCallableValue(
                 *this, func1->getResult(), locator))
           return recordFix(fix, /*impact=*/5) ? SolutionKind::Error
                                               : SolutionKind::Solved;
       }
       return SolutionKind::Error;
+    }
 
     if (unwrapCount == 0) {
       if (locator.isForImplicitCallOfCallableValue()) {
@@ -9138,7 +9149,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
           return SolutionKind::Error;
       }
       return SolutionKind::Solved;
-
+    }
     // Record any fixes we attempted to get to the correct solution.
     auto *fix = ForceOptional::create(*this, origType2, func1,
                                       getConstraintLocator(locator));
@@ -9416,7 +9427,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
             .isFailure()) {
       if (locator.isForImplicitCallOfCallableValue()) {
         // This dynamicCall overload cannot be called to produce a value of the
-        // expected type, so we fallback to record the actual mismatch.
+        // expected type, so we fall back to record the actual mismatch.
         if (auto *fix = fixImplicitCallOfCallableValue(
                 *this, func1->getResult(), locator))
           return recordFix(fix, /*impact=*/5) ? SolutionKind::Error

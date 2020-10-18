@@ -868,9 +868,9 @@ public:
     return (getSummaryFlags() & ConstraintLocator::IsNonEphemeralParam);
   }
 
-  /// Checks whether this locator is describing an anchor that produces a value of a
-  /// callable type that could be implicit called using "()" either by defining
-  /// a \c callAsFunction or by being a @dynamicCallable type.
+  /// Checks whether this locator is describing an anchor that produces a value
+  /// of a callable type that could be called using "()" either by defining a \c
+  /// callAsFunction or by being a @dynamicCallable type.
   bool isForImplicitCallOfCallableValue() const {
     SmallVector<LocatorPathElt, 8> path;
     getLocatorParts(path);
