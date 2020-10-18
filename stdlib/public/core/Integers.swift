@@ -3010,9 +3010,7 @@ extension FixedWidthInteger {
     let minBitWidth = source.significandWidth
     let isExact = (minBitWidth <= exponent)
     let bitPattern = source.significandBitPattern
-    // `RawSignificand.bitWidth` is not available if `RawSignificand` does not
-    // conform to `FixedWidthInteger`; we can compute this value as follows if
-    // `source` is finite:
+    // Determine the number of meaningful bits in the significand bit pattern.
     let bitWidth = minBitWidth &+ bitPattern.trailingZeroBitCount
     let shift = exponent - Source.Exponent(bitWidth)
     // Use `Self.Magnitude` to prevent sign extension if `shift < 0`.
