@@ -786,6 +786,10 @@ enum ScoreKind {
   SK_DisfavoredOverload,
   /// A member for an \c UnresolvedMemberExpr found via unwrapped optional base.
   SK_UnresolvedMemberViaOptional,
+  /// An implicit conversion from a value of one type (lhs)
+  /// to another type (rhs) via implicit initialization of
+  /// `rhs` type which an argument of `lhs` value.
+  SK_ImplicitValueConversion,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
