@@ -5089,6 +5089,41 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
+      if (kind >= ConstraintKind::Subtype &&
+          nominal1->getDecl() != nominal2->getDecl() &&
+          (desugar1->isCGFloatType() || desugar2->isCGFloatType())) {
+        SmallVector<LocatorPathElt, 4> path;
+        auto anchor = locator.getLocatorParts(path);
+
+        // Try implicit CGFloat conversion only if:
+        // - This is not an explicit call to a CGFloat initializer;
+        // - This is a first type such conversion is attempted for
+        //   for a given path (AST element).
+
+        bool isCGFloatInit = false;
+        if (auto *call = getAsExpr<CallExpr>(anchor)) {
+          if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
+            isCGFloatInit = getInstanceType(typeExpr)->isCGFloatType();
+          }
+        }
+
+        if (!isCGFloatInit &&
+            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
+              if (auto elt =
+                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
+                auto convKind = elt->getConversionKind();
+                return convKind == ConversionRestrictionKind::TypeToCGFloat ||
+                       convKind == ConversionRestrictionKind::CGFloatToType;
+              }
+              return false;
+            })) {
+          conversionsOrFixes.push_back(
+              desugar1->isCGFloatType()
+                  ? ConversionRestrictionKind::CGFloatToType
+                  : ConversionRestrictionKind::TypeToCGFloat);
+        }
+      }
+
       break;
     }
 

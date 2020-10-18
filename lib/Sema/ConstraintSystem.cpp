@@ -4477,6 +4477,29 @@ ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
   if (!locator)
     return None;
 
+  // Implicit conversions to/from CGFloat type are modeled without
+  // any changes to the AST, so we have to accomodate for that here
+  // by faking presence of appopriate AST location.
+  if (locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
+      locator->isLastElement<LocatorPathElt::ApplyFunction>()) {
+    auto path = locator->getPath().drop_back();
+    if (!path.empty() && path.back().is<LocatorPathElt::ImplicitConversion>()) {
+      auto conversion = path.back()
+                            .castTo<LocatorPathElt::ImplicitConversion>()
+                            .getConversionKind();
+
+      if (conversion == ConversionRestrictionKind::TypeToCGFloat ||
+          conversion == ConversionRestrictionKind::CGFloatToType) {
+        // TODO: This is not very efficient, long term we should just
+        //       save a single `ArgumentInfo` and use it for all of
+        //       the locations where conversion is needed.
+        ArrayRef<Identifier> labels{Identifier()};
+        return ArgumentInfo{.Labels = allocateCopy(labels),
+                            .UnlabeledTrailingClosureIndex = None};
+      }
+    }
+  }
+
   if (auto *infoLocator = getArgumentInfoLocator(locator)) {
     auto known = ArgumentInfos.find(infoLocator);
     if (known != ArgumentInfos.end())
