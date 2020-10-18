@@ -5687,7 +5687,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // wrapped value placeholder, the first non-defaulted argument must be
   // wrapped in an OpaqueValueExpr.
   bool shouldInjectWrappedValuePlaceholder =
-     target->shouldInjectWrappedValuePlaceholder(apply);
+      target && target->shouldInjectWrappedValuePlaceholder(apply);
 
   auto injectWrappedValuePlaceholder =
       [&](Expr *arg, bool isAutoClosure = false) -> Expr * {
@@ -6692,7 +6692,31 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::CGFloatToType:
     case ConversionRestrictionKind::TypeToCGFloat: {
-      llvm_unreachable("not yet implemented");
+      auto *fnExpr = TypeExpr::createImplicit(toType, ctx);
+      cs.cacheExprTypes(fnExpr);
+
+      auto *argExpr = locator.trySimplifyToExpr();
+      assert(argExpr);
+
+      auto *callLocator = cs.getConstraintLocator(
+          locator,
+          LocatorPathElt::ImplicitConversion(knownRestriction->second));
+
+      auto *implicitInit =
+          CallExpr::createImplicit(ctx, fnExpr,
+                                   /*args=*/{argExpr},
+                                   /*argLabels=*/{Identifier()});
+      cs.cacheExprTypes(implicitInit);
+
+      // HACK: Temporarily push the call expr onto the expr stack to make sure
+      // we don't try to prematurely close an existential when applying the
+      // curried member ref. This can be removed once existential opening is
+      // refactored not to rely on the shape of the AST prior to rewriting.
+      ExprStack.push_back(implicitInit);
+      SWIFT_DEFER { ExprStack.pop_back(); };
+
+      finishApply(implicitInit, toType, callLocator, callLocator);
+      return implicitInit;
     }
     }
   }
