@@ -187,6 +187,7 @@ module WinSDK [system] {
 
     module IMM {
       header "immdev.h"
+      header "imm.h"
       export *
 
       link "Imm32.lib"
