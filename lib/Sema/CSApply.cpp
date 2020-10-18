@@ -6689,6 +6689,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return cs.cacheType(new (ctx)
                               ForeignObjectConversionExpr(result, toType));
     }
+
+    case ConversionRestrictionKind::CGFloatToType:
+    case ConversionRestrictionKind::TypeToCGFloat: {
+      llvm_unreachable("not yet implemented");
+    }
     }
   }
 

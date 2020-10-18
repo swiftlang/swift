@@ -258,6 +258,12 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
   ObjCTollFreeBridgeToCF,
+  /// Implicit conversion from a CGFloat to another compatible type via
+  /// an implicit CGFloat initializer call.
+  TypeToCGFloat,
+  /// Implicit conversion from a compatible value to a CGFloat via
+  /// an implicit call to an initializer passing CGFloat value.
+  CGFloatToType,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary

@@ -10487,6 +10487,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
+
+  case ConversionRestrictionKind::TypeToCGFloat:
+  case ConversionRestrictionKind::CGFloatToType: {
+    llvm_unreachable("not yet implemented");
+  }
   }
   
   llvm_unreachable("bad conversion restriction");
