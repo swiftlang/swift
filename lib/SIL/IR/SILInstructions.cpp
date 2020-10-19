@@ -2931,12 +2931,12 @@ DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-CanType GetAsyncContinuationInst::getFormalResumeType() const {
+CanType GetAsyncContinuationInstBase::getFormalResumeType() const {
   // The resume type is the type argument to the continuation type.
   return getType().castTo<BoundGenericType>().getGenericArgs()[0];
 }
 
-SILType GetAsyncContinuationInst::getLoweredResumeType() const {
+SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   // The lowered resume type is the maximally-abstracted lowering of the
   // formal resume type.
   auto formalType = getFormalResumeType();
@@ -2945,29 +2945,8 @@ SILType GetAsyncContinuationInst::getLoweredResumeType() const {
   return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
 }
 
-bool GetAsyncContinuationInst::throws() const {
+bool GetAsyncContinuationInstBase::throws() const {
   // The continuation throws if it's an UnsafeThrowingContinuation
   return getType().castTo<BoundGenericType>()->getDecl()
     == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
 }
-
-CanType GetAsyncContinuationAddrInst::getFormalResumeType() const {
-  // The resume type is the type argument to the continuation type.
-  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
-}
-
-SILType GetAsyncContinuationAddrInst::getLoweredResumeType() const {
-  // The lowered resume type is the maximally-abstracted lowering of the
-  // formal resume type.
-  auto formalType = getFormalResumeType();
-  auto &M = getFunction()->getModule();
-  auto c = getFunction()->getTypeExpansionContext();
-  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
-}
-
-bool GetAsyncContinuationAddrInst::throws() const {
-  // The continuation throws if it's an UnsafeThrowingContinuation
-  return getType().castTo<BoundGenericType>()->getDecl()
-    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
-}
-
