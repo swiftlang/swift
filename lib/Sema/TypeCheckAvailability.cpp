@@ -3061,8 +3061,7 @@ public:
           // but we need the canonical type to be serializable or else
           // canonicalization (e.g. in SIL) might break things.
           if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
-            ctx.Diags.diagnose(Loc, diag::unexportable_clang_function_type,
-                               fnType);
+            ctx.Diags.diagnose(Loc, diag::unexportable_clang_function_type, T);
           }
         }
       }
