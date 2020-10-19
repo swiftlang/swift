@@ -17,9 +17,11 @@
 @frozen // trivial-implementation
 /// 
 /// `ObjectIdentifier` is only guaranteed to remain unique for the
-/// lifetime of an object. If an object has a stronger notion of identity, it
-/// may be appropriate to provide a custom implementation.
-
+/// lifetime of an object. When the instance gets deallocated, its object 
+/// identifier may be reused for a different object. (Internally, objects are
+/// identified by their memory location.)
+/// If you need an object identifier over the lifetime of an objec, it may
+/// be appropriate to provide a custom implementation of `Identifiable`.
 public struct ObjectIdentifier {
   @usableFromInline // trivial-implementation
   internal let _value: Builtin.RawPointer
