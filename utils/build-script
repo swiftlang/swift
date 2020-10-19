@@ -62,6 +62,7 @@ _SUPPORTED_XCODE_BUILDS = [
 # -----------------------------------------------------------------------------
 # Helpers
 
+
 def print_note(message, stream=sys.stdout):
     """Writes a diagnostic message to the given stream. By default this
     function outputs to stdout.
@@ -152,6 +153,7 @@ def print_xcodebuild_versions(file=sys.stdout):
     print(fmt.format(version=version, sdks=sdks), file=file)
     file.flush()
 
+
 def validate_xcode_compatibility():
     if sys.platform != 'darwin':
         return
@@ -168,10 +170,13 @@ def validate_xcode_compatibility():
         valid_versions_string = "\n".join(
             "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
         raise SystemExit(
-            "error: using unsupported Xcode version:\n\n{}\n\nInstall one of:\n{}\n\nOr set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
+            "error: using unsupported Xcode version:\n\n{}\n\n"
+            "Install one of:\n{}\n\n"
+            "Or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
                 version, valid_versions_string
             )
         )
+
 
 def tar(source, destination):
     """
