@@ -744,14 +744,6 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
   return UnavailabilityReason::requiresVersionRange(version);
 }
 
-void TypeChecker::diagnosePotentialUnavailability(
-    const ValueDecl *D, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC,
-    const UnavailabilityReason &Reason) {
-  diagnosePotentialUnavailability(D, D->getName(), ReferenceRange,
-                                  ReferenceDC, Reason);
-}
-
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
 /// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
@@ -1382,8 +1374,9 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
-    const Decl *D, DeclName Name, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const UnavailabilityReason &Reason) {
+    const ValueDecl *D, SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC,
+    const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   // We only emit diagnostics for API unavailability, not for explicitly
@@ -1398,7 +1391,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     auto Err =
       Context.Diags.diagnose(
                ReferenceRange.Start, diag::availability_decl_only_version_newer,
-               Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
+               D->getName(), prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
     // Direct a fixit to the error if an existing guard is nearly-correct

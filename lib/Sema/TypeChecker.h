@@ -1033,14 +1033,6 @@ void diagnosePotentialUnavailability(const ValueDecl *D,
                                      const DeclContext *ReferenceDC,
                                      const UnavailabilityReason &Reason);
 
-// Emits a diagnostic, if necessary, for a reference to a declaration
-// that is potentially unavailable at the given source location, using
-// Name as the diagnostic name.
-void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
-                                     SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const UnavailabilityReason &Reason);
-
 void
 diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                           const DeclContext *ReferenceDC,
