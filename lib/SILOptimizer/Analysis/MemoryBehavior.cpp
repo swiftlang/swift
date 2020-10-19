@@ -364,6 +364,7 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::EndAccessInst:
         // Those instructions have no result and cannot escape the address.
         break;
       case SILInstructionKind::ApplyInst:
@@ -373,6 +374,7 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
         // possible that an address, passed as an indirect parameter, escapes
         // the function in any way (which is not unsafe and undefined behavior).
         break;
+      case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::OpenExistentialAddrInst:
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
       case SILInstructionKind::StructElementAddrInst:
