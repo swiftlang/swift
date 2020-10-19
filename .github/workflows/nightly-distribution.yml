@@ -7,10 +7,29 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
+      - name: Setup keychain
+        run: |
+          echo "$DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64" | base64 --decode -o developerID_application.cer
+          security import developerID_application.cer
+          echo "$DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64" | base64 --decode -o developerID_installer.cer
+          security import developerID_installer.cer
+        env:
+          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
+          DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64 }}
+          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
+          DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64 }}
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm DEVELOPMENT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
+          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
+          DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
+          DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
         if: github.ref == 'refs/heads/swiftwasm'
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.3 5.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
+          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
+          DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
+          DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
