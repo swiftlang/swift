@@ -28,12 +28,11 @@
 using namespace swift;
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
-                                           ConcreteDeclRef declRef,
+                                           const ValueDecl *D,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind) {
   assert(Kind.kind != FragileFunctionKind::None);
 
-  const ValueDecl *D = declRef.getDecl();
   // Do some important fast-path checks that apply to all cases.
 
   // Type parameters are OK.
@@ -48,7 +47,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   // Skip this check for accessors because the associated property or subscript
   // will also be checked, and will provide a better error message.
   if (!isa<AccessorDecl>(D))
-    if (diagnoseDeclRefExportability(loc, declRef, DC,
+    if (diagnoseDeclRefExportability(loc, D, DC,
                                      None, Kind))
       return true;
 
@@ -141,11 +140,12 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   return (downgradeToWarning == DowngradeToWarning::No);
 }
 
-static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
-                                      const SourceFile &userSF,
-                                      const DeclContext *userDC,
-                                      Optional<ExportabilityReason> reason,
-                                      FragileFunctionKind fragileKind) {
+bool
+TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                          const ValueDecl *D,
+                                          const DeclContext *DC,
+                                          Optional<ExportabilityReason> reason,
+                                          FragileFunctionKind fragileKind) {
   if (fragileKind.kind == FragileFunctionKind::None && !reason.hasValue())
     return false;
 
@@ -153,7 +153,9 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 
   auto downgradeToWarning = DowngradeToWarning::No;
   auto originKind = getDisallowedOriginKind(
-      D, userSF, userDC->getInnermostDeclarationDeclContext(),
+      D,
+      *DC->getParentSourceFile(),
+      DC->getInnermostDeclarationDeclContext(),
       downgradeToWarning);
   if (originKind == DisallowedOriginKind::None)
     return false;
@@ -210,21 +212,4 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      M->getName(),
                      static_cast<unsigned>(originKind));
   return true;
-}
-
-bool
-TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
-                                          ConcreteDeclRef declRef,
-                                          const DeclContext *DC,
-                                          Optional<ExportabilityReason> reason,
-                                          FragileFunctionKind fragileKind) {
-  // We're only interested in diagnosing uses from source files.
-  auto userSF = DC->getParentSourceFile();
-  if (!userSF)
-    return false;
-
-  const ValueDecl *D = declRef.getDecl();
-  if (diagnoseDeclExportability(loc, D, *userSF, DC, reason, fragileKind))
-    return true;
-  return false;
 }

@@ -947,7 +947,7 @@ DeclName getObjectLiteralConstructorName(ASTContext &ctx,
 ModuleDecl *getStdlibModule(const DeclContext *dc);
 
 /// \name Resilience diagnostics
-bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
+bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
                               const DeclContext *DC, FragileFunctionKind Kind);
 
 Expr *buildDefaultInitializer(Type type);
@@ -959,7 +959,8 @@ bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
 /// Given that a declaration is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if it cannot
 /// reasonably be shared.
-bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+bool diagnoseDeclRefExportability(SourceLoc loc,
+                                  const ValueDecl *D,
                                   const DeclContext *DC,
                                   Optional<ExportabilityReason> exportability,
                                   FragileFunctionKind fragileKind);

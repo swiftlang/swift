@@ -2653,11 +2653,11 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
   if (FragileKind.kind != FragileFunctionKind::None) {
     if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, D, DC, FragileKind))
         return true;
   } else if (ExportReason.hasValue()) {
     if (R.isValid())
-      if (TypeChecker::diagnoseDeclRefExportability(R.Start, declRef, DC,
+      if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, DC,
                                                     ExportReason, FragileKind))
         return true;
   }
