@@ -5822,13 +5822,11 @@ public:
 ///                object, including properties declared in a superclass.
 unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
 
-/// Get the property for a struct or class by its unique index.
+/// Get the property for a struct or class by its unique index, or nullptr if
+/// the index does not match a property declared in this struct or class or
+/// one its superclasses.
 ///
 /// Precondition: \p decl must be a non-resilient struct or class.
-///
-/// Precondition: \p index must be the index of a stored property
-///               (as returned by getFieldIndex()) which is declared
-///               in \p decl, not in a superclass.
 VarDecl *getIndexedField(NominalTypeDecl *decl, unsigned index);
 
 /// A common base for instructions that require a cached field index.

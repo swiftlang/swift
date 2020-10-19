@@ -603,7 +603,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  const AccessedStorage &storage = findAccessedStorage(address);
+  auto storage = AccessedStorage::compute(address);
   // Unsafe access may have invalid storage (e.g. a RawPointer).
   if (storage && !isPossibleFormalAccessBase(storage, &SGF.F))
     return address;
