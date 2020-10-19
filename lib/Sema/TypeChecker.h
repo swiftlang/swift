@@ -1011,17 +1011,6 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
-/// Checks whether a declaration is available when referred to at the given
-/// location (this reference location must be in the passed-in
-/// reference DeclContext).
-/// If the declaration is available, return true.
-/// If the declaration is not available, return false and write the
-/// declaration's availability info to the out parameter
-/// \p OutAvailableRange.
-bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                     const DeclContext *referenceDC,
-                     AvailabilityContext &OutAvailableRange);
-
 /// Checks whether a declaration should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is

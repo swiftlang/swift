@@ -712,29 +712,6 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   return OverApproximateContext;
 }
 
-bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                                  const DeclContext *referenceDC,
-                                  AvailabilityContext &OutAvailableInfo) {
-  ASTContext &Context = referenceDC->getASTContext();
-
-  AvailabilityContext safeRangeUnderApprox{
-      AvailabilityInference::availableRange(D, Context)};
-  AvailabilityContext runningOSOverApprox =
-      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
-
-  // The reference is safe if an over-approximation of the running OS
-  // versions is fully contained within an under-approximation
-  // of the versions on which the declaration is available. If this
-  // containment cannot be guaranteed, we say the reference is
-  // not available.
-  if (!(runningOSOverApprox.isContainedIn(safeRangeUnderApprox))) {
-    OutAvailableInfo = safeRangeUnderApprox;
-    return false;
-  }
-  
-  return true;
-}
-
 Optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
                                           const DeclContext *referenceDC) {
@@ -749,12 +726,20 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
     return None;
   }
 
-  auto safeRangeUnderApprox = AvailabilityContext::neverAvailable();
-  if (isDeclAvailable(D, referenceLoc, referenceDC, safeRangeUnderApprox)) {
-    return None;
-  }
+  AvailabilityContext runningOSOverApprox =
+      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
 
-  // safeRangeUnderApprox now holds the safe range.
+  AvailabilityContext safeRangeUnderApprox{
+      AvailabilityInference::availableRange(D, Context)};
+
+  // The reference is safe if an over-approximation of the running OS
+  // versions is fully contained within an under-approximation
+  // of the versions on which the declaration is available. If this
+  // containment cannot be guaranteed, we say the reference is
+  // not available.
+  if (runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
+    return None;
+
   VersionRange version = safeRangeUnderApprox.getOSVersion();
   return UnavailabilityReason::requiresVersionRange(version);
 }
