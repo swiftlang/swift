@@ -4,6 +4,12 @@ set -xe
 repository='swiftwasm/swift'
 workflow_name='main.yml'
 branch=$1
+channel=$2
+swift_source_dir="$(cd "$(dirname $0)/../.." && pwd)"
+
+DARWIN_TOOLCHAIN_APPLICATION_CERT=${DARWIN_TOOLCHAIN_APPLICATION_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
+DARWIN_TOOLCHAIN_INSTALLER_CERT=${DARWIN_TOOLCHAIN_INSTALLER_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
+DARWIN_TOOLCHAIN_NOTARIZE_EMAIL=${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL:?"Please set DARWIN_TOOLCHAIN_NOTARIZE_EMAIL"}
 
 gh_api=https://api.github.com
 
@@ -94,6 +100,72 @@ upload_tarball() {
     "https://uploads.github.com/repos/$repository/releases/$release_id/assets?name=$filename"
 }
 
+sign_toolchain() {
+  local darwin_toolchain=$1
+  local codesign_bin="/usr/bin/codesign"
+
+  codesign_args=(--force --verify --verbose --deep --options runtime --timestamp --sign "${DARWIN_TOOLCHAIN_APPLICATION_CERT}")
+  for binary in $(find "${darwin_toolchain}" -type f); do
+    if file "$binary" | grep -q "Mach-O"; then
+        ${codesign_bin} "${codesign_args[@]}" "${binary}"
+    fi
+  done
+
+  ${codesign_bin} "${codesign_args[@]}" "${darwin_toolchain}/usr/"
+}
+
+create_installer() {
+  local darwin_toolchain=$1
+  local darwin_toolchain_name=$(basename "$darwin_toolchain")
+  local darwin_toolchain_installer_package="$darwin_toolchain.pkg"
+  local darwin_toolchain_install_location="/Library/Developer/Toolchains/${darwin_toolchain_name}.xctoolchain"
+  local darwin_toolchain_version=$(/usr/libexec/PlistBuddy  -c "Print Version string" "$darwin_toolchain"/usr/Info.plist)
+  local darwin_toolchain_bundle_identifier=$(/usr/libexec/PlistBuddy  -c "Print CFBundleIdentifier string" "$darwin_toolchain"/usr/Info.plist)
+
+  "${swift_source_dir}/utils/toolchain-installer" "${darwin_toolchain}/" "${darwin_toolchain_bundle_identifier}" \
+    "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${darwin_toolchain_installer_package}" "${darwin_toolchain_install_location}" \
+    "${darwin_toolchain_version}" "${swift_source_dir}/utils/darwin-installer-scripts"
+
+  # Notarize the toolchain installer
+  local request_output=$(xcrun altool --notarize-app --type osx \
+      --file "${darwin_toolchain_installer_package}" \
+      --primary-bundle-id "${darwin_toolchain_bundle_identifier}" \
+      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
+      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+  local request_uuid=$(echo "$request_output" | grep "RequestUUID = " | awk '{print $3}')
+
+  local request_status=$(xcrun altool --notarization-info "$request_uuid" \
+      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
+      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+  # Wait until finished
+  while echo "$request_status" | grep -q "Status: in progress" ; do
+    sleep 60
+    request_status=$(xcrun altool --notarization-info "$request_uuid" \
+      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
+      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+  done
+
+  if echo "$request_status" | grep -q "Status: success"; then
+    xcrun stapler staple "${darwin_toolchain_installer_package}"
+  else
+    echo "Failed to notarize the toolchain $darwin_toolchain_installer_package: $request_status"
+  fi
+}
+
+package_darwin_toolchain() {
+  local toolchain_tar=$1
+  local destination=$2
+  local toolchain_name=$(basename $(tar tfz "$toolchain_tar" | head -n1))
+  local workdir=$(mktemp -d)
+
+  tar xfz "$toolchain_tar" -C "$workdir"
+  sign_toolchain "$workdir/$toolchain_name"
+  create_installer "$workdir/$toolchain_name"
+
+  mv "$workdir/$toolchain_name.pkg" "$destination"
+  rm -rf "$workdir"
+}
+
 tmp_dir=$(mktemp -d)
 pushd $tmp_dir
 download_artifact ubuntu18.04-installable
@@ -103,22 +175,23 @@ unzip ubuntu18.04-installable.zip
 unzip ubuntu20.04-installable.zip
 unzip macos-installable.zip
 
-toolchain_name=$(basename $(tar tfz swift-wasm-$2-SNAPSHOT-ubuntu18.04-x86_64.tar.gz | head -n1))
+toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04-x86_64.tar.gz | head -n1))
 
 if is_released $toolchain_name; then
   echo "Latest toolchain $toolchain_name has been already released"
   exit 0
 fi
 
-mv swift-wasm-$2-SNAPSHOT-ubuntu18.04-x86_64.tar.gz "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
-mv swift-wasm-$2-SNAPSHOT-ubuntu20.04-x86_64.tar.gz "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
-mv swift-wasm-$2-SNAPSHOT-macos-x86_64.tar.gz "$toolchain_name-macos-x86_64.tar.gz"
+
+mv swift-wasm-$channel-SNAPSHOT-ubuntu18.04-x86_64.tar.gz "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
+mv swift-wasm-$channel-SNAPSHOT-ubuntu20.04-x86_64.tar.gz "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
+package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos-x86_64.tar.gz" "$toolchain_name-macos-x86_64.pkg"
 
 create_tag $toolchain_name $head_sha
 release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
 
 upload_tarball $release_id "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
 upload_tarball $release_id "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-macos-x86_64.tar.gz"
+upload_tarball $release_id "$toolchain_name-macos-x86_64.pkg"
 
 popd
