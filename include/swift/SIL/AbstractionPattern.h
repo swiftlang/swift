@@ -260,46 +260,116 @@ class AbstractionPattern {
     OpaqueDerivativeFunction,
   };
 
-  class EncodedForeignErrorInfo {
+  class EncodedForeignInfo {
     unsigned Value;
+    
+    enum Error_t {
+      Error,
+    };
+    
+    enum Async_t {
+      Async,
+    };
+    
+  public:
+    enum ForeignKind {
+      IsNotForeign,
+      IsError,
+      IsAsync,
+    };
+
+  private:
+    friend AbstractionPattern;
+
+    EncodedForeignInfo() : Value(0) {}
+    EncodedForeignInfo(Error_t,
+                       unsigned errorParameterIndex,
+                       bool replaceParamWithVoid,
+                       bool stripsResultOptionality)
+      : Value(1
+              + (unsigned(IsError) - 1)
+              + (unsigned(stripsResultOptionality) << 1)
+              + (unsigned(replaceParamWithVoid) << 2)
+              + (errorParameterIndex << 3)) {
+        assert(getKind() == IsError);
+        assert(getErrorParamIndex() == errorParameterIndex);
+        assert(hasErrorParameterReplacedWithVoid() == replaceParamWithVoid);
+        assert(errorStripsResultOptionality() == stripsResultOptionality);
+      }
+
+    EncodedForeignInfo(Async_t,
+                       unsigned completionParameterIndex,
+                       Optional<unsigned> completionErrorParameterIndex)
+      : Value(1
+              + (unsigned(IsAsync) - 1)
+              + (unsigned(completionParameterIndex) << 1)
+              + ((completionErrorParameterIndex ? *completionErrorParameterIndex + 1
+                                                : 0) << 21)) {
+        assert(getKind() == IsAsync);
+        assert(getAsyncCompletionHandlerParamIndex() == completionParameterIndex);
+        assert(getAsyncCompletionHandlerErrorParamIndex() == completionErrorParameterIndex);
+      }
 
   public:
-    EncodedForeignErrorInfo() : Value(0) {}
-    EncodedForeignErrorInfo(unsigned errorParameterIndex,
-                            bool replaceParamWithVoid,
-                            bool stripsResultOptionality)
-      : Value(1 +
-              (unsigned(stripsResultOptionality)) +
-              (unsigned(replaceParamWithVoid) << 1) +
-              (errorParameterIndex << 2)) {}
-
-    static EncodedForeignErrorInfo
-    encode(const Optional<ForeignErrorConvention> &foreignError);
+    static EncodedForeignInfo
+    encode(const Optional<ForeignErrorConvention> &foreignError,
+           const Optional<ForeignAsyncConvention> &foreignAsync);
 
     bool hasValue() const { return Value != 0; }
-    bool hasErrorParameter() const { return hasValue(); }
-    bool hasUnreplacedErrorParameter() const {
-      return hasValue() && !isErrorParameterReplacedWithVoid();
+    ForeignKind getKind() const {
+      if (!hasValue())
+        return IsNotForeign;
+      
+      return ForeignKind((Value - 1 & 1) + 1);
     }
-
-    bool stripsResultOptionality() const {
-      assert(hasValue());
-      return (Value - 1) & 1;
-    }
-
-    bool isErrorParameterReplacedWithVoid() const {
-      assert(hasValue());
+    
+    bool errorStripsResultOptionality() const {
+      if (getKind() != IsError) return false;
       return (Value - 1) & 2;
     }
 
-    unsigned getErrorParameterIndex() const {
-      assert(hasValue());
-      return (Value - 1) >> 2;
+    bool hasErrorParameterReplacedWithVoid() const {
+      if (getKind() != IsError) return false;
+      return (Value - 1) & 4;
+    }
+
+    unsigned getErrorParamIndex() const {
+      assert(getKind() == IsError);
+      return (Value - 1) >> 3;
+    }
+    
+    unsigned getAsyncCompletionHandlerParamIndex() const {
+      assert(getKind() == IsAsync);
+      return ((Value - 1) >> 1) & 0xFFFFFu;
+    }
+    
+    Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
+      assert(getKind() == IsAsync);
+
+      unsigned encodedValue = (Value - 1) >> 21;
+      if (encodedValue == 0) {
+        return llvm::None;
+      }
+      return encodedValue - 1;
+    }
+
+    unsigned getForeignParamIndex() const {
+      switch (getKind()) {
+      case IsNotForeign:
+        llvm_unreachable("no foreign param");
+      
+      case IsError:
+        return getErrorParamIndex();
+          
+      case IsAsync:
+        return getAsyncCompletionHandlerParamIndex();
+      }
+      llvm_unreachable("uncovered switch");
     }
 
     unsigned getOpaqueValue() const { return Value; }
-    static EncodedForeignErrorInfo fromOpaqueValue(unsigned value) {
-      EncodedForeignErrorInfo result;
+    static EncodedForeignInfo fromOpaqueValue(unsigned value) {
+      EncodedForeignInfo result;
       result.Value = value;
       return result;
     }
@@ -374,7 +444,7 @@ class AbstractionPattern {
     }
   }
 
-  bool hasStoredForeignErrorInfo() const {
+  bool hasStoredForeignInfo() const {
     return hasStoredObjCMethod();
   }
 
@@ -411,7 +481,7 @@ class AbstractionPattern {
 
   void initObjCMethod(CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
-                      Kind kind, EncodedForeignErrorInfo errorInfo) {
+                      Kind kind, EncodedForeignInfo errorInfo) {
     initSwiftType(signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
@@ -519,7 +589,8 @@ public:
   /// Objective-C method.
   static AbstractionPattern
   getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                       const Optional<ForeignErrorConvention> &foreignError);
+                       const Optional<ForeignErrorConvention> &foreignError,
+                       const Optional<ForeignAsyncConvention> &foreignAsync);
 
   /// Return an abstraction pattern for the uncurried type of a C function
   /// imported as a method.
@@ -644,7 +715,7 @@ private:
   /// Objective-C method.
   static AbstractionPattern
   getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                       EncodedForeignErrorInfo errorInfo) {
+                       EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initObjCMethod(nullptr, origType, method,
@@ -670,7 +741,7 @@ private:
   getPartialCurriedObjCMethod(CanGenericSignature signature,
                               CanType origType,
                               const clang::ObjCMethodDecl *method,
-                              EncodedForeignErrorInfo errorInfo) {
+                              EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initObjCMethod(signature, origType, method,
@@ -733,14 +804,15 @@ public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                const Optional<ForeignErrorConvention> &foreignError);
+                const Optional<ForeignErrorConvention> &foreignError,
+                const Optional<ForeignAsyncConvention> &foreignAsync);
 
 private:
   /// Return an abstraction pattern for the uncurried type of an
   /// Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                EncodedForeignErrorInfo errorInfo) {
+                EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initObjCMethod(nullptr, origType, method, Kind::ObjCMethodType,
@@ -998,9 +1070,9 @@ public:
             getKind() == Kind::OpaqueDerivativeFunction);
   }
 
-  EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
-    assert(hasStoredForeignErrorInfo());
-    return EncodedForeignErrorInfo::fromOpaqueValue(OtherData);
+  EncodedForeignInfo getEncodedForeignInfo() const {
+    assert(hasStoredForeignInfo());
+    return EncodedForeignInfo::fromOpaqueValue(OtherData);
   }
   
   bool hasForeignErrorStrippingResultOptionality() const {
@@ -1029,8 +1101,8 @@ public:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType: {
-      auto errorInfo = getEncodedForeignErrorInfo();
-      return (errorInfo.hasValue() && errorInfo.stripsResultOptionality());
+      auto errorInfo = getEncodedForeignInfo();
+      return errorInfo.errorStripsResultOptionality();
     }
     }
     llvm_unreachable("bad kind");
@@ -1203,6 +1275,14 @@ public:
       GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
+  /// If this pattern refers to a foreign ObjC method that was imported as async, this returns
+  /// the abstraction pattern for the completion callback with the original ObjC block type.
+  ///
+  /// Otherwise, this produces the default fully-concrete abstraction pattern for the given
+  /// Swift type.
+  AbstractionPattern getObjCMethodAsyncCompletionHandlerType(
+                                     CanType swiftCompletionHandlerType) const;
+  
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
 };
