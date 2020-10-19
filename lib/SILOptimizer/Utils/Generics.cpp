@@ -2027,8 +2027,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
     assert(resultBlock->getSinglePredecessorBlock() == tai->getParent());
     // First insert the cleanups for our arguments int he appropriate spot.
     FullApplySite(tai).insertAfterFullEvaluation(
-        [&](SILBasicBlock::iterator insertPt) {
-          SILBuilderWithScope argBuilder(insertPt);
+        [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
         });
@@ -2052,8 +2051,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
   case ApplySiteKind::ApplyInst: {
     auto *ai = cast<ApplyInst>(applySite);
     FullApplySite(ai).insertAfterFullEvaluation(
-        [&](SILBasicBlock::iterator insertPt) {
-          SILBuilderWithScope argBuilder(insertPt);
+        [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
         });
@@ -2082,8 +2080,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
     auto *bai = cast<BeginApplyInst>(applySite);
     assert(!resultOut);
     FullApplySite(bai).insertAfterFullEvaluation(
-        [&](SILBasicBlock::iterator insertPt) {
-          SILBuilderWithScope argBuilder(insertPt);
+        [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
         });
@@ -2227,8 +2224,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   // Now that we have finished constructing our CFG (note the return above),
   // insert any compensating end borrows that we need.
-  ApplySite.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
-    SILBuilderWithScope argBuilder(insertPt);
+  ApplySite.insertAfterFullEvaluation([&](SILBuilder &argBuilder) {
     cleanupCallArguments(argBuilder, Loc, Arguments, ArgsThatNeedEndBorrow);
   });
 
