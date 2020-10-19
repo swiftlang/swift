@@ -637,79 +637,18 @@ func test_isa_class_2(x: B) -> AnyObject {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_array_11pyAA1P_p_tF
 func test_isa_array(ps: Array<P>) {
-  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
   switch ps {
-      // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-      // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
-
   case is [X]:
-    // CHECK: [[IS_X]]:
-    // CHECK-NEXT: load [trivial] [[TMPBUF]]
-    // CHECK-NEXT: // function_ref
-    // CHECK-NEXT: [[FUNC:%.*]] = function_ref @$s6switch1ayyF
-    // CHECK-NEXT: apply [[FUNC]]()
-    // CHECK-NEXT: dealloc_stack [[TMPBUF]]
-    // CHECK-NEXT: destroy_addr [[PTMPBUF]]
-    // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
-      // CHECK:   br [[CONT:bb[0-9]+]]
-
-      // CHECK: [[IS_NOT_X]]:
-      // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
-
   // CHECK: [[IS_Y]]:
   case is [Y]:
-    // CHECK:   function_ref @$s6switch1byyF
-    // CHECK:   br [[Y_CONT:bb[0-9]+]]
     b()
 
-      // CHECK: [[IS_NOT_Y]]:
-      // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
-      // CHECK: [[IS_NOT_Z]]:
   case _:
-    // CHECK:   function_ref @$s6switch1dyyF
-    // CHECK:   br [[CONT]]
     d()
   }
-  // CHECK: [[CONT]]:
-  // CHECK:   function_ref @$s6switch1eyyF
   e()
 }
-
-// CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_array_11pyAA1P_p_tF
-//func test_let_as_array(ps: Array<P>) -> AnyObject {
-//  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-//  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
-//  switch ps {
-//      // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-//      // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
-//
-//  case let xs as [X]:
-//    // CHECK: [[CASE2]]([[CAST_D2:%.*]] : @guaranteed $D2):
-//    // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
-//    // CHECK:   function_ref @$s6switch1byyF
-//    // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[CAST_D2_COPY]]
-//    // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D2_COPY]]
-//    // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D2_COPY_COPY]]
-//    // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]]
-//    // CHECK:   destroy_value [[CAST_D2_COPY]]
-//    // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
-//    return xs
-//      // CHECK:   br [[CONT:bb[0-9]+]]
-//
-//      // CHECK: [[IS_NOT_X]]:
-//      // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
-//
-//  case _:
-//    // CHECK:   function_ref @$s6switch1dyyF
-//    // CHECK:   br [[CONT]]
-//    d()
-//  }
-//  // CHECK: [[CONT]]:
-//  // CHECK:   function_ref @$s6switch1eyyF
-//  e()
-//}
 
 enum MaybePair {
   case Neither
