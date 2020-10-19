@@ -8802,14 +8802,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return false;
   };
 
-  // If the types are obviously equivalent, we're done. This optimization
-  // is not valid for operators though, where an inout parameter does not
-  // have an explicit inout argument.
-  if (type1.getPointer() == desugar2) {
-    if (!isOperator || !hasInOut())
-      return SolutionKind::Solved;
-  }
-
   // Local function to form an unsolved result.
   auto formUnsolved = [&] {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -8837,6 +8829,19 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   parts.pop_back();
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
+
+  // If the types are obviously equivalent, we're done. This optimization
+  // is not valid for operators though, where an inout parameter does not
+  // have an explicit inout argument.
+  if (type1.getPointer() == desugar2) {
+    if (!isOperator || !hasInOut()) {
+      recordTrailingClosureMatch(
+          getConstraintLocator(
+              outerLocator.withPathElement(ConstraintLocator::ApplyArgument)),
+          TrailingClosureMatching::Forward);
+      return SolutionKind::Solved;
+    }
+  }
 
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
