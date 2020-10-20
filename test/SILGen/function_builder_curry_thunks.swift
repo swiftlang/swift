@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)

@@ -493,8 +493,8 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   87)
-SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
-  OnNominalType | UserInaccessible |
+SIMPLE_DECL_ATTR(resultBuilder, FunctionBuilder,
+  OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   88)
 DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,

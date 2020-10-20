@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/function_builders_client.swift
 // RUN: %target-swift-frontend -compile-module-from-interface %t/FunctionBuilders.swiftinterface -o %t/FunctionBuilders.swiftmodule
 
-@_functionBuilder
+@resultBuilder
 public struct TupleBuilder {
   public static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)

@@ -5,7 +5,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
@@ -44,7 +44,7 @@ struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
   }
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
   // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}
   // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
@@ -171,7 +171,7 @@ struct TupleP<U> : P {
   init(_: U) {}
 }
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{required by static method 'buildBlock' where 'S1' = 'Label<_>.Type'}}
            -> TupleP<(S0, S1)> where S0: P, S1: P {
@@ -331,7 +331,7 @@ func checkSingleReturn(cond: Bool) {
 
 // rdar://problem/59116520
 func checkImplicitSelfInClosure() {
-  @_functionBuilder
+  @resultBuilder
   struct Builder {
     static func buildBlock(_ children: String...) -> Element { Element() }
   }
@@ -518,7 +518,7 @@ func testCaseVarTypes(e: E3) {
 }
 
 // Test for buildFinalResult.
-@_functionBuilder
+@resultBuilder
 struct WrapperBuilder {
   static func buildBlock() -> () { }
   
@@ -581,7 +581,7 @@ func testWrapperBuilder() {
 func rdar61347993() {
   struct Result {}
 
-  @_functionBuilder
+  @resultBuilder
   struct Builder {
     static func buildBlock() -> Result {
       Result()

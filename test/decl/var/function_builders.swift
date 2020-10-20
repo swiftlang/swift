@@ -1,15 +1,15 @@
 // RUN: %target-typecheck-verify-swift
 
-@_functionBuilder // expected-error {{'@_functionBuilder' attribute cannot be applied to this declaration}}
+@resultBuilder // expected-error {{'@resultBuilder' attribute cannot be applied to this declaration}}
 var globalBuilder: Int
 
-@_functionBuilder // expected-error {{'@_functionBuilder' attribute cannot be applied to this declaration}}
+@resultBuilder // expected-error {{'@resultBuilder' attribute cannot be applied to this declaration}}
 func globalBuilderFunction() -> Int { return 0 }
 
-@_functionBuilder
+@resultBuilder
 struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
-@_functionBuilder
+@resultBuilder
 class Inventor {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 @Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter, function, or computed property}}
@@ -65,11 +65,11 @@ func makerParamExtra(@Maker(5) // expected-error {{function builder attributes c
 func makerParamAutoclosure(@Maker // expected-error {{function builder attribute 'Maker' cannot be applied to an autoclosure parameter}}
                            fn: @autoclosure () -> ()) {}
 
-@_functionBuilder
+@resultBuilder
 struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}} expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
-  @_functionBuilder
+  @resultBuilder
   struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 }
 
@@ -88,7 +88,7 @@ func makeParamNestedBound(@GenericContainer<Int>.Maker
 
 protocol P { }
 
-@_functionBuilder
+@resultBuilder
 struct ConstrainedGenericMaker<T: P> {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 
@@ -100,7 +100,7 @@ struct WithinGeneric<U> {
     fn: () -> ()) {}
 }
 
-@_functionBuilder
+@resultBuilder
 struct ValidBuilder1 {
   static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
 }
@@ -111,41 +111,41 @@ extension BuilderFuncHelper {
   static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
 }
 
-@_functionBuilder
+@resultBuilder
 struct ValidBuilder2: BuilderFuncHelper {}
 
 class BuilderFuncBase {
   static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
 }
 
-@_functionBuilder
+@resultBuilder
 class ValidBuilder3: BuilderFuncBase {}
 
-@_functionBuilder
+@resultBuilder
 struct ValidBuilder4 {}
 extension ValidBuilder4 {
     static func buildBlock(_ exprs: Any...) -> Int { return exprs.count }
 }
 
-@_functionBuilder
+@resultBuilder
 struct ValidBuilder5 {
     static func buildBlock() -> Int { 0 }
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder1 {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder2 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
   func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{did you mean to make instance method 'buildBlock' static?}} {{3-3=static }}
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder3 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
   var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder4 {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 extension InvalidBuilder4 {
   func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{did you mean to make instance method 'buildBlock' static?}} {{3-3=static }}
@@ -156,10 +156,10 @@ extension InvalidBuilderHelper {
   func buildBlock(_ exprs: Any...) -> Int { return exprs.count } // expected-note {{potential match 'buildBlock' is not a static method}}
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder5: InvalidBuilderHelper {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder6 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
     static var buildBlock: Int = 0 // expected-note {{potential match 'buildBlock' is not a static method}}
 }
@@ -168,7 +168,7 @@ struct Callable {
     func callAsFunction(_ exprs: Any...) -> Int { return exprs.count }
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder7 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
     static var buildBlock = Callable() // expected-note {{potential match 'buildBlock' is not a static method}}
 }
@@ -177,7 +177,7 @@ class BuilderVarBase {
   static var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
 }
 
-@_functionBuilder
+@resultBuilder
 class InvalidBuilder8: BuilderVarBase {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
 protocol BuilderVarHelper {}
@@ -186,15 +186,15 @@ extension BuilderVarHelper {
   static var buildBlock: (Any...) -> Int { { return $0.count } } // expected-note {{potential match 'buildBlock' is not a static method}}
 }
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder9: BuilderVarHelper {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}
 
-@_functionBuilder
+@resultBuilder
 struct InvalidBuilder10 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
   static var buildBlock: (Any...) -> Int = { return $0.count } // expected-note {{potential match 'buildBlock' is not a static method}}
 }
 
-@_functionBuilder
+@resultBuilder
 enum InvalidBuilder11 { // expected-error {{function builder must provide at least one static 'buildBlock' method}}
     case buildBlock(Any) // expected-note {{enum case 'buildBlock' cannot be used to satisfy the function builder requirement}}
 }

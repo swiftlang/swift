@@ -16,7 +16,7 @@ extension Int: Taggable { }
 extension String: Taggable { }
 extension Double: Taggable { }
 
-@_functionBuilder
+@resultBuilder
 struct TaggedBuilder<Tag> {
   static func buildBlock() -> () { }
 

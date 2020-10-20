@@ -23,7 +23,7 @@ extension Taggable {
 extension Int: Taggable { }
 extension String: Taggable { }
 
-@_functionBuilder
+@resultBuilder
 struct TaggedBuilder<Tag> {
   static func buildBlock() -> () { }
 
@@ -87,7 +87,7 @@ enum MyEnum {
   case east, west
   case north, south
 }
-@_functionBuilder
+@resultBuilder
 struct EnumToVoidBuilder {
   static func buildBlock() {}
   static func buildBlock(_ :MyEnum) {}
@@ -96,7 +96,7 @@ struct EnumToVoidBuilder {
 }
 func acceptBuilder(@EnumToVoidBuilder body: () -> Void) {}
 
-@_functionBuilder
+@resultBuilder
 struct AnyBuilder {
   static func buildBlock(_ components: Any...) -> Any { 5 }
 

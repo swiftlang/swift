@@ -7,7 +7,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1

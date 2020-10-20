@@ -264,7 +264,7 @@ _ = testing([Point(4, 89)]) { arg in
 struct Thing {
     init(_ block: (Point) -> Void) {}
 }
-@_functionBuilder
+@resultBuilder
 struct ThingBuilder {
     static func buildBlock(_ x: Thing...) -> [Thing] { x }
 }

@@ -5,7 +5,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder {
   static func buildBlock() -> () {
     return ()
@@ -79,7 +79,7 @@ struct DoNotTupleMe {
 
 extension DoNotTupleMe: Tupled { }
 
-@_functionBuilder
+@resultBuilder
 struct OtherTupleBuilder {
   static func buildBlock() -> () {
     return ()

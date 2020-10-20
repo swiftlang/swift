@@ -6,7 +6,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
@@ -247,7 +247,7 @@ extension Int: Taggable { }
 extension String: Taggable { }
 extension Double: Taggable { }
 
-@_functionBuilder
+@resultBuilder
 struct TaggedBuilder<Tag> {
   static func buildBlock() -> () { }
 
@@ -330,7 +330,7 @@ enum Component {
   indirect case optional(Component?)
 }
 
-@_functionBuilder
+@resultBuilder
 struct ComponentBuilder {
   static func buildExpression(_ string: StaticString) -> Component {
     return .string(string)
@@ -422,7 +422,7 @@ testForEach1.show()
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))
 
 func test_single_stmt_closure_support() {
-  @_functionBuilder
+  @resultBuilder
   struct MyBuilder {
     static func buildBlock(_ numbers: Int...) -> Int {
       return 42
@@ -621,7 +621,7 @@ testSwitchCombined(getE(2))
 
 
 // Test buildOptional(_:) as an alternative to buildIf(_:).
-@_functionBuilder
+@resultBuilder
 struct TupleBuilderWithOpt {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
@@ -715,7 +715,7 @@ extension FunctionBuilderProtocol {
     static func buildLimitedAvailability(_ component: Component) -> Component { component }
 }
 
-@_functionBuilder
+@resultBuilder
 enum ArrayBuilder<E>: FunctionBuilderProtocol {
     typealias Expression = E
     typealias Component = FunctionBuilder<E>

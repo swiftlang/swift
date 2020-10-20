@@ -7,7 +7,7 @@ example function builder illustrates the various function-building methods one
 can define:
 
 ```swift
-@_functionBuilder
+@resultBuilder
 struct ExampleFunctionBuilder {
   /// The type of individual statement expressions in the transformed function,
   /// which defaults to Component if buildExpression() is not provided.

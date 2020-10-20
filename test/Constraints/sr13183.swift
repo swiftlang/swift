@@ -14,7 +14,7 @@ struct Map<Value, Transformed> {
   let transform: (Value) -> Transformed
 }
 
-@_functionBuilder
+@resultBuilder
 struct ScopeBuilder<Value> {
   static func buildExpression<T>(_ map: Map<Value, T>) -> Component {
     Component()

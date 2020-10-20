@@ -7,7 +7,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder { // expected-note{{add 'buildLimitedAvailability(_:)' to the function builder 'TupleBuilder' to erase type information for less-available types}}{{22-22=\n    static func buildLimitedAvailability(_ component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
@@ -77,7 +77,7 @@ tuplify(true) { cond in
 }
 
 // Function builder that can perform type erasure for #available.
-@_functionBuilder
+@resultBuilder
 struct TupleBuilderAvailability {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
