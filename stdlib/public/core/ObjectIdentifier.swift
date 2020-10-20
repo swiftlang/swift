@@ -14,14 +14,14 @@
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
-@frozen // trivial-implementation
-/// 
 /// `ObjectIdentifier` is only guaranteed to remain unique for the
 /// lifetime of an object. When the instance gets deallocated, its object 
 /// identifier may be reused for a different object. (Internally, objects are
 /// identified by their memory location.)
-/// If you need an object identifier over the lifetime of an objec, it may
+/// If you need an object identifier over the lifetime of an object, it may
 /// be appropriate to provide a custom implementation of `Identifiable`.
+@frozen // trivial-implementation
+/// 
 public struct ObjectIdentifier {
   @usableFromInline // trivial-implementation
   internal let _value: Builtin.RawPointer
