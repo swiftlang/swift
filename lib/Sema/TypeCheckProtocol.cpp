@@ -4337,9 +4337,11 @@ static void checkExportability(Type depTy, Type replacementTy,
       conformance->getRootConformance();
   ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
 
+  auto where = ExportContext::forDeclSignature(
+      DC->getInnermostDeclarationDeclContext());
   auto originKind = getDisallowedOriginKind(
       rootConformance->getDeclContext()->getAsDecl(),
-      *SF, DC->getAsDecl());
+      where);
   if (originKind == DisallowedOriginKind::None)
     return;
 
@@ -5455,14 +5457,13 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
-    AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
-    for (Decl *enclosingDecl = classDecl; enclosingDecl;
-         enclosingDecl = enclosingDecl->getDeclContext()
-                           ->getInnermostDeclarationDeclContext()) {
-      if (!TypeChecker::isDeclAvailable(enclosingDecl, SourceLoc(), sourceFile,
-                                        availableInfo))
-        return;
-    }
+    AvailabilityContext safeRangeUnderApprox{
+        AvailabilityInference::availableRange(classDecl, ctx)};
+    AvailabilityContext runningOSOverApprox =
+        AvailabilityContext::forDeploymentTarget(ctx);
+
+    if (!runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
+      return;
   }
 
   // Infer @_staticInitializeObjCMetadata.

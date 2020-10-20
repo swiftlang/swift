@@ -1551,6 +1551,8 @@ public:
       }
     }
 
+    checkImplementationOnlyOverride(VD);
+
     if (VD->getDeclContext()->getSelfClassDecl()) {
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
         if (VD->hasStorage())
@@ -1771,6 +1773,8 @@ public:
         }
       }
     }
+
+    checkImplementationOnlyOverride(SD);
 
     // Compute these requests in case they emit diagnostics.
     (void) SD->isGetterMutating();
@@ -2364,6 +2368,8 @@ public:
       }
     }
 
+    checkImplementationOnlyOverride(FD);
+
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -2671,6 +2677,8 @@ public:
                      OD->getName());
       }
     }
+
+    checkImplementationOnlyOverride(CD);
 
     // If this initializer overrides a 'required' initializer, it must itself
     // be marked 'required'.

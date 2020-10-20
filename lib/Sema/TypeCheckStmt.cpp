@@ -1686,7 +1686,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
 
     for (auto decl : lookupResults) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
-      if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
+    if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
 
@@ -1696,12 +1696,9 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    auto fragileKind = fromCtor->getFragileFunctionKind();
-    if (fragileKind.kind != FragileFunctionKind::None) {
-      TypeChecker::diagnoseInlinableDeclRef(
-          fromCtor->getLoc(), ctor, fromCtor,
-          fragileKind);
-    }
+    TypeChecker::diagnoseInlinableDeclRef(
+        fromCtor->getLoc(), ctor,
+        ExportContext::forFunctionBody(fromCtor));
   }
 
 
