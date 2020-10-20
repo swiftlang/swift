@@ -307,7 +307,7 @@ namespace {
                       StringRef value,
                       unsigned indentLevel) {
     out << "\"";
-    out.write_escaped(value);
+    out << value;
     out << "\"";
   }
 
@@ -460,8 +460,6 @@ static void writeJSON(llvm::raw_ostream &out,
     writeJSONSingleField(out, "modulePath", modulePath, /*indentLevel=*/3,
                          /*trailingComma=*/true);
 
-    // Artem Refactoring
-    {
     // Source files.
     if (swiftTextualDeps) {
       writeJSONSingleField(out, "sourceFiles", swiftTextualDeps->sourceFiles, 3,
@@ -612,7 +610,6 @@ static void writeJSON(llvm::raw_ostream &out,
     if (&module != &allModules.back())
       out << ",";
     out << "\n";
-  }
   }
 }
 
