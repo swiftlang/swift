@@ -139,7 +139,7 @@ ninja -C S:\b\1
 
 ```cmd
 path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
-ninja -C S:\b\toolchain check-swift
+ninja -C S:\b\1 check-swift
 ```
 
 ## Build swift-corelibs-libdispatch
