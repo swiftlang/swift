@@ -38,10 +38,11 @@
 using namespace swift;
 
 ExportContext::ExportContext(DeclContext *DC, FragileFunctionKind kind,
-                             bool spi, bool exported)
+                             bool spi, bool exported, bool deprecated)
     : DC(DC), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
+  Deprecated = deprecated;
   Reason = ExportabilityReason::General;
 }
 
@@ -95,7 +96,73 @@ bool swift::isExported(const Decl *D) {
   return true;
 }
 
+template<typename Fn>
+static void forEachOuterDecl(DeclContext *DC, Fn fn) {
+  for (; !DC->isModuleScopeContext(); DC = DC->getParent()) {
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+      break;
+
+    case DeclContextKind::Initializer:
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+        fn(PBI->getBinding());
+      break;
+
+    case DeclContextKind::SubscriptDecl:
+      fn(cast<SubscriptDecl>(DC));
+      break;
+
+    case DeclContextKind::EnumElementDecl:
+      fn(cast<EnumElementDecl>(DC));
+      break;
+
+    case DeclContextKind::AbstractFunctionDecl:
+      fn(cast<AbstractFunctionDecl>(DC));
+
+      if (auto *AD = dyn_cast<AccessorDecl>(DC))
+        fn(AD->getStorage());
+      break;
+
+    case DeclContextKind::GenericTypeDecl:
+      fn(cast<GenericTypeDecl>(DC));
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+      fn(cast<ExtensionDecl>(DC));
+      break;
+    }
+  }
+}
+
+static void computeExportContextBits(Decl *D,
+                                     bool *implicit, bool *deprecated) {
+  if (D->isImplicit())
+    *implicit = true;
+
+  if (D->getAttrs().getDeprecated(D->getASTContext()))
+    *deprecated = true;
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        computeExportContextBits(VD, implicit, deprecated);
+    }
+  }
+}
+
 ExportContext ExportContext::forDeclSignature(Decl *D) {
+  bool implicit = false;
+  bool deprecated = false;
+  computeExportContextBits(D, &implicit, &deprecated);
+  forEachOuterDecl(D->getDeclContext(),
+                   [&](Decl *D) {
+                     computeExportContextBits(D, &implicit, &deprecated);
+                   });
+
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
 
@@ -113,11 +180,19 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, fragileKind, spi, exported);
+  return ExportContext(DC, fragileKind, spi, exported, deprecated);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
-  ;
+  assert(DC && "Use ExportContext::forImplicit() for implicit decls");
+
+  bool implicit = false;
+  bool deprecated = false;
+  forEachOuterDecl(DC,
+                   [&](Decl *D) {
+                     computeExportContextBits(D, &implicit, &deprecated);
+                   });
+
   auto fragileKind = DC->getFragileFunctionKind();
 
   bool spi = false;
@@ -129,16 +204,21 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
     assert(fragileKind.kind == FragileFunctionKind::None);
   }
 
-  return ExportContext(DC, fragileKind, spi, exported);
+  return ExportContext(DC, fragileKind, spi, exported, deprecated);
 }
 
-ExportContext ExportContext::forReason(ExportabilityReason reason) const {
+ExportContext ExportContext::forImplicit() {
+  return ExportContext(nullptr, FragileFunctionKind(),
+                       false, false, false);
+}
+
+ExportContext ExportContext::withReason(ExportabilityReason reason) const {
   auto copy = *this;
   copy.Reason = reason;
   return copy;
 }
 
-ExportContext ExportContext::forExported(bool exported) const {
+ExportContext ExportContext::withExported(bool exported) const {
   auto copy = *this;
   copy.Exported = isExported() && exported;
   return copy;
@@ -1672,17 +1752,6 @@ static bool isInsideCompatibleUnavailableDeclaration(
   return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
 }
 
-/// Returns true if the reference is lexically contained in a declaration
-/// that is deprecated on all deployment targets.
-static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC){
-  auto IsDeprecated = [](const Decl *D) {
-    return D->getAttrs().getDeprecated(D->getASTContext());
-  };
-
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);
-}
-
 static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
                                      const ValueDecl *renamedDecl,
@@ -2059,12 +2128,14 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
+                                       ExportContext Where,
                                        const ValueDecl *DeprecatedDecl,
                                        const ApplyExpr *Call) {
   const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
   if (!Attr)
     return;
+
+  auto *ReferenceDC = Where.getDeclContext();
 
   // We don't want deprecated declarations to trigger warnings
   // in synthesized code.
@@ -2075,7 +2146,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC)) {
+  if (Where.isDeprecated()) {
     return;
   }
 
@@ -2788,7 +2859,7 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
-    TypeChecker::diagnoseIfDeprecated(R, DC, D, call);
+    TypeChecker::diagnoseIfDeprecated(R, Where, D, call);
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
     return false;

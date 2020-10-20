@@ -1513,7 +1513,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
       loc = varDecl->getNameLoc();
 
     diagnoseTypeAvailability(typeRepr, type, loc,
-                             Where.forReason(reason), flags);
+                             Where.withReason(reason), flags);
   }
 
   void checkGenericParams(const GenericContext *ownerCtx,
@@ -1751,14 +1751,14 @@ public:
       return isExported(valueMember);
     });
 
-    Where = wasWhere.forExported(hasExportedMembers);
-    checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
+    Where = wasWhere.withExported(hasExportedMembers);
+    checkType(ED->getExtendedType(), ED->getExtendedTypeRepr(), ED,
               ExportabilityReason::ExtensionWithPublicMembers);
 
     // 3) If the extension contains exported members or defines conformances,
     // the 'where' clause must only name exported types.
-    Where = wasWhere.forExported(hasExportedMembers ||
-                                 !ED->getInherited().empty());
+    Where = wasWhere.withExported(hasExportedMembers ||
+                                  !ED->getInherited().empty());
     checkConstrainedExtensionRequirements(ED, hasExportedMembers);
   }
 

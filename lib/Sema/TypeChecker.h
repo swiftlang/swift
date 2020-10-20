@@ -1047,7 +1047,7 @@ const AvailableAttr *getDeprecated(const Decl *D);
 /// Callers can provide a lambda that adds additional information (such as a
 /// fixit hint) to the deprecation diagnostic, if it is emitted.
 void diagnoseIfDeprecated(SourceRange SourceRange,
-                          const DeclContext *ReferenceDC,
+                          ExportContext Where,
                           const ValueDecl *DeprecatedDecl,
                           const ApplyExpr *Call);
 /// @}
