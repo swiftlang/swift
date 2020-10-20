@@ -448,7 +448,7 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
-void checkParameterList(ParameterList *params);
+void checkParameterList(ParameterList *params, DeclContext *owner);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
