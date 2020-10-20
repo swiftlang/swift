@@ -2004,9 +2004,6 @@ public:
                                   IGF.getSILModule());
 
     // Move all the arguments into the context.
-    if (selfValue) {
-      llArgs.add(selfValue);
-    }
     auto layout = getAsyncContextLayout();
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
@@ -2024,8 +2021,10 @@ public:
       layout.getBindings().save(IGF, bindingsAddr, llArgs);
     }
     if (selfValue) {
+      Explosion selfExplosion;
+      selfExplosion.add(selfValue);
       auto fieldLayout = layout.getLocalContextLayout();
-      saveValue(fieldLayout, llArgs, isOutlined);
+      saveValue(fieldLayout, selfExplosion, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
