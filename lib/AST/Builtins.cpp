@@ -30,6 +30,12 @@
 #include "llvm/Support/ManagedStatic.h"
 #include <tuple>
 
+// SWIFT_ENABLE_TENSORFLOW
+#undef and
+#undef or
+#undef xor
+// SWIFT_ENABLE_TENSORFLOW END
+
 using namespace swift;
 
 struct BuiltinExtraInfoTy {

@@ -23,6 +23,12 @@
 #include "swift/SIL/SILInstruction.h"
 #include <type_traits>
 
+// SWIFT_ENABLE_TENSORFLOW
+#undef and
+#undef or
+#undef xor
+// SWIFT_ENABLE_TENSORFLOW END
+
 namespace swift {
 
 template <typename ImplClass, typename ValueRetTy = void>

@@ -29,6 +29,12 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#undef and
+#undef or
+#undef xor
+// SWIFT_ENABLE_TENSORFLOW END
+
 using namespace swift;
 using namespace Lowering;
 

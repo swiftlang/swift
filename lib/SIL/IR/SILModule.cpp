@@ -32,6 +32,13 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
+
+// SWIFT_ENABLE_TENSORFLOW
+#undef and
+#undef or
+#undef xor
+// SWIFT_ENABLE_TENSORFLOW END
+
 using namespace swift;
 using namespace Lowering;
 

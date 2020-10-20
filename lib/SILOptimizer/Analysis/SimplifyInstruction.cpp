@@ -27,6 +27,12 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#undef and
+#undef or
+#undef xor
+// SWIFT_ENABLE_TENSORFLOW END
+
 using namespace swift;
 using namespace swift::PatternMatch;
 
