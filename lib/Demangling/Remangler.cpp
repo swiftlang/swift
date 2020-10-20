@@ -805,6 +805,11 @@ void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
   Buffer << "TC";
 }
 
+void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tz";
+}
+
 void Remangler::mangleDeallocator(Node *node) {
   mangleChildNodes(node);
   Buffer << "fD";
