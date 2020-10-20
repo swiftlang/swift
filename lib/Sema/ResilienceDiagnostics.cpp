@@ -29,9 +29,10 @@ using namespace swift;
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const ValueDecl *D,
-                                           const DeclContext *DC,
-                                           FragileFunctionKind Kind) {
-  assert(Kind.kind != FragileFunctionKind::None);
+                                           ExportContext where) {
+  auto fragileKind = where.getFragileFunctionKind();
+  if (fragileKind.kind == FragileFunctionKind::None)
+    return false;
 
   // Do some important fast-path checks that apply to all cases.
 
@@ -40,15 +41,14 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     return false;
 
   // Check whether the declaration is accessible.
-  if (diagnoseInlinableDeclRefAccess(loc, D, DC, Kind))
+  if (diagnoseInlinableDeclRefAccess(loc, D, where))
     return true;
 
   // Check whether the declaration comes from a publically-imported module.
   // Skip this check for accessors because the associated property or subscript
   // will also be checked, and will provide a better error message.
   if (!isa<AccessorDecl>(D))
-    if (diagnoseDeclRefExportability(loc, D, DC,
-                                     None, Kind))
+    if (diagnoseDeclRefExportability(loc, D, where))
       return true;
 
   return false;
@@ -56,9 +56,10 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
 
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
-                                                 const DeclContext *DC,
-                                                 FragileFunctionKind Kind) {
-  assert(Kind.kind != FragileFunctionKind::None);
+                                                 ExportContext where) {
+  auto *DC = where.getDeclContext();
+  auto fragileKind = where.getFragileFunctionKind();
+  assert(fragileKind.kind != FragileFunctionKind::None);
 
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
@@ -66,7 +67,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   // Public declarations or SPI used from SPI are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              Kind.allowUsableFromInline).isPublic() &&
+                              fragileKind.allowUsableFromInline).isPublic() &&
       !(D->isSPI() && !DC->getInnermostDeclarationDeclContext()->isSPI()))
     return false;
 
@@ -126,10 +127,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
            loc, diagID,
            D->getDescriptiveKind(), diagName,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(Kind.kind),
+           static_cast<unsigned>(fragileKind.kind),
            isAccessor);
 
-  if (Kind.allowUsableFromInline) {
+  if (fragileKind.allowUsableFromInline) {
     Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
                            D->getDescriptiveKind(), diagName, isAccessor);
   } else {
@@ -143,15 +144,15 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 bool
 TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                                           const ValueDecl *D,
-                                          const DeclContext *DC,
-                                          Optional<ExportabilityReason> reason,
-                                          FragileFunctionKind fragileKind) {
-  if (fragileKind.kind == FragileFunctionKind::None && !reason.hasValue())
+                                          ExportContext where) {
+  if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
   auto definingModule = D->getModuleContext();
 
   auto downgradeToWarning = DowngradeToWarning::No;
+
+  auto *DC = where.getDeclContext();
   auto originKind = getDisallowedOriginKind(
       D,
       *DC->getParentSourceFile(),
@@ -161,6 +162,9 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
     return false;
 
   ASTContext &ctx = definingModule->getASTContext();
+
+  auto fragileKind = where.getFragileFunctionKind();
+  auto reason = where.getExportabilityReason();
 
   if (fragileKind.kind == FragileFunctionKind::None) {
     auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
@@ -187,24 +191,25 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 bool
 TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
-                                              const SourceFile &userSF,
-                                              const DeclContext *userDC,
-                                              Optional<ExportabilityReason> reason,
-                                              FragileFunctionKind fragileKind) {
-  if (fragileKind.kind == FragileFunctionKind::None && !reason.hasValue())
+                                              ExportContext where) {
+  if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
+  auto *DC = where.getDeclContext();
   auto originKind = getDisallowedOriginKind(
       rootConf->getDeclContext()->getAsDecl(),
-      userSF, userDC->getInnermostDeclarationDeclContext());
+      *DC->getParentSourceFile(),
+      DC->getInnermostDeclarationDeclContext());
   if (originKind == DisallowedOriginKind::None)
     return false;
 
+  ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+  ASTContext &ctx = M->getASTContext();
+
+  auto reason = where.getExportabilityReason();
   if (!reason.hasValue())
     reason = ExportabilityReason::General;
 
-  ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
-  ASTContext &ctx = M->getASTContext();
   ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                      rootConf->getType(),
                      rootConf->getProtocol()->getName(),

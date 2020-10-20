@@ -13,6 +13,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
@@ -24,18 +25,15 @@
 namespace swift {
   class ApplyExpr;
   class AvailableAttr;
-  class DeclContext;
   class Expr;
   class InFlightDiagnostic;
   class Decl;
-  struct FragileFunctionKind;
   class ProtocolConformanceRef;
   class Stmt;
   class SubstitutionMap;
   class Type;
   class TypeRepr;
   class ValueDecl;
-
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
   /// Used when type-checking protocol conformances, since conforming to a
@@ -70,6 +68,38 @@ enum class ExportabilityReason : unsigned {
   ExtensionWithConditionalConformances
 };
 
+class ExportContext {
+  DeclContext *DC;
+  FragileFunctionKind FragileKind;
+  unsigned SPI : 1;
+  unsigned Exported : 1;
+  ExportabilityReason Reason;
+
+  ExportContext(DeclContext *DC, FragileFunctionKind kind, bool spi, bool exported);
+
+public:
+  static ExportContext forDeclSignature(Decl *D);
+  static ExportContext forFunctionBody(DeclContext *DC);
+
+  ExportContext forReason(ExportabilityReason reason) const;
+  ExportContext forExported(bool exported) const;
+
+  DeclContext *getDeclContext() const { return DC; }
+  FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
+
+  bool isSPI() const { return SPI; }
+  bool isExported() const { return Exported; }
+
+  bool mustOnlyReferenceExportedDecls() const;
+
+  Optional<ExportabilityReason> getExportabilityReason() const;
+};
+
+/// Check if a public declaration is part of a module's API; that is, this
+/// will return false if the declaration is @_spi or @_implementationOnly.
+bool isExported(const ValueDecl *VD);
+bool isExported(const Decl *D);
+
 /// Diagnose uses of unavailable declarations in expressions.
 void diagAvailability(const Expr *E, DeclContext *DC);
 
@@ -78,47 +108,37 @@ void diagAvailability(const Expr *E, DeclContext *DC);
 void diagAvailability(const Stmt *S, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in types.
-bool diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
-                                  Optional<ExportabilityReason> reason,
-                                  FragileFunctionKind fragileKind,
+bool diagnoseTypeReprAvailability(const TypeRepr *T,
+                                  ExportContext context,
                                   DeclAvailabilityFlags flags = None);
 
 /// Diagnose uses of unavailable conformances in types.
-void diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC,
-                              Optional<ExportabilityReason> reason,
-                              FragileFunctionKind fragileKind,
+void diagnoseTypeAvailability(Type T, SourceLoc loc,
+                              ExportContext context,
                               DeclAvailabilityFlags flags = None);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
 void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
-                              DeclContext *DC,
-                              Optional<ExportabilityReason> reason,
-                              FragileFunctionKind fragileKind,
+                              ExportContext context,
                               DeclAvailabilityFlags flags = None);
 
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
-                                const DeclContext *DC,
-                                Optional<ExportabilityReason> reason,
-                                FragileFunctionKind fragileKind);
+                                ExportContext context);
 
 bool
 diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
-                                    const DeclContext *DC,
-                                    Optional<ExportabilityReason> reason,
-                                    FragileFunctionKind fragileKind);
+                                    ExportContext context);
 
 /// Run the Availability-diagnostics algorithm otherwise used in an expr
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
 bool diagnoseDeclAvailability(const ValueDecl *Decl,
                               SourceRange R,
-                              DeclContext *DC,
-                              Optional<ExportabilityReason> reason,
-                              FragileFunctionKind fragileKind,
+                              ExportContext context,
                               DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,

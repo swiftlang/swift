@@ -1483,63 +1483,11 @@ swift::getDisallowedOriginKind(const Decl *decl,
   return DisallowedOriginKind::None;
 };
 
-static bool isExported(const ValueDecl *VD) {
-  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
-
-  // Is this part of the module's API or ABI?
-  AccessScope accessScope =
-      VD->getFormalAccessScope(nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublic())
-    return true;
-
-  // Is this a stored property in a non-resilient struct or class?
-  auto *property = dyn_cast<VarDecl>(VD);
-  if (!property || !property->hasStorage() || property->isStatic())
-    return false;
-  auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
-  if (!parentNominal || parentNominal->isResilient())
-    return false;
-
-  // Is that struct or class part of the module's API or ABI?
-  AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
-      nullptr, /*treatUsableFromInlineAsPublic*/true);
-  if (parentAccessScope.isPublic())
-    return true;
-
-  return false;
-}
-
-static bool isExported(Decl *D) {
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    return isExported(VD);
-  }
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
-      if (auto *VD = PBD->getAnchoringVarDecl(i))
-        return isExported(VD);
-    }
-
-    return false;
-  }
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto *NTD = ED->getExtendedNominal())
-      return isExported(NTD);
-
-    return false;
-  }
-
-  return true;
-}
-
 namespace {
 
 /// Diagnose declarations whose signatures refer to unavailable types.
 class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
-  DeclContext *DC;
-  FragileFunctionKind FragileKind;
-  bool Exported;
+  ExportContext Where;
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  ExportabilityReason reason=ExportabilityReason::General,
@@ -1547,10 +1495,6 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
-
-    Optional<ExportabilityReason> optReason;
-    if (Exported)
-      optReason = reason;
 
     DeclAvailabilityFlags flags = None;
 
@@ -1568,8 +1512,8 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     if (auto *varDecl = dyn_cast<VarDecl>(context))
       loc = varDecl->getNameLoc();
 
-    diagnoseTypeAvailability(typeRepr, type, loc, DC,
-                             optReason, FragileKind, flags);
+    diagnoseTypeAvailability(typeRepr, type, loc,
+                             Where.forReason(reason), flags);
   }
 
   void checkGenericParams(const GenericContext *ownerCtx,
@@ -1598,10 +1542,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
 public:
   explicit DeclAvailabilityChecker(Decl *D)
-    : DC(D->getInnermostDeclContext()) {
-    FragileKind = DC->getFragileFunctionKind();
-    Exported = isExported(D);
-  }
+    : Where(ExportContext::forDeclSignature(D)) {}
 
   // Force all kinds to be handled at a lower level.
   void visitDecl(Decl *D) = delete;
@@ -1798,7 +1739,7 @@ public:
                 /*allowUnavailableProtocol=*/true);
     });
 
-    bool wasExported = Exported;
+    auto wasWhere = Where;
 
     // 2) If the extension contains exported members, the as-written
     // extended type should be exportable.
@@ -1810,14 +1751,14 @@ public:
       return isExported(valueMember);
     });
 
-    Exported = wasExported && hasExportedMembers;
+    Where = wasWhere.forExported(hasExportedMembers);
     checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
               ExportabilityReason::ExtensionWithPublicMembers);
 
     // 3) If the extension contains exported members or defines conformances,
     // the 'where' clause must only name exported types.
-    Exported = wasExported && (hasExportedMembers ||
-                               !ED->getInherited().empty());
+    Where = wasWhere.forExported(hasExportedMembers ||
+                                 !ED->getInherited().empty());
     checkConstrainedExtensionRequirements(ED, hasExportedMembers);
   }
 

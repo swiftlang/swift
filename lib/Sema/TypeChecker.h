@@ -37,6 +37,7 @@
 
 namespace swift {
 
+class ExportContext;
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
@@ -947,33 +948,26 @@ DeclName getObjectLiteralConstructorName(ASTContext &ctx,
 ModuleDecl *getStdlibModule(const DeclContext *dc);
 
 /// \name Resilience diagnostics
-bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
-                              const DeclContext *DC, FragileFunctionKind Kind);
+bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D, ExportContext where);
 
 Expr *buildDefaultInitializer(Type type);
 
 bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
-                                    const DeclContext *DC,
-                                    FragileFunctionKind Kind);
+                                    ExportContext where);
 
 /// Given that a declaration is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if it cannot
 /// reasonably be shared.
 bool diagnoseDeclRefExportability(SourceLoc loc,
                                   const ValueDecl *D,
-                                  const DeclContext *DC,
-                                  Optional<ExportabilityReason> exportability,
-                                  FragileFunctionKind fragileKind);
+                                  ExportContext where);
 
 /// Given that a conformance is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if the
 /// conformance is SPI or visible via an implementation-only import.
 bool diagnoseConformanceExportability(SourceLoc loc,
                                       const RootProtocolConformance *rootConf,
-                                      const SourceFile &userSF,
-                                      const DeclContext *userDC,
-                                      Optional<ExportabilityReason> reason,
-                                      FragileFunctionKind fragileKind);
+                                      ExportContext where);
 
 /// \name Availability checking
 ///

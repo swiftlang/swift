@@ -37,6 +37,111 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
+ExportContext::ExportContext(DeclContext *DC, FragileFunctionKind kind,
+                             bool spi, bool exported)
+    : DC(DC), FragileKind(kind) {
+  SPI = spi;
+  Exported = exported;
+  Reason = ExportabilityReason::General;
+}
+
+bool swift::isExported(const ValueDecl *VD) {
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  if (accessScope.isPublic())
+    return true;
+
+  // Is this a stored property in a non-resilient struct or class?
+  auto *property = dyn_cast<VarDecl>(VD);
+  if (!property || !property->hasStorage() || property->isStatic())
+    return false;
+  auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
+  if (!parentNominal || parentNominal->isResilient())
+    return false;
+
+  // Is that struct or class part of the module's API or ABI?
+  AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
+      nullptr, /*treatUsableFromInlineAsPublic*/true);
+  if (parentAccessScope.isPublic())
+    return true;
+
+  return false;
+}
+
+bool swift::isExported(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    return isExported(VD);
+  }
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        return isExported(VD);
+    }
+
+    return false;
+  }
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *NTD = ED->getExtendedNominal())
+      return isExported(NTD);
+
+    return false;
+  }
+
+  return true;
+}
+
+ExportContext ExportContext::forDeclSignature(Decl *D) {
+  auto *DC = D->getInnermostDeclContext();
+  auto fragileKind = DC->getFragileFunctionKind();
+  bool spi = D->isSPI();
+  bool exported = ::isExported(D);
+
+  return ExportContext(DC, fragileKind, spi, exported);
+}
+
+ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
+  ;
+  auto fragileKind = DC->getFragileFunctionKind();
+
+  bool spi = false;
+  bool exported = false;
+
+  if (auto *D = DC->getInnermostDeclarationDeclContext()) {
+    spi = D->isSPI();
+  } else {
+    assert(fragileKind.kind == FragileFunctionKind::None);
+  }
+
+  return ExportContext(DC, fragileKind, spi, exported);
+}
+
+ExportContext ExportContext::forReason(ExportabilityReason reason) const {
+  auto copy = *this;
+  copy.Reason = reason;
+  return copy;
+}
+
+ExportContext ExportContext::forExported(bool exported) const {
+  auto copy = *this;
+  copy.Exported = isExported() && exported;
+  return copy;
+}
+
+bool ExportContext::mustOnlyReferenceExportedDecls() const {
+  return Exported || FragileKind.kind != FragileFunctionKind::None;
+}
+
+Optional<ExportabilityReason> ExportContext::getExportabilityReason() const {
+  if (Exported)
+    return Reason;
+  return None;
+}
+
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
@@ -2320,15 +2425,14 @@ class AvailabilityWalker : public ASTWalker {
   };
 
   ASTContext &Context;
-  DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  Optional<ExportabilityReason> ExportReason;
-  FragileFunctionKind FragileKind;
+  ExportContext Where;
 
   /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
   /// implicit.
   bool inSynthesizedInitRawValue() {
+    auto *DC = Where.getDeclContext();
     auto init = dyn_cast_or_null<ConstructorDecl>(
                     DC->getInnermostDeclarationDeclContext());
 
@@ -2340,11 +2444,8 @@ class AvailabilityWalker : public ASTWalker {
   }
 
 public:
-  AvailabilityWalker(DeclContext *DC,
-                     Optional<ExportabilityReason> ExportReason,
-                     FragileFunctionKind FragileKind)
-    : Context(DC->getASTContext()), DC(DC),
-      ExportReason(ExportReason), FragileKind(FragileKind) {}
+  AvailabilityWalker(ExportContext Where)
+    : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
@@ -2353,6 +2454,8 @@ public:
   bool shouldWalkIntoTapExpression() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    auto *DC = Where.getDeclContext();
+
     ExprStack.push_back(E);
 
     auto visitChildren = [&]() { return std::make_pair(true, E); };
@@ -2412,23 +2515,22 @@ public:
     if (auto T = dyn_cast<TypeExpr>(E)) {
       if (!T->isImplicit()) {
         diagnoseTypeAvailability(T->getTypeRepr(), T->getType(), E->getLoc(),
-                                 DC, ExportReason, FragileKind);
+                                 Where);
       }
     }
     if (auto CE = dyn_cast<ClosureExpr>(E)) {
       for (auto *param : *CE->getParameters()) {
         diagnoseTypeAvailability(param->getTypeRepr(), param->getInterfaceType(),
-                                 E->getLoc(), DC, ExportReason, FragileKind);
+                                 E->getLoc(), Where);
       }
       diagnoseTypeAvailability(CE->hasExplicitResultType()
                                ? CE->getExplicitResultTypeRepr()
                                : nullptr,
-                               CE->getResultType(), E->getLoc(), DC,
-                               ExportReason, FragileKind);
+                               CE->getResultType(), E->getLoc(), Where);
     }
     if (auto CE = dyn_cast<ExplicitCastExpr>(E)) {
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
-                               E->getLoc(), DC, ExportReason, FragileKind);
+                               E->getLoc(), Where);
     }
 
     return visitChildren();
@@ -2512,6 +2614,7 @@ private:
       return;
 
     // Diagnose for appropriate accessors, given the access context.
+    auto *DC = Where.getDeclContext();
     maybeDiagStorageAccess(D, E->getSourceRange(), DC);
   }
 
@@ -2644,23 +2747,24 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (FragileKind.kind != FragileFunctionKind::None) {
+  if (Where.getFragileFunctionKind().kind != FragileFunctionKind::None) {
     if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, D, DC, FragileKind))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, D, Where))
         return true;
-  } else if (ExportReason.hasValue()) {
+  } else if (Where.getExportabilityReason().hasValue()) {
     if (R.isValid())
-      if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, DC,
-                                                    ExportReason, FragileKind))
+      if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
         return true;
   }
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
-                                            DC, ExportReason, FragileKind)) {
+                                            Where)) {
       return true;
     }
   }
+
+  auto *DC = Where.getDeclContext();
 
   if (diagnoseExplicitUnavailability(D, R, DC, call, Flags))
     return true;
@@ -2738,6 +2842,7 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 
   // If the expression type is integer or floating point, then we can rewrite it
   // to "lvalue += 1".
+  auto *DC = Where.getDeclContext();
   std::string replacement;
   if (isIntegerOrFloatingPointType(call->getType(), DC, Context))
     replacement = isInc ? " += 1" : " -= 1";
@@ -2853,23 +2958,18 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 
 /// Diagnose uses of unavailable declarations.
 void swift::diagAvailability(const Expr *E, DeclContext *DC) {
-  Optional<ExportabilityReason> reason = None;
-  FragileFunctionKind fragileKind = DC->getFragileFunctionKind();
-  AvailabilityWalker walker(DC, reason, fragileKind);
+  AvailabilityWalker walker(ExportContext::forFunctionBody(DC));
   const_cast<Expr*>(E)->walk(walker);
 }
 
 namespace {
 
 class StmtAvailabilityWalker : public ASTWalker {
-  DeclContext *DC;
-  Optional<ExportabilityReason> ExportReason;
-  FragileFunctionKind FragileKind;
+  ExportContext Where;
 
 public:
-  explicit StmtAvailabilityWalker(DeclContext *DC) : DC(DC) {
-    FragileKind = DC->getFragileFunctionKind();
-  }
+  explicit StmtAvailabilityWalker(DeclContext *DC)
+    : Where(ExportContext::forFunctionBody(DC)) {}
 
   /// We'll visit the expression from performSyntacticExprDiagnostics().
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -2877,14 +2977,13 @@ public:
   }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
-    diagnoseTypeReprAvailability(T, DC, ExportReason, FragileKind);
+    diagnoseTypeReprAvailability(T, Where);
     return false;
   }
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
     if (auto *IP = dyn_cast<IsPattern>(P))
-      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), DC,
-                               ExportReason, FragileKind);
+      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), Where);
 
     return std::make_pair(true, P);
   }
@@ -2904,17 +3003,13 @@ void swift::diagAvailability(const Stmt *S, DeclContext *DC) {
 namespace {
 
 class TypeReprAvailabilityWalker : public ASTWalker {
-  DeclContext *DC;
-  Optional<ExportabilityReason> reason;
-  FragileFunctionKind fragileKind;
+  ExportContext where;
   DeclAvailabilityFlags flags;
 
   bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
-      if (diagnoseDeclAvailability(typeDecl, range, DC,
-                                   reason, fragileKind,
-                                   flags))
+      if (diagnoseDeclAvailability(typeDecl, range, where, flags))
         return true;
     }
 
@@ -2925,9 +3020,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
       genericFlags -= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
       for (auto *genericArg : GTR->getGenericArgs()) {
-        if (diagnoseTypeReprAvailability(genericArg, DC,
-                                         reason, fragileKind,
-                                         genericFlags))
+        if (diagnoseTypeReprAvailability(genericArg, where, genericFlags))
           foundAnyIssues = true;
       }
     }
@@ -2938,11 +3031,9 @@ class TypeReprAvailabilityWalker : public ASTWalker {
 public:
   bool foundAnyIssues = false;
 
-  TypeReprAvailabilityWalker(DeclContext *DC,
-                             Optional<ExportabilityReason> reason,
-                             FragileFunctionKind fragileKind,
+  TypeReprAvailabilityWalker(ExportContext where,
                              DeclAvailabilityFlags flags)
-      : DC(DC), reason(reason), fragileKind(fragileKind), flags(flags) {}
+      : where(where), flags(flags) {}
 
   bool walkToTypeReprPre(TypeRepr *T) override {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
@@ -2975,13 +3066,11 @@ public:
 
 }
 
-bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, DeclContext *DC,
-                                         Optional<ExportabilityReason> reason,
-                                         FragileFunctionKind fragileKind,
+bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, ExportContext where,
                                          DeclAvailabilityFlags flags) {
   if (!T)
     return false;
-  TypeReprAvailabilityWalker walker(DC, reason, fragileKind, flags);
+  TypeReprAvailabilityWalker walker(where, flags);
   const_cast<TypeRepr*>(T)->walk(walker);
   return walker.foundAnyIssues;
 }
@@ -2990,29 +3079,19 @@ namespace {
 
 class ProblematicTypeFinder : public TypeDeclFinder {
   SourceLoc Loc;
-  DeclContext *DC;
-  Optional<ExportabilityReason> ExportReason;
-  FragileFunctionKind FragileKind;
+  ExportContext Where;
   DeclAvailabilityFlags Flags;
 
 public:
-  ProblematicTypeFinder(SourceLoc Loc, DeclContext *DC,
-                        Optional<ExportabilityReason> ExportReason,
-                        FragileFunctionKind FragileKind,
+  ProblematicTypeFinder(SourceLoc Loc, ExportContext Where,
                         DeclAvailabilityFlags Flags)
-      : Loc(Loc), DC(DC),
-        ExportReason(ExportReason),
-        FragileKind(FragileKind),
-        Flags(Flags) {}
+      : Loc(Loc), Where(Where), Flags(Flags) {}
 
   void visitTypeDecl(TypeDecl *decl) {
     // We only need to diagnose exportability here. Availability was
     // already checked on the TypeRepr.
-    if (FragileKind.kind != FragileFunctionKind::None ||
-        ExportReason.hasValue()) {
-      TypeChecker::diagnoseDeclRefExportability(Loc, decl, DC,
-                                                ExportReason, FragileKind);
-    }
+    if (Where.mustOnlyReferenceExportedDecls())
+      TypeChecker::diagnoseDeclRefExportability(Loc, decl, Where);
   }
 
   Action visitNominalType(NominalType *ty) override {
@@ -3025,11 +3104,9 @@ public:
   Action visitBoundGenericType(BoundGenericType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    ModuleDecl *useModule = DC->getParentModule();
+    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
     auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, DC,
-                                               ExportReason,
-                                               FragileKind);
+    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 
@@ -3037,9 +3114,7 @@ public:
     visitTypeDecl(ty->getDecl());
 
     auto subs = ty->getSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, DC,
-                                               ExportReason,
-                                               FragileKind);
+    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 
@@ -3047,10 +3122,10 @@ public:
   // post-visitor so that we diagnose any unexportable component
   // types first.
   Action walkToTypePost(Type T) override {
-    if (FragileKind.kind != FragileFunctionKind::None ||
-        ExportReason.hasValue()) {
+    if (Where.mustOnlyReferenceExportedDecls()) {
       if (auto fnType = T->getAs<AnyFunctionType>()) {
         if (auto clangType = fnType->getClangTypeInfo().getType()) {
+          auto *DC = Where.getDeclContext();
           auto &ctx = DC->getASTContext();
           auto loader = ctx.getClangModuleLoader();
           // Serialization will serialize the sugared type if it can,
@@ -3069,58 +3144,47 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, DeclContext *DC,
-                                     Optional<ExportabilityReason> reason,
-                                     FragileFunctionKind fragileKind,
+void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, ExportContext where,
                                      DeclAvailabilityFlags flags) {
   if (!T)
     return;
-  T.walk(ProblematicTypeFinder(loc, DC, reason, fragileKind, flags));
+  T.walk(ProblematicTypeFinder(loc, where, flags));
 }
 
 void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
-                                     DeclContext *DC,
-                                     Optional<ExportabilityReason> reason,
-                                     FragileFunctionKind fragileKind,
+                                     ExportContext where,
                                      DeclAvailabilityFlags flags) {
-  if (diagnoseTypeReprAvailability(TR, DC, reason, fragileKind, flags))
+  if (diagnoseTypeReprAvailability(TR, where, flags))
     return;
-  diagnoseTypeAvailability(T, loc, DC, reason, fragileKind, flags);
+  diagnoseTypeAvailability(T, loc, where, flags);
 }
 
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
-                                       const DeclContext *DC,
-                                       Optional<ExportabilityReason> reason,
-                                       FragileFunctionKind fragileKind) {
+                                       ExportContext where) {
   if (!conformance.isConcrete())
     return false;
   const ProtocolConformance *concreteConf = conformance.getConcrete();
 
+  auto *DC = where.getDeclContext();
   SubstitutionMap subConformanceSubs =
       concreteConf->getSubstitutions(DC->getParentModule());
-  diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, DC,
-                                      reason, fragileKind);
-
+  diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where);
   const RootProtocolConformance *rootConf =
       concreteConf->getRootConformance();
 
   return TypeChecker::diagnoseConformanceExportability(
-      loc, rootConf, *DC->getParentSourceFile(), DC,
-      reason, fragileKind);
+      loc, rootConf, where);
 }
 
 bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
-                                           const DeclContext *DC,
-                                           Optional<ExportabilityReason> reason,
-                                           FragileFunctionKind fragileKind) {
+                                           ExportContext where) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
-    if (diagnoseConformanceAvailability(loc, conformance, DC,
-                                        reason, fragileKind))
+    if (diagnoseConformanceAvailability(loc, conformance, where))
       hadAnyIssues = true;
   }
   return hadAnyIssues;
@@ -3131,12 +3195,10 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
 /// TypeReprs.
 bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      SourceRange R,
-                                     DeclContext *DC,
-                                     Optional<ExportabilityReason> reason,
-                                     FragileFunctionKind fragileKind,
+                                     ExportContext Where,
                                      DeclAvailabilityFlags Flags)
 {
-  AvailabilityWalker AW(DC, reason, fragileKind);
+  AvailabilityWalker AW(Where);
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
