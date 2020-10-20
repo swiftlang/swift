@@ -34,6 +34,7 @@ namespace swift {
   class Type;
   class TypeRepr;
   class ValueDecl;
+
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
   /// Used when type-checking protocol conformances, since conforming to a
@@ -68,6 +69,29 @@ enum class ExportabilityReason : unsigned {
   ExtensionWithConditionalConformances
 };
 
+/// A description of the restrictions on what declarations can be referenced
+/// from a the signature or body of a declaration.
+///
+/// We say a declaration is "exported" if it is `public` or
+/// `@usableFromInline`, not `_@spi`, and not visible via an
+/// `@_implementationOnly` import.
+///
+/// The "signature" of a declaration is the set of all types written in the
+/// declaration (such as function parameter and return types), but not
+/// including the function body.
+///
+/// The signature of an exported declaration can only reference other
+/// exported types.
+///
+/// The body of an inlinable function can only reference other `public` and
+/// `@usableFromInline` declarations; furthermore, if the inlinable
+/// function is also exported, its body is restricted to referencing other
+/// exported declarations.
+///
+/// The ExportContext also stores if the location in the program is inside
+/// of a function or type body with deprecated or unavailable availability.
+/// This allows referencing other deprecated and unavailable declarations,
+/// without producing a warning or error, respectively.
 class ExportContext {
   DeclContext *DC;
   FragileFunctionKind FragileKind;
@@ -78,20 +102,54 @@ class ExportContext {
   ExportContext(DeclContext *DC, FragileFunctionKind kind, bool spi, bool exported);
 
 public:
+
+  /// Create an instance describing the types that can be referenced from the
+  /// given declaration's signature.
+  ///
+  /// If the declaration is exported, the resulting context is restricted to
+  /// referencing exported types only. Otherwise it can reference anything.
   static ExportContext forDeclSignature(Decl *D);
+
+  /// Create an instance describing the declarations that can be referenced
+  /// from the given function's body.
+  ///
+  /// If the function is inlinable, the resulting context is restricted to
+  /// referencing ABI-public declarations only. Furthermore, if the function
+  /// is exported, referenced declarations must also be exported. Otherwise
+  /// it can reference anything.
   static ExportContext forFunctionBody(DeclContext *DC);
 
+  /// Produce a new context with the same properties as this one, except
+  /// changing the ExportabilityReason. This only affects diagnostics.
   ExportContext forReason(ExportabilityReason reason) const;
+
+  /// Produce a new context with the same properties as this one, except
+  /// that if 'exported' is false, the resulting context can reference
+  /// declarations that are not exported. If 'exported' is true, the
+  /// resulting context is indentical to this one.
+  ///
+  /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext forExported(bool exported) const;
 
   DeclContext *getDeclContext() const { return DC; }
+
+  /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
+  /// If true, the context is SPI and can reference SPI declarations.
   bool isSPI() const { return SPI; }
+
+  /// If true, the context is exported and cannot reference SPI declarations
+  /// or declarations from `@_implementationOnly` imports.
   bool isExported() const { return Exported; }
 
+  /// If true, the context can only reference exported declarations, either
+  /// because it is the signature context of an exported declaration, or
+  /// because it is the function body context of an inlinable function.
   bool mustOnlyReferenceExportedDecls() const;
 
+  /// Get the ExportabilityReason for diagnostics. If this is 'None', there
+  /// are no restrictions on referencing unexported declarations.
   Optional<ExportabilityReason> getExportabilityReason() const;
 };
 
