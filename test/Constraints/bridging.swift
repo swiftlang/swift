@@ -208,7 +208,7 @@ let d2: Double = 3.14159
 inferDouble2 = d2
 
 // rdar://problem/18269449
-var i1: Int = 1.5 * 3.5 // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
+var i1: Int = 1.5 * 3.5 // Ok (Double -> CGFloat for each argument, CGFloat -> Int for the result)
 
 // rdar://problem/18330319
 func rdar18330319(_ s: String, d: [String : AnyObject]) {

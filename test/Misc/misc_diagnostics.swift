@@ -17,9 +17,9 @@ if let realRoomName = roomName as! NSString { // expected-warning{{forced cast f
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error@:21{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
+var dpi:CGFloat = d*pi // Ok (implicit conversion Float -> CGFloat)
 
-let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let ff: CGFloat = floorf(20.0) // Ok (implicit conversion Float -> CGFloat)
 
 let total = 15.0
 let count = 7
@@ -34,7 +34,7 @@ var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' t
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to specified type 'Double'}}
+var dd: Double = f1 - f2 // Ok (implicit conversion Float -> CGFloat for each argument and CGFloat -> Double for the result)
 
 func f() -> Bool {
   return 1 + 1 // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
