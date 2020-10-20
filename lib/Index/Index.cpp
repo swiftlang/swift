@@ -631,6 +631,22 @@ private:
     return true;
   }
 
+  // Are there members or conformances in \c D that should be indexed?
+  bool shouldIndexMembers(ExtensionDecl *D) {
+    for (auto Member : D->getMembers())
+      if (auto VD = dyn_cast<ValueDecl>(Member))
+        if (shouldIndex(VD, /*IsRef=*/false))
+          return true;
+
+    for (auto Inherit : D->getInherited())
+      if (auto T = Inherit.getType())
+        if (T->getAnyNominal() &&
+            shouldIndex(T->getAnyNominal(), /*IsRef=*/false))
+          return true;
+
+    return false;
+  }
+
   /// Reports all implicit member value decl conformances that \p D introduces
   /// as implicit overrides at the source location of \p D, and returns the
   /// explicit ones so we can check against them later on when visiting them as
@@ -1066,6 +1082,10 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!NTD)
     return true;
   if (!shouldIndex(NTD, /*IsRef=*/false))
+    return true;
+
+  // Don't index "empty" extensions in imported modules.
+  if (IsModuleFile && !shouldIndexMembers(D))
     return true;
 
   IndexSymbol Info;

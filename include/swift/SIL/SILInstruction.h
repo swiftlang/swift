@@ -514,6 +514,10 @@ public:
            "Operand does not belong to a SILInstruction");
     return isTypeDependentOperand(Op.getOperandNumber());
   }
+      
+  /// Returns true if evaluation of this instruction may cause suspension of an
+  /// async task.
+  bool maySuspend() const;
 
 private:
   /// Predicate used to filter OperandValueRange.
@@ -3039,12 +3043,34 @@ public:
   }
 };
 
-/// Accesses the continuation for an async task, to prepare a primitive suspend operation.
+/// Base class for instructions that access the continuation of an async task,
+/// in order to set up a suspension.
 /// The continuation must be consumed by an AwaitAsyncContinuation instruction locally,
 /// and must dynamically be resumed exactly once during the program's ensuing execution.
+class GetAsyncContinuationInstBase
+    : public SingleValueInstruction
+{
+protected:
+  using SingleValueInstruction::SingleValueInstruction;
+  
+public:
+  /// Get the type of the value the async task receives on a resume.
+  CanType getFormalResumeType() const;
+  SILType getLoweredResumeType() const;
+  
+  /// True if the continuation can be used to resume the task by throwing an error.
+  bool throws() const;
+  
+  static bool classof(const SILNode *I) {
+    return I->getKind() >= SILNodeKind::First_GetAsyncContinuationInstBase &&
+           I->getKind() <= SILNodeKind::Last_GetAsyncContinuationInstBase;
+  }
+};
+
+/// Accesses the continuation for an async task, to prepare a primitive suspend operation.
 class GetAsyncContinuationInst final
     : public InstructionBase<SILInstructionKind::GetAsyncContinuationInst,
-                             SingleValueInstruction>
+                             GetAsyncContinuationInstBase>
 {
   friend SILBuilder;
   
@@ -3054,14 +3080,6 @@ class GetAsyncContinuationInst final
   {}
   
 public:
-  
-  /// Get the type of the value the async task receives on a resume.
-  CanType getFormalResumeType() const;
-  SILType getLoweredResumeType() const;
-  
-  /// True if the continuation can be used to resume the task by throwing an error.
-  bool throws() const;
-  
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
@@ -3074,7 +3092,7 @@ public:
 /// buffer that receives the incoming value when the continuation is resumed.
 class GetAsyncContinuationAddrInst final
     : public UnaryInstructionBase<SILInstructionKind::GetAsyncContinuationAddrInst,
-                                  SingleValueInstruction>
+                                  GetAsyncContinuationInstBase>
 {
   friend SILBuilder;
   GetAsyncContinuationAddrInst(SILDebugLocation Loc,
@@ -3082,15 +3100,6 @@ class GetAsyncContinuationAddrInst final
                                SILType ContinuationTy)
     : UnaryInstructionBase(Loc, Operand, ContinuationTy)
   {}
-  
-public:
-  
-  /// Get the type of the value the async task receives on a resume.
-  CanType getFormalResumeType() const;
-  SILType getLoweredResumeType() const;
-  
-  /// True if the continuation can be used to resume the task by throwing an error.
-  bool throws() const;
 };
 
 /// Instantiates a key path object.
@@ -5822,13 +5831,11 @@ public:
 ///                object, including properties declared in a superclass.
 unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
 
-/// Get the property for a struct or class by its unique index.
+/// Get the property for a struct or class by its unique index, or nullptr if
+/// the index does not match a property declared in this struct or class or
+/// one its superclasses.
 ///
 /// Precondition: \p decl must be a non-resilient struct or class.
-///
-/// Precondition: \p index must be the index of a stored property
-///               (as returned by getFieldIndex()) which is declared
-///               in \p decl, not in a superclass.
 VarDecl *getIndexedField(NominalTypeDecl *decl, unsigned index);
 
 /// A common base for instructions that require a cached field index.

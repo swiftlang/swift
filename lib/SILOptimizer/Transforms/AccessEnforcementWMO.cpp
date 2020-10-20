@@ -67,22 +67,21 @@ using llvm::DenseMap;
 using llvm::SmallDenseSet;
 
 // Get the VarDecl that represents the DisjointAccessLocation for the given
-// AccessedStorage. Returns nullptr for any storage that can't be partitioned
-// into a disjoint location.
+// storage and access base. Returns nullptr for any storage that can't be
+// partitioned into a disjoint location.
 //
-// identifyFormalAccess may only return Unidentified storage for a global
-// variable access if the global is defined in a different module.
-//
-// WARNING: Retrieving VarDecl for Class access is not constant time.
-const VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
+// Global storage is expected to be disjoint because identifyFormalAccess may
+// only return Unidentified storage for a global variable access if the global
+// is defined in a different module.
+const VarDecl *
+getDisjointAccessLocation(AccessedStorageWithBase storageAndBase) {
+  auto storage = storageAndBase.storage;
   switch (storage.getKind()) {
   case AccessedStorage::Global:
-    // A global variable may return a null decl. These variables are
-    // implementation details that aren't formally accessed.
-    return storage.getGlobal()->getDecl();
-  case AccessedStorage::Class: {
-    return cast<VarDecl>(storage.getDecl());
-  }
+  case AccessedStorage::Class:
+    // Class and Globals are always a VarDecl, but the global decl may have a
+    // null value for global_addr -> phi.
+    return cast_or_null<VarDecl>(storage.getDecl(storageAndBase.base));
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
   case AccessedStorage::Tail:
@@ -169,15 +168,17 @@ void GlobalAccessRemoval::perform() {
 
 void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storage);
-    recordAccess(BAI, decl, storage.getKind(), BAI->hasNoNestedConflict());
+    auto storageAndBase = AccessedStorageWithBase::compute(BAI->getSource());
+    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BAI, decl, storageAndBase.storage.getKind(),
+                 BAI->hasNoNestedConflict());
     return;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
-    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
-    const VarDecl *decl = getDisjointAccessLocation(storage);
-    recordAccess(BUAI, decl, storage.getKind(), BUAI->hasNoNestedConflict());
+    auto storageAndBase = AccessedStorageWithBase::compute(BUAI->getSource());
+    const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
+    recordAccess(BUAI, decl, storageAndBase.storage.getKind(),
+                 BUAI->hasNoNestedConflict());
     return;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(I)) {
