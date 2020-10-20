@@ -152,12 +152,8 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 
   auto downgradeToWarning = DowngradeToWarning::No;
 
-  auto *DC = where.getDeclContext();
   auto originKind = getDisallowedOriginKind(
-      D,
-      *DC->getParentSourceFile(),
-      DC->getInnermostDeclarationDeclContext(),
-      downgradeToWarning);
+      D, where, downgradeToWarning);
   if (originKind == DisallowedOriginKind::None)
     return false;
 
@@ -195,11 +191,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
-  auto *DC = where.getDeclContext();
   auto originKind = getDisallowedOriginKind(
       rootConf->getDeclContext()->getAsDecl(),
-      *DC->getParentSourceFile(),
-      DC->getInnermostDeclarationDeclContext());
+      where);
   if (originKind == DisallowedOriginKind::None)
     return false;
 

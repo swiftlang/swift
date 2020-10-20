@@ -4337,9 +4337,11 @@ static void checkExportability(Type depTy, Type replacementTy,
       conformance->getRootConformance();
   ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
 
+  auto where = ExportContext::forDeclSignature(
+      DC->getInnermostDeclarationDeclContext());
   auto originKind = getDisallowedOriginKind(
       rootConformance->getDeclContext()->getAsDecl(),
-      *SF, DC->getAsDecl());
+      where);
   if (originKind == DisallowedOriginKind::None)
     return;
 

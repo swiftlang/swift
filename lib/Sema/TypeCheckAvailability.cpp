@@ -98,7 +98,19 @@ bool swift::isExported(const Decl *D) {
 ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
+
   bool spi = D->isSPI();
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i)) {
+        if (VD->isSPI()) {
+          spi = true;
+          break;
+        }
+      }
+    }
+  }
+
   bool exported = ::isExported(D);
 
   return ExportContext(DC, fragileKind, spi, exported);

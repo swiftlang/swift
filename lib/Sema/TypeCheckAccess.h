@@ -22,6 +22,7 @@
 namespace swift {
 
 class Decl;
+class ExportContext;
 class SourceFile;
 
 /// Performs access-related checks for \p D.
@@ -55,12 +56,10 @@ enum class DowngradeToWarning: bool {
 /// Returns the kind of origin, implementation-only import or SPI declaration,
 /// that restricts exporting \p decl from the given file and context.
 DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
-                                             const SourceFile &userSF,
-                                             const Decl *userContext);
+                                             ExportContext where);
 
 DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
-                                             const SourceFile &userSF,
-                                             const Decl *userContext,
+                                             ExportContext where,
                                              DowngradeToWarning &downgradeToWarning);
 
 } // end namespace swift

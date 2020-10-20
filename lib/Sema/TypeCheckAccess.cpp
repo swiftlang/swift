@@ -1460,22 +1460,22 @@ public:
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
 swift::getDisallowedOriginKind(const Decl *decl,
-                               const SourceFile &userSF,
-                               const Decl *userContext,
+                               ExportContext where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
-  if (userSF.isImportedImplementationOnly(M)) {
+  auto *SF = where.getDeclContext()->getParentSourceFile();
+  if (SF->isImportedImplementationOnly(M)) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (userContext->isSPI())
+    if (where.isSPI())
       downgradeToWarning = DowngradeToWarning::Yes;
 
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
-  } else if (decl->isSPI() && !userContext->isSPI()) {
+  } else if (decl->isSPI() && !where.isSPI()) {
     // SPI can only be exported in SPI.
-    return userContext->getModuleContext() == M ?
+    return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :
       DisallowedOriginKind::SPIImported;
   }
@@ -1842,10 +1842,9 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
 }
 
 DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
-                                                    const SourceFile &userSF,
-                                                    const Decl *declContext) {
+                                                    ExportContext where) {
   auto downgradeToWarning = DowngradeToWarning::No;
-  return getDisallowedOriginKind(decl, userSF, declContext, downgradeToWarning);
+  return getDisallowedOriginKind(decl, where, downgradeToWarning);
 }
 
 void swift::checkAccessControl(Decl *D) {
