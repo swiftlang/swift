@@ -8,16 +8,16 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 
 case $(uname -s) in
   Darwin)
-    OS_SUFFIX=macos-x86_64
+    OS_SUFFIX=macos_x86_64
     HOST_PRESET=webassembly-host-install
     TARGET_PRESET=webassembly-macos-target-install
     HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
     if [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=18.04" ]; then
-      OS_SUFFIX=ubuntu18.04-x86_64
+      OS_SUFFIX=ubuntu18.04_x86_64
     elif [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=20.04" ]; then
-      OS_SUFFIX=ubuntu20.04-x86_64
+      OS_SUFFIX=ubuntu20.04_x86_64
     else
       echo "Unknown Ubuntu version"
       exit 1

@@ -175,7 +175,7 @@ unzip ubuntu18.04-installable.zip
 unzip ubuntu20.04-installable.zip
 unzip macos-installable.zip
 
-toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04-x86_64.tar.gz | head -n1))
+toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz | head -n1))
 
 if is_released $toolchain_name; then
   echo "Latest toolchain $toolchain_name has been already released"
@@ -183,15 +183,15 @@ if is_released $toolchain_name; then
 fi
 
 
-mv swift-wasm-$channel-SNAPSHOT-ubuntu18.04-x86_64.tar.gz "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
-mv swift-wasm-$channel-SNAPSHOT-ubuntu20.04-x86_64.tar.gz "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
-package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos-x86_64.tar.gz" "$toolchain_name-macos-x86_64.pkg"
+mv swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz "$toolchain_name-ubuntu18.04_x86_64.tar.gz"
+mv swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz "$toolchain_name-ubuntu20.04_x86_64.tar.gz"
+package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz" "$toolchain_name-macos_x86_64.pkg"
 
 create_tag $toolchain_name $head_sha
 release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
 
-upload_tarball $release_id "$toolchain_name-ubuntu18.04-x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-ubuntu20.04-x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-macos-x86_64.pkg"
+upload_tarball $release_id "$toolchain_name-ubuntu18.04_x86_64.tar.gz"
+upload_tarball $release_id "$toolchain_name-ubuntu20.04_x86_64.tar.gz"
+upload_tarball $release_id "$toolchain_name-macos_x86_64.pkg"
 
 popd
