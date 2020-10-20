@@ -9,15 +9,17 @@ jobs:
       - uses: actions/checkout@v1
       - name: Setup keychain
         run: |
-          echo "$DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64" | base64 --decode -o developerID_application.cer
-          security import developerID_application.cer
-          echo "$DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64" | base64 --decode -o developerID_installer.cer
-          security import developerID_installer.cer
+          echo "$DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64" | base64 --decode -o developerID_application.p12
+          security import developerID_application.p12 -P "$DARWIN_TOOLCHAIN_APPLICATION_CERT_PASSWORD"
+          echo "$DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64" | base64 --decode -o developerID_installer.p12
+          security import developerID_installer.p12 -P "$DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD"
         env:
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64 }}
+          DARWIN_TOOLCHAIN_APPLICATION_CERT_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT_PASSWORD }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64 }}
+          DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD }}
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm DEVELOPMENT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
