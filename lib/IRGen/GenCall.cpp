@@ -143,29 +143,6 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   if (hasLocalContextParameter) {
     parameters = parameters.drop_back();
   }
-  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
-  if (hasLocalContext) {
-    if (hasLocalContextParameter) {
-      SILType ty =
-          IGF.IGM.silConv.getSILType(localContextParameter, substitutedType,
-                                     IGF.IGM.getMaximalTypeExpansionContext());
-      auto argumentLoweringType =
-          getArgumentLoweringType(ty.getASTType(), localContextParameter,
-                                  /*isNoEscape*/ true);
-
-      auto &ti = IGF.getTypeInfoForLowered(argumentLoweringType);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, localContextParameter.getConvention()};
-    } else {
-      // TODO: DETERMINE: Is there a field in this case to match the sync ABI?
-      auto &ti = IGF.IGM.getNativeObjectTypeInfo();
-      SILType ty = SILType::getNativeObjectType(IGF.IGM.Context);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, substitutedType->getCalleeConvention()};
-    }
-  }
 
   //   ArgTypes formalArguments...;
   for (auto parameter : parameters) {
@@ -191,6 +168,31 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     valTypes.push_back(SILType());
     typeInfos.push_back(&bindingsTI);
   }
+
+  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
+  if (hasLocalContext) {
+    if (hasLocalContextParameter) {
+      SILType ty =
+          IGF.IGM.silConv.getSILType(localContextParameter, substitutedType,
+                                     IGF.IGM.getMaximalTypeExpansionContext());
+      auto argumentLoweringType =
+          getArgumentLoweringType(ty.getASTType(), localContextParameter,
+                                  /*isNoEscape*/ true);
+
+      auto &ti = IGF.getTypeInfoForLowered(argumentLoweringType);
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      localContextInfo = {ty, localContextParameter.getConvention()};
+    } else {
+      // TODO: DETERMINE: Is there a field in this case to match the sync ABI?
+      auto &ti = IGF.IGM.getNativeObjectTypeInfo();
+      SILType ty = SILType::getNativeObjectType(IGF.IGM.Context);
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      localContextInfo = {ty, substitutedType->getCalleeConvention()};
+    }
+  }
+
 
   Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
   if (originalType->getRepresentation() ==

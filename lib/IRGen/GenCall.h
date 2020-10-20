@@ -83,6 +83,8 @@ namespace irgen {
   //     };
   //     ResultTypes directResults...;
   //   };
+  //   ArgTypes formalArguments...;
+  //   SelfType self?;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -124,14 +126,7 @@ namespace irgen {
     unsigned getIndexAfterDirectReturns() {
       return getFirstDirectReturnIndex() + getDirectReturnCount();
     }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
-      return getIndexAfterDirectReturns();
-    }
-    unsigned getIndexAfterLocalContext() {
-      return getIndexAfterDirectReturns() + (hasLocalContext() ? 1 : 0);
-    }
-    unsigned getFirstArgumentIndex() { return getIndexAfterLocalContext(); }
+    unsigned getFirstArgumentIndex() { return getIndexAfterDirectReturns(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
@@ -142,16 +137,24 @@ namespace irgen {
     unsigned getIndexAfterBindings() {
       return getIndexAfterArguments() + (hasBindings() ? 1 : 0);
     }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getIndexAfterBindings();
+    }
+    unsigned getIndexAfterLocalContext() {
+      return getIndexAfterBindings() +
+             (hasLocalContext() ? 1 : 0);
+    }
     unsigned getSelfMetadataIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterBindings();
+      return getIndexAfterLocalContext();
     }
     unsigned getSelfWitnessTableIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterBindings() + 1;
+      return getIndexAfterLocalContext() + 1;
     }
     unsigned getIndexAfterTrailingWitnesses() {
-      return getIndexAfterBindings() + (hasTrailingWitnesses() ? 2 : 0);
+      return getIndexAfterLocalContext() + (hasTrailingWitnesses() ? 2 : 0);
     }
 
   public:
