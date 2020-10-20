@@ -6711,6 +6711,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // not instance properties or static members -- the metatype value itself
         // doesn't give us a witness so there's no static method to bind.
         hasInstanceMethods = true;
+        hasStaticMembers = true;
       } else {
         // Metatypes of nominal types and archetypes have instance methods and
         // static members, but not instance properties.

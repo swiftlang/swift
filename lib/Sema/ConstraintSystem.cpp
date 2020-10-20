@@ -1453,19 +1453,25 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
-  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+  Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
   // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->is<ModuleType>()) {
+  if (resolvedBaseTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefKind, locator, useDC);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
-  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseObjTy, value);
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(resolvedBaseTy, value);
 
-  baseObjTy = baseObjTy->getMetatypeInstanceType();
+  auto baseObjTy = resolvedBaseTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
+
+  // Indicates whether this is a reference to a static member on a protocol
+  // metatype e.g. existential metatype.
+  bool isStaticMemberRefOnProtocol = resolvedBaseTy->is<MetatypeType>() &&
+                                     baseObjTy->isExistentialType() &&
+                                     value->isStatic();
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
@@ -1569,10 +1575,28 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If we are looking at a member of an existential, open the existential.
   Type baseOpenedTy = baseObjTy;
-  if (baseObjTy->isExistentialType()) {
+
+  if (isStaticMemberRefOnProtocol) {
+    auto refTy = openedType->castTo<FunctionType>();
+    switch (functionRefKind) {
+    // Either variable or use of method as a value
+    case FunctionRefKind::Unapplied:
+    case FunctionRefKind::SingleApply:
+    case FunctionRefKind::Compound: {
+      baseOpenedTy =
+          isa<AbstractFunctionDecl>(value)
+              ? refTy->getResult()->castTo<FunctionType>()->getResult()
+              : refTy->getResult();
+      break;
+    }
+
+    case FunctionRefKind::DoubleApply:
+      llvm_unreachable("not implemented yet");
+    }
+  } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
-    OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
-                                       openedArchetype });
+    OpenedExistentialTypes.push_back(
+        {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
   }
 
@@ -1582,11 +1606,18 @@ ConstraintSystem::getTypeOfMemberReference(
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getSelfProtocolDecl()) {
-    // For a protocol, substitute the base object directly. We don't need a
-    // conformance constraint because we wouldn't have found the declaration
-    // if it didn't conform.
-    addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
-                  getConstraintLocator(locator));
+    if (isStaticMemberRefOnProtocol) {
+      // If this is a static member reference on a protocol metatype
+      // we need to make sure that base type, we yet to infer from a
+      // result type of the member, does indeed conform to `Self`.
+      addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
+    } else {
+      // For a protocol, substitute the base object directly. We don't need a
+      // conformance constraint because we wouldn't have found the declaration
+      // if it didn't conform.
+      addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
+                    getConstraintLocator(locator));
+    }
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
   }
