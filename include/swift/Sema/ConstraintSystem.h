@@ -66,6 +66,12 @@ class SolutionApplicationTarget;
 
 } // end namespace constraints
 
+namespace unittest {
+
+class SemaTest;
+
+} // end namespace unittest
+
 // Forward declare some TypeChecker related functions
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
@@ -2017,6 +2023,8 @@ enum class SolutionApplicationToFunctionResult {
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
   ASTContext &Context;
+
+  friend class swift::unittest::SemaTest;
 
 public:
   DeclContext *DC;
@@ -4705,7 +4713,11 @@ private:
     SmallVector<PotentialBinding, 4> Bindings;
 
     /// The set of protocol requirements placed on this type variable.
-    llvm::TinyPtrVector<Constraint *> Protocols;
+    llvm::SmallVector<Constraint *, 4> Protocols;
+
+    /// The set of transitive protocol requirements inferred through
+    /// subtype/conversion/equivalence relations with other type variables.
+    Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
     /// The set of constraints which would be used to infer default types.
     llvm::TinyPtrVector<Constraint *> Defaults;
@@ -4740,15 +4752,13 @@ private:
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
-    /// A set of all constraints which contribute to pontential bindings.
-    llvm::SmallPtrSet<Constraint *, 8> Sources;
-
     /// A set of all not-yet-resolved type variables this type variable
-    /// is a subtype of. This is used to determine ordering inside a
-    /// chain of subtypes because binding inference algorithm can't,
-    /// at the moment, determine bindings transitively through supertype
-    /// type variables.
-    llvm::SmallPtrSet<TypeVariableType *, 4> SubtypeOf;
+    /// is a subtype of, supertype of or is equivalent to. This is used
+    /// to determine ordering inside of a chain of subtypes to help infer
+    /// transitive bindings  and protocol requirements.
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SubtypeOf;
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
+    llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
 
     PotentialBindings(TypeVariableType *typeVar)
         : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
@@ -4793,10 +4803,10 @@ private:
       // This is required because algorithm can't currently infer
       // bindings for subtype transitively through superclass ones.
       if (!(x.IsHole && y.IsHole)) {
-        if (x.SubtypeOf.count(y.TypeVar))
+        if (x.isSubtypeOf(y.TypeVar))
           return false;
 
-        if (y.SubtypeOf.count(x.TypeVar))
+        if (y.isSubtypeOf(x.TypeVar))
           return true;
       }
 
@@ -4842,6 +4852,15 @@ private:
       return false;
     }
 
+    bool isSubtypeOf(TypeVariableType *typeVar) const {
+      auto result = SubtypeOf.find(typeVar);
+      if (result == SubtypeOf.end())
+        return false;
+
+      auto *constraint = result->second;
+      return constraint->getKind() == ConstraintKind::Subtype;
+    }
+
     /// Check if this binding is favored over a disjunction e.g.
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
@@ -4865,6 +4884,15 @@ private:
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
+    /// Detect subtype, conversion or equivalence relationship
+    /// between two type variables and attempt to propagate protocol
+    /// requirements down the subtype or equivalence chain.
+    void inferTransitiveProtocolRequirements(
+        const ConstraintSystem &cs,
+        llvm::SmallDenseMap<TypeVariableType *,
+                            ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
     /// Infer bindings based on any protocol conformances that have default
     /// types.
     void inferDefaultTypes(ConstraintSystem &cs,
@@ -4878,8 +4906,8 @@ public:
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
     void finalize(ConstraintSystem &cs,
-                  const llvm::SmallDenseMap<TypeVariableType *,
-                                            ConstraintSystem::PotentialBindings>
+                  llvm::SmallDenseMap<TypeVariableType *,
+                                      ConstraintSystem::PotentialBindings>
                       &inferredBindings);
 
     void dump(llvm::raw_ostream &out,
@@ -5379,7 +5407,10 @@ public:
   /// indices.
   ///
   /// \param paramIdx The index of the parameter that is missing an argument.
-  virtual Optional<unsigned> missingArgument(unsigned paramIdx);
+  /// \param argInsertIdx The index in the argument list where this argument was
+  /// expected.
+  virtual Optional<unsigned> missingArgument(unsigned paramIdx,
+                                             unsigned argInsertIdx);
 
   /// Indicate that there was no label given when one was expected by parameter.
   ///

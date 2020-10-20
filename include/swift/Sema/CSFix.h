@@ -1178,18 +1178,21 @@ public:
                                                 ConstraintLocator *locator);
 };
 
+struct SynthesizedArg {
+  unsigned paramIdx;
+  AnyFunctionType::Param param;
+};
+
 class AddMissingArguments final
     : public ConstraintFix,
       private llvm::TrailingObjects<
-          AddMissingArguments, std::pair<unsigned, AnyFunctionType::Param>> {
+          AddMissingArguments, SynthesizedArg> {
   friend TrailingObjects;
-
-  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
 
   unsigned NumSynthesized;
 
   AddMissingArguments(ConstraintSystem &cs,
-                      ArrayRef<SynthesizedParam> synthesizedArgs,
+                      ArrayRef<SynthesizedArg> synthesizedArgs,
                       ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddMissingArguments, locator),
         NumSynthesized(synthesizedArgs.size()) {
@@ -1200,8 +1203,8 @@ class AddMissingArguments final
 public:
   std::string getName() const override { return "synthesize missing argument(s)"; }
 
-  ArrayRef<SynthesizedParam> getSynthesizedArguments() const {
-    return {getTrailingObjects<SynthesizedParam>(), NumSynthesized};
+  ArrayRef<SynthesizedArg> getSynthesizedArguments() const {
+    return {getTrailingObjects<SynthesizedArg>(), NumSynthesized};
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -1211,12 +1214,16 @@ public:
   }
 
   static AddMissingArguments *create(ConstraintSystem &cs,
-                                     ArrayRef<SynthesizedParam> synthesizedArgs,
+                                     ArrayRef<SynthesizedArg> synthesizedArgs,
                                      ConstraintLocator *locator);
 
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AddMissingArguments;
+  }
+
 private:
-  MutableArrayRef<SynthesizedParam> getSynthesizedArgumentsBuf() {
-    return {getTrailingObjects<SynthesizedParam>(), NumSynthesized};
+  MutableArrayRef<SynthesizedArg> getSynthesizedArgumentsBuf() {
+    return {getTrailingObjects<SynthesizedArg>(), NumSynthesized};
   }
 };
 

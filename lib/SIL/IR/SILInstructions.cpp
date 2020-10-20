@@ -1345,15 +1345,23 @@ unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
 
 /// Get the property for a struct or class by its unique index.
 VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
-    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
-         superDecl = superDecl->getSuperclassDecl()) {
-      assert(index >= superDecl->getStoredProperties().size()
-             && "field index cannot refer to a superclass field");
-      index -= superDecl->getStoredProperties().size();
-    }
+  if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
+    return structDecl->getStoredProperties()[index];
   }
-  return decl->getStoredProperties()[index];
+  auto *classDecl = cast<ClassDecl>(decl);
+  SmallVector<ClassDecl *, 3> superclasses;
+  for (auto *superDecl = classDecl; superDecl != nullptr;
+       superDecl = superDecl->getSuperclassDecl()) {
+    superclasses.push_back(superDecl);
+  }
+  std::reverse(superclasses.begin(), superclasses.end());
+  for (auto *superDecl : superclasses) {
+    if (index < superDecl->getStoredProperties().size()) {
+      return superDecl->getStoredProperties()[index];
+    }
+    index -= superDecl->getStoredProperties().size();
+  }
+  return nullptr;
 }
 
 unsigned FieldIndexCacheBase::cacheFieldIndex() {
@@ -2923,12 +2931,12 @@ DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-CanType GetAsyncContinuationInst::getFormalResumeType() const {
+CanType GetAsyncContinuationInstBase::getFormalResumeType() const {
   // The resume type is the type argument to the continuation type.
   return getType().castTo<BoundGenericType>().getGenericArgs()[0];
 }
 
-SILType GetAsyncContinuationInst::getLoweredResumeType() const {
+SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   // The lowered resume type is the maximally-abstracted lowering of the
   // formal resume type.
   auto formalType = getFormalResumeType();
@@ -2937,29 +2945,8 @@ SILType GetAsyncContinuationInst::getLoweredResumeType() const {
   return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
 }
 
-bool GetAsyncContinuationInst::throws() const {
+bool GetAsyncContinuationInstBase::throws() const {
   // The continuation throws if it's an UnsafeThrowingContinuation
   return getType().castTo<BoundGenericType>()->getDecl()
     == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
 }
-
-CanType GetAsyncContinuationAddrInst::getFormalResumeType() const {
-  // The resume type is the type argument to the continuation type.
-  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
-}
-
-SILType GetAsyncContinuationAddrInst::getLoweredResumeType() const {
-  // The lowered resume type is the maximally-abstracted lowering of the
-  // formal resume type.
-  auto formalType = getFormalResumeType();
-  auto &M = getFunction()->getModule();
-  auto c = getFunction()->getTypeExpansionContext();
-  return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
-}
-
-bool GetAsyncContinuationAddrInst::throws() const {
-  // The continuation throws if it's an UnsafeThrowingContinuation
-  return getType().castTo<BoundGenericType>()->getDecl()
-    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
-}
-

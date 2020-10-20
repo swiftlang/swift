@@ -6,6 +6,16 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=NOCALLBACK_FALLBACK | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FALLBACK | %FileCheck %s --check-prefix=MULTICLOSURE_FALLBACK
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNAMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=UNAMBIGUOUSCLOSURE_ARG
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG_RETURN | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG_RETURN
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_FOO | %FileCheck %s --check-prefix=OVERLOADEDFUNC_FOO
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_BAR | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGLABEL | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BOTH
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGARG_AFTER | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BOTH
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDMEMBER_MISSINGARG_AFTER | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BOTH
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGARG_BEFORE | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGARG_BEFOREANDAFTER | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=ERROR_IN_BASE | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=GENERIC_MISSINGARG | %FileCheck %s --check-prefix=NORESULTS
@@ -69,7 +79,6 @@ switch undefined {
     break
 }
 
-
 func takesClosureA(_ arg: (A) -> ()) {}
 func takesClosureB(_ arg: (B) -> ()) {}
 
@@ -84,6 +93,108 @@ takesClosureA { arg in
 // MULTICLOSURE_FALLBACK-DAG: Keyword[self]/CurrNominal:        self[#B#]{{; name=.+$}}
 // MULTICLOSURE_FALLBACK-DAG: Decl[InstanceMethod]/CurrNominal: doBThings()[#Void#]{{; name=.+$}}
 // MULTICLOSURE_FALLBACK: End completions
+
+func takesAnonClosure(_ x: (A) -> A) { return A() }
+func takesAnonClosure(_ x: (B, A) -> B { return B() }
+func takesAnonClosure(_ x: () -> (A, B) { return (A(), B()) }
+
+struct TestRelations {
+  static let a = A()
+  static let b = B()
+  static let ab = (A(), B())
+}
+
+// test we consider both overloads as $0 or $1 may have just not been written yet
+takesAnonClosure { $1.#^UNAMBIGUOUSCLOSURE_ARG^# }
+// UNAMBIGUOUSCLOSURE_ARG: Begin completions, 2 items
+// UNAMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#A#]{{; name=.+$}}
+// UNAMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: doAThings()[#A#]{{; name=.+$}}
+// UNAMBIGUOUSCLOSURE_ARG: End completions
+
+takesAnonClosure { $0.#^AMBIGUOUSCLOSURE_ARG^# }
+// AMBIGUOUSCLOSURE_ARG: Begin completions, 4 items
+// AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#A#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: doAThings()[#A#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#B#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: doBThings()[#Void#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG: End completions
+
+takesAnonClosure { TestRelations.#^AMBIGUOUSCLOSURE_ARG_RETURN^# }
+// AMBIGUOUSCLOSURE_ARG_RETURN: Begin completions, 6 items
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: a[#A#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: b[#B#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG_RETURN: End completions
+
+
+func testMissingArgs() {
+  enum Foo { case foo }
+  enum Bar { case bar }
+
+  struct Test {
+    static let foo = Foo.foo
+    static let bar = Bar.bar
+  }
+
+  func test(foo: Foo) {}
+  func test(bar: Bar) {}
+
+  func test2(first: Bar, second: Int) {}
+  func test2(first: Foo) {}
+
+  func test3(skipMe: Int, after: Foo) {}
+  func test3(after: Bar) {}
+
+  func test4(skipMe: Int, both: Foo, skipMeToo: Int) {}
+  func test4(both: Bar, skipMeTo: Int) {}
+
+
+  test(foo: Test.#^OVERLOADEDFUNC_FOO^#)
+  // OVERLOADEDFUNC_FOO: Begin completions, 5 items
+  // OVERLOADEDFUNC_FOO-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: foo[#Foo#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO-DAG: Decl[StaticVar]/CurrNominal: bar[#Bar#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
+  // OVERLOADEDFUNC_FOO: End completions
+
+  test(bar: Test.#^OVERLOADEDFUNC_BAR^#)
+  // OVERLOADEDFUNC_BAR: Begin completions, 5 items
+  // OVERLOADEDFUNC_BAR-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR-DAG: Decl[StaticVar]/CurrNominal: foo[#Foo#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: bar[#Bar#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BAR: End completions
+
+  test(Test.#^OVERLOADEDFUNC_MISSINGLABEL^#, extraArg: 2)
+  test2(first: Test.#^OVERLOADEDFUNC_MISSINGARG_AFTER^#)
+
+  // Also check ambiguous member functions
+  struct TestStruct {
+    func test2(first: Bar, second: Int) {}
+    func test2(first: Foo) {}
+  }
+
+  TestStruct().test2(first: Test.#^OVERLOADEDMEMBER_MISSINGARG_AFTER^#)
+
+  // TODO: Should we insert the missing label in the completion text for OVERLOADEDFUNC_MISSINGLABEL?
+  // OVERLOADEDFUNC_BOTH: Begin completions, 5 items
+  // OVERLOADEDFUNC_BOTH-DAG: Keyword[self]/CurrNominal: self[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Keyword/CurrNominal: Type[#Test.Type#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: foo[#Foo#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: bar[#Bar#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH-DAG: Decl[Constructor]/CurrNominal: init()[#Test#]{{; name=.+$}}
+  // OVERLOADEDFUNC_BOTH: End completions
+
+  test3(after: Test.#^OVERLOADEDFUNC_MISSINGARG_BEFORE^#);
+  test4(both: Test.#^OVERLOADEDFUNC_MISSINGARG_BEFOREANDAFTER^#)
+}
+
+
 
 protocol C {
   associatedtype Element
