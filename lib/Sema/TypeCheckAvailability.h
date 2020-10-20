@@ -49,13 +49,9 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// is inout and both the getter and setter must be available.
   ForInout = 1 << 2,
 
-  /// Do not diagnose uses of declarations in versions before they were
-  /// introduced. Used to work around availability-checker bugs.
-  AllowPotentiallyUnavailable = 1 << 3,
-
   /// If an error diagnostic would normally be emitted, demote the error to a
   /// warning. Used for ObjC key path components.
-  ForObjCKeyPath = 1 << 4
+  ForObjCKeyPath = 1 << 3
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -98,10 +94,12 @@ class ExportContext {
   unsigned SPI : 1;
   unsigned Exported : 1;
   unsigned Deprecated : 1;
+  unsigned Implicit : 1;
   ExportabilityReason Reason;
 
   ExportContext(DeclContext *DC, FragileFunctionKind kind,
-                bool spi, bool exported, bool deprecated);
+                bool spi, bool exported, bool implicit,
+                bool deprecated);
 
 public:
 
@@ -121,11 +119,6 @@ public:
   /// it can reference anything.
   static ExportContext forFunctionBody(DeclContext *DC);
 
-  /// Produce a new context describing an implicit declaration. Implicit code
-  /// does not have source locations. We simply trust the compiler synthesizes
-  /// implicit declarations correctly, and skip the checks.
-  static ExportContext forImplicit();
-
   /// Produce a new context with the same properties as this one, except
   /// changing the ExportabilityReason. This only affects diagnostics.
   ExportContext withReason(ExportabilityReason reason) const;
@@ -138,17 +131,14 @@ public:
   /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext withExported(bool exported) const;
 
-  DeclContext *getDeclContext() const {
-    assert(DC != nullptr && "This is an implicit context");
-    return DC;
-  }
+  DeclContext *getDeclContext() const { return DC; }
 
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
   /// If true, the context is part of a synthesized declaration, and
   /// availability checking should be disabled.
-  bool isImplicit() const { return DC == nullptr; }
+  bool isImplicit() const { return Implicit; }
 
   /// If true, the context is SPI and can reference SPI declarations.
   bool isSPI() const { return SPI; }

@@ -107,7 +107,6 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; it is SPI}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; the conformance is declared as SPI}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; it is SPI}}

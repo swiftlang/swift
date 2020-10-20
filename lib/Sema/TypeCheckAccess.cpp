@@ -1541,8 +1541,8 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
   }
 
 public:
-  explicit DeclAvailabilityChecker(Decl *D)
-    : Where(ExportContext::forDeclSignature(D)) {}
+  explicit DeclAvailabilityChecker(ExportContext where)
+    : Where(where) {}
 
   // Force all kinds to be handled at a lower level.
   void visitDecl(Decl *D) = delete;
@@ -1857,9 +1857,12 @@ void swift::checkAccessControl(Decl *D) {
     checkExtensionGenericParamAccess(ED);
   }
 
-  //ExportabilityChecker().visit(D);
-  if (D->isImplicit() || isa<AccessorDecl>(D))
+  if (isa<AccessorDecl>(D))
     return;
 
-  DeclAvailabilityChecker(D).visit(D);
+  auto where = ExportContext::forDeclSignature(D);
+  if (where.isImplicit())
+    return;
+
+  DeclAvailabilityChecker(where).visit(D);
 }
