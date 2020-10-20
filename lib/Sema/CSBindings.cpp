@@ -408,6 +408,31 @@ void PotentialBindings::finalize(
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
+
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      // If this is a base of an unresolved member chain, as a last
+      // resort effort let's infer base to be a protocol type based
+      // on contextual conformance requirements.
+      //
+      // This allows us to find solutions in cases like this:
+      //
+      // \code
+      // func foo<T: P>(_: T) {}
+      // foo(.bar) <- `.bar` should be a static member of `P`.
+      // \endcode
+      if (Bindings.empty() && TransitiveProtocols.hasValue()) {
+        for (auto *constraint : *TransitiveProtocols) {
+          auto protocolTy = constraint->getSecondType();
+          addPotentialBinding(
+              {protocolTy, AllowedBindingKind::Exact, constraint});
+        }
+
+        PotentiallyIncomplete = true;
+        FullyBound = true;
+      }
+    }
+  }
 }
 
 PotentialBindings::BindingScore
@@ -450,6 +475,14 @@ Optional<PotentialBindings> ConstraintSystem::determineBestBindings() {
   // attempted next.
   auto isViableForRanking = [this](const PotentialBindings &bindings) -> bool {
     auto *typeVar = bindings.TypeVar;
+
+    // Type variable representing a base of unresolved member chain should
+    // always be considered viable for ranking since it's allow to infer
+    // types from transitive protocol requirements.
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+        return true;
+    }
 
     // If type variable is marked as a potential hole there is always going
     // to be at least one binding available for it.
