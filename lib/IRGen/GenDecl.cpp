@@ -38,6 +38,8 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/GlobalDecl.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
+#include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -2761,6 +2763,77 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
     IGF.Builder.CreateRet(Res);
 }
 
+/// If the calling convention for `ctor` doesn't match the calling convention
+/// that we assumed for it when we imported it as `initializer`, emit and
+/// return a thunk that conforms to the assumed calling convention. The thunk
+/// is marked `alwaysinline`, so it doesn't generate any runtime overhead.
+/// If the assumed calling convention was correct, just return `ctor`.
+///
+/// See also comments in CXXMethodConventions in SIL/IR/SILFunctionType.cpp.
+static llvm::Constant *
+emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, SILFunction *initializer,
+                                const clang::CXXConstructorDecl *ctor,
+                                const LinkEntity &entity,
+                                llvm::Constant *ctorAddress) {
+  Signature signature = IGM.getSignature(initializer->getLoweredFunctionType());
+
+  llvm::FunctionType *assumedFnType = signature.getType();
+  llvm::FunctionType *ctorFnType =
+      cast<llvm::FunctionType>(ctorAddress->getType()->getPointerElementType());
+
+  if (assumedFnType == ctorFnType) {
+    return ctorAddress;
+  }
+
+  // The thunk has private linkage, so it doesn't need to have a predictable
+  // mangled name -- we just need to make sure the name is unique.
+  llvm::SmallString<32> name;
+  llvm::raw_svector_ostream stream(name);
+  stream << "__swift_cxx_ctor";
+  entity.mangle(stream);
+
+  llvm::Function *thunk = llvm::Function::Create(
+      assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
+
+  thunk->setCallingConv(llvm::CallingConv::C);
+
+  llvm::AttrBuilder attrBuilder;
+  IGM.constructInitialFnAttributes(attrBuilder);
+  attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
+  llvm::AttributeList attr = signature.getAttributes().addAttributes(
+      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrBuilder);
+  thunk->setAttributes(attr);
+
+  IRGenFunction subIGF(IGM, thunk);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(subIGF, thunk);
+
+  SmallVector<llvm::Value *, 8> Args;
+  for (auto i = thunk->arg_begin(), e = thunk->arg_end(); i != e; ++i) {
+    auto *argTy = i->getType();
+    auto *paramTy = ctorFnType->getParamType(i - thunk->arg_begin());
+    if (paramTy != argTy)
+      Args.push_back(subIGF.coerceValue(i, paramTy, IGM.DataLayout));
+    else
+      Args.push_back(i);
+  }
+
+  clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
+      clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
+                                                    ctor);
+  for (size_t i = 0; i < implicitArgs.Prefix.size(); ++i) {
+    Args.insert(Args.begin() + 1 + i, implicitArgs.Prefix[i]);
+  }
+  for (const auto &arg : implicitArgs.Suffix) {
+    Args.push_back(arg);
+  }
+
+  subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
+  subIGF.Builder.CreateRetVoid();
+
+  return thunk;
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(
     SILFunction *f, ForDefinition_t forDefinition,
@@ -2789,6 +2862,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (auto clangDecl = f->getClangDecl()) {
     auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
     clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
+
+    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+      clangAddr =
+          emitCXXConstructorThunkIfNeeded(*this, f, ctor, entity, clangAddr);
+    }
   }
 
   bool isDefinition = f->isDefinition();

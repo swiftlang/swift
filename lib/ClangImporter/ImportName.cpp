@@ -1366,6 +1366,15 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
           initKind == CtorInitializerKind::ConvenienceFactory);
 }
 
+static void
+addEmptyArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
+                                 SmallVectorImpl<StringRef> &argumentNames) {
+  for (size_t i = 0; i < funcDecl->param_size(); ++i)
+    argumentNames.push_back(StringRef());
+  if (funcDecl->isVariadic())
+    argumentNames.push_back(StringRef());
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameVersion version,
                                           clang::DeclarationName givenName) {
@@ -1599,7 +1608,19 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> selectorSplitScratch;
   ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
-  case clang::DeclarationName::CXXConstructorName:
+  case clang::DeclarationName::CXXConstructorName: {
+    isInitializer = true;
+    isFunction = true;
+    result.info.initKind = CtorInitializerKind::Designated;
+    baseName = "init";
+    auto ctor = dyn_cast<clang::CXXConstructorDecl>(D);
+    if (auto templateCtor = dyn_cast<clang::FunctionTemplateDecl>(D))
+      ctor = cast<clang::CXXConstructorDecl>(templateCtor->getAsFunction());
+    assert(ctor && "Unkown decl with CXXConstructorName.");
+    addEmptyArgNamesForClangFunction(ctor, argumentNames);
+    break;
+  }
+
   case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
@@ -1670,16 +1691,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
     }
 
-    // For C functions, create empty argument names.
     if (auto function = dyn_cast<clang::FunctionDecl>(D)) {
       isFunction = true;
-      params = {function->param_begin(), function->param_end()};
-      for (auto param : params) {
-        (void)param;
-        argumentNames.push_back(StringRef());
-      }
-      if (function->isVariadic())
-        argumentNames.push_back(StringRef());
+      addEmptyArgNamesForClangFunction(function, argumentNames);
     }
     break;
 
