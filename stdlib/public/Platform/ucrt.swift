@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import ucrt // Clang module
-@_exported import visualc // Clang module
 
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
 public let M_PI = Double.pi
