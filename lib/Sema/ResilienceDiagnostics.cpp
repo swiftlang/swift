@@ -27,43 +27,18 @@
 
 using namespace swift;
 
-bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
-                                           const ValueDecl *D,
-                                           ExportContext where) {
+bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
+                                                 const ValueDecl *D,
+                                                 ExportContext where) {
   auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None)
     return false;
 
-  // Do some important fast-path checks that apply to all cases.
-
-  // Type parameters are OK.
-  if (isa<AbstractTypeParamDecl>(D))
-    return false;
-
-  // Check whether the declaration is accessible.
-  if (diagnoseInlinableDeclRefAccess(loc, D, where))
-    return true;
-
-  // Check whether the declaration comes from a publically-imported module.
-  // Skip this check for accessors because the associated property or subscript
-  // will also be checked, and will provide a better error message.
-  if (!isa<AccessorDecl>(D))
-    if (diagnoseDeclRefExportability(loc, D, where))
-      return true;
-
-  return false;
-}
-
-bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
-                                                 const ValueDecl *D,
-                                                 ExportContext where) {
-  auto *DC = where.getDeclContext();
-  auto fragileKind = where.getFragileFunctionKind();
-  assert(fragileKind.kind != FragileFunctionKind::None);
-
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
+
+  auto *DC = where.getDeclContext();
 
   // Public declarations or SPI used from SPI are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
@@ -145,6 +120,11 @@ bool
 TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                                           const ValueDecl *D,
                                           ExportContext where) {
+  // Accessors cannot have exportability that's different than the storage,
+  // so skip them for now.
+  if (isa<AccessorDecl>(D))
+    return false;
+
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 

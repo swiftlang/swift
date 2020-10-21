@@ -2716,6 +2716,10 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
     return false;
   const ValueDecl *D = declRef.getDecl();
 
+  // Generic parameters are always available.
+  if (isa<GenericTypeParamDecl>(D))
+    return false;
+
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
@@ -2733,14 +2737,12 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (Where.getFragileFunctionKind().kind != FragileFunctionKind::None) {
-    if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, D, Where))
-        return true;
-  } else if (Where.getExportabilityReason().hasValue()) {
-    if (R.isValid())
-      if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
-        return true;
+  if (R.isValid()) {
+    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
+      return true;
+
+    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
+      return true;
   }
 
   if (R.isValid()) {
