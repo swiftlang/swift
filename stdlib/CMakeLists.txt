@@ -42,9 +42,16 @@ endif()
 # User-configurable options for the standard library.
 #
 
+# NOTE: Some of these variables are also initialized in StandaloneOverlay.cmake
+# so that interfaces are emitted when overlays are separately built.
+
 option(SWIFT_STDLIB_STABLE_ABI
   "Should stdlib be built with stable ABI (library evolution, resilience)."
   "${SWIFT_STDLIB_STABLE_ABI_default}")
+
+option(SWIFT_ENABLE_MODULE_INTERFACES
+  "Generate .swiftinterface files alongside .swiftmodule files"
+  "${SWIFT_STDLIB_STABLE_ABI}")
 
 option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
   "Support back-deploying compatibility fixes for newer apps running on older runtimes."
@@ -61,10 +68,6 @@ option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 option(SWIFT_STDLIB_OS_VERSIONING
     "Build stdlib with availability based on OS versions (Darwin only)."
     TRUE)
-
-option(SWIFT_ENABLE_MODULE_INTERFACES
-       "Generate .swiftinterface files alongside .swiftmodule files"
-       "${SWIFT_STDLIB_STABLE_ABI}")
 
 option(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH
        "Build Differentation without tgmath (and dependency on platform runtime libraries)"
