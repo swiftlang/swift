@@ -31,6 +31,8 @@ struct A {
 
 class fuzz { }
 
+protocol P : class { }
+
 enum Boo {
   case one
   case two
@@ -816,4 +818,70 @@ bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.W
   %copy = builtin "copyArray"<AnyObject>(%eltty : $@thick AnyObject.Protocol, %newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
   release_value %0 : $_ContiguousArrayBuffer<AnyObject>
   return %newptr : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz>
+// CHECK:    strong_retain %0
+// CHECK:    checked_cast_br %0
+// CHECK:  } // end sil function 'dontMoveOverExistentialToClassCast'
+sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz> {
+bb0(%0 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  checked_cast_br %0 : $AnyObject to fuzz, bb1, bb2
+
+bb1(%18 : $fuzz):
+  %19 = enum $Optional<fuzz>, #Optional.some!enumelt, %18 : $fuzz
+  br bb3(%19 : $Optional<fuzz>)
+
+bb2:
+  strong_release %0 : $AnyObject
+  %22 = enum $Optional<fuzz>, #Optional.none!enumelt
+  br bb3(%22 : $Optional<fuzz>)
+
+bb3(%24 : $Optional<fuzz>):
+  return %24 : $Optional<fuzz>
+}
+
+// CHECK-LABEL: sil @dontMoveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P>
+// CHECK:    strong_retain %0
+// CHECK:    checked_cast_br %0
+// CHECK:  } // end sil function 'dontMoveOverClassToExistentialCast'
+sil @dontMoveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P> {
+bb0(%0 : $fuzz):
+  strong_retain %0 : $fuzz
+  checked_cast_br %0 : $fuzz to P, bb1, bb2
+
+bb1(%18 : $P):
+  %19 = enum $Optional<P>, #Optional.some!enumelt, %18 : $P
+  br bb3(%19 : $Optional<P>)
+
+bb2:
+  strong_release %0 : $fuzz
+  %22 = enum $Optional<P>, #Optional.none!enumelt
+  br bb3(%22 : $Optional<P>)
+
+bb3(%24 : $Optional<P>):
+  return %24 : $Optional<P>
+}
+
+// CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<P>
+// CHECK:    strong_retain %0
+// CHECK:    checked_cast_br %0
+// CHECK:  } // end sil function 'dontMoveOverExistentialToExistentialCast'
+sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<P> {
+bb0(%0 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  checked_cast_br %0 : $AnyObject to P, bb1, bb2
+
+bb1(%18 : $P):
+  %19 = enum $Optional<P>, #Optional.some!enumelt, %18 : $P
+  br bb3(%19 : $Optional<P>)
+
+bb2:
+  strong_release %0 : $AnyObject
+  %22 = enum $Optional<P>, #Optional.none!enumelt
+  br bb3(%22 : $Optional<P>)
+
+bb3(%24 : $Optional<P>):
+  return %24 : $Optional<P>
 }
