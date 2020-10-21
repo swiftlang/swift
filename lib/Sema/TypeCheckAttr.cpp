@@ -3098,8 +3098,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         .highlight(attr->getArg()->getSourceRange());
     }
 
-    // Complain if this isn't the primary function-builder attribute.
-    auto attached = decl->getAttachedFunctionBuilder();
+    // Complain if this isn't the primary result-builder attribute.
+    auto attached = decl->getAttachedResultBuilder();
     if (attached != attr) {
       diagnose(attr->getLocation(), diag::result_builder_multiple,
                isa<ParamDecl>(decl));
@@ -3107,9 +3107,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       attr->setInvalid();
       return;
     } else {
-      // Force any diagnostics associated with computing the function-builder
+      // Force any diagnostics associated with computing the result-builder
       // type.
-      (void) decl->getFunctionBuilderType();
+      (void) decl->getResultBuilderType();
     }
 
     return;
@@ -3157,14 +3157,14 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
       std::string stubIndent;
       Type componentType;
       std::tie(buildInsertionLoc, stubIndent, componentType) =
-          determineFunctionBuilderBuildFixItInfo(nominal);
+          determineResultBuilderBuildFixItInfo(nominal);
       if (buildInsertionLoc.isValid() && potentialMatches.empty()) {
         std::string fixItString;
         {
           llvm::raw_string_ostream out(fixItString);
-          printFunctionBuilderBuildFunction(
+          printResultBuilderBuildFunction(
               nominal, componentType,
-              FunctionBuilderBuildFunction::BuildBlock,
+              ResultBuilderBuildFunction::BuildBlock,
               stubIndent, out);
         }
 

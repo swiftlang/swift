@@ -219,7 +219,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         // If the stored property has an attached result builder and its
         // type is not a function type, the argument is a noescape closure
         // that needs to be called.
-        if (field->getFunctionBuilderType()) {
+        if (field->getResultBuilderType()) {
           if (!field->getValueInterfaceType()
                   ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
             auto resultTy = cast<FunctionType>(arg.getType()).getResult();

@@ -223,7 +223,7 @@ public:
   bool isForOptionalTry() const;
 
   /// Determine whether this locator is for a result builder body result type.
-  bool isForFunctionBuilderBodyResult() const;
+  bool isForResultBuilderBodyResult() const;
 
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {

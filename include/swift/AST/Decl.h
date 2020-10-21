@@ -2403,11 +2403,11 @@ public:
 
   /// Retrieve the attribute associating this declaration with a
   /// result builder, if there is one.
-  CustomAttr *getAttachedFunctionBuilder() const;
+  CustomAttr *getAttachedResultBuilder() const;
 
-  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// Retrieve the @resultBuilder type attached to this declaration,
   /// if there is one.
-  Type getFunctionBuilderType() const;
+  Type getResultBuilderType() const;
 
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration

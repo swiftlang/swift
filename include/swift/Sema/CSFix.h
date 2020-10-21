@@ -193,9 +193,8 @@ enum class FixKind : uint8_t {
   DefaultGenericArgument,
 
   /// Skip any unhandled constructs that occur within a closure argument that
-  /// matches up with a
-  /// parameter that has a result builder.
-  SkipUnhandledConstructInFunctionBuilder,
+  /// matches up with a parameter that has a result builder.
+  SkipUnhandledConstructInResultBuilder,
 
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
@@ -278,7 +277,7 @@ enum class FixKind : uint8_t {
   AllowKeyPathWithoutComponents,
 
   /// Ignore result builder body which fails `pre-check` call.
-  IgnoreInvalidFunctionBuilderBody,
+  IgnoreInvalidResultBuilderBody,
 
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
@@ -1500,7 +1499,7 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class SkipUnhandledConstructInFunctionBuilder final : public ConstraintFix {
+class SkipUnhandledConstructInResultBuilder final : public ConstraintFix {
 public:
   using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
 
@@ -1508,11 +1507,11 @@ private:
   UnhandledNode unhandled;
   NominalTypeDecl *builder;
 
-  SkipUnhandledConstructInFunctionBuilder(ConstraintSystem &cs,
+  SkipUnhandledConstructInResultBuilder(ConstraintSystem &cs,
                                           UnhandledNode unhandled,
                                           NominalTypeDecl *builder,
                                           ConstraintLocator *locator)
-    : ConstraintFix(cs, FixKind::SkipUnhandledConstructInFunctionBuilder,
+    : ConstraintFix(cs, FixKind::SkipUnhandledConstructInResultBuilder,
                     locator),
       unhandled(unhandled), builder(builder) { }
 
@@ -1523,7 +1522,7 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static SkipUnhandledConstructInFunctionBuilder *
+  static SkipUnhandledConstructInResultBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
 };
@@ -1997,7 +1996,7 @@ public:
                                                ConstraintLocator *locator);
 };
 
-class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
+class IgnoreInvalidResultBuilderBody final : public ConstraintFix {
   enum class ErrorInPhase {
     PreCheck,
     ConstraintGeneration,
@@ -2005,9 +2004,9 @@ class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
 
   ErrorInPhase Phase;
 
-  IgnoreInvalidFunctionBuilderBody(ConstraintSystem &cs, ErrorInPhase phase,
+  IgnoreInvalidResultBuilderBody(ConstraintSystem &cs, ErrorInPhase phase,
                                    ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::IgnoreInvalidFunctionBuilderBody, locator),
+      : ConstraintFix(cs, FixKind::IgnoreInvalidResultBuilderBody, locator),
         Phase(phase) {}
 
 public:
@@ -2021,18 +2020,18 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static IgnoreInvalidFunctionBuilderBody *
+  static IgnoreInvalidResultBuilderBody *
   duringPreCheck(ConstraintSystem &cs, ConstraintLocator *locator) {
     return create(cs, ErrorInPhase::PreCheck, locator);
   }
 
-  static IgnoreInvalidFunctionBuilderBody *
+  static IgnoreInvalidResultBuilderBody *
   duringConstraintGeneration(ConstraintSystem &cs, ConstraintLocator *locator) {
     return create(cs, ErrorInPhase::ConstraintGeneration, locator);
   }
 
 private:
-  static IgnoreInvalidFunctionBuilderBody *
+  static IgnoreInvalidResultBuilderBody *
   create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
 };
 

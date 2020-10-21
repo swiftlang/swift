@@ -1607,14 +1607,14 @@ void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
   stmtChecker.typeCheckASTNode(node);
 }
 
-static Type getFunctionBuilderType(FuncDecl *FD) {
-  Type builderType = FD->getFunctionBuilderType();
+static Type getResultBuilderType(FuncDecl *FD) {
+  Type builderType = FD->getResultBuilderType();
 
   // For getters, fall back on looking on the attribute on the storage.
   if (!builderType) {
     auto accessor = dyn_cast<AccessorDecl>(FD);
     if (accessor && accessor->getAccessorKind() == AccessorKind::Get) {
-      builderType = accessor->getStorage()->getFunctionBuilderType();
+      builderType = accessor->getStorage()->getResultBuilderType();
     }
   }
 
@@ -1917,9 +1917,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
-    if (Type builderType = getFunctionBuilderType(func)) {
+    if (Type builderType = getResultBuilderType(func)) {
       auto optBody =
-          TypeChecker::applyFunctionBuilderBodyTransform(func, builderType);
+          TypeChecker::applyResultBuilderBodyTransform(func, builderType);
       if (!optBody || !*optBody)
         return true;
       // Wire up the function body now.
@@ -1978,9 +1978,9 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
-    if (Type builderType = getFunctionBuilderType(func)) {
+    if (Type builderType = getResultBuilderType(func)) {
       if (auto optBody =
-              TypeChecker::applyFunctionBuilderBodyTransform(
+              TypeChecker::applyResultBuilderBodyTransform(
                 func, builderType)) {
         if (!*optBody)
           return errorBody();

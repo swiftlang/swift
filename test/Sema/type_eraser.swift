@@ -57,8 +57,8 @@ struct Builder {
   }
 }
 
-// CHECK-LABEL: TestFunctionBuilder
-class TestFunctionBuilder {
+// CHECK-LABEL: TestResultBuilder
+class TestResultBuilder {
   // CHECK-LABEL: testTransformFnBody
   @Builder dynamic var testTransformFnBody: some P {
     // CHECK: return_stmt

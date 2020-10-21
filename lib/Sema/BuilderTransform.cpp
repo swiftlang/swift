@@ -1,4 +1,4 @@
-//===--- BuilderTransform.cpp - Function-builder transformation -----------===//
+//===--- BuilderTransform.cpp - Result-builder transformation -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements routines associated with the function-builder
+// This file implements routines associated with the result-builder
 // transformation.
 //
 //===----------------------------------------------------------------------===//
@@ -73,7 +73,7 @@ class BuilderClosureVisitor
   Identifier buildOptionalId;
   llvm::SmallDenseMap<Identifier, bool> supportedOps;
 
-  SkipUnhandledConstructInFunctionBuilder::UnhandledNode unhandledNode;
+  SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
   /// Whether an error occurred during application of the builder closure,
   /// e.g., during constraint generation.
@@ -253,7 +253,7 @@ public:
 
   /// Check whether the result builder can be applied to this statement.
   /// \returns the node that cannot be handled by this builder on failure.
-  SkipUnhandledConstructInFunctionBuilder::UnhandledNode check(Stmt *stmt) {
+  SkipUnhandledConstructInResultBuilder::UnhandledNode check(Stmt *stmt) {
     (void)visit(stmt);
     return unhandledNode;
   }
@@ -770,7 +770,7 @@ protected:
 
     // For-each statements require the Sequence protocol. If we don't have
     // it (which generally means the standard library isn't loaded), fall
-    // out of the function-builder path entirely to let normal type checking
+    // out of the result-builder path entirely to let normal type checking
     // take care of this.
     auto sequenceProto = TypeChecker::getProtocol(
         dc->getASTContext(), forEachStmt->getForLoc(),
@@ -910,7 +910,7 @@ protected:
 
 /// Describes the target into which the result of a particular statement in
 /// a closure involving a result builder should be written.
-struct FunctionBuilderTarget {
+struct ResultBuilderTarget {
   enum Kind {
     /// The resulting value is returned from the closure.
     ReturnValue,
@@ -924,24 +924,24 @@ struct FunctionBuilderTarget {
   /// Captured variable information.
   std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>> captured;
 
-  static FunctionBuilderTarget forReturn(Expr *expr) {
-    return FunctionBuilderTarget{ReturnValue, {nullptr, {expr}}};
+  static ResultBuilderTarget forReturn(Expr *expr) {
+    return ResultBuilderTarget{ReturnValue, {nullptr, {expr}}};
   }
 
-  static FunctionBuilderTarget forAssign(VarDecl *temporaryVar,
+  static ResultBuilderTarget forAssign(VarDecl *temporaryVar,
                                          llvm::TinyPtrVector<Expr *> exprs) {
-    return FunctionBuilderTarget{TemporaryVar, {temporaryVar, exprs}};
+    return ResultBuilderTarget{TemporaryVar, {temporaryVar, exprs}};
   }
 
-  static FunctionBuilderTarget forExpression(Expr *expr) {
-    return FunctionBuilderTarget{Expression, { nullptr, { expr }}};
+  static ResultBuilderTarget forExpression(Expr *expr) {
+    return ResultBuilderTarget{Expression, { nullptr, { expr }}};
   }
 };
 
 /// Handles the rewrite of the body of a closure to which a result builder
 /// has been applied.
 class BuilderClosureRewriter
-    : public StmtVisitor<BuilderClosureRewriter, Stmt *, FunctionBuilderTarget> {
+    : public StmtVisitor<BuilderClosureRewriter, Stmt *, ResultBuilderTarget> {
   ASTContext &ctx;
   const Solution &solution;
   DeclContext *dc;
@@ -1001,12 +1001,12 @@ public:
 
 private:
   /// Build the statement or expression to initialize the target.
-  ASTNode initializeTarget(FunctionBuilderTarget target) {
+  ASTNode initializeTarget(ResultBuilderTarget target) {
     assert(target.captured.second.size() == 1);
     auto capturedExpr = target.captured.second.front();
     SourceLoc implicitLoc = capturedExpr->getEndLoc();
     switch (target.kind) {
-    case FunctionBuilderTarget::ReturnValue: {
+    case ResultBuilderTarget::ReturnValue: {
       // Return the expression.
       Type bodyResultType =
           solution.simplifyType(builderTransform.bodyResultType);
@@ -1021,7 +1021,7 @@ private:
       return new (ctx) ReturnStmt(implicitLoc, resultExpr);
     }
 
-    case FunctionBuilderTarget::TemporaryVar: {
+    case ResultBuilderTarget::TemporaryVar: {
       // Assign the expression into a variable.
       auto temporaryVar = target.captured.first;
       auto declRef = new (ctx) DeclRefExpr(
@@ -1041,7 +1041,7 @@ private:
       return assign;
     }
 
-    case FunctionBuilderTarget::Expression:
+    case ResultBuilderTarget::Expression:
       // Execute the expression.
       return rewriteExpr(capturedExpr);
     }
@@ -1102,8 +1102,8 @@ public:
         solution(solution), dc(dc), builderTransform(builderTransform),
         rewriteTarget(rewriteTarget) { }
 
-  Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
-                       Optional<FunctionBuilderTarget> innerTarget = None) {
+  Stmt *visitBraceStmt(BraceStmt *braceStmt, ResultBuilderTarget target,
+                       Optional<ResultBuilderTarget> innerTarget = None) {
     std::vector<ASTNode> newElements;
 
     // If there is an "inner" target corresponding to this brace, declare
@@ -1156,7 +1156,7 @@ public:
 
         Stmt *finalStmt = visit(
             stmt,
-            FunctionBuilderTarget{FunctionBuilderTarget::TemporaryVar,
+            ResultBuilderTarget{ResultBuilderTarget::TemporaryVar,
                                   std::move(captured)});
         newElements.push_back(finalStmt);
         continue;
@@ -1208,21 +1208,21 @@ public:
                              braceStmt->getRBraceLoc());
   }
 
-  Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
+  Stmt *visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
     // Rewrite the condition.
     if (auto condition = rewriteTarget(
             SolutionApplicationTarget(ifStmt->getCond(), dc)))
       ifStmt->setCond(*condition->getAsStmtCondition());
 
-    assert(target.kind == FunctionBuilderTarget::TemporaryVar);
+    assert(target.kind == ResultBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
 
     // Translate the "then" branch.
     auto capturedThen = takeCapturedStmt(ifStmt->getThenStmt());
     auto newThen = visitBraceStmt(cast<BraceStmt>(ifStmt->getThenStmt()),
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             temporaryVar, {target.captured.second[0]}),
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             capturedThen.first, {capturedThen.second.front()}));
     ifStmt->setThenStmt(newThen);
 
@@ -1257,14 +1257,14 @@ public:
             std::string stubIndent;
             Type componentType;
             std::tie(buildInsertionLoc, stubIndent, componentType) =
-                determineFunctionBuilderBuildFixItInfo(builder);
+                determineResultBuilderBuildFixItInfo(builder);
             if (buildInsertionLoc.isValid()) {
               std::string fixItString;
               {
                 llvm::raw_string_ostream out(fixItString);
-                printFunctionBuilderBuildFunction(
+                printResultBuilderBuildFunction(
                     builder, componentType,
-                    FunctionBuilderBuildFunction::BuildLimitedAvailability,
+                    ResultBuilderBuildFunction::BuildLimitedAvailability,
                     stubIndent, out);
 
                 builder->diagnose(
@@ -1288,9 +1288,9 @@ public:
       auto capturedElse = takeCapturedStmt(elseBraceStmt);
       Stmt *newElse = visitBraceStmt(
           elseBraceStmt,
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             temporaryVar, {target.captured.second[1]}),
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             capturedElse.first, {capturedElse.second.front()}));
       ifStmt->setElseStmt(newElse);
     } else if (auto elseIfStmt = cast_or_null<IfStmt>(ifStmt->getElseStmt())){
@@ -1301,11 +1301,11 @@ public:
       newElseElements.push_back(
           visitIfStmt(
             elseIfStmt,
-            FunctionBuilderTarget::forAssign(
+            ResultBuilderTarget::forAssign(
               capturedElse.first, capturedElse.second)));
       newElseElements.push_back(
           initializeTarget(
-            FunctionBuilderTarget::forAssign(
+            ResultBuilderTarget::forAssign(
               temporaryVar, {target.captured.second[1]})));
 
       Stmt *newElse = BraceStmt::create(
@@ -1316,7 +1316,7 @@ public:
       // Form an "else" brace containing an assignment to the temporary
       // variable.
       auto init = initializeTarget(
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             temporaryVar, {target.captured.second[1]}));
       auto newElse = BraceStmt::create(
           ctx, ifStmt->getEndLoc(), { init }, ifStmt->getEndLoc());
@@ -1326,7 +1326,7 @@ public:
     return ifStmt;
   }
 
-  Stmt *visitDoStmt(DoStmt *doStmt, FunctionBuilderTarget target) {
+  Stmt *visitDoStmt(DoStmt *doStmt, ResultBuilderTarget target) {
     // Each statement turns into a (potential) temporary variable
     // binding followed by the statement itself.
     auto body = cast<BraceStmt>(doStmt->getBody());
@@ -1336,13 +1336,13 @@ public:
         visitBraceStmt(
           body,
           target,
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             captured.first, {captured.second.front()})));
     doStmt->setBody(newInnerBody);
     return doStmt;
   }
 
-  Stmt *visitSwitchStmt(SwitchStmt *switchStmt, FunctionBuilderTarget target) {
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt, ResultBuilderTarget target) {
     // Translate the subject expression.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto subjectTarget =
@@ -1362,13 +1362,13 @@ public:
 
     // Translate all of the cases.
     bool limitExhaustivityChecks = false;
-    assert(target.kind == FunctionBuilderTarget::TemporaryVar);
+    assert(target.kind == ResultBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
     unsigned caseIndex = 0;
     for (auto caseStmt : switchStmt->getCases()) {
       if (!visitCaseStmt(
             caseStmt,
-            FunctionBuilderTarget::forAssign(
+            ResultBuilderTarget::forAssign(
               temporaryVar, {target.captured.second[caseIndex]})))
         return nullptr;
 
@@ -1387,7 +1387,7 @@ public:
     return switchStmt;
   }
 
-  Stmt *visitCaseStmt(CaseStmt *caseStmt, FunctionBuilderTarget target) {
+  Stmt *visitCaseStmt(CaseStmt *caseStmt, ResultBuilderTarget target) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
       SolutionApplicationTarget caseLabelTarget(&caseLabelItem, dc);
@@ -1402,7 +1402,7 @@ public:
         visitBraceStmt(
           body,
           target,
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forAssign(
             captured.first, {captured.second.front()})));
     caseStmt->setBody(newInnerBody);
 
@@ -1410,7 +1410,7 @@ public:
   }
 
   Stmt *visitForEachStmt(
-      ForEachStmt *forEachStmt, FunctionBuilderTarget target) {
+      ForEachStmt *forEachStmt, ResultBuilderTarget target) {
     // Translate the for-each loop header.
     ConstraintSystem &cs = solution.getConstraintSystem();
     auto forEachTarget =
@@ -1443,8 +1443,8 @@ public:
     auto newBody = cast<BraceStmt>(
         visitBraceStmt(
           body,
-          FunctionBuilderTarget::forExpression(arrayAppendCall),
-          FunctionBuilderTarget::forAssign(
+          ResultBuilderTarget::forExpression(arrayAppendCall),
+          ResultBuilderTarget::forAssign(
             capturedBody.first, {capturedBody.second.front()})));
     forEachStmt->setBody(newBody);
     outerBodySteps.push_back(forEachStmt);
@@ -1454,7 +1454,7 @@ public:
     // the result builder.
     outerBodySteps.push_back(
         initializeTarget(
-          FunctionBuilderTarget::forAssign(finalForEachVar, {buildArrayCall})));
+          ResultBuilderTarget::forAssign(finalForEachVar, {buildArrayCall})));
 
     // Form a brace statement to put together the three main steps for the
     // for-each loop translation outlined above.
@@ -1474,12 +1474,12 @@ public:
     return throwStmt;
   }
 
-  Stmt *visitThrowStmt(ThrowStmt *throwStmt, FunctionBuilderTarget target) {
+  Stmt *visitThrowStmt(ThrowStmt *throwStmt, ResultBuilderTarget target) {
     llvm_unreachable("Throw statements produce no value");
   }
 
 #define UNHANDLED_RESULT_BUILDER_STMT(STMT) \
-  Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
+  Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, ResultBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
                      #STMT); \
   }
@@ -1501,7 +1501,7 @@ public:
 
 } // end anonymous namespace
 
-BraceStmt *swift::applyFunctionBuilderTransform(
+BraceStmt *swift::applyResultBuilderTransform(
     const Solution &solution,
     AppliedBuilderTransform applied,
     BraceStmt *body,
@@ -1514,12 +1514,12 @@ BraceStmt *swift::applyFunctionBuilderTransform(
   return cast<BraceStmt>(
     rewriter.visitBraceStmt(
       body,
-      FunctionBuilderTarget::forReturn(applied.returnExpr),
-      FunctionBuilderTarget::forAssign(
+      ResultBuilderTarget::forReturn(applied.returnExpr),
+      ResultBuilderTarget::forAssign(
         captured.first, captured.second)));
 }
 
-Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
+Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
@@ -1528,18 +1528,18 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
   auto request =
-      PreCheckFunctionBuilderRequest{{AnyFunctionRef(func),
+      PreCheckResultBuilderRequest{{AnyFunctionRef(func),
                                       /*SuppressDiagnostics=*/false}};
   switch (evaluateOrDefault(ctx.evaluator, request,
-                            FunctionBuilderBodyPreCheck::Error)) {
-  case FunctionBuilderBodyPreCheck::Okay:
-    // If the pre-check was okay, apply the function-builder transform.
+                            ResultBuilderBodyPreCheck::Error)) {
+  case ResultBuilderBodyPreCheck::Okay:
+    // If the pre-check was okay, apply the result-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error:
+  case ResultBuilderBodyPreCheck::Error:
     return nullptr;
 
-  case FunctionBuilderBodyPreCheck::HasReturnStmt: {
+  case ResultBuilderBodyPreCheck::HasReturnStmt: {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
     auto returnStmts = findReturnStatements(func);
@@ -1550,10 +1550,10 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
         diag::result_builder_disabled_by_return, builderType);
 
     // Note that one can remove the result builder attribute.
-    auto attr = func->getAttachedFunctionBuilder();
+    auto attr = func->getAttachedResultBuilder();
     if (!attr) {
       if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-        attr = accessor->getStorage()->getAttachedFunctionBuilder();
+        attr = accessor->getStorage()->getAttachedResultBuilder();
       }
     }
 
@@ -1594,7 +1594,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  if (auto result = cs.matchFunctionBuilder(
+  if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
@@ -1653,7 +1653,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
 }
 
 Optional<ConstraintSystem::TypeMatchResult>
-ConstraintSystem::matchFunctionBuilder(
+ConstraintSystem::matchResultBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocatorBuilder locator) {
@@ -1661,9 +1661,9 @@ ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
 
-  if (InvalidFunctionBuilderBodies.count(fn)) {
+  if (InvalidResultBuilderBodies.count(fn)) {
     (void)recordFix(
-        IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+        IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
             *this, getConstraintLocator(fn.getBody())));
     return getTypeMatchSuccess();
   }
@@ -1671,32 +1671,32 @@ ConstraintSystem::matchFunctionBuilder(
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
-      PreCheckFunctionBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
+      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
-                            FunctionBuilderBodyPreCheck::Error)) {
-  case FunctionBuilderBodyPreCheck::Okay:
-    // If the pre-check was okay, apply the function-builder transform.
+                            ResultBuilderBodyPreCheck::Error)) {
+  case ResultBuilderBodyPreCheck::Okay:
+    // If the pre-check was okay, apply the result-builder transform.
     break;
 
-  case FunctionBuilderBodyPreCheck::Error: {
+  case ResultBuilderBodyPreCheck::Error: {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (recordFix(IgnoreInvalidFunctionBuilderBody::duringPreCheck(
+    if (recordFix(IgnoreInvalidResultBuilderBody::duringPreCheck(
             *this, getConstraintLocator(fn.getBody()))))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
   }
 
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case ResultBuilderBodyPreCheck::HasReturnStmt:
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
     return None;
   }
 
   // Check the form of this body to see if we can apply the
-  // function-builder translation at all.
+  // result-builder translation at all.
   auto dc = fn.getAsDeclContext();
   {
     // Check whether we can apply this specific result builder.
@@ -1713,7 +1713,7 @@ ConstraintSystem::matchFunctionBuilder(
 
       // Record the first unhandled construct as a fix.
       if (recordFix(
-              SkipUnhandledConstructInFunctionBuilder::create(
+              SkipUnhandledConstructInResultBuilder::create(
                 *this, unhandledNode, builder,
                 getConstraintLocator(locator)))) {
         return getTypeMatchFailure(locator);
@@ -1733,10 +1733,10 @@ ConstraintSystem::matchFunctionBuilder(
       return getTypeMatchFailure(locator);
 
     if (transaction.hasErrors()) {
-      InvalidFunctionBuilderBodies.insert(fn);
+      InvalidResultBuilderBodies.insert(fn);
 
       if (recordFix(
-              IgnoreInvalidFunctionBuilderBody::duringConstraintGeneration(
+              IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
                   *this, getConstraintLocator(fn.getBody()))))
         return getTypeMatchFailure(locator);
 
@@ -1749,13 +1749,13 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Record the transformation.
   assert(std::find_if(
-      functionBuilderTransformed.begin(),
-      functionBuilderTransformed.end(),
+      resultBuilderTransformed.begin(),
+      resultBuilderTransformed.end(),
       [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
         return elt.first == fn;
-      }) == functionBuilderTransformed.end() &&
+      }) == resultBuilderTransformed.end() &&
          "already transformed this body along this path!?!");
-  functionBuilderTransformed.push_back(
+  resultBuilderTransformed.push_back(
       std::make_pair(fn, std::move(*applied)));
 
   // If builder is applied to the closure expression then
@@ -1765,7 +1765,7 @@ ConstraintSystem::matchFunctionBuilder(
     locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
   } else {
     locator = getConstraintLocator(fn.getAbstractFunctionDecl(),
-                                   ConstraintLocator::FunctionBuilderBodyResult);
+                                   ConstraintLocator::ResultBuilderBodyResult);
   }
 
   // Bind the body result type to the type of the transformed expression.
@@ -1777,7 +1777,7 @@ ConstraintSystem::matchFunctionBuilder(
 namespace {
 
 /// Pre-check all the expressions in the body.
-class PreCheckFunctionBuilderApplication : public ASTWalker {
+class PreCheckResultBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
   bool SuppressDiagnostics = false;
@@ -1787,14 +1787,14 @@ class PreCheckFunctionBuilderApplication : public ASTWalker {
   bool hasReturnStmt() const { return !ReturnStmts.empty(); }
 
 public:
-  PreCheckFunctionBuilderApplication(AnyFunctionRef fn, bool skipPrecheck,
+  PreCheckResultBuilderApplication(AnyFunctionRef fn, bool skipPrecheck,
                                      bool suppressDiagnostics)
       : Fn(fn), SkipPrecheck(skipPrecheck),
         SuppressDiagnostics(suppressDiagnostics) {}
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
-  FunctionBuilderBodyPreCheck run() {
+  ResultBuilderBodyPreCheck run() {
     Stmt *oldBody = Fn.getBody();
 
     Stmt *newBody = oldBody->walk(*this);
@@ -1803,14 +1803,14 @@ public:
     assert((newBody == nullptr) == HasError &&
            "unexpected short-circuit while walking body");
     if (HasError)
-      return FunctionBuilderBodyPreCheck::Error;
+      return ResultBuilderBodyPreCheck::Error;
 
     assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
     if (hasReturnStmt())
-      return FunctionBuilderBodyPreCheck::HasReturnStmt;
+      return ResultBuilderBodyPreCheck::HasReturnStmt;
 
-    return FunctionBuilderBodyPreCheck::Okay;
+    return ResultBuilderBodyPreCheck::Okay;
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1859,8 +1859,8 @@ public:
 
 }
 
-FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
-    Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const {
+ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
+    Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;
@@ -1868,14 +1868,14 @@ FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
           owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(
+  return PreCheckResultBuilderApplication(
              owner.Fn, /*skipPrecheck=*/false,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)
       .run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  PreCheckFunctionBuilderApplication precheck(fn, /*skipPreCheck=*/true,
+  PreCheckResultBuilderApplication precheck(fn, /*skipPreCheck=*/true,
                                               /*SuppressDiagnostics=*/true);
   (void)precheck.run();
   return precheck.getReturnStmts();
@@ -1914,7 +1914,7 @@ bool TypeChecker::typeSupportsBuilderOp(
   return foundMatch;
 }
 
-Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
+Type swift::inferResultBuilderComponentType(NominalTypeDecl *builder) {
   Type componentType;
 
   SmallVector<ValueDecl *, 4> potentialMatches;
@@ -1946,7 +1946,7 @@ Type swift::inferFunctionBuilderComponentType(NominalTypeDecl *builder) {
 }
 
 std::tuple<SourceLoc, std::string, Type>
-swift::determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder) {
+swift::determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder) {
   SourceLoc buildInsertionLoc = builder->getBraces().Start;
   std::string stubIndent;
   Type componentType;
@@ -1963,13 +1963,13 @@ swift::determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder) {
       ctx.SourceMgr, buildInsertionLoc, &extraIndent);
   stubIndent = (currentIndent + extraIndent).str();
 
-  componentType = inferFunctionBuilderComponentType(builder);
+  componentType = inferResultBuilderComponentType(builder);
   return std::make_tuple(buildInsertionLoc, stubIndent, componentType);
 }
 
-void swift::printFunctionBuilderBuildFunction(
+void swift::printResultBuilderBuildFunction(
       NominalTypeDecl *builder, Type componentType,
-      FunctionBuilderBuildFunction function,
+      ResultBuilderBuildFunction function,
       Optional<std::string> stubIndent, llvm::raw_ostream &out) {
   // Render the component type into a string.
   std::string componentTypeString;
@@ -1995,36 +1995,36 @@ void swift::printFunctionBuilderBuildFunction(
 
   bool printedResult = false;
   switch (function) {
-  case FunctionBuilderBuildFunction::BuildBlock:
+  case ResultBuilderBuildFunction::BuildBlock:
     printer << "buildBlock(_ components: " << componentTypeString << "...)";
     break;
 
-  case FunctionBuilderBuildFunction::BuildExpression:
+  case ResultBuilderBuildFunction::BuildExpression:
     printer << "buildExpression(_ expression: <#Expression#>)";
     break;
 
-  case FunctionBuilderBuildFunction::BuildOptional:
+  case ResultBuilderBuildFunction::BuildOptional:
     printer << "buildOptional(_ component: " << componentTypeString << "?)";
     break;
 
-  case FunctionBuilderBuildFunction::BuildEitherFirst:
+  case ResultBuilderBuildFunction::BuildEitherFirst:
     printer << "buildEither(first component: " << componentTypeString << ")";
     break;
 
-  case FunctionBuilderBuildFunction::BuildEitherSecond:
+  case ResultBuilderBuildFunction::BuildEitherSecond:
     printer << "buildEither(second component: " << componentTypeString << ")";
     break;
 
-  case FunctionBuilderBuildFunction::BuildArray:
+  case ResultBuilderBuildFunction::BuildArray:
     printer << "buildArray(_ components: [" << componentTypeString << "])";
     break;
 
-  case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+  case ResultBuilderBuildFunction::BuildLimitedAvailability:
     printer << "buildLimitedAvailability(_ component: " << componentTypeString
             << ")";
     break;
 
-  case FunctionBuilderBuildFunction::BuildFinalResult:
+  case ResultBuilderBuildFunction::BuildFinalResult:
     printer << "buildFinalResult(_ component: " << componentTypeString
             << ") -> <#Result#>";
     printedResult = true;

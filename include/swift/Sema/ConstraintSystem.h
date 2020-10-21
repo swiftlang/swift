@@ -76,7 +76,7 @@ class SemaTest;
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
 
-Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
 Optional<constraints::SolutionApplicationTarget>
@@ -1186,7 +1186,7 @@ public:
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
-      functionBuilderTransformed;
+      resultBuilderTransformed;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1300,8 +1300,8 @@ public:
   /// Retrieve the builder transform that was applied to this function, if any.
   const AppliedBuilderTransform *getAppliedBuilderTransform(
      AnyFunctionRef fn) const {
-    auto known = functionBuilderTransformed.find(fn);
-    return known != functionBuilderTransformed.end()
+    auto known = resultBuilderTransformed.find(fn);
+    return known != resultBuilderTransformed.end()
         ? &known->second
         : nullptr;
   }
@@ -2130,7 +2130,7 @@ private:
   ///
   /// Tracking this information is useful to avoid producing duplicate
   /// diagnostics when result builder has multiple overloads.
-  llvm::SmallDenseSet<AnyFunctionRef> InvalidFunctionBuilderBodies;
+  llvm::SmallDenseSet<AnyFunctionRef> InvalidResultBuilderBodies;
 
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
@@ -2220,7 +2220,7 @@ private:
 
   /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
-      functionBuilderTransformed;
+      resultBuilderTransformed;
 
   /// Cache of the effects any closures visited.
   llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
@@ -2687,7 +2687,7 @@ public:
 
     unsigned numFavoredConstraints;
 
-    unsigned numFunctionBuilderTransformed;
+    unsigned numResultBuilderTransformed;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
@@ -2759,7 +2759,7 @@ private:
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend Optional<BraceStmt *>
-  swift::TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
+  swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
   friend Optional<SolutionApplicationTarget>
@@ -4607,7 +4607,7 @@ public:
   ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
-  Optional<TypeMatchResult> matchFunctionBuilder(
+  Optional<TypeMatchResult> matchResultBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
@@ -6002,7 +6002,7 @@ std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 /// type-checked version.
 ///
 /// \returns the transformed body
-BraceStmt *applyFunctionBuilderTransform(
+BraceStmt *applyResultBuilderTransform(
     const constraints::Solution &solution,
     constraints::AppliedBuilderTransform applied,
     BraceStmt *body,

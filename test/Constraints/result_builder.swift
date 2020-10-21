@@ -375,13 +375,13 @@ acceptComponentBuilder {
 // rdar://53325810
 
 // Test that we don't have problems with expression pre-checking when
-// type-checking an overloaded function-builder call.  In particular,
+// type-checking an overloaded result-builder call.  In particular,
 // we need to make sure that expressions in the closure are pre-checked
 // before we build constraints for them.  Note that top-level expressions
 // that need to be rewritten by expression prechecking (such as the operator
 // sequences in the boolean conditions and statements below) won't be
 // rewritten in the original closure body if we just precheck the
-// expressions produced by the function-builder transformation.
+// expressions produced by the result-builder transformation.
 struct ForEach1<Data : RandomAccessCollection, Content> {
   var data: Data
   var content: (Data.Element) -> Content

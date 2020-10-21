@@ -44,7 +44,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
-  case ConstraintLocator::FunctionBuilderBodyResult:
+  case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalPayload:
@@ -198,8 +198,8 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
-  return isFirstElement<LocatorPathElt::FunctionBuilderBodyResult>();
+bool ConstraintLocator::isForResultBuilderBodyResult() const {
+  return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
@@ -300,7 +300,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "function result";
       break;
 
-    case FunctionBuilderBodyResult:
+    case ResultBuilderBodyResult:
       out << "result builder body result";
       break;
 

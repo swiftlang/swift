@@ -244,7 +244,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
   // If the locator is for a result builder body result type, the requirement
   // came from the function's return type.
-  if (getLocator()->isForFunctionBuilderBodyResult()) {
+  if (getLocator()->isForResultBuilderBodyResult()) {
     auto *func = getAsDecl<FuncDecl>(getAnchor());
     return getAffectedDeclFromType(func->getResultInterfaceType());
   }
@@ -2256,7 +2256,7 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
-  case ConstraintLocator::FunctionBuilderBodyResult: {
+  case ConstraintLocator::ResultBuilderBodyResult: {
     diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
     break;
   }
@@ -5501,7 +5501,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
   return associator.allParamsAssigned();
 }
 
-SourceLoc SkipUnhandledConstructInFunctionBuilderFailure::getLoc() const {
+SourceLoc SkipUnhandledConstructInResultBuilderFailure::getLoc() const {
   if (auto stmt = unhandled.dyn_cast<Stmt *>())
     return stmt->getStartLoc();
 
@@ -5519,7 +5519,7 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
   return false;
 }
 
-void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
+void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
     bool asNote) {
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
     emitDiagnostic(asNote ? diag::note_result_builder_control_flow
@@ -5532,7 +5532,7 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     std::string stubIndent;
     Type componentType;
     std::tie(buildInsertionLoc, stubIndent, componentType) =
-        determineFunctionBuilderBuildFixItInfo(builder);
+        determineResultBuilderBuildFixItInfo(builder);
 
     if (buildInsertionLoc.isInvalid()) {
       // Do nothing.
@@ -5544,8 +5544,8 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
-            builder, componentType, FunctionBuilderBuildFunction::BuildOptional,
+        printResultBuilderBuildFunction(
+            builder, componentType, ResultBuilderBuildFunction::BuildOptional,
             stubIndent, out);
       }
 
@@ -5558,14 +5558,14 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
+        printResultBuilderBuildFunction(
             builder, componentType,
-            FunctionBuilderBuildFunction::BuildEitherFirst,
+            ResultBuilderBuildFunction::BuildEitherFirst,
             stubIndent, out);
         out << '\n';
-        printFunctionBuilderBuildFunction(
+        printResultBuilderBuildFunction(
             builder, componentType,
-            FunctionBuilderBuildFunction::BuildEitherSecond,
+            ResultBuilderBuildFunction::BuildEitherSecond,
             stubIndent, out);
       }
 
@@ -5578,8 +5578,8 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
-            builder, componentType, FunctionBuilderBuildFunction::BuildArray,
+        printResultBuilderBuildFunction(
+            builder, componentType, ResultBuilderBuildFunction::BuildArray,
             stubIndent, out);
       }
 
@@ -5592,14 +5592,14 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
   }
 }
 
-bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
   diagnosePrimary(/*asNote=*/false);
   emitDiagnosticAt(builder, diag::kind_declname_declared_here,
                    builder->getDescriptiveKind(), builder->getName());
   return true;
 }
 
-bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
+bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsNote() {
   diagnosePrimary(/*asNote=*/true);
   return true;
 }

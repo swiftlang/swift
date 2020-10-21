@@ -633,7 +633,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   CustomAttr *FuncBuilderAttr = nullptr;
   if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedFunctionBuilder();
+    FuncBuilderAttr = VD->getAttachedResultBuilder();
   }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Always print result builder attribute.
@@ -744,7 +744,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // on parameter decls and on protocol requirements.
     // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getAttachedFunctionBuilder() == this) {
+      if (VD->getAttachedResultBuilder() == this) {
         if (!isa<ParamDecl>(D) &&
             !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
           return false;

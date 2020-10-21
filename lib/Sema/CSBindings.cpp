@@ -1421,7 +1421,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
     if (cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
-                     FixKind::IgnoreInvalidFunctionBuilderBody))
+                     FixKind::IgnoreInvalidResultBuilderBody))
       return None;
 
     ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);

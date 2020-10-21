@@ -1,4 +1,4 @@
-# Function Builder Methods
+# Result Builder Methods
 
 To be useful as a result builder, a result builder type must provide a
 sufficient subset of function-building methods that enable the transformation of
@@ -8,7 +8,7 @@ can define:
 
 ```swift
 @resultBuilder
-struct ExampleFunctionBuilder {
+struct ExampleResultBuilder {
   /// The type of individual statement expressions in the transformed function,
   /// which defaults to Component if buildExpression() is not provided.
   typealias Expression = ...

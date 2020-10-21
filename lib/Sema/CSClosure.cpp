@@ -317,7 +317,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
     // Apply the result builder to the closure. We want to be in the
     // context of the closure for subsequent transforms.
-    auto newBody = applyFunctionBuilderTransform(
+    auto newBody = applyResultBuilderTransform(
         solution, *transform, fn.getBody(), fn.getAsDeclContext(),
         [&](SolutionApplicationTarget target) {
           auto resultTarget = rewriteTarget(target);
