@@ -1,8 +1,4 @@
-// =============================================================================
-// With private dependencies
-// =============================================================================
-
-// Establish status quo
+// Establish baseline
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/superfluous-cascade/* %t
@@ -20,7 +16,7 @@
 
 // RUN: cd %t && %target-swiftc_driver -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesPoint.swift usesPoint.swift usesDisplay.swift  -module-name main -output-file-map ofm.json >&output4
 
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE-RECOMPILED %s --dump-input=always < %t/output4
+// RUN: %FileCheck -check-prefix=CHECK-RECOMPILED %s --dump-input=always < %t/output4
 
-// CHECK-PRIVATE-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesPoint.o <= usesPoint.swift}
-// CHECK-PRIVATE-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: usesDisplay.o <= usesDisplay.swift}
+// CHECK-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesPoint.o <= usesPoint.swift}
+// CHECK-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: usesDisplay.o <= usesDisplay.swift}

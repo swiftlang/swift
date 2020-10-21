@@ -49,7 +49,7 @@
 ///
 /// For better identification an access base, use
 /// AccessedStorage::compute(). It returns an AccessedStorage value
-/// that identifies the storage location of a memory access. It provides APIs
+/// that identifies the storage of a memory access. It provides APIs
 /// for inspecting type of accessed storage and allows for disambiguation
 /// between different types of storage and different properties within a class.
 ///
@@ -64,7 +64,7 @@
 /// from an enforced begin_access or from any memory operation that is part of a
 /// formal access, then it returns a valid AccessedStorage value. If the memory
 /// operation is not part of a formal access, then it still identifies the
-/// accessed location as a best effort, but the result may be invalid storage.
+/// accessed storage as a best effort, but the result may be invalid storage.
 ///
 ///    An active goal is to require compute() to always return a
 ///    valid AccessedStorage value even for operations that aren't part of a
@@ -77,13 +77,30 @@
 /// make incorrect assumptions about the absence of access to globals or class
 /// properties.
 ///
-/// identifyFormalAccess() is similar to AccessedStorage::compute(), but returns
-/// the formally accessed storage of a begin_access instruction. This must
-/// return a valid AccessedStorage value unless the access has "Unsafe"
-/// enforcement. The formal access location may be nested within an outer
-/// begin_access. For the purpose of exclusivity, nested accesses are considered
-/// distinct formal accesses so they return distinct AccessedStorage values even
-/// though they may access the same memory.
+/// AccessedStorage::computeInScope() returns an AccessedStorage value for the
+/// immediately enclosing access scope. Within a formal access, it always
+/// returns a Nested storage kind, which provides the begin_access marker.
+///
+/// identifyFormalAccess() works like AccessedStorage::computeInScope(), but
+/// finds the storage corresponding to a begin_access marker, rather than an
+/// arbitrary address. This must return a valid AccessedStorage value unless the
+/// access has "Unsafe" enforcement. The given begin_access marker may be nested
+/// within another, outer access scope. For the purpose of exclusivity, nested
+/// accesses are considered distinct formal accesses so they return distinct
+/// AccessedStorage values even though they may access the same memory. This
+/// way, nested accesses do not appear to conflict.
+///
+/// AccessPath identifies both the accessed storage and the path to a specific
+/// storage location within that storage object. See ProgrammersGuide.md and the
+/// class comments below for details. AccessPath::compute() and
+/// AccessPath::computeInScope() mirror the AccessedStorage API.
+/// AccessPath::contains() and AccessPath::mayOverlap() provide efficient
+/// comparison of access paths.
+///
+/// AccessPath::collectUses() provides all reachable uses of the accessed
+/// storage, allowing the selection of Exact, Inner, or Overlapping uses.
+/// visitAccessedStorageUses() and visitAccessPathUses() generalize
+/// handling of all reachable uses for a given storage location.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -1200,6 +1217,10 @@ SILBasicBlock::iterator removeBeginAccess(BeginAccessInst *beginAccess);
 //===----------------------------------------------------------------------===//
 
 namespace swift {
+
+/// Return true if \p svi is a cast that preserves the identity and
+/// reference-counting equivalence of the reference at operand zero.
+bool isRCIdentityPreservingCast(SingleValueInstruction *svi);
 
 /// If \p svi is an access projection, return an address-type operand for the
 /// incoming address.
