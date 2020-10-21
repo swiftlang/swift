@@ -32,6 +32,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
+
 using namespace swift;
 using namespace Lowering;
 
