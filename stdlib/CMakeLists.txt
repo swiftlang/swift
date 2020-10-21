@@ -9,7 +9,7 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # All Darwin platforms have ABI stability.
   set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
