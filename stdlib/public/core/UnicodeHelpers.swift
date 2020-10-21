@@ -395,19 +395,17 @@ extension _StringGuts {
         startingAt: String.Index(_encodedOffset: start)
       ).0))
     }
-    let range = start..<end
-    let from = self._object.cocoaObject
 
-    // 16 code units would be more than enough for anything non-pathological
-    _internalInvariant(count <= 16 * MemoryLayout<UInt64>.stride)
-    var cus = _FixedArray16<UInt64>(allZeros: ())
-    return cus.withUnsafeMutableBufferPointer { buffer in
-      let baseAddress = buffer.baseAddress._unsafelyUnwrappedUnchecked
-      let into = UnsafeMutableRawPointer(baseAddress)
-        .bindMemory(to: UInt16.self, capacity: 16 * MemoryLayout<UInt64>.stride)
-      _cocoaStringCopyCharacters(from: from, range: range, into: into)
-      let intoBuffer = UnsafeBufferPointer(start: UnsafePointer<UInt16>(into), count: range.count)
-      return Character(String._uncheckedFromUTF16(intoBuffer))
+    let cus = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buffer, initializedCapacity in
+      _cocoaStringCopyCharacters(
+        from: self._object.cocoaObject,
+        range: start..<end,
+        into: buffer.baseAddress._unsafelyUnwrappedUnchecked)
+      initializedCapacity = count
+    }
+    return cus.withUnsafeBufferPointer {
+      return Character(String._uncheckedFromUTF16($0))
     }
 #else
     fatalError("No foreign strings on Linux in this version of Swift")
