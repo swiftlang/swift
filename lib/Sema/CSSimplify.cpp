@@ -5507,6 +5507,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
+
+    if (elt->is<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      if (type1->is<ProtocolType>() && !type2->isTypeVariableOrMember()) {
+        auto result = simplifyConformsToConstraint(
+            type2, type1, ConstraintKind::ConformsTo,
+            locator.withPathElement(LocatorPathElt::TypeParameterRequirement(
+                0, RequirementKind::Conformance)),
+            subflags);
+
+        return result == SolutionKind::Error ? getTypeMatchFailure(locator)
+                                             : getTypeMatchSuccess();
+      }
+    }
   }
 
   if (kind == ConstraintKind::BindParam) {
