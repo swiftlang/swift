@@ -2402,7 +2402,7 @@ public:
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
-  /// function builder, if there is one.
+  /// result builder, if there is one.
   CustomAttr *getAttachedFunctionBuilder() const;
 
   /// Retrieve the @functionBuilder type attached to this declaration,

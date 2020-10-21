@@ -5128,11 +5128,11 @@ public:
       FunctionBuilderBuildFunction function) {
     switch (function) {
     case FunctionBuilderBuildFunction::BuildArray:
-      return "Enables support for..in loops in a function builder by "
+      return "Enables support for..in loops in a result builder by "
         "combining the results of all iterations into a single result";
 
     case FunctionBuilderBuildFunction::BuildBlock:
-      return "Required by every function builder to build combined results "
+      return "Required by every result builder to build combined results "
           "from statement blocks";
 
     case FunctionBuilderBuildFunction::BuildEitherFirst:
@@ -5155,7 +5155,7 @@ public:
 
     case FunctionBuilderBuildFunction::BuildLimitedAvailability:
       return "If declared, this will be called on the partial result of "
-        "an 'if #available' block to allow the function builder to erase "
+        "an 'if #available' block to allow the result builder to erase "
         "type information";
 
     case FunctionBuilderBuildFunction::BuildOptional:
@@ -5195,7 +5195,7 @@ public:
     Builder.setBriefDocComment(getFunctionBuilderDocComment(function));
   }
 
-  /// Add completions for the various "build" functions in a function builder.
+  /// Add completions for the various "build" functions in a result builder.
   void addFunctionBuilderBuildCompletions(NominalTypeDecl *builder) {
     Type componentType = inferFunctionBuilderComponentType(builder);
 
@@ -5237,7 +5237,7 @@ public:
       addAssociatedTypes(NTD);
     }
 
-    if (NTD && NTD->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+    if (NTD && NTD->getAttrs().hasAttribute<ResultBuilderAttr>()) {
       addFunctionBuilderBuildCompletions(NTD);
     }
   }

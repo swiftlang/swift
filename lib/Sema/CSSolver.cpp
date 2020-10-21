@@ -560,7 +560,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   /// Remove any builder transformed closures.
   truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
 
-  // Remove any inferred closure types (e.g. used in function builder body).
+  // Remove any inferred closure types (e.g. used in result builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
 
   // Remove any contextual types.

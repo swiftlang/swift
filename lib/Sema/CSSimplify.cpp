@@ -7657,7 +7657,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
-  // Determine whether a function builder will be applied.
+  // Determine whether a result builder will be applied.
   auto functionBuilderType = getOpenedFunctionBuilderTypeFor(*this, locator);
 
   // Determine whether to introduce one-way constraints between the parameter's
@@ -7730,7 +7730,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  // If there is a function builder to apply, do so now.
+  // If there is a result builder to apply, do so now.
   if (functionBuilderType) {
     if (auto result = matchFunctionBuilder(
             closure, functionBuilderType, closureType->getResult(),
@@ -10367,14 +10367,14 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
 
   // If we have an unresolved closure argument, form an unsolved argument
   // conversion constraint, making sure to reference the type variables for
-  // a function builder if applicable. This ensures we properly connect the
-  // closure type variable with any type variables in the function builder, as
+  // a result builder if applicable. This ensures we properly connect the
+  // closure type variable with any type variables in the result builder, as
   // such type variables will be accessible within the body of the closure when
   // we open it.
   first = getFixedTypeRecursive(first, /*rvalue*/ false);
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
-      // Extract any type variables present in the parameter's function builder.
+      // Extract any type variables present in the parameter's result builder.
       SmallVector<TypeVariableType *, 4> typeVars;
       if (auto builderTy = getOpenedFunctionBuilderTypeFor(*this, locator))
         builderTy->getTypeVariables(typeVars);

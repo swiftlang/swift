@@ -2710,7 +2710,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
 
   // Historical name for result builders.
   checkInvalidAttrName(
-      "_functionBuilder", "resultBuilder", DAK_FunctionBuilder,
+      "_functionBuilder", "resultBuilder", DAK_ResultBuilder,
       diag::attr_renamed_warning);
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {

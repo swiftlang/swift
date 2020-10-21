@@ -46,9 +46,9 @@ struct TupleBuilder { // expected-note 2 {{struct 'TupleBuilder' declared here}}
 
 @resultBuilder
 struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
-  // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}
-  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
-  // expected-note@-3{{add 'buildArray(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
+  // expected-note@-1{{add 'buildOptional(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}
+  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
+  // expected-note@-3{{add 'buildArray(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -99,26 +99,26 @@ func testDiags() {
   tuplify(true) { _ in
     17
     let x = 17
-    let y: Int // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
+    let y: Int // expected-error{{closure containing a declaration cannot be used with result builder 'TupleBuilder'}}
     x + 25
   }
 
   // Statements unsupported by the particular builder.
   tuplifyWithoutIf(true) {
-    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       "hello"
     }
   }
 
   tuplifyWithoutIf(true) {
-    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       "hello"
     } else {
     }
   }
 
   tuplifyWithoutIf(true) { a in
-    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       x
     }
   }
@@ -218,7 +218,7 @@ struct SR11440 {
   }
 
   func foo() {
-    // This is okay, we apply the function builder for the subscript arg.
+    // This is okay, we apply the result builder for the subscript arg.
     self[{
       5
       5
@@ -276,10 +276,10 @@ tuplify(true) { x in
 struct MyTuplifiedStruct {
   var condition: Bool
 
-  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the result builder}}{{3-17=}}
     if condition {
-      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
-      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+      return 17 // expected-warning{{application of result builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the result builder}}{{7-14=}}{{12-19=}}
     } else {
            return 42
     }
@@ -314,7 +314,7 @@ func checkConditions(cond: Bool) {
   }
 }
 
-// Check that a closure with a single "return" works with function builders.
+// Check that a closure with a single "return" works with result builders.
 func checkSingleReturn(cond: Bool) {
   tuplify(cond) { value in
     return (value, 17)
@@ -386,7 +386,7 @@ func testSwitch(e: E) {
     case .b(let i, let s?):
       i * 2
       s + "!"
-      fallthrough // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+      fallthrough // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilder'}}
     case .b(let i, nil):
       "just \(i)"
     }
@@ -577,7 +577,7 @@ func testWrapperBuilder() {
   let _: Int = x // expected-error{{cannot convert value of type 'Wrapper<(Double, String)>' to specified type 'Int'}}
 }
 
-// rdar://problem/61347993 - empty function builder doesn't compile
+// rdar://problem/61347993 - empty result builder doesn't compile
 func rdar61347993() {
   struct Result {}
 
@@ -649,7 +649,7 @@ struct MyView {
   }
 }
 
-// Make sure throwing function builder closures are implied.
+// Make sure throwing result builder closures are implied.
 enum MyError: Error {
   case boom
 }

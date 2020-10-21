@@ -55,7 +55,7 @@ protocol Tupled {
 struct TupleMe: Tupled {
   var condition: Bool
 
-  // Okay: applies the function builder @TupleBuilder.
+  // Okay: applies the result builder @TupleBuilder.
   var tuple: some Any {
     "hello"
     if condition {
@@ -67,7 +67,7 @@ struct TupleMe: Tupled {
 }
 
 // Witness is separated from the context declaring conformance, so don't infer
-// the function builder.
+// the result builder.
 struct DoNotTupleMe {
   var condition: Bool
 
@@ -129,8 +129,8 @@ protocol Tupled2 {
 struct TupleMe2: Tupled, Tupled2 {
   var condition: Bool
 
-  // Okay: applies the function builder @TupleBuilder, even though it satisfies
-  // two requirements. (They have the same function builder)
+  // Okay: applies the result builder @TupleBuilder, even though it satisfies
+  // two requirements. (They have the same result builder)
   var tuple: some Any {
     "hello"
     if condition {
@@ -152,10 +152,10 @@ struct AmbigTupleMe: Tupled, OtherTupled {
 
   // Ambiguous
   internal
-  var tuple: Void { // expected-error{{ambiguous function builder inferred for 'tuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
-    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}{{3-3=return <#expr#>\n}}
-    // expected-note@-2{{apply function builder 'TupleBuilder' (inferred from protocol 'Tupled')}}{{3-3=@TupleBuilder }}
-    // expected-note@-3{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}{{3-3=@OtherTupleBuilder }}
+  var tuple: Void { // expected-error{{ambiguous result builder inferred for 'tuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a result builder}}{{3-3=return <#expr#>\n}}
+    // expected-note@-2{{apply result builder 'TupleBuilder' (inferred from protocol 'Tupled')}}{{3-3=@TupleBuilder }}
+    // expected-note@-3{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}{{3-3=@OtherTupleBuilder }}
     "hello" // expected-warning{{string literal is unused}}
     "world" // expected-warning{{string literal is unused}}
   }
@@ -209,10 +209,10 @@ struct DynamicTupled2: Tupled, OtherTupled {
 
 extension DynamicTupled2 {
   @_dynamicReplacement(for: tuple)
-  var replacementTuple: some Any { // expected-error{{ambiguous function builder inferred for 'replacementTuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
-    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}
-    // expected-note@-2{{apply function builder 'TupleBuilder' (inferred from protocol 'Tupled')}}
-    // expected-note@-3{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
+  var replacementTuple: some Any { // expected-error{{ambiguous result builder inferred for 'replacementTuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a result builder}}
+    // expected-note@-2{{apply result builder 'TupleBuilder' (inferred from protocol 'Tupled')}}
+    // expected-note@-3{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
     1
   }
 }
@@ -225,10 +225,10 @@ struct DynamicTupled3 {
 
 extension DynamicTupled3: OtherTupled {
   @_dynamicReplacement(for: dynamicTuple)
-  var tuple: some Any { // expected-error{{ambiguous function builder inferred for 'tuple': 'OtherTupleBuilder' or 'TupleBuilder'}}
-    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}
-    // expected-note@-2{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
-    // expected-note@-3{{apply function builder 'TupleBuilder' (inferred from dynamic replacement of 'dynamicTuple')}}
+  var tuple: some Any { // expected-error{{ambiguous result builder inferred for 'tuple': 'OtherTupleBuilder' or 'TupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a result builder}}
+    // expected-note@-2{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
+    // expected-note@-3{{apply result builder 'TupleBuilder' (inferred from dynamic replacement of 'dynamicTuple')}}
     0
   }
 }

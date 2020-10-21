@@ -287,7 +287,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
 
-      // Attach a function builder attribute if needed.
+      // Attach a result builder attribute if needed.
       if (functionBuilderType) {
         auto typeExpr = TypeExpr::createImplicit(functionBuilderType, ctx);
         auto attr = CustomAttr::create(

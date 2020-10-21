@@ -478,7 +478,7 @@ testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
 // CHECK: testIfConditions
 // CHECK-SAME: hello
 
-// Use a "let" declaration within a function builder.
+// Use a "let" declaration within a result builder.
 tuplify(true) { c in
   "testLetDeclarations"
   let (a, b) = (c, c && true)
@@ -685,7 +685,7 @@ tuplify(true) { c in
   }
 }
 
-// Test the use of function builders partly implemented through a protocol.
+// Test the use of result builders partly implemented through a protocol.
 indirect enum FunctionBuilder<Expression> {
     case expression(Expression)
     case block([FunctionBuilder])
@@ -749,7 +749,7 @@ let a = buildArray {
 // CHECK: ["1", "2"
 print(a)
 
-// Throwing in function builders.
+// Throwing in result builders.
 enum MyError: Error {
   case boom
 }

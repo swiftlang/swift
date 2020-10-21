@@ -3,13 +3,13 @@
 // Line-feeds in Fix-Its fail to check on Windows.
 
 @resultBuilder
-struct Maker {} // expected-error {{function builder must provide at least one static 'buildBlock' method}}{{15-15=\n    static func buildBlock(_ components: <#Component#>...) -> <#Component#> {\n      <#code#>\n    \}}}
+struct Maker {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}{{15-15=\n    static func buildBlock(_ components: <#Component#>...) -> <#Component#> {\n      <#code#>\n    \}}}
 
 @resultBuilder
 struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf' declared here}}
-  // expected-note@-1{{add 'buildOptional(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}{{31-31=\n    static func buildOptional(_ component: <#Component#>?) -> <#Component#> {\n      <#code#>\n    \}}}
-  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}{{31-31=\n    static func buildEither(first component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}\n\n    static func buildEither(second component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
-  // expected-note@-3{{add 'buildArray(_:)' to the function builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}{{31-31=\n    static func buildArray(_ components: [<#Component#>]) -> <#Component#> {\n      <#code#>\n    \}}}
+  // expected-note@-1{{add 'buildOptional(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if' statements without an 'else'}}{{31-31=\n    static func buildOptional(_ component: <#Component#>?) -> <#Component#> {\n      <#code#>\n    \}}}
+  // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}{{31-31=\n    static func buildEither(first component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}\n\n    static func buildEither(second component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
+  // expected-note@-3{{add 'buildArray(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}{{31-31=\n    static func buildArray(_ components: [<#Component#>]) -> <#Component#> {\n      <#code#>\n    \}}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -44,20 +44,20 @@ func tuplifyWithoutIf<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T)
 func testDiags() {
   // Statements unsupported by the particular builder.
   tuplifyWithoutIf(true) {
-    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       "hello"
     }
   }
 
   tuplifyWithoutIf(true) {
-    if $0 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    if $0 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       "hello"
     } else {
     }
   }
 
   tuplifyWithoutIf(true) { a in
-    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilderWithoutIf'}}
+    for x in 0..<100 {    // expected-error{{closure containing control flow statement cannot be used with result builder 'TupleBuilderWithoutIf'}}
       x
     }
   }

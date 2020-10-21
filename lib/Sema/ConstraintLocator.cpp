@@ -301,7 +301,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       break;
 
     case FunctionBuilderBodyResult:
-      out << "function builder body result";
+      out << "result builder body result";
       break;
 
     case SequenceElementType:

@@ -194,7 +194,7 @@ enum class FixKind : uint8_t {
 
   /// Skip any unhandled constructs that occur within a closure argument that
   /// matches up with a
-  /// parameter that has a function builder.
+  /// parameter that has a result builder.
   SkipUnhandledConstructInFunctionBuilder,
 
   /// Allow invalid reference to a member declared as `mutating`
@@ -277,7 +277,7 @@ enum class FixKind : uint8_t {
   /// Allow key path expressions with no components.
   AllowKeyPathWithoutComponents,
 
-  /// Ignore function builder body which fails `pre-check` call.
+  /// Ignore result builder body which fails `pre-check` call.
   IgnoreInvalidFunctionBuilderBody,
 
   /// Resolve type of `nil` by providing a contextual type.
@@ -1518,7 +1518,7 @@ private:
 
 public:
   std::string getName() const override {
-    return "skip unhandled constructs when applying a function builder";
+    return "skip unhandled constructs when applying a result builder";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -2012,7 +2012,7 @@ class IgnoreInvalidFunctionBuilderBody final : public ConstraintFix {
 
 public:
   std::string getName() const override {
-    return "ignore invalid function builder body";
+    return "ignore invalid result builder body";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;

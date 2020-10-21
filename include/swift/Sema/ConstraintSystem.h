@@ -810,7 +810,7 @@ enum ScoreKind {
 /// The number of score kinds.
 const unsigned NumScoreKinds = SK_LastScoreKind + 1;
 
-/// Describes what happened when a function builder transform was applied
+/// Describes what happened when a result builder transform was applied
 /// to a particular closure.
 struct AppliedBuilderTransform {
   /// The builder type that was applied to the closure.
@@ -1184,7 +1184,7 @@ public:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
-  /// The set of functions that have been transformed by a function builder.
+  /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       functionBuilderTransformed;
 
@@ -2125,11 +2125,11 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
-  /// This is a *global* list of all function builder bodies that have
+  /// This is a *global* list of all result builder bodies that have
   /// been determined to be incorrect by failing constraint generation.
   ///
   /// Tracking this information is useful to avoid producing duplicate
-  /// diagnostics when function builder has multiple overloads.
+  /// diagnostics when result builder has multiple overloads.
   llvm::SmallDenseSet<AnyFunctionRef> InvalidFunctionBuilderBodies;
 
   /// Maps node types used within all portions of the constraint
@@ -2218,7 +2218,7 @@ private:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
-  /// The set of functions that have been transformed by a function builder.
+  /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
       functionBuilderTransformed;
 
@@ -2555,7 +2555,7 @@ public:
 
     case ConstraintSystemPhase::Solving:
       // We can come back to constraint generation phase while
-      // processing function builder body.
+      // processing result builder body.
       assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
              newPhase == ConstraintSystemPhase::Diagnostics ||
              newPhase == ConstraintSystemPhase::Finalization);
@@ -4603,10 +4603,10 @@ public:
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
 
-  /// Apply the given function builder to the closure expression.
+  /// Apply the given result builder to the closure expression.
   ///
-  /// \returns \c None when the function builder cannot be applied at all,
-  /// otherwise the result of applying the function builder.
+  /// \returns \c None when the result builder cannot be applied at all,
+  /// otherwise the result of applying the result builder.
   Optional<TypeMatchResult> matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
@@ -5990,7 +5990,7 @@ bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 
-/// Apply the given function builder transform within a specific solution
+/// Apply the given result builder transform within a specific solution
 /// to produce the rewritten body.
 ///
 /// \param solution The solution to use during application, providing the

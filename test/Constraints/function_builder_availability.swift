@@ -8,7 +8,7 @@ enum Either<T,U> {
 }
 
 @resultBuilder
-struct TupleBuilder { // expected-note{{add 'buildLimitedAvailability(_:)' to the function builder 'TupleBuilder' to erase type information for less-available types}}{{22-22=\n    static func buildLimitedAvailability(_ component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
+struct TupleBuilder { // expected-note{{add 'buildLimitedAvailability(_:)' to the result builder 'TupleBuilder' to erase type information for less-available types}}{{22-22=\n    static func buildLimitedAvailability(_ component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
   }
@@ -65,7 +65,7 @@ tuplify(true) { cond in
   if #available(OSX 10.51, *) {
     globalFuncAvailableOn10_51()
     tuplify(false) { cond2 in
-      if cond, #available(OSX 10.52, *) { // expected-warning{{function builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
+      if cond, #available(OSX 10.52, *) { // expected-warning{{result builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
         cond2
         globalFuncAvailableOn10_52()
       } else {

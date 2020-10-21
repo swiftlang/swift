@@ -1582,7 +1582,7 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
       return std::make_pair(true, S);
     }
 
-    // Ignore patterns because function builder pre-check does so as well.
+    // Ignore patterns because result builder pre-check does so as well.
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
       return std::make_pair(false, P);
     }

@@ -636,12 +636,12 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     FuncBuilderAttr = VD->getAttachedFunctionBuilder();
   }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
-    // Always print function builder attribute.
-    bool isFunctionBuilderAttr = DA == FuncBuilderAttr;
+    // Always print result builder attribute.
+    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isFunctionBuilderAttr &&
+        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
@@ -740,7 +740,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     if (!Options.IsForSwiftInterface)
       break;
-    // For Swift interface, we should print function builder attributes
+    // For Swift interface, we should print result builder attributes
     // on parameter decls and on protocol requirements.
     // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {

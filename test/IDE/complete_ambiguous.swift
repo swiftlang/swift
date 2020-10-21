@@ -300,7 +300,7 @@ CreateThings {
     }
 }
 
-// FIXME: No results in multi-statement closure with erroreous sibling function builder element
+// FIXME: No results in multi-statement closure with erroreous sibling result builder element
 CreateThings {
     Thing { point in
       print("hello")

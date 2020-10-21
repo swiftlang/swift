@@ -735,7 +735,7 @@ void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
-/// Request the custom attribute which attaches a function builder to the
+/// Request the custom attribute which attaches a result builder to the
 /// given declaration.
 class AttachedFunctionBuilderRequest :
     public SimpleRequest<AttachedFunctionBuilderRequest,
@@ -756,7 +756,7 @@ public:
   bool isCached() const;
 };
 
-/// Request the function builder type attached to the given declaration,
+/// Request the result builder type attached to the given declaration,
 /// if any.
 class FunctionBuilderTypeRequest :
     public SimpleRequest<FunctionBuilderTypeRequest,

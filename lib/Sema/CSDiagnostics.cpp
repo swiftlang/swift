@@ -242,7 +242,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return type->getAnyGeneric();
   };
 
-  // If the locator is for a function builder body result type, the requirement
+  // If the locator is for a result builder body result type, the requirement
   // came from the function's return type.
   if (getLocator()->isForFunctionBuilderBodyResult()) {
     auto *func = getAsDecl<FuncDecl>(getAnchor());
@@ -5522,8 +5522,8 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
 void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     bool asNote) {
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
-    emitDiagnostic(asNote ? diag::note_function_builder_control_flow
-                          : diag::function_builder_control_flow,
+    emitDiagnostic(asNote ? diag::note_result_builder_control_flow
+                          : diag::result_builder_control_flow,
                    builder->getName());
 
     // Emit custom notes to help the user introduce the appropriate 'build'
@@ -5538,7 +5538,7 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       // Do nothing.
     } else if (isa<IfStmt>(stmt) && hasMissingElseInChain(cast<IfStmt>(stmt))) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_optional,
+          builder->getLoc(), diag::result_builder_missing_build_optional,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
@@ -5552,7 +5552,7 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       diag.fixItInsert(buildInsertionLoc, fixItString);
     } else if (isa<SwitchStmt>(stmt) || isa<IfStmt>(stmt)) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_either,
+          builder->getLoc(), diag::result_builder_missing_build_either,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
@@ -5572,7 +5572,7 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       diag.fixItInsert(buildInsertionLoc, fixItString);
     } else if (isa<ForEachStmt>(stmt)) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_array,
+          builder->getLoc(), diag::result_builder_missing_build_array,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
@@ -5586,8 +5586,8 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
       diag.fixItInsert(buildInsertionLoc, fixItString);
     }
   } else {
-    emitDiagnostic(asNote ? diag::note_function_builder_decl
-                          : diag::function_builder_decl,
+    emitDiagnostic(asNote ? diag::note_result_builder_decl
+                          : diag::result_builder_decl,
                    builder->getName());
   }
 }

@@ -251,7 +251,7 @@ public:
     return std::move(applied);
   }
 
-  /// Check whether the function builder can be applied to this statement.
+  /// Check whether the result builder can be applied to this statement.
   /// \returns the node that cannot be handled by this builder on failure.
   SkipUnhandledConstructInFunctionBuilder::UnhandledNode check(Stmt *stmt) {
     (void)visit(stmt);
@@ -863,7 +863,7 @@ protected:
     }
 
     // Form a final variable for the for-each expression itself, which will
-    // be initialized with the call to the function builder's buildArray(_:).
+    // be initialized with the call to the result builder's buildArray(_:).
     auto finalForEachVar = buildVar(loc);
     cs->setType(finalForEachVar, cs->getType(buildArrayCall));
     applied.capturedStmts.insert(
@@ -909,7 +909,7 @@ protected:
 };
 
 /// Describes the target into which the result of a particular statement in
-/// a closure involving a function builder should be written.
+/// a closure involving a result builder should be written.
 struct FunctionBuilderTarget {
   enum Kind {
     /// The resulting value is returned from the closure.
@@ -938,7 +938,7 @@ struct FunctionBuilderTarget {
   }
 };
 
-/// Handles the rewrite of the body of a closure to which a function builder
+/// Handles the rewrite of the body of a closure to which a result builder
 /// has been applied.
 class BuilderClosureRewriter
     : public StmtVisitor<BuilderClosureRewriter, Stmt *, FunctionBuilderTarget> {
@@ -1045,7 +1045,7 @@ private:
       // Execute the expression.
       return rewriteExpr(capturedExpr);
     }
-    llvm_unreachable("invalid function builder target");
+    llvm_unreachable("invalid result builder target");
   }
 
   /// Declare the given temporary variable, adding the appropriate
@@ -1232,7 +1232,7 @@ public:
     //
     // Note that this is for staging in support for buildLimitedAvailability();
     // the diagnostic is currently a warning, so that existing code that
-    // compiles today will continue to compile. Once function builder types
+    // compiles today will continue to compile. Once result builder types
     // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
@@ -1247,10 +1247,10 @@ public:
         if (auto reason = TypeChecker::checkDeclarationAvailability(
                               nominal, loc, dc)) {
           ctx.Diags.diagnose(
-              loc, diag::function_builder_missing_limited_availability,
+              loc, diag::result_builder_missing_limited_availability,
               builderTransform.builderType);
 
-          // Add a note to the function builder with a stub for
+          // Add a note to the result builder with a stub for
           // buildLimitedAvailability().
           if (auto builder = builderTransform.builderType->getAnyNominal()) {
             SourceLoc buildInsertionLoc;
@@ -1268,7 +1268,7 @@ public:
                     stubIndent, out);
 
                 builder->diagnose(
-                    diag::function_builder_missing_build_limited_availability,
+                    diag::result_builder_missing_build_limited_availability,
                     builderTransform.builderType)
                   .fixItInsert(buildInsertionLoc, fixItString);
               }
@@ -1451,7 +1451,7 @@ public:
 
     // Step 3. Perform the buildArray() call to turn the array of results
     // collected from the iterations into a single value under the control of
-    // the function builder.
+    // the result builder.
     outerBodySteps.push_back(
         initializeTarget(
           FunctionBuilderTarget::forAssign(finalForEachVar, {buildArrayCall})));
@@ -1478,25 +1478,25 @@ public:
     llvm_unreachable("Throw statements produce no value");
   }
 
-#define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
+#define UNHANDLED_RESULT_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
                      #STMT); \
   }
 
-  UNHANDLED_FUNCTION_BUILDER_STMT(Return)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Yield)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Guard)
-  UNHANDLED_FUNCTION_BUILDER_STMT(While)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Defer)
-  UNHANDLED_FUNCTION_BUILDER_STMT(DoCatch)
-  UNHANDLED_FUNCTION_BUILDER_STMT(RepeatWhile)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Break)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Fail)
-  UNHANDLED_FUNCTION_BUILDER_STMT(PoundAssert)
-#undef UNHANDLED_FUNCTION_BUILDER_STMT
+  UNHANDLED_RESULT_BUILDER_STMT(Return)
+  UNHANDLED_RESULT_BUILDER_STMT(Yield)
+  UNHANDLED_RESULT_BUILDER_STMT(Guard)
+  UNHANDLED_RESULT_BUILDER_STMT(While)
+  UNHANDLED_RESULT_BUILDER_STMT(Defer)
+  UNHANDLED_RESULT_BUILDER_STMT(DoCatch)
+  UNHANDLED_RESULT_BUILDER_STMT(RepeatWhile)
+  UNHANDLED_RESULT_BUILDER_STMT(Break)
+  UNHANDLED_RESULT_BUILDER_STMT(Continue)
+  UNHANDLED_RESULT_BUILDER_STMT(Fallthrough)
+  UNHANDLED_RESULT_BUILDER_STMT(Fail)
+  UNHANDLED_RESULT_BUILDER_STMT(PoundAssert)
+#undef UNHANDLED_RESULT_BUILDER_STMT
 };
 
 } // end anonymous namespace
@@ -1541,15 +1541,15 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt: {
     // One or more explicit 'return' statements were encountered, which
-    // disables the function builder transform. Warn when we do this.
+    // disables the result builder transform. Warn when we do this.
     auto returnStmts = findReturnStatements(func);
     assert(!returnStmts.empty());
 
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
-        diag::function_builder_disabled_by_return, builderType);
+        diag::result_builder_disabled_by_return, builderType);
 
-    // Note that one can remove the function builder attribute.
+    // Note that one can remove the result builder attribute.
     auto attr = func->getAttachedFunctionBuilder();
     if (!attr) {
       if (auto accessor = dyn_cast<AccessorDecl>(func)) {
@@ -1559,7 +1559,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
 
     if (attr) {
       ctx.Diags.diagnose(
-          attr->getLocation(), diag::function_builder_remove_attr)
+          attr->getLocation(), diag::result_builder_remove_attr)
         .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
     }
@@ -1568,7 +1568,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     {
       auto diag = ctx.Diags.diagnose(
           returnStmts.front()->getReturnLoc(),
-          diag::function_builder_remove_returns);
+          diag::result_builder_remove_returns);
       for (auto returnStmt : returnStmts) {
         diag.fixItRemove(returnStmt->getReturnLoc());
       }
@@ -1658,8 +1658,8 @@ ConstraintSystem::matchFunctionBuilder(
     ConstraintKind bodyResultConstraintKind,
     ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
-  assert(builder && "Bad function builder type");
-  assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
+  assert(builder && "Bad result builder type");
+  assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
 
   if (InvalidFunctionBuilderBodies.count(fn)) {
     (void)recordFix(
@@ -1699,12 +1699,12 @@ ConstraintSystem::matchFunctionBuilder(
   // function-builder translation at all.
   auto dc = fn.getAsDeclContext();
   {
-    // Check whether we can apply this specific function builder.
+    // Check whether we can apply this specific result builder.
     BuilderClosureVisitor visitor(getASTContext(), nullptr, dc, builderType,
                                   bodyResultType);
 
     // If we saw a control-flow statement or declaration that the builder
-    // cannot handle, we don't have a well-formed function builder application.
+    // cannot handle, we don't have a well-formed result builder application.
     if (auto unhandledNode = visitor.check(fn.getBody())) {
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {

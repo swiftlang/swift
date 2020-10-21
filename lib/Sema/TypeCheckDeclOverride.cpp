@@ -1510,7 +1510,7 @@ namespace  {
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
-    UNINTERESTING_ATTR(FunctionBuilder)
+    UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)

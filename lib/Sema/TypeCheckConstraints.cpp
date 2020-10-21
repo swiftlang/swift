@@ -222,7 +222,7 @@ void ParentConditionalConformance::diagnoseConformanceStack(
 
 namespace {
 /// Produce any additional syntactic diagnostics for the body of a function
-/// that had a function builder applied.
+/// that had a result builder applied.
 class FunctionSyntacticDiagnosticWalker : public ASTWalker {
   SmallVector<DeclContext *, 4> dcStack;
 
