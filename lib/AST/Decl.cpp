@@ -1582,12 +1582,27 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
 }
 
 bool VarDecl::isInitExposedToClients() const {
+  return hasInitialValue() && isLayoutExposedToClients();
+}
+
+bool VarDecl::isLayoutExposedToClients() const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
-  if (!hasInitialValue()) return false;
   if (isStatic()) return false;
-  return parent->getAttrs().hasAttribute<FrozenAttr>() ||
-         parent->getAttrs().hasAttribute<FixedLayoutAttr>();
+
+  if (!hasStorage() &&
+      !getAttrs().hasAttribute<LazyAttr>() &&
+      !hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  auto nominalAccess =
+    parent->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+  if (!nominalAccess.isPublic()) return false;
+
+  return (parent->getAttrs().hasAttribute<FrozenAttr>() ||
+          parent->getAttrs().hasAttribute<FixedLayoutAttr>());
 }
 
 /// Check whether the given type representation will be

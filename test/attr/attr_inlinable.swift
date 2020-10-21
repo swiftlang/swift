@@ -275,8 +275,21 @@ internal func internalIntReturningFunc() -> Int { return 0 }
 public struct PublicFixedStructWithInit {
   var x = internalGlobal // expected-error {{let 'internalGlobal' is internal and cannot be referenced from a property initializer in a '@frozen' type}}
   var y = publicGlobal // OK
+
+  // Static property initializers are not inlinable contexts.
   static var z = privateIntReturningFunc() // OK
   static var a = internalIntReturningFunc() // OK
+
+  // Test the same with a multi-statement closure, which introduces a
+  // new DeclContext.
+  static var zz: Int = {
+    let x = privateIntReturningFunc()
+    return x
+  }()
+  static var aa: Int = {
+    let x = internalIntReturningFunc()
+    return x
+  }()
 }
 
 public struct KeypathStruct {

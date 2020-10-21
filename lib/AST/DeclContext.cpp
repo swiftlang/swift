@@ -368,21 +368,17 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 
     // Stored property initializer contexts use minimal resilience expansion
     // if the type is formally fixed layout.
-    if (isa<PatternBindingInitializer>(dc)) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(dc->getParent())) {
-        auto nominalAccess =
-          NTD->getFormalAccessScope(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-        if (!nominalAccess.isPublic())
-          return {FragileFunctionKind::None,
-                  /*allowUsableFromInline=*/false};
-
-        if (NTD->isFormallyResilient())
-          return {FragileFunctionKind::None,
-                  /*allowUsableFromInline=*/false};
-
-        return {FragileFunctionKind::PropertyInitializer, true};
+    if (auto *init = dyn_cast <PatternBindingInitializer>(dc)) {
+      auto bindingIndex = init->getBindingIndex();
+      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(bindingIndex)) {
+        if (varDecl->isInitExposedToClients()) {
+          return {FragileFunctionKind::PropertyInitializer,
+                  /*allowUsableFromInline=*/true};
+        }
       }
+
+      return {FragileFunctionKind::None,
+              /*allowUsableFromInline=*/false};
     }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
@@ -434,7 +430,8 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return {FragileFunctionKind::None, false};
+  return {FragileFunctionKind::None,
+          /*allowUsableFromInline=*/false};
 }
 
 /// Determine whether the innermost context is generic.

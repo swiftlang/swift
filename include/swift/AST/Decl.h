@@ -4763,11 +4763,19 @@ public:
 
   /// Determines if this var has an initializer expression that should be
   /// exposed to clients.
+  ///
   /// There's a very narrow case when we would: if the decl is an instance
   /// member with an initializer expression and the parent type is
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
-  
+
+  /// Determines if this var is exposed as part of the layout of a
+  /// @frozen struct.
+  ///
+  /// From the standpoint of access control and exportability checking, this
+  /// var will behave as if it was public, even if it is internal or private.
+  bool isLayoutExposedToClients() const;
+
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
   void setDebuggerVar(bool IsDebuggerVar) {
