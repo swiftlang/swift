@@ -9,4 +9,4 @@ var self1 = self1
 struct Broken {
   var b : Bool = True // expected-error{{cannot find 'True' in scope}}
 }
-var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+// CHECK_NAMES: error: cannot find 'True' in scope [cannot_find_in_scope]{{$}}

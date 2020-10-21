@@ -37,6 +37,15 @@ enum LocalDiagID : uint32_t {
   NumDiags
 };
 
+static constexpr const char *const diagnosticNameStrings[] = {
+#define ERROR(ID, Options, Text, Signature) " [" #ID "]",
+#define WARNING(ID, Options, Text, Signature) " [" #ID "]",
+#define NOTE(ID, Options, Text, Signature) " [" #ID "]",
+#define REMARK(ID, Options, Text, Signature) " [" #ID "]",
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a diagnostic>",
+};
+
 } // namespace
 
 namespace llvm {
@@ -85,9 +94,22 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
   return OS.has_error();
 }
 
+llvm::StringRef
+LocalizationProducer::getMessageOr(swift::DiagID id,
+                                   llvm::StringRef defaultMessage) const {
+  auto localizedMessage = getMessage(id);
+  if (localizedMessage.empty())
+    return defaultMessage;
+  llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
+  const std::string &localizedDebugDiagnosticMessage =
+      localizedMessage.str() + diagnosticName.str();
+  return printDiagnosticName ? localizedDebugDiagnosticMessage
+                             : localizedMessage;
+}
+
 SerializedLocalizationProducer::SerializedLocalizationProducer(
-    std::unique_ptr<llvm::MemoryBuffer> buffer)
-    : Buffer(std::move(buffer)) {
+    std::unique_ptr<llvm::MemoryBuffer> buffer, bool printDiagnosticName)
+    : LocalizationProducer(printDiagnosticName), Buffer(std::move(buffer)) {
   auto base =
       reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
   auto tableOffset = endian::read<offset_type>(base, little);
@@ -103,7 +125,9 @@ SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
   return {(const char *)value.getDataPtr(), value.getDataLen()};
 }
 
-YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath) {
+YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath,
+                                                   bool printDiagnosticName)
+    : LocalizationProducer(printDiagnosticName) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filePath);
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   diag::LocalizationInput yin(document->getBuffer());

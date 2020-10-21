@@ -804,15 +804,15 @@ namespace swift {
       if (llvm::sys::fs::exists(filePath)) {
         if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
           localization = std::make_unique<diag::SerializedLocalizationProducer>(
-              std::move(file.get()));
+              std::move(file.get()), getPrintDiagnosticNames());
         }
       } else {
         llvm::sys::path::replace_extension(filePath, ".yaml");
         // In case of missing localization files, we should fallback to messages
         // from `.def` files.
         if (llvm::sys::fs::exists(filePath)) {
-          localization =
-              std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+          localization = std::make_unique<diag::YAMLLocalizationProducer>(
+              filePath.str(), getPrintDiagnosticNames());
         }
       }
     }
