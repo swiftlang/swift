@@ -19,9 +19,6 @@
 /// lifetime of an object. When the instance gets deallocated, its object 
 /// identifier may be reused for a different object. (Internally, objects are
 /// identified by their memory location.)
-///
-/// If you need an object identifier over the lifetime of an object, it may
-/// be appropriate to provide a custom implementation of `Identifiable`.
 @frozen // trivial-implementation
 public struct ObjectIdentifier {
   @usableFromInline // trivial-implementation
