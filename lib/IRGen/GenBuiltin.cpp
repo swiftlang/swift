@@ -34,12 +34,6 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 
-// SWIFT_ENABLE_TENSORFLOW
-#undef and
-#undef or
-#undef xor
-// SWIFT_ENABLE_TENSORFLOW END
-
 using namespace swift;
 using namespace irgen;
 
