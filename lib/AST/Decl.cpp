@@ -7524,11 +7524,16 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }
 
-template<class ...Args>
-ConstructorDecl *ConstructorDecl::createImported(ASTContext &ctx,
-                                                 ClangNode clangNode,
-                                                 Args&&... args) {
-  auto ctor = new (ctx) ConstructorDecl(std::forward<Args>(args)...);
+ConstructorDecl *ConstructorDecl::createImported(
+    ASTContext &ctx, ClangNode clangNode, DeclName name,
+    SourceLoc constructorLoc, bool failable, SourceLoc failabilityLoc,
+    bool throws, SourceLoc throwsLoc, ParameterList *bodyParams,
+    GenericParamList *genericParams, DeclContext *parent) {
+  void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
+      ctx, sizeof(ConstructorDecl), true);
+  auto ctor = ::new (declPtr)
+      ConstructorDecl(name, constructorLoc, failable, failabilityLoc, throws,
+                      throwsLoc, bodyParams, genericParams, parent);
   ctor->setClangNode(clangNode);
   return ctor;
 }
