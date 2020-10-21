@@ -253,7 +253,6 @@ def process_module(module_file):
             '-build-module-from-parseable-interface',
             '-sdk', args.sdk,
             '-prebuilt-module-cache-path', args.output_dir,
-            '-track-system-dependencies'
         ]
         module_cache_path = ""
         if args.module_cache_path:
