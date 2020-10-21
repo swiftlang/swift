@@ -13,6 +13,7 @@
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.swift
   PartialAsyncTask.swift
+  Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
   Mutex.cpp
