@@ -14,12 +14,13 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN
           security set-keychain-settings -lut 7200 $KEYCHAIN
           security default-keychain -s $KEYCHAIN
-          security set-key-partition-list -S "apple-tool:,apple:" -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN
 
           echo "$DARWIN_TOOLCHAIN_APPLICATION_CERT_BASE64" | base64 --decode -o developerID_application.p12
           security import developerID_application.p12 -P "$DARWIN_TOOLCHAIN_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
           echo "$DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64" | base64 --decode -o developerID_installer.p12
           security import developerID_installer.p12 -P "$DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD" -T /usr/bin/pkgbuild
+
+          security set-key-partition-list -S "apple-tool:,apple:" -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
