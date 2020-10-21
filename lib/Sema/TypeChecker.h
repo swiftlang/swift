@@ -425,14 +425,14 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-/// Try to apply the function builder transform of the given builder type
+/// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
 ///
 /// \returns \c None if the builder transformation cannot be applied at all,
 /// e.g., because of a \c return statement. Otherwise, returns either the
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
-Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
 /// Find the return statements within the body of the given function.
@@ -1151,7 +1151,7 @@ bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// an \c UnresolvedMemberExpr, \c nullptr is returned.
 UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 
-/// Checks whether a function builder type has a well-formed function builder
+/// Checks whether a result builder type has a well-formed result builder
 /// method with the given name. If provided and non-empty, the argument labels
 /// are verified against any candidates.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,

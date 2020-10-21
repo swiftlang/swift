@@ -15,7 +15,7 @@ extension Taggable {
 extension Int: Taggable { }
 extension String: Taggable { }
 
-@_functionBuilder
+@resultBuilder
 struct TaggedBuilder<Tag> {
   static func buildBlock() -> () { }
 
@@ -50,8 +50,8 @@ func testAcceptColorTagged(i: Int, s: String) {
 // ATTR_NAME-NEXT: s:11BuilderTest06TaggedA0V
 // ATTR_NAME-NEXT: TaggedBuilder<Tag>.Type
 // ATTR_NAME-NEXT: $s11BuilderTest06TaggedA0VyxGmD
-// ATTR_NAME-NEXT: <Declaration>@_functionBuilder struct TaggedBuilder&lt;Tag&gt;</Declaration>
-// ATTR_NAME-NEXT: <decl.struct><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@_functionBuilder</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>TaggedBuilder</decl.name>&lt;<decl.generic_type_param usr="s:11BuilderTest06TaggedA0V3Tagxmfp"><decl.generic_type_param.name>Tag</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.struct>
+// ATTR_NAME-NEXT: <Declaration>@resultBuilder struct TaggedBuilder&lt;Tag&gt;</Declaration>
+// ATTR_NAME-NEXT: <decl.struct><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@resultBuilder</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>TaggedBuilder</decl.name>&lt;<decl.generic_type_param usr="s:11BuilderTest06TaggedA0V3Tagxmfp"><decl.generic_type_param.name>Tag</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.struct>
 
 // Generic argument in attribute name.
 // RUN: %sourcekitd-test -req=cursor -pos=35:47 %s -- %s -module-name BuilderTest | %FileCheck %s --check-prefix=ATTR_GENERICARG

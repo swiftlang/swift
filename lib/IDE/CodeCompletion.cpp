@@ -5124,48 +5124,48 @@ public:
     }
   }
 
-  static StringRef getFunctionBuilderDocComment(
-      FunctionBuilderBuildFunction function) {
+  static StringRef getResultBuilderDocComment(
+      ResultBuilderBuildFunction function) {
     switch (function) {
-    case FunctionBuilderBuildFunction::BuildArray:
-      return "Enables support for..in loops in a function builder by "
+    case ResultBuilderBuildFunction::BuildArray:
+      return "Enables support for..in loops in a result builder by "
         "combining the results of all iterations into a single result";
 
-    case FunctionBuilderBuildFunction::BuildBlock:
-      return "Required by every function builder to build combined results "
+    case ResultBuilderBuildFunction::BuildBlock:
+      return "Required by every result builder to build combined results "
           "from statement blocks";
 
-    case FunctionBuilderBuildFunction::BuildEitherFirst:
+    case ResultBuilderBuildFunction::BuildEitherFirst:
       return "With buildEither(second:), enables support for 'if-else' and "
           "'switch' statements by folding conditional results into a single "
           "result";
 
-    case FunctionBuilderBuildFunction::BuildEitherSecond:
+    case ResultBuilderBuildFunction::BuildEitherSecond:
       return "With buildEither(first:), enables support for 'if-else' and "
           "'switch' statements by folding conditional results into a single "
           "result";
 
-    case FunctionBuilderBuildFunction::BuildExpression:
+    case ResultBuilderBuildFunction::BuildExpression:
       return "If declared, provides contextual type information for statement "
           "expressions to translate them into partial results";
 
-    case FunctionBuilderBuildFunction::BuildFinalResult:
+    case ResultBuilderBuildFunction::BuildFinalResult:
       return "If declared, this will be called on the partial result from the "
           "outermost block statement to produce the final returned result";
 
-    case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+    case ResultBuilderBuildFunction::BuildLimitedAvailability:
       return "If declared, this will be called on the partial result of "
-        "an 'if #available' block to allow the function builder to erase "
+        "an 'if #available' block to allow the result builder to erase "
         "type information";
 
-    case FunctionBuilderBuildFunction::BuildOptional:
+    case ResultBuilderBuildFunction::BuildOptional:
       return "Enables support for `if` statements that do not have an `else`";
     }
   }
 
-  void addFunctionBuilderBuildCompletion(
+  void addResultBuilderBuildCompletion(
       NominalTypeDecl *builder, Type componentType,
-      FunctionBuilderBuildFunction function) {
+      ResultBuilderBuildFunction function) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Pattern,
@@ -5187,35 +5187,35 @@ public:
     std::string declStringWithoutFunc;
     {
       llvm::raw_string_ostream out(declStringWithoutFunc);
-      printFunctionBuilderBuildFunction(
+      printResultBuilderBuildFunction(
           builder, componentType, function, None, out);
     }
     Builder.addTextChunk(declStringWithoutFunc);
     Builder.addBraceStmtWithCursor();
-    Builder.setBriefDocComment(getFunctionBuilderDocComment(function));
+    Builder.setBriefDocComment(getResultBuilderDocComment(function));
   }
 
-  /// Add completions for the various "build" functions in a function builder.
-  void addFunctionBuilderBuildCompletions(NominalTypeDecl *builder) {
-    Type componentType = inferFunctionBuilderComponentType(builder);
+  /// Add completions for the various "build" functions in a result builder.
+  void addResultBuilderBuildCompletions(NominalTypeDecl *builder) {
+    Type componentType = inferResultBuilderComponentType(builder);
 
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildBlock);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildExpression);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildOptional);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildEitherFirst);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildEitherSecond);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildArray);
-    addFunctionBuilderBuildCompletion(
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildBlock);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildExpression);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildOptional);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildEitherFirst);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildEitherSecond);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildArray);
+    addResultBuilderBuildCompletion(
         builder, componentType,
-        FunctionBuilderBuildFunction::BuildLimitedAvailability);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildFinalResult);
+        ResultBuilderBuildFunction::BuildLimitedAvailability);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildFinalResult);
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
@@ -5237,8 +5237,8 @@ public:
       addAssociatedTypes(NTD);
     }
 
-    if (NTD && NTD->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
-      addFunctionBuilderBuildCompletions(NTD);
+    if (NTD && NTD->getAttrs().hasAttribute<ResultBuilderAttr>()) {
+      addResultBuilderBuildCompletions(NTD);
     }
   }
 };

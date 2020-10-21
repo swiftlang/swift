@@ -6,7 +6,7 @@ enum Either<T,U> {
   case second(U)
 }
 
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
@@ -247,7 +247,7 @@ extension Int: Taggable { }
 extension String: Taggable { }
 extension Double: Taggable { }
 
-@_functionBuilder
+@resultBuilder
 struct TaggedBuilder<Tag> {
   static func buildBlock() -> () { }
 
@@ -330,7 +330,7 @@ enum Component {
   indirect case optional(Component?)
 }
 
-@_functionBuilder
+@resultBuilder
 struct ComponentBuilder {
   static func buildExpression(_ string: StaticString) -> Component {
     return .string(string)
@@ -375,13 +375,13 @@ acceptComponentBuilder {
 // rdar://53325810
 
 // Test that we don't have problems with expression pre-checking when
-// type-checking an overloaded function-builder call.  In particular,
+// type-checking an overloaded result-builder call.  In particular,
 // we need to make sure that expressions in the closure are pre-checked
 // before we build constraints for them.  Note that top-level expressions
 // that need to be rewritten by expression prechecking (such as the operator
 // sequences in the boolean conditions and statements below) won't be
 // rewritten in the original closure body if we just precheck the
-// expressions produced by the function-builder transformation.
+// expressions produced by the result-builder transformation.
 struct ForEach1<Data : RandomAccessCollection, Content> {
   var data: Data
   var content: (Data.Element) -> Content
@@ -422,7 +422,7 @@ testForEach1.show()
 // CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))
 
 func test_single_stmt_closure_support() {
-  @_functionBuilder
+  @resultBuilder
   struct MyBuilder {
     static func buildBlock(_ numbers: Int...) -> Int {
       return 42
@@ -478,7 +478,7 @@ testIfConditions(cond: true, c1: true, i1: 1, i2: 1)
 // CHECK: testIfConditions
 // CHECK-SAME: hello
 
-// Use a "let" declaration within a function builder.
+// Use a "let" declaration within a result builder.
 tuplify(true) { c in
   "testLetDeclarations"
   let (a, b) = (c, c && true)
@@ -621,7 +621,7 @@ testSwitchCombined(getE(2))
 
 
 // Test buildOptional(_:) as an alternative to buildIf(_:).
-@_functionBuilder
+@resultBuilder
 struct TupleBuilderWithOpt {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
     return (t1)
@@ -685,7 +685,7 @@ tuplify(true) { c in
   }
 }
 
-// Test the use of function builders partly implemented through a protocol.
+// Test the use of result builders partly implemented through a protocol.
 indirect enum FunctionBuilder<Expression> {
     case expression(Expression)
     case block([FunctionBuilder])
@@ -715,7 +715,7 @@ extension FunctionBuilderProtocol {
     static func buildLimitedAvailability(_ component: Component) -> Component { component }
 }
 
-@_functionBuilder
+@resultBuilder
 enum ArrayBuilder<E>: FunctionBuilderProtocol {
     typealias Expression = E
     typealias Component = FunctionBuilder<E>
@@ -749,7 +749,7 @@ let a = buildArray {
 // CHECK: ["1", "2"
 print(a)
 
-// Throwing in function builders.
+// Throwing in result builders.
 enum MyError: Error {
   case boom
 }

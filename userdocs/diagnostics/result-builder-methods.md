@@ -1,14 +1,14 @@
-# Function Builder Methods
+# Result Builder Methods
 
-To be useful as a function builder, a function builder type must provide a
+To be useful as a result builder, a result builder type must provide a
 sufficient subset of function-building methods that enable the transformation of
 various statement kinds (`if`, `switch`, `for`..`in`, etc.). The following
-example function builder illustrates the various function-building methods one
+example result builder illustrates the various function-building methods one
 can define:
 
 ```swift
-@_functionBuilder
-struct ExampleFunctionBuilder {
+@resultBuilder
+struct ExampleResultBuilder {
   /// The type of individual statement expressions in the transformed function,
   /// which defaults to Component if buildExpression() is not provided.
   typealias Expression = ...
@@ -21,7 +21,7 @@ struct ExampleFunctionBuilder {
   /// buildFinalResult() is not provided.
   typealias Result = ...
 
-  /// Required by every function builder to build combined results from
+  /// Required by every result builder to build combined results from
   /// statement blocks.
   static func buildBlock(_ components: Component...) -> Component { ... }
 
@@ -40,12 +40,12 @@ struct ExampleFunctionBuilder {
   /// statements by folding conditional results into a single result.
   static func buildEither(second component: Component) -> Component { ... }
 
-  /// Enables support for..in loops in a function builder by combining the
+  /// Enables support for..in loops in a result builder by combining the
   /// results of all iterations into a single result.
   static func buildArray(_ components: [Component]) -> Component { ... }
 
   /// If declared, this will be called on the partial result of an 'if
-  /// #available' block to allow the function builder to erase type
+  /// #available' block to allow the result builder to erase type
   /// information.
   static func buildLimitedAvailability(_ component: Component) -> Component { ... }
 

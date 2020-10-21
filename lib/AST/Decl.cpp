@@ -6254,19 +6254,19 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
   defaultInfo->DefaultArg = var;
 }
 
-Type ValueDecl::getFunctionBuilderType() const {
+Type ValueDecl::getResultBuilderType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           FunctionBuilderTypeRequest{mutableThis},
+                           ResultBuilderTypeRequest{mutableThis},
                            Type());
 }
 
-CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
+CustomAttr *ValueDecl::getAttachedResultBuilder() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           AttachedFunctionBuilderRequest{mutableThis},
+                           AttachedResultBuilderRequest{mutableThis},
                            nullptr);
 }
 

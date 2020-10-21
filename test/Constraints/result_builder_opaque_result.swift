@@ -3,7 +3,7 @@
 protocol Taggable {}
 extension String: Taggable {}
 
-@_functionBuilder
+@resultBuilder
 struct TaggableBuilder {
   static func buildBlock(_ params: Taggable...) -> String {
     return "Your tags weren't worth keeping anyway"

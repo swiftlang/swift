@@ -76,7 +76,7 @@ class SemaTest;
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
 
-Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
 Optional<constraints::SolutionApplicationTarget>
@@ -810,7 +810,7 @@ enum ScoreKind {
 /// The number of score kinds.
 const unsigned NumScoreKinds = SK_LastScoreKind + 1;
 
-/// Describes what happened when a function builder transform was applied
+/// Describes what happened when a result builder transform was applied
 /// to a particular closure.
 struct AppliedBuilderTransform {
   /// The builder type that was applied to the closure.
@@ -1184,9 +1184,9 @@ public:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
-  /// The set of functions that have been transformed by a function builder.
+  /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
-      functionBuilderTransformed;
+      resultBuilderTransformed;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1300,8 +1300,8 @@ public:
   /// Retrieve the builder transform that was applied to this function, if any.
   const AppliedBuilderTransform *getAppliedBuilderTransform(
      AnyFunctionRef fn) const {
-    auto known = functionBuilderTransformed.find(fn);
-    return known != functionBuilderTransformed.end()
+    auto known = resultBuilderTransformed.find(fn);
+    return known != resultBuilderTransformed.end()
         ? &known->second
         : nullptr;
   }
@@ -2125,12 +2125,12 @@ private:
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
 
-  /// This is a *global* list of all function builder bodies that have
+  /// This is a *global* list of all result builder bodies that have
   /// been determined to be incorrect by failing constraint generation.
   ///
   /// Tracking this information is useful to avoid producing duplicate
-  /// diagnostics when function builder has multiple overloads.
-  llvm::SmallDenseSet<AnyFunctionRef> InvalidFunctionBuilderBodies;
+  /// diagnostics when result builder has multiple overloads.
+  llvm::SmallDenseSet<AnyFunctionRef> InvalidResultBuilderBodies;
 
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
@@ -2218,9 +2218,9 @@ private:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
-  /// The set of functions that have been transformed by a function builder.
+  /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
-      functionBuilderTransformed;
+      resultBuilderTransformed;
 
   /// Cache of the effects any closures visited.
   llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
@@ -2555,7 +2555,7 @@ public:
 
     case ConstraintSystemPhase::Solving:
       // We can come back to constraint generation phase while
-      // processing function builder body.
+      // processing result builder body.
       assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
              newPhase == ConstraintSystemPhase::Diagnostics ||
              newPhase == ConstraintSystemPhase::Finalization);
@@ -2687,7 +2687,7 @@ public:
 
     unsigned numFavoredConstraints;
 
-    unsigned numFunctionBuilderTransformed;
+    unsigned numResultBuilderTransformed;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
@@ -2759,7 +2759,7 @@ private:
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend Optional<BraceStmt *>
-  swift::TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
+  swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
   friend Optional<SolutionApplicationTarget>
@@ -4603,11 +4603,11 @@ public:
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
 
-  /// Apply the given function builder to the closure expression.
+  /// Apply the given result builder to the closure expression.
   ///
-  /// \returns \c None when the function builder cannot be applied at all,
-  /// otherwise the result of applying the function builder.
-  Optional<TypeMatchResult> matchFunctionBuilder(
+  /// \returns \c None when the result builder cannot be applied at all,
+  /// otherwise the result of applying the result builder.
+  Optional<TypeMatchResult> matchResultBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
@@ -5990,7 +5990,7 @@ bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 
-/// Apply the given function builder transform within a specific solution
+/// Apply the given result builder transform within a specific solution
 /// to produce the rewritten body.
 ///
 /// \param solution The solution to use during application, providing the
@@ -6002,7 +6002,7 @@ std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 /// type-checked version.
 ///
 /// \returns the transformed body
-BraceStmt *applyFunctionBuilderTransform(
+BraceStmt *applyResultBuilderTransform(
     const constraints::Solution &solution,
     constraints::AppliedBuilderTransform applied,
     BraceStmt *body,

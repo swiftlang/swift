@@ -20,7 +20,7 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
                                 SmallVector<GenericTypeParamType *, 2>,
                                 SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, AttachedFunctionBuilderRequest,
+SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,
               CustomAttr *(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
               Type(VarDecl *, unsigned), Cached, NoLocationInfo)
@@ -81,7 +81,7 @@ SWIFT_REQUEST(TypeChecker, ExistentialTypeSupportedRequest,
               bool(ProtocolDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExtendedTypeRequest, Type(ExtensionDecl *), Cached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, FunctionBuilderTypeRequest, Type(ValueDecl *),
+SWIFT_REQUEST(TypeChecker, ResultBuilderTypeRequest, Type(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAsyncHandlerRequest, bool(FuncDecl *),
               Cached, NoLocationInfo)
@@ -249,8 +249,8 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
-              FunctionBuilderClosurePreCheck(PreCheckFunctionBuilderDescriptor),
+SWIFT_REQUEST(TypeChecker, PreCheckResultBuilderRequest,
+              ResultBuilderBodyPreCheck(PreCheckResultBuilderDescriptor),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),

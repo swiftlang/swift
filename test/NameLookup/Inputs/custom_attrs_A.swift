@@ -7,7 +7,7 @@ public struct Wrapper<Value> {
   }
 }
 
-@_functionBuilder
+@resultBuilder
 public struct Builder {
   static func buildBlock<T>(_ component: T) -> T { component }
 }

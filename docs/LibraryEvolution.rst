@@ -159,7 +159,7 @@ No other changes are permitted; the following are particularly of note:
   not they have default arguments.
 - An ABI-public function that throws may not become non-throwing or vice versa.
 - The ``@escaping`` attribute may not be added to or removed from a parameter.
-- Adding or removing a function builder from a parameter is a
+- Adding or removing a result builder from a parameter is a
   `binary-compatible source-breaking change`.
 
 

@@ -4061,7 +4061,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::FunctionBuilderBodyResult: {
+    case ConstraintLocator::ResultBuilderBodyResult: {
       path = path.slice(1);
       break;
     }

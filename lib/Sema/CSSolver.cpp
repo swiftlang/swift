@@ -187,8 +187,8 @@ Solution ConstraintSystem::finalize() {
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
-  for (const auto &transformed : functionBuilderTransformed) {
-    solution.functionBuilderTransformed.insert(transformed);
+  for (const auto &transformed : resultBuilderTransformed) {
+    solution.resultBuilderTransformed.insert(transformed);
   }
 
   return solution;
@@ -276,8 +276,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
-  for (const auto &transformed : solution.functionBuilderTransformed) {
-    functionBuilderTransformed.push_back(transformed);
+  for (const auto &transformed : solution.resultBuilderTransformed) {
+    resultBuilderTransformed.push_back(transformed);
   }
     
   // Register any fixes produced along this path.
@@ -479,7 +479,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
+  numResultBuilderTransformed = cs.resultBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
@@ -558,9 +558,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
-  truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
+  truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
 
-  // Remove any inferred closure types (e.g. used in function builder body).
+  // Remove any inferred closure types (e.g. used in result builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
 
   // Remove any contextual types.

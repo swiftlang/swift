@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_functon_builder %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
-@_functionBuilder
+@resultBuilder
 struct Summer {
   static func buildBlock(_ x: Int...) -> Int {
     return x.reduce(0, +)

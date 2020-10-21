@@ -75,8 +75,8 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
 /// The result type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 
-/// The result type of a function builder body.
-SIMPLE_LOCATOR_PATH_ELT(FunctionBuilderBodyResult)
+/// The result type of a result builder body.
+SIMPLE_LOCATOR_PATH_ELT(ResultBuilderBodyResult)
 
 /// A generic argument.
 /// FIXME: Add support for named generic arguments?

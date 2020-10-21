@@ -2402,12 +2402,12 @@ public:
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
-  /// function builder, if there is one.
-  CustomAttr *getAttachedFunctionBuilder() const;
+  /// result builder, if there is one.
+  CustomAttr *getAttachedResultBuilder() const;
 
-  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// Retrieve the @resultBuilder type attached to this declaration,
   /// if there is one.
-  Type getFunctionBuilderType() const;
+  Type getResultBuilderType() const;
 
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration
