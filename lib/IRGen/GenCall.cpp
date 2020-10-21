@@ -1959,8 +1959,8 @@ class AsyncCallEmission final : public CallEmission {
   }
   void loadValue(ElementLayout layout, Explosion &explosion) {
     Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
-    auto &ti = layout.getType();
-    cast<LoadableTypeInfo>(ti).loadAsTake(IGF, addr, explosion);
+    auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    ti.loadAsTake(IGF, addr, explosion);
   }
 
 public:
