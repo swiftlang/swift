@@ -48,7 +48,7 @@ import Glibc
 #elseif os(WASI)
 import WASILibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 import WinSDK
 #endif
 

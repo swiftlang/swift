@@ -19,7 +19,7 @@ import Glibc
 #elseif os(WASI)
 import WASILibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 #endif
 
 #if _runtime(_ObjC)

@@ -64,7 +64,8 @@ def rpathize(filename):
 
     # Build a command to invoke install_name_tool.
     command = ['install_name_tool']
-    for line in dylibsOutput.splitlines():
+    for binaryline in dylibsOutput.splitlines():
+        line = binaryline.decode("utf-8", "strict")
         match = dylib_regex.match(line)
         if match:
             command.append('-change')

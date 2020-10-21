@@ -1431,10 +1431,12 @@ SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
 
 namespace {
 
-struct FormalAccessReleaseValueCleanup : Cleanup {
+struct FormalAccessReleaseValueCleanup final : Cleanup {
   FormalEvaluationContext::stable_iterator Depth;
 
-  FormalAccessReleaseValueCleanup() : Depth() {}
+  FormalAccessReleaseValueCleanup() : Cleanup(), Depth() {
+    setIsFormalAccess();
+  }
 
   void setState(SILGenFunction &SGF, CleanupState newState) override {
     if (newState == CleanupState::Dead) {

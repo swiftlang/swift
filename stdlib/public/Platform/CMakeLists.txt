@@ -100,8 +100,8 @@ if(WASI IN_LIST SWIFT_SDKS)
   add_dependencies(sdk-overlay wasi_libc_modulemap)
 endif()
 
-add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    msvcrt.swift
+add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ucrt.swift
     ${swift_platform_sources}
     POSIXError.swift
 
