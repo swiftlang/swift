@@ -66,11 +66,13 @@ enum class ExportabilityReason : unsigned {
 };
 
 /// A description of the restrictions on what declarations can be referenced
-/// from a the signature or body of a declaration.
+/// from the signature or body of a declaration.
 ///
-/// We say a declaration is "exported" if it is `public` or
-/// `@usableFromInline`, not `_@spi`, and not visible via an
-/// `@_implementationOnly` import.
+/// We say a declaration is "exported" if all of the following holds:
+///
+/// - the declaration is `public` or `@usableFromInline`
+/// - the declaration is not `@_spi`
+/// - the declaration was not imported from an `@_implementationOnly` import
 ///
 /// The "signature" of a declaration is the set of all types written in the
 /// declaration (such as function parameter and return types), but not
@@ -81,8 +83,8 @@ enum class ExportabilityReason : unsigned {
 ///
 /// The body of an inlinable function can only reference other `public` and
 /// `@usableFromInline` declarations; furthermore, if the inlinable
-/// function is also exported, its body is restricted to referencing other
-/// exported declarations.
+/// function is not `@_spi`, its body can only reference other exported
+/// declarations.
 ///
 /// The ExportContext also stores if the location in the program is inside
 /// of a function or type body with deprecated or unavailable availability.
