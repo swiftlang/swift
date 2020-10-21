@@ -40,10 +40,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   auto *DC = where.getDeclContext();
 
-  // Public declarations or SPI used from SPI are OK.
+  // Public declarations are OK, even if they're SPI or came from an
+  // implementation-only import. We'll diagnose exportability violations
+  // from diagnoseDeclRefExportability().
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              fragileKind.allowUsableFromInline).isPublic() &&
-      !(D->isSPI() && !DC->getInnermostDeclarationDeclContext()->isSPI()))
+                              fragileKind.allowUsableFromInline).isPublic())
     return false;
 
   auto &Context = DC->getASTContext();

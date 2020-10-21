@@ -7,18 +7,14 @@
 // RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5
 
 // SPI declarations
-@_spi(MySPI) public func spiFunc() {} // expected-note 2 {{global function 'spiFunc()' is not '@usableFromInline' or public}}
+@_spi(MySPI) public func spiFunc() {}
 @_spi(+) public func invalidSPIName() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(🤔) public func emojiNamedSPI() {}
 @_spi() public func emptyParensSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(set) public func keywordSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 
 @_spi(S) public class SPIClass { // expected-note 6 {{type declared here}}
-  // expected-note@-1 3 {{class 'SPIClass' is not '@usableFromInline' or public}}
-  // expected-note@-2 {{class 'SPIClass' is not public}}
   public init() {}
-  // expected-note@-1 2 {{initializer 'init()' is not '@usableFromInline' or public}}
-  // expected-note@-2 {{initializer 'init()' is not public}}
 }
 class InternalClass {} // expected-note 2 {{type declared here}}
 private class PrivateClass {} // expected-note 2 {{type declared here}}
@@ -31,28 +27,24 @@ public func useOfSPITypeInvalid() -> SPIClass { fatalError() } // expected-error
 @_spi(S) public func spiUseOfPrivateType(_ a: PrivateClass)  { fatalError() } // expected-error{{function cannot be declared public because its parameter uses a private type}}
 
 @inlinable
-func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  spiFunc() // expected-error {{global function 'spiFunc()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  _ = SPIClass() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  // expected-error@-1 {{initializer 'init()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
+  spiFunc() // expected-error {{global function 'spiFunc()' cannot be used in an '@inlinable' function because it is SPI}}
+  _ = SPIClass() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
+  // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because it is SPI}}
 }
 
-@_spi(S) public struct SPIStruct { // expected-note 2 {{struct 'SPIStruct' is not '@usableFromInline' or public}}
-// expected-note@-1 2 {{type declared here}}
-  // FIXME: Misleading diagnostic here
+@_spi(S) public struct SPIStruct {
+// expected-note@-1 {{type declared here}}
   public init() {}
-  // expected-note@-1 2 {{initializer 'init()' is not '@usableFromInline' or public}}
 }
 
 @frozen public struct FrozenStruct {
-  @_spi(S) public var spiInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  @_spi(S) public var spiInFrozen = SPIStruct()
   // expected-error@-1 {{stored property 'spiInFrozen' cannot be declared '@_spi' in a '@frozen' struct}}
-  // expected-error@-2 {{cannot use struct 'SPIStruct' here; it is SPI}}
-  // expected-error@-3 {{initializer 'init()' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
 
-  var spiTypeInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  var spiTypeInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-1 {{cannot use struct 'SPIStruct' here; it is SPI}}
-  // expected-error@-2 {{initializer 'init()' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  // expected-error@-2 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var spiTypeInFrozen1: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
 }
@@ -109,17 +101,17 @@ public struct NestedParent {
 }
 
 public func publicFuncWithDefaultValue(_ p: SPIClass = SPIClass()) {} // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
-// expected-error@-1 {{class 'SPIClass' is '@_spi' and cannot be referenced from a default argument value}}
-// expected-error@-2 {{initializer 'init()' is '@_spi' and cannot be referenced from a default argument value}}
+// expected-error@-1 {{class 'SPIClass' cannot be used in a default argument value because it is SPI}}
+// expected-error@-2 {{initializer 'init()' cannot be used in a default argument value because it is SPI}}
 
 @_spi(S)
 public func spiFuncWithDefaultValue(_ p: SPIClass = SPIClass()) {}
 
 @inlinable
 public func inlinablePublic() {
-  spiFunc() // expected-error {{global function 'spiFunc()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  let _ = SPIClass() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  // expected-error@-1 {{initializer 'init()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+  spiFunc() // expected-error {{global function 'spiFunc()' cannot be used in an '@inlinable' function because it is SPI}}
+  let _ = SPIClass() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
+  // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because it is SPI}}
 }
 
 @_spi(S)
