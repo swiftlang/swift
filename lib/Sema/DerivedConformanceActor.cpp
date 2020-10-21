@@ -236,10 +236,9 @@ static ValueDecl *deriveActor_enqueuePartialTask(DerivedConformance &derived) {
   func->copyFormalAccessFrom(derived.Nominal);
   func->setBodySynthesizer(deriveBodyActor_enqueuePartialTask);
   func->setSynthesized();
-
-  // FIXME: This function should be "actor-unsafe", not "actor-independent", but
-  // the latter is all we have at the moment.
-  func->getAttrs().add(new (ctx) ActorIndependentAttr(/*IsImplicit=*/true));
+  // mark as @actorIndependent(unsafe)
+  func->getAttrs().add(new (ctx) ActorIndependentAttr(
+                            ActorIndependentKind::Unsafe, /*IsImplicit=*/true));
 
   // Actor storage property and its initialization.
   auto actorStorage = new (ctx) VarDecl(

@@ -1358,6 +1358,12 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_option_such_as,none,
+      "expected '%0' option such as '%1'", (StringRef, StringRef))
+
+ERROR(attr_unknown_option,none,
+      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
+
 ERROR(attr_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
 ERROR(attr_expected_label,none,
@@ -1533,17 +1539,9 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// inline, optimize
-ERROR(optimization_attribute_expect_option,none,
-      "expected '%0' option such as '%1'", (StringRef, StringRef))
-ERROR(optimization_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
-
 // effects
 ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-ERROR(effects_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,

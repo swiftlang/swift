@@ -501,6 +501,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
+    case ActorIsolation::IndependentUnsafe:
       // Actor-independent have no restrictions on their access.
       return forUnrestricted();
 
@@ -758,6 +759,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         switch (auto isolation = swift::getActorIsolation(value)) {
         case ActorIsolation::ActorInstance:
         case ActorIsolation::Independent:
+        case ActorIsolation::IndependentUnsafe:
         case ActorIsolation::Unspecified:
           return isolation;
 
@@ -803,7 +805,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return ActorIsolation::forUnspecified();
       }
 
-      return ActorIsolation::forIndependent();
+      // At module scope, actor independence with safety is assumed.
+      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
     }
 
     /// Check a reference to an entity within a global actor.
@@ -833,6 +836,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       }
 
       case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_independent_context,
             value->getDescriptiveKind(), value->getName(), globalActor);
@@ -933,6 +937,7 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
             }
             break;
 
+          case ActorIsolation::IndependentUnsafe:
           case ActorIsolation::Unspecified:
             // Okay
             break;
@@ -1028,7 +1033,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(Decl *decl) {
   // If the declaration is explicitly marked @actorIndependent, report it as
   // independent.
   if (independentAttr) {
-    return ActorIsolation::forIndependent();
+    return ActorIsolation::forIndependent(independentAttr->getKind());
   }
 
   // If the declaration is marked with a global actor, report it as being
@@ -1105,6 +1110,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
         // We only need one @actorIndependent.
         if (sawActorIndependent)
           return true;
@@ -1168,8 +1174,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
+    // FIXME: if the context is 'unsafe', is it fine to infer the 'safe' one?
+    case ActorIsolation::IndependentUnsafe:
     case ActorIsolation::Independent:
-      value->getAttrs().add(new (ctx) ActorIndependentAttr(true));
+      value->getAttrs().add(new (ctx) ActorIndependentAttr(
+                              ActorIndependentKind::Safe, /*IsImplicit=*/true));
       break;
 
     case ActorIsolation::GlobalActor: {
