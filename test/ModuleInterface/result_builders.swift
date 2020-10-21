@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name FunctionBuilders -emit-module-interface-path %t/FunctionBuilders.swiftinterface %s
-// RUN: %FileCheck %s < %t/FunctionBuilders.swiftinterface
+// RUN: %target-swift-frontend -typecheck -module-name ResultBuilders -emit-module-interface-path %t/ResultBuilders.swiftinterface %s
+// RUN: %FileCheck %s < %t/ResultBuilders.swiftinterface
 // RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/result_builders_client.swift
-// RUN: %target-swift-frontend -compile-module-from-interface %t/FunctionBuilders.swiftinterface -o %t/FunctionBuilders.swiftmodule
+// RUN: %target-swift-frontend -compile-module-from-interface %t/ResultBuilders.swiftinterface -o %t/ResultBuilders.swiftmodule
+// RUN: %FileCheck %s < %t/ResultBuilders.swiftinterface
 
+// CHECK: @_functionBuilder public struct TupleBuilder
 @resultBuilder
 public struct TupleBuilder {
   public static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
@@ -38,7 +40,7 @@ public struct TupleBuilder {
   public static func buildIf<T>(_ value: T?) -> T? { return value }
 }
 
-// CHECK-LABEL: public func tuplify<T>(_ cond: Swift.Bool, @FunctionBuilders.TupleBuilder body: (Swift.Bool) -> T)
+// CHECK-LABEL: public func tuplify<T>(_ cond: Swift.Bool, @ResultBuilders.TupleBuilder body: (Swift.Bool) -> T)
 public func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
@@ -52,13 +54,13 @@ public struct UsesBuilderProperty {
     "goodbye"
   }
 
-  // CHECK: public func myFunc(@FunctionBuilders.TupleBuilder fn: () -> ())
+  // CHECK: public func myFunc(@ResultBuilders.TupleBuilder fn: () -> ())
   public func myFunc(@TupleBuilder fn: () -> ()) {}
 }
 
 public protocol ProtocolWithBuilderProperty {
   associatedtype Assoc
-  
-  // CHECK: @FunctionBuilders.TupleBuilder var myVar: Self.Assoc { get }
+
+  // CHECK: @ResultBuilders.TupleBuilder var myVar: Self.Assoc { get }
   @TupleBuilder var myVar: Assoc { get }
 }

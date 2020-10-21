@@ -771,6 +771,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
+    } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
+      // Use @_functionBuilder in Swift interfaces to maintain backward
+      // compatibility.
+      Printer.printSimpleAttr("_functionBuilder", /*needAt=*/true);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
