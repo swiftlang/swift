@@ -264,7 +264,7 @@ _ = testing([Point(4, 89)]) { arg in
 struct Thing {
     init(_ block: (Point) -> Void) {}
 }
-@_functionBuilder
+@resultBuilder
 struct ThingBuilder {
     static func buildBlock(_ x: Thing...) -> [Thing] { x }
 }
@@ -300,7 +300,7 @@ CreateThings {
     }
 }
 
-// FIXME: No results in multi-statement closure with erroreous sibling function builder element
+// FIXME: No results in multi-statement closure with erroreous sibling result builder element
 CreateThings {
     Thing { point in
       print("hello")

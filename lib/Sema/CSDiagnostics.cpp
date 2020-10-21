@@ -242,9 +242,9 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return type->getAnyGeneric();
   };
 
-  // If the locator is for a function builder body result type, the requirement
+  // If the locator is for a result builder body result type, the requirement
   // came from the function's return type.
-  if (getLocator()->isForFunctionBuilderBodyResult()) {
+  if (getLocator()->isForResultBuilderBodyResult()) {
     auto *func = getAsDecl<FuncDecl>(getAnchor());
     return getAffectedDeclFromType(func->getResultInterfaceType());
   }
@@ -2256,7 +2256,7 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
-  case ConstraintLocator::FunctionBuilderBodyResult: {
+  case ConstraintLocator::ResultBuilderBodyResult: {
     diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
     break;
   }
@@ -5501,7 +5501,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
   return associator.allParamsAssigned();
 }
 
-SourceLoc SkipUnhandledConstructInFunctionBuilderFailure::getLoc() const {
+SourceLoc SkipUnhandledConstructInResultBuilderFailure::getLoc() const {
   if (auto stmt = unhandled.dyn_cast<Stmt *>())
     return stmt->getStartLoc();
 
@@ -5519,11 +5519,11 @@ static bool hasMissingElseInChain(IfStmt *ifStmt) {
   return false;
 }
 
-void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
+void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
     bool asNote) {
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
-    emitDiagnostic(asNote ? diag::note_function_builder_control_flow
-                          : diag::function_builder_control_flow,
+    emitDiagnostic(asNote ? diag::note_result_builder_control_flow
+                          : diag::result_builder_control_flow,
                    builder->getName());
 
     // Emit custom notes to help the user introduce the appropriate 'build'
@@ -5532,74 +5532,74 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
     std::string stubIndent;
     Type componentType;
     std::tie(buildInsertionLoc, stubIndent, componentType) =
-        determineFunctionBuilderBuildFixItInfo(builder);
+        determineResultBuilderBuildFixItInfo(builder);
 
     if (buildInsertionLoc.isInvalid()) {
       // Do nothing.
     } else if (isa<IfStmt>(stmt) && hasMissingElseInChain(cast<IfStmt>(stmt))) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_optional,
+          builder->getLoc(), diag::result_builder_missing_build_optional,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
-            builder, componentType, FunctionBuilderBuildFunction::BuildOptional,
+        printResultBuilderBuildFunction(
+            builder, componentType, ResultBuilderBuildFunction::BuildOptional,
             stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);
     } else if (isa<SwitchStmt>(stmt) || isa<IfStmt>(stmt)) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_either,
+          builder->getLoc(), diag::result_builder_missing_build_either,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
+        printResultBuilderBuildFunction(
             builder, componentType,
-            FunctionBuilderBuildFunction::BuildEitherFirst,
+            ResultBuilderBuildFunction::BuildEitherFirst,
             stubIndent, out);
         out << '\n';
-        printFunctionBuilderBuildFunction(
+        printResultBuilderBuildFunction(
             builder, componentType,
-            FunctionBuilderBuildFunction::BuildEitherSecond,
+            ResultBuilderBuildFunction::BuildEitherSecond,
             stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);
     } else if (isa<ForEachStmt>(stmt)) {
       auto diag = emitDiagnosticAt(
-          builder->getLoc(), diag::function_builder_missing_build_array,
+          builder->getLoc(), diag::result_builder_missing_build_array,
           builder->getDeclaredInterfaceType());
 
       std::string fixItString;
       {
         llvm::raw_string_ostream out(fixItString);
-        printFunctionBuilderBuildFunction(
-            builder, componentType, FunctionBuilderBuildFunction::BuildArray,
+        printResultBuilderBuildFunction(
+            builder, componentType, ResultBuilderBuildFunction::BuildArray,
             stubIndent, out);
       }
 
       diag.fixItInsert(buildInsertionLoc, fixItString);
     }
   } else {
-    emitDiagnostic(asNote ? diag::note_function_builder_decl
-                          : diag::function_builder_decl,
+    emitDiagnostic(asNote ? diag::note_result_builder_decl
+                          : diag::result_builder_decl,
                    builder->getName());
   }
 }
 
-bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
   diagnosePrimary(/*asNote=*/false);
   emitDiagnosticAt(builder, diag::kind_declname_declared_here,
                    builder->getDescriptiveKind(), builder->getName());
   return true;
 }
 
-bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
+bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsNote() {
   diagnosePrimary(/*asNote=*/true);
   return true;
 }

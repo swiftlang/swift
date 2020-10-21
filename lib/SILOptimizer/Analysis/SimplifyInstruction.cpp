@@ -488,7 +488,8 @@ SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
       || instanceType.getStructOrBoundGenericStruct()
       || instanceType.getEnumOrBoundGenericEnum()) {
     for (SILArgument *argument : MI->getFunction()->getArguments()) {
-      if (argument->getType().getASTType() == metaType)
+      if (argument->getType().getASTType() == metaType &&
+          argument->getType().isObject())
         return argument;
     }
   }

@@ -863,7 +863,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // FIXME: There is currently no way to distinguish between
-  // multi-statement closures which are function builder bodies
+  // multi-statement closures which are result builder bodies
   // (that are type-checked together with enclosing context)
   // and regular closures which are type-checked separately.
 

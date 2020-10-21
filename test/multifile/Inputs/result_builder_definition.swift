@@ -1,4 +1,4 @@
-@_functionBuilder
+@resultBuilder
 struct TupleBuilder {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)

@@ -3,7 +3,7 @@
 
 protocol View {}
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock<C0: View>(_ c0: C0) -> C0 {}
   static func buildBlock<C0: View, C1: View>(_ c0: C0, _ c1: C1) -> C1 {}

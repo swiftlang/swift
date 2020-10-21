@@ -593,10 +593,10 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
-// FunctionBuilder-related requests.
+// ResultBuilder-related requests.
 //----------------------------------------------------------------------------//
 
-bool AttachedFunctionBuilderRequest::isCached() const {
+bool AttachedResultBuilderRequest::isCached() const {
   // Only needs to be cached if there are any custom attributes.
   auto var = std::get<0>(getStorage());
   return var->getAttrs().hasAttribute<CustomAttr>();
@@ -1105,19 +1105,19 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckFunctionBuilderRequest computation.
+// PreCheckResultBuilderRequest computation.
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderBodyPreCheck value) {
+                           ResultBuilderBodyPreCheck value) {
   switch (value) {
-  case FunctionBuilderBodyPreCheck::Okay:
+  case ResultBuilderBodyPreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case ResultBuilderBodyPreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderBodyPreCheck::Error:
+  case ResultBuilderBodyPreCheck::Error:
     out << "error";
     break;
   }

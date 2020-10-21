@@ -4494,7 +4494,7 @@ bool ConstraintSystem::repairFailures(
                           getConstraintLocator(anchor, path));
   }
 
-  case ConstraintLocator::FunctionBuilderBodyResult: {
+  case ConstraintLocator::ResultBuilderBodyResult: {
     // If result type of the body couldn't be determined
     // there is going to be other fix available to diagnose
     // the underlying issue.
@@ -7594,7 +7594,7 @@ ConstraintSystem::simplifyOneWayConstraint(
       secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
-static Type getOpenedFunctionBuilderTypeFor(ConstraintSystem &cs,
+static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
                                             ConstraintLocatorBuilder locator) {
   auto lastElt = locator.last();
   if (!lastElt)
@@ -7620,7 +7620,7 @@ static Type getOpenedFunctionBuilderTypeFor(ConstraintSystem &cs,
     return Type();
 
   auto *PD = getParameterAt(choice, argToParamElt->getParamIdx());
-  auto builderType = PD->getFunctionBuilderType();
+  auto builderType = PD->getResultBuilderType();
   if (!builderType)
     return Type();
 
@@ -7657,15 +7657,15 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
-  // Determine whether a function builder will be applied.
-  auto functionBuilderType = getOpenedFunctionBuilderTypeFor(*this, locator);
+  // Determine whether a result builder will be applied.
+  auto resultBuilderType = getOpenedResultBuilderTypeFor(*this, locator);
 
   // Determine whether to introduce one-way constraints between the parameter's
   // type as seen in the body of the closure and the external parameter
   // type.
   bool oneWayConstraints =
     getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
-    functionBuilderType;
+    resultBuilderType;
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
@@ -7730,10 +7730,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  // If there is a function builder to apply, do so now.
-  if (functionBuilderType) {
-    if (auto result = matchFunctionBuilder(
-            closure, functionBuilderType, closureType->getResult(),
+  // If there is a result builder to apply, do so now.
+  if (resultBuilderType) {
+    if (auto result = matchResultBuilder(
+            closure, resultBuilderType, closureType->getResult(),
             ConstraintKind::Conversion, locator)) {
       return result->isSuccess();
     }
@@ -10131,7 +10131,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveAddressOf:
   case FixKind::AddMissingArguments:
   case FixKind::MoveOutOfOrderArgument:
-  case FixKind::SkipUnhandledConstructInFunctionBuilder:
+  case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
@@ -10146,7 +10146,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
-  case FixKind::IgnoreInvalidFunctionBuilderBody:
+  case FixKind::IgnoreInvalidResultBuilderBody:
   case FixKind::SpecifyContextualTypeForNil: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -10367,16 +10367,16 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
 
   // If we have an unresolved closure argument, form an unsolved argument
   // conversion constraint, making sure to reference the type variables for
-  // a function builder if applicable. This ensures we properly connect the
-  // closure type variable with any type variables in the function builder, as
+  // a result builder if applicable. This ensures we properly connect the
+  // closure type variable with any type variables in the result builder, as
   // such type variables will be accessible within the body of the closure when
   // we open it.
   first = getFixedTypeRecursive(first, /*rvalue*/ false);
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
-      // Extract any type variables present in the parameter's function builder.
+      // Extract any type variables present in the parameter's result builder.
       SmallVector<TypeVariableType *, 4> typeVars;
-      if (auto builderTy = getOpenedFunctionBuilderTypeFor(*this, locator))
+      if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
         builderTy->getTypeVariables(typeVars);
 
       auto *loc = getConstraintLocator(locator);

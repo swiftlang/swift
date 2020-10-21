@@ -735,10 +735,10 @@ void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
-/// Request the custom attribute which attaches a function builder to the
+/// Request the custom attribute which attaches a result builder to the
 /// given declaration.
-class AttachedFunctionBuilderRequest :
-    public SimpleRequest<AttachedFunctionBuilderRequest,
+class AttachedResultBuilderRequest :
+    public SimpleRequest<AttachedResultBuilderRequest,
                          CustomAttr *(ValueDecl *),
                          RequestFlags::Cached> {
 public:
@@ -756,10 +756,10 @@ public:
   bool isCached() const;
 };
 
-/// Request the function builder type attached to the given declaration,
+/// Request the result builder type attached to the given declaration,
 /// if any.
-class FunctionBuilderTypeRequest :
-    public SimpleRequest<FunctionBuilderTypeRequest,
+class ResultBuilderTypeRequest :
+    public SimpleRequest<ResultBuilderTypeRequest,
                          Type(ValueDecl *),
                          RequestFlags::Cached> {
 public:
@@ -1960,7 +1960,7 @@ public:
   void cacheResult(Witness value) const;
 };
 
-struct PreCheckFunctionBuilderDescriptor {
+struct PreCheckResultBuilderDescriptor {
   AnyFunctionRef Fn;
   bool SuppressDiagnostics;
 
@@ -1972,35 +1972,35 @@ private:
   BraceStmt *Body;
 
 public:
-  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
+  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
       : Fn(Fn), SuppressDiagnostics(suppressDiagnostics), Body(Fn.getBody()) {}
 
   friend llvm::hash_code
-  hash_value(const PreCheckFunctionBuilderDescriptor &owner) {
+  hash_value(const PreCheckResultBuilderDescriptor &owner) {
     return llvm::hash_combine(owner.Fn, owner.Body);
   }
 
-  friend bool operator==(const PreCheckFunctionBuilderDescriptor &lhs,
-                         const PreCheckFunctionBuilderDescriptor &rhs) {
+  friend bool operator==(const PreCheckResultBuilderDescriptor &lhs,
+                         const PreCheckResultBuilderDescriptor &rhs) {
     return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
   }
 
-  friend bool operator!=(const PreCheckFunctionBuilderDescriptor &lhs,
-                         const PreCheckFunctionBuilderDescriptor &rhs) {
+  friend bool operator!=(const PreCheckResultBuilderDescriptor &lhs,
+                         const PreCheckResultBuilderDescriptor &rhs) {
     return !(lhs == rhs);
   }
 
-  friend SourceLoc extractNearestSourceLoc(PreCheckFunctionBuilderDescriptor d) {
+  friend SourceLoc extractNearestSourceLoc(PreCheckResultBuilderDescriptor d) {
     return extractNearestSourceLoc(d.Fn);
   }
 
   friend void simple_display(llvm::raw_ostream &out,
-                             const PreCheckFunctionBuilderDescriptor &d) {
+                             const PreCheckResultBuilderDescriptor &d) {
     simple_display(out, d.Fn);
   }
 };
 
-enum class FunctionBuilderBodyPreCheck : uint8_t {
+enum class ResultBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
 
@@ -2011,10 +2011,10 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
   HasReturnStmt,
 };
 
-class PreCheckFunctionBuilderRequest
-    : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(
-                               PreCheckFunctionBuilderDescriptor),
+class PreCheckResultBuilderRequest
+    : public SimpleRequest<PreCheckResultBuilderRequest,
+                           ResultBuilderBodyPreCheck(
+                               PreCheckResultBuilderDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2023,8 +2023,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const;
+  ResultBuilderBodyPreCheck
+  evaluate(Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const;
 
 public:
   // Separate caching.
@@ -2759,7 +2759,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, FunctionBuilderBodyPreCheck pck);
+void simple_display(llvm::raw_ostream &out, ResultBuilderBodyPreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
