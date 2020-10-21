@@ -456,6 +456,7 @@ private:
   Optional<ForeignAsyncConvention::Info>
   considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
+                      SmallVectorImpl<char> &baseNameScratch,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName,

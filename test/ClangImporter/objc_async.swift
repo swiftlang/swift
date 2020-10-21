@@ -18,6 +18,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // still async version...
   let _: Int = slowServer.doSomethingConflicted("thinking")
   // expected-error@-1{{call is 'async' but is not marked with 'await'}}
+
+  let _: String? = await try slowServer.fortune()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {

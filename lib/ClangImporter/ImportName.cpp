@@ -1189,6 +1189,7 @@ Optional<ForeignAsyncConvention::Info>
 NameImporter::considerAsyncImport(
     const clang::ObjCMethodDecl *clangDecl,
     StringRef &baseName,
+    SmallVectorImpl<char> &baseNameScratch,
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params,
     bool isInitializer, bool hasCustomName,
@@ -1222,6 +1223,17 @@ NameImporter::considerAsyncImport(
     // The parameter has an appropriate name.
   } else {
     return None;
+  }
+
+  // If there's no custom name, and the base name starts with "get", drop the
+  // get.
+  if (!hasCustomName) {
+    StringRef currentBaseName = newBaseName ? *newBaseName : baseName;
+    if (currentBaseName.size() > 3 &&
+        camel_case::getFirstWord(currentBaseName) == "get") {
+      newBaseName = camel_case::toLowercaseInitialisms(
+          currentBaseName.substr(3), baseNameScratch);
+    }
   }
 
   // Used for returns once we've determined that the method cannot be
@@ -1461,6 +1473,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   }
 
   // If we have a swift_name attribute, use that.
+  SmallString<32> asyncBaseNameScratch;
   if (auto *nameAttr = findSwiftNameAttr(D, version)) {
     bool skipCustomName = false;
 
@@ -1539,9 +1552,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
         if (version.supportsConcurrency()) {
           if (auto asyncInfo = considerAsyncImport(
-                  method, parsedName.BaseName, parsedName.ArgumentLabels,
-                  params, isInitializer, /*hasCustomName=*/true,
-                  result.getErrorInfo())) {
+                  method, parsedName.BaseName, asyncBaseNameScratch,
+                  parsedName.ArgumentLabels, params, isInitializer,
+                  /*hasCustomName=*/true, result.getErrorInfo())) {
             result.info.hasAsyncInfo = true;
             result.info.asyncInfo = *asyncInfo;
 
@@ -1816,8 +1829,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (version.supportsConcurrency() &&
         result.info.accessorKind == ImportedAccessorKind::None) {
       if (auto asyncInfo = considerAsyncImport(
-              objcMethod, baseName, argumentNames, params, isInitializer,
-              /*hasCustomName=*/false,
+              objcMethod, baseName, asyncBaseNameScratch,
+              argumentNames, params, isInitializer, /*hasCustomName=*/false,
               result.getErrorInfo())) {
         result.info.hasAsyncInfo = true;
         result.info.asyncInfo = *asyncInfo;
