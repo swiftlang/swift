@@ -643,5 +643,7 @@ ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
 NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
      "value escapes here", ())
 
+WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

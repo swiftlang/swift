@@ -251,6 +251,8 @@ PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
+     "Diagnose improperly nested '@_semantics' functions")
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
