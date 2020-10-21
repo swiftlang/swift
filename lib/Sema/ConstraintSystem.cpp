@@ -4488,8 +4488,8 @@ ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
                             .castTo<LocatorPathElt::ImplicitConversion>()
                             .getConversionKind();
 
-      if (conversion == ConversionRestrictionKind::TypeToCGFloat ||
-          conversion == ConversionRestrictionKind::CGFloatToType) {
+      if (conversion == ConversionRestrictionKind::DoubleToCGFloat ||
+          conversion == ConversionRestrictionKind::CGFloatToDouble) {
         // TODO: This is not very efficient, long term we should just
         //       save a single `ArgumentInfo` and use it for all of
         //       the locations where conversion is needed.
@@ -4902,8 +4902,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
-  case ConversionRestrictionKind::CGFloatToType:
-  case ConversionRestrictionKind::TypeToCGFloat:
+  case ConversionRestrictionKind::CGFloatToDouble:
+  case ConversionRestrictionKind::DoubleToCGFloat:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

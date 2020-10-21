@@ -6690,8 +6690,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               ForeignObjectConversionExpr(result, toType));
     }
 
-    case ConversionRestrictionKind::CGFloatToType:
-    case ConversionRestrictionKind::TypeToCGFloat: {
+    case ConversionRestrictionKind::CGFloatToDouble:
+    case ConversionRestrictionKind::DoubleToCGFloat: {
       auto *fnExpr = TypeExpr::createImplicit(toType, ctx);
       cs.cacheExprTypes(fnExpr);
 

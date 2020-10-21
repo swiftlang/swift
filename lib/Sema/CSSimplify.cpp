@@ -5089,9 +5089,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
+      auto isDoubleType = [&](NominalType *NTD) {
+        return NTD->getDecl() == getASTContext().getDoubleDecl();
+      };
+
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
-          (desugar1->isCGFloatType() || desugar2->isCGFloatType())) {
+          ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
+           (isDoubleType(nominal1) || isDoubleType(nominal2)))) {
         SmallVector<LocatorPathElt, 4> path;
         auto anchor = locator.getLocatorParts(path);
 
@@ -5112,15 +5117,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               if (auto elt =
                       rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
                 auto convKind = elt->getConversionKind();
-                return convKind == ConversionRestrictionKind::TypeToCGFloat ||
-                       convKind == ConversionRestrictionKind::CGFloatToType;
+                return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
+                       convKind == ConversionRestrictionKind::CGFloatToDouble;
               }
               return false;
             })) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloatType()
-                  ? ConversionRestrictionKind::CGFloatToType
-                  : ConversionRestrictionKind::TypeToCGFloat);
+                  ? ConversionRestrictionKind::CGFloatToDouble
+                  : ConversionRestrictionKind::DoubleToCGFloat);
         }
       }
 
@@ -10523,8 +10528,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       ConstraintKind::Subtype, subflags, locator);
   }
 
-  case ConversionRestrictionKind::TypeToCGFloat:
-  case ConversionRestrictionKind::CGFloatToType: {
+  case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::CGFloatToDouble: {
     increaseScore(SK_ImplicitValueConversion);
     if (worseThanBestSolution())
       return SolutionKind::Error;

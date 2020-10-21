@@ -19,7 +19,8 @@ var pi = 3.14159265358979
 var d: CGFloat = 2.0
 var dpi:CGFloat = d*pi // Ok (implicit conversion Float -> CGFloat)
 
-let ff: CGFloat = floorf(20.0) // Ok (implicit conversion Float -> CGFloat)
+let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let _: CGFloat = floor(20.0) // Ok (Double -> CGFloat) conversion
 
 let total = 15.0
 let count = 7
@@ -34,7 +35,7 @@ var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' t
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // Ok (implicit conversion Float -> CGFloat for each argument and CGFloat -> Double for the result)
+var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to specified type 'Double'}}
 
 func f() -> Bool {
   return 1 + 1 // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
@@ -171,4 +172,24 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
 // SR-1612: Type comparison of foreign types is always true.
 func is_foreign(a: AnyObject) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
+
+func test_implicit_cgfloat_conversion() {
+  func test_to(_: CGFloat) {}
+  func test_from(_: Double) {}
+
+  let d: Double    = 0.0
+  let f: Float     = 0.0
+  let cgf: CGFloat = 0.0
+
+  test_to(d) // Ok (Double -> CGFloat
+  test_to(f) // error
+
+  test_from(cgf) // Ok (CGFloat -> Double)
+  test_from(f) // error
+
+  let _: CGFloat = d // Ok
+  let _: CGFloat = f // error
+  let _: Double  = cgf // Ok
+  let _: Float   = cgf // error
 }
