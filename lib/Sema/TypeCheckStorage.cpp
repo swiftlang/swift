@@ -785,10 +785,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         if (accessor->getAccessorKind() == AccessorKind::Get ||
             accessor->getAccessorKind() == AccessorKind::Read) {
           if (wrappedValue->getAttrs().getUnavailable(ctx)) {
+            ExportContext where = ExportContext::forDeclSignature(var);
             diagnoseExplicitUnavailability(
                 wrappedValue,
                 var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-                var->getDeclContext(), nullptr);
+                where, nullptr);
           }
         }
 

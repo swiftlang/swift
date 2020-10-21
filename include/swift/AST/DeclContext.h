@@ -57,6 +57,7 @@ namespace swift {
   class GenericTypeParamType;
   class InfixOperatorDecl;
   class InfixOperatorLookupResult;
+  enum class PlatformKind: uint8_t;
   class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;

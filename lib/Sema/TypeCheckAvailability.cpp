@@ -38,11 +38,22 @@
 using namespace swift;
 
 ExportContext::ExportContext(DeclContext *DC, FragileFunctionKind kind,
-                             bool spi, bool exported)
+                             bool spi, bool exported, bool implicit, bool deprecated,
+                             Optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
-  Reason = ExportabilityReason::General;
+  Implicit = implicit;
+  Deprecated = deprecated;
+  if (unavailablePlatformKind) {
+    Unavailable = 1;
+    Platform = unsigned(*unavailablePlatformKind);
+  } else {
+    Unavailable = 0;
+    Platform = 0;
+  }
+
+  Reason = unsigned(ExportabilityReason::General);
 }
 
 bool swift::isExported(const ValueDecl *VD) {
@@ -95,7 +106,84 @@ bool swift::isExported(const Decl *D) {
   return true;
 }
 
+template<typename Fn>
+static void forEachOuterDecl(DeclContext *DC, Fn fn) {
+  for (; !DC->isModuleScopeContext(); DC = DC->getParent()) {
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+      break;
+
+    case DeclContextKind::Initializer:
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+        fn(PBI->getBinding());
+      break;
+
+    case DeclContextKind::SubscriptDecl:
+      fn(cast<SubscriptDecl>(DC));
+      break;
+
+    case DeclContextKind::EnumElementDecl:
+      fn(cast<EnumElementDecl>(DC));
+      break;
+
+    case DeclContextKind::AbstractFunctionDecl:
+      fn(cast<AbstractFunctionDecl>(DC));
+
+      if (auto *AD = dyn_cast<AccessorDecl>(DC))
+        fn(AD->getStorage());
+      break;
+
+    case DeclContextKind::GenericTypeDecl:
+      fn(cast<GenericTypeDecl>(DC));
+      break;
+
+    case DeclContextKind::ExtensionDecl:
+      fn(cast<ExtensionDecl>(DC));
+      break;
+    }
+  }
+}
+
+static void computeExportContextBits(Decl *D,
+                                     bool *implicit, bool *deprecated,
+                                     Optional<PlatformKind> *unavailablePlatformKind) {
+  if (D->isImplicit())
+    *implicit = true;
+
+  auto &Ctx = D->getASTContext();
+
+  if (D->getAttrs().getDeprecated(Ctx))
+    *deprecated = true;
+
+  if (auto *A = D->getAttrs().getUnavailable(Ctx)) {
+    *unavailablePlatformKind = A->Platform;
+  }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        computeExportContextBits(VD, implicit, deprecated,
+                                 unavailablePlatformKind);
+    }
+  }
+}
+
 ExportContext ExportContext::forDeclSignature(Decl *D) {
+  bool implicit = false;
+  bool deprecated = false;
+  Optional<PlatformKind> unavailablePlatformKind;
+  computeExportContextBits(D, &implicit, &deprecated,
+                           &unavailablePlatformKind);
+  forEachOuterDecl(D->getDeclContext(),
+                   [&](Decl *D) {
+                     computeExportContextBits(D, &implicit, &deprecated,
+                                              &unavailablePlatformKind);
+                   });
+
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
 
@@ -113,11 +201,20 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, fragileKind, spi, exported);
+  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+                       unavailablePlatformKind);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
-  ;
+  bool implicit = false;
+  bool deprecated = false;
+  Optional<PlatformKind> unavailablePlatformKind;
+  forEachOuterDecl(DC,
+                   [&](Decl *D) {
+                     computeExportContextBits(D, &implicit, &deprecated,
+                                              &unavailablePlatformKind);
+                   });
+
   auto fragileKind = DC->getFragileFunctionKind();
 
   bool spi = false;
@@ -129,19 +226,26 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
     assert(fragileKind.kind == FragileFunctionKind::None);
   }
 
-  return ExportContext(DC, fragileKind, spi, exported);
+  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+                       unavailablePlatformKind);
 }
 
-ExportContext ExportContext::forReason(ExportabilityReason reason) const {
+ExportContext ExportContext::withReason(ExportabilityReason reason) const {
   auto copy = *this;
-  copy.Reason = reason;
+  copy.Reason = unsigned(reason);
   return copy;
 }
 
-ExportContext ExportContext::forExported(bool exported) const {
+ExportContext ExportContext::withExported(bool exported) const {
   auto copy = *this;
   copy.Exported = isExported() && exported;
   return copy;
+}
+
+Optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
+  if (Unavailable)
+    return PlatformKind(Platform);
+  return None;
 }
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {
@@ -150,7 +254,7 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
 
 Optional<ExportabilityReason> ExportContext::getExportabilityReason() const {
   if (Exported)
-    return Reason;
+    return ExportabilityReason(Reason);
   return None;
 }
 
@@ -1569,85 +1673,15 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
   return nullptr;
 }
 
-/// Returns true if some declaration lexically enclosing the reference
-/// matches the passed in predicate and false otherwise.
-static bool
-someEnclosingDeclMatches(SourceRange ReferenceRange,
-                         const DeclContext *ReferenceDC,
-                         llvm::function_ref<bool(const Decl *)> Pred) {
-  // Climb the DeclContext hierarchy to see if any of the containing
-  // declarations matches the predicate.
-  const DeclContext *DC = ReferenceDC;
-  while (true) {
-    auto *D = DC->getInnermostDeclarationDeclContext();
-    if (!D)
-      break;
-
-    if (Pred(D)) {
-      return true;
-    }
-
-    // If we are in an accessor, check to see if the associated
-    // property matches the predicate.
-    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-      if (Pred(accessor->getStorage()))
-        return true;
-    }
-
-    DC = D->getDeclContext();
-  }
-
-  // Search the AST starting from our innermost declaration context to see if
-  // if the reference is inside a property declaration but not inside an
-  // accessor (this can happen for the TypeRepr for the declared type of a
-  // property, for example).
-  // We can't rely on the DeclContext hierarchy climb above because properties
-  // do not introduce a new DeclContext.
-
-  // Don't search for a containing declaration if we don't have a source range.
-  if (ReferenceRange.isInvalid())
-    return false;
-
-  ASTContext &Ctx = ReferenceDC->getASTContext();
-  const Decl *DeclToSearch =
-      findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
-
-  // We may not be able to find a declaration to search if the ReferenceRange
-  // isn't useful (i.e., we are in synthesized code).
-  if (!DeclToSearch)
-    return false;
-
-  return Pred(abstractSyntaxDeclForAvailableAttribute(DeclToSearch));
-}
-
-/// Returns true if the reference or any of its parents is an
-/// implicit function.
-static bool isInsideImplicitFunction(SourceRange ReferenceRange,
-                                     const DeclContext *DC) {
-  auto IsInsideImplicitFunc = [](const Decl *D) {
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
-    return AFD && AFD->isImplicit();
-  };
-
-  return someEnclosingDeclMatches(ReferenceRange, DC, IsInsideImplicitFunc);
-}
-
-/// Returns true if the reference or any of its parents is an
-/// unavailable (or obsoleted) declaration.
-static bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
-                                           const DeclContext *ReferenceDC) {
-  auto IsUnavailable = [](const Decl *D) {
-    return D->getAttrs().getUnavailable(D->getASTContext());
-  };
-
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
-}
-
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const ValueDecl *referencedD, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailableAttr *attr) {
+    const ValueDecl *D, ExportContext where,
+    const AvailableAttr *attr) {
+  auto referencedPlatform = where.getUnavailablePlatformKind();
+  if (!referencedPlatform)
+    return false;
+
   if (!attr->isUnconditionallyUnavailable()) {
     return false;
   }
@@ -1656,31 +1690,13 @@ static bool isInsideCompatibleUnavailableDeclaration(
   // but allow the use of types.
   PlatformKind platform = attr->Platform;
   if (platform == PlatformKind::none &&
-      !isa<TypeDecl>(referencedD)) {
+      !isa<TypeDecl>(D)) {
     return false;
   }
 
-  auto IsUnavailable = [platform](const Decl *D) {
-    auto EnclosingUnavailable =
-        D->getAttrs().getUnavailable(D->getASTContext());
-    return EnclosingUnavailable &&
-        (EnclosingUnavailable->Platform == platform ||
-         inheritsAvailabilityFromPlatform(platform,
-           EnclosingUnavailable->Platform));
-  };
-
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
-}
-
-/// Returns true if the reference is lexically contained in a declaration
-/// that is deprecated on all deployment targets.
-static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC){
-  auto IsDeprecated = [](const Decl *D) {
-    return D->getAttrs().getDeprecated(D->getASTContext());
-  };
-
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);
+  return (*referencedPlatform == platform ||
+          inheritsAvailabilityFromPlatform(platform,
+                                           *referencedPlatform));
 }
 
 static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
@@ -2059,26 +2075,21 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
+                                       ExportContext Where,
                                        const ValueDecl *DeprecatedDecl,
                                        const ApplyExpr *Call) {
   const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
   if (!Attr)
     return;
 
-  // We don't want deprecated declarations to trigger warnings
-  // in synthesized code.
-  if (ReferenceRange.isInvalid() &&
-      isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
-    return;
-  }
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC)) {
+  if (Where.isDeprecated()) {
     return;
   }
 
+  auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
     AvailabilityContext RunningOSVersions =
@@ -2165,8 +2176,8 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
     return;
   }
 
-  diagnoseExplicitUnavailability(base, override->getLoc(),
-                                 override->getDeclContext(),
+  ExportContext where = ExportContext::forDeclSignature(override);
+  diagnoseExplicitUnavailability(base, override->getLoc(), where,
                                  /*Flags*/None,
                                  [&](InFlightDiagnostic &diag) {
     ParsedDeclName parsedName = parseDeclName(attr->Rename);
@@ -2199,10 +2210,10 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
                                            SourceRange R,
-                                           const DeclContext *DC,
+                                           ExportContext Where,
                                            const ApplyExpr *call,
                                            DeclAvailabilityFlags Flags) {
-  return diagnoseExplicitUnavailability(D, R, DC, Flags,
+  return diagnoseExplicitUnavailability(D, R, Where, Flags,
                                         [=](InFlightDiagnostic &diag) {
     fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
@@ -2273,30 +2284,19 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
-    const DeclContext *DC,
+    ExportContext Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
 
-  // Suppress the diagnostic if we are in synthesized code inside
-  // a synthesized function and the reference is lexically
-  // contained in a declaration that is itself marked unavailable.
-  // The right thing to do here is to not synthesize that code in the
-  // first place. rdar://problem/20491640
-  if (R.isInvalid() && isInsideImplicitFunction(R, DC) &&
-      isInsideUnavailableDeclaration(R, DC)) {
-    return false;
-  }
-
   // Calling unavailable code from within code with the same
   // unavailability is OK -- the eventual caller can't call the
   // enclosing code in the same situations it wouldn't be able to
   // call this code.
-  if (isInsideCompatibleUnavailableDeclaration(D, R, DC, Attr)) {
+  if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
     return false;
-  }
 
   SourceLoc Loc = R.Start;
   DeclName Name;
@@ -2441,20 +2441,6 @@ class AvailabilityWalker : public ASTWalker {
   SmallVector<const Expr *, 16> ExprStack;
   ExportContext Where;
 
-  /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
-  /// implicit.
-  bool inSynthesizedInitRawValue() {
-    auto *DC = Where.getDeclContext();
-    auto init = dyn_cast_or_null<ConstructorDecl>(
-                    DC->getInnermostDeclarationDeclContext());
-
-    return init &&
-           init->isImplicit() &&
-           init->getParameters()->size() == 1 &&
-           init->getParameters()->get(0)->getArgumentName() ==
-                   Context.Id_rawValue;
-  }
-
 public:
   AvailabilityWalker(ExportContext Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
@@ -2477,20 +2463,8 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
-      DeclAvailabilityFlags flags = None;
-      if (inSynthesizedInitRawValue())
-        // HACK: If a raw-value enum has cases with `@available(introduced:)`
-        // attributes, the auto-derived `init(rawValue:)` will contain
-        // DeclRefExprs which reference those cases. It will also contain
-        // appropriate `guard #available` statements to keep them from running
-        // on older versions, but the availability checker can't verify that
-        // because the synthesized code uses invalid SourceLocs. Don't diagnose
-        // these errors; instead, take it on faith that
-        // DerivedConformanceRawRepresentable will do the right thing.
-        flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
-
       diagAvailability(DR->getDeclRef(), DR->getSourceRange(),
-                       getEnclosingApplyExpr(), flags);
+                       getEnclosingApplyExpr(), None);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -2776,9 +2750,7 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
     }
   }
 
-  auto *DC = Where.getDeclContext();
-
-  if (diagnoseExplicitUnavailability(D, R, DC, call, Flags))
+  if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -2788,14 +2760,13 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
-    TypeChecker::diagnoseIfDeprecated(R, DC, D, call);
-
-  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
-    return false;
+    TypeChecker::diagnoseIfDeprecated(R, Where, D, call);
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
     return false;
+
+  auto *DC = Where.getDeclContext();
 
   // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, R.Start, DC);
@@ -2970,7 +2941,10 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 
 /// Diagnose uses of unavailable declarations.
 void swift::diagAvailability(const Expr *E, DeclContext *DC) {
-  AvailabilityWalker walker(ExportContext::forFunctionBody(DC));
+  auto where = ExportContext::forFunctionBody(DC);
+  if (where.isImplicit())
+    return;
+  AvailabilityWalker walker(where);
   const_cast<Expr*>(E)->walk(walker);
 }
 
@@ -2980,8 +2954,8 @@ class StmtAvailabilityWalker : public ASTWalker {
   ExportContext Where;
 
 public:
-  explicit StmtAvailabilityWalker(DeclContext *DC)
-    : Where(ExportContext::forFunctionBody(DC)) {}
+  explicit StmtAvailabilityWalker(ExportContext where)
+    : Where(where) {}
 
   /// We'll visit the expression from performSyntacticExprDiagnostics().
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -3008,7 +2982,11 @@ void swift::diagAvailability(const Stmt *S, DeclContext *DC) {
   if (isa<BraceStmt>(S))
     return;
 
-  StmtAvailabilityWalker walker(DC);
+  auto where = ExportContext::forFunctionBody(DC);
+  if (where.isImplicit())
+    return;
+
+  StmtAvailabilityWalker walker(where);
   const_cast<Stmt*>(S)->walk(walker);
 }
 
@@ -3210,6 +3188,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      ExportContext Where,
                                      DeclAvailabilityFlags Flags)
 {
+  assert(!Where.isImplicit());
   AvailabilityWalker AW(Where);
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }

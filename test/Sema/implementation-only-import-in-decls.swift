@@ -73,7 +73,6 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; 'BADLibrary' has been imported as implementation-only}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; 'BADLibrary' has been imported as implementation-only}}
