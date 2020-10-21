@@ -1606,17 +1606,27 @@ ConstraintSystem::getTypeOfMemberReference(
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getSelfProtocolDecl()) {
+    // For a protocol, substitute the base object directly. We don't need a
+    // conformance constraint because we wouldn't have found the declaration
+    // if it didn't conform.
+    addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
+                  getConstraintLocator(locator));
+
     if (isStaticMemberRefOnProtocol) {
-      // If this is a static member reference on a protocol metatype
-      // we need to make sure that base type, we yet to infer from a
-      // result type of the member, does indeed conform to `Self`.
-      addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
-    } else {
-      // For a protocol, substitute the base object directly. We don't need a
-      // conformance constraint because we wouldn't have found the declaration
-      // if it didn't conform.
-      addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
-                    getConstraintLocator(locator));
+      // Since base is a protocol metatype we could use to make sure that
+      // self type inferred from result of the member does indeed conform
+      // to the expected protocol.
+      //
+      // Delay solving this constraint until after member choice has
+      // been completely resolved by the constraint system, so that
+      // conformance failure has access to a referenced declaration.
+      auto *constraint = Constraint::create(
+          *this, ConstraintKind::ConformsTo, selfObjTy, baseObjTy,
+          getConstraintLocator(
+              locator.withPathElement(ConstraintLocator::MemberRefBase)));
+
+      addUnsolvedConstraint(constraint);
+      activateConstraint(constraint);
     }
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);

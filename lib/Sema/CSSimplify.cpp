@@ -5962,6 +5962,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       }
     }
 
+    if (path.back().is<LocatorPathElt::MemberRefBase>()) {
+      path.pop_back();
+
+      auto *memberLoc = getConstraintLocator(anchor, path);
+      if (auto overload = findSelectedOverloadFor(memberLoc)) {
+        const auto &choice = overload->choice;
+        assert(choice.isDecl());
+
+        auto *decl = choice.getDecl();
+        auto nameRef = choice.getFunctionRefKind() == FunctionRefKind::Compound
+                           ? decl->createNameRef()
+                           : DeclNameRef(decl->getBaseName());
+
+        auto *fix = AllowTypeOrInstanceMember::create(
+            *this, MetatypeType::get(protocolTy, getASTContext()), decl,
+            nameRef, memberLoc);
+
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
