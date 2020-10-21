@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
   std::string CPUStr, FeaturesStr;
   llvm::TargetMachine *Machine = nullptr;
   const llvm::TargetOptions Options =
-      llvm::codegen::InitTargetOptionsFromCodeGenFlags();
+      llvm::codegen::InitTargetOptionsFromCodeGenFlags(ModuleTriple);
 
   if (ModuleTriple.getArch()) {
     CPUStr = llvm::codegen::getCPUStr();
