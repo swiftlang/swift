@@ -72,8 +72,6 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
   //   SwiftError *errorResult;
   //   IndirectResultTypes *indirectResults...;
-  //   SelfType self?;
-  //   ArgTypes formalArguments...;
   //   union {
   //     struct {
   //       SwiftPartialFunction * __ptrauth(...) resumeFromYield?;
@@ -173,10 +171,6 @@ namespace irgen {
       assert(hasLocalContext());
       return getElement(getLocalContextIndex());
     }
-    ParameterConvention getLocalContextConvention() {
-      assert(hasLocalContext());
-      return localContextInfo->convention;
-    }
     SILType getLocalContextType() {
       assert(hasLocalContext());
       return localContextInfo->type;
@@ -230,6 +224,10 @@ namespace irgen {
         Optional<ArgumentInfo> localContextInfo);
   };
 
+  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
+                                          AsyncContextLayout layout,
+                                          CanSILFunctionType functionType,
+                                          llvm::Value *thickContext);
   AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
                                            SILFunction *function);
 
@@ -320,6 +318,16 @@ namespace irgen {
   Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
+  /// Allocate task local storage for the specified layout but using the
+  /// provided dynamic size.  Allowing the size to be specified dynamically is
+  /// necessary for applies of thick functions the sizes of whose async contexts
+  /// are dependent on the underlying, already partially applied, called
+  /// function.  The provided sizeLowerBound will be used to track the lifetime
+  /// of the allocation that is known statically.
+  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
+                                                 AsyncContextLayout layout,
+                                                 llvm::Value *sizeValue,
+                                                 Size sizeLowerBound);
   std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
                                                  AsyncContextLayout layout);
   void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);

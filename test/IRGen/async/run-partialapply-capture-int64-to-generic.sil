@@ -1,0 +1,64 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt32 : $@convention(thin) (Int32) -> ()
+
+sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T {
+bb0(%x : $Int32, %f : $@async @callee_owned (Int32) -> @out T):
+  %p = partial_apply %f(%x) : $@async @callee_owned (Int32) -> @out T
+  return %p : $@async @callee_owned () -> @out T
+}
+
+// CHECK-LL: define internal swiftcc void @"$sTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$s6calleeTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+sil @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T {
+entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printInt32 = function_ref @printInt32 : $@convention(thin) (Int32) -> ()
+  %result = apply %printGeneric<T>(%in_t) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 1
+  %printInt32_result = apply %printInt32(%x) : $@convention(thin) (Int32) -> () // CHECK: 6789
+  copy_addr %in_t to [initialization] %out_t : $*T
+  return %result : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %callee = function_ref @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
+  %first_literal = integer_literal $Builtin.Int32, 1
+  %first = struct $Int32 (%first_literal : $Builtin.Int32)
+  %first_addr = alloc_stack $Int32
+  store %first to %first_addr : $*Int32
+  %callee1 = partial_apply %callee<Int32>(%first_addr) : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
+  %partialApplier = function_ref @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T
+  %second_literal = integer_literal $Builtin.Int32, 6789
+  %second = struct $Int32 (%second_literal : $Builtin.Int32)
+  %callee2 = apply %partialApplier<Int32>(%second, %callee1) : $@convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T
+  
+  %result_addr = alloc_stack $Int32
+  %result = apply %callee2(%result_addr) : $@async @callee_owned () -> @out Int32
+
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printGeneric_result = apply %printGeneric<Int32>(%result_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 1
+
+  dealloc_stack %result_addr : $*Int32
+  dealloc_stack %first_addr : $*Int32
+
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

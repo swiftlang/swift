@@ -1,0 +1,71 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+public protocol Q {
+  associatedtype Update
+}
+
+public struct BaseProducer<T> : Q {
+  public typealias Update = T
+}
+sil_witness_table <T> BaseProducer<T> : Q module main {
+  associated_type Update : T
+}
+
+public class WeakBox<T> {}
+sil_vtable WeakBox {}
+
+// CHECK-LL: define hidden swiftcc void @takingQ(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @takingQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> () {
+entry(%box : $WeakBox<τ_0_0>):
+  %box_addr = alloc_stack $WeakBox<τ_0_0>
+  store %box to %box_addr : $*WeakBox<τ_0_0>
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %printGeneric<WeakBox<τ_0_0>>(%box_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: main.WeakBox<main.BaseProducer<Swift.Int64>>
+  dealloc_stack %box_addr : $*WeakBox<τ_0_0>
+  return %result : $()
+}
+
+
+// CHECK-LL: define internal swiftcc void @"$s7takingQTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+sil public @bind_polymorphic_param_from_forwarder_parameter : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> () {
+bb0(%0 : $*τ_0_1):
+  %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
+  %8 = function_ref @takingQ : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  %9 = partial_apply %8<BaseProducer<τ_0_1>>() : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> ()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %bind_polymorphic_param_from_forwarder_parameter = function_ref @bind_polymorphic_param_from_forwarder_parameter : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> ()
+  %int_literal = integer_literal $Builtin.Int64, 9999
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %int_addr = alloc_stack $Int64
+  store %int to %int_addr : $*Int64
+  %partiallyApplied = apply %bind_polymorphic_param_from_forwarder_parameter<Int64>(%int_addr) : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> ()
+  dealloc_stack %int_addr : $*Int64
+
+  %box = alloc_ref $WeakBox<BaseProducer<Int64>>
+  %result = apply %partiallyApplied(%box) : $@callee_owned @async (@owned WeakBox<BaseProducer<Int64>>) -> ()
+
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Runtime/Config.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecordLayout.h"
@@ -135,9 +136,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   //   SelfType self?;
   bool hasLocalContextParameter = hasSelfContextParameter(substitutedType);
   bool canHaveValidError = substitutedType->hasErrorResult();
-  bool hasLocalContext = (hasLocalContextParameter || canHaveValidError ||
-                          substitutedType->getRepresentation() ==
-                              SILFunctionTypeRepresentation::Thick);
+  bool hasLocalContext = (hasLocalContextParameter || canHaveValidError);
   SILParameterInfo localContextParameter =
       hasLocalContextParameter ? parameters.back() : SILParameterInfo();
   if (hasLocalContextParameter) {
@@ -694,6 +693,10 @@ void SignatureExpansion::addAsyncParameters() {
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
   // TODO: Add actor.
   // TODO: Add task.
+  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Thick) {
+    IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
+    ParamIRTypes.push_back(IGM.RefCountedPtrTy);
+  }
 }
 
 void SignatureExpansion::addCoroutineContextParameter() {
@@ -1740,6 +1743,116 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries, bool isOutlined);
 
+llvm::Value *irgen::getDynamicAsyncContextSize(IRGenFunction &IGF,
+                                               AsyncContextLayout layout,
+                                               CanSILFunctionType functionType,
+                                               llvm::Value *thickContext) {
+  switch (functionType->getRepresentation()) {
+  case SILFunctionTypeRepresentation::Thick: {
+    // If the called function is thick, the size of the called function's
+    // async context may not be statically knowable.
+    //
+    // Specifically, if the thick function was produced by a partial_apply,
+    // the function which was originally partially applied determines the
+    // size of the needed async context.  That original function isn't known
+    // statically.  The dynamic size is available within the context as an
+    // i32 at the first index: <{ %swift.refcounted*, /*size*/ i32, ... }>.
+    //
+    // On the other hand, if the thick function was produced by a
+    // thin_to_thick_function, then the context will be nullptr.  In that
+    // case, the size of the needed async context is known statically to
+    // be the size dictated by the function signature.
+    //
+    // We are currently emitting into some basic block.  To handle these two
+    // cases, we need to branch based on whether the context is nullptr; each
+    // branch must then determine the size in the manner appropriate to it.
+    // Finally, both blocks must join back together to make the call:
+    //
+    // SIL:      IR:
+    // +-----+           +-------------------------+
+    // |.....|           |%cond = %ctx == nullptr  |
+    // |apply|           |br %cond, static, dynamic|
+    // |.....|           +--------/--------------\-+
+    // +-----+                   /                \
+    //           +-static-------+        +-dynamic----------------------------------------------+
+    //           |%size = K     |        |%layout = bitcast %context to <{%swift.context*, i32}>|
+    //           |br join(%size)|        |%size_addr = getelementptr %layout, i32 1, i32 0      |
+    //           +-----\--------+        |%size = load %size_addr                               |
+    //                  \                |br join(%size)                                        |
+    //                   \               +------------------------------------------------------+
+    //                    \                   /
+    //           +-join(%size)-----------------------------------------------------------+
+    //           |%dataAddr = swift_taskAlloc(%task, %size)                              |
+    //           |%async_context = bitcast %dataAddr to ASYNC_CONTEXT(static_callee_type)|
+    //           |... // populate the fields %context with arguments                     |
+    //           |call %callee(%async_context, %context)                                 |
+    //           +-----------------------------------------------------------------------+
+    auto *staticSizeBlock = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    auto *dynamicSizeBlock = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    auto *joinBlock = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+
+    auto hasThickContext =
+        IGF.Builder.CreateICmpNE(thickContext, IGF.IGM.RefCountedNull);
+    IGF.Builder.CreateCondBr(hasThickContext, dynamicSizeBlock,
+                             staticSizeBlock);
+
+    SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 2> phiValues;
+    {
+      IGF.Builder.emitBlock(staticSizeBlock);
+      auto size = getAsyncContextSize(layout);
+      auto *sizeValue =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, size.getValue());
+      phiValues.push_back({staticSizeBlock, sizeValue});
+      IGF.Builder.CreateBr(joinBlock);
+    }
+
+    {
+      IGF.Builder.emitBlock(dynamicSizeBlock);
+      SmallVector<const TypeInfo *, 4> argTypeInfos;
+      SmallVector<SILType, 4> argValTypes;
+      auto int32ASTType =
+          BuiltinIntegerType::get(32, IGF.IGM.IRGen.SIL.getASTContext())
+              ->getCanonicalType();
+      auto int32SILType = SILType::getPrimitiveObjectType(int32ASTType);
+      const TypeInfo &int32TI = IGF.IGM.getTypeInfo(int32SILType);
+      argValTypes.push_back(int32SILType);
+      argTypeInfos.push_back(&int32TI);
+      HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes,
+                        argTypeInfos,
+                        /*typeToFill*/ nullptr, NecessaryBindings());
+      auto castThickContext =
+          layout.emitCastTo(IGF, thickContext, "context.prefix");
+      auto sizeLayout = layout.getElement(0);
+      auto sizeAddr = sizeLayout.project(IGF, castThickContext,
+                                         /*NonFixedOffsets*/ llvm::None);
+      auto *sizeValue = IGF.Builder.CreateLoad(sizeAddr);
+      phiValues.push_back({dynamicSizeBlock, sizeValue});
+      IGF.Builder.CreateBr(joinBlock);
+    }
+
+    {
+      IGF.Builder.emitBlock(joinBlock);
+      auto *phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, phiValues.size());
+      for (auto &entry : phiValues) {
+        phi->addIncoming(entry.second, entry.first);
+      }
+      return phi;
+    }
+  }
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::Block: {
+    auto size = getAsyncContextSize(layout);
+    auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.Int32Ty, size.getValue());
+    return sizeValue;
+  }
+  }
+}
+
 namespace {
 
 class SyncCallEmission final : public CallEmission {
@@ -1947,6 +2060,7 @@ class AsyncCallEmission final : public CallEmission {
   Address contextBuffer;
   Size contextSize;
   Address context;
+  llvm::Value *thickContext = nullptr;
 
   AsyncContextLayout getAsyncContextLayout() {
     return ::getAsyncContextLayout(IGF, getCallee().getOrigFunctionType(),
@@ -1975,9 +2089,14 @@ public:
     super::begin();
     assert(!contextBuffer.isValid());
     assert(!context.isValid());
-    // Allocate space for the async arguments.
     auto layout = getAsyncContextLayout();
-    std::tie(contextBuffer, contextSize) = emitAllocAsyncContext(IGF, layout);
+    // Allocate space for the async arguments.
+    auto *dynamicContextSize32 = getDynamicAsyncContextSize(
+        IGF, layout, CurCallee.getOrigFunctionType(), thickContext);
+    auto *dynamicContextSize =
+        IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
+    std::tie(contextBuffer, contextSize) = emitAllocAsyncContext(
+        IGF, layout, dynamicContextSize, getAsyncContextSize(layout));
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
     if (layout.canHaveError()) {
       auto fieldLayout = layout.getErrorLayout();
@@ -1993,7 +2112,10 @@ public:
     emitDeallocAsyncContext(IGF, contextBuffer, contextSize);
     super::end();
   }
-  void setFromCallee() override { super::setFromCallee(); }
+  void setFromCallee() override {
+    super::setFromCallee();
+    thickContext = CurCallee.getSwiftContext();
+  }
   SILType getParameterType(unsigned index) override {
     return getAsyncContextLayout().getParameterType(index);
   }
@@ -2001,6 +2123,10 @@ public:
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
     asyncExplosion.add(contextBuffer.getAddress());
+    if (getCallee().getRepresentation() ==
+        SILFunctionTypeRepresentation::Thick) {
+      asyncExplosion.add(getCallee().getSwiftContext());
+    }
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
@@ -3196,14 +3322,21 @@ void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
                      llvm::Attribute::ReadNone);
 }
 
+std::pair<Address, Size> irgen::emitAllocAsyncContext(IRGenFunction &IGF,
+                                                      AsyncContextLayout layout,
+                                                      llvm::Value *sizeValue,
+                                                      Size sizeLowerBound) {
+  auto alignment = getAsyncContextAlignment(IGF.IGM);
+  auto address = emitTaskAlloc(IGF, sizeValue, alignment);
+  IGF.Builder.CreateLifetimeStart(address, sizeLowerBound);
+  return {address, sizeLowerBound};
+}
+
 std::pair<Address, Size>
 irgen::emitAllocAsyncContext(IRGenFunction &IGF, AsyncContextLayout layout) {
   auto size = getAsyncContextSize(layout);
   auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
-  auto alignment = getAsyncContextAlignment(IGF.IGM);
-  auto address = emitTaskAlloc(IGF, sizeValue, alignment);
-  IGF.Builder.CreateLifetimeStart(address, size);
-  return {address, size};
+  return emitAllocAsyncContext(IGF, layout, sizeValue, size);
 }
 
 void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context,
