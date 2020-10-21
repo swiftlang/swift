@@ -95,11 +95,13 @@ class ExportContext {
   unsigned Exported : 1;
   unsigned Deprecated : 1;
   unsigned Implicit : 1;
-  ExportabilityReason Reason;
+  unsigned Unavailable : 1;
+  unsigned Platform : 8;
+  unsigned Reason : 2;
 
   ExportContext(DeclContext *DC, FragileFunctionKind kind,
-                bool spi, bool exported, bool implicit,
-                bool deprecated);
+                bool spi, bool exported, bool implicit, bool deprecated,
+                Optional<PlatformKind> unavailablePlatformKind);
 
 public:
 
@@ -150,6 +152,8 @@ public:
   /// If true, the context is part of a deprecated declaration and can
   /// reference other deprecated declarations without warning.
   bool isDeprecated() const { return Deprecated; }
+
+  Optional<PlatformKind> getUnavailablePlatformKind() const;
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
@@ -215,7 +219,7 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                     SourceRange R,
-                                    const DeclContext *DC,
+                                    ExportContext Where,
                                     const ApplyExpr *call,
                                     DeclAvailabilityFlags Flags = None);
 
@@ -224,7 +228,7 @@ bool diagnoseExplicitUnavailability(const ValueDecl *D,
 bool diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
-    const DeclContext *DC,
+    ExportContext Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
 
