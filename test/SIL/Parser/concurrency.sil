@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-experimental-concurrency -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-experimental-concurrency -enable-sil-verify-all=true | %FileCheck %s
+// REQUIRES: concurrency
+
+sil_stage raw // CHECK: sil_stage raw
+
+import Builtin
+import Swift
+
+actor class Actor { }
+
+// CHECK-LABEL: sil @test_hop_to_executor
+sil @test_hop_to_executor : $@convention(thin) (@guaranteed Actor) -> () {
+bb0(%0 : $Actor):
+  // CHECK: hop_to_executor %0 : $Actor
+  hop_to_executor %0 : $Actor
+  %2 = tuple ()
+  return %2 : $()
+}
+
+

@@ -3102,6 +3102,21 @@ class GetAsyncContinuationAddrInst final
   {}
 };
 
+/// Begins a suspension point and enqueues the continuation to the executor
+/// which is bound to the operand actor.
+class HopToExecutorInst
+    : public UnaryInstructionBase<SILInstructionKind::HopToExecutorInst,
+                                  NonValueInstruction>
+{
+  friend SILBuilder;
+
+  HopToExecutorInst(SILDebugLocation DebugLoc, SILValue Actor, bool HasOwnership)
+      : UnaryInstructionBase(DebugLoc, Actor) { }
+
+public:
+  SILValue getActor() const { return getOperand(); }
+};
+
 /// Instantiates a key path object.
 class KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,

@@ -2964,6 +2964,17 @@ void SILCloner<ImplClass>
                               : nullptr));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitHopToExecutorInst(HopToExecutorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createHopToExecutor(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getActor())));
+}
+
+
 } // end namespace swift
 
 #endif
