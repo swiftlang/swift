@@ -205,7 +205,7 @@ func testFunctionPointers() {
   useFunctionPointer(wrapper.a)
   _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
-  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void
+  var anotherFP: @convention(c) (Int, CLong, UnsafeMutableRawPointer?) -> Void
     = getFunctionPointer2()
 
   var sizedFP: (@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?

@@ -4039,7 +4039,9 @@ public:
     visit(staticSelfT);
   }
 
-  void printFunctionExtInfo(ASTContext &Ctx, AnyFunctionType::ExtInfo info) {
+  void printFunctionExtInfo(AnyFunctionType *fnType) {
+    auto &ctx = fnType->getASTContext();
+    auto info = fnType->getExtInfo();
     if (Options.SkipAttributes)
       return;
 
@@ -4076,13 +4078,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
-        if (printClangType && !info.getClangTypeInfo().empty())
-          printCType(Ctx, Printer, info);
+        if (printClangType && fnType->hasNonDerivableClangType())
+          printCType(ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        if (printClangType && !info.getClangTypeInfo().empty())
-          printCType(Ctx, Printer, info);
+        if (printClangType && fnType->hasNonDerivableClangType())
+          printCType(ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4103,9 +4105,12 @@ public:
     }
   }
 
-  void printFunctionExtInfo(ASTContext &Ctx,
-                            SILFunctionType::ExtInfo info,
-                            ProtocolConformanceRef witnessMethodConformance) {
+  void printFunctionExtInfo(SILFunctionType *fnType) {
+    auto &Ctx = fnType->getASTContext();
+    auto info = fnType->getExtInfo();
+    auto witnessMethodConformance =
+        fnType->getWitnessMethodConformanceOrInvalid();
+
     if (Options.SkipAttributes)
       return;
 
@@ -4142,12 +4147,12 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
-        if (printClangType)
+        if (printClangType && fnType->hasNonDerivableClangType())
           printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        if (printClangType)
+        if (printClangType && fnType->hasNonDerivableClangType())
           printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
@@ -4222,7 +4227,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
+    printFunctionExtInfo(T);
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
@@ -4262,7 +4267,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
+    printFunctionExtInfo(T);
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::PrintRequirements);
@@ -4324,8 +4329,7 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
-                         T->getWitnessMethodConformanceOrInvalid());
+    printFunctionExtInfo(T);
     printCalleeConvention(T->getCalleeConvention());
 
     if (auto sig = T->getInvocationGenericSignature()) {

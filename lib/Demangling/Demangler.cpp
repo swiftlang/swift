@@ -1229,8 +1229,13 @@ NodePointer Demangler::demanglePlainFunction() {
   return createWithChildren(Node::Kind::Function, Ctx, Name, Type);
 }
 
-NodePointer Demangler::popFunctionType(Node::Kind kind) {
+NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   NodePointer FuncType = createNode(kind);
+  NodePointer ClangType = nullptr;
+  if (hasClangType) {
+    ClangType = demangleClangType();
+  }
+  addChild(FuncType, ClangType);
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
@@ -1749,6 +1754,16 @@ NodePointer Demangler::demangleImplDifferentiability() {
   return createNode(Node::Kind::ImplDifferentiability, attr);
 }
 
+NodePointer Demangler::demangleClangType() {
+  int numChars = demangleNatural();
+  if (numChars <= 0 || Pos + numChars > Text.size())
+    return nullptr;
+  CharVector mangledClangType;
+  mangledClangType.append(StringRef(Text.data() + Pos, numChars), *this);
+  Pos = Pos + numChars;
+  return createNode(Node::Kind::ClangType, mangledClangType);
+}
+
 NodePointer Demangler::demangleImplFunctionType() {
   NodePointer type = createNode(Node::Kind::ImplFunctionType);
 
@@ -1807,20 +1822,33 @@ NodePointer Demangler::demangleImplFunctionType() {
   }
   type->addChild(createNode(Node::Kind::ImplConvention, CAttr), *this);
 
-  const char *FAttr = nullptr;
+  const char *FConv = nullptr;
+  bool hasClangType = false;
   switch (nextChar()) {
-    case 'B': FAttr = "@convention(block)"; break;
-    case 'C': FAttr = "@convention(c)"; break;
-    case 'M': FAttr = "@convention(method)"; break;
-    case 'O': FAttr = "@convention(objc_method)"; break;
-    case 'K': FAttr = "@convention(closure)"; break;
-    case 'W': FAttr = "@convention(witness_method)"; break;
-    default:
-      pushBack();
-      break;
+  case 'B': FConv = "block"; break;
+  case 'C': FConv = "c"; break;
+  case 'z': {
+    switch (nextChar()) {
+    case 'B': hasClangType = true; FConv = "block"; break;
+    case 'C': hasClangType = true; FConv = "c"; break;
+    default: pushBack(); pushBack(); break;
+    }
+    break;
   }
-  if (FAttr)
-    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, FAttr), *this);
+  case 'M': FConv = "method"; break;
+  case 'O': FConv = "objc_method"; break;
+  case 'K': FConv = "closure"; break;
+  case 'W': FConv = "witness_method"; break;
+  default: pushBack(); break;
+  }
+  if (FConv) {
+    auto FAttrNode = createNode(Node::Kind::ImplFunctionConvention);
+    FAttrNode->addChild(
+        createNode(Node::Kind::ImplFunctionConventionName, FConv), *this);
+    if (hasClangType)
+      FAttrNode->addChild(demangleClangType(), *this);
+    type->addChild(FAttrNode, *this);
+  }
 
   const char *CoroAttr = nullptr;
   if (nextIf('A'))
@@ -2867,6 +2895,15 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'z':
+      switch (auto cchar = nextChar()) {
+      case 'B':
+        return popFunctionType(Node::Kind::ObjCBlock, true);
+      case 'C':
+        return popFunctionType(Node::Kind::CFunctionPointer, true);
+      default:
+        return nullptr;
+      }
     case 'F':
       return popFunctionType(Node::Kind::DifferentiableFunctionType);
     case 'G':

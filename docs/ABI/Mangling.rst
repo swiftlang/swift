@@ -523,14 +523,19 @@ Types
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
-  FUNCTION-KIND ::= 'L'                      // objc block function type (escaping) (DWARF only; otherwise use 'B')
+  FUNCTION-KIND ::= 'zB' C-TYPE              // objc block type with non-canonical C type
+  FUNCTION-KIND ::= 'L'                      // objc block function type with canonical C type (escaping) (DWARF only; otherwise use 'B' or 'zB' C-TYPE)
   FUNCTION-KIND ::= 'C'                      // C function pointer type
+  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
   FUNCTION-KIND ::= 'F'                      // @differentiable function type
   FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
   FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
   FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
+
+  C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
+  Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
   function-signature ::= params-type params-type async? throws? // results and parameters
 
@@ -618,7 +623,9 @@ mangled in to disambiguate.
   CALLEE-CONVENTION ::= 't'                  // thin
 
   FUNC-REPRESENTATION ::= 'B'                // C block invocation function
+  FUNC-REPRESENTATION ::= 'zB' C-TYPE        // C block invocation function with non-canonical C type
   FUNC-REPRESENTATION ::= 'C'                // C global function
+  FUNC-REPRESENTATION ::= 'zC' C-TYPE        // C global function with non-canonical C type
   FUNC-REPRESENTATION ::= 'M'                // Swift method
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure

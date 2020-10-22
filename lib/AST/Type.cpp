@@ -3424,6 +3424,16 @@ ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
 
+bool AnyFunctionType::hasNonDerivableClangType() {
+  auto clangTypeInfo = getClangTypeInfo();
+  if (clangTypeInfo.empty())
+    return false;
+  auto computedClangType = getASTContext().getClangFunctionType(
+      getParams(), getResult(), getRepresentation());
+  assert(computedClangType && "Failed to compute Clang type.");
+  return clangTypeInfo != ClangTypeInfo(computedClangType);
+}
+
 bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
@@ -3435,6 +3445,20 @@ ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   assert(!info->empty() &&
          "If the ClangTypeInfo was empty, we shouldn't have stored it.");
   return *info;
+}
+
+bool SILFunctionType::hasNonDerivableClangType() {
+  auto clangTypeInfo = getClangTypeInfo();
+  if (clangTypeInfo.empty())
+    return false;
+  auto results = getResults();
+  auto computedClangType =
+      getASTContext().getCanonicalClangFunctionType(
+          getParameters(),
+          results.empty() ? None : Optional<SILResultInfo>(results[0]),
+          getRepresentation());
+  assert(computedClangType && "Failed to compute Clang type.");
+  return clangTypeInfo != ClangTypeInfo(computedClangType);
 }
 
 bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {

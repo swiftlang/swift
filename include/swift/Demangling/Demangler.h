@@ -505,7 +505,7 @@ protected:
   NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
   NodePointer demanglePlainFunction();
-  NodePointer popFunctionType(Node::Kind kind);
+  NodePointer popFunctionType(Node::Kind kind, bool hasClangType = false);
   NodePointer popFunctionParams(Node::Kind kind);
   NodePointer popFunctionParamLabels(NodePointer FuncType);
   NodePointer popTuple();
@@ -522,6 +522,7 @@ protected:
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplDifferentiability();
   NodePointer demangleImplFunctionType();
+  NodePointer demangleClangType();
   NodePointer demangleMetatype();
   NodePointer demanglePrivateContextDescriptor();
   NodePointer createArchetypeRef(int depth, int i);
