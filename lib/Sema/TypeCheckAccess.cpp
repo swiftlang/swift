@@ -1051,29 +1051,25 @@ public:
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
 
-  /// If \p PBD declared stored instance properties in a fixed-contents struct,
-  /// return said struct.
-  static const StructDecl *
-  getFixedLayoutStructContext(const PatternBindingDecl *PBD) {
-    auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext());
-    if (!parentStruct)
-      return nullptr;
-    if (!(parentStruct->getAttrs().hasAttribute<FrozenAttr>() ||         
-          parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>()) ||
-        PBD->isStatic() || !PBD->hasStorage()) {
-      return nullptr;
-    }
-    // We don't check for "in resilient modules" because there's no reason to
-    // write '@_fixedLayout' on a struct in a non-resilient module.
-    return parentStruct;
+  /// If \p VD's layout is exposed by a @frozen struct, return said struct.
+  ///
+  /// Stored instance properties in @frozen structs must always use
+  /// public/@usableFromInline types. In these cases, check the access against
+  /// the struct instead of the VarDecl, and customize the diagnostics.
+  static const ValueDecl *
+  getFixedLayoutStructContext(const VarDecl *VD) {
+    if (VD->isLayoutExposedToClients())
+      return dyn_cast<StructDecl>(VD->getDeclContext());
+
+    return nullptr;
   }
 
   /// \see visitPatternBindingDecl
   void checkNamedPattern(const NamedPattern *NP,
-                         const ValueDecl *fixedLayoutStructContext,
                          bool isTypeContext,
                          const llvm::DenseSet<const VarDecl *> &seenVars) {
     const VarDecl *theVar = NP->getDecl();
+    auto *fixedLayoutStructContext = getFixedLayoutStructContext(theVar);
     if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
       return;
     // Only check individual variables if we didn't check an enclosing
@@ -1101,7 +1097,6 @@ public:
 
   /// \see visitPatternBindingDecl
   void checkTypedPattern(const TypedPattern *TP,
-                         const ValueDecl *fixedLayoutStructContext,
                          bool isTypeContext,
                          llvm::DenseSet<const VarDecl *> &seenVars) {
     // FIXME: We need an access level to check against, so we pull one out
@@ -1114,6 +1109,7 @@ public:
     });
     if (!anyVar)
       return;
+    auto *fixedLayoutStructContext = getFixedLayoutStructContext(anyVar);
     if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
       return;
 
@@ -1154,27 +1150,18 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
-    // Stored instance properties in public/@usableFromInline fixed-contents
-    // structs in resilient modules must always use public/@usableFromInline
-    // types. In these cases, check the access against the struct instead of the
-    // VarDecl, and customize the diagnostics.
-    const ValueDecl *fixedLayoutStructContext =
-        getFixedLayoutStructContext(PBD);
-
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
-          checkNamedPattern(NP, fixedLayoutStructContext, isTypeContext,
-                            seenVars);
+          checkNamedPattern(NP, isTypeContext, seenVars);
           return;
         }
 
         auto *TP = dyn_cast<TypedPattern>(P);
         if (!TP)
           return;
-        checkTypedPattern(TP, fixedLayoutStructContext, isTypeContext,
-                          seenVars);
+        checkTypedPattern(TP, isTypeContext, seenVars);
       });
       seenVars.clear();
     }
