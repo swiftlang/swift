@@ -2688,21 +2688,21 @@ void irgen::emitPolymorphicParametersFromArray(IRGenFunction &IGF,
 
 Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
   // We need one pointer for each archetype or witness table.
-  return IGM.getPointerSize() * Requirements.size();
+  return IGM.getPointerSize() * size();
 }
 
 void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
                                 MetadataState metadataState) const {
-  bindFromGenericRequirementsBuffer(IGF, Requirements.getArrayRef(), buffer,
+  bindFromGenericRequirementsBuffer(IGF, getRequirements(), buffer,
                                     metadataState,
-                                    [&](CanType type) { return type;});
+                                    [&](CanType type) { return type; });
 }
 
 template <typename Transform>
 static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
                  Address buffer, Transform transform) {
   emitInitOfGenericRequirementsBuffer(
-      IGF, bindings.getRequirements().getArrayRef(), buffer,
+      IGF, bindings.getRequirements(), buffer,
       [&](GenericRequirement requirement) -> llvm::Value * {
         CanType type = requirement.TypeParameter;
         if (auto protocol = requirement.Protocol) {
@@ -2770,14 +2770,13 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   // Generic types are trickier, because they can require conformances.
 
   // Otherwise, just record the need for this metadata.
-  Requirements.insert({type, nullptr});
+  addRequirement({type, nullptr});
 }
 
 /// Add all the abstract conditional conformances in the specialized
 /// conformance to the \p requirements.
-static void addAbstractConditionalRequirements(
-    SpecializedProtocolConformance *specializedConformance,
-    llvm::SetVector<GenericRequirement> &requirements) {
+void NecessaryBindings::addAbstractConditionalRequirements(
+    SpecializedProtocolConformance *specializedConformance) {
   auto subMap = specializedConformance->getSubstitutionMap();
   auto condRequirements = specializedConformance->getConditionalRequirements();
   for (auto req : condRequirements) {
@@ -2789,7 +2788,7 @@ static void addAbstractConditionalRequirements(
     auto archetype = dyn_cast<ArchetypeType>(ty);
     if (!archetype)
       continue;
-    requirements.insert({ty, proto});
+    addRequirement({ty, proto});
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {
@@ -2799,7 +2798,7 @@ static void addAbstractConditionalRequirements(
         dyn_cast<SpecializedProtocolConformance>(conf.getConcrete());
     if (!specializedConf)
       continue;
-    addAbstractConditionalRequirements(specializedConf, requirements);
+    addAbstractConditionalRequirements(specializedConf);
   }
 }
 
@@ -2811,8 +2810,8 @@ void NecessaryBindings::addProtocolConformance(CanType type,
         dyn_cast<SpecializedProtocolConformance>(concreteConformance);
     // The partial apply forwarder does not have the context to reconstruct
     // abstract conditional conformance requirements.
-    if (forPartialApply && specializedConf) {
-      addAbstractConditionalRequirements(specializedConf, Requirements);
+    if (forPartialApply() && specializedConf) {
+      addAbstractConditionalRequirements(specializedConf);
     } else if (forAsyncFunction()) {
       ProtocolDecl *protocol = conf.getRequirement();
       GenericRequirement requirement;
@@ -2821,7 +2820,7 @@ void NecessaryBindings::addProtocolConformance(CanType type,
       std::pair<GenericRequirement, ProtocolConformanceRef> pair{requirement,
                                                                  conf};
       Conformances.insert(pair);
-      Requirements.insert({type, concreteConformance->getProtocol()});
+      addRequirement({type, concreteConformance->getProtocol()});
     }
     return;
   }
@@ -2829,7 +2828,7 @@ void NecessaryBindings::addProtocolConformance(CanType type,
 
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
-  Requirements.insert({type, conf.getAbstract()});
+  addRequirement({type, conf.getAbstract()});
 }
 
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
@@ -3033,7 +3032,8 @@ NecessaryBindings NecessaryBindings::computeBindings(
     bool forPartialApplyForwarder, bool considerParameterSources) {
 
   NecessaryBindings bindings;
-  bindings.forPartialApply = forPartialApplyForwarder;
+  bindings.kind =
+      forPartialApplyForwarder ? Kind::PartialApply : Kind::AsyncFunction;
 
   // Bail out early if we don't have polymorphic parameters.
   if (!hasPolymorphicParameters(origType))
