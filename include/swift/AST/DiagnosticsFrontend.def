@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -128,8 +128,7 @@ ERROR(error_mode_cannot_emit_interface,none,
 ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
-      "-experimental-skip-non-inlinable-function-bodies does not support "
-      "emitting IR", ())
+      "-experimental-skip-*-function-bodies do not support emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -416,7 +415,7 @@ ERROR(expectation_missing_opening_braces,none,
 ERROR(expectation_missing_closing_braces,none,
       "didn't find '}}' to match '{{' in expectation", ())
 
-WARNING(module_incompatible_with_skip_function_bodies,none,
+WARNING(module_incompatible_with_skip_non_inlinable_function_bodies,none,
         "module '%0' cannot be built with "
         "-experimental-skip-non-inlinable-function-bodies; this option has "
         "been automatically disabled", (StringRef))

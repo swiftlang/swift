@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -5659,13 +5659,14 @@ public:
   /// Set a new body for the function.
   void setBody(BraceStmt *S, BodyKind NewBodyKind);
 
-  /// Note that the body was skipped for this function.  Function body
+  /// Note that the body was skipped for this function. Function body
   /// cannot be attached after this call.
   void setBodySkipped(SourceRange bodyRange) {
-    // FIXME: Remove 'Parsed' from this once we can delay parsing function
-    //        bodies. Right now -experimental-skip-non-inlinable-function-bodies
-    //        requires being able to change the state from Parsed to Skipped,
-    //        because we're still eagerly parsing function bodies.
+    // FIXME: Remove 'Parsed' from this list once we can always delay
+    //        parsing bodies. The -experimental-skip-*-function-bodies options
+    //        do currently skip parsing, unless disabled through other means in
+    //        SourceFile::hasDelayedBodyParsing (eg. needing to build the full
+    //        syntax tree due to -verify-syntax-tree).
     assert(getBodyKind() == BodyKind::None ||
            getBodyKind() == BodyKind::Unparsed ||
            getBodyKind() == BodyKind::Parsed);
