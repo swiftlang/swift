@@ -620,11 +620,7 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      llvm::interleave(ID->getImportPath(),
-                       [&](const ImportPath::Element &Elem) {
-                         OS << Elem.Item;
-                       },
-                       [&] { OS << '.'; });
+      ID->getImportPath().print(OS);
       OS << "')";
     }
 
@@ -1998,7 +1994,7 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
     E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
-    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << "\n";
     printRec(E->getAppendingExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

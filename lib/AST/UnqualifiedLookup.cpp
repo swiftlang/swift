@@ -383,8 +383,11 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
+  auto nlOptions = NL_UnqualifiedDefault;
+  if (options.contains(Flags::IncludeUsableFromInline))
+    nlOptions |= NL_IncludeUsableFromInline;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
-                 NLKind::UnqualifiedLookup, resolutionKind, dc);
+                 NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {

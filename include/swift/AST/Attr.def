@@ -120,8 +120,7 @@ DECL_ATTR(_silgen_name, SILGenName,
   0)
 DECL_ATTR(available, Available,
   OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement |
-  OnExtension | OnGenericTypeParam |
-  AllowMultipleAttributes | LongAttribute |
+  OnExtension | AllowMultipleAttributes | LongAttribute |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
@@ -494,8 +493,8 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   87)
-SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
-  OnNominalType | UserInaccessible |
+SIMPLE_DECL_ATTR(resultBuilder, ResultBuilder,
+  OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   88)
 DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
@@ -572,7 +571,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   APIBreakingToAdd | APIBreakingToRemove,
   102)
 
-SIMPLE_DECL_ATTR(actorIndependent, ActorIndependent,
+DECL_ATTR(actorIndependent, ActorIndependent,
   OnFunc | OnVar | OnSubscript | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIBreakingToRemove,
@@ -583,6 +582,11 @@ SIMPLE_DECL_ATTR(globalActor, GlobalActor,
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove,
   104)
+
+SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
+  OnExtension | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  105)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

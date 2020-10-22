@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -118,10 +119,11 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
-      derivativeFunctionIdentifier(derivativeId) {}
+      pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
-    : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr) {
+    : defaultArgIndex(0),
+      pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -158,6 +160,12 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
   }
 
   isForeign = asForeign;
+}
+
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
+                       GenericSignature prespecializedSig)
+    : SILDeclRef(baseLoc, false) {
+  pointer = prespecializedSig.getPointer();
 }
 
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
@@ -223,6 +231,12 @@ bool SILDeclRef::isImplicit() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+
+  // Prespecializations are public.
+  if (getSpecializedSignature()) {
+    return SILLinkage::Public;
+  }
+
   if (getAbstractClosureExpr()) {
     return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   }
@@ -665,6 +679,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
+  auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier();
   if (derivativeFunctionIdentifier) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
@@ -700,6 +715,18 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         }
       }
     }
+  }
+
+  // Mangle prespecializations.
+  if (getSpecializedSignature()) {
+    SILDeclRef nonSpecializedDeclRef = *this;
+    nonSpecializedDeclRef.pointer =
+        (AutoDiffDerivativeFunctionIdentifier *)nullptr;
+    auto mangledNonSpecializedString = nonSpecializedDeclRef.mangle();
+    auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
+    auto genericSig = funcDecl->getGenericSignature();
+    return GenericSpecializationMangler::manglePrespecialization(
+        mangledNonSpecializedString, genericSig, getSpecializedSignature());
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
@@ -794,7 +821,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
 // FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
-  assert(declRef.derivativeFunctionIdentifier &&
+  assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");
   auto overridden = declRef.getOverridden();
   if (!overridden)
@@ -804,7 +831,7 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
       declRef.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
       [&](const DifferentiableAttr *derivedDiffAttr) {
         return derivedDiffAttr->getParameterIndices() ==
-               declRef.derivativeFunctionIdentifier->getParameterIndices();
+               declRef.getDerivativeFunctionIdentifier()->getParameterIndices();
       });
   assert(derivedDiffAttr && "Expected `@differentiable` attribute");
   // Otherwise, if the base `@differentiable` attribute specifies a derivative
@@ -814,7 +841,7 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
       overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *baseDiffAttr : baseDiffAttrs) {
     if (baseDiffAttr->getParameterIndices() ==
-        declRef.derivativeFunctionIdentifier->getParameterIndices())
+        declRef.getDerivativeFunctionIdentifier()->getParameterIndices())
       return false;
   }
   // Otherwise, if there is no base `@differentiable` attribute exists, then a
@@ -823,7 +850,7 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
 }
 
 bool SILDeclRef::requiresNewVTableEntry() const {
-  if (derivativeFunctionIdentifier)
+  if (getDerivativeFunctionIdentifier())
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
   if (!hasDecl())
@@ -904,15 +931,16 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 
     // JVPs/VJPs are overridden only if the base declaration has a
     // `@differentiable` attribute with the same parameter indices.
-    if (derivativeFunctionIdentifier) {
+    if (getDerivativeFunctionIdentifier()) {
       auto overriddenAttrs =
           overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
       for (const auto *attr : overriddenAttrs) {
         if (attr->getParameterIndices() !=
-            derivativeFunctionIdentifier->getParameterIndices())
+            getDerivativeFunctionIdentifier()->getParameterIndices())
           continue;
-        auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
-        overridden.derivativeFunctionIdentifier =
+        auto *overriddenDerivativeId =
+            overridden.getDerivativeFunctionIdentifier();
+        overridden.pointer =
             AutoDiffDerivativeFunctionIdentifier::get(
                 overriddenDerivativeId->getKind(),
                 overriddenDerivativeId->getParameterIndices(),

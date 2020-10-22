@@ -37,14 +37,17 @@
 
 namespace swift {
 
+class ExportContext;
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
+class RootProtocolConformance;
 class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
 enum class TypeResolutionStage : uint8_t;
+enum class ExportabilityReason : unsigned;
 
 namespace constraints {
   enum class ConstraintKind : char;
@@ -152,6 +155,8 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 1 << 1,
+  // Whether to include results that are marked @inlinable or @usableFromInline.
+  IncludeUsableFromInline = 1 << 2,
 };
 
 /// A set of options that control name lookup.
@@ -420,14 +425,14 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
-/// Try to apply the function builder transform of the given builder type
+/// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
 ///
 /// \returns \c None if the builder transformation cannot be applied at all,
 /// e.g., because of a \c return statement. Otherwise, returns either the
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
-Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
+Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
 /// Find the return statements within the body of the given function.
@@ -446,7 +451,7 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
-void checkParameterList(ParameterList *params);
+void checkParameterList(ParameterList *params, DeclContext *owner);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
@@ -943,31 +948,26 @@ DeclName getObjectLiteralConstructorName(ASTContext &ctx,
 ModuleDecl *getStdlibModule(const DeclContext *dc);
 
 /// \name Resilience diagnostics
-bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
-                              const DeclContext *DC, FragileFunctionKind Kind);
+bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D, ExportContext where);
 
 Expr *buildDefaultInitializer(Type type);
 
 bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
-                                    const DeclContext *DC,
-                                    FragileFunctionKind Kind);
+                                    ExportContext where);
 
 /// Given that a declaration is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if it cannot
 /// reasonably be shared.
-bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
-                                  const DeclContext *DC,
-                                  FragileFunctionKind fragileKind);
+bool diagnoseDeclRefExportability(SourceLoc loc,
+                                  const ValueDecl *D,
+                                  ExportContext where);
 
-/// Given that a type is used from a particular context which
-/// exposes it in the interface of the current module, diagnose if its
-/// generic arguments require the use of conformances that cannot reasonably
-/// be shared.
-///
-/// This method \e only checks how generic arguments are used; it is assumed
-/// that the declarations involved have already been checked elsewhere.
-void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
-                                      const DeclContext *DC);
+/// Given that a conformance is used from a particular context which
+/// exposes it in the interface of the current module, diagnose if the
+/// conformance is SPI or visible via an implementation-only import.
+bool diagnoseConformanceExportability(SourceLoc loc,
+                                      const RootProtocolConformance *rootConf,
+                                      ExportContext where);
 
 /// \name Availability checking
 ///
@@ -1006,17 +1006,6 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
-/// Checks whether a declaration is available when referred to at the given
-/// location (this reference location must be in the passed-in
-/// reference DeclContext).
-/// If the declaration is available, return true.
-/// If the declaration is not available, return false and write the
-/// declaration's availability info to the out parameter
-/// \p OutAvailableRange.
-bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                     const DeclContext *referenceDC,
-                     AvailabilityContext &OutAvailableRange);
-
 /// Checks whether a declaration should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
@@ -1034,14 +1023,6 @@ void checkIgnoredExpr(Expr *E);
 // Emits a diagnostic, if necessary, for a reference to a declaration
 // that is potentially unavailable at the given source location.
 void diagnosePotentialUnavailability(const ValueDecl *D,
-                                     SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const UnavailabilityReason &Reason);
-
-// Emits a diagnostic, if necessary, for a reference to a declaration
-// that is potentially unavailable at the given source location, using
-// Name as the diagnostic name.
-void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
                                      SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const UnavailabilityReason &Reason);
@@ -1066,7 +1047,7 @@ const AvailableAttr *getDeprecated(const Decl *D);
 /// Callers can provide a lambda that adds additional information (such as a
 /// fixit hint) to the deprecation diagnostic, if it is emitted.
 void diagnoseIfDeprecated(SourceRange SourceRange,
-                          const DeclContext *ReferenceDC,
+                          ExportContext Where,
                           const ValueDecl *DeprecatedDecl,
                           const ApplyExpr *Call);
 /// @}
@@ -1170,7 +1151,7 @@ bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 /// an \c UnresolvedMemberExpr, \c nullptr is returned.
 UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 
-/// Checks whether a function builder type has a well-formed function builder
+/// Checks whether a result builder type has a well-formed result builder
 /// method with the given name. If provided and non-empty, the argument labels
 /// are verified against any candidates.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,

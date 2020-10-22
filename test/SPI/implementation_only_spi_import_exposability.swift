@@ -38,8 +38,10 @@ public struct PublicStruct : IOIProtocol, SPIProtocol { // expected-error {{cann
   public func publicInlinable() {
     spiFunc() // expected-error {{global function 'spiFunc()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
     ioiFunc() // expected-error {{global function 'ioiFunc()' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
-    let s = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-    let i = IOIStruct() // expected-error {{struct 'IOIStruct' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
+    let _ = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+    // expected-error@-1 {{initializer 'init()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+    let _ = IOIStruct() // expected-error {{struct 'IOIStruct' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
+    // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
   }
 }
 

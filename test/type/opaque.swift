@@ -73,7 +73,7 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'some' types are only implemented}}
+let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
 // Invalid positions
 

@@ -3759,7 +3759,7 @@ static Type substType(Type derivedType,
     // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
-      auto newSubMap = subMap.subst(substitutions, lookupConformances);
+      auto newSubMap = subMap.subst(substitutions, lookupConformances, options);
 
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),

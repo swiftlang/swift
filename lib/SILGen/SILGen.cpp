@@ -1988,3 +1988,57 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
   auto desc = ASTLoweringDescriptor::forFile(sf, tc, options);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
+
+static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
+                                               Decl *d) {
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(d)) {
+    for (auto ad : asd->getAllAccessors()) {
+      transferSpecializeAttributeTargets(SGM, M, ad);
+    }
+  } else if (auto *vd = dyn_cast<AbstractFunctionDecl>(d)) {
+    for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+      auto *SA = cast<SpecializeAttr>(A);
+      // Filter _spi.
+      auto spiGroups = SA->getSPIGroups();
+      auto hasSPIGroup = !spiGroups.empty();
+      if (hasSPIGroup) {
+        if (vd->getModuleContext() != M.getSwiftModule() &&
+            !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+          continue;
+        }
+      }
+      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
+        auto target = SILDeclRef(targetFunctionDecl);
+        auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
+        auto kind = SA->getSpecializationKind() ==
+                            SpecializeAttr::SpecializationKind::Full
+                        ? SILSpecializeAttr::SpecializationKind::Full
+                        : SILSpecializeAttr::SpecializationKind::Partial;
+        Identifier spiGroupIdent;
+        if (hasSPIGroup) {
+          spiGroupIdent = spiGroups[0];
+        }
+        targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+            spiGroupIdent, vd->getModuleContext()));
+      }
+    }
+  }
+}
+
+void SILGenModule::visitImportDecl(ImportDecl *import) {
+  auto *module = import->getModule();
+  if (module->isNonSwiftModule())
+    return;
+
+  SmallVector<Decl*, 16> topLevelDecls;
+  module->getTopLevelDecls(topLevelDecls);
+  for (auto *t : topLevelDecls) {
+    if (auto *vd = dyn_cast<AbstractFunctionDecl>(t)) {
+      transferSpecializeAttributeTargets(*this, M, vd);
+    } else if (auto *extension = dyn_cast<ExtensionDecl>(t)) {
+      for (auto *d : extension->getMembers())
+        transferSpecializeAttributeTargets(*this, M, d);
+    }
+  }
+}

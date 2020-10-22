@@ -510,7 +510,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
                                VD->getBaseName(), results,
                                NLKind::UnqualifiedLookup,
                                namelookup::ResolutionKind::Overloadable,
-                               DC->getModuleScopeContext());
+                               DC->getModuleScopeContext(),
+                               NL_UnqualifiedDefault);
   }
 
   SmallVector<ValueDecl *, 8> RelatedDecls;

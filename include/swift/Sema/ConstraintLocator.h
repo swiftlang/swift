@@ -222,8 +222,8 @@ public:
   /// Determine whether this locator points to the `try?` expression.
   bool isForOptionalTry() const;
 
-  /// Determine whether this locator is for a function builder body result type.
-  bool isForFunctionBuilderBodyResult() const;
+  /// Determine whether this locator is for a result builder body result type.
+  bool isForResultBuilderBodyResult() const;
 
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {

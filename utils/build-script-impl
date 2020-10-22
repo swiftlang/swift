@@ -1361,6 +1361,74 @@ function cmake_config_opt() {
     fi
 }
 
+function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
+    local clang_dest_dir="$1"
+
+    HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+    HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
+    DEST_LIB_CLANG_DIR="${clang_dest_dir}/lib/clang"
+
+    [ -d "${HOST_LIB_CLANG_DIR}" -a -d "${DEST_LIB_CLANG_DIR}" ] || return 0
+
+    DEST_CXX_BUILTINS_VERSION=$(ls -1 "${DEST_LIB_CLANG_DIR}")
+    DEST_BUILTINS_DIR="${clang_dest_dir}/lib/clang/${DEST_CXX_BUILTINS_VERSION}/lib/darwin"
+
+    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+
+            for OS in ios watchos tvos; do
+                # Copy over the device .a when necessary
+                LIB_NAME="libclang_rt.$OS.a"
+                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                if [[ ! -f "${DEST_LIB_PATH}" ]]; then
+                    if [[ -f "${HOST_LIB_PATH}" ]]; then
+                        if [[ "$OS" == "tvos" ]]; then
+                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}"
+                        else
+                           call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                        fi
+                    elif [[ "${VERBOSE_BUILD}" ]]; then
+                        echo "no file exists at ${HOST_LIB_PATH}"
+                    fi
+                fi
+
+                # Copy over the simulator .a when necessary
+                SIM_LIB_NAME="libclang_rt.${OS}sim.a"
+                HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
+                DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
+                if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
+                    if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
+                        if [[ "$OS" == "tvos" ]]; then
+                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
+                        else
+                           call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                        fi
+                    elif [[ -f "${HOST_LIB_PATH}" ]]; then
+                        # The simulator .a might not exist if the host
+                        # Xcode is old. In that case, copy over the
+                        # device library to the simulator location to allow
+                        # clang to find it. The device library has the simulator
+                        # slices in Xcode that doesn't have the simulator .a, so
+                        # the link is still valid.
+                        echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
+                        if [[ "$OS" == "tvos" ]]; then
+                            echo "Remove i386 from tvOS ${DEST_SIM_LIB_PATH}"
+                            call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
+                        else
+                            call cp "${HOST_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                        fi
+                    elif [[ "${VERBOSE_BUILD}" ]]; then
+                        echo "no file exists at ${HOST_SIM_LIB_PATH}"
+                    fi
+                fi
+            done
+        done
+    fi
+}
+
 #
 # Configure and build each product
 #
@@ -1960,17 +2028,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${lldb_cmake_options[@]}"
                     )
 
-                # Figure out if we think this is a buildbot build.
-                # This will influence the lldb version line.
-                if [ ! -z "${JENKINS_HOME}" -a ! -z "${JOB_NAME}" -a ! -z "${BUILD_NUMBER}" ]; then
-                    LLDB_IS_BUILDBOT_BUILD=1
-                else
-                    LLDB_IS_BUILDBOT_BUILD=0
-                fi
-
-                # Get the build date.
-                LLDB_BUILD_DATE=$(date +%Y-%m-%d)
-
                 # Pick the right cache.
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                   cmake_cache="Apple-lldb-macOS.cmake"
@@ -2041,9 +2098,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_ENABLE_PYTHON=ON
                     -DLLDB_ENABLE_LZMA=OFF
                     -DLLDB_ENABLE_LUA=OFF
-                    -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                    -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
-                    -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
@@ -2421,55 +2475,7 @@ for host in "${ALL_HOSTS[@]}"; do
         # builtins for iOS/tvOS/watchOS to ensure that Swift's
         # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
         if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-            HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-            HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
-            DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
-
-            if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
-                DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
-                DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
-
-                if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-                    for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-                        HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-                        echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
-
-                        for OS in ios watchos tvos; do
-                            # Copy over the device .a when necessary
-                            LIB_NAME="libclang_rt.$OS.a"
-                            HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                            DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                            if [[ ! -f "${DEST_LIB_PATH}" ]]; then
-                                if [[ -f "${HOST_LIB_PATH}" ]]; then
-                                    call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
-                                elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at ${HOST_LIB_PATH}"
-                                fi
-                            fi
-                            # Copy over the simulator .a when necessary
-                            SIM_LIB_NAME="libclang_rt.${OS}sim.a"
-                            HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
-                            DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                            if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
-                                if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                                    call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                                elif [[ -f "${HOST_LIB_PATH}" ]]; then
-                                    # The simulator .a might not exist if the host
-                                    # Xcode is old. In that case, copy over the
-                                    # device library to the simulator location to allow
-                                    # clang to find it. The device library has the simulator
-                                    # slices in Xcode that doesn't have the simulator .a, so
-                                    # the link is still valid.
-                                    echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
-                                    call cp "${HOST_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                                elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at ${HOST_SIM_LIB_PATH}"
-                                fi
-                            fi
-                        done
-                    done
-                fi
-            fi
+            copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "$(build_directory_bin ${host} llvm)/.."
         fi
     done
 done
@@ -2896,7 +2902,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|cygwin-*|haiku-*|android-*) ;;
+                  linux-*|freebsd-*|openbsd-*|cygwin-*|haiku-*|android-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1
@@ -2990,6 +2996,13 @@ for host in "${ALL_HOSTS[@]}"; do
         build_dir=$(build_directory ${host} ${product})
 
         call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
+
+        # When we are installing LLVM copy over the compiler-rt
+        # builtins for iOS/tvOS/watchOS to ensure that we don't
+        # have linker errors  when building apps for such platforms.
+        if [[ "${product}" = "llvm" ]] && [[ ! -z "${LLVM_INSTALL_COMPONENTS}" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
+            copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "${host_install_destdir}${host_install_prefix}"
+        fi
     done
 done
 

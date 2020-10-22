@@ -913,10 +913,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // defining a non-final class conforming to 'Collection' which uses
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
-        auto selfKind = proto->findProtocolSelfReferences(req,
-                                             /*allowCovariantParameters=*/false,
-                                             /*skipAssocTypes=*/false);
-        if (!selfKind.other) {
+        const auto selfRefInfo = proto->findProtocolSelfReferences(
+            req, /*treatNonResultCovariantSelfAsInvariant=*/true);
+        if (!selfRefInfo.assocTypeRef) {
           covariantSelf = classDecl;
         }
       }
@@ -2655,6 +2654,115 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
+bool ConformanceChecker::checkActorIsolation(
+    ValueDecl *requirement, ValueDecl *witness) {
+  // Ensure that the witness is not actor-isolated in a manner that makes it
+  // unsuitable as a witness.
+  Type witnessGlobalActor;
+  switch (auto witnessRestriction =
+              ActorIsolationRestriction::forDeclaration(witness)) {
+  case ActorIsolationRestriction::ActorSelf: {
+    // Actor-isolated witnesses cannot conform to protocol requirements.
+    bool canBeAsyncHandler = false;
+    if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
+      canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
+      witnessFunc->canBeAsyncHandler();
+    }
+    auto diag = witness->diagnose(
+        canBeAsyncHandler
+            ? diag::actor_isolated_witness_could_be_async_handler
+            : diag::actor_isolated_witness,
+        witness->getDescriptiveKind(), witness->getName());
+
+    if (canBeAsyncHandler) {
+      diag.fixItInsert(
+         witness->getAttributeInsertionLoc(false), "@asyncHandler ");
+    }
+
+    return true;
+  }
+
+  case ActorIsolationRestriction::GlobalActor: {
+    // Hang on to the global actor that's used for the witness. It will need
+    // to match that of the requirement.
+    witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
+        witnessRestriction.getGlobalActor());
+    break;
+  }
+
+  case ActorIsolationRestriction::Unsafe:
+  case ActorIsolationRestriction::LocalCapture:
+    break;
+
+  case ActorIsolationRestriction::Unrestricted:
+    // The witness is completely unrestricted, so ignore any annotations on
+    // the requirement.
+    return false;
+  }
+
+  // Check whether the requirement requires some particular actor isolation.
+  Type requirementGlobalActor;
+  switch (auto requirementIsolation = getActorIsolation(requirement)) {
+  case ActorIsolation::ActorInstance:
+    llvm_unreachable("There are not actor protocols");
+
+  case ActorIsolation::GlobalActor: {
+    auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
+        Proto, Adoptee, ProtocolConformanceRef(Conformance));
+    requirementGlobalActor = requirementIsolation.getGlobalActor()
+        .subst(requirementSubs);
+    break;
+  }
+
+  case ActorIsolation::Independent:
+  case ActorIsolation::IndependentUnsafe:
+  case ActorIsolation::Unspecified:
+    break;
+  }
+
+  // If neither has a global actor, we're done.
+  if (!witnessGlobalActor && !requirementGlobalActor)
+    return false;
+
+  // If the witness has a global actor but the requirement does not, we have
+  // an isolation error.
+  if (witnessGlobalActor && !requirementGlobalActor) {
+    witness->diagnose(
+        diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
+        witness->getName(), witnessGlobalActor, Proto->getName());
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // If the requirement has a global actor but the witness does not, we have
+  // an isolation error.
+  //
+  // FIXME: Within a module, this will be an inference rule.
+  if (requirementGlobalActor && !witnessGlobalActor) {
+    witness->diagnose(
+        diag::global_actor_isolated_requirement, witness->getDescriptiveKind(),
+        witness->getName(), requirementGlobalActor, Proto->getName())
+      .fixItInsert(
+        witness->getAttributeInsertionLoc(/*forModifier=*/false),
+      "@" + requirementGlobalActor.getString());
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // If both have global actors but they differ, this is an isolation error.
+  if (!witnessGlobalActor->isEqual(requirementGlobalActor)) {
+    witness->diagnose(
+        diag::global_actor_isolated_requirement_witness_conflict,
+        witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
+        Proto->getName(), requirementGlobalActor);
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+    return true;
+  }
+
+  // Everything is okay.
+  return false;
+}
+
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
                                                  AssociatedTypeDecl *assocType,
                                                  Type type,
@@ -3359,6 +3467,30 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   }
 }
 
+/// Whether the given protocol requirement has a "Self ==" constraint.
+static bool hasSelfSameTypeConstraint(const ValueDecl *req) {
+  const auto *proto = cast<ProtocolDecl>(req->getDeclContext());
+  const auto *genCtx = req->getAsGenericContext();
+  if (!genCtx)
+    return false;
+
+  const auto genericSig = genCtx->getGenericSignature();
+  if (!genericSig)
+    return false;
+
+  const auto selfTy = proto->getSelfInterfaceType();
+  for (const auto &constr : genericSig->getRequirements()) {
+    if (constr.getKind() != RequirementKind::SameType)
+      continue;
+
+    if (constr.getFirstType()->isEqual(selfTy) ||
+        constr.getSecondType()->isEqual(selfTy))
+      return true;
+  }
+
+  return false;
+}
+
 /// Determine the given witness has a same-type constraint constraining the
 /// given 'Self' type, and return the requirement that does.
 ///
@@ -3458,11 +3590,10 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
-  auto selfKind = Proto->findProtocolSelfReferences(requirement,
-                                       /*allowCovariantParameters=*/false,
-                                       /*skipAssocTypes=*/true);
+  const auto selfRefInfo = Proto->findProtocolSelfReferences(
+      requirement, /*treatNonResultCovariantSelfAsInvariant=*/true);
 
-  if (selfKind.other) {
+  if (selfRefInfo.selfRef == SelfReferencePosition::Invariant) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
@@ -3477,7 +3608,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                        conformance->getType());
         emitDeclaredHereIfNeeded(diags, diagLoc, witness);
       });
-  } else if (selfKind.result) {
+  } else if (selfRefInfo.hasCovariantSelfResult) {
     // The reference to Self occurs in the result type of a method/subscript
     // or the type of a property. A non-final class can satisfy this requirement
     // by holding onto Self accordingly.
@@ -3509,7 +3640,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
           });
       }
     }
-  } else if (selfKind.requirement) {
+  } else if (hasSelfSameTypeConstraint(requirement)) {
     if (auto targetPair = getAdopteeSelfSameTypeConstraint(classDecl,
                                                            witness)) {
       // A "Self ==" constraint works incorrectly with subclasses. Complain.
@@ -3545,12 +3676,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // associated types.
   if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
     if (witness->getDeclContext()->getExtendedProtocolDecl()) {
-      auto selfKindWithAssocTypes = Proto->findProtocolSelfReferences(
-          requirement,
-          /*allowCovariantParameters=*/false,
-          /*skipAssocTypes=*/false);
-      if (selfKindWithAssocTypes.other &&
-          selfKindWithAssocTypes.result) {
+      if (selfRefInfo.hasCovariantSelfResult && selfRefInfo.assocTypeRef) {
         diagnoseOrDefer(requirement, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
@@ -4212,9 +4338,11 @@ static void checkExportability(Type depTy, Type replacementTy,
       conformance->getRootConformance();
   ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
 
+  auto where = ExportContext::forDeclSignature(
+      DC->getInnermostDeclarationDeclContext());
   auto originKind = getDisallowedOriginKind(
       rootConformance->getDeclContext()->getAsDecl(),
-      *SF, DC->getAsDecl());
+      where);
   if (originKind == DisallowedOriginKind::None)
     return;
 
@@ -4336,39 +4464,8 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
       }
 
-      // Check for actor-isolation consistency.
-      switch (auto restriction =
-                  ActorIsolationRestriction::forDeclaration(witness)) {
-      case ActorIsolationRestriction::ActorSelf: {
-        // Actor-isolated witnesses cannot conform to protocol requirements.
-        bool canBeAsyncHandler = false;
-        if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
-          canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
-          witnessFunc->canBeAsyncHandler();
-        }
-        auto diag = witness->diagnose(
-            canBeAsyncHandler
-                ? diag::actor_isolated_witness_could_be_async_handler
-                : diag::actor_isolated_witness,
-            witness->getDescriptiveKind(), witness->getName());
-
-        if (canBeAsyncHandler) {
-          diag.fixItInsert(
-             witness->getAttributeInsertionLoc(false), "@asyncHandler ");
-        }
+      if (checkActorIsolation(requirement, witness))
         return;
-      }
-
-      case ActorIsolationRestriction::GlobalActor: {
-        // FIXME: Check against the requirement. This needs serious refactoring.
-        break;
-      }
-
-      case ActorIsolationRestriction::Unrestricted:
-      case ActorIsolationRestriction::Unsafe:
-      case ActorIsolationRestriction::LocalCapture:
-        break;
-      }
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
@@ -5361,14 +5458,13 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
-    AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
-    for (Decl *enclosingDecl = classDecl; enclosingDecl;
-         enclosingDecl = enclosingDecl->getDeclContext()
-                           ->getInnermostDeclarationDeclContext()) {
-      if (!TypeChecker::isDeclAvailable(enclosingDecl, SourceLoc(), sourceFile,
-                                        availableInfo))
-        return;
-    }
+    AvailabilityContext safeRangeUnderApprox{
+        AvailabilityInference::availableRange(classDecl, ctx)};
+    AvailabilityContext runningOSOverApprox =
+        AvailabilityContext::forDeploymentTarget(ctx);
+
+    if (!runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
+      return;
   }
 
   // Infer @_staticInitializeObjCMetadata.

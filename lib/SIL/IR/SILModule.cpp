@@ -94,7 +94,8 @@ class SILModule::SerializationCallback final
 
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options)
-    : Stage(SILStage::Raw), Options(Options), serialized(false),
+    : Stage(SILStage::Raw), indexTrieRoot(new IndexTrieNode()),
+      Options(Options), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       SerializeSILAction(), Types(TC) {
@@ -133,6 +134,7 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
+    F.clearSpecializeAttrs();
   }
 }
 
@@ -516,6 +518,8 @@ void SILModule::eraseFunction(SILFunction *F) {
   F->dropAllReferences();
   F->dropDynamicallyReplacedFunction();
   F->getBlocks().clear();
+  // Drop references for any _specialize(target:) functions.
+  F->clearSpecializeAttrs();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {

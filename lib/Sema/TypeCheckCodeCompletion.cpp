@@ -593,6 +593,237 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
+namespace {
+
+class CompletionContextFinder : public ASTWalker {
+  enum class ContextKind {
+    FallbackExpression,
+    StringInterpolation,
+    SingleStmtClosure,
+    MultiStmtClosure,
+    ErrorExpression
+  };
+
+  struct Context {
+    ContextKind Kind;
+    Expr * E;
+  };
+
+  /// Stack of all "interesting" contexts up to code completion expression.
+  llvm::SmallVector<Context, 4> Contexts;
+  CodeCompletionExpr *CompletionExpr = nullptr;
+  Expr *InitialExpr = nullptr;
+  DeclContext *InitialDC;
+
+public:
+  /// Finder for completion contexts within the provided initial expression.
+  CompletionContextFinder(Expr *initialExpr, DeclContext *DC)
+      : InitialExpr(initialExpr), InitialDC(DC) {
+    assert(DC);
+    initialExpr->walk(*this);
+  };
+
+  /// Finder for completion contexts within the outermost non-closure context of
+  /// the code completion expression's direct context.
+  CompletionContextFinder(DeclContext *completionDC): InitialDC(completionDC) {
+    while (auto *ACE = dyn_cast<AbstractClosureExpr>(InitialDC))
+      InitialDC = ACE->getParent();
+    InitialDC->walkContext(*this);
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+      Contexts.push_back({closure->hasSingleExpressionBody()
+                            ? ContextKind::SingleStmtClosure
+                            : ContextKind::MultiStmtClosure,
+                          closure});
+    }
+
+    if (isa<InterpolatedStringLiteralExpr>(E)) {
+      Contexts.push_back({ContextKind::StringInterpolation, E});
+    }
+
+    if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E)) {
+      Contexts.push_back({ContextKind::FallbackExpression, E});
+    }
+
+    if (auto *Error = dyn_cast<ErrorExpr>(E)) {
+      Contexts.push_back({ContextKind::ErrorExpression, E});
+      if (auto *OrigExpr = Error->getOriginalExpr()) {
+        OrigExpr->walk(*this);
+        if (hasCompletionExpr())
+          return std::make_pair(false, nullptr);
+      }
+    }
+
+    if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+      CompletionExpr = CCE;
+      return std::make_pair(false, nullptr);
+    }
+
+    return std::make_pair(true, E);
+  }
+
+  Expr *walkToExprPost(Expr *E) override {
+    if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
+        isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
+      assert(Contexts.back().E == E);
+      Contexts.pop_back();
+    }
+    return E;
+  }
+
+  /// Check whether code completion expression is located inside of a
+  /// multi-statement closure.
+  bool locatedInMultiStmtClosure() const {
+    return hasContext(ContextKind::MultiStmtClosure);
+  }
+
+  bool locatedInStringIterpolation() const {
+    return hasContext(ContextKind::StringInterpolation);
+  }
+
+  bool hasCompletionExpr() const {
+    return CompletionExpr;
+  }
+
+  CodeCompletionExpr *getCompletionExpr() const {
+    assert(CompletionExpr);
+    return CompletionExpr;
+  }
+
+  struct Fallback {
+    Expr *E; ///< The fallback expression.
+    DeclContext *DC; ///< The fallback expression's decl context.
+    bool SeparatePrecheck; ///< True if the fallback may require prechecking.
+  };
+
+  /// As a fallback sometimes its useful to not only type-check
+  /// code completion expression directly but instead add some
+  /// of the enclosing context e.g. when completion is an argument
+  /// to a call.
+  Optional<Fallback> getFallbackCompletionExpr() const {
+    assert(CompletionExpr);
+
+    Optional<Fallback> fallback;
+    bool separatePrecheck = false;
+    DeclContext *fallbackDC = InitialDC;
+
+    // Find the outermost fallback expression within the innermost error
+    // expression or multi-statement closure, keeping track of its decl context.
+    for (auto context: Contexts) {
+      switch (context.Kind) {
+      case ContextKind::StringInterpolation:
+        LLVM_FALLTHROUGH;
+      case ContextKind::FallbackExpression:
+        if (!fallback && context.E != InitialExpr)
+          fallback = Fallback{context.E, fallbackDC, separatePrecheck};
+        continue;
+
+      case ContextKind::SingleStmtClosure:
+        if (!fallback && context.E != InitialExpr)
+          fallback = Fallback{context.E, fallbackDC, separatePrecheck};
+        fallbackDC = cast<AbstractClosureExpr>(context.E);
+        continue;
+
+      case ContextKind::MultiStmtClosure:
+        fallbackDC = cast<AbstractClosureExpr>(context.E);
+        LLVM_FALLTHROUGH;
+      case ContextKind::ErrorExpression:;
+        fallback = None;
+        separatePrecheck = true;
+        continue;
+      }
+    }
+
+    if (fallback)
+      return fallback;
+
+    if (CompletionExpr->getBase() && CompletionExpr != InitialExpr)
+      return Fallback{CompletionExpr, fallbackDC, separatePrecheck};
+    return None;
+  }
+
+private:
+  bool hasContext(ContextKind kind) const {
+    return llvm::find_if(Contexts, [&kind](const Context &currContext) {
+             return currContext.Kind == kind;
+           }) != Contexts.end();
+  }
+};
+
+} // end namespace
+
+// Determine if the target expression is the implicit BinaryExpr generated for
+// pattern-matching in a switch/if/guard case (<completion> ~= matchValue).
+static bool isForPatternMatch(SolutionApplicationTarget &target) {
+  if (target.getExprContextualTypePurpose() != CTP_Condition)
+    return false;
+  Expr *condition = target.getAsExpr();
+  if (!condition->isImplicit())
+    return false;
+  if (auto *BE = dyn_cast<BinaryExpr>(condition)) {
+    Identifier id;
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(BE->getFn())) {
+      id = ODRE->getDecls().front()->getBaseIdentifier();
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(BE->getFn())) {
+      id = DRE->getDecl()->getBaseIdentifier();
+    }
+    if (id != target.getDeclContext()->getASTContext().Id_MatchOperator)
+      return false;
+    return isa<CodeCompletionExpr>(BE->getArg()->getElement(0));
+  }
+  return false;
+}
+
+/// Remove any solutions from the provided vector with a score less than the best solution's.
+static void filterSolutions(SolutionApplicationTarget &target,
+                            SmallVectorImpl<Solution> &solutions) {
+  // FIXME: this is only needed because in pattern matching position, the
+  // code completion expression always becomes an expression pattern, which
+  // requires the ~= operator to be defined on the type being matched against.
+  // Pattern matching against an enum doesn't require that however, so valid
+  // solutions always end up having fixes. This is a problem because there will
+  // always be a valid solution as well. Optional defines ~= between Optional
+  // and _OptionalNilComparisonType (which defines a nilLiteral initializer),
+  // and the matched-against value can implicitly be made Optional if it isn't
+  // already, so _OptionalNilComparisonType is always a valid solution for the
+  // completion. That only generates the 'nil' completion, which is rarely what
+  // the user intends to write in this position and shouldn't be preferred over
+  // the other formed solutions (which require fixes). We should generate enum
+  // pattern completions separately.
+  if (isForPatternMatch(target))
+    return;
+
+  if (solutions.size() <= 1)
+    return;
+
+  auto min = std::min_element(solutions.begin(), solutions.end(),
+                              [](const Solution &a, const Solution &b) {
+    return a.getFixedScore() < b.getFixedScore();
+  });
+  auto fixStart = llvm::partition(solutions, [&](const Solution &S) {
+    return S.getFixedScore() == min->getFixedScore();
+  });
+
+  if (fixStart != solutions.begin() && fixStart != solutions.end())
+    solutions.erase(fixStart, solutions.end());
+}
+
+/// When solving for code completion we still consider solutions with holes as
+/// valid. Regular type-checking does not. This is intended to return true only
+/// if regular type-checking would consider this solution viable.
+static bool isViableForReTypeCheck(const Solution &S) {
+  if (llvm::any_of(S.Fixes, [&](const ConstraintFix *CF) {
+    return !CF->isWarning();
+  }))
+    return false;
+  using Binding = std::pair<swift::TypeVariableType *, swift::Type>;
+  return llvm::none_of(S.typeBindings, [&](const Binding& binding) {
+    return binding.second->hasHole();
+  });
+}
+
 bool TypeChecker::typeCheckForCodeCompletion(
     SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
@@ -618,151 +849,21 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
   expr = expr->walk(SanitizeExpr(Context,
                                  /*shouldReusePrecheckedType=*/false));
+  target.setExpr(expr);
 
-  enum class ContextKind {
-    Expression,
-    Application,
-    StringInterpolation,
-    SingleStmtClosure,
-    MultiStmtClosure,
-    ErrorExpression
-  };
-
-  class ContextFinder : public ASTWalker {
-    using Context = std::pair<ContextKind, Expr *>;
-
-    // Stack of all "interesting" contexts up to code completion expression.
-    llvm::SmallVector<Context, 4> Contexts;
-
-    Expr *CompletionExpr = nullptr;
-
-  public:
-    ContextFinder(Expr *E) {
-      Contexts.push_back(std::make_pair(ContextKind::Expression, E));
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
-        Contexts.push_back(std::make_pair(closure->hasSingleExpressionBody()
-                                              ? ContextKind::SingleStmtClosure
-                                              : ContextKind::MultiStmtClosure,
-                                          closure));
-      }
-
-      if (isa<InterpolatedStringLiteralExpr>(E)) {
-        Contexts.push_back(std::make_pair(ContextKind::StringInterpolation, E));
-      }
-
-      if (isa<ApplyExpr>(E)) {
-        Contexts.push_back(std::make_pair(ContextKind::Application, E));
-      }
-
-      if (isa<CodeCompletionExpr>(E)) {
-        CompletionExpr = E;
-        return std::make_pair(false, nullptr);
-      }
-
-      if (auto *Error = dyn_cast<ErrorExpr>(E)) {
-        Contexts.push_back(std::make_pair(ContextKind::ErrorExpression, E));
-        if (auto *OrigExpr = Error->getOriginalExpr()) {
-          OrigExpr->walk(*this);
-          return std::make_pair(false, hasCompletionExpr() ? nullptr : E);
-        }
-      }
-
-      return std::make_pair(true, E);
-    }
-
-    Expr *walkToExprPost(Expr *E) override {
-      if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
-          isa<ApplyExpr>(E) || isa<ErrorExpr>(E))
-        Contexts.pop_back();
-      return E;
-    }
-
-    /// Check whether code completion expression is located inside of a
-    /// multi-statement closure.
-    bool locatedInMultiStmtClosure() const {
-      return hasContext(ContextKind::MultiStmtClosure);
-    }
-
-    bool locatedInStringIterpolation() const {
-      return hasContext(ContextKind::StringInterpolation);
-    }
-
-    bool hasCompletionExpr() const {
-      return CompletionExpr;
-    }
-
-    Expr *getCompletionExpr() const {
-      assert(CompletionExpr);
-      return CompletionExpr;
-    }
-
-    ErrorExpr *getInnermostErrorExpr() const {
-      for (const Context &curr : llvm::reverse(Contexts)) {
-        if (curr.first == ContextKind::ErrorExpression)
-          return cast<ErrorExpr>(curr.second);
-      }
-      return nullptr;
-    }
-
-    ClosureExpr *getOutermostMultiStmtClosure() const {
-      for (const Context &curr : Contexts) {
-        if (curr.first == ContextKind::MultiStmtClosure)
-          return cast<ClosureExpr>(curr.second);
-      }
-      return nullptr;
-    }
-
-    /// As a fallback sometimes its useful to not only type-check
-    /// code completion expression directly but instead add some
-    /// of the enclosing context e.g. when completion is an argument
-    /// to a call.
-    Expr *getCompletionExprInContext() const {
-      assert(CompletionExpr);
-
-      auto &innerContext = Contexts.back();
-      return innerContext.first == ContextKind::Application
-                 ? innerContext.second
-                 : CompletionExpr;
-    }
-
-  private:
-    bool hasContext(ContextKind kind) const {
-      return llvm::find_if(Contexts, [&kind](const Context &currContext) {
-               return currContext.first == kind;
-             }) != Contexts.end();
-    }
-  };
-
-  ContextFinder contextAnalyzer(expr);
-  expr->walk(contextAnalyzer);
+  CompletionContextFinder contextAnalyzer(expr, DC);
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
   if (!contextAnalyzer.hasCompletionExpr())
     return false;
 
-  // If the completion expression is in a valid subexpression of an ErrorExpr,
-  // fallback to trying the valid subexpression without any context. This can
-  // happen for cases like `expectsBoolArg(foo.<complete>).` which becomes an
-  // ErrorExpr due to the missing member name after the final dot.
-  if (auto *errorExpr = contextAnalyzer.getInnermostErrorExpr()) {
-    if (auto *origExpr = errorExpr->getOriginalExpr()) {
-      SolutionApplicationTarget completionTarget(origExpr, DC, CTP_Unused,
-                                                 /*contextualType=*/Type(),
-                                                 /*isDiscarded=*/true);
-      return typeCheckForCodeCompletion(completionTarget, callback);
-    }
-  }
-
   // Interpolation components are type-checked separately.
   if (contextAnalyzer.locatedInStringIterpolation())
     return false;
 
   // FIXME: There is currently no way to distinguish between
-  // multi-statement closures which are function builder bodies
+  // multi-statement closures which are result builder bodies
   // (that are type-checked together with enclosing context)
   // and regular closures which are type-checked separately.
 
@@ -793,41 +894,40 @@ bool TypeChecker::typeCheckForCodeCompletion(
     llvm::SmallVector<Solution, 4> solutions;
 
     // If solve failed to generate constraints or with some other
-    // issue, we need to fallback to type-checking code completion
-    // expression directly.
+    // issue, we need to fallback to type-checking a sub-expression.
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
-    // If case type-check didn't produce any solutions, let's
-    // attempt to type-check code completion expression without
-    // enclosing context.
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Only keep the solution(s) with the best score.
+    filterSolutions(target, solutions);
+
+    // Similarly, if the type-check didn't produce any solutions, fall back
+    // to type-checking a sub-expression in isolation.
     if (solutions.empty())
       return CompletionResult::Fallback;
 
     // If code completion expression resides inside of multi-statement
-    // closure body it code either be type-checker together with context
-    // or not, it's impossible to say without trying. If solution
-    // doesn't have a type for a code completion expression it means that
-    // we have to wait until body of the closure is type-checked.
+    // closure body it could either be type-checked together with the context
+    // or not, it's impossible to say without checking.
     if (contextAnalyzer.locatedInMultiStmtClosure()) {
       auto &solution = solutions.front();
 
-      // Let's check whether closure participated in the type-check.
       if (solution.hasType(contextAnalyzer.getCompletionExpr())) {
         llvm::for_each(solutions, callback);
         return CompletionResult::Ok;
       }
 
-      if (solutions.size() > 1)
-        return CompletionResult::Fallback;
+      // At this point we know the code completion expression wasn't checked
+      // with the closure's surrounding context. If a single valid solution
+      // was formed we can wait until the body of the closure is type-checked
+      // and gather completions then.
+      if (solutions.size() == 1 && isViableForReTypeCheck(solution))
+        return CompletionResult::NotApplicable;
 
-      auto *closure = contextAnalyzer.getOutermostMultiStmtClosure();
-      auto closureType = solution.getResolvedType(closure);
-
-      if (closureType->hasUnresolvedType())
-        return CompletionResult::Fallback;
-
-      return CompletionResult::NotApplicable;
+      // Otherwise, it's unlikely the body will ever be type-checked, so fall
+      // back to manually checking a sub-expression within the closure body.
+      return CompletionResult::Fallback;
     }
 
     llvm::for_each(solutions, callback);
@@ -845,33 +945,25 @@ bool TypeChecker::typeCheckForCodeCompletion(
     break;
   }
 
-  {
-    auto *completionExpr = contextAnalyzer.getCompletionExpr();
-
-    if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      auto completionInContext = contextAnalyzer.getCompletionExprInContext();
-      // If pre-check fails, let's switch to code completion
-      // expression without any enclosing context.
-      if (ConstraintSystem::preCheckExpression(
-              completionInContext, DC, /*replaceInvalidRefsWithErrors=*/true)) {
-        completionExpr = contextAnalyzer.getCompletionExpr();
-      } else {
-        completionExpr = completionInContext;
-      }
-    }
-
-    // If initial solve failed, let's fallback to checking only code completion
-    // expresion without any context.
-    SolutionApplicationTarget completionTarget(completionExpr, DC, CTP_Unused,
+  // Determine the best subexpression to use based on the collected context
+  // of the code completion expression.
+  if (auto fallback = contextAnalyzer.getFallbackCompletionExpr()) {
+    assert(fallback->E != expr);
+    SolutionApplicationTarget completionTarget(fallback->E,
+                                               fallback->DC, CTP_Unused,
                                                /*contextualType=*/Type(),
                                                /*isDiscarded=*/true);
+    if (fallback->SeparatePrecheck) {
+      typeCheckForCodeCompletion(completionTarget, callback);
+      return true;
+    }
 
     switch (solveForCodeCompletion(completionTarget)) {
     case CompletionResult::Ok:
     case CompletionResult::Fallback:
       break;
     case CompletionResult::NotApplicable:
-      llvm_unreachable("solve on CodeCompletionExpr produced not applicable?");
+      llvm_unreachable("fallback expr not applicable?");
     }
   }
   return true;
@@ -974,8 +1066,23 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
 
 void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
   assert(!gotCallback());
-  SolutionApplicationTarget completionTarget(CompletionExpr, DC, CTP_Unused,
-                                             Type(), /*isDiscared=*/true);
+
+  // Default to checking the completion expression in isolation.
+  Expr *fallbackExpr = CompletionExpr;
+  DeclContext *fallbackDC = DC;
+
+  CompletionContextFinder finder(DC);
+  if (finder.hasCompletionExpr()) {
+    if (auto fallback = finder.getFallbackCompletionExpr()) {
+      fallbackExpr = fallback->E;
+      fallbackDC = fallback->DC;
+    }
+  }
+
+  SolutionApplicationTarget completionTarget(fallbackExpr, fallbackDC,
+                                             CTP_Unused, Type(),
+                                             /*isDiscared=*/true);
+
   TypeChecker::typeCheckForCodeCompletion(
       completionTarget, [&](const Solution &S) { sawSolution(S); });
 }

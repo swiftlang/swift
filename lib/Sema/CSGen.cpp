@@ -589,6 +589,13 @@ namespace {
       
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        // We want to consider all options for calls that might contain the code
+        // completion location, as missing arguments after the completion
+        // location are valid (since it might be that they just haven't been
+        // written yet).
+        if (CS.isForCodeCompletion())
+          return false;
+
         if (!type->is<AnyFunctionType>())
           return false;
 
@@ -991,7 +998,7 @@ namespace {
         : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
       // Although constraint system is initialized in `constraint
       // generation` phase, we have to set it here manually because e.g.
-      // function builders could generate constraints for its body
+      // result builders could generate constraints for its body
       // in the middle of the solving.
       CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
     }
@@ -1310,7 +1317,7 @@ namespace {
         type = CS.openUnboundGenericTypes(type, locator);
       } else if (CS.hasType(E)) {
         // If there's a type already set into the constraint system, honor it.
-        // FIXME: This supports the function builder transform, which sneakily
+        // FIXME: This supports the result builder transform, which sneakily
         // stashes a type in the constraint system through a TypeExpr in order
         // to pass it down to the rest of CSGen. This is a terribly
         // unprincipled thing to do.

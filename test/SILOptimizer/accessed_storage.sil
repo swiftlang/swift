@@ -1,4 +1,7 @@
 // RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -access-path-verification -o /dev/null
+
+// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 
@@ -14,6 +17,9 @@ struct MyStruct {
 // CHECK-LABEL: @testStructPhiCommon
 // CHECK: store
 // CHECK: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Base: %0 = argument of bb0 : $*MyStruct
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: (#0)
 sil hidden @testStructPhiCommon : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
@@ -41,6 +47,7 @@ bb3(%6 : $Builtin.RawPointer) :
 //
 // CHECK-LABEL: @testStructPhiDivergent
 // CHECK: store
+// CHECK: INVALID
 // CHECK: INVALID
 sil hidden @testStructPhiDivergent : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
@@ -74,6 +81,7 @@ bb3(%6 : $Builtin.RawPointer) :
 //
 // CHECK-LABEL: @testStructPhiChained
 // CHECK:   store
+// CHECK: INVALID
 // CHECK: INVALID
 sil hidden @testStructPhiChained : $@convention(thin) (@inout MyStruct, @inout Int64) -> () {
 bb0(%0 : $*MyStruct, %1 : $*Int64):
@@ -123,9 +131,15 @@ struct MyArray<T> {
 
 // CHECK-LABEL: @arrayValue
 // CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
-// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+// CHECK: Tail     %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Base:    %{{.*}} = ref_tail_addr [immutable] %{{.*}} : $__ContiguousArrayStorageBase, $Int64
+// CHECK: Storage: Tail %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Path:    (@3,#0)
 // CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
-// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+// CHECK: Tail    %{{.*}} = struct_extract %5 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Base:    %{{.*}} = ref_tail_addr [immutable] %{{.*}} : $__ContiguousArrayStorageBase, $Int64
+// CHECK: Storage: Tail   %{{.*}} = struct_extract %5 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Path:    (@4,#0)
 sil [ossa] @arrayValue : $@convention(thin) (@guaranteed MyArray<Int64>) -> Int64 {
 bb0(%0 : @guaranteed $MyArray<Int64>):
   %1 = integer_literal $Builtin.Word, 3
@@ -148,4 +162,304 @@ bb0(%0 : @guaranteed $MyArray<Int64>):
   cond_fail %17 : $Builtin.Int1, "arithmetic overflow"
   %19 = struct $Int64 (%16 : $Builtin.Int64)
   return %19 : $Int64
+}
+
+// CHECK-LABEL: @staticIndexAddrChain
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@1,#0)
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %{{.*}} = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@2,#0)
+sil [ossa] @staticIndexAddrChain : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*MyStruct
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = index_addr %1 : $*MyStruct, %2 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  %5 = load [trivial] %4 : $*Int64
+  %6 = index_addr %3 : $*MyStruct, %2 : $Builtin.Word
+  %7 = struct_element_addr %6 : $*MyStruct, #MyStruct.i
+  %8 = load [trivial] %7 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @staticIndexAddrSubobject
+// CHECK: ###For MemOp:   %5 = load [trivial] %4 : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: INVALID
+sil [ossa] @staticIndexAddrSubobject : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*MyStruct
+  %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.i
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = index_addr %2 : $*Int64, %3 : $Builtin.Word
+  %5 = load [trivial] %4 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @dynamicIndexAddrChain
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@Unknown,#0)
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@Unknown,#0)
+sil [ossa] @dynamicIndexAddrChain : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*MyStruct
+  %3 = index_addr %2 : $*MyStruct, %1 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  %5 = load [trivial] %4 : $*Int64
+  %6 = integer_literal $Builtin.Word, 1
+  %7 = index_addr %3 : $*MyStruct, %6 : $Builtin.Word
+  %8 = struct_element_addr %7 : $*MyStruct, #MyStruct.i
+  %9 = load [trivial] %8 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @staticIndexAddrCancel
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@1,#0)
+// CHECK:   %{{.*}} = load [trivial] %{{.*}} : $*Int64
+// CHECK: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@2,#0)
+sil [ossa] @staticIndexAddrCancel : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*MyStruct
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = index_addr %1 : $*MyStruct, %2 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  %5 = load [trivial] %4 : $*Int64
+  %6 = integer_literal $Builtin.Word, -1
+  %7 = index_addr %3 : $*MyStruct, %2 : $Builtin.Word
+  %8 = struct_element_addr %7 : $*MyStruct, #MyStruct.i
+  %9 = load [trivial] %8 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+class A {
+  var prop0: Int64
+}
+class B : A {
+  var prop1: Int64
+}
+
+// CHECK-LABEL: @testNonUniquePropertyIndex
+// CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK: Class   %{{.*}} = alloc_ref $B
+// CHECK:   Field: var prop1: Int64 Index: 1
+// CHECK: Base:   %{{.*}} = ref_element_addr %{{.*}} : $B, #B.prop1
+// CHECK: Storage: Class   %{{.*}} = alloc_ref $B
+// CHECK:   Field: var prop1: Int64 Index: 1
+// CHECK: Path: ()
+// CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK: Class   %{{.*}} = alloc_ref $B
+// CHECK:   Field: var prop0: Int64 Index: 0
+// CHECK: Base:   %{{.*}} = ref_element_addr %{{.*}} : $A, #A.prop0
+// CHECK: Storage: Class   %{{.*}} = alloc_ref $B
+// CHECK:   Field: var prop0: Int64 Index: 0
+// CHECK: Path: ()
+sil @testNonUniquePropertyIndex : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_ref $B
+  %2 = ref_element_addr %1 : $B, #B.prop1
+  store %0 to %2 : $*Int64
+  %4 = upcast %1 : $B to $A
+  %5 = ref_element_addr %4 : $A, #A.prop0
+  store %0 to %5 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testRefTailAndStruct0
+// CHECK: %{{.*}} = load %{{.*}} : $*Builtin.Int64
+// CHECK: Class   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK:  Index: 0
+// CHECK: Base:   %{{.*}} = ref_element_addr [immutable] %{{.*}} : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+// CHECK: Storage: Class   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK:  Index: 0
+// CHECK: Path: (#0,#0,#0)
+// CHECK:   %{{.*}} = load %{{.*}} : $*_StringGuts
+// CHECK: Tail   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Base:   %{{.*}} = ref_tail_addr [immutable] %{{.*}} : $__ContiguousArrayStorageBase, $String
+// CHECK: Storage: Tail   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Path: (#0)
+// CHECK: %{{.*}} = load %{{.*}} : $*String
+// CHECK: Tail   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Base:   %{{.*}} = ref_tail_addr [immutable] %{{.*}} : $__ContiguousArrayStorageBase, $String
+// CHECK: Storage: Tail   %{{.*}} = struct_extract %{{.*}} : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+// CHECK: Path: ()
+sil hidden [noinline] @testRefTailAndStruct0 : $@convention(thin) (@owned MyArray<String>) -> () {
+bb0(%0 : $MyArray<String>):
+  %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
+  %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
+  %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %6 = struct_element_addr %5 : $*_ArrayBody, #_ArrayBody._storage
+  %7 = struct_element_addr %6 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %8 = struct_element_addr %7 : $*Int, #Int._value
+  %9 = load %8 : $*Builtin.Int64
+  %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+  %11 = struct_element_addr %10 : $*String, #String._guts
+  %12 = load %11 : $*_StringGuts
+  %13 = load %10 : $*String
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: @testPointerDynamicIndex
+// CHECK: ###For MemOp: %{{.*}} = load [trivial] %{{.*}} : $*MyStruct
+// CHECK: Base: %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Storage: Argument %0 = argument of bb0 : $Builtin.RawPointer
+// CHECK: Path: (@Unknown)
+sil [serialized] [ossa] @testPointerDynamicIndex : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*MyStruct
+  %3 = index_addr %2 : $*MyStruct, %1 : $Builtin.Word
+  %4 = address_to_pointer %3 : $*MyStruct to $Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*MyStruct
+  %6 = load [trivial] %5 : $*MyStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: @testAddressToPointer
+// CHECK: ###For MemOp:   %3 = load [trivial] %{{.*}} : $*MyStruct
+// CHECK: Base: %0 = argument of bb0 : $*MyStruct
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: ()
+// CHECK: ###For MemOp:   %5 = load [trivial] %4 : $*Int64
+// CHECK: Base: %0 = argument of bb0 : $*MyStruct
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: (#0)
+sil [serialized] [ossa] @testAddressToPointer : $@convention(thin) (@in MyStruct) -> () {
+bb18(%0 : $*MyStruct):
+  %1 = address_to_pointer %0 : $*MyStruct to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*MyStruct
+  %3 = load [trivial] %2 : $*MyStruct
+  %4 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+  %5 = load [trivial] %4 : $*Int64
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @testIndexLoop
+// CHECK: ###For MemOp:   %3 = load %2 : $*AnyObject
+// CHECK: Base:   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Storage: Unidentified   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Path: ()
+// CHECK: ###For MemOp:   %7 = load %6 : $*AnyObject
+// CHECK: Base:   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Storage: Unidentified   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   store %7 to %6 : $*AnyObject                    // id: %8
+// CHECK: Base:   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Storage: Unidentified   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+// CHECK: Path: (@Unknown)
+sil shared @testIndexLoop : $@convention(thin) (UnsafeMutablePointer<AnyObject>) -> UnsafeMutablePointer<AnyObject> {
+bb0(%0 : $UnsafeMutablePointer<AnyObject>):
+  %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*AnyObject
+  %3 = load %2 : $*AnyObject
+  br bb1(%1 : $Builtin.RawPointer)
+
+bb1(%5 : $Builtin.RawPointer):
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*AnyObject
+  %7 = load %6 : $*AnyObject
+  store %7 to %6 : $*AnyObject
+  %9 = integer_literal $Builtin.Word, 1
+  %10 = index_addr %6 : $*AnyObject, %9 : $Builtin.Word
+  %11 = address_to_pointer %10 : $*AnyObject to $Builtin.RawPointer
+  cond_br undef, bb2, bb3(%11 : $Builtin.RawPointer)
+
+bb2:
+  br bb1(%11 : $Builtin.RawPointer)
+
+bb3(%14 : $Builtin.RawPointer):
+  %15 = struct $UnsafeMutablePointer<AnyObject> (%14 : $Builtin.RawPointer)
+  return %15 : $UnsafeMutablePointer<AnyObject>
+}
+
+// Handle index_addr boundary conditions
+// Most will end up as "unknown" offset, but we shouldn't crash.
+// CHECK-LABEL: @indexAddrBoundaries
+// CHECK: ###For MemOp:   %4 = load %3 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %7 = load %6 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %10 = load %9 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %13 = load %12 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %16 = load %15 : $*Int
+// CHECK: Path: (@1073741823)
+// CHECK: ###For MemOp:   %19 = load %18 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %22 = load %21 : $*Int
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %25 = load %24 : $*Int
+// CHECK: Path: (@-1073741823)
+// CHECK: ###For MemOp:   %28 = load %27 : $*Int
+// CHECK: Path: (@-1)
+sil @indexAddrBoundaries : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
+  // INT_MIN (IndexTrie root)
+  %2 = integer_literal $Builtin.Word, 2147483648  // '0x80000000'
+  %3 = index_addr %1 : $*Int, %2 : $Builtin.Word
+  %4 = load %3 : $*Int
+  // INT_MIN (IndexTrie root)
+  %5 = integer_literal $Builtin.Word, -2147483648 // '0x80000000'
+  %6 = index_addr %1 : $*Int, %5 : $Builtin.Word
+  %7 = load %6 : $*Int
+  // INT_MAX (TailIndex)
+  %8 = integer_literal $Builtin.Word, 2147483647  // '0x7fffffff'
+  %9 = index_addr %1 : $*Int, %8 : $Builtin.Word
+  %10 = load %9 : $*Int
+  // Largest unsigned offset + 1
+  %11 = integer_literal $Builtin.Word, 1073741824 // '0x40000000'
+  %12 = index_addr %1 : $*Int, %11 : $Builtin.Word
+  %13 = load %12 : $*Int
+  // Largest unsigned offset
+  %14 = integer_literal $Builtin.Word, 1073741823 // '0x3fffffff'
+  %15 = index_addr %1 : $*Int, %14 : $Builtin.Word
+  %16 = load %15 : $*Int
+  // Smallest signed offset - 1
+  %17 = integer_literal $Builtin.Word, -1073741825 // '0xbfffffff'
+  %18 = index_addr %1 : $*Int, %17 : $Builtin.Word
+  %19 = load %18 : $*Int
+  // Smallest signed offset (Unknown offset)
+  %20 = integer_literal $Builtin.Word, -1073741824 // '0xc0000000'
+  %21 = index_addr %1 : $*Int, %20 : $Builtin.Word
+  %22 = load %21 : $*Int
+  // Smallest signed offset + 1 (concrete offset)
+  %23 = integer_literal $Builtin.Word, -1073741823 // '0xc0000001'
+  %24 = index_addr %1 : $*Int, %23 : $Builtin.Word
+  %25 = load %24 : $*Int
+  // Largest Negative
+  %26 = integer_literal $Builtin.Word, -1          // '0xffffffff'
+  %27 = index_addr %1 : $*Int, %26 : $Builtin.Word
+  %28 = load %27 : $*Int
+  //
+  %99 = tuple ()
+  return %99 : $()
 }

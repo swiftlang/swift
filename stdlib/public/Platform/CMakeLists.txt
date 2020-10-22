@@ -48,8 +48,8 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS glibc_modulemap)
 
-add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    msvcrt.swift
+add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ucrt.swift
     ${swift_platform_sources}
     POSIXError.swift
 

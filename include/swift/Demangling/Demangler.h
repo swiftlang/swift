@@ -140,7 +140,7 @@ public:
 #endif
 
     // Do we have enough space in the current slab?
-    if (CurPtr + ObjectSize > End) {
+    if (!CurPtr || CurPtr + ObjectSize > End) {
       // No. We have to malloc a new slab.
       // We double the slab size for each allocated slab.
       SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));

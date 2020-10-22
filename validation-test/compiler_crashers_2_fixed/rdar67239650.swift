@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck %s
 
-@_functionBuilder
+@resultBuilder
 struct SillyBuilder {
   static func buildBlock() -> () {}
 }

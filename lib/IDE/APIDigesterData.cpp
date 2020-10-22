@@ -56,6 +56,7 @@ StringRef swift::ide::api::getDeclKindStr(const DeclKind Value, bool lower) {
     }
 #include "swift/AST/DeclNodes.def"
     }
+    llvm_unreachable("Unhandled DeclKind in switch.");
   } else {
     return getDeclKindStrRaw(Value);
   }

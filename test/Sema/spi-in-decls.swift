@@ -22,7 +22,7 @@ extension NormalClass: NormalProto {
 }
 
 @_spi(X)
-public struct BadStruct {} // expected-note 27 {{type declared here}}
+public struct BadStruct {} // expected-note 34 {{type declared here}}
 @_spi(X)
 public protocol BadProto {} // expected-note 20 {{type declared here}}
 @_spi(X)
@@ -107,7 +107,6 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; it is SPI}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; the conformance is declared as SPI}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; it is SPI}}

@@ -67,3 +67,29 @@ func useStuff() {
   print(generic2(1).0)
   print(generic2(1).1)
 }
+
+
+public struct BigThing<T> {
+  var x: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+  var y: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+  var z: (Int64, Int64, Int64, Int64) = (0, 0, 0, 0)
+}
+
+public protocol P {}
+
+public protocol Assoc {
+ associatedtype A
+ func foo() -> A
+}
+
+extension Int : P {}
+
+public struct DefineSome : Assoc {
+   public func foo() -> some P {
+     return 5
+   }
+}
+
+public func abiIndirect() -> BigThing<DefineSome.A> {
+  return BigThing<DefineSome.A>()
+}

@@ -388,6 +388,7 @@ private:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
+    case Node::Kind::GenericSpecializationPrespecialized:
     case Node::Kind::InlinedGenericFunction:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
@@ -1388,6 +1389,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::GenericSpecialization:
     printSpecializationPrefix(Node, "generic specialization");
+    return nullptr;
+  case Node::Kind::GenericSpecializationPrespecialized:
+    printSpecializationPrefix(Node, "generic pre-specialization");
     return nullptr;
   case Node::Kind::GenericSpecializationNotReAbstracted:
     printSpecializationPrefix(Node, "generic not re-abstracted specialization");

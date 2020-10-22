@@ -49,9 +49,9 @@ void AccessSummaryAnalysis::processFunction(FunctionInfo *info,
 /// started by a begin_access and any flows of the arguments to other
 /// functions.
 void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
-                                             SILFunctionArgument *argument,
-                                             ArgumentSummary &summary,
-                                             FunctionOrder &order) {
+                                            SILFunctionArgument *argument,
+                                            ArgumentSummary &summary,
+                                            FunctionOrder &order) {
   unsigned argumentIndex = argument->getIndex();
 
   // Use a worklist to track argument uses to be processed.
@@ -77,7 +77,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       // call.
       if (!callee || callee->empty()) {
         summary.mergeWith(SILAccessKind::Modify, apply.getLoc(),
-                          getSubPathTrieRoot());
+                          apply.getModule().getIndexTrieRoot());
         continue;
       }
       unsigned operandNumber = operand->getOperandNumber();
@@ -468,7 +468,6 @@ AccessSummaryAnalysis::getOrCreateSummary(SILFunction *fn) {
 void AccessSummaryAnalysis::AccessSummaryAnalysis::invalidate() {
   FunctionInfos.clear();
   Allocator.DestroyAll();
-  SubPathTrie.reset(new IndexTrieNode());
 }
 
 void AccessSummaryAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
@@ -526,7 +525,7 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
 
 const IndexTrieNode *
 AccessSummaryAnalysis::findSubPathAccessed(BeginAccessInst *BAI) {
-  IndexTrieNode *SubPath = getSubPathTrieRoot();
+  IndexTrieNode *SubPath = BAI->getModule().getIndexTrieRoot();
 
   // For each single-user projection of BAI, construct or get a node
   // from the trie representing the index of the field or tuple element

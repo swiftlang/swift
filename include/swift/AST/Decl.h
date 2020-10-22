@@ -2187,7 +2187,8 @@ public:
   /// implementations for the requirements of a public protocol, even when
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
-                        bool forConformance = false) const;
+                        bool forConformance = false,
+                        bool allowUsableFromInline = false) const;
 
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes
@@ -2401,12 +2402,12 @@ public:
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
-  /// function builder, if there is one.
-  CustomAttr *getAttachedFunctionBuilder() const;
+  /// result builder, if there is one.
+  CustomAttr *getAttachedResultBuilder() const;
 
-  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// Retrieve the @resultBuilder type attached to this declaration,
   /// if there is one.
-  Type getFunctionBuilderType() const;
+  Type getResultBuilderType() const;
 
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration
@@ -3741,62 +3742,80 @@ public:
   }
 };
 
+/// A convenience wrapper around the \c SelfReferencePosition::Kind enum.
+struct SelfReferencePosition final {
+  enum Kind : uint8_t { None, Covariant, Contravariant, Invariant };
 
-/// Describes whether a requirement refers to 'Self', for use in the
-/// is-inheritable and is-available-existential checks.
-struct SelfReferenceKind {
-  bool result;
-  bool parameter;
-  bool requirement;
-  bool other;
+private:
+  Kind kind;
 
-  /// The type does not refer to 'Self' at all.
-  static SelfReferenceKind None() {
-    return SelfReferenceKind(false, false, false, false);
+public:
+  SelfReferencePosition(Kind kind) : kind(kind) {}
+
+  SelfReferencePosition flipped() const {
+    switch (kind) {
+    case None:
+    case Invariant:
+      return *this;
+    case Covariant:
+      return Contravariant;
+    case Contravariant:
+      return Covariant;
+    }
+    llvm_unreachable("unhandled self reference position!");
   }
 
-  /// The type refers to 'Self', but only as the type of a property or
-  /// the result type of a method/subscript.
-  static SelfReferenceKind Result() {
-    return SelfReferenceKind(true, false, false, false);
+  explicit operator bool() const { return kind > None; }
+
+  operator Kind() const { return kind; }
+};
+
+/// Describes the least favorable positions at which a requirement refers
+/// to 'Self' in terms of variance, for use in the is-inheritable and
+/// is-available-existential checks.
+struct SelfReferenceInfo final {
+  using Position = SelfReferencePosition;
+
+  bool hasCovariantSelfResult;
+  Position selfRef;
+  Position assocTypeRef;
+
+  /// A reference to 'Self'.
+  static SelfReferenceInfo forSelfRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, position, Position::None);
   }
 
-  /// The type refers to 'Self', but only as the parameter type
-  /// of a method/subscript.
-  static SelfReferenceKind Parameter() {
-    return SelfReferenceKind(false, true, false, false);
+  /// A reference to 'Self' through an associated type.
+  static SelfReferenceInfo forAssocTypeRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, Position::None, position);
   }
 
-  /// The type refers to 'Self' within a same-type requiement.
-  static SelfReferenceKind Requirement() {
-    return SelfReferenceKind(false, false, true, false);
-  }
-
-  /// The type refers to 'Self' in a position that is invariant.
-  static SelfReferenceKind Other() {
-    return SelfReferenceKind(false, false, false, true);
-  }
-
-  SelfReferenceKind flip() const {
-    return SelfReferenceKind(parameter, result, requirement, other);
-  }
-
-  SelfReferenceKind operator|=(SelfReferenceKind kind) {
-    result |= kind.result;
-    requirement |= kind.requirement;
-    parameter |= kind.parameter;
-    other |= kind.other;
+  SelfReferenceInfo operator|=(const SelfReferenceInfo &pos) {
+    hasCovariantSelfResult |= pos.hasCovariantSelfResult;
+    if (pos.selfRef > selfRef) {
+      selfRef = pos.selfRef;
+    }
+    if (pos.assocTypeRef > assocTypeRef) {
+      assocTypeRef = pos.assocTypeRef;
+    }
     return *this;
   }
 
-  operator bool() const {
-    return result || parameter || requirement || other;
+  explicit operator bool() const {
+    return hasCovariantSelfResult || selfRef || assocTypeRef;
   }
 
+  SelfReferenceInfo()
+      : hasCovariantSelfResult(false), selfRef(Position::None),
+        assocTypeRef(Position::None) {}
+
 private:
-  SelfReferenceKind(bool result, bool parameter, bool requirement, bool other)
-    : result(result), parameter(parameter), requirement(requirement),
-      other(other) { }
+  SelfReferenceInfo(bool hasCovariantSelfResult, Position selfRef,
+                    Position assocTypeRef)
+      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
+        assocTypeRef(assocTypeRef) {}
 };
 
 /// The set of known protocols for which derived conformances are supported.
@@ -3978,15 +3997,12 @@ public:
 
   /// Find direct Self references within the given requirement.
   ///
-  /// \param allowCovariantParameters If true, 'Self' is assumed to be
-  /// covariant anywhere; otherwise, only in the return type of the top-level
-  /// function type.
-  ///
-  /// \param skipAssocTypes If true, associated types of 'Self' are ignored;
-  /// otherwise, they count as an 'other' usage of 'Self'.
-  SelfReferenceKind findProtocolSelfReferences(const ValueDecl *decl,
-                                               bool allowCovariantParameters,
-                                               bool skipAssocTypes) const;
+  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' is only
+  /// assumed to be covariant in a top-level non-function type, or in the
+  /// eventual result type of a top-level function type.
+  SelfReferenceInfo
+  findProtocolSelfReferences(const ValueDecl *decl,
+                             bool treatNonResultCovariantSelfAsInvariant) const;
 
   /// Determine whether we are allowed to refer to an existential type
   /// conforming to this protocol. This is only permitted if the type of

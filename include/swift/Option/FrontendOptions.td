@@ -480,10 +480,6 @@ def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
   HelpText<"Enable operator designated types">;
 
-def solver_enable_operator_designated_types :
-  Flag<["-"], "solver-enable-operator-designated-types">,
-  HelpText<"Enable operator designated types in constraint solver">;
-
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
   HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;
@@ -511,6 +507,9 @@ def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
 
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
+
+def testable_import_module : Separate<["-"], "testable-import-module">,
+  HelpText<"Implicitly import the specified module with @testable">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;

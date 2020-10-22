@@ -4,7 +4,7 @@
 
 import Swift
 
-@_functionBuilder
+@resultBuilder
 class ArrayBuilder<Element> {
   static func buildBlock() -> [Element] { [] }
   static func buildBlock(_ elt: Element) -> [Element] { [elt] }
@@ -32,7 +32,7 @@ bar("") { x, ty in
 protocol P {}
 extension String : P {}
 
-@_functionBuilder
+@resultBuilder
 struct FooBuilder<T> {}
 
 extension FooBuilder where T : P {

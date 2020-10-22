@@ -21,14 +21,21 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Located.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 namespace swift {
 class ASTContext;
+class ModuleDecl;
+
+// MARK: - Fundamental import enums
 
 /// Describes what kind of name is being imported.
 ///
@@ -44,6 +51,43 @@ enum class ImportKind : uint8_t {
   Var,
   Func
 };
+
+inline bool isScopedImportKind(ImportKind importKind) {
+  return importKind != ImportKind::Module;
+}
+
+/// Possible attributes for imports in source files.
+enum class ImportFlags {
+  /// The imported module is exposed to anyone who imports the parent module.
+  Exported = 0x1,
+
+  /// This source file has access to testable declarations in the imported
+  /// module.
+  Testable = 0x2,
+
+  /// This source file has access to private declarations in the imported
+  /// module.
+  PrivateImport = 0x4,
+
+  /// The imported module is an implementation detail of this file and should
+  /// not be required to be present if the main module is ever imported
+  /// elsewhere.
+  ///
+  /// Mutually exclusive with Exported.
+  ImplementationOnly = 0x8,
+
+  /// The module is imported to have access to named SPIs which is an
+  /// implementation detail of this file.
+  SPIAccessControl = 0x10,
+
+  /// Used for DenseMap.
+  Reserved = 0x80
+};
+
+/// \see ImportFlags
+using ImportOptions = OptionSet<ImportFlags>;
+
+// MARK: - Import Paths
 
 namespace detail {
   using ImportPathElement = Located<Identifier>;
@@ -108,6 +152,17 @@ namespace detail {
       if (empty()) return SourceRange();
       return SourceRange(raw.front().Loc, raw.back().Loc);
     }
+
+    void print(llvm::raw_ostream &os) const {
+      llvm::interleave(*this,
+                       [&](Element elem) { os << elem.Item.str(); },
+                       [&]() { os << "."; });
+    }
+
+    void getString(SmallVectorImpl<char> &modulePathStr) const {
+      llvm::raw_svector_ostream os(modulePathStr);
+      print(os);
+    }
   };
 
   // These shims avoid circularity between ASTContext.h and Import.h.
@@ -118,9 +173,17 @@ namespace detail {
 
   template<typename Subclass>
   class ImportPathBuilder {
-    llvm::SmallVector<ImportPathElement, 4> scratch;
+    using Scratch = llvm::SmallVector<ImportPathElement, 4>;
+    Scratch scratch;
 
   public:
+    using value_type = Scratch::value_type;
+    using reference = Scratch::reference;
+    using iterator = Scratch::iterator;
+    using const_iterator = Scratch::const_iterator;
+    using difference_type = Scratch::difference_type;
+    using size_type = Scratch::size_type;
+
     Subclass get() const {
       return Subclass(scratch);
     }
@@ -352,16 +415,326 @@ public:
   /// including submodules, assuming the \c ImportDecl has the indicated
   /// \c importKind.
   Module getModulePath(ImportKind importKind) const {
-    return getModulePath(importKind != ImportKind::Module);
+    return getModulePath(isScopedImportKind(importKind));
   }
 
   /// Extracts the portion of the \c ImportPath which represents a scope for the
   /// import, assuming the \c ImportDecl has the indicated \c importKind.
   Access getAccessPath(ImportKind importKind) const {
-    return getAccessPath(importKind != ImportKind::Module);
+    return getAccessPath(isScopedImportKind(importKind));
   }
 };
 
+// MARK: - Abstractions of imports
+
+/// Convenience struct to keep track of an import path and whether or not it
+/// is scoped.
+class UnloadedImportedModule {
+  // This is basically an ArrayRef with a bit stolen from the pointer.
+  // FIXME: Extract an ArrayRefIntPair type from this.
+  llvm::PointerIntPair<ImportPath::Raw::iterator, 1, bool> dataAndIsScoped;
+  ImportPath::Raw::size_type length;
+
+  ImportPath::Raw::iterator data() const {
+    return dataAndIsScoped.getPointer();
+  }
+
+  bool isScoped() const {
+    return dataAndIsScoped.getInt();
+  }
+
+  ImportPath::Raw getRaw() const {
+    return ImportPath::Raw(data(), length);
+  }
+
+  UnloadedImportedModule(ImportPath::Raw raw, bool isScoped)
+    : dataAndIsScoped(raw.data(), isScoped), length(raw.size()) { }
+
+public:
+  UnloadedImportedModule(ImportPath importPath, bool isScoped)
+    : UnloadedImportedModule(importPath.getRaw(), isScoped) { }
+
+  UnloadedImportedModule(ImportPath importPath, ImportKind importKind)
+    : UnloadedImportedModule(importPath, isScopedImportKind(importKind)) { }
+
+  ImportPath getImportPath() const {
+    return ImportPath(getRaw());
+  }
+
+  ImportPath::Module getModulePath() const {
+    return getImportPath().getModulePath(isScoped());
+  }
+
+  ImportPath::Access getAccessPath() const {
+    return getImportPath().getAccessPath(isScoped());
+  }
+
+  friend bool operator==(const UnloadedImportedModule &lhs,
+                         const UnloadedImportedModule &rhs) {
+    return (lhs.getRaw() == rhs.getRaw()) &&
+           (lhs.isScoped() == rhs.isScoped());
+  }
+};
+
+/// Convenience struct to keep track of a module along with its access path.
+struct alignas(uint64_t) ImportedModule {
+  /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
+  ImportPath::Access accessPath;
+  /// The actual module corresponding to the import.
+  ///
+  /// Invariant: The pointer is non-null.
+  ModuleDecl *importedModule;
+
+  ImportedModule(ImportPath::Access accessPath,
+                 ModuleDecl *importedModule)
+      : accessPath(accessPath), importedModule(importedModule) {
+    assert(this->importedModule);
+  }
+
+  explicit ImportedModule(ModuleDecl *importedModule)
+      : ImportedModule(ImportPath::Access(), importedModule) { }
+
+  bool operator==(const ImportedModule &other) const {
+    return (this->importedModule == other.importedModule) &&
+           (this->accessPath == other.accessPath);
+  }
+
+  /// Uniques the items in \p imports, ignoring the source locations of the
+  /// access paths.
+  ///
+  /// The order of items in \p imports is \e not preserved.
+  static void removeDuplicates(SmallVectorImpl<ImportedModule> &imports);
+
+  // Purely here to allow ImportedModule and UnloadedImportedModule to
+  // substitute into the same templates.
+  ImportPath::Access getAccessPath() const { return accessPath; }
+
+  /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
+  class Order {
+  public:
+    bool operator()(const ImportedModule &lhs,
+                    const ImportedModule &rhs) const {
+      if (lhs.importedModule != rhs.importedModule)
+        return std::less<const ModuleDecl *>()(lhs.importedModule,
+                                               rhs.importedModule);
+      if (lhs.accessPath.getRaw().data() != rhs.accessPath.getRaw().data())
+        return std::less<ImportPath::Raw::iterator>()(lhs.accessPath.begin(),
+                                                   rhs.accessPath.begin());
+      return lhs.accessPath.size() < rhs.accessPath.size();
+    }
+  };
+};
+
+/// Augments a type representing an import to also include information about the
+/// import's attributes. This is usually used with either \c ImportedModule or
+/// \c UnloadedImportedModule.
+template<class ModuleInfo>
+struct AttributedImport {
+  /// Information about the module and access path being imported.
+  ModuleInfo module;
+
+  /// Flags indicating which attributes of this import are present.
+  ImportOptions options;
+
+  /// If this is a @_private import, the value of its 'sourceFile:' argument;
+  /// otherwise, empty string.
+  StringRef sourceFileArg;
+
+  /// Names of explicitly imported SPI groups.
+  ArrayRef<Identifier> spiGroups;
+
+  AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
+                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
+      : module(module), options(options), sourceFileArg(filename),
+        spiGroups(spiGroups) {
+    assert(!(options.contains(ImportFlags::Exported) &&
+             options.contains(ImportFlags::ImplementationOnly)) ||
+           options.contains(ImportFlags::Reserved));
+  }
+
+  template<class OtherModuleInfo>
+  AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
+    : AttributedImport(module, other.options, other.sourceFileArg,
+                       other.spiGroups) { }
+
+  friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
+                         const AttributedImport<ModuleInfo> &rhs) {
+    return lhs.module == rhs.module &&
+           lhs.options.toRaw() == rhs.options.toRaw() &&
+           lhs.sourceFileArg == rhs.sourceFileArg &&
+           lhs.spiGroups == rhs.spiGroups;
+  }
+
+  AttributedImport<ImportedModule> getLoaded(ModuleDecl *loadedModule) const {
+    return { ImportedModule(module.getAccessPath(), loadedModule), *this };
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ImportedModule &import);
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnloadedImportedModule &import);
+
+// This is a quasi-implementation detail of the template version below.
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<std::tuple<>> &import);
+
+template<typename ModuleInfo>
+void simple_display(llvm::raw_ostream &out,
+                    const AttributedImport<ModuleInfo> &import) {
+  // Print the module.
+  simple_display(out, import.module);
+
+  // Print the other details of the import, using the std::tuple<>
+  // specialization.
+  AttributedImport<std::tuple<>> importWithoutModule({}, import);
+  simple_display(out, importWithoutModule);
+}
+
+// MARK: - Implicit imports
+
+/// The kind of stdlib that should be imported.
+enum class ImplicitStdlibKind {
+  /// No standard library should be implicitly imported.
+  None,
+
+  /// The Builtin module should be implicitly imported.
+  Builtin,
+
+  /// The regular Swift standard library should be implicitly imported.
+  Stdlib
+};
+
+/// Represents unprocessed options for implicit imports.
+struct ImplicitImportInfo {
+  /// The implicit stdlib to import.
+  ImplicitStdlibKind StdlibKind;
+
+  /// Whether we should attempt to import an underlying Clang half of this
+  /// module.
+  bool ShouldImportUnderlyingModule;
+
+  /// The bridging header path for this module, empty if there is none.
+  StringRef BridgingHeaderPath;
+
+  /// The names of additional modules to be loaded and implicitly imported.
+  SmallVector<AttributedImport<UnloadedImportedModule>, 4>
+      AdditionalUnloadedImports;
+
+  /// An additional list of already-loaded modules which should be implicitly
+  /// imported.
+  SmallVector<AttributedImport<ImportedModule>, 4>
+      AdditionalImports;
+
+  ImplicitImportInfo()
+      : StdlibKind(ImplicitStdlibKind::None),
+        ShouldImportUnderlyingModule(false) {}
+};
+
+/// Contains names of and pointers to modules that must be implicitly imported.
+struct ImplicitImportList {
+  ArrayRef<AttributedImport<ImportedModule>> imports;
+  ArrayRef<AttributedImport<UnloadedImportedModule>> unloadedImports;
+
+  friend bool operator==(const ImplicitImportList &lhs,
+                         const ImplicitImportList &rhs) {
+    return lhs.imports == rhs.imports
+        && lhs.unloadedImports == rhs.unloadedImports;
+  }
+};
+
+/// A list of modules to implicitly import.
+void simple_display(llvm::raw_ostream &out,
+                    const ImplicitImportList &importList);
+
+}
+
+// MARK: - DenseMapInfo
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::ImportOptions> {
+  using ImportOptions = swift::ImportOptions;
+
+  using UnsignedDMI = DenseMapInfo<uint8_t>;
+
+  static inline ImportOptions getEmptyKey() {
+    return ImportOptions(UnsignedDMI::getEmptyKey());
+  }
+  static inline ImportOptions getTombstoneKey() {
+    return ImportOptions(UnsignedDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(ImportOptions options) {
+    return UnsignedDMI::getHashValue(options.toRaw());
+  }
+  static bool isEqual(ImportOptions a, ImportOptions b) {
+    return UnsignedDMI::isEqual(a.toRaw(), b.toRaw());
+  }
+};
+
+template <>
+class DenseMapInfo<swift::ImportedModule> {
+  using ImportedModule = swift::ImportedModule;
+  using ModuleDecl = swift::ModuleDecl;
+public:
+  static ImportedModule getEmptyKey() {
+    return {{}, llvm::DenseMapInfo<ModuleDecl *>::getEmptyKey()};
+  }
+  static ImportedModule getTombstoneKey() {
+    return {{}, llvm::DenseMapInfo<ModuleDecl *>::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const ImportedModule &val) {
+    auto pair = std::make_pair(val.accessPath.size(), val.importedModule);
+    return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
+  }
+
+  static bool isEqual(const ImportedModule &lhs,
+                      const ImportedModule &rhs) {
+    return lhs.importedModule == rhs.importedModule &&
+           lhs.accessPath.isSameAs(rhs.accessPath);
+  }
+};
+
+template<typename ModuleInfo>
+struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
+  using AttributedImport = swift::AttributedImport<ModuleInfo>;
+
+  using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
+  using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
+  using StringRefDMI = DenseMapInfo<StringRef>;
+  // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
+  // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
+
+  static inline AttributedImport getEmptyKey() {
+    return AttributedImport(ModuleInfoDMI::getEmptyKey(),
+                            ImportOptionsDMI::getEmptyKey(),
+                            StringRefDMI::getEmptyKey(),
+                            {});
+  }
+  static inline AttributedImport getTombstoneKey() {
+    return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
+                            ImportOptionsDMI::getTombstoneKey(),
+                            StringRefDMI::getTombstoneKey(),
+                            {});
+  }
+  static inline unsigned getHashValue(const AttributedImport &import) {
+    return detail::combineHashValue(
+        ModuleInfoDMI::getHashValue(import.module),
+        detail::combineHashValue(
+            ImportOptionsDMI::getHashValue(import.options),
+            StringRefDMI::getHashValue(import.sourceFileArg)));
+  }
+  static bool isEqual(const AttributedImport &a,
+                      const AttributedImport &b) {
+    return ModuleInfoDMI::isEqual(a.module, b.module) &&
+           ImportOptionsDMI::isEqual(a.options, b.options) &&
+           StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg) &&
+           a.spiGroups == b.spiGroups;
+  }
+};
 }
 
 #endif

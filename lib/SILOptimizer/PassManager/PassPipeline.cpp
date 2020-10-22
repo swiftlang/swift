@@ -393,6 +393,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+  P.addTempRValueOpt();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
@@ -421,6 +422,11 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
+
+  // Verify AccessedStorage once in OSSA before optimizing.
+#ifndef NDEBUG
+  P.addAccessPathVerification();
+#endif
 
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
@@ -669,6 +675,11 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // A loop might have only one dynamic access now, i.e. hoistable
   P.addLICM();
 
+  // Verify AccessedStorage once again after optimizing and lowering OSSA.
+#ifndef NDEBUG
+  P.addAccessPathVerification();
+#endif
+
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
@@ -805,6 +816,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Create pre-specializations.
+  P.addOnonePrespecializations();
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();

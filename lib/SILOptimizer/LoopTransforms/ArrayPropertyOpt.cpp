@@ -402,7 +402,7 @@ private:
     if (!Call.canHoist(Preheader->getTerminator(), DomTree))
       return false;
 
-    SmallVector<unsigned, 4> AccessPath;
+    SmallVector<int, 4> AccessPath;
     SILValue ArrayContainer =
       StructUseCollector::getAccessPath(Arr, AccessPath);
 

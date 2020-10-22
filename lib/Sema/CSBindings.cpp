@@ -22,6 +22,137 @@
 using namespace swift;
 using namespace constraints;
 
+void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
+    const ConstraintSystem &cs,
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+        &inferredBindings) {
+  if (TransitiveProtocols)
+    return;
+
+  llvm::SmallVector<std::pair<TypeVariableType *, TypeVariableType *>, 4>
+      workList;
+  llvm::SmallPtrSet<TypeVariableType *, 4> visitedRelations;
+
+  llvm::SmallDenseMap<TypeVariableType *, SmallPtrSet<Constraint *, 4>, 4>
+      protocols;
+
+  auto addToWorkList = [&](TypeVariableType *parent,
+                           TypeVariableType *typeVar) {
+    if (visitedRelations.insert(typeVar).second)
+      workList.push_back({parent, typeVar});
+  };
+
+  auto propagateProtocolsTo =
+      [&protocols](TypeVariableType *dstVar,
+                   const SmallVectorImpl<Constraint *> &direct,
+                   const SmallPtrSetImpl<Constraint *> &transitive) {
+        auto &destination = protocols[dstVar];
+
+        for (auto *protocol : direct)
+          destination.insert(protocol);
+
+        for (auto *protocol : transitive)
+          destination.insert(protocol);
+      };
+
+  addToWorkList(nullptr, TypeVar);
+
+  do {
+    auto *currentVar = workList.back().second;
+
+    auto cachedBindings = inferredBindings.find(currentVar);
+    if (cachedBindings == inferredBindings.end()) {
+      workList.pop_back();
+      continue;
+    }
+
+    auto &bindings = cachedBindings->getSecond();
+
+    // If current variable already has transitive protocol
+    // conformances inferred, there is no need to look deeper
+    // into subtype/equivalence chain.
+    if (bindings.TransitiveProtocols) {
+      TypeVariableType *parent = nullptr;
+      std::tie(parent, currentVar) = workList.pop_back_val();
+      assert(parent);
+      propagateProtocolsTo(parent, bindings.Protocols,
+                           *bindings.TransitiveProtocols);
+      continue;
+    }
+
+    for (const auto &entry : bindings.SubtypeOf)
+      addToWorkList(currentVar, entry.first);
+
+    // If current type variable is part of an equivalence
+    // class, make it a "representative" and let's it infer
+    // supertypes and direct protocol requirements from
+    // other members.
+    for (const auto &entry : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(entry.first);
+      if (eqBindings != inferredBindings.end()) {
+        const auto &bindings = eqBindings->getSecond();
+
+        llvm::SmallPtrSet<Constraint *, 2> placeholder;
+        // Add any direct protocols from members of the
+        // equivalence class, so they could be propagated
+        // to all of the members.
+        propagateProtocolsTo(currentVar, bindings.Protocols, placeholder);
+
+        // Since type variables are equal, current type variable
+        // becomes a subtype to any supertype found in the current
+        // equivalence  class.
+        for (const auto &eqEntry : bindings.SubtypeOf)
+          addToWorkList(currentVar, eqEntry.first);
+      }
+    }
+
+    // More subtype/equivalences relations have been added.
+    if (workList.back().second != currentVar)
+      continue;
+
+    TypeVariableType *parent = nullptr;
+    std::tie(parent, currentVar) = workList.pop_back_val();
+
+    // At all of the protocols associated with current type variable
+    // are transitive to its parent, propogate them down the subtype/equivalence
+    // chain.
+    if (parent) {
+      propagateProtocolsTo(parent, bindings.Protocols, protocols[currentVar]);
+    }
+
+    auto inferredProtocols = std::move(protocols[currentVar]);
+
+    llvm::SmallPtrSet<Constraint *, 4> protocolsForEquivalence;
+
+    // Equivalence class should contain both:
+    // - direct protocol requirements of the current type
+    //   variable;
+    // - all of the transitive protocols inferred through
+    //   the members of the equivalence class.
+    {
+      protocolsForEquivalence.insert(bindings.Protocols.begin(),
+                                     bindings.Protocols.end());
+
+      protocolsForEquivalence.insert(inferredProtocols.begin(),
+                                     inferredProtocols.end());
+    }
+
+    // Propogate inferred protocols to all of the members of the
+    // equivalence class.
+    for (const auto &equivalence : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(equivalence.first);
+      if (eqBindings != inferredBindings.end()) {
+        auto &bindings = eqBindings->getSecond();
+        bindings.TransitiveProtocols.emplace(protocolsForEquivalence);
+      }
+    }
+
+    // Update the bindings associated with current type variable,
+    // to avoid repeating this inference process.
+    bindings.TransitiveProtocols.emplace(std::move(inferredProtocols));
+  } while (!workList.empty());
+}
+
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
@@ -29,29 +160,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
         &inferredBindings) {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
 
-  llvm::SmallVector<Constraint *, 4> conversions;
-  // First, let's collect all of the conversions associated
-  // with this type variable.
-  llvm::copy_if(
-      Sources, std::back_inserter(conversions),
-      [&](const Constraint *constraint) -> bool {
-        if (constraint->getKind() != ConstraintKind::Subtype &&
-            constraint->getKind() != ConstraintKind::Conversion &&
-            constraint->getKind() != ConstraintKind::ArgumentConversion &&
-            constraint->getKind() != ConstraintKind::OperatorArgumentConversion)
-          return false;
-
-        auto rhs = cs.simplifyType(constraint->getSecondType());
-        return rhs->getAs<TypeVariableType>() == TypeVar;
-      });
-
-  for (auto *constraint : conversions) {
-    auto *tv =
-        cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
-    if (!tv || tv == TypeVar)
-      continue;
-
-    auto relatedBindings = inferredBindings.find(tv);
+  for (const auto &entry : SupertypeOf) {
+    auto relatedBindings = inferredBindings.find(entry.first);
     if (relatedBindings == inferredBindings.end())
       continue;
 
@@ -89,7 +199,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
 
     // TODO: We shouldn't need this in the future.
-    if (constraint->getKind() != ConstraintKind::Subtype)
+    if (entry.second->getKind() != ConstraintKind::Subtype)
       continue;
 
     for (auto &binding : bindings.Bindings) {
@@ -302,8 +412,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 
 void ConstraintSystem::PotentialBindings::finalize(
     ConstraintSystem &cs,
-    const llvm::SmallDenseMap<TypeVariableType *,
-                              ConstraintSystem::PotentialBindings>
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
   // We need to make sure that there are no duplicate bindings in the
   // set, otherwise solver would produce multiple identical solutions.
@@ -311,8 +420,8 @@ void ConstraintSystem::PotentialBindings::finalize(
   for (const auto &binding : Bindings)
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
+  inferTransitiveProtocolRequirements(cs, inferredBindings);
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
-
   inferDefaultTypes(cs, existingTypes);
 
   // Adjust optionality of existing bindings based on presence of
@@ -670,10 +779,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   auto *typeVar = result.TypeVar;
 
-  // Record constraint which contributes to the
-  // finding of potential bindings.
-  result.Sources.insert(constraint);
-
   auto first = simplifyType(constraint->getFirstType());
   auto second = simplifyType(constraint->getSecondType());
 
@@ -790,9 +895,29 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       }
     }
 
-    if (constraint->getKind() == ConstraintKind::Subtype &&
-        kind == AllowedBindingKind::Subtypes) {
-      result.SubtypeOf.insert(bindingTypeVar);
+    switch (constraint->getKind()) {
+    case ConstraintKind::Subtype:
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::OperatorArgumentConversion: {
+      if (kind == AllowedBindingKind::Subtypes) {
+        result.SubtypeOf.insert({bindingTypeVar, constraint});
+      } else {
+        assert(kind == AllowedBindingKind::Supertypes);
+        result.SupertypeOf.insert({bindingTypeVar, constraint});
+      }
+      break;
+    }
+
+    case ConstraintKind::Bind:
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Equal: {
+      result.EquivalentTo.insert({bindingTypeVar, constraint});
+      break;
+    }
+
+    default:
+      break;
     }
 
     return None;
@@ -986,8 +1111,13 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-    return false;
+  case ConstraintKind::SelfObjectOfProtocol: {
+    auto protocolTy = constraint->getSecondType();
+    if (!protocolTy->is<ProtocolType>())
+      return false;
+
+    LLVM_FALLTHROUGH;
+  }
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
@@ -1291,7 +1421,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
     if (cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
-                     FixKind::IgnoreInvalidFunctionBuilderBody))
+                     FixKind::IgnoreInvalidResultBuilderBody))
       return None;
 
     ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);

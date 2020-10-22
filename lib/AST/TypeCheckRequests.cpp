@@ -593,10 +593,10 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
-// FunctionBuilder-related requests.
+// ResultBuilder-related requests.
 //----------------------------------------------------------------------------//
 
-bool AttachedFunctionBuilderRequest::isCached() const {
+bool AttachedResultBuilderRequest::isCached() const {
   // Only needs to be cached if there are any custom attributes.
   auto var = std::get<0>(getStorage());
   return var->getAttrs().hasAttribute<CustomAttr>();
@@ -1105,19 +1105,19 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckFunctionBuilderRequest computation.
+// PreCheckResultBuilderRequest computation.
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderBodyPreCheck value) {
+                           ResultBuilderBodyPreCheck value) {
   switch (value) {
-  case FunctionBuilderBodyPreCheck::Okay:
+  case ResultBuilderBodyPreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case ResultBuilderBodyPreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderBodyPreCheck::Error:
+  case ResultBuilderBodyPreCheck::Error:
     out << "error";
     break;
   }
@@ -1379,9 +1379,62 @@ TypeCheckFunctionBodyRequest::readDependencySource(
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ImplicitImport &import) {
-  out << "implicit import of ";
-  simple_display(out, import.Module);
+                           const ImportedModule &module) {
+  out << "import of ";
+  if (!module.accessPath.empty()) {
+    module.accessPath.print(out);
+    out << " in ";
+  }
+  simple_display(out, module.importedModule);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const UnloadedImportedModule &module) {
+  out << "import of ";
+  if (!module.getAccessPath().empty()) {
+    module.getAccessPath().print(out);
+    out << " in ";
+  }
+  out << "unloaded ";
+  module.getModulePath().print(out);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const AttributedImport<std::tuple<>> &import) {
+  out << " [";
+
+  if (import.options.contains(ImportFlags::Exported))
+    out << " exported";
+  if (import.options.contains(ImportFlags::Testable))
+    out << " testable";
+  if (import.options.contains(ImportFlags::ImplementationOnly))
+    out << " implementation-only";
+  if (import.options.contains(ImportFlags::PrivateImport))
+    out << " private(" << import.sourceFileArg << ")";
+
+  if (import.options.contains(ImportFlags::SPIAccessControl)) {
+    out << " spi(";
+    llvm::interleaveComma(import.spiGroups, out, [&out](Identifier name) {
+                                                   simple_display(out, name);
+                                                 });
+    out << ")";
+  }
+
+  out << " ]";
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ImplicitImportList &importList) {
+  llvm::interleaveComma(importList.imports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
+  if (!importList.imports.empty() && !importList.unloadedImports.empty())
+    out << ", ";
+  llvm::interleaveComma(importList.unloadedImports, out,
+                        [&](const auto &import) {
+                          simple_display(out, import);
+                        });
 }
 
 //----------------------------------------------------------------------------//
@@ -1414,8 +1467,12 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "non-generic";
     return;
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
+  case CustomAttrTypeKind::PropertyWrapper:
+    out << "property-wrapper";
+    return;
+
+  case CustomAttrTypeKind::GlobalActor:
+    out << "global-actor";
     return;
   }
   llvm_unreachable("bad kind");
@@ -1434,6 +1491,33 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
   attr->setType(value);
 }
 
+bool ActorIsolation::requiresSubstitution() const {
+  switch (kind) {
+  case ActorInstance:
+  case Independent:
+  case IndependentUnsafe:
+  case Unspecified:
+    return false;
+
+  case GlobalActor:
+    return getGlobalActor()->hasTypeParameter();
+  }
+  llvm_unreachable("unhandled actor isolation kind!");
+}
+
+ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
+  switch (kind) {
+  case ActorInstance:
+  case Independent:
+  case IndependentUnsafe:
+  case Unspecified:
+    return *this;
+
+  case GlobalActor:
+    return forGlobalActor(getGlobalActor().subst(subs));
+  }
+  llvm_unreachable("unhandled actor isolation kind!");
+}
 
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
@@ -1444,6 +1528,10 @@ void swift::simple_display(
 
     case ActorIsolation::Independent:
       out << "actor-independent";
+      break;
+
+    case ActorIsolation::IndependentUnsafe:
+      out << "actor-independent (unsafe)";
       break;
 
     case ActorIsolation::Unspecified:

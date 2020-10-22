@@ -4,14 +4,14 @@
 // RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
 // RUN: %FileCheck -check-prefix CHECK-DOT %s < %t.dot
 
-class Left // expected-error {{'Left' inherits from itself}} expected-note {{through reference here}}
+class Left // expected-error {{'Left' inherits from itself}} expected-note 2{{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
-  class Hand {}
+  class Hand {}  // expected-note {{through reference here}}
 }
 
-class Right // expected-note {{through reference here}} expected-note{{class 'Right' declared here}}
+class Right // expected-note 2 {{through reference here}} expected-note{{class 'Right' declared here}}
   : Left.Hand { // expected-note {{through reference here}}
-  class Hand {}
+  class Hand {}  // expected-error {{circular reference}}
 }
 
 class C : B { } // expected-error{{'C' inherits from itself}}
@@ -30,15 +30,15 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 // expected-error {{'Outer2' inherits from itself}} expected-note {{through reference here}}
+class Outer2 // expected-error {{'Outer2' inherits from itself}} expected-note 2 {{through reference here}}
     : Outer2.Inner { // expected-note {{through reference here}}
 
-  class Inner {}
+  class Inner {} // expected-error{{circular reference}}
 }
 
-class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note {{through reference here}}
+class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note 2 {{through reference here}}
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
-  class Inner<T> {}
+  class Inner<T> {} // expected-error{{circular reference}}
 }
 
 // CHECK-DOT: digraph Dependencies

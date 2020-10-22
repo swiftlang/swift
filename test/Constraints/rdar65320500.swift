@@ -2,7 +2,7 @@
 
 struct Result {}
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock() -> Result {
     Result()

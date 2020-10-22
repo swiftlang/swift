@@ -37,7 +37,8 @@ using namespace swift;
 static EnumElementDecl *
 extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
-  diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
+  ExportContext where = ExportContext::forFunctionBody(DC);
+  diagnoseExplicitUnavailability(constant, UseLoc, where, nullptr);
 
   const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)

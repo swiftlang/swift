@@ -290,8 +290,7 @@ static void recordShadowedDeclsAfterTypeMatch(
       auto file = dc->getParentSourceFile();
       if (!file) return false;
       for (const auto &import : file->getImports()) {
-        if (import.importOptions.contains(
-                SourceFile::ImportFlags::PrivateImport)
+        if (import.options.contains(ImportFlags::PrivateImport)
             && import.module.importedModule == module
             && import.module.accessPath.matches(name))
           return true;
@@ -1503,7 +1502,9 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   // Check access.
   if (!(options & NL_IgnoreAccessControl) &&
       !dc->getASTContext().isAccessControlDisabled()) {
-    return decl->isAccessibleFrom(dc);
+    bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
+    return decl->isAccessibleFrom(dc, /*forConformance*/ false,
+                                  allowUsableFromInline);
   }
 
   return true;
@@ -1779,8 +1780,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
-    lookupInModule(module, member.getFullName(), decls,
-                   NLKind::QualifiedLookup, kind, topLevelScope);
+    lookupInModule(module, member.getFullName(), decls, NLKind::QualifiedLookup,
+                   kind, topLevelScope, options);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1796,7 +1797,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                        return accessPath.matches(member.getFullName());
                      })) {
       lookupInModule(module, member.getFullName(), decls,
-                     NLKind::QualifiedLookup, kind, topLevelScope);
+                     NLKind::QualifiedLookup, kind, topLevelScope,
+                     options);
     }
   }
 

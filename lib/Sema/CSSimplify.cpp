@@ -40,7 +40,8 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
 Optional<unsigned>
-MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
+MatchCallArgumentListener::missingArgument(unsigned paramIdx,
+                                           unsigned argInsertIdx) {
   return None;
 }
 
@@ -701,11 +702,14 @@ static bool matchCallArgumentsImpl(
   }
 
   // If we have any unfulfilled parameters, check them now.
+  Optional<unsigned> prevArgIdx;
   if (haveUnfulfilledParams) {
     for (auto paramIdx : indices(params)) {
       // If we have a binding for this parameter, we're done.
-      if (!parameterBindings[paramIdx].empty())
+      if (!parameterBindings[paramIdx].empty()) {
+        prevArgIdx = parameterBindings[paramIdx].back();
         continue;
+      }
 
       const auto &param = params[paramIdx];
 
@@ -717,7 +721,8 @@ static bool matchCallArgumentsImpl(
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
+      unsigned argInsertIdx = prevArgIdx ? *prevArgIdx + 1 : 0;
+      if (auto newArgIdx = listener.missingArgument(paramIdx, argInsertIdx)) {
         parameterBindings[paramIdx].push_back(*newArgIdx);
         continue;
       }
@@ -980,14 +985,47 @@ constraints::matchCallArguments(
   };
 }
 
+static Optional<unsigned>
+getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
+  Expr *arg = nullptr;
+  if (auto *CE = getAsExpr<CallExpr>(anchor))
+    arg = CE->getArg();
+  if (auto *SE = getAsExpr<SubscriptExpr>(anchor))
+    arg = SE->getIndex();
+  if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor))
+    arg =  OLE->getArg();
+
+  if (!arg)
+    return None;
+
+  auto containsCompletion = [&](Expr *elem) {
+    if (!elem)
+      return false;
+    SourceRange range = elem->getSourceRange();
+    return range.isValid() && SM.rangeContainsCodeCompletionLoc(range);
+  };
+
+  if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+    auto elems = TE->getElements();
+    auto idx = llvm::find_if(elems, containsCompletion);
+    if (idx != elems.end())
+      return std::distance(elems.begin(), idx);
+  } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
+    if (containsCompletion(PE->getSubExpr()))
+      return 0;
+  }
+  return None;
+}
+
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
   ConstraintLocatorBuilder Locator;
 
-  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> MissingArguments;
+  SmallVector<SynthesizedArg, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
+  Optional<unsigned> CompletionArgIdx;
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
@@ -1006,7 +1044,8 @@ public:
     }
   }
 
-  Optional<unsigned> missingArgument(unsigned paramIdx) override {
+  Optional<unsigned> missingArgument(unsigned paramIdx,
+                                     unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
       return None;
 
@@ -1023,9 +1062,21 @@ public:
                                       TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
     auto synthesizedArg = param.withType(argType);
-
-    MissingArguments.push_back(std::make_pair(paramIdx, synthesizedArg));
     Arguments.push_back(synthesizedArg);
+
+    if (CS.isForCodeCompletion()) {
+      // When solving for code completion, if any argument contains the
+      // completion location, later arguments shouldn't be considered missing
+      // (causing the solution to have a worse score) as the user just hasn't
+      // written them yet. Early exit to avoid recording them in this case.
+      SourceManager &SM = CS.getASTContext().SourceMgr;
+      if (!CompletionArgIdx)
+        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), SM);
+      if (CompletionArgIdx && *CompletionArgIdx < argInsertIdx)
+        return newArgIdx;
+    }
+
+    MissingArguments.push_back(SynthesizedArg{paramIdx, synthesizedArg});
 
     return newArgIdx;
   }
@@ -1190,12 +1241,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       argsWithLabels.pop_back();
       // Let's make sure that labels associated with tuple elements
       // line up with what is expected by argument list.
-      SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4>
-          synthesizedArgs;
+      SmallVector<SynthesizedArg, 4> synthesizedArgs;
       for (unsigned i = 0, n = argTuple->getNumElements(); i != n; ++i) {
         const auto &elt = argTuple->getElement(i);
         AnyFunctionType::Param argument(elt.getType(), elt.getName());
-        synthesizedArgs.push_back(std::make_pair(i, argument));
+        synthesizedArgs.push_back(SynthesizedArg{i, argument});
         argsWithLabels.push_back(argument);
       }
 
@@ -1771,15 +1821,27 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
         cs.createTypeVariable(argLoc, TVO_CanBindToNoEscape)));
   }
 
-  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> synthesizedArgs;
+  SmallVector<SynthesizedArg, 4> synthesizedArgs;
   synthesizedArgs.reserve(numMissing);
   for (unsigned i = args.size() - numMissing, n = args.size(); i != n; ++i) {
-    synthesizedArgs.push_back(std::make_pair(i, args[i]));
+    synthesizedArgs.push_back(SynthesizedArg{i, args[i]});
+  }
+
+  // Treat missing anonymous arguments as valid in closures containing the
+  // code completion location, since they may have just not been written yet.
+  if (cs.isForCodeCompletion()) {
+    if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
+      SourceManager &SM = closure->getASTContext().SourceMgr;
+      SourceRange range = closure->getSourceRange();
+      if (range.isValid() && SM.rangeContainsCodeCompletionLoc(range) &&
+          (closure->hasAnonymousClosureVars() ||
+           (args.empty() && closure->getInLoc().isInvalid())))
+          return false;
+    }
   }
 
   auto *fix = AddMissingArguments::create(cs, synthesizedArgs,
                                           cs.getConstraintLocator(locator));
-
   if (cs.recordFix(fix))
     return true;
 
@@ -3966,7 +4028,7 @@ bool ConstraintSystem::repairFailures(
     // to diagnose this as a missing argument which can't be ignored.
     if (arg != getTypeVariables().end()) {
       conversionsOrFixes.push_back(AddMissingArguments::create(
-          *this, {std::make_pair(0, AnyFunctionType::Param(*arg))},
+          *this, {SynthesizedArg{0, AnyFunctionType::Param(*arg)}},
           getConstraintLocator(anchor, path)));
       break;
     }
@@ -4432,7 +4494,7 @@ bool ConstraintSystem::repairFailures(
                           getConstraintLocator(anchor, path));
   }
 
-  case ConstraintLocator::FunctionBuilderBodyResult: {
+  case ConstraintLocator::ResultBuilderBodyResult: {
     // If result type of the body couldn't be determined
     // there is going to be other fix available to diagnose
     // the underlying issue.
@@ -7532,7 +7594,7 @@ ConstraintSystem::simplifyOneWayConstraint(
       secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
-static Type getOpenedFunctionBuilderTypeFor(ConstraintSystem &cs,
+static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
                                             ConstraintLocatorBuilder locator) {
   auto lastElt = locator.last();
   if (!lastElt)
@@ -7558,7 +7620,7 @@ static Type getOpenedFunctionBuilderTypeFor(ConstraintSystem &cs,
     return Type();
 
   auto *PD = getParameterAt(choice, argToParamElt->getParamIdx());
-  auto builderType = PD->getFunctionBuilderType();
+  auto builderType = PD->getResultBuilderType();
   if (!builderType)
     return Type();
 
@@ -7595,15 +7657,15 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
-  // Determine whether a function builder will be applied.
-  auto functionBuilderType = getOpenedFunctionBuilderTypeFor(*this, locator);
+  // Determine whether a result builder will be applied.
+  auto resultBuilderType = getOpenedResultBuilderTypeFor(*this, locator);
 
   // Determine whether to introduce one-way constraints between the parameter's
   // type as seen in the body of the closure and the external parameter
   // type.
   bool oneWayConstraints =
     getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
-    functionBuilderType;
+    resultBuilderType;
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
@@ -7668,10 +7730,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  // If there is a function builder to apply, do so now.
-  if (functionBuilderType) {
-    if (auto result = matchFunctionBuilder(
-            closure, functionBuilderType, closureType->getResult(),
+  // If there is a result builder to apply, do so now.
+  if (resultBuilderType) {
+    if (auto result = matchResultBuilder(
+            closure, resultBuilderType, closureType->getResult(),
             ConstraintKind::Conversion, locator)) {
       return result->isSuccess();
     }
@@ -8802,14 +8864,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return false;
   };
 
-  // If the types are obviously equivalent, we're done. This optimization
-  // is not valid for operators though, where an inout parameter does not
-  // have an explicit inout argument.
-  if (type1.getPointer() == desugar2) {
-    if (!isOperator || !hasInOut())
-      return SolutionKind::Solved;
-  }
-
   // Local function to form an unsolved result.
   auto formUnsolved = [&] {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -8837,6 +8891,19 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   parts.pop_back();
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
+
+  // If the types are obviously equivalent, we're done. This optimization
+  // is not valid for operators though, where an inout parameter does not
+  // have an explicit inout argument.
+  if (type1.getPointer() == desugar2) {
+    if (!isOperator || !hasInOut()) {
+      recordTrailingClosureMatch(
+          getConstraintLocator(
+              outerLocator.withPathElement(ConstraintLocator::ApplyArgument)),
+          TrailingClosureMatching::Forward);
+      return SolutionKind::Solved;
+    }
+  }
 
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
@@ -9913,16 +9980,11 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   return false;
 }
 
-void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
-  assert(typeVar);
-  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
-}
-
-void ConstraintSystem::recordPotentialHole(FunctionType *fnType) {
-  assert(fnType);
-  Type(fnType).visit([&](Type type) {
+void ConstraintSystem::recordPotentialHole(Type type) {
+  assert(type->hasTypeVariable());
+  type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>())
-      recordPotentialHole(typeVar);
+      typeVar->getImpl().enableCanBindToHole(getSavedBindings());
   });
 }
 
@@ -10024,7 +10086,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          recordPotentialHole(largerElt.getType()->getAs<TypeVariableType>());
+          recordPotentialHole(largerElt.getType());
       }
     }
     auto matchingType =
@@ -10069,7 +10131,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveAddressOf:
   case FixKind::AddMissingArguments:
   case FixKind::MoveOutOfOrderArgument:
-  case FixKind::SkipUnhandledConstructInFunctionBuilder:
+  case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
@@ -10084,7 +10146,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyKeyPathRootType:
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
-  case FixKind::IgnoreInvalidFunctionBuilderBody:
+  case FixKind::IgnoreInvalidResultBuilderBody:
   case FixKind::SpecifyContextualTypeForNil: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -10305,16 +10367,16 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
 
   // If we have an unresolved closure argument, form an unsolved argument
   // conversion constraint, making sure to reference the type variables for
-  // a function builder if applicable. This ensures we properly connect the
-  // closure type variable with any type variables in the function builder, as
+  // a result builder if applicable. This ensures we properly connect the
+  // closure type variable with any type variables in the result builder, as
   // such type variables will be accessible within the body of the closure when
   // we open it.
   first = getFixedTypeRecursive(first, /*rvalue*/ false);
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
-      // Extract any type variables present in the parameter's function builder.
+      // Extract any type variables present in the parameter's result builder.
       SmallVector<TypeVariableType *, 4> typeVars;
-      if (auto builderTy = getOpenedFunctionBuilderTypeFor(*this, locator))
+      if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
         builderTy->getTypeVariables(typeVars);
 
       auto *loc = getConstraintLocator(locator);

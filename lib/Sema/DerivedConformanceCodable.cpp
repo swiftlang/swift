@@ -799,8 +799,10 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
               diag::decodable_property_init_or_codingkeys_explicit,
               varDecl->getName());
         }
-        varDecl->diagnose(diag::decodable_make_property_mutable)
-            .fixItReplace(varDecl->getAttributeInsertionLoc(true), "var");
+        if (auto *PBD = varDecl->getParentPatternBinding()) {
+          varDecl->diagnose(diag::decodable_make_property_mutable)
+              .fixItReplace(PBD->getLoc(), "var");
+        }
 
         continue;
       }

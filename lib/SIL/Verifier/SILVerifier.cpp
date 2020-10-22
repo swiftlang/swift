@@ -662,7 +662,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
-
+  
   DeadEndBlocks DEBlocks;
   LoadBorrowNeverInvalidatedAnalysis loadBorrowNeverInvalidatedAnalysis;
   bool SingleFunction = true;
@@ -3591,6 +3591,15 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
+  // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
+  // from a trivial to a reference type. Such a cast may dynamically
+  // instantiate a new reference-counted object.
+  void checkNoTrivialToReferenceCast(SingleValueInstruction *svi) {
+    require(!svi->getOperand(0)->getType().isTrivial(*svi->getFunction())
+            || svi->getType().isTrivial(*svi->getFunction()),
+            "Unexpected trivial-to-reference conversion: ");
+  }
+
   /// Verify if a given type is or contains an opened archetype or dynamic self.
   /// If this is the case, verify that the provided instruction has a type
   /// dependent operand for it.
@@ -3753,6 +3762,7 @@ public:
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand()->getType(),
             "can't upcast to same type");
+    checkNoTrivialToReferenceCast(UI);
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
       require(UI->getOperand()->getType().is<MetatypeType>(),
@@ -4748,6 +4758,72 @@ public:
                     "Type of witness instruction does not match actual type of "
                     "witnessed function");
   }
+  
+  void checkGetAsyncContinuationInstBase(GetAsyncContinuationInstBase *GACI) {
+    auto resultTy = GACI->getType();
+    auto &C = resultTy.getASTContext();
+    auto resultBGT = resultTy.getAs<BoundGenericType>();
+    require(resultBGT, "Instruction type must be a continuation type");
+    auto resultDecl = resultBGT->getDecl();
+    require(resultDecl == C.getUnsafeContinuationDecl()
+             || resultDecl == C.getUnsafeThrowingContinuationDecl(),
+            "Instruction type must be a continuation type");
+  }
+  
+  void checkGetAsyncContinuationInst(GetAsyncContinuationInst *GACI) {
+    checkGetAsyncContinuationInstBase(GACI);
+  }
+  
+  void checkGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GACI) {
+    checkGetAsyncContinuationInstBase(GACI);
+
+    requireSameType(GACI->getOperand()->getType(),
+                    GACI->getLoweredResumeType().getAddressType(),
+                    "Operand type must match continuation resume type");
+  }
+  
+  void checkAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AACI) {
+    // The operand must be a GetAsyncContinuation* instruction.
+    auto cont = dyn_cast<GetAsyncContinuationInstBase>(AACI->getOperand());
+    require(cont, "can only await the result of a get_async_continuation instruction");
+    bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
+
+    auto &C = cont->getType().getASTContext();
+    
+    // The shape of the successors depends on the continuation instruction being
+    // awaited.
+    require((bool)AACI->getErrorBB() == cont->throws(),
+            "must have an error successor if and only if the continuation is throwing");
+    if (cont->throws()) {
+      require(AACI->getErrorBB()->getNumArguments() == 1,
+              "error successor must take one argument");
+      auto arg = AACI->getErrorBB()->getArgument(0);
+      auto errorType = C.getErrorDecl()->getDeclaredType()->getCanonicalType();
+      requireSameType(arg->getType(),
+                      SILType::getPrimitiveObjectType(errorType),
+              "error successor argument must have Error type");
+      
+      if (AACI->getFunction()->hasOwnership()) {
+        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+                "error successor argument must be owned");
+      }
+    }
+    if (isAddressForm) {
+      require(AACI->getResumeBB()->getNumArguments() == 0,
+              "resume successor must take no arguments for get_async_continuation_addr");
+    } else {
+      require(AACI->getResumeBB()->getNumArguments() == 1,
+              "resume successor must take one argument for get_async_continuation");
+      auto arg = AACI->getResumeBB()->getArgument(0);
+
+      requireSameType(arg->getType(), cont->getLoweredResumeType(),
+                      "resume successor must take an argument of the continuation resume type");
+      if (AACI->getFunction()->hasOwnership()) {
+        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+                "resume successor argument must be owned");
+      }
+    }
+  }
 
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
@@ -4902,6 +4978,8 @@ public:
       std::set<SILInstruction*> ActiveOps;
 
       CFGState CFG = Normal;
+      
+      GetAsyncContinuationInstBase *GotAsyncContinuation = nullptr;
     };
   };
 
@@ -4909,6 +4987,8 @@ public:
   ///
   /// - stack allocations and deallocations must obey a stack discipline
   /// - accesses must be uniquely ended
+  /// - async continuations must be awaited before getting the continuation again, suspending
+  ///  the task, or exiting the function
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
     // Do a traversal of the basic blocks.
@@ -4924,6 +5004,20 @@ public:
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
+        if (i.maySuspend()) {
+          // Instructions that may suspend an async context must not happen
+          // while the continuation is being accessed, with the exception of
+          // the AwaitAsyncContinuationInst that completes suspending the task.
+          if (auto aaci = dyn_cast<AwaitAsyncContinuationInst>(&i)) {
+            require(state.GotAsyncContinuation == aaci->getOperand(),
+                    "encountered await_async_continuation that doesn't match active gotten continuation");
+            state.GotAsyncContinuation = nullptr;
+          } else {
+            require(!state.GotAsyncContinuation,
+                    "cannot suspend async task while unawaited continuation is active");
+          }
+        }
+          
         if (i.isAllocatingStack()) {
           state.Stack.push_back(cast<SingleValueInstruction>(&i));
 
@@ -4946,13 +5040,18 @@ public:
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");
           }
-
+        } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
+          require(!state.GotAsyncContinuation,
+                  "get_async_continuation while unawaited continuation is already active");
+          state.GotAsyncContinuation = gaci;
         } else if (auto term = dyn_cast<TermInst>(&i)) {
           if (term->isFunctionExiting()) {
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
             require(state.ActiveOps.empty(),
                     "return with operations still active");
+            require(!state.GotAsyncContinuation,
+                    "return with unawaited async continuation");
 
             if (isa<UnwindInst>(term)) {
               require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldUnwind,
@@ -4970,12 +5069,14 @@ public:
               }
             }
           }
-
+          
           if (isa<YieldInst>(term)) {
             require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldOnceResume,
                     "encountered multiple 'yield's along single path");
             require(state.CFG == VerifyFlowSensitiveRulesDetails::Normal,
                     "encountered 'yield' on abnormal CFG path");
+            require(!state.GotAsyncContinuation,
+                    "encountered 'yield' while an unawaited continuation is active");
           }
 
           auto successors = term->getSuccessors();
@@ -5037,6 +5138,8 @@ public:
                     "inconsistent active-operations sets entering basic block");
             require(state.CFG == foundState.CFG,
                     "inconsistent coroutine states entering basic block");
+            require(state.GotAsyncContinuation == foundState.GotAsyncContinuation,
+                    "inconsistent active async continuations entering basic block");
           }
         }
       }

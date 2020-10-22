@@ -63,7 +63,7 @@ public:
       if (!sig->requiresProtocol(paramResultType, ViewProtocol)) continue;
 
       // The parameter must not be a @ViewBuilder parameter.
-      if (param->getFunctionBuilderType()) continue;
+      if (param->getResultBuilderType()) continue;
 
       // Print the function.
       printDecl(fn);

@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
+import Swift
+
 sil_stage canonical
 
 class Klass {}
@@ -39,4 +41,49 @@ bb0(%0 : @owned $KlassUser):
   destroy_value %0 : $KlassUser
   %3 = load [copy] %2 : $*Klass
   return %3 : $Klass
+}
+
+class OptionalBox<T> {
+  var t: T?
+}
+
+// CHECK-NOT: Function: 'inject_enum_addr_test'
+sil [ossa] @inject_enum_addr_test : $@convention(thin) <T> (@owned OptionalBox<T>) -> () {
+bb0(%0 : @owned $OptionalBox<T>):
+  %1 = begin_borrow %0 : $OptionalBox<T>
+  %2 = ref_element_addr %1 : $OptionalBox<T>, #OptionalBox.t
+  inject_enum_addr %2 : $*Optional<T>, #Optional.none!enumelt
+  end_borrow %1 : $OptionalBox<T>
+  destroy_value %0 : $OptionalBox<T>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-NOT: Function: 'init_enum_data_addr_test'
+sil [ossa] @init_enum_data_addr_test : $@convention(thin) <T> (@owned OptionalBox<T>, @in_guaranteed T) -> () {
+bb0(%0 : @owned $OptionalBox<T>, %1 : $*T):
+  %2 = begin_borrow %0 : $OptionalBox<T>
+  %3 = ref_element_addr %2 : $OptionalBox<T>, #OptionalBox.t
+  %4 = init_enum_data_addr %3 : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [initialization] %4 : $*T
+  end_borrow %2 : $OptionalBox<T>
+  destroy_value %0 : $OptionalBox<T>
+  %5 = tuple ()
+  return %5 : $()
+}
+
+class Box<T> {
+  var t: T
+}
+
+// CHECK-NOT: Function: 'unconditional_cast_test'
+sil [ossa] @unconditional_cast_test : $@convention(thin) <T> (@owned Box<T>, @in Int) -> () {
+bb0(%0 : @owned $Box<T>, %1 : $*Int):
+  %2 = begin_borrow %0 : $Box<T>
+  %3 = ref_element_addr %2 : $Box<T>, #Box.t
+  unconditional_checked_cast_addr Int in %1 : $*Int to T in %3 : $*T
+  end_borrow %2 : $Box<T>
+  destroy_value %0 : $Box<T>
+  %4 = tuple ()
+  return %4 : $()
 }

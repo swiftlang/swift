@@ -23,7 +23,7 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 import WinSDK
 #endif
 

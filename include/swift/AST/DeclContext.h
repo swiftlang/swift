@@ -57,6 +57,7 @@ namespace swift {
   class GenericTypeParamType;
   class InfixOperatorDecl;
   class InfixOperatorLookupResult;
+  enum class PlatformKind: uint8_t;
   class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;
@@ -489,6 +490,10 @@ public:
 
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
+
+  /// Determine whether this or any parent context is a `@_specialize` extension
+  /// context.
+  bool isInSpecializeExtensionContext() const;
 
   /// Get the most optimal resilience expansion for code in this context.
   /// If the body is able to be inlined into functions in other resilience

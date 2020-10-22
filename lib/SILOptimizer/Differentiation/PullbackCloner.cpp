@@ -336,6 +336,7 @@ private:
     case AdjointValueKind::Concrete:
       return val.getConcreteValue();
     }
+    llvm_unreachable("unhandled adjoint value kind!");
   }
 
   /// Materializes an adjoint value indirectly to a SIL buffer.

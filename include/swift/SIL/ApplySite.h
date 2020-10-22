@@ -585,62 +585,28 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// If this is a terminator apply site, then pass the first instruction of
-  /// each successor to fun. Otherwise, pass std::next(Inst).
+  /// If this is a terminator apply site, then pass a builder to insert at the
+  /// first instruction of each successor to \p func. Otherwise, pass a builder
+  /// to insert at std::next(Inst).
   ///
   /// The intention is that this abstraction will enable the compiler writer to
   /// ignore whether or not an apply site is a terminator when inserting
   /// instructions after an apply site. This results in eliminating unnecessary
   /// if-else code otherwise required to handle such situations.
   ///
-  /// NOTE: We return std::next() for begin_apply. If one wishes to insert code
+  /// NOTE: We pass std::next() for begin_apply. If one wishes to insert code
   /// /after/ the end_apply/abort_apply, please use instead
   /// insertAfterFullEvaluation.
-  void insertAfterInvocation(
-      function_ref<void(SILBasicBlock::iterator)> func) const {
-    switch (getKind()) {
-    case FullApplySiteKind::ApplyInst:
-    case FullApplySiteKind::BeginApplyInst:
-      return func(std::next(getInstruction()->getIterator()));
-    case FullApplySiteKind::TryApplyInst:
-      for (auto *succBlock :
-           cast<TermInst>(getInstruction())->getSuccessorBlocks()) {
-        func(succBlock->begin());
-      }
-      return;
-    }
-    llvm_unreachable("Covered switch isn't covered");
-  }
+  void insertAfterInvocation(function_ref<void(SILBuilder &)> func) const;
 
-  /// Pass to func insertion points that are guaranteed to be immediately after
-  /// this full apply site has completely finished executing.
+  /// Pass a builder with insertion points that are guaranteed to be immediately
+  /// after this full apply site has completely finished executing.
   ///
   /// This is just like insertAfterInvocation except that if the full apply site
   /// is a begin_apply, we pass the insertion points after the end_apply,
   /// abort_apply rather than an insertion point right after the
   /// begin_apply. For such functionality, please invoke insertAfterInvocation.
-  void insertAfterFullEvaluation(
-      function_ref<void(SILBasicBlock::iterator)> func) const {
-    switch (getKind()) {
-    case FullApplySiteKind::ApplyInst:
-    case FullApplySiteKind::TryApplyInst:
-      return insertAfterInvocation(func);
-    case FullApplySiteKind::BeginApplyInst:
-      SmallVector<EndApplyInst *, 2> endApplies;
-      SmallVector<AbortApplyInst *, 2> abortApplies;
-      auto *bai = cast<BeginApplyInst>(getInstruction());
-      bai->getCoroutineEndPoints(endApplies, abortApplies);
-      for (auto *eai : endApplies) {
-        func(std::next(eai->getIterator()));
-      }
-      for (auto *aai : abortApplies) {
-        func(std::next(aai->getIterator()));
-      }
-      return;
-    }
-
-    llvm_unreachable("covered switch isn't covered");
-  }
+  void insertAfterFullEvaluation(function_ref<void(SILBuilder &)> func) const;
 
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.

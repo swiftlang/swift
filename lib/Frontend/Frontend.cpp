@@ -740,11 +740,23 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   ImplicitImportInfo imports;
   imports.StdlibKind = Invocation.getImplicitStdlibKind();
 
-  for (auto &moduleStr : frontendOpts.getImplicitImportModuleNames())
-    imports.ModuleNames.push_back(Context->getIdentifier(moduleStr));
+  auto pushImport = [&](StringRef moduleStr,
+                        ImportOptions options = ImportOptions()) {
+    ImportPath::Builder importPath(Context->getIdentifier(moduleStr));
+    UnloadedImportedModule import(importPath.copyTo(*Context),
+                                  /*isScoped=*/false);
+    imports.AdditionalUnloadedImports.emplace_back(import, options);
+  };
 
-  if (Invocation.shouldImportSwiftONoneSupport())
-    imports.ModuleNames.push_back(Context->getIdentifier(SWIFT_ONONE_SUPPORT));
+  for (auto &moduleStrAndTestable : frontendOpts.getImplicitImportModuleNames()) {
+    pushImport(moduleStrAndTestable.first,
+               moduleStrAndTestable.second ? ImportFlags::Testable
+                                           : ImportOptions());
+  }
+
+  if (Invocation.shouldImportSwiftONoneSupport()) {
+    pushImport(SWIFT_ONONE_SUPPORT);
+  }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;

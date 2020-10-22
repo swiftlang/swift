@@ -9,7 +9,7 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # All Darwin platforms have ABI stability.
   set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
@@ -50,9 +50,16 @@ endif()
 # User-configurable options for the standard library.
 #
 
+# NOTE: Some of these variables are also initialized in StandaloneOverlay.cmake
+# so that interfaces are emitted when overlays are separately built.
+
 option(SWIFT_STDLIB_STABLE_ABI
        "Should stdlib be built with stable ABI (library evolution, resilience)."
        "${SWIFT_STDLIB_STABLE_ABI_default}")
+
+option(SWIFT_ENABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       "${SWIFT_STDLIB_STABLE_ABI}")
 
 option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
        "Support back-deploying compatibility fixes for newer apps running on older runtimes."
@@ -69,10 +76,6 @@ option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."
        TRUE)
-
-option(SWIFT_ENABLE_MODULE_INTERFACES
-       "Generate .swiftinterface files alongside .swiftmodule files"
-       "${SWIFT_STDLIB_STABLE_ABI}")
 
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."

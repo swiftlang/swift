@@ -102,6 +102,8 @@ module WinSDK [system] {
     module path {
       header "PathCch.h"
       export *
+
+      link "pathcch.lib"
     }
 
     // api-ms-win-core-processthreads-l1-1-2.dll
@@ -217,6 +219,13 @@ module WinSDK [system] {
     link "WinMM.Lib"
   }
 
+  module Networking {
+    header "winnetwk.h"
+    export *
+
+    link "Mpr.Lib"
+  }
+
   module Security {
     module AuthZ {
       header "AuthZ.h"
@@ -271,6 +280,11 @@ module WinSDK [system] {
 
     module IOCTL {
       header "winioctl.h"
+      export *
+    }
+
+    module MCX {
+      header "mcx.h"
       export *
     }
   }

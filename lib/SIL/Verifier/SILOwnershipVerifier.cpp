@@ -391,7 +391,7 @@ bool SILValueOwnershipChecker::gatherUsers(
             llvm::errs() << "Could not recognize address user of interior "
                             "pointer operand!\n"
                          << "Interior Pointer Operand: "
-                         << interiorPointerOperand->operand->getUser()
+                         << *interiorPointerOperand->operand->getUser()
                          << "Address User: " << *op->getUser();
           });
         };

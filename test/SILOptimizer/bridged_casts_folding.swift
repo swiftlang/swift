@@ -904,8 +904,12 @@ var anyHashable: AnyHashable = 0
 
 // CHECK-LABEL: $s21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$s21bridged_casts_folding11anyHashables03AnyE0Vv
+// CHECK: [[TMP:%[0-9]+]] = alloc_stack $AnyHashable
+// CHECK: [[ACCESS:%[0-9]+]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]]
+// CHECK: copy_addr [[ACCESS]] to [initialization] [[TMP]]
 // CHECK: [[FUNC:%.*]] = function_ref @$ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
-// CHECK-NEXT: apply [[FUNC]]([[GLOBAL]])
+// CHECK-NEXT: apply [[FUNC]]([[TMP]])
+// CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to NSObjectSubclass
 // CHECK: } // end sil function '$s21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF'
 @inline(never)

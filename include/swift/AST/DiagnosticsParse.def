@@ -626,6 +626,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_specialize_target_func_not_found,none,
+      "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
       "expected version number in 'available' attribute", ())
 
@@ -1356,6 +1358,12 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_option_such_as,none,
+      "expected '%0' option such as '%1'", (StringRef, StringRef))
+
+ERROR(attr_unknown_option,none,
+      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
+
 ERROR(attr_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
 ERROR(attr_expected_label,none,
@@ -1531,17 +1539,9 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// inline, optimize
-ERROR(optimization_attribute_expect_option,none,
-      "expected '%0' option such as '%1'", (StringRef, StringRef))
-ERROR(optimization_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
-
 // effects
 ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-ERROR(effects_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
@@ -1579,6 +1579,10 @@ ERROR(attr_specialize_parameter_already_defined,none,
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_function,none,
+      "expected a function name as the value of the 'target' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_spi_name,none,
+      "expected an SPI identifier as the value of the 'spi' parameter in '_specialize' attribute", ())
 
 // _implements
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,

@@ -1,5 +1,4 @@
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk %s -emit-ir
-// REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
