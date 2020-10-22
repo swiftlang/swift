@@ -52,6 +52,7 @@ add_swift_host_library(swiftBasic STATIC
   FileSystem.cpp
   FileTypes.cpp
   Fingerprint.cpp
+  ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   Located.cpp
