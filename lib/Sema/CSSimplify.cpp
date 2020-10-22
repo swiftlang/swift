@@ -1345,12 +1345,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     }
   }
 
-  // If this application is part of an operator, then we allow an implicit
-  // lvalue to be compatible with inout arguments.  This is used by
-  // assignment operators.
-  auto anchor = locator.getAnchor();
-  assert(bool(anchor) && "locator without anchor?");
-
   auto isSynthesizedArgument = [](const AnyFunctionType::Param &arg) -> bool {
     if (auto *typeVar = arg.getPlainType()->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
@@ -10534,12 +10528,29 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    auto *applicationLoc = getConstraintLocator(
-        locator, {LocatorPathElt::ImplicitConversion(restriction),
-                  ConstraintLocator::ApplyFunction});
+    auto *conversionLoc = getConstraintLocator(
+        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
+
+    auto *applicationLoc =
+        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
 
     auto *memberLoc = getConstraintLocator(
         applicationLoc, ConstraintLocator::ConstructorMember);
+
+    // This conversion has been already attempted for and constructor
+    // choice has been recorded.
+    if (findSelectedOverloadFor(memberLoc))
+      return SolutionKind::Solved;
+
+    // Allocate a single argument info to conver all possible
+    // Double <-> CGFloat conversion locations.
+    if (!ArgumentInfos.count(memberLoc)) {
+      auto &ctx = getASTContext();
+      ArgumentInfo callInfo{.Labels = ctx.Allocate<Identifier>(
+                                1, AllocationArena::ConstraintSolver),
+                            .UnlabeledTrailingClosureIndex = None};
+      ArgumentInfos.insert({memberLoc, std::move(callInfo)});
+    }
 
     auto *memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
 

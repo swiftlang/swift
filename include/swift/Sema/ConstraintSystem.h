@@ -553,8 +553,12 @@ template <typename T = Expr> T *castToExpr(ASTNode node) {
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
+  if (node.isNull())
+    return nullptr;
+
   if (auto *E = node.dyn_cast<Expr *>())
     return dyn_cast_or_null<T>(E);
+
   return nullptr;
 }
 

@@ -6692,21 +6692,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::CGFloatToDouble:
     case ConversionRestrictionKind::DoubleToCGFloat: {
-      auto *fnExpr = TypeExpr::createImplicit(toType, ctx);
-      cs.cacheExprTypes(fnExpr);
+      auto conversionKind = knownRestriction->second;
 
       auto *argExpr = locator.trySimplifyToExpr();
       assert(argExpr);
 
-      auto *callLocator = cs.getConstraintLocator(
-          locator,
-          LocatorPathElt::ImplicitConversion(knownRestriction->second));
-
       auto *implicitInit =
-          CallExpr::createImplicit(ctx, fnExpr,
+          CallExpr::createImplicit(ctx, TypeExpr::createImplicit(toType, ctx),
                                    /*args=*/{argExpr},
                                    /*argLabels=*/{Identifier()});
-      cs.cacheExprTypes(implicitInit);
+
+      cs.cacheExprTypes(implicitInit->getFn());
+      cs.setType(argExpr, fromType);
+      cs.setType(implicitInit->getArg(),
+                 ParenType::get(cs.getASTContext(), fromType));
+
+      auto *callLocator = cs.getConstraintLocator(
+          implicitInit, LocatorPathElt::ImplicitConversion(conversionKind));
 
       // HACK: Temporarily push the call expr onto the expr stack to make sure
       // we don't try to prematurely close an existential when applying the
@@ -6714,6 +6716,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // refactored not to rely on the shape of the AST prior to rewriting.
       ExprStack.push_back(implicitInit);
       SWIFT_DEFER { ExprStack.pop_back(); };
+
+      // We need to take information recorded for all conversions of this
+      // kind and move it to a specific location where restriction is applied.
+      {
+        auto *memberLoc = solution.getConstraintLocator(
+            callLocator, {ConstraintLocator::ApplyFunction,
+                          ConstraintLocator::ConstructorMember});
+
+        auto overload = solution.getOverloadChoice(cs.getConstraintLocator(
+            ASTNode(), {LocatorPathElt::ImplicitConversion(conversionKind),
+                        ConstraintLocator::ApplyFunction,
+                        ConstraintLocator::ConstructorMember}));
+
+        solution.overloadChoices.insert({memberLoc, overload});
+        solution.trailingClosureMatchingChoices.insert(
+            {cs.getConstraintLocator(callLocator,
+                                     ConstraintLocator::ApplyArgument),
+             TrailingClosureMatching::Forward});
+      }
 
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;
