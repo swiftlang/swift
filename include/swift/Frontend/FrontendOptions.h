@@ -184,6 +184,11 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
+  /// Emit parseable-output directly from the frontend, instead of relying
+  /// the driver to emit it. This is used in context where frontend jobs are executed by
+  /// clients other than the driver.
+  bool FrontendParseableOutput = false;
+
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;

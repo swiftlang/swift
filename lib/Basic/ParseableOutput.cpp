@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/ParseableOutput.h"
-
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/TaskQueue.h"
@@ -20,6 +19,8 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <sstream>
 
 using namespace swift::parseable_output;
 using namespace swift::driver;
@@ -221,17 +222,9 @@ class DetailedInvocationBasedMessage : public InvocationBasedMessage {
 public:
   DetailedInvocationBasedMessage(StringRef Kind,
                                  const CompilerInvocation &Invocation,
+                                 const InputFile &PrimaryInput,
                                  ArrayRef<const char *> Args)
       : InvocationBasedMessage(Kind, Invocation), Args(Args) {
-    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    // This frontend invocation correpsonds to a BatchJob:
-    // A container of multiple StandardCompile Jobs.
-    if (IO.hasMultiplePrimaryInputs()) {
-      llvm::dbgs() << "Batch JOB.\n";
-    } else {
-      llvm::dbgs() << "Single JOB.\n";
-    }
-
     // Command line and arguments
     Executable = Invocation.getFrontendOptions().MainExecutablePath;
     CommandLine += Executable;
@@ -240,30 +233,23 @@ public:
       CommandLine += std::string(" ") + A;
     }
 
-    // Primary Inputs
-    IO.forEachPrimaryInput([&](const InputFile &input) -> bool {
-      Inputs.push_back(CommandInput(input.getFileName()));
-      return false;
-    });
+    // Primary Input only
+    Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
 
-    // Outputs
-    IO.forEachOutputFilename([&](const StringRef &output) {
-      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                       llvm::sys::path::extension(output)),
-                                   output.str()));
-    });
+    // Output for this Primary
+    auto OutputFile = PrimaryInput.outputFilename();
+    Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                     llvm::sys::path::extension(OutputFile)),
+                                 OutputFile));
 
     // Supplementary outputs
-    IO.forEachPrimaryInput([&](const InputFile &input) -> bool {
-      const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
-      const auto &supplementaryOutputPaths =
-          primarySpecificFiles.SupplementaryOutputs;
-      supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-        Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                         llvm::sys::path::extension(output)),
-                                     output));
-      });
-      return false;
+    const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
+    const auto &supplementaryOutputPaths =
+        primarySpecificFiles.SupplementaryOutputs;
+    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                       llvm::sys::path::extension(output)),
+                                   output));
     });
   }
 
@@ -286,22 +272,6 @@ public:
 
   void provideMapping(swift::json::Output &out) override {
     CommandBasedMessage::provideMapping(out);
-    out.mapRequired("pid", Pid);
-  }
-};
-
-class FinishedInvocationBasedMessage : public InvocationBasedMessage {
-  int64_t Pid;
-
-public:
-  FinishedInvocationBasedMessage(StringRef Kind,
-                                 const CompilerInvocation &Invocation,
-                                 int64_t Pid,
-                                 StringRef Output,
-                                 int ExitStatus)
-  : InvocationBasedMessage(Kind, Invocation), Pid(Pid) {}
-  void provideMapping(swift::json::Output &out) override {
-    InvocationBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
   }
 };
@@ -329,15 +299,37 @@ class BeganInvocationMessage : public DetailedInvocationBasedMessage {
 
 public:
   BeganInvocationMessage(const CompilerInvocation &Invocation,
+                         const InputFile &PrimaryInput,
                          ArrayRef<const char *> Args, int64_t Pid,
                          TaskProcessInformation ProcInfo)
-      : DetailedInvocationBasedMessage("began", Invocation, Args), Pid(Pid),
-        ProcInfo(ProcInfo) {}
+      : DetailedInvocationBasedMessage("began", Invocation, PrimaryInput, Args),
+        Pid(Pid), ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
     DetailedInvocationBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
     out.mapRequired("process", ProcInfo);
+  }
+};
+
+class FinishedInvocationMessage : public InvocationBasedMessage {
+  int64_t Pid;
+  int ExitStatus;
+  std::string Output;
+  TaskProcessInformation ProcInfo;
+
+public:
+  FinishedInvocationMessage(const CompilerInvocation &Invocation, int64_t Pid,
+                            StringRef Output, int ExitStatus,
+                            TaskProcessInformation ProcInfo)
+      : InvocationBasedMessage("finished", Invocation), Pid(Pid),
+        ExitStatus(ExitStatus), Output(Output), ProcInfo(ProcInfo) {}
+  void provideMapping(swift::json::Output &out) override {
+    InvocationBasedMessage::provideMapping(out);
+    out.mapOptional("output", Output, std::string());
+    out.mapRequired("process", ProcInfo);
+    out.mapRequired("pid", Pid);
+    out.mapRequired("exit-status", ExitStatus);
   }
 };
 
@@ -362,7 +354,7 @@ class FinishedCommandMessage : public TaskOutputMessage {
 
 public:
   FinishedCommandMessage(const driver::Job &Cmd, int64_t Pid, StringRef Output,
-                  TaskProcessInformation ProcInfo, int ExitStatus)
+                         TaskProcessInformation ProcInfo, int ExitStatus)
       : TaskOutputMessage("finished", Cmd, Pid, Output, ProcInfo),
         ExitStatus(ExitStatus) {}
 
@@ -418,25 +410,56 @@ static void emitMessage(raw_ostream &os, Message &msg) {
   os << JSONString << '\n';
 }
 
-void parseable_output::emitBeganMessage(
-    raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
-    TaskProcessInformation ProcInfo) {
+void parseable_output::emitBeganMessage(raw_ostream &os, const driver::Job &Cmd,
+                                        int64_t Pid,
+                                        TaskProcessInformation ProcInfo) {
   BeganCommandMessage msg(Cmd, Pid, ProcInfo);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitBeganMessage(
-    raw_ostream &os, const CompilerInvocation &Invocation,
-    ArrayRef<const char *> Args, int64_t Pid, TaskProcessInformation ProcInfo) {
-  BeganInvocationMessage msg(Invocation, Args, Pid, ProcInfo);
+void parseable_output::emitBeganMessage(raw_ostream &os,
+                                        const CompilerInvocation &Invocation,
+                                        ArrayRef<const char *> Args,
+                                        int64_t Pid,
+                                        TaskProcessInformation ProcInfo) {
+  const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+  IO.forEachPrimaryInput([&](const InputFile &Input) -> bool {
+    BeganInvocationMessage msg(Invocation, Input, Args, Pid, ProcInfo);
+    emitMessage(os, msg);
+    return false;
+  });
+}
+
+void parseable_output::emitFinishedMessage(raw_ostream &os,
+                                           const driver::Job &Cmd, int64_t Pid,
+                                           int ExitStatus, StringRef Output,
+                                           TaskProcessInformation ProcInfo) {
+  FinishedCommandMessage msg(Cmd, Pid, Output, ProcInfo, ExitStatus);
   emitMessage(os, msg);
 }
 
 void parseable_output::emitFinishedMessage(
-    raw_ostream &os, const driver::Job &Cmd, int64_t Pid, int ExitStatus,
-    StringRef Output, TaskProcessInformation ProcInfo) {
-  FinishedCommandMessage msg(Cmd, Pid, Output, ProcInfo, ExitStatus);
-  emitMessage(os, msg);
+    raw_ostream &os, const CompilerInvocation &Invocation, int64_t Pid,
+    int ExitStatus,
+    const llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
+    TaskProcessInformation ProcInfo) {
+  const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+  IO.forEachPrimaryInput([&](const InputFile &Input) -> bool {
+    assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+           "Expected diagnostic collection for input.");
+
+    // Join all diagnostics produced for this file into a single output.
+    auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+    const char* const Delim = "\n";
+    std::ostringstream JoinedDiags;
+    std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+              std::ostream_iterator<std::string>(JoinedDiags, Delim));
+    FinishedInvocationMessage msg(Invocation, Pid,
+                                  JoinedDiags.str(),
+                                  ExitStatus, ProcInfo);
+    emitMessage(os, msg);
+    return false;
+  });
 }
 
 void parseable_output::emitSignalledMessage(
@@ -447,7 +470,7 @@ void parseable_output::emitSignalledMessage(
 }
 
 void parseable_output::emitSkippedMessage(raw_ostream &os,
-                                                   const driver::Job &Cmd) {
+                                          const driver::Job &Cmd) {
   SkippedMessage msg(Cmd);
   emitMessage(os, msg);
 }

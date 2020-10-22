@@ -24,7 +24,6 @@
 #include "Dependencies.h"
 #include "ScanDependencies.h"
 #include "TBD.h"
-
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -42,6 +41,7 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -49,6 +49,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Option/Options.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -67,6 +68,7 @@
 #include "swift/TBDGen/TBDGen.h"
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
@@ -1694,6 +1696,22 @@ createSerializedDiagnosticConsumerIfNeeded(
       });
 }
 
+/// Creates a diagnostic consumer that accumulates all emitted diagnostics as compilation
+/// proceeds. The accumulated diagnostics are then emitted in the frontend's parseable-output.
+static std::unique_ptr<DiagnosticConsumer>
+createAccumulatingDiagnosticConsumer(
+    const FrontendInputsAndOutputs &InputsAndOutputs,
+    llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
+  return createDispatchingDiagnosticConsumerIfNeeded(
+      InputsAndOutputs,
+      [&](const InputFile &Input) -> std::unique_ptr<DiagnosticConsumer> {
+    FileSpecificDiagnostics.try_emplace(Input.getFileName(),
+                                        std::vector<std::string>());
+    auto &DiagBufferRef = FileSpecificDiagnostics[Input.getFileName()];
+    return std::make_unique<AccumulatingFileDiagnosticConsumer>(DiagBufferRef);
+  });
+}
+
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
 /// the supplementary output paths specified in \p options.
 ///
@@ -1995,6 +2013,17 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
+  std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer;
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+    // We need a diagnostic consumer that will, per-file, collect all
+    // diagnostics to be reported in parseable-output
+    FileSpecificAccumulatingConsumer = createAccumulatingDiagnosticConsumer(
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        FileSpecificDiagnostics);
+    Instance->addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
+  }
+
   // Because the serialized diagnostics consumer is initialized here,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
@@ -2043,6 +2072,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+    parseable_output::emitBeganMessage(
+        llvm::errs(), Invocation, Args, llvm::sys::ProcessInfo::InvalidPid,
+        sys::TaskProcessInformation(getpid()));
+  }
+
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, ReturnValue, observer);
 
@@ -2060,6 +2095,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto r = finishDiagProcessing(HadError ? 1 : ReturnValue, verifierEnabled);
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
+
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+    parseable_output::emitFinishedMessage(
+        llvm::errs(), Invocation, llvm::sys::ProcessInfo::InvalidPid, r,
+        FileSpecificDiagnostics, sys::TaskProcessInformation(getpid()));
+  }
+
   return r;
 }
 
