@@ -9,7 +9,7 @@ public struct Wrapper<T> {
 
 @_spi(Foo)
 public class Bar {
-  // expected-note@-1 11{{type declared here}}
+  // expected-note@-1 12{{type declared here}}
 
   public init() {}
 }
@@ -42,9 +42,19 @@ public struct Resilient {
   // expected-error@-1 {{stored property 'storedProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
 
   @_spi(Foo) public lazy var lazyProperty1 = Bar()
+  // expected-error@-1 {{stored property 'lazyProperty1' cannot be declared '@_spi' in a '@frozen' struct}}
+
   @_spi(Foo) public lazy var lazyProperty2: Bar = Bar()
+  // expected-error@-1 {{cannot use class 'Bar' here; it is SPI}}
+  // expected-error@-2 {{stored property 'lazyProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
+  // expected-error@-3 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
+  // expected-error@-4 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
+
   @_spi(Foo) @Wrapper public var wrappedProperty1: Bar
+  // expected-error@-1 {{stored property 'wrappedProperty1' cannot be declared '@_spi' in a '@frozen' struct}}
+
   @_spi(Foo) @Wrapper public var wrappedProperty2 = Bar()
+  // expected-error@-1 {{stored property 'wrappedProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
 }
 
 @frozen public struct Bad {
