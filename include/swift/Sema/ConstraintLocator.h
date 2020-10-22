@@ -813,6 +813,10 @@ public:
     return static_cast<ConversionRestrictionKind>(getValue());
   }
 
+  bool is(ConversionRestrictionKind kind) const {
+    return getConversionKind() == kind;
+  }
+
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ImplicitConversion;
   }
