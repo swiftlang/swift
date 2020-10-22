@@ -449,6 +449,16 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
+  if (auto conversion =
+          locator->findLast<LocatorPathElt::ImplicitConversion>()) {
+    if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+      return getConstraintLocator(
+          ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
+                      ConstraintLocator::ConstructorMember});
+    }
+  }
+
   auto anchor = locator->getAnchor();
   assert(bool(anchor) && "Expected an anchor!");
 
@@ -4304,7 +4314,10 @@ ASTNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
 }
 
 Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
-  auto *expr = castToExpr(node);
+  auto *expr = getAsExpr(node);
+  if (!expr)
+    return nullptr;
+
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
     argExpr = AE->getArg();
@@ -4443,7 +4456,9 @@ void ConstraintSystem::generateConstraints(
 ConstraintLocator *
 ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   auto anchor = locator->getAnchor();
-  if (!anchor)
+
+  // An empty locator which code completion uses for member references.
+  if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
 
   // Applies and unresolved member exprs can have callee locators that are
@@ -4476,29 +4491,6 @@ Optional<ConstraintSystem::ArgumentInfo>
 ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
   if (!locator)
     return None;
-
-  // Implicit conversions to/from CGFloat type are modeled without
-  // any changes to the AST, so we have to accomodate for that here
-  // by faking presence of appopriate AST location.
-  if (locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
-      locator->isLastElement<LocatorPathElt::ApplyFunction>()) {
-    auto path = locator->getPath().drop_back();
-    if (!path.empty() && path.back().is<LocatorPathElt::ImplicitConversion>()) {
-      auto conversion = path.back()
-                            .castTo<LocatorPathElt::ImplicitConversion>()
-                            .getConversionKind();
-
-      if (conversion == ConversionRestrictionKind::DoubleToCGFloat ||
-          conversion == ConversionRestrictionKind::CGFloatToDouble) {
-        // TODO: This is not very efficient, long term we should just
-        //       save a single `ArgumentInfo` and use it for all of
-        //       the locations where conversion is needed.
-        ArrayRef<Identifier> labels{Identifier()};
-        return ArgumentInfo{.Labels = allocateCopy(labels),
-                            .UnlabeledTrailingClosureIndex = None};
-      }
-    }
-  }
 
   if (auto *infoLocator = getArgumentInfoLocator(locator)) {
     auto known = ArgumentInfos.find(infoLocator);
