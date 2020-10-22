@@ -3070,7 +3070,20 @@ public:
   Action visitNominalType(NominalType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    /// FIXME
+    // If some generic parameters are missing, don't check conformances.
+    if (ty->hasUnboundGenericType())
+      return Action::Continue;
+
+    // When the DeclContext parameter to getContextSubstitutionMap()
+    // is a protocol declaration, the receiver must be a concrete
+    // type, so it doesn't make sense to perform this check on
+    // protocol types.
+    if (isa<ProtocolType>(ty))
+      return Action::Continue;
+
+    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
+    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 

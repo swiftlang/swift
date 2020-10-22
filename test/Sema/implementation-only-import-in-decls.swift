@@ -179,6 +179,13 @@ public struct NormalProtoAssocHolder<T: NormalProto> {
 }
 public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
+public struct OuterGenericHolder<T> {
+  public struct Nested where T : NormalProto {
+    public var value: T.Assoc
+  }
+}
+public func testConformanceInNestedNonGeneric(_: OuterGenericHolder<NormalStruct>.Nested) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+
 public class SubclassOfNormalClass: NormalClass {}
 
 public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalClass>) {} // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
