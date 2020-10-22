@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-syntax-tree
 
+// REQUIRES: concurrency
+
 func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
   _ = await asyncfp() + asyncfp()

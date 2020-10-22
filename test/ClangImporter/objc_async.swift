@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
 
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
 

@@ -5,6 +5,8 @@
 // RUN: sed -ne '/\/\/ *DEMANGLE-TYPE: /s/\/\/ *DEMANGLE-TYPE: *//p' < %s > %t/input
 // RUN: %lldb-moduleimport-test-with-sdk %t/concurrency -type-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-TYPE
 
+// REQUIRES: concurrency
+
 func blackHole(_: Any...) {}
 
 public var lookAtMeeee: [(Int) async -> Void] = []

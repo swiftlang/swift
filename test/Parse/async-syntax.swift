@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -verify-syntax-tree
 
+// REQUIRES: concurrency
+
 func asyncGlobal1() async { }
 func asyncGlobal2() async throws { }
 

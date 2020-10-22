@@ -2,7 +2,6 @@
 // REQUIRES: concurrency
 
 // Synthesis of for actor classes.
-import _Concurrency
 
 actor class A1 {
   var x: Int = 17

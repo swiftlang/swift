@@ -5,7 +5,6 @@
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
 // REQUIRES: concurrency
-import _Concurrency
 
 // CHECK: actor public class SomeActor
 public actor class SomeActor {
