@@ -22,6 +22,10 @@ module ExplicitClassSpecialization {
   header "explicit-class-specialization.h"
 }
 
+module FunctionTemplates {
+  header "function-templates.h"
+}
+
 module UsingDirective {
   header "using-directive.h"
 }

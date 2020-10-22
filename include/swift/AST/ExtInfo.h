@@ -70,6 +70,7 @@ class ClangTypeInfo {
   constexpr ClangTypeInfo(const clang::Type *type) : type(type) {}
 
   friend bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs);
+  friend bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs);
   ClangTypeInfo getCanonical() const;
 
 public:

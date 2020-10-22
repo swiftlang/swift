@@ -296,12 +296,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addSROA();
   }
 
+  // Promote stack allocations to values.
+  P.addMem2Reg();
+
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
   // handle the stdlib functions.
   P.addNonTransparentFunctionOwnershipModelEliminator();
-
-  // Promote stack allocations to values.
-  P.addMem2Reg();
 
   // Run the existential specializer Pass.
   P.addExistentialSpecializer();

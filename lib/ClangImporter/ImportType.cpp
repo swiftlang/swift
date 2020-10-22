@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -210,10 +211,10 @@ namespace {
 
     ImportResult VisitType(const Type*) = delete;
 
-#define DEPENDENT_TYPE(Class, Base)                               \
-    ImportResult Visit##Class##Type(const clang::Class##Type *) { \
-      llvm_unreachable("Dependent types cannot be converted");    \
-    }
+#define DEPENDENT_TYPE(Class, Base)                                            \
+  ImportResult Visit##Class##Type(const clang::Class##Type *) {                \
+    llvm_unreachable("Dependent types cannot be converted");                   \
+  }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.inc"
 
@@ -1696,22 +1697,51 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                     OptionalityOfReturn);
 }
 
+static Type
+findGenericTypeInGenericDecls(const clang::TemplateTypeParmType *templateParam,
+                              ArrayRef<GenericTypeParamDecl *> genericParams) {
+  StringRef name = templateParam->getIdentifier()->getName();
+  auto genericParamIter =
+      llvm::find_if(genericParams, [name](GenericTypeParamDecl *generic) {
+        return generic->getName().str() == name;
+      });
+  // TODO: once we support generics in class types, replace this with
+  // "return nullptr". Once support for template classes, this will need to
+  // be updated, though. I'm leaving the assert here to make it easier to
+  // find.
+  assert(genericParamIter != genericParams.end() &&
+         "Could not find generic param type in generic params.");
+  auto *genericParamDecl = *genericParamIter;
+  auto metatype =
+      cast<MetatypeType>(genericParamDecl->getInterfaceType().getPointer());
+  return metatype->getMetatypeInstanceType();
+}
+
 ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-    bool isFromSystemModule, DeclName name, ParameterList *&parameterList) {
+    bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
+    ArrayRef<GenericTypeParamDecl *> genericParams) {
 
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
-  auto importedType =
-      importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-  if (!importedType)
-    return {Type(), false};
+  ImportedType importedType;
+  if (auto templateType =
+          dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
+    importedType = {findGenericTypeInGenericDecls(templateType, genericParams),
+                    false};
+  } else {
+    importedType =
+        importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+    if (!importedType)
+      return {Type(), false};
+  }
 
   ArrayRef<Identifier> argNames = name.getArgumentNames();
   parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
-                                              allowNSUIntegerAsInt, argNames);
+                                              allowNSUIntegerAsInt, argNames,
+                                              genericParams);
   if (!parameterList)
     return {Type(), false};
 
@@ -1725,7 +1755,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-    bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames) {
+    bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
+    ArrayRef<GenericTypeParamDecl *> genericParams) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -1773,12 +1804,21 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       importKind = ImportTypeKind::CFUnretainedOutParameter;
 
     // Import the parameter type into Swift.
-    auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
-                                   Bridgeability::Full, OptionalityOfParam);
-    if (!importedType)
-      return nullptr;
+    Type swiftParamTy;
+    bool isParamTypeImplicitlyUnwrapped = false;
+    if (auto *templateParamType =
+            dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
+      swiftParamTy =
+          findGenericTypeInGenericDecls(templateParamType, genericParams);
+    } else {
+      auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
+                                     Bridgeability::Full, OptionalityOfParam);
+      if (!importedType)
+        return nullptr;
 
-    auto swiftParamTy = importedType.getType();
+      isParamTypeImplicitlyUnwrapped = importedType.isImplicitlyUnwrapped();
+      swiftParamTy = importedType.getType();
+    }
 
     // Map __attribute__((noescape)) to @noescape.
     if (param->hasAttr<clang::NoEscapeAttr>()) {
@@ -1806,8 +1846,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         ImportedHeaderUnit);
     paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
-    recordImplicitUnwrapForDecl(paramInfo,
-                                importedType.isImplicitlyUnwrapped());
+    recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);
     ++index;
   }
