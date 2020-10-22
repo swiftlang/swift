@@ -2061,11 +2061,15 @@ class AsyncCallEmission final : public CallEmission {
   Size contextSize;
   Address context;
   llvm::Value *thickContext = nullptr;
+  Optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
-    return ::getAsyncContextLayout(IGF, getCallee().getOrigFunctionType(),
-                                   getCallee().getSubstFunctionType(),
-                                   getCallee().getSubstitutions());
+    if (!asyncContextLayout) {
+      asyncContextLayout.emplace(::getAsyncContextLayout(
+          IGF, getCallee().getOrigFunctionType(),
+          getCallee().getSubstFunctionType(), getCallee().getSubstitutions()));
+    }
+    return *asyncContextLayout;
   }
 
   void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {
