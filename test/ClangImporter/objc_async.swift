@@ -21,6 +21,9 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   let _: String? = await try slowServer.fortune()
   let _: Int = await try slowServer.magicNumber(withSeed: 42)
+
+  await slowServer.serverRestart("localhost")
+  await slowServer.server("localhost", atPriorityRestart: 0.8)
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {

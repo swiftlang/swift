@@ -16,6 +16,8 @@
 
 -(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(NSInteger)doSomethingConflicted:(NSString *)operation;
+-(void)server:(NSString *)name restartWithCompletionHandler:(void (^)(void))block;
+-(void)server:(NSString *)name atPriority:(double)priority restartWithCompletionHandler:(void (^)(void))block;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
