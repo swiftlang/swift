@@ -17,7 +17,7 @@ github() {
   curl --header "authorization: Bearer $GITHUB_TOKEN" "$@"
 }
 
-latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?head_branch=${branch}&status=completed&conclusion=success" \
+latest_run=$(github "${gh_api}/repos/${repository}/actions/workflows/${workflow_name}/runs?head_branch=${branch}&status=success" \
   | jq ".workflow_runs | map(select(.head_branch == \"$branch\")) | sort_by(.run_number) | last")
 
 if [ -z "$latest_run" ] || [ "$latest_run" == "null" ]; then
