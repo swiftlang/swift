@@ -1,0 +1,87 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+public protocol Observable {
+  associatedtype Result
+  func subscribe<T: Observer>(o: T) async -> ()
+}
+class ObservableImpl : Observable {
+  typealias Result = Void
+  func subscribe<T: Observer>(o: T) async -> ()
+}
+sil_vtable ObservableImpl {
+}
+// CHECK-LL: define hidden swiftcc void @subscribe_ObservableImpl_Observable(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @subscribe_ObservableImpl_Observable : $@convention(witness_method: Observable) @async <τ_0_0 where τ_0_0 : Observer> (@in_guaranteed τ_0_0, @in_guaranteed ObservableImpl) -> () {
+bb0(%observer : $*τ_0_0, %self : $*ObservableImpl):
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printGeneric_result1 = apply %printGeneric<τ_0_0>(%observer) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: main.ObserverImpl
+  %printGeneric_result2 = apply %printGeneric<ObservableImpl>(%self) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: main.ObservableImpl
+  %result = tuple ()
+  return %result : $()
+}
+sil_witness_table ObservableImpl : Observable module main {
+  associated_type Result : ()
+  method #Observable.subscribe: <Self where Self : Observable><T where T : Observer> (Self) -> (T) async -> () : @subscribe_ObservableImpl_Observable
+}
+
+public protocol Observer {
+  associatedtype Result
+}
+
+class ObserverImpl : Observer {
+  typealias Result = Void
+}
+sil_vtable ObserverImpl {}
+sil_witness_table ObserverImpl : Observer module main {
+    associated_type Result : ()
+}
+
+// CHECK-LL: define internal swiftcc void @"$sTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+sil hidden @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> () {
+bb0(%0 : $*S):
+  %1 = witness_method $S, #Observable.subscribe : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %2 = partial_apply %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  return %2 : $@async @callee_owned (@in O) -> ()
+}
+
+
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %observableImpl = alloc_ref $ObservableImpl
+  strong_retain %observableImpl : $ObservableImpl
+  %observableImpl_addr = alloc_stack $ObservableImpl
+  store %observableImpl to %observableImpl_addr : $*ObservableImpl
+  %witness_method = function_ref @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
+  %partiallyApplied = apply %witness_method<ObservableImpl, ObserverImpl>(%observableImpl_addr) : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
+  %observerImpl = alloc_ref $ObserverImpl
+  %observerImpl_addr = alloc_stack $ObserverImpl
+  store %observerImpl to %observerImpl_addr : $*ObserverImpl
+
+  %result = apply %partiallyApplied(%observerImpl_addr) : $@async @callee_owned (@in ObserverImpl) -> ()
+
+  dealloc_stack %observerImpl_addr : $*ObserverImpl
+  dealloc_stack %observableImpl_addr : $*ObservableImpl
+
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

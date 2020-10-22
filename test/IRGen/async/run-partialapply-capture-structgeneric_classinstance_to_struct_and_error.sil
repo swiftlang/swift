@@ -1,0 +1,97 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+struct A1 {
+    let b: () -> ()
+}
+
+struct A2<T>  {
+    let a: T
+}
+
+class A3 {}
+sil_vtable A3 {}
+
+sil @printA2AtA3 : $@convention(thin) (A2<A3>) -> () {
+entry(%value : $A2<A3>):
+  %addr = alloc_stack $A2<A3>
+  store %value to %addr : $*A2<A3>
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %printGeneric<A2<A3>>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  dealloc_stack %addr : $*A2<A3>
+  return %result : $()
+}
+
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @amethod(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+sil @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error) {
+entry(%a2_at_a3_addr : $*A2<A3>):
+  %a2_at_a3 = load %a2_at_a3_addr : $*A2<A3>
+  %printA2AtA3 = function_ref @printA2AtA3 : $@convention(thin) (A2<A3>) -> () 
+  %partiallyApplied = partial_apply [callee_guaranteed] %printA2AtA3(%a2_at_a3) : $@convention(thin) (A2<A3>) -> () 
+  %result = struct $A1 ( %partiallyApplied : $@callee_guaranteed () -> () )
+  return %result : $A1
+}
+
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @repo(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$s7amethodTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+sil @repo : $@async @convention(thin) (@in_guaranteed A2<A3>) -> @owned @async @callee_guaranteed () -> (@owned A1, @error Error) {
+bb0(%0 : $*A2<A3>):
+  %1 = load %0 : $*A2<A3>
+  %2 = alloc_stack $A2<A3>
+  store %1 to %2 : $*A2<A3>
+  %4 = function_ref @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  dealloc_stack %2 : $*A2<A3>
+  return %5 : $@async @callee_guaranteed () -> (@owned A1, @error Error)
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %a3 = alloc_ref $A3
+  %a2 = struct $A2<A3> (%a3 : $A3)
+
+  %a2_addr = alloc_stack $A2<A3>
+  store %a2 to %a2_addr : $*A2<A3>
+
+  %callee = function_ref @repo : $@async @convention(thin) (@in_guaranteed A2<A3>) -> @owned @async @callee_guaranteed () -> (@owned A1, @error Error)
+  %partiallyApplied = apply %callee(%a2_addr) : $@async @convention(thin) (@in_guaranteed A2<A3>) -> @owned @async @callee_guaranteed () -> (@owned A1, @error Error)
+  try_apply %partiallyApplied() : $@async @callee_guaranteed () -> (@owned A1, @error Error), normal bb_success, error bb_error
+
+bb_success(%value : $A1):
+  %value_addr = alloc_stack $A1
+  store %value to %value_addr : $*A1
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %printGeneric<A1>(%value_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: A1(b: (Function))
+  %closure = struct_extract %value : $A1, #A1.b
+  %closure_result = apply %closure() : $@callee_guaranteed () -> () // CHECK: A2<A3>(a: main.A3)
+  dealloc_stack %value_addr : $*A1
+  
+  br bb_finish
+
+bb_error(%error : $Error):
+  br bb_finish
+
+bb_finish:
+
+  dealloc_stack %a2_addr : $*A2<A3>
+
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

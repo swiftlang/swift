@@ -257,18 +257,19 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<SILType> fieldTypes,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
-                       NecessaryBindings &&bindings)
-  : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
-                 fieldTypeInfos, typeToFill),
-    ElementTypes(fieldTypes.begin(), fieldTypes.end()),
-    Bindings(std::move(bindings))
-{
+                       NecessaryBindings &&bindings, unsigned bindingsIndex)
+    : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
+                   fieldTypeInfos, typeToFill),
+      ElementTypes(fieldTypes.begin(), fieldTypes.end()),
+      Bindings(std::move(bindings)), BindingsIndex(bindingsIndex) {
 #ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size()
          && "type infos don't match types");
   if (!Bindings.empty()) {
-    assert(fieldTypeInfos.size() >= 1 && "no field for bindings");
-    auto fixedBindingsField = dyn_cast<FixedTypeInfo>(fieldTypeInfos[0]);
+    assert(fieldTypeInfos.size() >= (bindingsIndex + 1) &&
+           "no field for bindings");
+    auto fixedBindingsField =
+        dyn_cast<FixedTypeInfo>(fieldTypeInfos[bindingsIndex]);
     assert(fixedBindingsField
            && "bindings field is not fixed size");
     assert(fixedBindingsField->getFixedSize()
@@ -425,7 +426,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   if (layout.hasBindings()) {
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
-    auto bindingsAddr = layout.getElement(0).project(IGF, structAddr, None);
+    auto bindingsAddr = layout.getElement(layout.getBindingsIndex())
+                            .project(IGF, structAddr, None);
     layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
