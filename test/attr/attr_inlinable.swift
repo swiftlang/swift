@@ -340,3 +340,13 @@ public struct PrivateInlinableCrash {
 
   func innerFunction4(x: () = publicFunction()) {}
 }
+
+// This is OK -- lazy property initializers are emitted inside the getter,
+// which is never @inlinable.
+@frozen public struct LazyField {
+  public lazy var y: () = privateFunction()
+
+  @inlinable private lazy var z: () = privateFunction()
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to stored properties}}
+}
+

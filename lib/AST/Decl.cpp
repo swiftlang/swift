@@ -1582,6 +1582,11 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
 }
 
 bool VarDecl::isInitExposedToClients() const {
+  // 'lazy' initializers are emitted inside the getter, which is never
+  // @inlinable.
+  if (getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
   return hasInitialValue() && isLayoutExposedToClients();
 }
 

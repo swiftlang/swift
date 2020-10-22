@@ -47,8 +47,6 @@ public struct Resilient {
   @_spi(Foo) public lazy var lazyProperty2: Bar = Bar()
   // expected-error@-1 {{cannot use class 'Bar' here; it is SPI}}
   // expected-error@-2 {{stored property 'lazyProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
-  // expected-error@-3 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-4 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   @_spi(Foo) @Wrapper public var wrappedProperty1: Bar
   // expected-error@-1 {{stored property 'wrappedProperty1' cannot be declared '@_spi' in a '@frozen' struct}}
@@ -73,12 +71,8 @@ public struct Resilient {
   public var computedProperty: Bar { Bar() } // expected-error {{cannot use class 'Bar' here; it is SPI}}
 
   public lazy var lazyProperty1 = Bar() // expected-error {{cannot use class 'Bar' here; it is SPI}}
-  // expected-error@-1 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-2 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   public lazy var lazyProperty2: Bar = Bar() // expected-error {{cannot use class 'Bar' here; it is SPI}}
-  // expected-error@-1 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-2 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   @Wrapper public var wrappedProperty1: Bar
   // expected-error@-1 {{cannot use class 'Bar' here; it is SPI}}
@@ -105,12 +99,8 @@ public struct Resilient {
   private var computedProperty: Bar { Bar() }
 
   private lazy var lazyProperty1 = Bar() // expected-error {{cannot use class 'Bar' here; it is SPI}}
-  // expected-error@-1 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-2 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private lazy var lazyProperty2: Bar = Bar() // expected-error {{cannot use class 'Bar' here; it is SPI}}
-  // expected-error@-1 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-2 {{class 'Bar' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   @Wrapper private var wrappedProperty1: Bar
   // expected-error@-1 {{cannot use class 'Bar' here; it is SPI}}
