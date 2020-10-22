@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-invalid-ephemeralness-as-error
+// RUN: %target-typecheck-verify-swift -enable-invalid-ephemeralness-as-error -disable-objc-interop
 
 // Test availability attributes on UnsafePointer initializers.
 // Assume the original source contains no UnsafeRawPointer types.

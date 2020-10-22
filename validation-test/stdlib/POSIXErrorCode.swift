@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu
+// UNSUPPORTED: freestanding
 
 import Swift
 import StdlibUnittest

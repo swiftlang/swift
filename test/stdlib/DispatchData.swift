@@ -3,6 +3,7 @@
 // RUN: %target-build-swift -swift-version 4.2 %s %import-libdispatch -o %t/a.out-4.2 && %target-codesign %t/a.out-4.2 && %target-run %t/a.out-4.2
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
+// UNSUPPORTED: freestanding
 
 import Dispatch
 import StdlibUnittest
