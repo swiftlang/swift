@@ -950,9 +950,6 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
-  /// Returns true if this Decl cannot be seen by any other source file
-  bool isPrivateToEnclosingFile() const;
-
   /// Retrieve the global actor attribute that applies to this declaration,
   /// if any.
   ///

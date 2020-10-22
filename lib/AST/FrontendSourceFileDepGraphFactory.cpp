@@ -229,6 +229,13 @@ std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
   return getInterfaceHash(SF);
 }
 
+std::string
+FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  return interfaceHash.str().str();
+}
+
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
 //==============================================================================
@@ -407,7 +414,8 @@ template <NodeKind kind, typename ContentsT>
 void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
     std::vector<ContentsT> &contentsVec) {
   for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp = getFingerprintIfAny(declOrPair);
+    Optional<std::string> fp =
+        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
     addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
         fp ? StringRef(fp.getValue()) : Optional<StringRef>());
@@ -520,33 +528,6 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 }
 
 //==============================================================================
-// MARK: FrontendSourceFileDepGraphFactory - adding individual defined Decls
-//==============================================================================
-
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
-
-/// At present, only \c NominalTypeDecls have (body) fingerprints
-Optional<std::string> FrontendSourceFileDepGraphFactory::getFingerprintIfAny(
-    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-  return None;
-}
-Optional<std::string>
-FrontendSourceFileDepGraphFactory::getFingerprintIfAny(const Decl *d) {
-  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
-    auto result = idc->getBodyFingerprint();
-    assert((!result || !result->empty()) &&
-           "Fingerprint should never be empty");
-    return result;
-  }
-  return None;
-}
-
-//==============================================================================
 // MARK: ModuleDepGraphFactory
 //==============================================================================
 
@@ -591,29 +572,10 @@ template <NodeKind kind, typename ContentsT>
 void ModuleDepGraphFactory::addAllDefinedDeclsOfAGivenType(
     std::vector<ContentsT> &contentsVec) {
   for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp = getFingerprintIfAny(declOrPair);
+    Optional<std::string> fp =
+        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
     addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
         fp ? StringRef(fp.getValue()) : Optional<StringRef>());
   }
-}
-
-//==============================================================================
-// MARK: ModuleDepGraphFactory - adding individual defined Decls
-//==============================================================================
-
-/// At present, only \c NominalTypeDecls have (body) fingerprints
-Optional<std::string> ModuleDepGraphFactory::getFingerprintIfAny(
-    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-  return None;
-}
-Optional<std::string>
-ModuleDepGraphFactory::getFingerprintIfAny(const Decl *d) {
-  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
-    auto result = idc->getBodyFingerprint();
-    assert((!result || !result->empty()) &&
-           "Fingerprint should never be empty");
-    return result;
-  }
-  return None;
 }
