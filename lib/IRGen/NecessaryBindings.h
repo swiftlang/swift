@@ -25,8 +25,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
-#include "Explosion.h"
-
 namespace swift {
   class CanType;
   enum class MetadataState : size_t;
@@ -36,6 +34,7 @@ namespace swift {
 
   namespace irgen {
   class Address;
+  class Explosion;
   class IRGenFunction;
   class IRGenModule;
   class Size;
