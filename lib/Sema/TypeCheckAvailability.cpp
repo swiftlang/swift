@@ -67,19 +67,10 @@ bool swift::isExported(const ValueDecl *VD) {
   if (accessScope.isPublic())
     return true;
 
-  // Is this a stored property in a non-resilient struct or class?
-  auto *property = dyn_cast<VarDecl>(VD);
-  if (!property || !property->hasStorage() || property->isStatic())
-    return false;
-  auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
-  if (!parentNominal || parentNominal->isResilient())
-    return false;
-
-  // Is that struct or class part of the module's API or ABI?
-  AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
-      nullptr, /*treatUsableFromInlineAsPublic*/true);
-  if (parentAccessScope.isPublic())
-    return true;
+  // Is this a stored property in a @frozen struct or class?
+  if (auto *property = dyn_cast<VarDecl>(VD))
+    if (property->isLayoutExposedToClients())
+      return true;
 
   return false;
 }

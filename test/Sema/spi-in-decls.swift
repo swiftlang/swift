@@ -169,33 +169,36 @@ extension Array: TestConstrainedExtensionProto where Element == BadStruct { // e
 //  higherThan: BadPrecedence
 //}
 
-public struct PublicStructStoredProperties {
+@frozen public struct PublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-@usableFromInline internal struct UFIStructStoredProperties {
+@frozen @usableFromInline internal struct UFIStructStoredProperties {
   @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-public class PublicClassStoredProperties {
+@_fixed_layout public class PublicClassStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
