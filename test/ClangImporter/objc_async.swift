@@ -20,6 +20,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // expected-error@-1{{call is 'async' but is not marked with 'await'}}
 
   let _: String? = await try slowServer.fortune()
+  let _: Int = await try slowServer.magicNumber(withSeed: 42)
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {

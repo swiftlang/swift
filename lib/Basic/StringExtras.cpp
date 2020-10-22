@@ -1301,6 +1301,15 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
 
+  // For a method imported as "async", drop the "Asynchronously" suffix from
+  // the base name. It is redundant with 'async'.
+  const StringRef asynchronously = "Asynchronously";
+  if (isAsync && camel_case::getLastWord(baseName) == asynchronously &&
+      baseName.size() > asynchronously.size()) {
+    baseName = baseName.drop_back(asynchronously.size());
+    anyChanges = true;
+  }
+
   // Omit needless words based on parameter types.
   for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
     // If there is no corresponding parameter, there is nothing to

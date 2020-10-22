@@ -10,7 +10,8 @@
 -(void)findAnswerAsynchronously:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswer(completionHandler:)")));
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
--(void)getFortuneWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
+-(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
+-(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
 
 -(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
