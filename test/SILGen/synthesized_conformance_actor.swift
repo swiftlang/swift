@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s -swift-version 5 -enable-experimental-concurrency | %FileCheck -check-prefix CHECK %s
 // REQUIRES: concurrency
 
-import _Concurrency
-
 public protocol DefaultInit {
   init()
 }

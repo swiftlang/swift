@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 // expected-error@+1{{'@actorIndependent' can only be applied to actor members and global/static variables}}
 @actorIndependent func globalFunction() { }
 

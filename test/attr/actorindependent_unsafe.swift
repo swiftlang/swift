@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 //////////////////////////
 /// Cases that only work because of @actorIndependent(unsafe)
 //////////////////////////

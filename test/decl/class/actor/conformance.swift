@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 protocol AsyncProtocol {
   func asyncMethod() async -> Int
 }
