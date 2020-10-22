@@ -135,33 +135,36 @@ precedencegroup TestHigherThan {
   higherThan: BadPrecedence // expected-error {{cannot use precedence group 'BadPrecedence' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public struct PublicStructStoredProperties {
+@frozen public struct PublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-@usableFromInline internal struct UFIStructStoredProperties {
+@frozen @usableFromInline internal struct UFIStructStoredProperties {
   @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public class PublicClassStoredProperties {
+@_fixed_layout public class PublicClassStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
@@ -175,6 +178,13 @@ public struct NormalProtoAssocHolder<T: NormalProto> {
   public var value: T.Assoc
 }
 public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+
+public struct OuterGenericHolder<T> {
+  public struct Nested where T : NormalProto {
+    public var value: T.Assoc
+  }
+}
+public func testConformanceInNestedNonGeneric(_: OuterGenericHolder<NormalStruct>.Nested) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public class SubclassOfNormalClass: NormalClass {}
 

@@ -53,11 +53,11 @@ public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{
 public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
 
 @inlinable
-public func inlinable1() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  spiFunc() // expected-error {{global function 'spiFunc()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  _ = SPIClass() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  // expected-error@-1 {{initializer 'init()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
-  _ = [SPIClass]() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+public func inlinable1() -> SPIClass { // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
+  spiFunc() // expected-error {{global function 'spiFunc()' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
+  _ = SPIClass() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
+  // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
+  _ = [SPIClass]() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
 }
 
 @_spi(S)

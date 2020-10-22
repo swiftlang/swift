@@ -67,19 +67,10 @@ bool swift::isExported(const ValueDecl *VD) {
   if (accessScope.isPublic())
     return true;
 
-  // Is this a stored property in a non-resilient struct or class?
-  auto *property = dyn_cast<VarDecl>(VD);
-  if (!property || !property->hasStorage() || property->isStatic())
-    return false;
-  auto *parentNominal = dyn_cast<NominalTypeDecl>(property->getDeclContext());
-  if (!parentNominal || parentNominal->isResilient())
-    return false;
-
-  // Is that struct or class part of the module's API or ABI?
-  AccessScope parentAccessScope = parentNominal->getFormalAccessScope(
-      nullptr, /*treatUsableFromInlineAsPublic*/true);
-  if (parentAccessScope.isPublic())
-    return true;
+  // Is this a stored property in a @frozen struct or class?
+  if (auto *property = dyn_cast<VarDecl>(VD))
+    if (property->isLayoutExposedToClients())
+      return true;
 
   return false;
 }
@@ -148,13 +139,14 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   }
 }
 
-static void computeExportContextBits(Decl *D,
-                                     bool *implicit, bool *deprecated,
+static void computeExportContextBits(ASTContext &Ctx, Decl *D,
+                                     bool *spi, bool *implicit, bool *deprecated,
                                      Optional<PlatformKind> *unavailablePlatformKind) {
+  if (D->isSPI())
+    *spi = true;
+
   if (D->isImplicit())
     *implicit = true;
-
-  auto &Ctx = D->getASTContext();
 
   if (D->getAttrs().getDeprecated(Ctx))
     *deprecated = true;
@@ -166,38 +158,30 @@ static void computeExportContextBits(Decl *D,
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
       if (auto *VD = PBD->getAnchoringVarDecl(i))
-        computeExportContextBits(VD, implicit, deprecated,
+        computeExportContextBits(Ctx, VD, spi, implicit, deprecated,
                                  unavailablePlatformKind);
     }
   }
 }
 
 ExportContext ExportContext::forDeclSignature(Decl *D) {
-  bool implicit = false;
-  bool deprecated = false;
-  Optional<PlatformKind> unavailablePlatformKind;
-  computeExportContextBits(D, &implicit, &deprecated,
-                           &unavailablePlatformKind);
-  forEachOuterDecl(D->getDeclContext(),
-                   [&](Decl *D) {
-                     computeExportContextBits(D, &implicit, &deprecated,
-                                              &unavailablePlatformKind);
-                   });
+  auto &Ctx = D->getASTContext();
 
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
 
-  bool spi = D->isSPI();
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
-      if (auto *VD = PBD->getAnchoringVarDecl(i)) {
-        if (VD->isSPI()) {
-          spi = true;
-          break;
-        }
-      }
-    }
-  }
+  bool spi = false;
+  bool implicit = false;
+  bool deprecated = false;
+  Optional<PlatformKind> unavailablePlatformKind;
+  computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
+                           &unavailablePlatformKind);
+  forEachOuterDecl(D->getDeclContext(),
+                   [&](Decl *D) {
+                     computeExportContextBits(Ctx, D,
+                                              &spi, &implicit, &deprecated,
+                                              &unavailablePlatformKind);
+                   });
 
   bool exported = ::isExported(D);
 
@@ -206,25 +190,22 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
+  auto &Ctx = DC->getASTContext();
+
+  auto fragileKind = DC->getFragileFunctionKind();
+
+  bool spi = false;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
   forEachOuterDecl(DC,
                    [&](Decl *D) {
-                     computeExportContextBits(D, &implicit, &deprecated,
+                     computeExportContextBits(Ctx, D,
+                                              &spi, &implicit, &deprecated,
                                               &unavailablePlatformKind);
                    });
 
-  auto fragileKind = DC->getFragileFunctionKind();
-
-  bool spi = false;
   bool exported = false;
-
-  if (auto *D = DC->getInnermostDeclarationDeclContext()) {
-    spi = D->isSPI();
-  } else {
-    assert(fragileKind.kind == FragileFunctionKind::None);
-  }
 
   return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
                        unavailablePlatformKind);
@@ -2716,6 +2697,10 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
     return false;
   const ValueDecl *D = declRef.getDecl();
 
+  // Generic parameters are always available.
+  if (isa<GenericTypeParamDecl>(D))
+    return false;
+
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
@@ -2733,14 +2718,12 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (Where.getFragileFunctionKind().kind != FragileFunctionKind::None) {
-    if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, D, Where))
-        return true;
-  } else if (Where.getExportabilityReason().hasValue()) {
-    if (R.isValid())
-      if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
-        return true;
+  if (R.isValid()) {
+    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
+      return true;
+
+    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
+      return true;
   }
 
   if (R.isValid()) {
@@ -3087,7 +3070,20 @@ public:
   Action visitNominalType(NominalType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    /// FIXME
+    // If some generic parameters are missing, don't check conformances.
+    if (ty->hasUnboundGenericType())
+      return Action::Continue;
+
+    // When the DeclContext parameter to getContextSubstitutionMap()
+    // is a protocol declaration, the receiver must be a concrete
+    // type, so it doesn't make sense to perform this check on
+    // protocol types.
+    if (isa<ProtocolType>(ty))
+      return Action::Continue;
+
+    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
+    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
 

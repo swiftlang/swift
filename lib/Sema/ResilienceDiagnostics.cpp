@@ -27,48 +27,24 @@
 
 using namespace swift;
 
-bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
-                                           const ValueDecl *D,
-                                           ExportContext where) {
-  auto fragileKind = where.getFragileFunctionKind();
-  if (fragileKind.kind == FragileFunctionKind::None)
-    return false;
-
-  // Do some important fast-path checks that apply to all cases.
-
-  // Type parameters are OK.
-  if (isa<AbstractTypeParamDecl>(D))
-    return false;
-
-  // Check whether the declaration is accessible.
-  if (diagnoseInlinableDeclRefAccess(loc, D, where))
-    return true;
-
-  // Check whether the declaration comes from a publically-imported module.
-  // Skip this check for accessors because the associated property or subscript
-  // will also be checked, and will provide a better error message.
-  if (!isa<AccessorDecl>(D))
-    if (diagnoseDeclRefExportability(loc, D, where))
-      return true;
-
-  return false;
-}
-
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  ExportContext where) {
-  auto *DC = where.getDeclContext();
   auto fragileKind = where.getFragileFunctionKind();
-  assert(fragileKind.kind != FragileFunctionKind::None);
+  if (fragileKind.kind == FragileFunctionKind::None)
+    return false;
 
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public declarations or SPI used from SPI are OK.
+  auto *DC = where.getDeclContext();
+
+  // Public declarations are OK, even if they're SPI or came from an
+  // implementation-only import. We'll diagnose exportability violations
+  // from diagnoseDeclRefExportability().
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              fragileKind.allowUsableFromInline).isPublic() &&
-      !(D->isSPI() && !DC->getInnermostDeclarationDeclContext()->isSPI()))
+                              fragileKind.allowUsableFromInline).isPublic())
     return false;
 
   auto &Context = DC->getASTContext();
@@ -79,14 +55,6 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->shouldUseObjCDispatch() && !Context.isSwiftVersionAtLeast(5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
-  }
-
-  // Property initializers that are not exposed to clients are OK.
-  if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
-    auto bindingIndex = pattern->getBindingIndex();
-    auto *varDecl = pattern->getBinding()->getAnchoringVarDecl(bindingIndex);
-    if (!varDecl->isInitExposedToClients())
-      return false;
   }
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
@@ -145,6 +113,11 @@ bool
 TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                                           const ValueDecl *D,
                                           ExportContext where) {
+  // Accessors cannot have exportability that's different than the storage,
+  // so skip them for now.
+  if (isa<AccessorDecl>(D))
+    return false;
+
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
