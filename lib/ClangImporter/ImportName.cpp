@@ -804,7 +804,7 @@ static bool omitNeedlessWordsInFunctionName(
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    NameImporter &nameImporter) {
+    Optional<unsigned> completionHandlerIndex, NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
@@ -816,10 +816,6 @@ static bool omitNeedlessWordsInFunctionName(
     // Capture the first parameter name.
     if (i == 0)
       firstParamName = param->getName();
-
-    // Determine the number of parameters.
-    unsigned numParams = params.size();
-    if (errorParamIndex) --numParams;
 
     bool isLastParameter
       = (i == params.size() - 1) ||
@@ -858,7 +854,8 @@ static bool omitNeedlessWordsInFunctionName(
                            getClangTypeNameForOmission(clangCtx, resultType),
                            getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
-                           allPropertyNames, nameImporter.getScratch());
+                           allPropertyNames, completionHandlerIndex.hasValue(),
+                           nameImporter.getScratch());
 }
 
 /// Prepare global name for importing onto a swift_newtype.
@@ -1189,7 +1186,6 @@ Optional<ForeignAsyncConvention::Info>
 NameImporter::considerAsyncImport(
     const clang::ObjCMethodDecl *clangDecl,
     StringRef &baseName,
-    SmallVectorImpl<char> &baseNameScratch,
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params,
     bool isInitializer, bool hasCustomName,
@@ -1223,17 +1219,6 @@ NameImporter::considerAsyncImport(
     // The parameter has an appropriate name.
   } else {
     return None;
-  }
-
-  // If there's no custom name, and the base name starts with "get", drop the
-  // get.
-  if (!hasCustomName) {
-    StringRef currentBaseName = newBaseName ? *newBaseName : baseName;
-    if (currentBaseName.size() > 3 &&
-        camel_case::getFirstWord(currentBaseName) == "get") {
-      newBaseName = camel_case::toLowercaseInitialisms(
-          currentBaseName.substr(3), baseNameScratch);
-    }
   }
 
   // Used for returns once we've determined that the method cannot be
@@ -1473,7 +1458,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   }
 
   // If we have a swift_name attribute, use that.
-  SmallString<32> asyncBaseNameScratch;
   if (auto *nameAttr = findSwiftNameAttr(D, version)) {
     bool skipCustomName = false;
 
@@ -1552,9 +1536,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
         if (version.supportsConcurrency()) {
           if (auto asyncInfo = considerAsyncImport(
-                  method, parsedName.BaseName, asyncBaseNameScratch,
-                  parsedName.ArgumentLabels, params, isInitializer,
-                  /*hasCustomName=*/true, result.getErrorInfo())) {
+                  method, parsedName.BaseName, parsedName.ArgumentLabels,
+                  params, isInitializer, /*hasCustomName=*/true,
+                  result.getErrorInfo())) {
             result.info.hasAsyncInfo = true;
             result.info.asyncInfo = *asyncInfo;
 
@@ -1829,9 +1813,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (version.supportsConcurrency() &&
         result.info.accessorKind == ImportedAccessorKind::None) {
       if (auto asyncInfo = considerAsyncImport(
-              objcMethod, baseName, asyncBaseNameScratch,
-              argumentNames, params, isInitializer, /*hasCustomName=*/false,
-              result.getErrorInfo())) {
+              objcMethod, baseName, argumentNames, params, isInitializer,
+              /*hasCustomName=*/false, result.getErrorInfo())) {
         result.info.hasAsyncInfo = true;
         result.info.asyncInfo = *asyncInfo;
       }
@@ -1971,7 +1954,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                scratch);
+                                /*isAsync=*/false, scratch);
       }
     }
 
@@ -1983,7 +1966,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           result.getErrorInfo()
               ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
               : None,
-          method->hasRelatedResultType(), method->isInstanceMethod(), *this);
+          method->hasRelatedResultType(), method->isInstanceMethod(),
+          result.getAsyncInfo().map(
+            [](const ForeignAsyncConvention::Info &info) {
+              return info.CompletionHandlerParamIndex;
+            }),
+          *this);
     }
 
     // If the result is a value, lowercase it.
