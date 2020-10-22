@@ -106,7 +106,7 @@ jobs:
 
   macos_build:
     timeout-minutes: 0
-    runs-on: macos-latest
+    runs-on: macos-10.15
 
     steps:
       - uses: actions/checkout@v1
@@ -145,7 +145,7 @@ jobs:
 
   macos_smoke_test:
     name: Run smoke tests on macOS
-    runs-on: macos-latest
+    runs-on: macos-10.15
     needs: macos_build
     steps:
       - name: Download installable macOS archive
