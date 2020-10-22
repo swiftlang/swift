@@ -7524,6 +7524,15 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }
 
+template<class ...Args>
+ConstructorDecl *ConstructorDecl::createImported(ASTContext &ctx,
+                                                 ClangNode clangNode,
+                                                 Args&&... args) {
+  auto ctor = new (ctx) ConstructorDecl(std::forward<Args>(args)...);
+  ctor->setClangNode(clangNode);
+  return ctor;
+}
+
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   // The initializer must have a single, non-empty argument name.
   if (getName().getArgumentNames().size() != 1 ||

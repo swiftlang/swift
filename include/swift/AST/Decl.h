@@ -6509,6 +6509,10 @@ public:
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
+  template<class ...Args>
+  static ConstructorDecl *createImported(ASTContext &ctx, ClangNode clangNode,
+                                         Args&&... args);
+
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
