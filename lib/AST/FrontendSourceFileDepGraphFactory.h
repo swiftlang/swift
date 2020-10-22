@@ -44,12 +44,6 @@ private:
   /// create node pairs for context and name
   template <NodeKind kind, typename ContentsT>
   void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
-
-  /// At present, only nominals, protocols, and extensions have (body)
-  /// fingerprints
-  static Optional<std::string>
-  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>);
-  static Optional<std::string> getFingerprintIfAny(const Decl *d);
 };
 
 class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
@@ -68,12 +62,6 @@ private:
   /// create node pairs for context and name
   template <NodeKind kind, typename ContentsT>
   void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
-
-  /// At present, only nominals, protocols, and extensions have (body)
-  /// fingerprints
-  static Optional<std::string> getFingerprintIfAny(
-      std::pair<const NominalTypeDecl *, const ValueDecl *>);
-  static Optional<std::string> getFingerprintIfAny(const Decl *d);
 };
 
 } // namespace fine_grained_dependencies

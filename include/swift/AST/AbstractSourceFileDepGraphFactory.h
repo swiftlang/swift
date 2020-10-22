@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 #define SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/FineGrainedDependencies.h"
 
@@ -72,6 +73,21 @@ protected:
                        Optional<StringRef> fingerprint);
 
   void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
+
+  static Optional<std::string> getFingerprintIfAny(
+      std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+
+  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+      auto result = idc->getBodyFingerprint();
+      assert((!result || !result->empty()) &&
+             "Fingerprint should never be empty");
+      return result;
+    }
+    return None;
+  }
 };
 
 } // namespace fine_grained_dependencies
