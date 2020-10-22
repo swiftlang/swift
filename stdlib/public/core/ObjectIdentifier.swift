@@ -16,9 +16,7 @@
 /// is no notion of identity for structs, enums, functions, or tuples.
 ///
 /// `ObjectIdentifier` is only guaranteed to remain unique for the
-/// lifetime of an object. When the instance gets deallocated, its object 
-/// identifier may be reused for a different object. (Internally, objects are
-/// identified by their memory location.)
+/// lifetime of an object. 
 @frozen // trivial-implementation
 public struct ObjectIdentifier {
   @usableFromInline // trivial-implementation
