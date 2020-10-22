@@ -1142,7 +1142,8 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 }
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
-  if (performMandatorySILPasses(Invocation, silModule))
+  if (performMandatorySILPasses(Invocation, silModule) &&
+      !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return true;
 
   {

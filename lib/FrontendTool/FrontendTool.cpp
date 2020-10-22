@@ -1786,11 +1786,13 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     assert(ctx.getLoadedModules().begin()->second == Instance.getMainModule());
   }
 
-  // Verify the AST for all the modules we've loaded.
-  ctx.verifyAllLoadedModules();
+  if (!opts.AllowModuleWithCompilerErrors) {
+    // Verify the AST for all the modules we've loaded.
+    ctx.verifyAllLoadedModules();
 
-  // Verify generic signatures if we've been asked to.
-  verifyGenericSignaturesIfNeeded(Invocation, ctx);
+    // Verify generic signatures if we've been asked to.
+    verifyGenericSignaturesIfNeeded(Invocation, ctx);
+  }
 
   // Emit any additional outputs that we only need for a successful compilation.
   // We don't want to unnecessarily delay getting any errors back to the user.
@@ -1867,7 +1869,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
-  if (Instance.getASTContext().hadError())
+  if (Instance.getASTContext().hadError() &&
+      !opts.AllowModuleWithCompilerErrors)
     return true;
 
   return cont(Instance);
@@ -2048,7 +2051,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Instance.hasASTContext() &&
       FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
-    hadError |= Instance.getASTContext().hadError();
+    if (!opts.AllowModuleWithCompilerErrors)
+      hadError |= Instance.getASTContext().hadError();
   }
   return hadError;
 }
@@ -2334,7 +2338,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (PSPs.haveModuleOrModuleDocOutputPaths()) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      return Context.hadError();
+      return Context.hadError() && !opts.AllowModuleWithCompilerErrors;
     }
   }
 
@@ -2352,7 +2356,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
-    return true;
+    return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
 

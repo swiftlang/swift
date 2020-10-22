@@ -145,6 +145,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
       extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
+    case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
+      extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1150,6 +1153,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
+      Bits.IsAllowModuleWithCompilerErrorsEnabled =
+          extInfo.isAllowModuleWithCompilerErrorsEnabled();
       MiscVersion = info.miscVersion;
 
       hasValidControlBlock = true;
