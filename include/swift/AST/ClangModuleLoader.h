@@ -15,6 +15,7 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "clang/AST/Decl.h"
 
 namespace clang {
 class ASTContext;
@@ -219,6 +220,10 @@ public:
   /// based on subtleties like the target module interface format.
   virtual bool isSerializable(const clang::Type *type,
                               bool checkCanonical) const = 0;
+
+  /// Writes the mangled name of \p clangDecl to \p os.
+  virtual void getMangledName(raw_ostream &os,
+                              const clang::NamedDecl *clangDecl) const = 0;
 };
 
 } // namespace swift
