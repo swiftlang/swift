@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -1986,6 +1987,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     }
     mainFunction = viableCandidates[0];
   }
+
+  auto where = ExportContext::forDeclSignature(D);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), where, None);
 
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,
