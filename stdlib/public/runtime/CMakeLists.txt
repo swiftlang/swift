@@ -31,7 +31,6 @@ set(swift_runtime_sources
     BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp
-    Concurrency.cpp
     CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp
