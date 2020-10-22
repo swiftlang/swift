@@ -21,8 +21,9 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/AST/ImportCache.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -35,8 +36,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/ClangImporter/ClangModule.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
@@ -4082,3 +4081,32 @@ swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
 }
 
+clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
+    ASTContext &ctx, clang::FunctionTemplateDecl *func, SubstitutionMap subst) {
+  SmallVector<clang::TemplateArgument, 4> templateSubst;
+  std::unique_ptr<TemplateInstantiationError> error =
+      ctx.getClangTemplateArguments(func->getTemplateParameters(),
+                                    subst.getReplacementTypes(), templateSubst);
+  if (error) {
+    std::string failedTypesStr;
+    llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
+    llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+    // TODO: Use the location of the apply here.
+    // TODO: This error message should not reference implementation details.
+    // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::unable_to_convert_generic_swift_types.ID,
+                       {func->getName(), StringRef(failedTypesStr)});
+    // Return a valid FunctionDecl but, we'll never use it.
+    return func->getAsFunction();
+  }
+
+  // Instanciate a specialization of this template using the substitution map.
+  auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
+      func->getASTContext(), templateSubst);
+  auto &sema = getClangInstance().getSema();
+  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
+                                                   clang::SourceLocation());
+  sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
+  return spec;
+}

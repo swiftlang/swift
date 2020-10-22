@@ -807,3 +807,33 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
   auto it = ReversedExportMap.find(decl);
   return (it != ReversedExportMap.end() ? it->second : nullptr);
 }
+
+std::unique_ptr<TemplateInstantiationError>
+ClangTypeConverter::getClangTemplateArguments(
+    const clang::TemplateParameterList *templateParams,
+    ArrayRef<Type> genericArgs,
+    SmallVectorImpl<clang::TemplateArgument> &templateArgs) {
+  // Keep track of the types we failed to convert so we can return a useful
+  // error.
+  SmallVector<Type, 2> failedTypes;
+  for (clang::NamedDecl *param : *templateParams) {
+    // Note: all template parameters must be template type parameters. This is
+    // verified when we import the clang decl.
+    auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
+    auto replacement = genericArgs[templateParam->getIndex()];
+    auto qualType = convert(replacement);
+    if (qualType.isNull()) {
+      failedTypes.push_back(replacement);
+      // Find all the types we can't convert.
+      continue;
+    }
+    templateArgs.push_back(clang::TemplateArgument(qualType));
+  }
+  if (failedTypes.empty())
+    return nullptr;
+  auto errorInfo = std::make_unique<TemplateInstantiationError>();
+  llvm::for_each(failedTypes, [&errorInfo](auto type) {
+    errorInfo->failedTypes.push_back(type);
+  });
+  return errorInfo;
+}

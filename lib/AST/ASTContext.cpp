@@ -18,13 +18,13 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
-#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -41,19 +41,19 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/References.h"
+#include "swift/Syntax/SyntaxArena.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -4561,6 +4561,21 @@ ASTContext::getCanonicalClangFunctionType(
     SILFunctionType::Representation trueRep) {
   auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+}
+
+std::unique_ptr<TemplateInstantiationError>
+ASTContext::getClangTemplateArguments(
+    const clang::TemplateParameterList *templateParams,
+    ArrayRef<Type> genericArgs,
+    SmallVectorImpl<clang::TemplateArgument> &templateArgs) {
+  auto &impl = getImpl();
+  if (!impl.Converter) {
+    auto *cml = getClangModuleLoader();
+    impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
+  }
+
+  return impl.Converter->getClangTemplateArguments(templateParams, genericArgs,
+                                                   templateArgs);
 }
 
 const Decl *
