@@ -1051,15 +1051,16 @@ public:
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
 
-  /// If \p VD's layout is exposed by a @frozen struct, return said struct.
+  /// If \p VD's layout is exposed by a @frozen struct or class, return said
+  /// struct or class.
   ///
-  /// Stored instance properties in @frozen structs must always use
+  /// Stored instance properties in @frozen structs and classes must always use
   /// public/@usableFromInline types. In these cases, check the access against
   /// the struct instead of the VarDecl, and customize the diagnostics.
   static const ValueDecl *
   getFixedLayoutStructContext(const VarDecl *VD) {
     if (VD->isLayoutExposedToClients())
-      return dyn_cast<StructDecl>(VD->getDeclContext());
+      return dyn_cast<NominalTypeDecl>(VD->getDeclContext());
 
     return nullptr;
   }
