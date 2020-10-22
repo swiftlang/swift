@@ -3,6 +3,8 @@
 // RUN: %swift @%t-commonflags -module-name MyModule -emit-ir %s -o - | %FileCheck %s
 // RUN: %swift @%t-commonflags -module-name MyModule -emit-ir %s -o - -emit-dead-strippable-symbols | %FileCheck %s -check-prefix CHECK-DEADSTRIPPABLE
 
+// REQUIRES: OS=macosx
+
 public class MyClass {
 }
 
