@@ -17,7 +17,7 @@ if let realRoomName = roomName as! NSString { // expected-warning{{forced cast f
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // Ok (implicit conversion Float -> CGFloat)
+var dpi:CGFloat = d*pi // Ok (implicit conversion Double -> CGFloat)
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
 let _: CGFloat = floor(20.0) // Ok (Double -> CGFloat) conversion
@@ -182,18 +182,18 @@ func test_implicit_cgfloat_conversion() {
   let f: Float     = 0.0
   let cgf: CGFloat = 0.0
 
-  test_to(d) // Ok (Double -> CGFloat
+  test_to(d) // Ok (Double -> CGFloat)
   test_to(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'CGFloat'}}
   test_to(d + d) // Ok (Double -> CGFloat for both arguments)
   test_to(d + cgf) // Ok
-  test_to(d + cgf - d) // Ok
+  test_to(d + cgf - d) // expected-error {{ambiguous use of operator '+'}} (Both Double and CGFloat are equaly viable here)
   test_to(d + cgf - cgf) // Ok (only one choice here to conver `d` to CGFloat)
 
   test_from(cgf) // Ok (CGFloat -> Double)
   test_from(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'Double'}}
   test_from(cgf + cgf) // Ok (CGFloat -> Double for both arguments)
   test_from(d + cgf) // Ok
-  test_from(cgf + d - cgf) // Ok
+  test_from(cgf + d - cgf) // expected-error {{ambiguous use of operator '+'}} (Both Double and CGFloat are equaly viable here)
   test_from(cgf + d - d) // Ok (only one choice here to conver `cgf` to Double)
 
   func test_returns_double(_: CGFloat) -> Double {
@@ -211,4 +211,13 @@ func test_implicit_cgfloat_conversion() {
   let _: CGFloat = f // expected-error {{cannot convert value of type 'Float' to specified type 'CGFloat'}}
   let _: Double  = cgf // Ok
   let _: Float   = cgf // expected-error {{cannot convert value of type 'CGFloat' to specified type 'Float'}}
+
+  // Let's make sure that implicit conversion doesn't interfere with optionality
+  func test(a: CGFloat?) {
+    let b = a ?? 0 // Produces non-optional binding of CGFloat type
+    test_to(b) // Ok
+    test_from(b) // Ok
+
+    let c: Double = (a ?? 0) as CGFloat // Ok with implicit conversion
+  }
 }
