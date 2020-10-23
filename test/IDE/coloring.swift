@@ -559,3 +559,22 @@ struct FreeWhere<T> {
 // CHECK: @availability(<kw>macOS</kw> <float>10.11</float>, *)
 @availability(macOS 10.11, *)
 class HasMisspelledAttr {}
+
+// 'self' and 'Self' must be highlighted accordingly when allowed to act as
+// an identifier.
+// CHECK: <kw>precedencegroup</kw> Self
+precedencegroup Self {}
+
+// CHECK: <kw>struct</kw> SelfGenericParam<self>
+struct SelfGenericParam<self> {
+  // CHECK: <kw>func</kw> selfGenericParam<Self>(arg: <type>Self</type>)
+  func selfGenericParam<Self>(arg: Self) {}
+
+  enum Enum {
+    case z(Int, Int)
+  }
+  func test(arg: Enum) {
+    // CHECK: <kw>if</kw> <kw>case</kw> <kw>let</kw> .z(self, Self) = arg
+    if case let .z(self, Self) = arg { }
+  }
+}

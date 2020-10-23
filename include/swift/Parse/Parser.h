@@ -564,6 +564,7 @@ public:
   SourceLoc consumeIdentifier(Identifier *Result = nullptr,
                               bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+    Tok.setKind(tok::identifier);
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
 
