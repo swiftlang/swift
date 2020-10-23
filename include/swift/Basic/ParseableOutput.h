@@ -27,6 +27,15 @@ namespace swift {
 
 namespace parseable_output {
 
+/// Quasi-PIDs are _negative_ PID-like unique keys used to
+/// masquerade batch job constituents as (quasi)processes, when writing
+/// parseable output to consumers that don't understand the idea of a batch
+/// job. They are negative in order to avoid possibly colliding with real
+/// PIDs (which are always positive). We start at -1000 here as a crude but
+/// harmless hedge against colliding with an errno value that might slip
+/// into the stream of real PIDs (say, due to a TaskQueue bug).
+const int QUASI_PID_START = -1000;
+
 /// Emits a "began" message to the given stream, corresponding to a Driver Job.
 void emitBeganMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
                       sys::TaskProcessInformation ProcInfo);
@@ -34,8 +43,7 @@ void emitBeganMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
 /// Emits a "began" message to the given stream, corresponding to a given
 /// Frontend Compiler Invocation.
 void emitBeganMessage(raw_ostream &os, const CompilerInvocation &Invocation,
-                      ArrayRef<const char *> Args, int64_t Pid,
-                      sys::TaskProcessInformation ProcInfo);
+                      ArrayRef<const char *> Args, int64_t OSPid);
 
 /// Emits a "finished" message to the given stream.
 void emitFinishedMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
@@ -45,10 +53,9 @@ void emitFinishedMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
 /// Emits a "finished" message to the given stream corresponding to a given
 /// Frontend Compiler Invocation.
 void emitFinishedMessage(
-    raw_ostream &os, const CompilerInvocation &Invocation, int64_t Pid,
-    int ExitStatus,
+    raw_ostream &os, const CompilerInvocation &Invocation, int ExitStatus,
     const llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
-    sys::TaskProcessInformation ProcInfo);
+    int64_t OSPid);
 
 /// Emits a "signalled" message to the given stream.
 void emitSignalledMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,

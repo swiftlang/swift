@@ -420,11 +420,18 @@ void parseable_output::emitBeganMessage(raw_ostream &os, const driver::Job &Cmd,
 void parseable_output::emitBeganMessage(raw_ostream &os,
                                         const CompilerInvocation &Invocation,
                                         ArrayRef<const char *> Args,
-                                        int64_t Pid,
-                                        TaskProcessInformation ProcInfo) {
+                                        int64_t OSPid) {
   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-  IO.forEachPrimaryInput([&](const InputFile &Input) -> bool {
-    BeganInvocationMessage msg(Invocation, Input, Args, Pid, ProcInfo);
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                      unsigned idx) -> bool {
+    BeganInvocationMessage msg(Invocation, Input, Args, Pid - idx, ProcInfo);
     emitMessage(os, msg);
     return false;
   });
@@ -439,27 +446,33 @@ void parseable_output::emitFinishedMessage(raw_ostream &os,
 }
 
 void parseable_output::emitFinishedMessage(
-    raw_ostream &os, const CompilerInvocation &Invocation, int64_t Pid,
-    int ExitStatus,
+    raw_ostream &os, const CompilerInvocation &Invocation, int ExitStatus,
     const llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
-    TaskProcessInformation ProcInfo) {
+    int64_t OSPid) {
   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-  IO.forEachPrimaryInput([&](const InputFile &Input) -> bool {
-    assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-           "Expected diagnostic collection for input.");
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
 
-    // Join all diagnostics produced for this file into a single output.
-    auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-    const char* const Delim = "\n";
-    std::ostringstream JoinedDiags;
-    std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-              std::ostream_iterator<std::string>(JoinedDiags, Delim));
-    FinishedInvocationMessage msg(Invocation, Pid,
-                                  JoinedDiags.str(),
-                                  ExitStatus, ProcInfo);
-    emitMessage(os, msg);
-    return false;
-  });
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex(
+      [&](const InputFile &Input, unsigned idx) -> bool {
+        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+               "Expected diagnostic collection for input.");
+
+        // Join all diagnostics produced for this file into a single output.
+        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+        const char *const Delim = "\n";
+        std::ostringstream JoinedDiags;
+        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
+        FinishedInvocationMessage msg(Invocation, Pid - idx, JoinedDiags.str(),
+                                      ExitStatus, ProcInfo);
+        emitMessage(os, msg);
+        return false;
+      });
 }
 
 void parseable_output::emitSignalledMessage(

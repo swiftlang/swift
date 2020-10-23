@@ -204,7 +204,7 @@ namespace driver {
     /// PIDs (which are always positive). We start at -1000 here as a crude but
     /// harmless hedge against colliding with an errno value that might slip
     /// into the stream of real PIDs (say, due to a TaskQueue bug).
-    int64_t NextBatchQuasiPID = -1000;
+    int64_t NextBatchQuasiPID = parseable_output::QUASI_PID_START;
 
     /// All jobs which have finished execution or which have been determined
     /// that they don't need to run.

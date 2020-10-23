@@ -2073,9 +2073,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    parseable_output::emitBeganMessage(
-        llvm::errs(), Invocation, Args, llvm::sys::ProcessInfo::InvalidPid,
-        sys::TaskProcessInformation(getpid()));
+    parseable_output::emitBeganMessage(llvm::errs(), Invocation, Args,
+                                       getpid());
   }
 
   int ReturnValue = 0;
@@ -2097,9 +2096,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     StatsReporter->noteCurrentProcessExitStatus(r);
 
   if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    parseable_output::emitFinishedMessage(
-        llvm::errs(), Invocation, llvm::sys::ProcessInfo::InvalidPid, r,
-        FileSpecificDiagnostics, sys::TaskProcessInformation(getpid()));
+    parseable_output::emitFinishedMessage(llvm::errs(), Invocation, r,
+                                          FileSpecificDiagnostics, getpid());
   }
 
   return r;
