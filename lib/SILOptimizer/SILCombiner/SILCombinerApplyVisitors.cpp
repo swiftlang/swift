@@ -1222,6 +1222,17 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   ProtocolConformanceRef SelfConformance =
       SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
 
+  // The optimizer (generic specializer) has problems when we generate a
+  //   %wm = witness_method $ConreteClass, #NonClassProtocol.method
+  //         apply<NonClassProtocol>%wm(...)
+  // because the implementation of that witness method can contain loads of
+  // Self.
+  // When we specialize (because now we know the underlying method) we run into
+  // invalid SIL: load %self_arg : $*NonClassProtocol.
+  if (SelfCEI.ConcreteType && SelfCEI.ConcreteType.isAnyClassReferenceType() &&
+      WMI->getLookupType() && WMI->getLookupType().isAnyClassReferenceType()) {
+    return nullptr;
+  }
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction. It's ok to rewrite the witness method in terms
   // of a concrete type without rewriting the apply itself. In fact, doing so
