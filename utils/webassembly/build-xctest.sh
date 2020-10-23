@@ -15,7 +15,7 @@ cmake -G Ninja \
   -DWASI_SDK_PATH="$SOURCE_PATH/wasi-sdk" \
   -DBUILD_SHARED_LIBS=OFF \
   -DCMAKE_Swift_COMPILER_FORCED=ON \
-  -DSWIFT_FOUNDATION_PATH=$DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32 \
+  -DSWIFT_FOUNDATION_PATH=$DESTINATION_TOOLCHAIN/usr/lib/swift_static/wasi/wasm32 \
   "${SOURCE_PATH}/swift-corelibs-xctest"
   
 ninja -v

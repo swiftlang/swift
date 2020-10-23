@@ -20,7 +20,3 @@ cmake -G Ninja \
   
 ninja -v
 ninja -v install
-
-# .swiftdoc and .swiftmodule files should live in `swift`, not in `swift_static`
-mv $DESTINATION_TOOLCHAIN/usr/lib/swift_static/wasi/wasm32/Foundation.swift* \
-  $DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32
