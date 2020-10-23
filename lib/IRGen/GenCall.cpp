@@ -1747,6 +1747,8 @@ llvm::Value *irgen::getDynamicAsyncContextSize(IRGenFunction &IGF,
                                                AsyncContextLayout layout,
                                                CanSILFunctionType functionType,
                                                llvm::Value *thickContext) {
+  // TODO: This calculation should be extracted out into a standalone function
+  //       emitted on-demand per-module to improve codesize.
   switch (functionType->getRepresentation()) {
   case SILFunctionTypeRepresentation::Thick: {
     // If the called function is thick, the size of the called function's
