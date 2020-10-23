@@ -1733,12 +1733,12 @@ void IRGenFunction::emit##ID(llvm::Value *value, Address src) {       \
 #undef DEFINE_STORE_WEAK_OP
 #undef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
-llvm::Value *IRGenFunction::getLocalSelfMetadata() {
-  assert(LocalSelf && "no local self metadata");
+llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
+  assert(SelfValue && "no local self metadata");
 
   // If we already have a metatype, just return it.
   if (SelfKind == SwiftMetatype)
-    return LocalSelf;
+    return SelfValue;
 
   // We need to materialize a metatype. Emit the code for that once at the
   // top of the function and cache the result.
@@ -1754,9 +1754,9 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   // with the correct value.
 
   llvm::IRBuilderBase::InsertPointGuard guard(Builder);
-  auto insertPt = isa<llvm::Instruction>(LocalSelf)
+  auto insertPt = isa<llvm::Instruction>(SelfValue)
                       ? std::next(llvm::BasicBlock::iterator(
-                            cast<llvm::Instruction>(LocalSelf)))
+                            cast<llvm::Instruction>(SelfValue)))
                       : CurFn->getEntryBlock().begin();
   Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
 
@@ -1764,19 +1764,19 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case SwiftMetatype:
     llvm_unreachable("Already handled");
   case ObjCMetatype:
-    LocalSelf = emitObjCMetadataRefForMetadata(*this, LocalSelf);
+    SelfValue = emitObjCMetadataRefForMetadata(*this, SelfValue);
     SelfKind = SwiftMetatype;
     break;
   case ObjectReference:
-    LocalSelf = emitDynamicTypeOfHeapObject(*this, LocalSelf,
+    SelfValue = emitDynamicTypeOfHeapObject(*this, SelfValue,
                                 MetatypeRepresentation::Thick,
-                                SILType::getPrimitiveObjectType(LocalSelfType),
+                                SILType::getPrimitiveObjectType(SelfType),
                                 /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
   }
 
-  return LocalSelf;
+  return SelfValue;
 }
 
 /// Given a non-tagged object pointer, load a pointer to its class object.

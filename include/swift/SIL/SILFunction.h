@@ -587,15 +587,18 @@ public:
     return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
-  /// Returns true if this function either has a self metadata argument or
-  /// object that Self metadata may be derived from.
+  /// Returns true if this function ie either a class method, or a
+  /// closure that captures the 'self' value or its metatype.
+  ///
+  /// If this returns true, DynamicSelfType can be used in the body
+  /// of the function.
   ///
   /// Note that this is not the same as hasSelfParam().
   ///
-  /// For closures that capture DynamicSelfType, hasSelfMetadataParam()
+  /// For closures that capture DynamicSelfType, hasDynamicSelfMetadata()
   /// is true and hasSelfParam() is false. For methods on value types,
-  /// hasSelfParam() is true and hasSelfMetadataParam() is false.
-  bool hasSelfMetadataParam() const;
+  /// hasSelfParam() is true and hasDynamicSelfMetadata() is false.
+  bool hasDynamicSelfMetadata() const;
 
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
@@ -1084,8 +1087,8 @@ public:
     return getArguments().back();
   }
 
-  const SILArgument *getSelfMetadataArgument() const {
-    assert(hasSelfMetadataParam() && "This method can only be called if the "
+  const SILArgument *getDynamicSelfMetadata() const {
+    assert(hasDynamicSelfMetadata() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
     return getArguments().back();
   }
