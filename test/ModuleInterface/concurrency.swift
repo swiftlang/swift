@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -DLIBRARY -module-name Library %s
 
+// REQUIRES: concurrency
+
 #if LIBRARY
 public func fn() async {
   fatalError()

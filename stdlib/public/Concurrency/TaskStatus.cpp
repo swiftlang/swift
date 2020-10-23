@@ -1,4 +1,4 @@
-//===--- Metadata.cpp - Swift Language ABI Metadata Support ---------------===//
+//===--- TaskStatus.cpp - Asynchronous task status tracking ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Routines for cancelling tasks.
+// Routines for maintaining and interacting with the current state of a
+// task, including tracking child tasks, deadlines, and cancellation.
 //
 //===----------------------------------------------------------------------===//
 

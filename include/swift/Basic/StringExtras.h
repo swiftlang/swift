@@ -442,6 +442,8 @@ public:
 ///
 /// \param allPropertyNames The set of property names in the enclosing context.
 ///
+/// \param isAsync Whether this is a function imported as 'async'.
+///
 /// \param scratch Scratch space that will be used for modifications beyond
 /// just chopping names.
 ///
@@ -455,6 +457,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool returnsSelf,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
+                       bool isAsync,
                        StringScratchSpace &scratch);
 
 } // end namespace swift

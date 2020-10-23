@@ -21,6 +21,50 @@
 
 namespace swift {
 
+struct AsyncTaskAndContext {
+  AsyncTask *Task;
+  AsyncContext *InitialContext;
+};
+
+/// Create a task object with no future which will run the given
+/// function.
+///
+/// The task is not yet scheduled.
+///
+/// If a parent task is provided, flags.task_hasChildFragment() must
+/// be true, and this must be called synchronously with the parent.
+/// The parent is responsible for creating a ChildTaskStatusRecord.
+/// TODO: should we have a single runtime function for creating a task
+/// and doing this child task status record management?
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create(JobFlags flags,
+                                      AsyncTask *parent,
+                                const AsyncFunctionPointer<void()> *function);
+
+/// Create a task object with no future which will run the given
+/// function.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_f(JobFlags flags,
+                                        AsyncTask *parent,
+                                        AsyncFunctionType<void()> *function,
+                                        size_t initialContextSize);
+
+/// Allocate memory in a task.
+///
+/// This must be called synchronously with the task.
+///
+/// All allocations will be rounded to a multiple of MAX_ALIGNMENT.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_task_alloc(AsyncTask *task, size_t size);
+
+/// Deallocate memory in a task.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_dealloc(AsyncTask *task, void *ptr);
+
 /// Cancel a task and all of its child tasks.
 ///
 /// This can be called from any thread.

@@ -17,6 +17,7 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
+#include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
@@ -32,7 +33,21 @@ class TaskStatusRecord;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
 /// object; it may have other bits set.
-using ExecutorRef = Executor *;
+struct ExecutorRef {
+  Executor *Pointer;
+
+  /// Get an executor ref that represents a lack of preference about
+  /// where execution resumes.  This is only valid in continuations,
+  /// return contexts, and so on; it is not generally passed to
+  /// executing functions.
+  static ExecutorRef noPreference() {
+    return { nullptr };
+  }
+
+  bool operator==(ExecutorRef other) const {
+    return Pointer == other.Pointer;
+  }
+};
 
 using JobInvokeFunction =
   SWIFT_CC(swift)
@@ -41,6 +56,33 @@ using JobInvokeFunction =
 using TaskContinuationFunction =
   SWIFT_CC(swift)
   void (AsyncTask *, ExecutorRef, AsyncContext *);
+
+template <class Fn>
+struct AsyncFunctionTypeImpl;
+template <class Result, class... Params>
+struct AsyncFunctionTypeImpl<Result(Params...)> {
+  // TODO: expand and include the arguments in the parameters.
+  using type = TaskContinuationFunction;
+};
+
+template <class Fn>
+using AsyncFunctionType = typename AsyncFunctionTypeImpl<Fn>::type;
+
+/// A "function pointer" for an async function.
+///
+/// Eventually, this will always be signed with the data key
+/// using a type-specific discriminator.
+template <class FnType>
+class AsyncFunctionPointer {
+public:
+  /// The function to run.
+  RelativeDirectPointer<AsyncFunctionType<FnType>,
+                        /*nullable*/ false,
+                        int32_t> Function;
+
+  /// The expected size of the context.
+  uint32_t ExpectedContextSize;
+};
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job {
@@ -76,7 +118,7 @@ public:
   }
 
   /// Run this job.
-  void run(Executor *currentExecutor);
+  void run(ExecutorRef currentExecutor);
 };
 
 // The compiler will eventually assume these.
@@ -128,7 +170,7 @@ public:
 /// An asynchronous task.  Tasks are the analogue of threads for
 /// asynchronous functions: that is, they are a persistent identity
 /// for the overall async computation.
-class AsyncTask : public Job {
+class AsyncTask : public HeapObject, public Job {
 public:
   /// The context for resuming the job.  When a task is scheduled
   /// as a job, the next continuation should be installed as the
@@ -146,9 +188,10 @@ public:
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 
-  AsyncTask(JobFlags flags, TaskContinuationFunction *run,
+  AsyncTask(const HeapMetadata *metadata, JobFlags flags,
+            TaskContinuationFunction *run,
             AsyncContext *initialContext)
-    : Job(flags, run),
+    : HeapObject(metadata), Job(flags, run),
       ResumeContext(initialContext),
       Status(ActiveTaskStatus()) {
     assert(flags.isAsyncTask());
@@ -164,12 +207,6 @@ public:
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
 
-  bool isHeapObject() const { return Flags.task_isHeapObject(); }
-  HeapObject *heapObjectHeader() {
-    assert(isHeapObject());
-    return reinterpret_cast<HeapObject*>(this) - 1;
-  }
-
   /// A fragment of an async task structure that happens to be a child task.
   class ChildFragment {
     /// The parent task of this task.
@@ -182,6 +219,8 @@ public:
     AsyncTask *NextChild = nullptr;
 
   public:
+    ChildFragment(AsyncTask *parent) : Parent(parent) {}
+
     AsyncTask *getParent() const {
       return Parent;
     }
@@ -190,6 +229,8 @@ public:
       return NextChild;
     }
   };
+
+  bool isFuture() const { return Flags.task_isFuture(); }
 
   bool hasChildFragment() const { return Flags.task_isChildTask(); }
   ChildFragment *childFragment() {
@@ -205,7 +246,7 @@ public:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == 10 * sizeof(void*),
+static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
@@ -237,6 +278,9 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
+  /// The executor that the parent needs to be resumed on.
+  ExecutorRef ResumeParentExecutor;
+
   /// Flags describing this context.
   ///
   /// Note that this field is only 32 bits; any alignment padding
@@ -245,29 +289,42 @@ public:
   /// is of course interrupted by the YieldToParent field.
   AsyncContextFlags Flags;
 
-  // Fields following this point may not be valid in all instances
-  // of AsyncContext.
-
-  /// The function to call to temporarily resume running in the
-  /// parent context temporarily.  Generally this means a semantic
-  /// yield.  Requires Flags.hasYieldFunction().
-  TaskContinuationFunction * __ptrauth_swift_async_context_yield
-    YieldToParent;
-
   AsyncContext(AsyncContextFlags flags,
                TaskContinuationFunction *resumeParent,
+               ExecutorRef resumeParentExecutor,
                AsyncContext *parent)
-    : Parent(parent), ResumeParent(resumeParent), Flags(flags) {}
-
-  AsyncContext(AsyncContextFlags flags,
-               TaskContinuationFunction *resumeParent,
-               TaskContinuationFunction *yieldToParent,
-               AsyncContext *parent)
-    : Parent(parent), ResumeParent(resumeParent), Flags(flags),
-      YieldToParent(yieldToParent) {}
+    : Parent(parent), ResumeParent(resumeParent),
+      ResumeParentExecutor(resumeParentExecutor),
+      Flags(flags) {}
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
+};
+
+/// An async context that supports yielding.
+class YieldingAsyncContext : public AsyncContext {
+public:
+  /// The function to call to temporarily resume running in the
+  /// parent context.  Generally this means a semantic yield.
+  TaskContinuationFunction * __ptrauth_swift_async_context_yield
+    YieldToParent;
+
+  /// The executor that the parent context needs to be yielded to on.
+  ExecutorRef YieldToParentExecutor;
+
+  YieldingAsyncContext(AsyncContextFlags flags,
+                       TaskContinuationFunction *resumeParent,
+                       ExecutorRef resumeParentExecutor,
+                       TaskContinuationFunction *yieldToParent,
+                       ExecutorRef yieldToParentExecutor,
+                       AsyncContext *parent)
+    : AsyncContext(flags, resumeParent, resumeParentExecutor, parent),
+      YieldToParent(yieldToParent),
+      YieldToParentExecutor(yieldToParentExecutor) {}
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::Yielding;
+  }
 };
 
 } // end namespace swift

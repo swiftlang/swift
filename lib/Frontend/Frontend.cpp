@@ -707,6 +707,10 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+bool CompilerInvocation::shouldImportSwiftConcurrency() const {
+  return getLangOptions().EnableExperimentalConcurrency;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -756,6 +760,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
 
   if (Invocation.shouldImportSwiftONoneSupport()) {
     pushImport(SWIFT_ONONE_SUPPORT);
+  }
+
+  if (Invocation.shouldImportSwiftConcurrency()) {
+    pushImport(SWIFT_CONCURRENCY_NAME);
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;

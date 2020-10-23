@@ -1220,6 +1220,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               bool returnsSelf,
                               bool isProperty,
                               const InheritedNameSet *allPropertyNames,
+                              bool isAsync,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
@@ -1287,10 +1288,27 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
   }
 
+  // If the base name of a method imported as "async" starts with the word
+  // "get", drop the "get".
+  if (isAsync && camel_case::getFirstWord(baseName) == "get" &&
+      baseName.size() > 3) {
+    baseName = baseName.substr(3);
+    anyChanges = true;
+  }
+
   // If needed, split the base name.
   if (!argNames.empty() &&
       splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
+
+  // For a method imported as "async", drop the "Asynchronously" suffix from
+  // the base name. It is redundant with 'async'.
+  const StringRef asynchronously = "Asynchronously";
+  if (isAsync && camel_case::getLastWord(baseName) == asynchronously &&
+      baseName.size() > asynchronously.size()) {
+    baseName = baseName.drop_back(asynchronously.size());
+    anyChanges = true;
+  }
 
   // Omit needless words based on parameter types.
   for (unsigned i = 0, n = argNames.size(); i != n; ++i) {

@@ -27,13 +27,9 @@ using InvokeFunctionRef =
 using BodyFunctionRef =
   llvm::function_ref<void(AsyncTask *task)>;
 
-template <class Storage> struct ValueContext : AsyncContext, Storage {
+template <class Storage> struct ValueContext : AsyncContext {
+  Storage Value;
   InvokeFunctionRef<Storage> StoredInvokeFn;
-  ValueContext(JobFlags flags, InvokeFunctionRef<Storage> invokeFn,
-               Storage &&value)
-    : AsyncContext(AsyncContextKind::Ordinary, nullptr, nullptr),
-      Storage(std::forward<Storage>(value)),
-      StoredInvokeFn(invokeFn) {}
 };
 
 // Disable template argument deduction.
@@ -47,16 +43,33 @@ static void simpleTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
                                      AsyncContext *context) {
   auto valueContext = static_cast<ValueContext<T>*>(context);
   valueContext->StoredInvokeFn(task, executor, valueContext);
+
+  // Destroy the stored value.
+  valueContext->Value.T::~T();
+
+  // Return to finish off the task.
+  // In a normal situation we'd need to free the context, but here
+  // we know we're at the top level.
+  valueContext->ResumeParent(task, executor, valueContext->Parent);
 }
 
 template <class T>
 static void withSimpleTask(JobFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
-  TaskContinuationFunction *invokeFP = &simpleTaskInvokeFunction<T>;
-  ValueContext<T> initialContext(flags, invokeFn, std::forward<T>(value));
-  AsyncTask task(flags, invokeFP, &initialContext);
-  body(&task);
+  auto taskAndContext =
+    swift_task_create_f(flags, /*parent*/ nullptr,
+                        &simpleTaskInvokeFunction<T>,
+                        sizeof(ValueContext<T>));
+
+  auto valueContext =
+    static_cast<ValueContext<T>*>(taskAndContext.InitialContext);
+  new (&valueContext->Value) T(std::forward<T>(value));
+  valueContext->StoredInvokeFn = invokeFn;
+
+  // Forward our owning reference to the task into its execution,
+  // causing it to be destroyed when it completes.
+  body(taskAndContext.Task);
 }
 
 template <class T>
@@ -67,7 +80,7 @@ static void withSimpleTask(T &&value,
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {
-  return reinterpret_cast<ExecutorRef>(value);
+  return {reinterpret_cast<Executor*>(value)};
 }
 
 } // end anonymous namespace
@@ -83,28 +96,30 @@ TEST(TaskStatusTest, basicTasks) {
         ValueContext<Storage> *context) {
     // The task passed in should be the task we created.
     EXPECT_EQ(createdTask, task);
+
+    // The executor passed in should be the executor we created.
     EXPECT_EQ(createdExecutor, executor);
 
-    if (hasRun) {
-      EXPECT_EQ(94, context->value);
-    } else {
-      EXPECT_EQ(47, context->value);
-      context->value *= 2;
-    }
+    // We shouldn't have run yet.
+    EXPECT_FALSE(hasRun);
+
+    // The context should've been initialized correctly.
+    // (This is really just testing our harness, not the runtime.)
+    EXPECT_EQ(47, context->Value.value);
 
     hasRun = true;
-
   }, [&](AsyncTask *task) {
     createdTask = task;
 
     EXPECT_FALSE(hasRun);
     createdTask->run(createdExecutor);
     EXPECT_TRUE(hasRun);
-    createdTask->run(createdExecutor);
-    EXPECT_TRUE(hasRun);
+
+    createdTask = nullptr;
   });
 
   EXPECT_TRUE(hasRun);
+  EXPECT_EQ(nullptr, createdTask);
 }
 
 TEST(TaskStatusTest, cancellation_simple) {

@@ -4,6 +4,7 @@
 // RUN: %FileCheck -input-file %t/ObjCConcurrency.printed.txt %s
 
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject {
 // CHECK-DAG:     func doSomethingSlow(_ operation: String, completionHandler handler: @escaping (Int) -> Void)

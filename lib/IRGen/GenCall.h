@@ -72,8 +72,6 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
   //   SwiftError *errorResult;
   //   IndirectResultTypes *indirectResults...;
-  //   SelfType self?;
-  //   ArgTypes formalArguments...;
   //   union {
   //     struct {
   //       SwiftPartialFunction * __ptrauth(...) resumeFromYield?;
@@ -83,6 +81,8 @@ namespace irgen {
   //     };
   //     ResultTypes directResults...;
   //   };
+  //   ArgTypes formalArguments...;
+  //   SelfType self?;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -115,38 +115,44 @@ namespace irgen {
     unsigned getFirstIndirectReturnIndex() {
       return getErrorIndex() + getErrorCount();
     }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
+    unsigned getIndexAfterIndirectReturns() {
       return getFirstIndirectReturnIndex() + getIndirectReturnCount();
     }
-    unsigned getIndexAfterLocalContext() {
-      return getFirstIndirectReturnIndex() + getIndirectReturnCount() +
-             (hasLocalContext() ? 1 : 0);
+    unsigned getFirstDirectReturnIndex() {
+      return getIndexAfterIndirectReturns();
     }
-    unsigned getBindingsIndex() {
-      assert(hasBindings());
-      return getIndexAfterLocalContext();
+    unsigned getIndexAfterDirectReturns() {
+      return getFirstDirectReturnIndex() + getDirectReturnCount();
     }
-    unsigned getIndexAfterBindings() {
-      return getIndexAfterLocalContext() + (hasBindings() ? 1 : 0);
-    }
-    unsigned getFirstArgumentIndex() { return getIndexAfterBindings(); }
+    unsigned getFirstArgumentIndex() { return getIndexAfterDirectReturns(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
+    unsigned getBindingsIndex() {
+      assert(hasBindings());
+      return getIndexAfterArguments();
+    }
+    unsigned getIndexAfterBindings() {
+      return getIndexAfterArguments() + (hasBindings() ? 1 : 0);
+    }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getIndexAfterBindings();
+    }
+    unsigned getIndexAfterLocalContext() {
+      return getIndexAfterBindings() +
+             (hasLocalContext() ? 1 : 0);
+    }
     unsigned getSelfMetadataIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterArguments();
+      return getIndexAfterLocalContext();
     }
     unsigned getSelfWitnessTableIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterArguments() + 1;
+      return getIndexAfterLocalContext() + 1;
     }
     unsigned getIndexAfterTrailingWitnesses() {
-      return getIndexAfterArguments() + (hasTrailingWitnesses() ? 2 : 0);
-    }
-    unsigned getFirstDirectReturnIndex() {
-      return getIndexAfterTrailingWitnesses();
+      return getIndexAfterLocalContext() + (hasTrailingWitnesses() ? 2 : 0);
     }
 
   public:
@@ -164,10 +170,6 @@ namespace irgen {
     ElementLayout getLocalContextLayout() {
       assert(hasLocalContext());
       return getElement(getLocalContextIndex());
-    }
-    ParameterConvention getLocalContextConvention() {
-      assert(hasLocalContext());
-      return localContextInfo->convention;
     }
     SILType getLocalContextType() {
       assert(hasLocalContext());
@@ -222,6 +224,10 @@ namespace irgen {
         Optional<ArgumentInfo> localContextInfo);
   };
 
+  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
+                                          AsyncContextLayout layout,
+                                          CanSILFunctionType functionType,
+                                          llvm::Value *thickContext);
   AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
                                            SILFunction *function);
 
@@ -312,6 +318,16 @@ namespace irgen {
   Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
+  /// Allocate task local storage for the specified layout but using the
+  /// provided dynamic size.  Allowing the size to be specified dynamically is
+  /// necessary for applies of thick functions the sizes of whose async contexts
+  /// are dependent on the underlying, already partially applied, called
+  /// function.  The provided sizeLowerBound will be used to track the lifetime
+  /// of the allocation that is known statically.
+  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
+                                                 AsyncContextLayout layout,
+                                                 llvm::Value *sizeValue,
+                                                 Size sizeLowerBound);
   std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
                                                  AsyncContextLayout layout);
   void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);

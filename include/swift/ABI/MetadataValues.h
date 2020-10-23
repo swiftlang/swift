@@ -1914,9 +1914,8 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsHeapObject = 24,
-    Task_IsChildTask  = 25,
-    Task_IsFuture     = 26
+    Task_IsChildTask  = 24,
+    Task_IsFuture     = 25
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -1933,9 +1932,6 @@ public:
     return getKind() == JobKind::Task;
   }
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsHeapObject,
-                                task_isHeapObject,
-                                task_setIsHeapObject)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 task_isChildTask,
                                 task_setIsChildTask)
@@ -2034,8 +2030,8 @@ public:
   /// allocated as part of the caller's context, or if the callee will
   /// be called multiple times.
   FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
-                                shouldNotDeallocateInCaller,
-                                setShouldNotDeallocateInCaller)
+                                shouldNotDeallocateInCallee,
+                                setShouldNotDeallocateInCallee)
 };
 
 } // end namespace swift

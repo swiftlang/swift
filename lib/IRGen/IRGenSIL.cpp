@@ -1236,11 +1236,15 @@ class AsyncNativeCCEntryPointArgumentEmission final
   const Address dataAddr;
   unsigned polymorphicParameterIndex = 0;
 
-  llvm::Value *loadValue(ElementLayout layout) {
+  Explosion loadExplosion(ElementLayout layout) {
     Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     Explosion explosion;
     ti.loadAsTake(IGF, addr, explosion);
+    return explosion;
+  }
+  llvm::Value *loadValue(ElementLayout layout) {
+    auto explosion = loadExplosion(layout);
     return explosion.claimNext();
   }
 
@@ -1263,12 +1267,9 @@ public:
   }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
     assert(size > 0);
-    Explosion result;
-    for (unsigned i = index, end = index + size; i < end; ++i) {
-      auto argumentLayout = layout.getArgumentLayout(i);
-      auto *value = loadValue(argumentLayout);
-      result.add(value);
-    }
+    auto argumentLayout = layout.getArgumentLayout(index);
+    auto result = loadExplosion(argumentLayout);
+    assert(result.size() == size);
     return result;
   }
   bool requiresIndirectResult(SILType retType) override { return false; }
@@ -1330,7 +1331,8 @@ public:
     return loadValue(fieldLayout);
   }
   llvm::Value *getCoroutineBuffer() override {
-    llvm_unreachable("unimplemented");
+    llvm_unreachable(
+        "async functions do not use a fixed size coroutine buffer");
   }
 };
 
@@ -2957,7 +2959,6 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
 }
 
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
-  // TODO: Handle async!
   SILValue v(i);
 
   if (isSimplePartialApply(*this, i)) {
@@ -3005,6 +3006,19 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs;
+
+  if (i->getOrigCalleeType()->isAsync()) {
+    auto result = getPartialApplicationFunction(*this, i->getCallee(),
+                                                i->getSubstitutionMap(),
+                                                i->getSubstCalleeType());
+    llvm::Value *innerContext = std::get<1>(result);
+    auto layout =
+        getAsyncContextLayout(*this, i->getOrigCalleeType(),
+                              i->getSubstCalleeType(), i->getSubstitutionMap());
+    auto size = getDynamicAsyncContextSize(
+        *this, layout, i->getOrigCalleeType(), innerContext);
+    llArgs.add(size);
+  }
 
   // Lower the parameters in the callee's generic context.
   {

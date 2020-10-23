@@ -1696,8 +1696,8 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    TypeChecker::diagnoseInlinableDeclRef(
-        fromCtor->getLoc(), ctor,
+    diagnoseDeclAvailability(
+        ctor, fromCtor->getLoc(),
         ExportContext::forFunctionBody(fromCtor));
   }
 

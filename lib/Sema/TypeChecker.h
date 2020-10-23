@@ -947,10 +947,9 @@ DeclName getObjectLiteralConstructorName(ASTContext &ctx,
 /// we're parsing the standard library.
 ModuleDecl *getStdlibModule(const DeclContext *dc);
 
-/// \name Resilience diagnostics
-bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D, ExportContext where);
-
 Expr *buildDefaultInitializer(Type type);
+
+/// \name Resilience diagnostics
 
 bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
                                     ExportContext where);

@@ -1,0 +1,105 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+class C {
+  deinit
+  init()
+}
+
+sil hidden [exact_self_class] @S_allocating_init : $@convention(method) (@thick C.Type) -> @owned C {
+bb0(%0 : $@thick C.Type):
+  %1 = alloc_ref $C
+  %2 = function_ref @$S_init : $@convention(method) (@owned C) -> @owned C
+  %3 = apply %2(%1) : $@convention(method) (@owned C) -> @owned C
+  return %3 : $C
+}
+
+sil hidden @$S_init : $@convention(method) (@owned C) -> @owned C {
+bb0(%0 : $C):
+  return %0 : $C
+}
+
+sil hidden @$S_deinit : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject {
+bb0(%0 : $C):
+  %2 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+sil hidden @S_deallocating_deinit : $@convention(method) (@owned C) -> () {
+bb0(%0 : $C):
+  %2 = function_ref @$S_deinit : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $C
+  dealloc_ref %4 : $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil_vtable C {
+  #C.init!allocator: (C.Type) -> () -> C : @S_allocating_init
+  #C.deinit!deallocator: @S_deallocating_deinit
+}
+
+
+struct S { var x: C, y: C }
+
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @structClassInstanceClassInstanceAndInt64ToInt64(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$s019structClassInstancebc10AndInt64ToE0TA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+sil @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64 {
+entry(%in : $Int64, %s : $S):
+  %s_addr = alloc_stack $S
+  store %s to %s_addr : $*S
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printGeneric_result = apply %printGeneric<S>(%s_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () //CHECK: S(x: main.C, y: main.C)
+  dealloc_stack %s_addr : $*S
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_result = apply %printInt64(%in) : $@convention(thin) (Int64) -> () // CHECK: 9999
+  return %in : $Int64
+}
+
+sil @partial_apply_guaranteed_class_pair_param : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64 {
+bb0(%x : $S):
+  %f = function_ref @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
+  %p = partial_apply %f(%x) : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
+  return %p : $@async @callee_owned (Int64) -> Int64
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %s_type = metatype $@thick C.Type
+  %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick C.Type) -> @owned C
+  %instance1 = apply %allocating_init(%s_type) : $@convention(method) (@thick C.Type) -> @owned C
+  %instance2 = apply %allocating_init(%s_type) : $@convention(method) (@thick C.Type) -> @owned C
+  strong_retain %instance1 : $C
+  strong_retain %instance2 : $C
+  %instance = struct $S (%instance1 : $C, %instance2 : $C)
+
+  %partial_apply_guaranteed_class_pair_param = function_ref @partial_apply_guaranteed_class_pair_param : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
+  %partiallyApplied = apply %partial_apply_guaranteed_class_pair_param(%instance) : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
+  %int_literal = integer_literal $Builtin.Int64, 9999
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %result = apply %partiallyApplied(%int) : $@async @callee_owned (Int64) -> Int64
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 9999
+
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}

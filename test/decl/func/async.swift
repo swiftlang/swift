@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 // Redeclaration checking
 func redecl1() async { } // expected-note{{previously declared here}}
 func redecl1() async throws { } // expected-error{{invalid redeclaration of 'redecl1()'}}

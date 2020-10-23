@@ -5061,12 +5061,12 @@ ERROR(local_type_in_inlinable_function,
       (Identifier, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
       (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
