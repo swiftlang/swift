@@ -464,7 +464,7 @@ void parseable_output::emitFinishedMessage(
 
         // Join all diagnostics produced for this file into a single output.
         auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-        const char *const Delim = "\n";
+        const char *const Delim = "";
         std::ostringstream JoinedDiags;
         std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
                   std::ostream_iterator<std::string>(JoinedDiags, Delim));
