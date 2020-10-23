@@ -9252,7 +9252,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
 bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
-    const FunctionType *argFnType, unsigned numOptionalUnwraps,
+    FunctionType *argFnType, unsigned numOptionalUnwraps,
     ConstraintLocatorBuilder locator) {
   // Don't attempt to filter overloads when solving for code completion
   // because presence of code completion token means that any call
@@ -9352,6 +9352,10 @@ retry_after_fail:
           return true;
         }
 
+        // If types lined up exactly, let's favor this overload choice.
+        if (Type(argFnType)->isEqual(choiceType))
+          constraint->setFavored();
+
         // Account for any optional unwrapping/binding
         for (unsigned i : range(numOptionalUnwraps)) {
           (void)i;
@@ -9439,8 +9443,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
 }
 
 bool ConstraintSystem::simplifyAppliedOverloads(
-    Type fnType, const FunctionType *argFnType,
-    ConstraintLocatorBuilder locator) {
+    Type fnType, FunctionType *argFnType, ConstraintLocatorBuilder locator) {
   // If we've already bound the function type, bail.
   auto *fnTypeVar = fnType->getAs<TypeVariableType>();
   if (!fnTypeVar || getFixedType(fnTypeVar))

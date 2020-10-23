@@ -4004,7 +4004,7 @@ private:
   /// \returns \c true if an error was encountered, \c false otherwise.
   bool simplifyAppliedOverloadsImpl(Constraint *disjunction,
                                     TypeVariableType *fnTypeVar,
-                                    const FunctionType *argFnType,
+                                    FunctionType *argFnType,
                                     unsigned numOptionalUnwraps,
                                     ConstraintLocatorBuilder locator);
 
@@ -4029,7 +4029,7 @@ public:
   /// call.
   ///
   /// \returns \c true if an error was encountered, \c false otherwise.
-  bool simplifyAppliedOverloads(Type fnType, const FunctionType *argFnType,
+  bool simplifyAppliedOverloads(Type fnType, FunctionType *argFnType,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
