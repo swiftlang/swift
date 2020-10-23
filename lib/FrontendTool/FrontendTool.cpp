@@ -1915,6 +1915,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();
+
+  // In parseable output, avoid printing diagnostics
   Instance->addDiagnosticConsumer(&PDC);
 
   struct FinishDiagProcessingCheckRAII {
@@ -2022,6 +2024,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
         Invocation.getFrontendOptions().InputsAndOutputs,
         FileSpecificDiagnostics);
     Instance->addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
+
+    // If we got this far, we need to suppress the output of the
+    // PrintingDiagnosticConsumer to ensure that only the parseable-output
+    // is emitted
+    PDC.setSuppressOutput(true);
   }
 
   // Because the serialized diagnostics consumer is initialized here,
