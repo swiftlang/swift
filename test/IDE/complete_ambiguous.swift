@@ -1,6 +1,11 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SIMPLE | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SIMPLE_EXTRAARG | %FileCheck %s --check-prefix=SIMPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SIMPLE_MEMBERS | %FileCheck %s --check-prefix=SIMPLE
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SKIP_DUPLICATES > %t
+// RUN: %FileCheck %s --input-file %t --check-prefixes=SKIP_DUPLICATES,SKIP_DUPLICATES_PROPERTY
+// RUN: %FileCheck %s --input-file %t --check-prefixes=SKIP_DUPLICATES,SKIP_DUPLICATES_METHOD
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SKIP_COMPOUND_DUPLICATES | %FileCheck %s --check-prefix=SKIP_COMPOUND_DUPLICATES
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=SKIP_CALLASFUNCTION_DUPLICATES | %FileCheck %s --check-prefix=SKIP_CALLASFUNCTION_DUPLICATES
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
@@ -49,6 +54,37 @@ HasMembers().overloadedReturn().#^SIMPLE_MEMBERS^#
 
 func givenErrorExpr(_ a: String) -> A {}
 func givenErrorExpr(_ b: Int) -> B {}
+
+func arrayWrapper<T>(a: T) -> [T]
+arrayWrapper(overloadedReturn()).#^SKIP_DUPLICATES^#
+
+// SKIP_DUPLICATES: Begin completions
+// SKIP_DUPLICATES_PROPERTY: Decl[InstanceVar]/CurrNominal/IsSystem: count[#Int#]{{; name=.+$}}
+// SKIP_DUPLICATES_PROPERTY-NOT: count[#Int#]
+// SKIP_DUPLICATES_METHOD: Decl[InstanceMethod]/Super/IsSystem: formIndex({#(i): &Int#}, {#offsetBy: Int#})[#Void#]{{; name=.+$}}
+// SKIP_DUPLICATES_METHOD-NOT: formIndex({#(i): &Int#}, {#offsetBy: Int#})[#Void#]
+// SKIP_DUPLICATES: End completions
+
+let x: (inout Int, Int) -> () = arrayWrapper(overloadedReturn()).#^SKIP_COMPOUND_DUPLICATES^#
+
+// SKIP_COMPOUND_DUPLICATES: Begin completions
+// SKIP_COMPOUND_DUPLICATES: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Identical]: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]{{; name=.+$}}
+// SKIP_COMPOUND_DUPLICATES-NOT: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]
+// SKIP_COMPOUND_DUPLICATES: End completions
+
+func testCallAsFunctionDeduplication() {
+  struct Test<T> {
+    func callAsFunction(x: Int) {}
+  }
+
+  func overloaded() -> Test<A> { fatalError() }
+  func overloaded() -> Test<B> { fatalError() }
+
+  overloaded()#^SKIP_CALLASFUNCTION_DUPLICATES^#
+}
+
+// FIXME: Update this to check the callAsFunction pattern only appears once when PostfixExpr completion is migrated to the solver-based implementation (which handles ambiguity).
+// SKIP_CALLASFUNCTION_DUPLICATES-NOT: Begin completions
 
 givenErrorExpr(undefined).#^ERROR_IN_BASE^#
 
