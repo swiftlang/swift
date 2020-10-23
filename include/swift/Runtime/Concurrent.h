@@ -952,8 +952,16 @@ public:
     /// Search for an element matching the given key. Returns a pointer to the
     /// found element, or nullptr if no matching element exists.
     template <class KeyTy> const ElemTy *find(const KeyTy &key) {
-      if (!Indices.Value || !ElementCount || !Elements)
+      if (!Indices.Value || !ElementCount || !Elements) {
+        // Empty table, find always fails.
         return nullptr;
+      } else if (ElementCount == 1) {
+        // Skip the hash lookup and just see if the one element we have matches
+        // the key.
+        if (Elements->matchesKey(key))
+          return Elements;
+        return nullptr;
+      }
       return ConcurrentReadableHashMap::find(key, Indices, ElementCount,
                                              Elements)
           .first;
