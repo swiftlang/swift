@@ -68,6 +68,37 @@ _ = ##"""
       """##
 // CHECK: "a raw string with \"\"\" in it"
 
+_ = #"""#
+// CHECK: "\""
+
+_ = #""""#
+// CHECK: "\"\""
+
+_ = #"""""#
+// CHECK: "\"\"\""
+
+_ = #""""""#
+// CHECK: "\"\"\"\""
+
+_ = ##""" foo # "# "##
+// CHECK: "\"\" foo # \"# "
+
+_ = ###""" "# "## "###
+// CHECK: "\"\" \"# \"## "
+
+_ = ###"""##"###
+// CHECK: "\"\"##"
+
+_ = "interpolating \(#"""false delimiter"#)"
+// CHECK: "interpolating "
+// CHECK: "\"\"false delimiter"
+  
+_ = """
+  interpolating \(#"""false delimiters"""#)
+  """
+// CHECK: "interpolating "
+// CHECK: "\"\"false delimiters\"\""
+
 let foo = "Interpolation"
 _ = #"\b\b \#(foo)\#(foo) Kappa"#
 // CHECK: "\\b\\b "
