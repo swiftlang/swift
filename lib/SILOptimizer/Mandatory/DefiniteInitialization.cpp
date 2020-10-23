@@ -850,7 +850,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
         break;
     }
     assert(valueMetatype);
-    SILValue metatypeArgument = load->getFunction()->getDynamicSelfMetadata();
+    SILValue metatypeArgument = load->getFunction()->getSelfArgument();
 
     // SILFunction parameter types never have a DynamicSelfType, since it only
     // makes sense in the context of a given method's body. Since the
