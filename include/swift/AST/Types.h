@@ -5219,6 +5219,10 @@ public:
   GenericEnvironment *getGenericEnvironment() const {
     return Environment;
   }
+
+  GenericTypeParamType *getInterfaceType() const {
+    return cast<GenericTypeParamType>(InterfaceType.getPointer());
+  }
       
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PrimaryArchetype;
