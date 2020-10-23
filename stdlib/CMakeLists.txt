@@ -69,10 +69,6 @@ option(SWIFT_STDLIB_OS_VERSIONING
     "Build stdlib with availability based on OS versions (Darwin only)."
     TRUE)
 
-option(SWIFT_COMPILE_DIFFERENTIATION_WITHOUT_TGMATH
-       "Build Differentation without tgmath (and dependency on platform runtime libraries)"
-       FALSE)
-
 #
 # End of user-configurable options.
 #
