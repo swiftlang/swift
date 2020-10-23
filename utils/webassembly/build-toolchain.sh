@@ -116,6 +116,7 @@ merge_toolchains() {
 
   # Replace absolute sysroot path with relative path
   sed -i "" -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap"
+  sed -i "" -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/wasi/wasm32/wasi.modulemap"
 }
 
 create_darwin_info_plist() {
