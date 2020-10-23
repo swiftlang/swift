@@ -24,7 +24,7 @@ sil @voidToInt64 : $@async @convention(thin) () -> (Int64) {
   return %int : $Int64
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
   %voidToInt64 = function_ref @voidToInt64 : $@async @convention(thin) () -> Int64

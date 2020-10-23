@@ -37,7 +37,7 @@ entry(%a : $*T):
   return %p : $@async @callee_owned (@in T) -> @out T
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %in_literal = integer_literal $Builtin.Int64, 876
   %in = struct $Int64 (%in_literal : $Builtin.Int64)

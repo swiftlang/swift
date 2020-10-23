@@ -45,7 +45,7 @@ bb0(%self : $S, %int : $Int64):
   return %out : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %s_type = metatype $@thin S.Type
   %storage_literal = integer_literal $Builtin.Int64, 987654321

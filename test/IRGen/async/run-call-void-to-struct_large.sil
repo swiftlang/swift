@@ -121,7 +121,7 @@ sil hidden @printBig : $@convention(thin) () -> () {
     return %out : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %printBig = function_ref @printBig : $@convention(thin) () -> ()
   %result = apply %printBig() : $@convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)

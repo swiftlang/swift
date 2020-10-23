@@ -61,7 +61,7 @@ bb0(%0 : $*A2<A3>):
   return %5 : $@async @callee_guaranteed () -> (@owned A1, @error Error)
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %a3 = alloc_ref $A3
   %a2 = struct $A2<A3> (%a3 : $A3)

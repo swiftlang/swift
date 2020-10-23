@@ -50,7 +50,7 @@ bb0(%0 : $*τ_0_1):
   return %9 : $@async @callee_owned () -> ()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %bind_polymorphic_param_from_context = function_ref @bind_polymorphic_param_from_context : $@convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
   %int_literal = integer_literal $Builtin.Int64, 9999

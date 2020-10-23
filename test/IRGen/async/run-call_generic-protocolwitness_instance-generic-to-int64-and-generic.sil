@@ -59,7 +59,7 @@ bb0(%out_addr : $*U, %self_addr : $*T, %in_addr : $*U):
   return %result : $Int64
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %I_type = metatype $@thin I.Type
   %int_literal = integer_literal $Builtin.Int64, 99

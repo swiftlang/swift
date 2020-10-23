@@ -35,7 +35,7 @@ bb0:
   return %result : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %createAndInvokeClosure = function_ref @createAndInvokeClosure : $@convention(thin) () -> ()
   %createAndInvokeClosure_result = apply %createAndInvokeClosure() : $@convention(thin) () -> ()
