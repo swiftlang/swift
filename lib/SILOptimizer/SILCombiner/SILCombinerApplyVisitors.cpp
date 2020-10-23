@@ -1230,7 +1230,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // When we specialize (because now we know the underlying method) we run into
   // invalid SIL: load %self_arg : $*NonClassProtocol.
   if (SelfCEI.ConcreteType && SelfCEI.ConcreteType.isAnyClassReferenceType() &&
-      WMI->getLookupType() && WMI->getLookupType().isAnyClassReferenceType()) {
+      WMI->getLookupType() && !WMI->getLookupType().isAnyClassReferenceType()) {
     return nullptr;
   }
   // Propagate the concrete type into a callee-operand, which is a
