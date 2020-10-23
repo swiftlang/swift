@@ -804,7 +804,8 @@ static bool omitNeedlessWordsInFunctionName(
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    Optional<unsigned> completionHandlerIndex, NameImporter &nameImporter) {
+    Optional<unsigned> completionHandlerIndex,
+    Optional<StringRef> completionHandlerName, NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
@@ -854,8 +855,8 @@ static bool omitNeedlessWordsInFunctionName(
                            getClangTypeNameForOmission(clangCtx, resultType),
                            getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
-                           allPropertyNames, completionHandlerIndex.hasValue(),
-                           nameImporter.getScratch());
+                           allPropertyNames, completionHandlerIndex,
+                           completionHandlerName, nameImporter.getScratch());
 }
 
 /// Prepare global name for importing onto a swift_newtype.
@@ -1135,25 +1136,8 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
 /// Whether the given parameter name identifies a completion handler.
 static bool isCompletionHandlerParamName(StringRef paramName) {
   return paramName == "completionHandler" || paramName == "completion" ||
-      paramName == "withCompletionHandler";
+      paramName == "withCompletionHandler" || paramName == "withCompletion";
 }
-
-/// Whether the give base name implies that the first parameter is a completion
-/// handler.
-///
-/// \returns a trimmed base name when it does, \c None others
-static Optional<StringRef> isCompletionHandlerInBaseName(StringRef basename) {
-  if (basename.endswith("WithCompletionHandler")) {
-    return basename.drop_back(strlen("WithCompletionHandler"));
-  }
-
-  if (basename.endswith("WithCompletion")) {
-    return basename.drop_back(strlen("WithCompletion"));
-  }
-
-  return None;
-}
-
 
 // Determine whether the given type is a nullable NSError type.
 static bool isNullableNSErrorType(
@@ -1185,7 +1169,7 @@ static bool isNullableNSErrorType(
 Optional<ForeignAsyncConvention::Info>
 NameImporter::considerAsyncImport(
     const clang::ObjCMethodDecl *clangDecl,
-    StringRef &baseName,
+    StringRef baseName,
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params,
     bool isInitializer, bool hasCustomName,
@@ -1207,12 +1191,14 @@ NameImporter::considerAsyncImport(
 
   // Determine whether the naming indicates that this is a completion
   // handler.
-  Optional<StringRef> newBaseName;
   if (isCompletionHandlerParamName(
-          paramNames[completionHandlerParamNameIndex])) {
+          paramNames[completionHandlerParamNameIndex]) ||
+      (completionHandlerParamNameIndex > 0 &&
+       stripWithCompletionHandlerSuffix(
+           paramNames[completionHandlerParamNameIndex]))) {
     // The argument label itself has an appropriate name.
   } else if (!hasCustomName && completionHandlerParamIndex == 0 &&
-             (newBaseName = isCompletionHandlerInBaseName(baseName))) {
+             stripWithCompletionHandlerSuffix(baseName)) {
     // The base name implies that the first parameter is a completion handler.
   } else if (isCompletionHandlerParamName(
                  params[completionHandlerParamIndex]->getName())) {
@@ -1300,10 +1286,6 @@ NameImporter::considerAsyncImport(
 
   // Drop the completion handler parameter name.
   paramNames.erase(paramNames.begin() + completionHandlerParamNameIndex);
-
-  // Update the base name, if needed.
-  if (newBaseName && !hasCustomName)
-    baseName = *newBaseName;
 
   return ForeignAsyncConvention::Info(
       completionHandlerParamIndex, completionHandlerErrorParamIndex);
@@ -1968,7 +1950,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                /*isAsync=*/false, scratch);
+                                None, None, scratch);
       }
     }
 
@@ -1984,6 +1966,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           result.getAsyncInfo().map(
             [](const ForeignAsyncConvention::Info &info) {
               return info.CompletionHandlerParamIndex;
+            }),
+          result.getAsyncInfo().map(
+            [&](const ForeignAsyncConvention::Info &info) {
+              return method->getDeclName().getObjCSelector().getNameForSlot(
+                  info.CompletionHandlerParamIndex);
             }),
           *this);
     }

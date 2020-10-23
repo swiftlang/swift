@@ -1220,7 +1220,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               bool returnsSelf,
                               bool isProperty,
                               const InheritedNameSet *allPropertyNames,
-                              bool isAsync,
+                              Optional<unsigned> completionHandlerIndex,
+                              Optional<StringRef> completionHandlerName,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
@@ -1290,6 +1291,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If the base name of a method imported as "async" starts with the word
   // "get", drop the "get".
+  bool isAsync = completionHandlerIndex.hasValue();
   if (isAsync && camel_case::getFirstWord(baseName) == "get" &&
       baseName.size() > 3) {
     baseName = baseName.substr(3);
@@ -1301,6 +1303,15 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))
     anyChanges = true;
 
+  // If this is an asynchronous function where the completion handler is
+  // the first parameter, strip off WithCompletion(Handler) from the base name.
+  if (isAsync && *completionHandlerIndex == 0) {
+    if (auto newBaseName = stripWithCompletionHandlerSuffix(baseName)) {
+      baseName = *newBaseName;
+      anyChanges = true;
+    }
+  }
+
   // For a method imported as "async", drop the "Asynchronously" suffix from
   // the base name. It is redundant with 'async'.
   const StringRef asynchronously = "Asynchronously";
@@ -1308,6 +1319,21 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       baseName.size() > asynchronously.size()) {
     baseName = baseName.drop_back(asynchronously.size());
     anyChanges = true;
+  }
+
+  // If this is an asynchronous function where the completion handler is
+  // the second parameter, and the corresponding name has some additional
+  // information prior to WithCompletion(Handler), append that
+  // additional text to the base name.
+  if (isAsync && *completionHandlerIndex == 1 && completionHandlerName) {
+    if (auto extraParamText = stripWithCompletionHandlerSuffix(
+            *completionHandlerName)) {
+      SmallString<32> newBaseName;
+      newBaseName += baseName;
+      appendSentenceCase(newBaseName, *extraParamText);
+      baseName = scratch.copyString(newBaseName);
+      anyChanges = true;
+    }
   }
 
   // Omit needless words based on parameter types.
@@ -1329,6 +1355,20 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         name, paramTypes[i], role,
         role == NameRole::BaseName ? allPropertyNames : nullptr);
 
+    // If this is an asynchronous function where the completion handler is
+    // past the second parameter and has additional information in the name,
+    // add that information to the prior argument name.
+    if (isAsync && completionHandlerName && *completionHandlerIndex > 1 &&
+        *completionHandlerIndex == i + 1) {
+      if (auto extraParamText = stripWithCompletionHandlerSuffix(
+              *completionHandlerName)) {
+        SmallString<32> extendedName;
+        extendedName += newName;
+        appendSentenceCase(extendedName, *extraParamText);
+        newName = scratch.copyString(extendedName);
+      }
+    }
+
     if (name == newName) continue;
 
     // Record this change.
@@ -1341,4 +1381,16 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   return lowercaseAcronymsForReturn();
+}
+
+Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
+  if (name.endswith("WithCompletionHandler")) {
+    return name.drop_back(strlen("WithCompletionHandler"));
+  }
+
+  if (name.endswith("WithCompletion")) {
+    return name.drop_back(strlen("WithCompletion"));
+  }
+
+  return None;
 }

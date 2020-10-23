@@ -60,7 +60,7 @@ def rpathize(filename):
     # The output from dyldinfo -dylibs is a line of header followed by one
     # install name per line, indented with spaces.
     dylib_regex = re.compile(
-        r"^\s*(?P<path>/usr/lib/swift/(?P<filename>.*\.dylib))\s*$")
+        r"(^|.*\s)(?P<path>/usr/lib/swift/(?P<filename>.*\.dylib))\s*$")
 
     # Build a command to invoke install_name_tool.
     command = ['install_name_tool']
