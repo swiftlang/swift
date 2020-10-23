@@ -58,6 +58,9 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
+                                             llvm::cl::init(false));
+
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
                               llvm::cl::init(true));
@@ -682,9 +685,18 @@ public:
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
 
-    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    StringRef funcName;
+    if (CurInstruction)
+      funcName = CurInstruction->getFunction()->getName();
+    else if (CurArgument)
+      funcName = CurArgument->getFunction()->getName();
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+    }
 
-    if (extraContext) extraContext();
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    if (extraContext)
+      extraContext();
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
@@ -693,6 +705,11 @@ public:
       llvm::dbgs() << "Verifying argument:\n";
       CurArgument->printInContext(llvm::dbgs());
     }
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "End Error in function " << funcName << "\n";
+      return;
+    }
+
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
     llvm::dbgs() << "In module:\n";
@@ -1460,6 +1477,8 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
@@ -1477,6 +1496,9 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
+
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -1522,6 +1544,8 @@ public:
 
     require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
             "must call yield_once coroutine with begin_apply");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
   }
 
   void checkAbortApplyInst(AbortApplyInst *AI) {
@@ -1571,6 +1595,8 @@ public:
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+    require(!resultInfo->isAsync() || PAI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     checkApplyTypeDependentArguments(PAI);
 
@@ -1653,7 +1679,7 @@ public:
                 "function");
       }
     }
-    
+
     // TODO: Impose additional constraints when partial_apply when the
     // -disable-sil-partial-apply flag is enabled. We want to reduce
     // partial_apply to being only a means of associating a closure invocation
@@ -1719,6 +1745,8 @@ public:
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
             "function_ref should have a context-free function result");
+    require(!fnType->isAsync() || FRI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
 
     // Note: in SingleFunction mode, we relax some of these checks because
     // we may not have linked everything yet.
@@ -2893,6 +2921,8 @@ public:
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
                                         "result of witness_method");
+    require(!methodType->isAsync() || AMI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
 
     auto *protocol
       = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
@@ -3048,6 +3078,9 @@ public:
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
+    require(!methodType->isAsync() || CMI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
+
     SILType operandType = CMI->getOperand()->getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
