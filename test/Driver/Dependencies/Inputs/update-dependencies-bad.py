@@ -27,6 +27,11 @@ import sys
 
 assert sys.argv[2] == '-frontend'
 
+# Forward -print-target-info to the real frontend by way of the driver.
+if '-print-target-info' in sys.argv:
+    process = subprocess.Popen(["swift-frontend"] + sys.argv[2:])
+    exit(process.wait())
+
 primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
 
 if (os.path.basename(primaryFile) == 'bad.swift' or

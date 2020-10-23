@@ -36,6 +36,11 @@ import sys
 
 assert sys.argv[2] == '-frontend'
 
+# Forward -print-target-info to the real frontend by way of the driver.
+if '-print-target-info' in sys.argv:
+    process = subprocess.Popen(["swift-frontend"] + sys.argv[2:])
+    exit(process.wait())
+
 # NB: The bitcode options automatically specify a -primary-file, even in cases
 #     where we do not wish to use a dependencies file in the test.
 if '-primary-file' in sys.argv \

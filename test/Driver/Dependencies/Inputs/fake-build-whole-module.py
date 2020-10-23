@@ -18,9 +18,16 @@
 from __future__ import print_function
 
 import os
+import subprocess
 import sys
 
 assert sys.argv[1] == '-frontend'
+
+# Forward -print-target-info to the real frontend by way of the driver.
+if '-print-target-info' in sys.argv:
+    process = subprocess.Popen(["swift-frontend"] + sys.argv[1:])
+    exit(process.wait())
+
 assert '-primary-file' not in sys.argv
 
 outputFile = sys.argv[sys.argv.index('-o') + 1]
