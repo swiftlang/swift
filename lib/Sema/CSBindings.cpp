@@ -1000,6 +1000,13 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (!BGT || !isKnownKeyPathDecl(CS.getASTContext(), BGT->getDecl()))
         return None;
     }
+
+    // Don't allow a protocol type to get propagated from the base to the result
+    // type of a chain, Result should always be a concrete type which conforms
+    // to the protocol inferred for the base.
+    if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>() &&
+        kind == AllowedBindingKind::Supertypes && type->is<ProtocolType>())
+      return None;
   }
 
   // If the source of the binding is 'OptionalObject' constraint
