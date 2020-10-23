@@ -3616,6 +3616,30 @@ static bool isParenthesizedUnowned(Parser &P) {
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
 
+static void skipAttribute(Parser &P) {
+  // Consider unexpected tokens to be incomplete attributes.
+
+  // Parse the attribute name, which can be qualified, have
+  // generic arguments, and so on.
+  do {
+    if (!P.consumeIf(tok::identifier) && !P.consumeIf(tok::code_complete))
+      return;
+
+    if (P.startsWithLess(P.Tok)) {
+      P.consumeStartingLess();
+      P.skipUntilGreaterInTypeList();
+    }
+  } while (P.consumeIf(tok::period));
+
+  // Skip an argument clause after the attribute name.
+  if (P.consumeIf(tok::l_paren)) {
+    while (P.Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+      if (P.consumeIf(tok::r_paren)) break;
+      P.skipSingle();
+    }
+  }
+}
+
 bool Parser::isStartOfSwiftDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
@@ -3645,23 +3669,14 @@ bool Parser::isStartOfSwiftDecl() {
   if (Tok.is(tok::kw_try))
     return peekToken().isAny(tok::kw_let, tok::kw_var);
   
-  // Look through attribute list, because it may be an *type* attribute list.
+  // Skip an attribute, since it might be a type attribute.  This can't
+  // happen at the top level of a scope, but we do use isStartOfSwiftDecl()
+  // in positions like generic argument lists.
   if (Tok.is(tok::at_sign)) {
     BacktrackingScope backtrack(*this);
-    while (consumeIf(tok::at_sign)) {
-      // If not identifier or code complete token, consider '@' as an incomplete
-      // attribute.
-      if (Tok.isNot(tok::identifier, tok::code_complete))
-        continue;
-      consumeToken();
-      // Eat paren after attribute name; e.g. @foo(x)
-      if (consumeIf(tok::l_paren)) {
-        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
-          if (consumeIf(tok::r_paren)) break;
-          skipSingle();
-        }
-      }
-    }
+    while (consumeIf(tok::at_sign))
+      skipAttribute(*this);
+
     // If this attribute is the last element in the block,
     // consider it is a start of incomplete decl.
     if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
