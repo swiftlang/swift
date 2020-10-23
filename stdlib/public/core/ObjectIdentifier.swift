@@ -12,11 +12,12 @@
 
 /// A unique identifier for a class instance or metatype.
 ///
+/// And the unique identifier is only valid for comparisons during the lifetime
+/// of the instance.
+///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 ///
-/// `ObjectIdentifier` is only guaranteed to remain unique for the
-/// lifetime of an object. 
 @frozen // trivial-implementation
 public struct ObjectIdentifier {
   @usableFromInline // trivial-implementation
