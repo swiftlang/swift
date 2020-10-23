@@ -183,13 +183,32 @@ func test_implicit_cgfloat_conversion() {
   let cgf: CGFloat = 0.0
 
   test_to(d) // Ok (Double -> CGFloat
-  test_to(f) // error
+  test_to(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'CGFloat'}}
+  test_to(d + d) // Ok (Double -> CGFloat for both arguments)
+  test_to(d + cgf) // Ok
+  test_to(d + cgf - d) // Ok
+  test_to(d + cgf - cgf) // Ok (only one choice here to conver `d` to CGFloat)
 
   test_from(cgf) // Ok (CGFloat -> Double)
-  test_from(f) // error
+  test_from(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'Double'}}
+  test_from(cgf + cgf) // Ok (CGFloat -> Double for both arguments)
+  test_from(d + cgf) // Ok
+  test_from(cgf + d - cgf) // Ok
+  test_from(cgf + d - d) // Ok (only one choice here to conver `cgf` to Double)
+
+  func test_returns_double(_: CGFloat) -> Double {
+    42.0
+  }
+
+  func test_returns_cgfloat(_: Double) -> CGFloat {
+    42.0
+  }
+
+  test_to(test_returns_double(d)) // Ok (two implicit conversions here `d` -> CGFloat & result of `test_returns_double` to CGFloat)
+  test_from(test_returns_cgfloat(cgf)) // Ok (same as above by in other direction)
 
   let _: CGFloat = d // Ok
-  let _: CGFloat = f // error
+  let _: CGFloat = f // expected-error {{cannot convert value of type 'Float' to specified type 'CGFloat'}}
   let _: Double  = cgf // Ok
-  let _: Float   = cgf // error
+  let _: Float   = cgf // expected-error {{cannot convert value of type 'CGFloat' to specified type 'Float'}}
 }
