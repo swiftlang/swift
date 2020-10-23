@@ -12,7 +12,7 @@
 
 /// A unique identifier for a class instance or metatype.
 ///
-/// And the unique identifier is only valid for comparisons during the lifetime
+/// This unique identifier is only valid for comparisons during the lifetime
 /// of the instance.
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
