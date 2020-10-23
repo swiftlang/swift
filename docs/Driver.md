@@ -205,7 +205,7 @@ in becoming more like non-whole-module builds.
 
 ## Incremental Builds ##
 
-Incremental builds in Swift work by primarily by cross-file dependency
+Incremental builds in Swift work primarily by cross-file dependency
 analysis, described in [DependencyAnalysis.md](DependencyAnalysis.md).
 Compiling a single file might be necessary because that file has changed, but
 it could also be because that file depends on something else that might have
