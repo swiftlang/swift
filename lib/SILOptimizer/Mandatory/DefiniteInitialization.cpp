@@ -460,6 +460,7 @@ namespace {
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(const DIMemoryUse &Use);
     void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
+    void handleTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -530,6 +531,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     switch (Use.Kind) {
     case DIUseKind::Load:
     case DIUseKind::LoadForTypeOfSelf:
+    case DIUseKind::TypeOfSelf:
     case DIUseKind::Escape:
       continue;
     case DIUseKind::Assign:
@@ -787,6 +789,9 @@ void LifetimeChecker::doIt() {
     case DIUseKind::LoadForTypeOfSelf:
       handleLoadForTypeOfSelfUse(Use);
       break;
+    case DIUseKind::TypeOfSelf:
+      handleTypeOfSelfUse(Use);
+      break;
     }
   }
 
@@ -835,6 +840,35 @@ void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
 }
 
+static void replaceValueMetatypeInstWithMetatypeArgument(
+    ValueMetatypeInst *valueMetatype) {
+  SILValue metatypeArgument = valueMetatype->getFunction()->getSelfArgument();
+
+  // SILFunction parameter types never have a DynamicSelfType, since it only
+  // makes sense in the context of a given method's body. Since the
+  // value_metatype instruction might produce a DynamicSelfType we have to
+  // cast the metatype argument.
+  //
+  // FIXME: Semantically, we're "opening" the class metatype here to produce
+  // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
+  // archetype associated with the original metatype or class instance value,
+  // instead of as a "global" type.
+  auto metatypeSelfType = metatypeArgument->getType()
+      .castTo<MetatypeType>().getInstanceType();
+  auto valueSelfType = valueMetatype->getType()
+      .castTo<MetatypeType>().getInstanceType();
+  if (metatypeSelfType != valueSelfType) {
+    assert(metatypeSelfType ==
+           cast<DynamicSelfType>(valueSelfType).getSelfType());
+
+    SILBuilderWithScope B(valueMetatype);
+    metatypeArgument = B.createUncheckedTrivialBitCast(
+        valueMetatype->getLoc(), metatypeArgument,
+        valueMetatype->getType());
+  }
+  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+}
+
 void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
   bool IsSuperInitComplete, FailedSelfUse;
   // If the value is not definitively initialized, replace the
@@ -849,32 +883,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
       if (valueMetatype)
         break;
     }
-    assert(valueMetatype);
-    SILValue metatypeArgument = load->getFunction()->getSelfArgument();
-
-    // SILFunction parameter types never have a DynamicSelfType, since it only
-    // makes sense in the context of a given method's body. Since the
-    // value_metatype instruction might produce a DynamicSelfType we have to
-    // cast the metatype argument.
-    //
-    // FIXME: Semantically, we're "opening" the class metatype here to produce
-    // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
-    // archetype associated with the original metatype or class instance value,
-    // instead of as a "global" type.
-    auto metatypeSelfType = metatypeArgument->getType()
-        .castTo<MetatypeType>().getInstanceType();
-    auto valueSelfType = valueMetatype->getType()
-        .castTo<MetatypeType>().getInstanceType();
-    if (metatypeSelfType != valueSelfType) {
-      assert(metatypeSelfType ==
-             cast<DynamicSelfType>(valueSelfType).getSelfType());
-
-      SILBuilderWithScope B(valueMetatype);
-      metatypeArgument = B.createUncheckedTrivialBitCast(
-          valueMetatype->getLoc(), metatypeArgument,
-          valueMetatype->getType());
-    }
-    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+    replaceValueMetatypeInstWithMetatypeArgument(valueMetatype);
 
     // Dead loads for type-of-self must be removed.
     // Otherwise it's a violation of memory lifetime.
@@ -884,6 +893,20 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
     }
     assert(load->use_empty());
     load->eraseFromParent();
+    // Clear the Inst pointer just to be sure to avoid use-after-free.
+    Use.Inst = nullptr;
+  }
+}
+
+void LifetimeChecker::handleTypeOfSelfUse(DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+  // If the value is not definitively initialized, replace the
+  // value_metatype instruction with the metatype argument that was passed into
+  // the initializer.
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    auto *valueMetatype = cast<ValueMetatypeInst>(Use.Inst);
+    replaceValueMetatypeInstWithMetatypeArgument(valueMetatype);
+
     // Clear the Inst pointer just to be sure to avoid use-after-free.
     Use.Inst = nullptr;
   }
