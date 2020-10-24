@@ -152,7 +152,10 @@ public:
     /// This type contains a type hole.
     HasTypeHole          = 0x800,
 
-    Last_Property = HasTypeHole
+    /// This type contains a placeholder.
+    HasPlaceholder   = 0x1000,
+
+    Last_Property = HasPlaceholder
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -210,6 +213,9 @@ public:
   /// Does a type with these properties structurally contain a
   /// type hole?
   bool hasTypeHole() const { return Bits & HasTypeHole; }
+
+  /// Does a type with these properties structurally contain a placeholder?
+  bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -578,6 +584,11 @@ public:
   /// Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
+  }
+
+  /// Determine whether this type involves a \c PlaceholderType.
+  bool hasPlaceholder() const {
+    return getRecursiveProperties().hasPlaceholder();
   }
 
   /// Determine whether this type involves a hole.
@@ -1350,6 +1361,20 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
+
+class PlaceholderType : public TypeBase {
+  friend class ASTContext;
+  // The Placeholder type is always canonical.
+  PlaceholderType(ASTContext &C)
+    : TypeBase(TypeKind::Placeholder, &C,
+        RecursiveTypeProperties(RecursiveTypeProperties::HasPlaceholder)) { }
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Placeholder;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
   
 /// BuiltinType - An abstract class for all the builtin types.

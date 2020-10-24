@@ -4901,6 +4901,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Unresolved:
       return getTypeMatchFailure(locator);
 
+    case TypeKind::Placeholder:
+      llvm_unreachable("placeholders should already be converted to type vars");
+
     case TypeKind::Hole: {
       // If it's allowed to attempt fixes, let's delegate
       // decision to `repairFailures`, since depending on
@@ -5596,6 +5599,7 @@ ConstraintSystem::simplifyConstructionConstraint(
       llvm_unreachable("artificial type in constraint");
     
   case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
   case TypeKind::Error:
   case TypeKind::Hole:
     return SolutionKind::Error;

@@ -4109,6 +4109,10 @@ public:
     llvm_unreachable("should not serialize an UnresolvedType");
   }
 
+  void visitPlaceholderType(const PlaceholderType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
   void visitHoleType(const HoleType *) {
     llvm_unreachable("should not serialize a HoleType");
   }

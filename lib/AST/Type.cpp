@@ -204,6 +204,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
@@ -1153,6 +1154,7 @@ CanType TypeBase::computeCanonicalType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
   case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
   case TypeKind::TypeVariable:
   case TypeKind::Hole:
     llvm_unreachable("these types are always canonical");
@@ -4275,6 +4277,7 @@ case TypeKind::Id:
   case TypeKind::OpenedArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
   case TypeKind::TypeVariable:
   case TypeKind::Hole:
   case TypeKind::GenericTypeParam:
@@ -5013,6 +5016,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:

@@ -595,6 +595,8 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
+    ThePlaceholderType(new (*this, AllocationArena::Permanent)
+                       PlaceholderType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                             /*HasExplicitAnyObject=*/false)),
@@ -3102,7 +3104,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 12,
+  static_assert(RecursiveTypeProperties::BitWidth == 13,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3676,7 +3678,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 12,
+  static_assert(RecursiveTypeProperties::BitWidth == 13,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();

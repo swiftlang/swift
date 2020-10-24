@@ -3535,6 +3535,8 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
+    TRIVIAL_TYPE_PRINTER(Placeholder, placeholder)
+
     void visitHoleType(HoleType *T, StringRef label) {
       printCommon(label, "hole_type");
       auto originator = T->getOriginator();

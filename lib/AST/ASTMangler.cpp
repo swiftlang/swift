@@ -966,6 +966,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
+    case TypeKind::Placeholder:
       appendOperator("Xe");
       return;
 

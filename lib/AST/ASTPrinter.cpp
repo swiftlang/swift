@@ -4168,6 +4168,13 @@ public:
       Printer << "_";
   }
 
+  void visitPlaceholderType(PlaceholderType *T) {
+    if (Options.PrintTypesForDebugging)
+      Printer << "<<placeholdertype>>";
+    else
+      Printer << "_";
+  }
+
   void visitHoleType(HoleType *T) {
     if (Options.PrintTypesForDebugging) {
       Printer << "<<hole for ";
