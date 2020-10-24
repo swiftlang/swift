@@ -1855,15 +1855,15 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 }
 
 /// Get metadata for the dynamic Self type if we have it.
-static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
-  if (!IGF.CurSILFn->hasSelfMetadataParam())
+static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
+  if (!IGF.CurSILFn->hasDynamicSelfMetadata())
     return;
   
-  const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  const SILArgument *selfArg = IGF.CurSILFn->getDynamicSelfMetadata();
   auto selfTy = selfArg->getType().getASTType();
   CanMetatypeType metaTy =
     dyn_cast<MetatypeType>(selfTy);
-  IRGenFunction::LocalSelfKind selfKind;
+  IRGenFunction::DynamicSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
   else {
@@ -1889,7 +1889,7 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
   bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
     || IGF.CurSILFn->isExactSelfClass();
 
-  IGF.setLocalSelfMetadata(selfTy, isExact, value, selfKind);
+  IGF.setDynamicSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.
@@ -1960,7 +1960,7 @@ void IRGenSILFunction::emitSILFunction() {
     emitEntryPointArgumentsCOrObjC(*this, entry->first, params, funcTy);
     break;
   }
-  emitLocalSelfMetadata(*this);
+  emitDynamicSelfMetadata(*this);
 
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 

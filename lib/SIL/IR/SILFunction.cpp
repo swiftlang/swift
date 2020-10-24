@@ -571,7 +571,7 @@ void SILFunction::viewCFGOnly() const {
 }
 
 
-bool SILFunction::hasSelfMetadataParam() const {
+bool SILFunction::hasDynamicSelfMetadata() const {
   auto paramTypes =
       getConventions().getParameterSILTypes(TypeExpansionContext::minimal());
   if (paramTypes.empty())

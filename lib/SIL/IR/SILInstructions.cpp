@@ -84,7 +84,7 @@ static void buildTypeDependentOperands(
     TypeDependentOperands.push_back(Def);
   }
   if (hasDynamicSelf)
-    TypeDependentOperands.push_back(F.getSelfMetadataArgument());
+    TypeDependentOperands.push_back(F.getDynamicSelfMetadata());
 }
 
 // Collects all opened archetypes from a type and a substitutions list and form

@@ -74,7 +74,6 @@ func generic_nocapture_existential<T>(_ x: T, y: Concept) -> Bool {
 
   // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed Concept) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = thin_to_thick_function [[FOO]]
-  // CHECK: destroy_value [[FOO_CLOSURE]]
   let _ = foo
 
   // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed Concept) -> Bool

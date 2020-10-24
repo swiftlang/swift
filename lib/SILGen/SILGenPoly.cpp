@@ -3204,7 +3204,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // If this thunk involves DynamicSelfType in any way, add a capture for it
   // in case we need to recover metadata.
   if (hasDynamicSelf) {
-    dynamicSelfType = F.getSelfMetadataArgument()->getType().getASTType();
+    dynamicSelfType = F.getDynamicSelfMetadata()->getType().getASTType();
     if (!isa<MetatypeType>(dynamicSelfType)) {
       dynamicSelfType = CanMetatypeType::get(dynamicSelfType,
                                              MetatypeRepresentation::Thick);

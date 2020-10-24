@@ -1574,7 +1574,7 @@ namespace {
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {
-      return MetadataResponse::forComplete(IGF.getLocalSelfMetadata());
+      return MetadataResponse::forComplete(IGF.getDynamicSelfMetadata());
     }
       
     MetadataResponse emitExistentialTypeMetadata(CanType type,
@@ -2757,8 +2757,8 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
 
   // If we're asking for the metadata of the type that dynamic Self is known
   // to be equal to, we can just use the self metadata.
-  if (LocalSelfIsExact && LocalSelfType == type) {
-    return MetadataResponse::forComplete(getLocalSelfMetadata());
+  if (SelfTypeIsExact && SelfType == type) {
+    return MetadataResponse::forComplete(getDynamicSelfMetadata());
   }
   
   if (type->hasArchetype() ||

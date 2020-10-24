@@ -1391,9 +1391,9 @@ public:
       if (isa<SILArgument>(V)) {
         require(hasDynamicSelf,
                 "dynamic self operand without dynamic self type");
-        require(AI->getFunction()->hasSelfMetadataParam(),
+        require(AI->getFunction()->hasDynamicSelfMetadata(),
                 "self metadata operand in function without self metadata param");
-        require((ValueBase *)V == AI->getFunction()->getSelfMetadataArgument(),
+        require((ValueBase *)V == AI->getFunction()->getDynamicSelfMetadata(),
                 "wrong self metadata operand");
       } else {
         require(isa<SingleValueInstruction>(V),
@@ -3615,10 +3615,10 @@ public:
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||
-                I->getFunction()->hasSelfMetadataParam(),
+                I->getFunction()->hasDynamicSelfMetadata(),
               "Function containing dynamic self type must have self parameter");
-        if (I->getFunction()->hasSelfMetadataParam())
-          Def = I->getFunction()->getArguments().back();
+        if (I->getFunction()->hasDynamicSelfMetadata())
+          Def = I->getFunction()->getDynamicSelfMetadata();
         else
           Def = I->getFunction()->getSelfArgument();
       } else {
