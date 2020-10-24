@@ -1446,9 +1446,6 @@ namespace {
 
       // The result of the last element of the chain must be convertible to the
       // whole chain, and the type of the whole chain must be equal to the base.
-      CS.addConstraint(
-          ConstraintKind::Conversion, memberTy, chainBaseTy,
-          CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
       CS.addConstraint(ConstraintKind::Conversion, memberTy, chainResultTy,
                        locator);
       CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
