@@ -388,6 +388,10 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
         return unboundTy;
+      }, /*placeholderHandler*/ [&]() {
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        return Ctx.ThePlaceholderType;
       });
 
   Optional<DiagnosticSuppression> suppression;

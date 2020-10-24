@@ -1370,6 +1370,10 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        }, /*placeholderHandler*/ [&]() {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return getASTContext().ThePlaceholderType;
         });
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
@@ -1897,6 +1901,10 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        }, /*placeholderHandler*/ [&]() {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return getASTContext().ThePlaceholderType;
         });
     const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())

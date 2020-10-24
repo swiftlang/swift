@@ -472,6 +472,10 @@ public:
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        }, /*placeholderHandler*/ [&]() {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return Context.ThePlaceholderType;
         });
     const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
@@ -589,6 +593,10 @@ public:
             // FIXME: Don't let unbound generic types escape type resolution.
             // For now, just return the unbound generic type.
             return unboundTy;
+          }, /*placeholderHandler*/ [&]() {
+            // FIXME: Don't let placeholder types escape type resolution.
+            // For now, just return the placeholder type.
+            return Context.ThePlaceholderType;
           }).resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
@@ -785,16 +793,23 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // that type.
   case PatternKind::Typed: {
     OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+    HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
     if (pattern.allowsInference()) {
       unboundTyOpener = [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
         return unboundTy;
       };
+      placeholderHandler = [&] {
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        return Context.ThePlaceholderType;
+      };
     }
     return validateTypedPattern(
         cast<TypedPattern>(P),
-        TypeResolution::forContextual(dc, options, unboundTyOpener));
+        TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                      placeholderHandler));
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -848,16 +863,23 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     auto somePat = cast<OptionalSomePattern>(P);
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
       OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+      HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
       if (pattern.allowsInference()) {
         unboundTyOpener = [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
         };
+        placeholderHandler = [&]() {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return Context.ThePlaceholderType;
+        };
       }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
       const auto type = validateTypedPattern(
-          TP, TypeResolution::forContextual(dc, options, unboundTyOpener));
+          TP, TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                            placeholderHandler));
       if (type && !type->hasError()) {
         return OptionalType::get(type);
       }
@@ -1264,8 +1286,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     const auto castType =
         TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
                                       // FIXME: Should we really unconditionally
-                                      // complain about unbound generics here?
-                                      /*unboundTyOpener*/ nullptr)
+                                      // complain about unbound generics and
+                                      // placeholders here?
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr)
             .resolveType(IP->getCastTypeRepr());
     if (castType->hasError())
       return nullptr;

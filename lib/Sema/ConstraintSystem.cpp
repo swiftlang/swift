@@ -693,7 +693,8 @@ Type ConstraintSystem::openUnboundGenericType(
   // call to BoundGenericType::get().
   return TypeChecker::applyUnboundGenericArguments(
       decl, parentTy, SourceLoc(),
-      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr),
+      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
+                                    /*placeholderHandler*/ nullptr),
       arguments);
 }
 
@@ -1213,7 +1214,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = TypeChecker::resolveTypeInContext(
         typeDecl, nullptr,
         TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
-                                      /*unboundTyOpener*/ nullptr),
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr),
         /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);
@@ -2230,7 +2232,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         if (auto castTypeRepr = isp->getCastTypeRepr()) {
           castType = TypeResolution::forContextual(
                          DC, TypeResolverContext::InExpression,
-                         /*unboundTyOpener*/ nullptr)
+                         /*unboundTyOpener*/ nullptr,
+                         /*placeholderHandler*/ nullptr)
                          .resolveType(castTypeRepr);
         } else {
           castType = isp->getCastType();
