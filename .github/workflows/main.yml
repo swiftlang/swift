@@ -153,32 +153,39 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: macos-installable
-      - name: Build hello.wasm
-        shell: bash
+      - name: Unpack toolchain
         run: |
           set -x
           tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          echo "TOOLCHAIN=$(find "$PWD" -name "swift-wasm-*" -type d)" >> $GITHUB_ENV
+      - name: Build hello.wasm
+        shell: bash
+        run: |
           echo 'print("Hello, world!")' > hello.swift
-          $TOOLCHAIN_PATH/usr/bin/swiftc \
+          $TOOLCHAIN/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
-                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
+                -sdk $TOOLCHAIN/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
       - name: Test SwiftPM
         shell: bash
         run: |
           set -x
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
           mkdir test
           cd test
-          $TOOLCHAIN_PATH/usr/bin/swift package init
-          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
+          $TOOLCHAIN/usr/bin/swift package init
+          $TOOLCHAIN/usr/bin/swift build --triple wasm32-unknown-wasi
       - name: Upload hello.wasm compiled with macOS package
         uses: actions/upload-artifact@v1
         with:
           name: macos-hello.wasm
           path: hello.wasm
+      - name: Checkout integration-tests
+        uses: actions/checkout@v2
+        with:
+          repository: swiftwasm/integration-tests
+      - name: Run integration tests
+        run: swift run # Use TOOLCHAIN env value
 
   ubuntu1804_smoke_test:
     name: Run smoke tests on Ubuntu 18.04
@@ -189,32 +196,39 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: ubuntu18.04-installable
-      - name: Build hello.wasm
-        shell: bash
+      - name: Unpack toolchain
         run: |
           set -x
           tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          echo "TOOLCHAIN=$(find "$PWD" -name "swift-wasm-*" -type d)" >> $GITHUB_ENV
+      - name: Build hello.wasm
+        shell: bash
+        run: |
           echo 'print("Hello, world!")' > hello.swift
-          $TOOLCHAIN_PATH/usr/bin/swiftc \
+          $TOOLCHAIN/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
-                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
+                -sdk $TOOLCHAIN/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
       - name: Test SwiftPM
         shell: bash
         run: |
           set -x
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
           mkdir test
           cd test
-          $TOOLCHAIN_PATH/usr/bin/swift package init
-          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
+          $TOOLCHAIN/usr/bin/swift package init
+          $TOOLCHAIN/usr/bin/swift build --triple wasm32-unknown-wasi
       - name: Upload hello.wasm compiled with Ubuntu 18.04 package
         uses: actions/upload-artifact@v1
         with:
           name: ubuntu18.04-hello.wasm
           path: hello.wasm
+      - name: Checkout integration-tests
+        uses: actions/checkout@v2
+        with:
+          repository: swiftwasm/integration-tests
+      - name: Run integration tests
+        run: swift run # Use TOOLCHAIN env value
 
   ubuntu2004_smoke_test:
     name: Run smoke tests on Ubuntu 20.04
@@ -225,29 +239,36 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: ubuntu20.04-installable
-      - name: Build hello.wasm
-        shell: bash
+      - name: Unpack toolchain
         run: |
           set -x
           tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          echo "TOOLCHAIN=$(find "$PWD" -name "swift-wasm-*" -type d)" >> $GITHUB_ENV
+      - name: Build hello.wasm
+        shell: bash
+        run: |
           echo 'print("Hello, world!")' > hello.swift
-          $TOOLCHAIN_PATH/usr/bin/swiftc \
+          $TOOLCHAIN/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
-                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
+                -sdk $TOOLCHAIN/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
       - name: Test SwiftPM
         shell: bash
         run: |
           set -x
-          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
           mkdir test
           cd test
-          $TOOLCHAIN_PATH/usr/bin/swift package init
-          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
+          $TOOLCHAIN/usr/bin/swift package init
+          $TOOLCHAIN/usr/bin/swift build --triple wasm32-unknown-wasi
       - name: Upload hello.wasm compiled with Ubuntu 20.04 package
         uses: actions/upload-artifact@v1
         with:
           name: ubuntu20.04-hello.wasm
           path: hello.wasm
+      - name: Checkout integration-tests
+        uses: actions/checkout@v2
+        with:
+          repository: swiftwasm/integration-tests
+      - name: Run integration tests
+        run: swift run # Use TOOLCHAIN env value
