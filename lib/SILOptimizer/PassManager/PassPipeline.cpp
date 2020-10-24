@@ -300,7 +300,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addMem2Reg();
 
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
+  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  P.addSemanticARCOpts();
   P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Run the existential specializer Pass.
