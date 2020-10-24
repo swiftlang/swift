@@ -1390,7 +1390,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
         continue;
 
       if (auto clangField = dyn_cast<clang::FieldDecl>(var->getClangDecl()))
-        if (clangField->isAnonymousStructOrUnion())
+        if (clangField->isAnonymousStructOrUnion() ||
+            clangField->getDeclName().isEmpty())
           generateParamName = false;
     }
 
@@ -2397,6 +2398,8 @@ namespace {
             if (field->isAnonymousStructOrUnion()) {
               IdStream << "__Anonymous_field" << field->getFieldIndex();
             } else {
+              assert(!field->getDeclName().isEmpty() &&
+                     "Microsoft anonymous struct extension?");
               IdStream << field->getName();
             }
             ImportedName Result;
@@ -4011,7 +4014,7 @@ namespace {
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
 
-      if (!decl->isAnonymousStructOrUnion()) {
+      if (!decl->isAnonymousStructOrUnion() && !decl->getDeclName().isEmpty()) {
         importedName = importFullName(decl, correctSwiftName);
         if (!importedName) {
           return nullptr;
