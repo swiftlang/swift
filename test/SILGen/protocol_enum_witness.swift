@@ -17,6 +17,13 @@ public enum AnotherBar: AnotherFoo {
   case bar(arg: Int)
 }
 
+public struct PublicStruct {}
+
+enum InternalEnumWithPublicStruct : Foo {
+  case button
+  case other(PublicStruct)
+}
+
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s21protocol_enum_witness3BarOAA3FooA2aDP6buttonxvgZTW : $@convention(witness_method: Foo) (@thick Bar.Type) -> @out Bar {
 // CHECK: bb0([[BAR:%.*]] : $*Bar, [[BAR_TYPE:%.*]] : $@thick Bar.Type):
 // CHECK-NEXT: [[META_TYPE:%.*]] = metatype $@thin Bar.Type
