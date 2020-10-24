@@ -1851,25 +1851,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
   bool IsMultilineString = advanceIfMultilineDelimiter(CustomDelimiterLen,
                                                        CurPtr, Diags, true);
-  
-  // Test for single-line string literals that may resemble multiline delimiter.
-  if (IsMultilineString && CustomDelimiterLen &&
-      *CurPtr != '\n' && *CurPtr != '\r') {
-    const char *TmpPtr = CurPtr-1;
-    while (*TmpPtr != '\r' && *TmpPtr != '\n') {
-      if (*TmpPtr == '"') {
-        if (delimiterMatches(CustomDelimiterLen, ++TmpPtr, nullptr)) {
-          // Undo effects from falsely detecting multiline delimiter.
-          CurPtr = CurPtr - 2;
-          IsMultilineString = false;
-          break;
-        }
-        continue;
-      }
-      ++TmpPtr;
-    }
-  }
-  
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
     diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
