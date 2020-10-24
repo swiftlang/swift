@@ -72,7 +72,10 @@ _ = ##"""
 
 /// Source code contains zero-width character in this format: `#"[U+200B]"[U+200B]"#`
 /// The check contains zero-width character in this format: `"[U+200B]\"[U+200B]"`
-/// Use this test when implementating `diagnoseZeroWidthMatchAndAdvance`.
+/// If this check fails after you implement `diagnoseZeroWidthMatchAndAdvance`,
+/// then you may need to tweak how to test for single-line string literals that
+/// resemble a multiline delimiter in `advanceIfMultilineDelimiter` so that it
+/// passes again.
 /// See https://bugs.swift.org/browse/SR-8678
 _ = #"​"​"#
 // CHECK: "​\"​"
