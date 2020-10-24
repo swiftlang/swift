@@ -1241,8 +1241,11 @@ namespace {
         // FIXME: We should eliminate this case.
         if (auto *PD = dyn_cast<ParamDecl>(VD)) {
           if (!CS.hasType(PD)) {
-            if (knownType && knownType->hasUnboundGenericType())
-              knownType = CS.openUnboundGenericTypes(knownType, locator);
+            if (knownType &&
+                (knownType->hasUnboundGenericType() ||
+                 knownType->hasPlaceholder())) {
+              knownType = CS.convertInferableTypes(knownType, locator);
+            }
 
             CS.setType(
                 PD, knownType ? knownType
@@ -1311,7 +1314,7 @@ namespace {
       if (E->isImplicit()) {
         type = CS.getInstanceType(CS.cacheType(E));
         assert(type && "Implicit type expr must have type set!");
-        type = CS.openUnboundGenericTypes(type, locator);
+        type = CS.convertInferableTypes(type, locator);
       } else if (CS.hasType(E)) {
         // If there's a type already set into the constraint system, honor it.
         // FIXME: This supports the result builder transform, which sneakily
@@ -1992,7 +1995,7 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = CS.getVarType(param);
-            externalType = CS.openUnboundGenericTypes(declaredTy, paramLoc);
+            externalType = CS.convertInferableTypes(declaredTy, paramLoc);
           } else {
             // Let's allow parameters which haven't been explicitly typed
             // to become holes by default, this helps in situations like
@@ -2208,7 +2211,7 @@ namespace {
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
-        Type openedType = CS.openUnboundGenericTypes(type, locator);
+        Type openedType = CS.convertInferableTypes(type, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2369,7 +2372,7 @@ namespace {
             // contained within the type resolver.
             if (const auto preresolvedTy = enumPattern->getParentType()) {
               const auto openedTy =
-                  CS.openUnboundGenericTypes(preresolvedTy, patternMatchLoc);
+                  CS.convertInferableTypes(preresolvedTy, patternMatchLoc);
               assert(openedTy);
               return openedTy;
             }
@@ -3604,7 +3607,7 @@ static bool generateWrappedPropertyTypeConstraints(
       auto *typeRepr = wrapperAttributes[i]->getTypeRepr();
       auto *locator =
           cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
-      wrapperType = cs.openUnboundGenericTypes(rawWrapperType, locator);
+      wrapperType = cs.convertInferableTypes(rawWrapperType, locator);
       cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
                        locator);
       cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
@@ -3891,7 +3894,7 @@ bool ConstraintSystem::generateConstraints(
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
     auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
     auto *typeRepr = outermostWrapper->getTypeRepr();
-    auto backingType = openUnboundGenericTypes(outermostWrapper->getType(),
+    auto backingType = convertInferableTypes(outermostWrapper->getType(),
                                                getConstraintLocator(typeRepr));
     setType(typeRepr, backingType);
 

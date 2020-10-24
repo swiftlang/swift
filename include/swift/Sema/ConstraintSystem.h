@@ -3759,14 +3759,14 @@ public:
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator);
 
-  /// "Open" the given type by replacing any occurrences of unbound
-  /// generic types with bound generic types with fresh type variables as
-  /// generic arguments.
+  /// Replace placeholder types with fresh type variables, and unbound generic
+  /// types with bound generic types whose generic args are fresh type
+  /// variables.
   ///
-  /// \param type The type to open.
+  /// \param type The type on which to perform the conversion.
   ///
-  /// \returns The opened type.
-  Type openUnboundGenericTypes(Type type, ConstraintLocatorBuilder locator);
+  /// \returns The converted type.
+  Type convertInferableTypes(Type type, ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.

@@ -652,7 +652,7 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
 Type ConstraintSystem::openUnboundGenericType(
     GenericTypeDecl *decl, Type parentTy, ConstraintLocatorBuilder locator) {
   if (parentTy) {
-    parentTy = openUnboundGenericTypes(parentTy, locator);
+    parentTy = convertInferableTypes(parentTy, locator);
   }
 
   // Open up the generic type.
@@ -777,17 +777,22 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
-Type ConstraintSystem::openUnboundGenericTypes(
+Type ConstraintSystem::convertInferableTypes(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
-  if (!type->hasUnboundGenericType())
+  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
     return type;
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator);
+      } else if (type->is<PlaceholderType>()) {
+        return createTypeVariable(getConstraintLocator(locator),
+                                  TVO_CanBindToNoEscape |
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_CanBindToHole);
       }
 
       return type;
@@ -1220,8 +1225,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     checkNestedTypeConstraints(*this, type, locator);
 
-    // Open the type.
-    type = openUnboundGenericTypes(type, locator);
+    // Convert any placeholder types and open generics.
+    type = convertInferableTypes(type, locator);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1476,8 +1481,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
     checkNestedTypeConstraints(*this, memberTy, locator);
 
-    // Open the type if it was a reference to a generic type.
-    memberTy = openUnboundGenericTypes(memberTy, locator);
+    // Convert any placeholders and open any generics.
+    memberTy = convertInferableTypes(memberTy, locator);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
