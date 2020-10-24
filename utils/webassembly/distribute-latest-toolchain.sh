@@ -111,7 +111,7 @@ sign_toolchain() {
     fi
   done
 
-  ${codesign_bin} "${codesign_args[@]}" "${darwin_toolchain}/usr/"
+  ${codesign_bin} "${codesign_args[@]}" "${darwin_toolchain}/"
 }
 
 create_installer() {
@@ -119,8 +119,8 @@ create_installer() {
   local darwin_toolchain_name=$(basename "$darwin_toolchain")
   local darwin_toolchain_installer_package="$darwin_toolchain.pkg"
   local darwin_toolchain_install_location="/Library/Developer/Toolchains/${darwin_toolchain_name}.xctoolchain"
-  local darwin_toolchain_version=$(/usr/libexec/PlistBuddy  -c "Print Version string" "$darwin_toolchain"/usr/Info.plist)
-  local darwin_toolchain_bundle_identifier=$(/usr/libexec/PlistBuddy  -c "Print CFBundleIdentifier string" "$darwin_toolchain"/usr/Info.plist)
+  local darwin_toolchain_version=$(/usr/libexec/PlistBuddy  -c "Print Version string" "$darwin_toolchain"/Info.plist)
+  local darwin_toolchain_bundle_identifier=$(/usr/libexec/PlistBuddy  -c "Print CFBundleIdentifier string" "$darwin_toolchain"/Info.plist)
 
   "${swift_source_dir}/utils/toolchain-installer" "${darwin_toolchain}/" "${darwin_toolchain_bundle_identifier}" \
     "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${darwin_toolchain_installer_package}" "${darwin_toolchain_install_location}" \
