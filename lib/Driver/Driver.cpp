@@ -1754,6 +1754,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           });
         }
       }
+    } if (OI.SDKPath.empty() && TC.getTriple().isOSWASI()) {
+        llvm::SmallString<128> SDKPath;
+        llvm::sys::path::append(SDKPath, getSwiftProgramPath());
+        llvm::sys::path::remove_filename(SDKPath); // 'swift'
+        llvm::sys::path::remove_filename(SDKPath); // 'bin'
+        llvm::sys::path::append(SDKPath, "share", "wasi-sysroot");
+        OI.SDKPath = SDKPath.str().str();
     }
 
     if (!OI.SDKPath.empty()) {
