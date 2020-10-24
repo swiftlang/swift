@@ -70,8 +70,8 @@ _ = ##"""
 
 // ===---------- False Multiline Delimiters --------===
 
-/// Source code contains zero-width character in this format `#"[U+200B]"[U+200B]"#`
-/// The check contains the zero-width character in this format: `"[U+200B]\"[U+200B]"`
+/// Source code contains zero-width character in this format: `#"[U+200B]"[U+200B]"#`
+/// The check contains zero-width character in this format: `"[U+200B]\"[U+200B]"`
 /// Use this test when implementating `diagnoseZeroWidthMatchAndAdvance`.
 /// See https://bugs.swift.org/browse/SR-8678
 _ = #"​"​"#
