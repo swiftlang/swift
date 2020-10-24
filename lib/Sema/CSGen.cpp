@@ -1292,11 +1292,11 @@ namespace {
     resolveTypeReferenceInExpression(TypeRepr *repr, TypeResolverContext resCtx,
                                      const ConstraintLocatorBuilder &locator) {
       // Introduce type variables for unbound generics.
-      const auto opener = OpenUnboundGenericType(CS, locator);
-      // TODO: Handle placeholders here.
-      const auto result =
-          TypeResolution::forContextual(CS.DC, resCtx, opener,
-                                        /*placeholderHandler*/ nullptr)
+      const auto genericOpener = OpenUnboundGenericType(CS, locator);
+      const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+      const auto result = TypeResolution::forContextual(CS.DC, resCtx,
+                                                        genericOpener,
+                                                        placeholderHandler)
               .resolveType(repr);
       if (result->hasError()) {
         return Type();
@@ -1561,9 +1561,8 @@ namespace {
             const auto resolution = TypeResolution::forContextual(
                 CS.DC, options,
                 // Introduce type variables for unbound generics.
-                // TODO: Handle placeholder types
                 OpenUnboundGenericType(CS, locator),
-                /*placeholderHandler*/ nullptr);
+                HandlePlaceholderType(CS, locator));
             const auto result = resolution.resolveType(specializations[i]);
             if (result->hasError())
               return Type();

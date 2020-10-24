@@ -5024,6 +5024,22 @@ public:
   }
 };
 
+class HandlePlaceholderType {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+
+public:
+  explicit HandlePlaceholderType(ConstraintSystem &cs,
+                                 const ConstraintLocatorBuilder &locator)
+      : cs(cs), locator(locator) {}
+
+  Type operator()() const {
+    return cs.createTypeVariable(
+        cs.getConstraintLocator(locator),
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole);
+  }
+};
+
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
