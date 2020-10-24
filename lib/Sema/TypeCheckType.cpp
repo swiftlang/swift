@@ -2022,6 +2022,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                        : ErrorType::get(getASTContext());
   }
 
+  case TypeReprKind::Placeholder: {
+    return ErrorType::get(resolution.getASTContext());
+  }
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
   }

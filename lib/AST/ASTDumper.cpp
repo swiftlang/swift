@@ -3123,6 +3123,11 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
+    printCommon("type_placeholder");
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitFixedTypeRepr(FixedTypeRepr *T) {
     printCommon("type_fixed");
     auto Ty = T->getType();
