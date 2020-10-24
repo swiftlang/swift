@@ -39,12 +39,12 @@ public func foo(_ x: Double) {
   // CHECK: [[FN:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1
   // CHECK: [[A:%.*]] = thin_to_thick_function [[FN]]
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
-  // CHECK: [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
-  // CHECK: [[BORROWED_A2:%.*]] = begin_borrow [[A_COPY]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
-  // CHECK: apply [[BORROWED_A2]]([[X]])
-  // CHECK: destroy_value [[A_COPY]]
+  // CHECK: [[NEW_Z_VALUE:%.*]] = apply [[BORROWED_A]]([[X]])
   // CHECK: end_borrow [[BORROWED_A]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]]
+  // CHECK: assign [[NEW_Z_VALUE]] to [[WRITE]]
+  // CHECK: end_access [[WRITE]]
   z = a(x)
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -77,14 +77,12 @@ public func foo(_ x: Double) {
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu2_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
-  // CHECK: [[BORROW:%.*]] = begin_borrow [[THICK]]
-  // CHECK: [[COPY:%.*]] = copy_value [[BORROW]]
   let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[BORROW_COPY:%.*]] = begin_borrow [[COPY]]
-  // CHECK: apply [[BORROW_COPY]]([[ZVAL]])
-  // CHECK: destroy_value [[COPY]]
+  // CHECK: [[THICK_BORROW:%.*]] = begin_borrow [[THICK]]
+  // CHECK: apply [[THICK_BORROW]]([[ZVAL]])
+  // CHECK: end_borrow [[THICK_BORROW]]
   z = d(z)(x)
 
   // TODO: If we implement SE-0042, this should thunk the value Struct1 param
