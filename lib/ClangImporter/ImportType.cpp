@@ -830,23 +830,32 @@ namespace {
       return { mappedType, underlyingResult.Hint };
     }
 
-#define SUGAR_TYPE(KIND)                                            \
-    ImportResult Visit##KIND##Type(const clang::KIND##Type *type) { \
-      return Visit(type->desugar());                                \
+    // TODO: add custom visitors for these types.
+#define MAYBE_SUGAR_TYPE(KIND)                                                 \
+    ImportResult Visit##KIND##Type(const clang::KIND##Type *type) {            \
+      if (type->isSugared())                                                   \
+        return Visit(type->desugar());                                         \
+      return Type();                                                           \
     }
-    SUGAR_TYPE(TypeOfExpr)
-    SUGAR_TYPE(TypeOf)
-    SUGAR_TYPE(Decltype)
-    SUGAR_TYPE(UnaryTransform)
-    SUGAR_TYPE(Elaborated)
-    SUGAR_TYPE(SubstTemplateTypeParm)
-    SUGAR_TYPE(TemplateSpecialization)
-    SUGAR_TYPE(Auto)
-    SUGAR_TYPE(DeducedTemplateSpecialization)
-    SUGAR_TYPE(Adjusted)
-    SUGAR_TYPE(PackExpansion)
-    SUGAR_TYPE(Attributed)
+    MAYBE_SUGAR_TYPE(TypeOfExpr)
+    MAYBE_SUGAR_TYPE(TypeOf)
+    MAYBE_SUGAR_TYPE(Decltype)
+    MAYBE_SUGAR_TYPE(UnaryTransform)
+    MAYBE_SUGAR_TYPE(TemplateSpecialization)
+    MAYBE_SUGAR_TYPE(Auto)
+    MAYBE_SUGAR_TYPE(DeducedTemplateSpecialization)
+    MAYBE_SUGAR_TYPE(PackExpansion)
+
+    // These types are ALWAYS sugared.
+#define SUGAR_TYPE(KIND)                                                       \
+    ImportResult Visit##KIND##Type(const clang::KIND##Type *type) {            \
+      return Visit(type->desugar());                                           \
+    }
     SUGAR_TYPE(MacroQualified)
+    SUGAR_TYPE(Attributed)
+    SUGAR_TYPE(Adjusted)
+    SUGAR_TYPE(SubstTemplateTypeParm)
+    SUGAR_TYPE(Elaborated)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
