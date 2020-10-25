@@ -3544,6 +3544,14 @@ namespace {
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
+
+      // If this type is fully specialized (i.e. "Foo<>" or "Foo<int, int>"),
+      // bail to prevent a crash.
+      // TODO: we should be able to support fully specialized class templates.
+      // See SR-13775 for more info.
+      if (def->getTypeAsWritten())
+        return nullptr;
+
       // FIXME: This will instantiate all members of the specialization (and detect
       // instantiation failures in them), which can be more than is necessary
       // and is more than what Clang does. As a result we reject some C++
