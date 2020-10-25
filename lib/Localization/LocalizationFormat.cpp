@@ -38,10 +38,7 @@ enum LocalDiagID : uint32_t {
 };
 
 static constexpr const char *const diagnosticNameStrings[] = {
-#define ERROR(ID, Options, Text, Signature) " [" #ID "]",
-#define WARNING(ID, Options, Text, Signature) " [" #ID "]",
-#define NOTE(ID, Options, Text, Signature) " [" #ID "]",
-#define REMARK(ID, Options, Text, Signature) " [" #ID "]",
+#define DIAG(KIND, ID, Options, Text, Signature) " [" #ID "]",
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
@@ -96,12 +93,12 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
 
 llvm::StringRef
 LocalizationProducer::getMessageOr(swift::DiagID id,
-                                   llvm::StringRef defaultMessage) const {
+                                   llvm::StringRef defaultMessage) {
   auto localizedMessage = getMessage(id);
   if (localizedMessage.empty())
     return defaultMessage;
   llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
-  const std::string &localizedDebugDiagnosticMessage =
+  localizedDebugDiagnosticMessage =
       localizedMessage.str() + diagnosticName.str();
   return printDiagnosticName ? localizedDebugDiagnosticMessage
                              : localizedMessage;

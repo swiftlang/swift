@@ -155,6 +155,7 @@ public:
 
 class LocalizationProducer {
   bool printDiagnosticName;
+  std::string localizedDebugDiagnosticMessage;
 
 public:
   LocalizationProducer(bool printDiagnosticName = false)
@@ -163,7 +164,7 @@ public:
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
-                                       llvm::StringRef defaultMessage) const;
+                                       llvm::StringRef defaultMessage);
 
   virtual ~LocalizationProducer() {}
 
