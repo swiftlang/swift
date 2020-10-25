@@ -186,7 +186,9 @@ jobs:
           repository: swiftwasm/integration-tests
           path: integration-tests
       - name: Run integration tests
-        run: swift run # Use TOOLCHAIN env value
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_12.2.app/Contents/Developer/
+          swift run # Use TOOLCHAIN env value
         working-directory: ${{ github.workspace }}/integration-tests
 
   ubuntu1804_smoke_test:
