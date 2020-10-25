@@ -1616,7 +1616,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     auto ctor = dyn_cast<clang::CXXConstructorDecl>(D);
     if (auto templateCtor = dyn_cast<clang::FunctionTemplateDecl>(D))
       ctor = cast<clang::CXXConstructorDecl>(templateCtor->getAsFunction());
-    assert(ctor && "Unkown decl with CXXConstructorName.");
+    // If we couldn't find a constructor decl, bail.
+    if (!ctor)
+      return ImportedName();
     addEmptyArgNamesForClangFunction(ctor, argumentNames);
     break;
   }
