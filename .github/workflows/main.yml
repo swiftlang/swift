@@ -184,8 +184,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: swiftwasm/integration-tests
+          path: integration-tests
       - name: Run integration tests
         run: swift run # Use TOOLCHAIN env value
+        working-directory: ${{ github.workspace }}/integration-tests
 
   ubuntu1804_smoke_test:
     name: Run smoke tests on Ubuntu 18.04
@@ -227,8 +229,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: swiftwasm/integration-tests
+          path: integration-tests
       - name: Run integration tests
         run: swift run # Use TOOLCHAIN env value
+        working-directory: ${{ github.workspace }}/integration-tests
 
   ubuntu2004_smoke_test:
     name: Run smoke tests on Ubuntu 20.04
@@ -270,5 +274,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: swiftwasm/integration-tests
+          path: integration-tests
       - name: Run integration tests
         run: swift run # Use TOOLCHAIN env value
+        working-directory: ${{ github.workspace }}/integration-tests
