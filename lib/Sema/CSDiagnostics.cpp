@@ -2463,9 +2463,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
-  if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
-    return false;
-
   if (getLocator()
       ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>())
     return false;

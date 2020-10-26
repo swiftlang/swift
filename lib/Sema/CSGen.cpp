@@ -2591,9 +2591,9 @@ namespace {
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);
-      CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
-                       CS.getType(expr->getBase()),
-           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
+      CS.addConstraint(
+          ConstraintKind::DynamicTypeOf, tv, CS.getType(expr->getBase()),
+          CS.getConstraintLocator(expr, ConstraintLocator::DynamicType));
       return tv;
     }
 
