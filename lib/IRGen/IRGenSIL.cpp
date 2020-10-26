@@ -1231,6 +1231,8 @@ public:
 class AsyncNativeCCEntryPointArgumentEmission final
     : public NativeCCEntryPointArgumentEmission,
       public AsyncEntryPointArgumentEmission {
+  llvm::Value *task;
+  llvm::Value *executor;
   llvm::Value *context;
   /*const*/ AsyncContextLayout layout;
   const Address dataAddr;
@@ -1253,6 +1255,7 @@ public:
                                           SILBasicBlock &entry,
                                           Explosion &allParamValues)
       : AsyncEntryPointArgumentEmission(IGF, entry, allParamValues),
+        task(allParamValues.claimNext()), executor(allParamValues.claimNext()),
         context(allParamValues.claimNext()), layout(getAsyncContextLayout(IGF)),
         dataAddr(layout.emitCastTo(IGF, context)){};
 
@@ -3176,8 +3179,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    Explosion parameters = IGF.collectParameters();
-    llvm::Value *context = parameters.claimNext();
+    llvm::Value *context = IGF.CurFn->getArg(2);
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);

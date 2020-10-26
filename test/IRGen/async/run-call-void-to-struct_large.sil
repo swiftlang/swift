@@ -100,7 +100,7 @@ bb0(%0 : $@thin Big.Type):
   return %62 : $Big
 }
 
-// CHECK-LL: define hidden swiftcc void @getBig(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swiftcc void @getBig(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @getBig : $@async @convention(thin) () -> Big {
 bb0:
   %0 = metatype $@thin Big.Type

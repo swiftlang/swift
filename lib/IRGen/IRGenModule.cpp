@@ -589,8 +589,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});

@@ -690,9 +690,12 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
 }
 
 void SignatureExpansion::addAsyncParameters() {
+  // using TaskContinuationFunction =
+  //   SWIFT_CC(swift)
+  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
+  ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
-  // TODO: Add actor.
-  // TODO: Add task.
   if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Thick) {
     IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
     ParamIRTypes.push_back(IGM.RefCountedPtrTy);
@@ -2141,6 +2144,9 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
+    asyncExplosion.add(llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy));
+    asyncExplosion.add(
+        llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
     asyncExplosion.add(contextBuffer.getAddress());
     if (getCallee().getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {
