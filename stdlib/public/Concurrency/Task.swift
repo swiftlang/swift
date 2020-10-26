@@ -28,6 +28,19 @@ import Swift
 public struct Task {
 }
 
+// ==== Current Task -----------------------------------------------------------
+
+extension Task {
+  /// Returns the currently executing `Task`.
+  ///
+  /// As invoking this function is only possible from an asynchronous context
+  /// it is always able to return the current `Task` in which we are currently
+  /// running.
+  public static func current() async -> Task {
+    fatalError("\(#function) not implemented yet.")
+  }
+}
+
 // ==== Task Priority ----------------------------------------------------------
 
 extension Task {
