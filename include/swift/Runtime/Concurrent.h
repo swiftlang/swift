@@ -804,7 +804,7 @@ private:
   uint32_t ElementCapacity{0};
 
   /// The list of pointers to be freed once no readers are active.
-  FreeListNode *FreeList{nullptr};
+//   FreeListNode *FreeList{nullptr};
 
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
@@ -817,8 +817,8 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
-      FreeListNode::freeAll(&FreeList);
+//     if (ReaderCount.load(std::memory_order_acquire) == 0)
+//       FreeListNode::freeAll(&FreeList);
   }
 
   /// Grow the elements array, adding the old array to the free list and
@@ -835,7 +835,7 @@ private:
     ElemTy *newElements = static_cast<ElemTy *>(malloc(newSize));
     if (elements) {
       memcpy(newElements, elements, elementCount * sizeof(ElemTy));
-      FreeListNode::add(&FreeList, elements);
+//       FreeListNode::add(&FreeList, elements);
     }
 
     ElementCapacity = newCapacity;
@@ -876,7 +876,7 @@ private:
     Indices.store(newIndices.Value, std::memory_order_release);
 
     if (auto *ptr = indices.pointer())
-      FreeListNode::add(&FreeList, ptr);
+//       FreeListNode::add(&FreeList, ptr);
 
     return newIndices;
   }
@@ -1084,9 +1084,9 @@ public:
     Elements.store(nullptr, std::memory_order_relaxed);
     ElementCapacity = 0;
 
-    if (auto *ptr = indices.pointer())
-      FreeListNode::add(&FreeList, ptr);
-    FreeListNode::add(&FreeList, elements);
+//     if (auto *ptr = indices.pointer())
+//       FreeListNode::add(&FreeList, ptr);
+//     FreeListNode::add(&FreeList, elements);
 
     deallocateFreeListIfSafe();
   }
@@ -1116,15 +1116,24 @@ struct StableAddressConcurrentReadableHashMap
   // Implicitly trivial destructor.
   ~StableAddressConcurrentReadableHashMap() = default;
 
+  std::atomic<ElemTy *> LastFound{nullptr};
+
   /// Get or insert an element for the given key and arguments. Returns the
   /// pointer to the existing or new element, and a bool indicating whether the
   /// element was created. When false, the element already existed before the
   /// call.
   template <class KeyTy, class... ArgTys>
   std::pair<ElemTy *, bool> getOrInsert(KeyTy key, ArgTys &&...args) {
+    // See if this is a repeat of the previous search.
+    if (auto lastFound = LastFound.load(std::memory_order_acquire))
+      if (lastFound->matchesKey(key))
+        return {lastFound, false};
+
     // Optimize for the case where the value already exists.
-    if (auto wrapper = this->snapshot().find(key))
+    if (auto wrapper = this->snapshot().find(key)) {
+      LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
       return {wrapper->Ptr, false};
+    }
 
     // No such element. Insert if needed. Note: another thread may have inserted
     // it in the meantime, so we still have to handle both cases!
@@ -1144,6 +1153,7 @@ struct StableAddressConcurrentReadableHashMap
           outerCreated = created;
           return true; // Keep the new entry.
         });
+    LastFound.store(ptr, std::memory_order_relaxed);
     return {ptr, outerCreated};
   }
 
