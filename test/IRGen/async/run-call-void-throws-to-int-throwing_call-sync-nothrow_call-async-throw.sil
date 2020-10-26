@@ -62,7 +62,7 @@ sil_witness_table hidden E: Error module main {
 }
 
 
-sil hidden @call : $@convention(thin) () -> () {
+sil hidden @call : $@async @convention(thin) () -> () {
 bb0:
   %voidThrowsToInt = function_ref @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
   try_apply %voidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal bb1, error bb3
@@ -101,8 +101,8 @@ bb5:
 // CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
 sil hidden @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
 entry:
-  %syncVoidThrowsToInt = function_ref @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error)
-  try_apply %syncVoidThrowsToInt() : $@convention(thin) () -> (Int64, @error Error), normal success1, error error1
+  %syncVoidThrowsToInt = function_ref @syncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
+  try_apply %syncVoidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal success1, error error1
 success1(%out1 : $Int64):
   %asyncVoidThrowsToInt = function_ref @asyncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)
   try_apply %asyncVoidThrowsToInt() : $@async @convention(thin) () -> (Int64, @error Error), normal success2, error error2
@@ -116,7 +116,7 @@ error(%error : $Error):
   throw %error : $Error
 }
 
-sil hidden @syncVoidThrowsToInt : $@convention(thin) () -> (Int64, @error Error) {
+sil hidden @syncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
 bb0:
   %int_literal = integer_literal $Builtin.Int64, 1          // user: %2
   %Int64 = struct $Int64 (%int_literal : $Builtin.Int64)          // user: %3
@@ -137,10 +137,10 @@ bb0:
   throw %error : $Error
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 42
-  %result = apply %call() : $@convention(thin) () -> ()
+  %call = function_ref @call : $@async @convention(thin) () -> () // CHECK: 42
+  %result = apply %call() : $@async @convention(thin) () -> ()
 
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)

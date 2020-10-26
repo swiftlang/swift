@@ -30,14 +30,14 @@ entry(%out : $*T, %in : $*T, %inout : $*T):
   return %result : $()
 }
 
-sil @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T {
+sil @partial_apply_open_generic_capture : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T {
 entry(%a : $*T):
   %f = function_ref @inGenericAndInoutGenericToGeneric : $@async @convention(thin) <U> (@in U, @inout U) -> @out U
   %p = partial_apply %f<T>(%a) : $@async @convention(thin) <U> (@in U, @inout U) -> @out U
   return %p : $@async @callee_owned (@in T) -> @out T
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %in_literal = integer_literal $Builtin.Int64, 876
   %in = struct $Int64 (%in_literal : $Builtin.Int64)
@@ -50,8 +50,8 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   store %inout to %inout_addr : $*Int64
   %result_addr = alloc_stack $Int64
 
-  %partial_apply_open_generic_capture = function_ref @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
-  %partiallyApplied = apply %partial_apply_open_generic_capture<Int64>(%inout_addr) : $@convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
+  %partial_apply_open_generic_capture = function_ref @partial_apply_open_generic_capture : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
+  %partiallyApplied = apply %partial_apply_open_generic_capture<Int64>(%inout_addr) : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T
   %void = apply %partiallyApplied(%result_addr, %in_addr) : $@async @callee_owned (@in Int64) -> @out Int64
 
   %result = load %result_addr : $*Int64

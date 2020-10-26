@@ -1757,6 +1757,8 @@ llvm::Value *irgen::getDynamicAsyncContextSize(IRGenFunction &IGF,
                                                AsyncContextLayout layout,
                                                CanSILFunctionType functionType,
                                                llvm::Value *thickContext) {
+  // TODO: This calculation should be extracted out into a standalone function
+  //       emitted on-demand per-module to improve codesize.
   switch (functionType->getRepresentation()) {
   case SILFunctionTypeRepresentation::Thick: {
     // If the called function is thick, the size of the called function's
@@ -2074,11 +2076,15 @@ class AsyncCallEmission final : public CallEmission {
   Size contextSize;
   Address context;
   llvm::Value *thickContext = nullptr;
+  Optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
-    return ::getAsyncContextLayout(IGF, getCallee().getOrigFunctionType(),
-                                   getCallee().getSubstFunctionType(),
-                                   getCallee().getSubstitutions());
+    if (!asyncContextLayout) {
+      asyncContextLayout.emplace(::getAsyncContextLayout(
+          IGF, getCallee().getOrigFunctionType(),
+          getCallee().getSubstFunctionType(), getCallee().getSubstitutions()));
+    }
+    return *asyncContextLayout;
   }
 
   void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {

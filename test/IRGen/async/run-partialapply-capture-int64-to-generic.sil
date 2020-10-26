@@ -36,7 +36,7 @@ entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
   return %result : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %callee = function_ref @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
   %first_literal = integer_literal $Builtin.Int32, 1

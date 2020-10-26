@@ -83,7 +83,7 @@ entry(%S_type: $@thin S.Type, %C_instance: $C):
   return %closure : $@async @callee_owned () -> ()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %c_type = metatype $@thick C.Type
   %allocating_init = function_ref @C_allocating_init : $@convention(method) (@thick C.Type) -> @owned C

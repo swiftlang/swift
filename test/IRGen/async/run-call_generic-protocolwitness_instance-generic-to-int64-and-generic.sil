@@ -53,14 +53,14 @@ bb0(%out_addr : $*τ_0_0, %in_addr : $*τ_0_0, %self_addr : $*I):
   return %result : $Int64
 }
 
-sil hidden @callPrintMe : $@convention(thin) <T, U where T : P> (@in_guaranteed T, @in_guaranteed U) -> (Int64, @out U) {
+sil hidden @callPrintMe : $@async @convention(thin) <T, U where T : P> (@in_guaranteed T, @in_guaranteed U) -> (Int64, @out U) {
 bb0(%out_addr : $*U, %self_addr : $*T, %in_addr : $*U):
   %I_P_printMe = witness_method $T, #P.printMe : <Self where Self : P><T> (Self) -> (T) async -> (Int64, T) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> (Int64, @out τ_1_0)
   %result = apply %I_P_printMe<T, U>(%out_addr, %in_addr, %self_addr) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> (Int64, @out τ_1_0)
   return %result : $Int64
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %I_type = metatype $@thin I.Type
   %int_literal = integer_literal $Builtin.Int64, 99
@@ -71,8 +71,8 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   store %i to %in_addr : $*I
   %i_addr = alloc_stack $I
   store %i to %i_addr : $*I
-  %callPrintMe = function_ref @callPrintMe : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
-  %result = apply %callPrintMe<I, I>(%out_addr, %in_addr, %i_addr) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
+  %callPrintMe = function_ref @callPrintMe : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
+  %result = apply %callPrintMe<I, I>(%out_addr, %in_addr, %i_addr) : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Int64, @out τ_0_1)
   dealloc_stack %i_addr : $*I
   dealloc_stack %in_addr : $*I
   %out = load %out_addr : $*I

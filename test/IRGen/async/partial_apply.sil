@@ -372,25 +372,25 @@ bb0(%0 : $*A2<A3>):
   return %5 : $@async @callee_guaranteed () -> (@owned A1, @error Error)
 }
 
-sil @capture_class : $@async @convention(thin) (@guaranteed A3) -> ()
-
-// CHECK-LABEL: define{{.*}} swiftcc i8* @partial_apply_stack_in_coroutine(i8* {{.*}} %0, %T13partial_apply2A3C* %1)
-sil @partial_apply_stack_in_coroutine : $@yield_once (@owned A3) -> () {
-entry(%0: $A3):
-  %f = function_ref @capture_class : $@async @convention(thin) (@guaranteed A3) -> ()
-  %p = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@async @convention(thin) (@guaranteed A3) -> ()
-  apply %p() : $@noescape @async @callee_guaranteed () -> ()
-  dealloc_stack %p : $@noescape @async @callee_guaranteed () -> ()
-  %1000 = integer_literal $Builtin.Int32, 1000
-  yield (), resume resume, unwind unwind
-
-resume:
-  %ret = tuple ()
-  return %ret : $()
-
-unwind:
-  unwind
-}
+//sil @capture_class : $@async @convention(thin) (@guaranteed A3) -> ()
+//
+//// CHECK LABEL: define{{.*}} swiftcc i8* @partial_apply_stack_in_coroutine(i8* {{.*}} %0, %T13partial_apply2A3C* %1)
+//sil @partial_apply_stack_in_coroutine : $@async @yield_once (@owned A3) -> () {
+//entry(%0: $A3):
+//  %f = function_ref @capture_class : $@async @convention(thin) (@guaranteed A3) -> ()
+//  %p = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@async @convention(thin) (@guaranteed A3) -> ()
+//  apply %p() : $@noescape @async @callee_guaranteed () -> ()
+//  dealloc_stack %p : $@noescape @async @callee_guaranteed () -> ()
+//  %1000 = integer_literal $Builtin.Int32, 1000
+//  yield (), resume resume, unwind unwind
+//
+//resume:
+//  %ret = tuple ()
+//  return %ret : $()
+//
+//unwind:
+//  unwind
+//}
 sil_vtable A3 {}
 
 

@@ -18,12 +18,12 @@ import PrintShims
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
-sil hidden @createAndInvokeClosure : $@convention(thin) () -> () {
+sil hidden @createAndInvokeClosure : $@async @convention(thin) () -> () {
 bb0:
   %captured_literal = integer_literal $Builtin.Int64, 783247897
   %captured = struct $Int64 (%captured_literal : $Builtin.Int64)
-  %createPartialApply = function_ref @createPartialApply : $@convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
-  %partialApply = apply %createPartialApply(%captured) : $@convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
+  %createPartialApply = function_ref @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
+  %partialApply = apply %createPartialApply(%captured) : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
   strong_retain %partialApply : $@async @callee_guaranteed (Int64) -> Int64
   %applied_literal = integer_literal $Builtin.Int64, 7823478
   %applied = struct $Int64 (%applied_literal : $Builtin.Int64)
@@ -35,10 +35,10 @@ bb0:
   return %result : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %createAndInvokeClosure = function_ref @createAndInvokeClosure : $@convention(thin) () -> ()
-  %createAndInvokeClosure_result = apply %createAndInvokeClosure() : $@convention(thin) () -> ()
+  %createAndInvokeClosure = function_ref @createAndInvokeClosure : $@async @convention(thin) () -> ()
+  %createAndInvokeClosure_result = apply %createAndInvokeClosure() : $@async @convention(thin) () -> ()
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32
@@ -46,7 +46,7 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
 
 // CHECK-LL: define internal swiftcc void @closure(%swift.context* {{%[0-9]*}}) {{#[0-9]*}}
 // CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}}
-sil hidden @createPartialApply : $@convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
+sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
 bb0(%captured : $Int64):
   %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> Int64
   %partialApply = partial_apply [callee_guaranteed] %closure(%captured) : $@async @convention(thin) (Int64, Int64) -> Int64
