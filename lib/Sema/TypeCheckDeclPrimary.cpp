@@ -26,6 +26,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
+#include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1445,6 +1446,59 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   diagnoseDuplicateDecls(captureListVars);
 }
 
+template <typename Attr>
+static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
+                            Optional<bool> expected,
+                            llvm::function_ref<Attr*()> willCreate) {
+  if (!expected) return;
+
+  auto attr = VD->getAttrs().getAttribute<Attr>();
+  if (*expected == (attr != nullptr)) return;
+
+  if (*expected) {
+    attr = willCreate();
+    VD->getAttrs().add(attr);
+  } else {
+    VD->getAttrs().removeAttribute(attr);
+  }
+}
+
+static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
+                            const AccessNotes &notes) {
+  ASTContext &ctx = VD->getASTContext();
+
+  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]() {
+    return ObjCAttr::create(ctx, note.ObjCName, true);
+  });
+
+  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{
+    return new (ctx) DynamicAttr(true);
+  });
+
+  if (note.ObjCName) {
+    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
+
+    if (!attr) {
+      // TODO: diagnose use of ObjCName without ObjC: true
+    }
+    else if (!attr->hasName()) {
+      attr->setName(*note.ObjCName, true);
+    }
+    else if (attr->getName() != *note.ObjCName) {
+      // TODO: diagnose conflict between explicit name in code and explicit
+      // name in access note
+    }
+  }
+}
+
+evaluator::SideEffect
+ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  AccessNotes &notes = VD->getModuleContext()->getAccessNotes();
+  if (auto note = notes.lookup(VD))
+    applyAccessNote(VD, *note.get(), notes);
+  return {};
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1466,7 +1520,11 @@ public:
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
                                     "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
-    
+
+    if (auto VD = dyn_cast<ValueDecl>(decl))
+      (void)evaluateOrDefault(VD->getASTContext().evaluator,
+                              ApplyAccessNoteRequest{VD}, {});
+
     DeclVisitor<DeclChecker>::visit(decl);
 
     TypeChecker::checkUnsupportedProtocolType(decl);
