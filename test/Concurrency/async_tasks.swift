@@ -2,7 +2,9 @@
 // REQUIRES: concurrency
 
 func someAsyncFunc() async -> String { "" }
+
 struct MyError: Error {}
+func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
 // non-async function with "weird shape" representing some API that has not adopted
 // swift concurrency yet, but we want to call it from an async function and make it
@@ -36,4 +38,27 @@ func test_unsafeThrowingContinuations() async {
   }
 
   // TODO: Potentially could offer some warnings if we know that a continuation was resumed or escaped at all in a closure?
+}
+
+// ==== Detached Tasks ---------------------------------------------------------
+
+func test_detached() async {
+  let handle = Task.runDetached() {
+    await someAsyncFunc() // able to call async functions
+  }
+
+  let result: String = await handle.get()
+  _ = result
+}
+
+func test_detached_throwing() async -> String {
+  let handle: Task.Handle<String, Error> = Task.runDetached() {
+    await try someThrowingAsyncFunc() // able to call async functions
+  }
+
+  do {
+    return await try handle.get()
+  } catch {
+    print("caught: \(error)")
+  }
 }
