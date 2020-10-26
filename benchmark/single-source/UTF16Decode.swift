@@ -106,6 +106,7 @@ public func run_UTF16Decode_InitFromData(_ N: Int) {
     blackHole(String(data: input, encoding: .utf16))
   }
 }
+
 @inline(never)
 public func run_UTF16Decode_InitDecoding(_ N: Int) {
     let input: [CodeUnit] = allStringsCodeUnits
@@ -121,6 +122,7 @@ public func run_UTF16Decode_InitFromData_ascii(_ N: Int) {
     blackHole(String(data: input, encoding: .utf16))
   }
 }
+
 @inline(never)
 public func run_UTF16Decode_InitDecoding_ascii(_ N: Int) {
   let input = asciiCodeUnits
@@ -185,6 +187,7 @@ public func run_UTF16Decode_InitFromCustom_contiguous(_ N: Int) {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
+
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_contiguous_ascii(_ N: Int) {
   let input = asciiCustomContiguous
@@ -200,6 +203,7 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
+
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
   let input = asciiCustomNoncontiguous
@@ -207,4 +211,3 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
-
