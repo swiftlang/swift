@@ -1057,11 +1057,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
   ImportSet spiImportSet =
-      getImportsAsSet(M, {
-          ModuleDecl::ImportFilterKind::Exported,
-          ModuleDecl::ImportFilterKind::Default,
-          ModuleDecl::ImportFilterKind::SPIAccessControl
-      });
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());

@@ -115,8 +115,7 @@ static void printImports(raw_ostream &out,
 
     SmallVector<ImportedModule, 4> ioiImport;
     M->getImportedModules(ioiImport,
-                          {ModuleDecl::ImportFilterKind::ImplementationOnly,
-                           ModuleDecl::ImportFilterKind::SPIAccessControl});
+                          ModuleDecl::ImportFilterKind::ImplementationOnly);
     ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
   }
 
