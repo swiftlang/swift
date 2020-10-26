@@ -27,7 +27,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -Xfrontend -disable-objc-attr-requires-foundation-module
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS
+    TARGET_SDKS ALL_APPLE_PLATFORMS FREESTANDING
     INSTALL_IN_COMPONENT sdk-overlay
 
     DEPENDS ${darwin_depends})

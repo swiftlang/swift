@@ -6059,3 +6059,8 @@ inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
 }
 }
 #endif
+
+// Autolink with libc++, for cases where libswiftCore is linked statically.
+#if defined(__MACH__)
+asm(".linker_option \"-lc++\"\n");
+#endif // defined(__MACH__)

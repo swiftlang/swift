@@ -6,6 +6,7 @@
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret
+// UNSUPPORTED: freestanding
 
 // With a non-optimized stdlib the test takes very long.
 // REQUIRES: optimized_stdlib
