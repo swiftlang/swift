@@ -3215,7 +3215,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.CurFn->getArg(2);
+    llvm::Value *context = IGF.getAsyncContext();
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);
