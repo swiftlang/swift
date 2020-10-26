@@ -1047,7 +1047,12 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(
       Arguments,
       options::OPT_enable_experimental_cross_module_incremental_build);
-
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                            options::OPT_no_static_executable, false) ||
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                            options::OPT_no_static_stdlib, false)) {
+    Arguments.push_back("-use-static-resource-dir");
+  }
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
