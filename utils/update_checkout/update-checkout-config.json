@@ -41,7 +41,7 @@
             "platforms": [ "Linux" ]
         },
         "yams": {
-            "remote": { "id": "asuhan/Yams" }
+            "remote": { "id": "compnerd/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -338,7 +338,7 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "3.0.1-patched",
+                "yams": "3.0.1-tensorflow",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "PythonKit": "master",
