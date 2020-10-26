@@ -66,9 +66,5 @@ func test_detached_throwing() async -> String {
 // ==== Current Task -----------------------------------------------------------
 
 func test_current_task() async {
-    let task = await Task.current() // yay, we know "in" what task we're executing
-}
-
-func test_current_task_notasync() {
-    let task = Task.current()
+    _ = await Task.current() // yay, we know "in" what task we're executing
 }

@@ -44,11 +44,43 @@ extension Task {
 // ==== Task Priority ----------------------------------------------------------
 
 extension Task {
+  /// Task priority may inform decisions an `Executor` makes about how and when
+  /// to schedule tasks submitted to it.
+  ///
+  /// ### Priority scheduling
+  /// An executor MAY utilize priority information to attempt running higher
+  /// priority tasks first, and then continuing to serve lower priority tasks.
+  ///
+  /// The exact semantics of how priority is treated are left up to each
+  /// platform and `Executor` implementation.
+  ///
+  /// ### Priority inheritance
+  /// Child tasks automatically inherit their parent task's priority.
+  ///
+  /// Detached tasks (created by `Task.runDetached`) DO NOT inherit task priority,
+  /// as they are "detached" from their parent tasks after all.
+  ///
+  /// ### Priority elevation
+  /// In some situations the priority of a task must be elevated ("raised"):
+  ///
+  /// - if a `Task` running on behalf of an actor, and a new higher-priority
+  ///   task is enqueued to the actor, its current task must be temporarily
+  ///   elevated to the priority of the enqueued task, in order to allow the new
+  ///   task to be processed at--effectively-- the priority it was enqueued with.
+  ///   - this DOES NOT affect `Task.currentPriority()`.
+  /// - if a task is created with a `Task.Handle`, and a higher-priority task
+  ///   calls the `await handle.get()` function the priority of this task must be
+  ///   permanently increased until the task completes.
+  ///   - this DOES affect `Task.currentPriority()`.
+  ///
+  /// TODO: Define the details of task priority; It is likely to be a concept
+  ///       similar to Darwin Dispatch's QoS; bearing in mind that priority is not as
+  ///       much of a thing on other platforms (i.e. server side Linux systems).
   public struct Priority: Comparable {
     public static let `default`: Task.Priority = .init() // TODO: replace with actual values
 
     // TODO: specifics of implementation are not decided yet
-    let __value: Int = 0
+    private let __value: Int = 0
 
     public static func < (lhs: Self, rhs: Self) -> Bool {
       lhs.__value < rhs.__value
@@ -60,32 +92,36 @@ extension Task {
 
 extension Task {
 
-  /// A task handle refers to an in-flight `Task`, allowing for (potentially)
-  /// awaiting for its result or potentially canceling it.
+  /// A task handle refers to an in-flight `Task`,
+  /// allowing for potentially awaiting for its result or canceling it.
+  ///
+  /// It is not a programming error to drop a handle without awaiting or canceling it,
+  /// i.e. the task will run regardless of the handle still being present or not.
+  /// Dropping a handle however means losing the ability to await on the task's result
+  /// and losing the ability to cancel it.
   public final class Handle<Success, Failure: Error> {
+      /// Wait for the task to complete, returning (or throwing) its result.
+      ///
+      /// ### Priority
+      /// If the task has not completed yet, its priority will be elevated to the
+      /// priority of the current task. Note that this may not be as effective as
+      /// creating the task with the "right" priority to in the first place.
+      public func get() async throws -> Success {
+      fatalError("\(#function) not implemented yet.")
+    }
 
-    /// Wait for the task to complete, returning (or throwing) its result.
+    /// Attempt to cancel the task.
     ///
-    /// ### Priority
-    /// If the task has not completed yet, its priority will be elevated to the
-    /// priority of the current task. Note that this may not be as effective as
-    /// creating the task with the "right" priority to in the first place.
-    public func get() async throws -> Success {
-    fatalError("\(#function) not implemented yet.")
+    /// Whether this function has any effect is task-dependent.
+    ///
+    /// For a task to respect cancellation it must cooperatively check for it
+    /// while running. Many tasks will check for cancellation before beginning
+    /// their "actual work", however this is not a requirement nor is it guaranteed
+    /// how and when tasks check for cancellation in general.
+    public func cancel() {
+      fatalError("\(#function) not implemented yet.")
+    }
   }
-
-  /// Attempt to cancel the task.
-  ///
-  /// Whether this function has any effect is task-dependent.
-  ///
-  /// For a task to respect cancellation it must cooperatively check for it
-  /// while running. Many tasks will check for cancellation before beginning
-  /// their "actual work", however this is not a requirement nor is it guaranteed
-  /// how and when tasks check for cancellation in general.
-  public func cancel() {
-    fatalError("\(#function) not implemented yet.")
-  }
-}
 }
 
 extension Task.Handle where Failure == Never {
