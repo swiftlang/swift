@@ -1060,15 +1060,24 @@ struct StableAddressConcurrentReadableHashMap
   // Implicitly trivial destructor.
   ~StableAddressConcurrentReadableHashMap() = default;
 
+  std::atomic<ElemTy *> LastFound{nullptr};
+
   /// Get or insert an element for the given key and arguments. Returns the
   /// pointer to the existing or new element, and a bool indicating whether the
   /// element was created. When false, the element already existed before the
   /// call.
   template <class KeyTy, class... ArgTys>
   std::pair<ElemTy *, bool> getOrInsert(KeyTy key, ArgTys &&...args) {
+    // See if this is a repeat of the previous search.
+    if (auto lastFound = LastFound.load(std::memory_order_acquire))
+      if (lastFound->matchesKey(key))
+        return {lastFound, false};
+
     // Optimize for the case where the value already exists.
-    if (auto wrapper = this->snapshot().find(key))
+    if (auto wrapper = this->snapshot().find(key)) {
+      LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
       return {wrapper->Ptr, false};
+    }
 
     // No such element. Insert if needed. Note: another thread may have inserted
     // it in the meantime, so we still have to handle both cases!
@@ -1088,6 +1097,7 @@ struct StableAddressConcurrentReadableHashMap
           outerCreated = created;
           return true; // Keep the new entry.
         });
+    LastFound.store(ptr, std::memory_order_relaxed);
     return {ptr, outerCreated};
   }
 
