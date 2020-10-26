@@ -291,6 +291,8 @@ private:
 
   bool canReplaceArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
                      const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
+  SILValue canCastArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
+                      const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
 
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
