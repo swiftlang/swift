@@ -78,7 +78,12 @@ public struct MyStruct<S> { public var x: S
 // BAR-NEXT:          }
 // BAR-NEXT:          {
 // BAR-NEXT:            "kind": "text",
-// BAR-NEXT:            "spelling": ": T"
+// BAR-NEXT:            "spelling": ": "
+// BAR-NEXT:          }
+// BAR-NEXT:          {
+// BAR-NEXT:            "kind": "typeIdentifier",
+// BAR-NEXT:            "spelling": "T",
+// BAR-NEXT:            "preciseIdentifier": "s:9Navigator8MyStructV3bar1xyqd___tSTRd__lF1TL_qd__mfp"
 // BAR-NEXT:          }
 // BAR-NEXT:          {
 // BAR-NEXT:            "kind": "text",
