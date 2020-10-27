@@ -340,6 +340,11 @@ namespace irgen {
                          CanSILFunctionType coroutineType,
                          Explosion &yieldedValues);
 
+  enum class AsyncFunctionArgumentIndex : unsigned {
+    Task = 0,
+    Executor = 1,
+    Context = 2,
+  };
 } // end namespace irgen
 } // end namespace swift
 

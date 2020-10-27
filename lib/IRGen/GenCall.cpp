@@ -273,6 +273,27 @@ static llvm::Value *getAsyncTask(IRGenFunction &IGF) {
   return llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy);
 }
 
+llvm::Value *IRGenFunction::getAsyncTask() {
+  assert(isAsync());
+  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
+  assert(value->getType() == IGM.SwiftTaskPtrTy);
+  return value;
+}
+
+llvm::Value *IRGenFunction::getAsyncExecutor() {
+  assert(isAsync());
+  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
+  assert(value->getType() == IGM.SwiftExecutorPtrTy);
+  return value;
+}
+
+llvm::Value *IRGenFunction::getAsyncContext() {
+  assert(isAsync());
+  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
+  assert(value->getType() == IGM.SwiftContextPtrTy);
+  return value;
+}
+
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
   if (size() == 0) {
     return IGM.VoidTy;
