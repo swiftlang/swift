@@ -3147,7 +3147,17 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                                                 const SolutionDiff &diff,
                                                 ArrayRef<Solution> solutions) {
-  if (!diff.overloads.empty())
+  // Also attempt to detect and diagnose conflicting generic arguments across
+  // multiple solutions and overloads when all fixes are generic mismatches.
+  bool allGenericMismatch =
+      llvm::all_of(solutions, [](const Solution &solution) -> bool {
+        return llvm::all_of(
+            solution.Fixes, [](const ConstraintFix *fix) -> bool {
+              return fix->getKind() == FixKind::GenericArgumentsMismatch;
+            });
+      });
+
+  if (!(diff.overloads.empty() || allGenericMismatch))
     return false;
 
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
@@ -3155,17 +3165,42 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
      return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
   });
 
-  bool allMismatches =
-      llvm::all_of(solutions, [](const Solution &solution) -> bool {
-        return llvm::all_of(
-            solution.Fixes, [](const ConstraintFix *fix) -> bool {
-              return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
-                     fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
-                     fix->getKind() == FixKind::AllowTupleTypeMismatch;
-            });
-      });
+  bool allMismatches = false;
+  if (!allGenericMismatch) {
+    allMismatches =
+        llvm::all_of(solutions, [](const Solution &solution) -> bool {
+          // Special casing situations where a type mismatch maybe followed by a
+          // conformance requirement fix on each solution e.g.
+          //    func f<E: Equatable>(_ e1: E, _ e2: E) {}
+          //
+          //    struct A {}
+          //    struct B {}
+          //
+          //    f(A(), B())
+          //
+          // We also have to make sure that we diagnose the generic argument
+          // mismatch in those situations.
+          bool allConformance = llvm::all_of(
+              solution.Fixes, [](const ConstraintFix *fix) -> bool {
+                return fix->getKind() == FixKind::AddConformance;
+              });
+          // Ensure to not attempt diagnose it when we only have conformance
+          // fixes.
+          return !allConformance &&
+                 llvm::all_of(
+                     solution.Fixes, [](const ConstraintFix *fix) -> bool {
+                       return fix->getKind() ==
+                                  FixKind::AllowArgumentTypeMismatch ||
+                              fix->getKind() ==
+                                  FixKind::AllowFunctionTypeMismatch ||
+                              fix->getKind() ==
+                                  FixKind::AllowTupleTypeMismatch ||
+                              fix->getKind() == FixKind::AddConformance;
+                     });
+        });
+  }
 
-  if (!noFixes && !allMismatches)
+  if (!(noFixes || allMismatches || allGenericMismatch))
     return false;
 
   auto &DE = cs.getASTContext().Diags;
