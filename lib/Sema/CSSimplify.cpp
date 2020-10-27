@@ -10525,7 +10525,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
-  case FixKind::AllowAlwaysSucceedCheckedCast: {
+  case FixKind::AllowAlwaysSucceedCheckedCast:
+  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

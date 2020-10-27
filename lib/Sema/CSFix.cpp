@@ -1938,3 +1938,23 @@ bool AllowUnsupportedRuntimeCheckedCast::diagnose(const Solution &solution,
       solution, getFromType(), getToType(), CastKind, getLocator());
   return failure.diagnose(asNote);
 }
+
+bool AllowInvalidStaticMemberRefOnProtocolMetatype::diagnose(
+    const Solution &solution, bool asNote) const {
+  auto *locator = getLocator();
+  auto overload = solution.getOverloadChoice(locator);
+
+  auto *member = overload.choice.getDeclOrNull();
+  assert(member);
+
+  AllowTypeOrInstanceMemberFailure failure(solution, BaseType, member,
+                                           member->createNameRef(), locator);
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidStaticMemberRefOnProtocolMetatype *
+AllowInvalidStaticMemberRefOnProtocolMetatype::create(
+    ConstraintSystem &cs, Type baseType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidStaticMemberRefOnProtocolMetatype(cs, baseType, locator);
+}

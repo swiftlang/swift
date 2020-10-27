@@ -307,6 +307,11 @@ enum class FixKind : uint8_t {
   /// convertible, but runtime does not support such convertions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
+
+  /// Allow reference to a static member on a protocol metatype
+  /// even though result type of the reference doesn't conform
+  /// to an expected protocol.
+  AllowInvalidStaticMemberRefOnProtocolMetatype,
 };
 
 class ConstraintFix {
@@ -2305,6 +2310,27 @@ public:
   static AllowUnsupportedRuntimeCheckedCast *
   attempt(ConstraintSystem &cs, Type fromType, Type toType,
           CheckedCastKind kind, ConstraintLocator *locator);
+};
+
+class AllowInvalidStaticMemberRefOnProtocolMetatype final
+  : public ConstraintFix {
+  Type BaseType;
+
+  AllowInvalidStaticMemberRefOnProtocolMetatype(ConstraintSystem &cs,
+                                                Type baseType,
+                                                ConstraintLocator *locator)
+    : ConstraintFix(cs,
+                    FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype,
+                    locator),
+      BaseType(baseType) {}
+
+  public:
+  std::string getName() const override {
+    return "allow invalid static member reference on a protocol metatype";
+  }
+
+  static AllowInvalidStaticMemberRefOnProtocolMetatype *
+  create(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
