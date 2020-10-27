@@ -44,6 +44,12 @@ extension Task {
 // ==== Task Priority ----------------------------------------------------------
 
 extension Task {
+
+  /// Returns the current task's priority.
+  public static func currentPriority() async -> Priority {
+    fatalError("\(#function) not implemented yet.")
+  }
+
   /// Task priority may inform decisions an `Executor` makes about how and when
   /// to schedule tasks submitted to it.
   ///
@@ -61,7 +67,7 @@ extension Task {
   /// as they are "detached" from their parent tasks after all.
   ///
   /// ### Priority elevation
-  /// In some situations the priority of a task must be elevated ("raised"):
+  /// In some situations the priority of a task must be elevated (or "escalated", "raised"):
   ///
   /// - if a `Task` running on behalf of an actor, and a new higher-priority
   ///   task is enqueued to the actor, its current task must be temporarily
