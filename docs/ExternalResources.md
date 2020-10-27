@@ -135,7 +135,7 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
 
 ## Code generation, runtime and ABI
 
-- The Swift Runtime by Jordan Rose (blog post series, Aug-Oct 2020):
+- [The Swift Runtime][] by Jordan Rose (blog post series, Aug-Oct 2020):
   This blog post series describes the runtime layout for different structures,
   runtime handling for metadata, as well as basic runtime functionality such
   as retain/release that needs to be handled when porting Swift to a new
