@@ -188,6 +188,7 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
   reabstraction thunks and protocol witness tables.
 
 [Mac OS 9]: https://belkadan.com/blog/2020/04/Swift-on-Mac-OS-9/
+[The Swift Runtime]: https://belkadan.com/blog/tags/swift-runtime/
 [Part 1: Heap Objects]: https://belkadan.com/blog/2020/08/Swift-Runtime-Heap-Objects/
 [Part 2: Type Layout]: https://belkadan.com/blog/2020/09/Swift-Runtime-Type-Layout/
 [Part 3: Type Metadata]: https://belkadan.com/blog/2020/09/Swift-Runtime-Type-Metadata/
