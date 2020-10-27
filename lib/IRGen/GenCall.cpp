@@ -103,6 +103,13 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   auto parameters = substitutedType->getParameters();
   SILFunctionConventions fnConv(substitutedType, IGF.getSILModule());
 
+  auto addTaskContinuationFunction = [&]() {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getTaskContinuationFunctionPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  };
+
   // AsyncContext * __ptrauth_swift_async_context_parent Parent;
   {
     auto ty = SILType();
@@ -113,12 +120,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
 
   // TaskContinuationFunction * __ptrauth_swift_async_context_resume
   //     ResumeParent;
-  {
-    auto ty = SILType();
-    auto &ti = IGF.IGM.getTaskContinuationFunctionPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  }
+  addTaskContinuationFunction();
 
   // ExecutorRef ResumeParentExecutor;
   {
