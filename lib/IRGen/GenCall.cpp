@@ -293,11 +293,6 @@ static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
 }
 
-static llvm::Value *getAsyncTask(IRGenFunction &IGF) {
-  // TODO: Return the appropriate task.
-  return llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy);
-}
-
 llvm::Value *IRGenFunction::getAsyncTask() {
   assert(isAsync());
   auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
@@ -3379,7 +3374,7 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
 Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                              Alignment alignment) {
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
-                                      {getAsyncTask(IGF), size});
+                                      {IGF.getAsyncTask(), size});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -3391,7 +3386,7 @@ Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
 void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
                             llvm::Value *size) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskDeallocFn(), {getAsyncTask(IGF), address.getAddress()});
+      IGF.IGM.getTaskDeallocFn(), {IGF.getAsyncTask(), address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
