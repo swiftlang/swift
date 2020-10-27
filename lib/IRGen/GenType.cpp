@@ -1467,6 +1467,20 @@ const TypeInfo &TypeConverter::getSwiftContextPtrTypeInfo() {
   return *SwiftContextPtrTI;
 }
 
+const TypeInfo &IRGenModule::getTaskContinuationFunctionPtrTypeInfo() {
+  return Types.getTaskContinuationFunctionPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
+  if (TaskContinuationFunctionPtrTI) return *TaskContinuationFunctionPtrTI;
+  TaskContinuationFunctionPtrTI = createUnmanagedStorageType(
+      IGM.TaskContinuationFunctionPtrTy, ReferenceCounting::Unknown,
+      /*isOptional*/ false);
+  TaskContinuationFunctionPtrTI->NextConverted = FirstType;
+  FirstType = TaskContinuationFunctionPtrTI;
+  return *TaskContinuationFunctionPtrTI;
+}
+
 const LoadableTypeInfo &
 IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   switch (refcounting) {
