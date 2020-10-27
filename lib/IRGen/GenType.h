@@ -105,6 +105,7 @@ private:
   const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
+  const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
   const LoadableTypeInfo *IntegerLiteralTI = nullptr;
@@ -181,6 +182,7 @@ public:
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
+  const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();

@@ -1453,6 +1453,20 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   return *TypeMetadataPtrTI;
 }
 
+const TypeInfo &IRGenModule::getSwiftContextPtrTypeInfo() {
+  return Types.getSwiftContextPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getSwiftContextPtrTypeInfo() {
+  if (SwiftContextPtrTI) return *SwiftContextPtrTI;
+  SwiftContextPtrTI = createUnmanagedStorageType(IGM.SwiftContextPtrTy,
+                                                 ReferenceCounting::Unknown,
+                                                 /*isOptional*/false);
+  SwiftContextPtrTI->NextConverted = FirstType;
+  FirstType = SwiftContextPtrTI;
+  return *SwiftContextPtrTI;
+}
+
 const LoadableTypeInfo &
 IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   switch (refcounting) {
