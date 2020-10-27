@@ -30,7 +30,39 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
 
 // Elf indirect symbol references.
 #if defined(__ELF__)
-#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 1"
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) ".Lgot." SYMBOL " - . + 1"
+
+// Helper for defining the .type on linux.
+#if defined(__arm__) && !defined(__aarch64__)
+#define TYPE_OBJECT "%object"
+#else
+#define TYPE_OBJECT "@object"
+#endif
+
+// Helper to get the pointer sized pointer to symbol and the right alignment.
+#if defined(__x86_64__) || defined(__aarch64__)
+#define POINTER_FOR_GOT(SYMBOL) \
+  "  .quad (" SYMBOL ")\n" \
+  "  .size .Lgot." SYMBOL ", 8\n"
+
+#define P2ALIGN_FOR_GOT "  .p2align 3\n"
+#else
+#define POINTER_FOR_GOT(SYMBOL) \
+  "  .long (" SYMBOl ")\n" \
+  "  .size .Lgot." SYMBOL ", 4\n"
+
+#define P2ALIGN_FOR_GOT "  .p2align 2\n"
+#endif
+
+// Helper to significantly reduce the amount of code necessary to create got
+// equivalent variables for linux.
+#define GOT_EQUIVALENT(SYMBOL) \
+  __asm( \
+    "  .type .Lgot." SYMBOL ", " TYPE_OBJECT "\n" \
+    P2ALIGN_FOR_GOT \
+    ".Lgot." SYMBOL ":\n" \
+    POINTER_FOR_GOT(SYMBOL) \
+  );
 #endif
 
 // MachO indirect symbol references.
@@ -88,15 +120,22 @@ __asm(
 );
 #endif
 
+// Define the got equivalents for the following on linux because some archs
+// support relocations like @GOTPCREL, but others don't.
+#if defined(__ELF__)
+GOT_EQUIVALENT(EQUATABLE_DESCRIPTOR_SYMBOL)
+GOT_EQUIVALENT(EQUATABLE_EE_METHOD_DESCRIPTOR)
+#endif
+
 // Define the conformance descriptor for tuple Equatable. We do this in
 // assembly to work around relative reference issues.
 __asm(
   #if defined(__ELF__)
-  "  .type __swift_tupleEquatable_private, @object\n"
+  "  .type __swift_tupleEquatable_private, " TYPE_OBJECT "\n"
   "  .local __swift_tupleEquatable_private\n"
   "  .comm __swift_tupleEquatable_private, 128, 16\n"
   "  .protected " TUPLE_EQUATABLE_CONF "\n"
-  "  .type " TUPLE_EQUATABLE_CONF ", @object\n"
+  "  .type " TUPLE_EQUATABLE_CONF ", " TYPE_OBJECT "\n"
   "  .section .rodata\n"
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleEquatable_private, 128, 4\n"
@@ -225,7 +264,7 @@ __asm(
 __asm(
   #if defined(__ELF__)
   "  .hidden \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
-  "  .type \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\", @object\n"
+  "  .type \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\", " TYPE_OBJECT "\n"
   "  .section swift5_typeref, \"a\"\n"
   "  .weak \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   #elif defined(__MACH__)
@@ -251,15 +290,26 @@ __asm(
   #endif
 );
 
+// Define the got equivalents for the following on linux because some archs
+// support relocations like @GOTPCREL, but others don't.
+#if defined(__ELF__)
+GOT_EQUIVALENT(COMPARABLE_DESCRIPTOR_SYMBOL)
+GOT_EQUIVALENT(COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR)
+GOT_EQUIVALENT(COMPARABLE_LT_METHOD_DESCRIPTOR)
+GOT_EQUIVALENT(COMPARBALE_LTE_METHOD_DESCRIPTOR)
+GOT_EQUIVALENT(COMPARABLE_GTE_METHOD_DESCRIPTOR)
+GOT_EQUIVALENT(COMPARABLE_GT_METHOD_DESCRIPTOR)
+#endif
+
 // Define the conformance descriptor for tuple Comparable. We do this in
 // assembly to work around relative reference issues.
 __asm(
   #if defined(__ELF__)
-  "  .type __swift_tupleComparable_private, @object\n"
+  "  .type __swift_tupleComparable_private, " TYPE_OBJECT "\n"
   "  .local __swift_tupleComparable_private\n"
   "  .comm __swift_tupleComparable_private, 128, 16\n"
   "  .protected " TUPLE_COMPARABLE_CONF "\n"
-  "  .type " TUPLE_COMPARABLE_CONF ", @object\n"
+  "  .type " TUPLE_COMPARABLE_CONF ", " TYPE_OBJECT "\n"
   "  .section .rodata\n"
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleComparable_private, 128, 4\n"
@@ -617,15 +667,25 @@ __asm(
 );
 #endif
 
+// Define the got equivalents for the following on linux because some archs
+// support relocations like @GOTPCREL, but others don't.
+#if defined(__ELF__)
+GOT_EQUIVALENT(HASHABLE_DESCRIPTOR_SYMBOL)
+GOT_EQUIVALENT(HASHABLE_BASE_CONFORMANCE_DESCRIPTOR)
+GOT_EQUIVALENT(HASHABLE_HASHVALUE_METHOD_DESCRIPTOR)
+GOT_EQUIVALENT(HASHABLE_HASH_METHOD_DESCRIPTOR)
+GOT_EQUIVALENT(HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR)
+#endif
+
 // Define the conformance descriptor for tuple Hashable. We do this in
 // assembly to work around relative reference issues.
 __asm(
   #if defined(__ELF__)
-  "  .type __swift_tupleHashable_private, @object\n"
+  "  .type __swift_tupleHashable_private, " TYPE_OBJECT "\n"
   "  .local __swift_tupleHashable_private\n"
   "  .comm __swift_tupleHashable_private, 128, 16\n"
   "  .protected " TUPLE_HASHABLE_CONF "\n"
-  "  .type " TUPLE_HASHABLE_CONF ", @object\n"
+  "  .type " TUPLE_HASHABLE_CONF ", " TYPE_OBJECT "\n"
   "  .section .rodata\n"
   #elif defined(__MACH__)
   "  .zerofill __DATA, __bss, __swift_tupleHashable_private, 128, 4\n"
