@@ -729,6 +729,8 @@ public:
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftExecutorPtrTy;
+  llvm::FunctionType *TaskContinuationFunctionTy;
+  llvm::PointerType *TaskContinuationFunctionPtrTy;
 
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
