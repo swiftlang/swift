@@ -5520,6 +5520,11 @@ internal struct _DictionaryCodingKey: CodingKey {
   }
 }
 
+public protocol StringKeyCodable {
+  var rawValue: String { get }
+  init?(rawValue: String)
+}
+
 extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
@@ -5544,6 +5549,14 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
       for (key, value) in self {
         let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
+        try container.encode(value, forKey: codingKey)
+      }
+    } else if let _ = Key.self as? StringKeyCodable.Type {
+      // Since the keys are StringKeyCodable, we can use their rawValues as keys.
+      var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
+      for (key, value) in self {
+        let stringKey = (key as! StringKeyCodable).rawValue
+        let codingKey = _DictionaryCodingKey(stringValue: stringKey)!
         try container.encode(value, forKey: codingKey)
       }
     } else {
@@ -5599,6 +5612,14 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
 
         let value = try container.decode(Value.self, forKey: key)
         self[key.intValue! as! Key] = value
+      }
+    } else if let stringKeyCodableType = Key.self as? StringKeyCodable.Type {
+      // The keys are StringKeyCodable, so we should be able to expect a keyed container.
+      let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
+      for key in container.allKeys {
+        let value = try container.decode(Value.self, forKey: key)
+        guard let sko = stringKeyCodableType.init(rawValue: key.stringValue) else { continue }
+        self[sko as! Key] = value
       }
     } else {
       // We should have encoded as an array of alternating key-value pairs.
