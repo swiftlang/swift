@@ -131,6 +131,16 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   // ExecutorRef ResumeParentExecutor;
   addExecutor();
 
+  // AsyncContextFlags Flags;
+  {
+    auto ty = SILType::getPrimitiveObjectType(
+        BuiltinIntegerType::get(32, IGF.IGM.IRGen.SIL.getASTContext())
+            ->getCanonicalType());
+    const auto &ti = IGF.IGM.getTypeInfo(ty);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);

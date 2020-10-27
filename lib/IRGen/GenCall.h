@@ -96,7 +96,8 @@ namespace irgen {
       Parent = 0,
       ResumeParent = 1,
       ResumeParentExecutor = 2,
-      Error = 3,
+      Flags = 3,
+      Error = 4,
     };
     enum class FixedCount : unsigned {
       Parent = 1,
@@ -124,6 +125,7 @@ namespace irgen {
     unsigned getResumeParentExecutorIndex() {
       return (unsigned)FixedIndex::ResumeParentExecutor;
     }
+    unsigned getFlagsIndex() { return (unsigned)FixedIndex::Flags; }
     unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
     unsigned getFirstIndirectReturnIndex() {
       return getErrorIndex() + getErrorCount();
@@ -176,6 +178,7 @@ namespace irgen {
     ElementLayout getResumeParentExecutorLayout() {
       return getElement(getResumeParentExecutorIndex());
     }
+    ElementLayout getFlagsLayout() { return getElement(getFlagsIndex()); }
     bool canHaveError() { return canHaveValidError; }
     ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
     unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
