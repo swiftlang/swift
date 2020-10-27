@@ -2196,9 +2196,16 @@ public:
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
-
-    // Move all the arguments into the context.
     auto layout = getAsyncContextLayout();
+
+    // Set caller info into the context.
+    { // caller context
+      Explosion explosion;
+      explosion.add(IGF.getAsyncContext());
+      auto fieldLayout = layout.getParentLayout();
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    // Move all the arguments into the context.
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
