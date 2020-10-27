@@ -41,7 +41,7 @@
             "platforms": [ "Linux" ]
         },
         "yams": {
-            "remote": { "id": "asuhan/Yams" }
+            "remote": { "id": "compnerd/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -326,9 +326,9 @@
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "swift-tools-support-core": "0.1.8",
-                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-09-28-a",
                 "swift-argument-parser": "0.3.1",
-                "swift-driver": "7a441561a176f6eac2953aea2c395cc4e683f820",
+                "swift-driver": "70243bde9b4879237d5ad75a7f35fbba073b4eab",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
@@ -338,11 +338,11 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "3.0.1-patched",
+                "yams": "3.0.1-tensorflow",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
-                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-09-11-a",
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-09-28-a",
                 "PythonKit": "master",
-                "swift-format": "master",
+                "swift-format": "main",
                 "tensorflow": "v2.3.0",
                 "tensorflow-swift-apis": "master"
             }
