@@ -65,6 +65,7 @@
 #include "../SwiftShims/LibcShims.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/RuntimeStubs.h"
+#include "../SwiftShims/Visibility.h"
 
 #include "llvm/ADT/StringExtras.h"
 
@@ -378,6 +379,7 @@ T _swift_strto(const char *nptr, char **endptr) {
   return ParsedValue;
 }
 
+SWIFT_USED
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtod_l(nptr, endptr, getCLocale());
@@ -388,6 +390,7 @@ static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 #endif
 }
 
+SWIFT_USED
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtof_l(nptr, endptr, getCLocale());
@@ -398,6 +401,7 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #endif
 }
 
+SWIFT_USED
 static long double swift_strtold_l(const char *nptr, char **endptr,
                                    locale_t loc) {
 #if defined(_WIN32)
