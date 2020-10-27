@@ -1,5 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 -access-notes %S/Inputs/objc_access_notes.accessnotes | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 -access-notes %S/Inputs/objc_access_notes.accessnotes -verify | %FileCheck %s
+
+// Verify that the access notes are necessary for the test to pass.
 // RUN-X: not %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 | %FileCheck %s
 
 // REQUIRES: objc_interop
@@ -8,6 +10,8 @@ import gizmo
 import ansible
 
 class Hoozit : Gizmo {
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func typical(_ x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC7typical_1ySo5GizmoCSi_AGtFTo : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
@@ -52,6 +56,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_RETURNS_RETAINED by family (-copy)
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func copyFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC7copyFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
@@ -66,6 +72,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_RETURNS_RETAINED by family (-mutableCopy)
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func mutableCopyFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC14mutableCopyFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
@@ -82,6 +90,8 @@ class Hoozit : Gizmo {
   // NS_RETURNS_RETAINED by family (-copy). This is different from Swift's
   // normal notion of CamelCase, but it's what Clang does, so we should match
   // it.
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func copy8() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC5copy8So5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
@@ -96,6 +106,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_RETURNS_RETAINED by family (-copy)
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func makeDuplicate() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC13makeDuplicateSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
@@ -111,6 +123,8 @@ class Hoozit : Gizmo {
 
   // Override the normal family conventions to make this non-consuming and
   // returning at +0.
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func initFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC7initFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
@@ -124,6 +138,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var typicalProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
@@ -174,6 +190,8 @@ class Hoozit : Gizmo {
   // CHECK: } // end sil function '$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvs'
 
   // NS_RETURNS_RETAINED getter by family (-copy)
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var copyProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC12copyPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
@@ -221,6 +239,8 @@ class Hoozit : Gizmo {
   // CHECK:   destroy_value [[ARG1]]
   // CHECK: } // end sil function '$s11objc_thunks6HoozitC12copyPropertySo5GizmoCvs'
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var roProperty: Gizmo { return self }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC10roPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
@@ -238,6 +258,8 @@ class Hoozit : Gizmo {
   // -- no setter
   // CHECK-NOT: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC10roPropertySo5GizmoCvsTo
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var rwProperty: Gizmo {
     get {
       return self
@@ -261,6 +283,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var copyRWProperty: Gizmo {
     get {
       return self
@@ -295,6 +319,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var initProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC12initPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
@@ -323,6 +349,8 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var propComputed: Gizmo {
     // FIXME: Add a way to specify these names in an access note.
     @objc(initPropComputedGetter) get { return self }
@@ -379,6 +407,8 @@ class Hoozit : Gizmo {
   }
 
   // Subscript
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this subscript}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   subscript (i: Int) -> Hoozit {
   // Getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitCyACSicigTo : $@convention(objc_method) (Int, Hoozit) -> @autoreleased Hoozit
@@ -424,6 +454,8 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $()
   // CHECK-NEXT: }
   func plain() { }
+  // expected-warning@-1 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@-2 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
 
   func generic<U>(_ x: U) {}
 
@@ -470,14 +502,20 @@ class Wotsit<T> : Gizmo {
 extension Hoozit {
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC3intACSi_tcfcTo : $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
   convenience init(int i: Int) { self.init(bellsOn: i) }
+  // expected-warning@-1 {{access note for fancy test suite adds attribute 'objc' to this initializer}}
+  // expected-note@-2 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
+  // expected-warning@-3 {{access note for fancy test suite adds modifier 'dynamic' to this initializer}}
+  // expected-note@-4 {{add modifier explicitly to silence this warning}} {{3-3=dynamic }}
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC6doubleACSd_tcfC : $@convention(method) (Double, @thick Hoozit.Type) -> @owned Hoozit
   convenience init(double d: Double) {
-    var x = X()
+    var x = X()       // expected-warning {{initialization of variable 'x' was never used}}
     self.init(int:Int(d))
     other()
   }
 
+  // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   func foof() {}
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC4foofyyFTo : $@convention(objc_method) (Hoozit) -> () {
 

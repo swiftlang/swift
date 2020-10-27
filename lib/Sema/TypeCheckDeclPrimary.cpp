@@ -1455,11 +1455,43 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
   auto attr = VD->getAttrs().getAttribute<Attr>();
   if (*expected == (attr != nullptr)) return;
 
+  auto diagnoseChangeByAccessNote =
+      [&](Diag<StringRef, bool, StringRef, DescriptiveDeclKind> diagID,
+          Diag<bool> fixitID) -> InFlightDiagnostic {
+    bool isModifier = attr->isDeclModifier();
+    Diagnostic warning(diagID, notes.reason, isModifier, attr->getAttrName(),
+                       VD->getDescriptiveKind());
+    Diagnostic note(fixitID, isModifier);
+
+    ASTContext &ctx = VD->getASTContext();
+
+    if (attr->getLocation().isValid()) {
+      ctx.Diags.diagnose(attr->getLocation(), warning);
+      return ctx.Diags.diagnose(attr->getLocation(), note);
+    }
+    else {
+      ctx.Diags.diagnose(VD, warning);
+      return ctx.Diags.diagnose(VD->getAttributeInsertionLoc(isModifier), note);
+    }
+  };
+
   if (*expected) {
     attr = willCreate();
     VD->getAttrs().add(attr);
+
+    SmallString<64> attrString;
+    llvm::raw_svector_ostream os(attrString);
+    attr->print(os, VD);
+
+    diagnoseChangeByAccessNote(diag::attr_added_by_access_note,
+                               diag::fixit_attr_added_by_access_note)
+      .fixItInsert(VD->getAttributeInsertionLoc(attr->isDeclModifier()),
+                   attrString);
   } else {
     VD->getAttrs().removeAttribute(attr);
+    diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
+                               diag::fixit_attr_removed_by_access_note)
+      .fixItRemove(attr->getRangeWithAt());
   }
 }
 
@@ -1483,6 +1515,26 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
     }
     else if (!attr->hasName()) {
       attr->setName(*note.ObjCName, true);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::attr_objc_name_changed_by_access_note,
+                         notes.reason, VD->getDescriptiveKind(),
+                         *note.ObjCName);
+
+      SmallString<64> newNameString;
+      llvm::raw_svector_ostream os(newNameString);
+      os << "(";
+      os << *note.ObjCName;
+      os << ")";
+
+      auto note =
+          ctx.Diags.diagnose(attr->getLocation(),
+                             diag::fixit_attr_objc_name_changed_by_access_note);
+
+      if (attr->getLParenLoc().isValid())
+        note.fixItReplace({ attr->getLParenLoc(), attr->getRParenLoc() },
+                          newNameString);
+      else
+        note.fixItInsertAfter(attr->getLocation(), newNameString);
     }
     else if (attr->getName() != *note.ObjCName) {
       // TODO: diagnose conflict between explicit name in code and explicit
