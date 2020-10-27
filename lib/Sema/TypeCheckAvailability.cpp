@@ -37,10 +37,12 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-ExportContext::ExportContext(DeclContext *DC, FragileFunctionKind kind,
+ExportContext::ExportContext(DeclContext *DC,
+                             AvailabilityContext runningOSVersion,
+                             FragileFunctionKind kind,
                              bool spi, bool exported, bool implicit, bool deprecated,
                              Optional<PlatformKind> unavailablePlatformKind)
-    : DC(DC), FragileKind(kind) {
+    : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
   Implicit = implicit;
@@ -169,7 +171,10 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
-
+  auto runningOSVersion =
+      (Ctx.LangOpts.DisableAvailabilityChecking
+       ? AvailabilityContext::alwaysAvailable()
+       : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
   bool spi = false;
   bool implicit = false;
   bool deprecated = false;
@@ -185,14 +190,19 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+  return ExportContext(DC, runningOSVersion, fragileKind,
+                       spi, exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 
-ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
+ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
+  auto runningOSVersion =
+      (Ctx.LangOpts.DisableAvailabilityChecking
+       ? AvailabilityContext::alwaysAvailable()
+       : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
   bool spi = false;
   bool implicit = false;
@@ -207,7 +217,8 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
 
   bool exported = false;
 
-  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+  return ExportContext(DC, runningOSVersion, fragileKind,
+                       spi, exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 
@@ -915,8 +926,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 }
 
 Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
-                                          const DeclContext *referenceDC) {
+TypeChecker::checkDeclarationAvailability(const Decl *D, ExportContext where) {
+  auto *referenceDC = where.getDeclContext();
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
     return None;
@@ -929,7 +940,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
   }
 
   AvailabilityContext runningOSOverApprox =
-      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
+      where.getAvailabilityContext();
 
   AvailabilityContext safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
@@ -2073,8 +2084,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityContext RunningOSVersions =
-        overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
+    AvailabilityContext RunningOSVersions = Where.getAvailabilityContext();
     if (RunningOSVersions.isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
@@ -2510,6 +2520,17 @@ public:
     return E;
   }
 
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    // We end up here when checking the output of the result builder transform,
+    // which includes closures that are not "separately typechecked" and yet
+    // contain statements and declarations. We need to walk them recursively,
+    // since these availability for these statements is not diagnosed from
+    // typeCheckStmt() as usual.
+    diagnoseStmtAvailability(S, Where.getDeclContext(),
+                             /*walkRecursively=*/true);
+    return std::make_pair(false, S);
+  }
+
   bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
                                    const ApplyExpr *call = nullptr,
                                    DeclAvailabilityFlags flags = None) const;
@@ -2768,11 +2789,11 @@ swift::diagnoseDeclAvailability(const ValueDecl *D,
         && isa<ProtocolDecl>(D))
     return false;
 
-  auto *DC = Where.getDeclContext();
-
   // Diagnose (and possibly signal) for potential unavailability
-  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, R.Start, DC);
+  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, Where);
   if (maybeUnavail.hasValue()) {
+    auto *DC = Where.getDeclContext();
+
     if (accessor) {
       bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
       TypeChecker::diagnosePotentialAccessorUnavailability(accessor, R, DC,
@@ -2943,7 +2964,7 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 
 /// Diagnose uses of unavailable declarations.
 void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
-  auto where = ExportContext::forFunctionBody(DC);
+  auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
   if (where.isImplicit())
     return;
   ExprAvailabilityWalker walker(where);
@@ -2953,33 +2974,37 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
 namespace {
 
 class StmtAvailabilityWalker : public ASTWalker {
-  ExportContext Where;
+  DeclContext *DC;
+  bool WalkRecursively;
 
 public:
-  explicit StmtAvailabilityWalker(ExportContext where)
-    : Where(where) {}
+  explicit StmtAvailabilityWalker(DeclContext *dc, bool walkRecursively)
+    : DC(dc), WalkRecursively(walkRecursively) {}
 
-  /// We'll visit each element of a BraceStmt individually.
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    if (isa<BraceStmt>(S))
+    if (!WalkRecursively && isa<BraceStmt>(S))
       return std::make_pair(false, S);
 
     return std::make_pair(true, S);
   }
 
-  /// We'll visit the expression from performSyntacticExprDiagnostics().
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (WalkRecursively)
+      diagnoseExprAvailability(E, DC);
     return std::make_pair(false, E);
   }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
-    diagnoseTypeReprAvailability(T, Where);
+    auto where = ExportContext::forFunctionBody(DC, T->getStartLoc());
+    diagnoseTypeReprAvailability(T, where);
     return false;
   }
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-    if (auto *IP = dyn_cast<IsPattern>(P))
-      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), Where);
+    if (auto *IP = dyn_cast<IsPattern>(P)) {
+      auto where = ExportContext::forFunctionBody(DC, P->getLoc());
+      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), where);
+    }
 
     return std::make_pair(true, P);
   }
@@ -2987,16 +3012,13 @@ public:
 
 }
 
-void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC) {
+void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
+                                     bool walkRecursively) {
   // We'll visit the individual statements when we check them.
-  if (isa<BraceStmt>(S))
+  if (!walkRecursively && isa<BraceStmt>(S))
     return;
 
-  auto where = ExportContext::forFunctionBody(DC);
-  if (where.isImplicit())
-    return;
-
-  StmtAvailabilityWalker walker(where);
+  StmtAvailabilityWalker walker(DC, walkRecursively);
   const_cast<Stmt*>(S)->walk(walker);
 }
 

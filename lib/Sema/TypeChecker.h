@@ -1010,8 +1010,7 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
 Optional<UnavailabilityReason>
-checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
-                             const DeclContext *referenceDC);
+checkDeclarationAvailability(const Decl *D, ExportContext where);
 
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 ///

@@ -1696,9 +1696,10 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
+    auto loc = fromCtor->getLoc();
     diagnoseDeclAvailability(
-        ctor, fromCtor->getLoc(), nullptr,
-        ExportContext::forFunctionBody(fromCtor));
+        ctor, loc, nullptr,
+        ExportContext::forFunctionBody(fromCtor, loc));
   }
 
 

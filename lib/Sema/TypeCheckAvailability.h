@@ -15,6 +15,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -92,6 +93,7 @@ enum class ExportabilityReason : unsigned {
 /// without producing a warning or error, respectively.
 class ExportContext {
   DeclContext *DC;
+  AvailabilityContext RunningOSVersion;
   FragileFunctionKind FragileKind;
   unsigned SPI : 1;
   unsigned Exported : 1;
@@ -101,7 +103,9 @@ class ExportContext {
   unsigned Platform : 8;
   unsigned Reason : 2;
 
-  ExportContext(DeclContext *DC, FragileFunctionKind kind,
+  ExportContext(DeclContext *DC,
+                AvailabilityContext runningOSVersion,
+                FragileFunctionKind kind,
                 bool spi, bool exported, bool implicit, bool deprecated,
                 Optional<PlatformKind> unavailablePlatformKind);
 
@@ -121,7 +125,7 @@ public:
   /// referencing ABI-public declarations only. Furthermore, if the function
   /// is exported, referenced declarations must also be exported. Otherwise
   /// it can reference anything.
-  static ExportContext forFunctionBody(DeclContext *DC);
+  static ExportContext forFunctionBody(DeclContext *DC, SourceLoc loc);
 
   /// Produce a new context with the same properties as this one, except
   /// changing the ExportabilityReason. This only affects diagnostics.
@@ -136,6 +140,10 @@ public:
   ExportContext withExported(bool exported) const;
 
   DeclContext *getDeclContext() const { return DC; }
+
+  AvailabilityContext getAvailabilityContext() const {
+    return RunningOSVersion;
+  }
 
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
@@ -175,9 +183,13 @@ bool isExported(const Decl *D);
 /// Diagnose uses of unavailable declarations in expressions.
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
-/// Diagnose uses of unavailable declarations in statements (via patterns, etc),
-/// without walking into expressions.
-void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
+/// Diagnose uses of unavailable declarations in statements (via patterns, etc)
+/// but not expressions, unless \p walkRecursively was specified.
+///
+/// \param walkRecursively Whether nested statements and expressions should
+/// be visited, too.
+void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
+                              bool walkRecursively=false);
 
 /// Diagnose uses of unavailable declarations in types.
 bool diagnoseTypeReprAvailability(const TypeRepr *T,

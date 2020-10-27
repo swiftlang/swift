@@ -1496,11 +1496,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     if (allowUnavailableProtocol)
       flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-    auto loc = context->getLoc();
-    if (auto *varDecl = dyn_cast<VarDecl>(context))
-      loc = varDecl->getNameLoc();
-
-    diagnoseTypeAvailability(typeRepr, type, loc,
+    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
                              Where.withReason(reason), flags);
   }
 
