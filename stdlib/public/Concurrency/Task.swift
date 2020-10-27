@@ -37,7 +37,7 @@ extension Task {
   /// it is always able to return the current `Task` in which we are currently
   /// running.
   public static func current() async -> Task {
-    fatalError("\(#function) not implemented yet.")
+    fatalError("\(#function) not implemented yet.") // TODO: needs a built-in function
   }
 }
 
@@ -100,13 +100,16 @@ extension Task {
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
   public final class Handle<Success, Failure: Error> {
-      /// Wait for the task to complete, returning (or throwing) its result.
-      ///
-      /// ### Priority
-      /// If the task has not completed yet, its priority will be elevated to the
-      /// priority of the current task. Note that this may not be as effective as
-      /// creating the task with the "right" priority to in the first place.
-      public func get() async throws -> Success {
+    /// Wait for the task to complete, returning (or throwing) its result.
+    ///
+    /// ### Priority
+    /// If the task has not completed yet, its priority will be elevated to the
+    /// priority of the current task. Note that this may not be as effective as
+    /// creating the task with the "right" priority to in the first place.
+    ///
+    /// ### Cancellation
+    /// If the awaited on task gets cancelled the `get()` will throw a cancellation error.
+    public func get() async throws -> Success {
       fatalError("\(#function) not implemented yet.")
     }
 
@@ -122,18 +125,6 @@ extension Task {
       fatalError("\(#function) not implemented yet.")
     }
   }
-}
-
-extension Task.Handle where Failure == Never {
-  /// Wait for the task to complete, returning its result.
-  ///
-  /// ### Priority
-  /// If the task has not completed yet, its priority will be elevated to the
-  /// priority of the current task. Note that this may not be as effective as
-  /// creating the task with the "right" priority to in the first place.
-  public func get() async -> Success {
-  fatalError("\(#function) not implemented yet.")
-}
 }
 
 // ==== Detached Tasks ---------------------------------------------------------

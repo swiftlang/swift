@@ -6,15 +6,6 @@ func someAsyncFunc() async -> String { "" }
 struct MyError: Error {}
 func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
-// non-async function with "weird shape" representing some API that has not adopted
-// swift concurrency yet, but we want to call it from an async function and make it
-// play nice with the rest of the system.
-func someManyCallbacksFunction(
-  calledSometimes: () -> (),
-  otherwiseThisIsCalled: () -> (),
-  calledOnError: (Error) -> ()
-) { }
-
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
@@ -42,12 +33,12 @@ func test_unsafeThrowingContinuations() async {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
-func test_detached() async {
+func test_detached() async throws {
   let handle = Task.runDetached() {
     await someAsyncFunc() // able to call async functions
   }
 
-  let result: String = await handle.get()
+  let result: String = await try handle.get()
   _ = result
 }
 
