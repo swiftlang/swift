@@ -103,6 +103,14 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   auto parameters = substitutedType->getParameters();
   SILFunctionConventions fnConv(substitutedType, IGF.getSILModule());
 
+  // AsyncContext * __ptrauth_swift_async_context_parent Parent;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftContextPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);
