@@ -2514,10 +2514,6 @@ public:
                                    const ApplyExpr *call = nullptr,
                                    DeclAvailabilityFlags flags = None) const;
 
-  bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
-                                const ApplyExpr *call = nullptr,
-                                DeclAvailabilityFlags flags = None) const;
-
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr) const;
@@ -2581,7 +2577,8 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange()))
+    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange(),
+                                 nullptr, Where))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
@@ -2682,9 +2679,13 @@ private:
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 DeclAvailabilityFlags Flags) const {
+    if (!D)
+      return;
+
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
+    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr,
+                                 Where, Flags))
       return;
   }
 };
@@ -2700,7 +2701,14 @@ AvailabilityWalker::diagnoseDeclRefAvailability(
     return false;
   const ValueDecl *D = declRef.getDecl();
 
-  diagnoseDeclAvailability(D, R, call, Flags);
+  if (auto *attr = AvailableAttr::isUnavailable(D)) {
+    if (diagnoseIncDecRemoval(D, R, attr))
+      return true;
+    if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
+      return true;
+  }
+
+  diagnoseDeclAvailability(D, R, call, Where, Flags);
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
@@ -2715,19 +2723,16 @@ AvailabilityWalker::diagnoseDeclRefAvailability(
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagnoseDeclAvailability(
-    const ValueDecl *D, SourceRange R, const ApplyExpr *call,
-    DeclAvailabilityFlags Flags) const {
+swift::diagnoseDeclAvailability(const ValueDecl *D,
+                                SourceRange R,
+                                const ApplyExpr *call,
+                                ExportContext Where,
+                                DeclAvailabilityFlags Flags) {
+  assert(!Where.isImplicit());
+
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(D))
     return false;
-
-  if (auto *attr = AvailableAttr::isUnavailable(D)) {
-    if (diagnoseIncDecRemoval(D, R, attr))
-      return true;
-    if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
-      return true;
-  }
 
   // Keep track if this is an accessor.
   auto accessor = dyn_cast<AccessorDecl>(D);
@@ -2996,7 +3001,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
-      if (diagnoseDeclAvailability(typeDecl, range, where, flags))
+      if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
         return true;
     }
 
@@ -3188,20 +3193,6 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
       hadAnyIssues = true;
   }
   return hadAnyIssues;
-}
-
-/// Run the Availability-diagnostics algorithm otherwise used in an expr
-/// context, but for non-expr contexts such as TypeDecls referenced from
-/// TypeReprs.
-bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
-                                     SourceRange R,
-                                     ExportContext Where,
-                                     DeclAvailabilityFlags Flags)
-{
-  assert(!Where.isImplicit());
-  AvailabilityWalker AW(Where);
-  return AW.diagnoseDeclAvailability(const_cast<ValueDecl *>(Decl), R,
-                                     nullptr, Flags);
 }
 
 /// Should we warn that \p decl needs an explicit availability annotation

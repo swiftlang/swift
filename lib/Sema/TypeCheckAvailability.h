@@ -205,12 +205,12 @@ diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
                                     ExportContext context);
 
-/// Run the Availability-diagnostics algorithm otherwise used in an expr
-/// context, but for non-expr contexts such as TypeDecls referenced from
-/// TypeReprs.
-bool diagnoseDeclAvailability(const ValueDecl *Decl,
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+bool diagnoseDeclAvailability(const ValueDecl *D,
                               SourceRange R,
-                              ExportContext context,
+                              const ApplyExpr *call,
+                              ExportContext where,
                               DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
