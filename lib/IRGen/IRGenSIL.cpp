@@ -852,7 +852,43 @@ public:
       }
     }
   }
-  
+
+  llvm::Value *getAsyncTask() override {
+    // FIXME: (1) Remove this override, (2) mark the IRGenFunction::getAsyncTask
+    //        declaration as non-virtual, and (3) mark IRGenFunction's
+    //        destructor non-virtual once Task.runDetached is available.
+    //        rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftTaskPtrTy);
+    }
+    return IRGenFunction::getAsyncTask();
+  }
+
+  llvm::Value *getAsyncExecutor() override {
+    // FIXME: (1) Remove this override, (2) mark the
+    //        IRGenFunction::getAsyncExecutor declaration as non-virtual, and
+    //        (3) mark IRGenFunction's destructor non-virtual once
+    //        Task.runDetached is available.  rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftExecutorPtrTy);
+    }
+    return IRGenFunction::getAsyncExecutor();
+  }
+
+  llvm::Value *getAsyncContext() override {
+    // FIXME: (1) Remove this override, (2) mark the
+    //        IRGenFunction::getAsyncContext declaration as non-virtual, and
+    //        (3) mark IRGenFunction's destructor non-virtual once
+    //        Task.runDetached is available.  rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftContextPtrTy);
+    }
+    return IRGenFunction::getAsyncContext();
+  }
+
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -3179,7 +3215,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.CurFn->getArg(2);
+    llvm::Value *context = IGF.getAsyncContext();
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);
