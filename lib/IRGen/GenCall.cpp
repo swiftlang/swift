@@ -2205,6 +2205,12 @@ public:
       auto fieldLayout = layout.getParentLayout();
       saveValue(fieldLayout, explosion, isOutlined);
     }
+    { // caller executor
+      Explosion explosion;
+      explosion.add(IGF.getAsyncExecutor());
+      auto fieldLayout = layout.getResumeParentExecutorLayout();
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
     // Move all the arguments into the context.
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
