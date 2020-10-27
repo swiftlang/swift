@@ -4190,6 +4190,21 @@ namespace {
       return nullptr;
     }
 
+    Decl *VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
+      Optional<ImportedName> correctSwiftName;
+      auto importedName =
+          importFullName(decl->getAsFunction(), correctSwiftName);
+      if (!importedName)
+        return nullptr;
+      // All template parameters must be template type parameters.
+      if (!llvm::all_of(*decl->getTemplateParameters(), [](auto param) {
+            return isa<clang::TemplateTypeParmDecl>(param);
+          }))
+        return nullptr;
+      return importFunctionDecl(decl->getAsFunction(), importedName,
+                                correctSwiftName, None, decl);
+    }
+
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
