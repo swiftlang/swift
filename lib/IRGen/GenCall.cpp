@@ -2186,8 +2186,7 @@ public:
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
     asyncExplosion.add(IGF.getAsyncTask());
-    asyncExplosion.add(
-        llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
+    asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
     if (getCallee().getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {
