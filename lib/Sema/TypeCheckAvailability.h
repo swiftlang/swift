@@ -173,11 +173,11 @@ bool isExported(const ValueDecl *VD);
 bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
-void diagAvailability(const Expr *E, DeclContext *DC);
+void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in statements (via patterns, etc),
 /// without walking into expressions.
-void diagAvailability(const Stmt *S, DeclContext *DC);
+void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in types.
 bool diagnoseTypeReprAvailability(const TypeRepr *T,

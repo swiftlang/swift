@@ -2444,8 +2444,8 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
-      diagAvailability(DR->getDeclRef(), DR->getSourceRange(),
-                       getEnclosingApplyExpr(), None);
+      diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
+                                  getEnclosingApplyExpr(), None);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -2453,18 +2453,18 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDeclRef(),
-                       OCDR->getConstructorLoc().getSourceRange(),
-                       getEnclosingApplyExpr());
+      diagnoseDeclRefAvailability(OCDR->getDeclRef(),
+                                  OCDR->getConstructorLoc().getSourceRange(),
+                                  getEnclosingApplyExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember(),
-                       DMR->getNameLoc().getSourceRange(),
-                       getEnclosingApplyExpr());
+      diagnoseDeclRefAvailability(DMR->getMember(),
+                                  DMR->getNameLoc().getSourceRange(),
+                                  getEnclosingApplyExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(DS->getMember(), DS->getSourceRange());
+      diagnoseDeclRefAvailability(DS->getMember(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
-        diagAvailability(S->getDecl(), S->getSourceRange());
+        diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange());
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
@@ -2510,9 +2510,13 @@ public:
     return E;
   }
 
-  bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
-                        const ApplyExpr *call = nullptr,
-                        DeclAvailabilityFlags flags = None) const;
+  bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
+                                   const ApplyExpr *call = nullptr,
+                                   DeclAvailabilityFlags flags = None) const;
+
+  bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
+                                const ApplyExpr *call = nullptr,
+                                DeclAvailabilityFlags flags = None) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -2577,7 +2581,7 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(D, E->getNameLoc().getSourceRange()))
+    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange()))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
@@ -2596,10 +2600,9 @@ private:
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::Subscript: {
-        auto *decl = component.getDeclRef().getDecl();
+        auto decl = component.getDeclRef();
         auto loc = component.getLoc();
-        SourceRange range(loc, loc);
-        diagAvailability(decl, range, nullptr, flags);
+        diagnoseDeclRefAvailability(decl, loc, nullptr, flags);
         break;
       }
 
@@ -2681,7 +2684,7 @@ private:
                                 DeclAvailabilityFlags Flags) const {
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
+    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
       return;
   }
 };
@@ -2690,13 +2693,31 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
-                                     const ApplyExpr *call,
-                                     DeclAvailabilityFlags Flags) const {
+AvailabilityWalker::diagnoseDeclRefAvailability(
+    ConcreteDeclRef declRef, SourceRange R, const ApplyExpr *call,
+    DeclAvailabilityFlags Flags) const {
   if (!declRef)
     return false;
   const ValueDecl *D = declRef.getDecl();
 
+  diagnoseDeclAvailability(D, R, call, Flags);
+
+  if (R.isValid()) {
+    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
+                                            Where)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+bool
+AvailabilityWalker::diagnoseDeclAvailability(
+    const ValueDecl *D, SourceRange R, const ApplyExpr *call,
+    DeclAvailabilityFlags Flags) const {
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(D))
     return false;
@@ -2724,13 +2745,6 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
     if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
       return true;
-  }
-
-  if (R.isValid()) {
-    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
-                                            Where)) {
-      return true;
-    }
   }
 
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
@@ -2923,7 +2937,7 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 }
 
 /// Diagnose uses of unavailable declarations.
-void swift::diagAvailability(const Expr *E, DeclContext *DC) {
+void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC);
   if (where.isImplicit())
     return;
@@ -2960,7 +2974,7 @@ public:
 
 }
 
-void swift::diagAvailability(const Stmt *S, DeclContext *DC) {
+void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC) {
   // We'll visit the individual statements when we check them.
   if (isa<BraceStmt>(S))
     return;
@@ -3186,7 +3200,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
 {
   assert(!Where.isImplicit());
   AvailabilityWalker AW(Where);
-  return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
+  return AW.diagnoseDeclAvailability(const_cast<ValueDecl *>(Decl), R,
+                                     nullptr, Flags);
 }
 
 /// Should we warn that \p decl needs an explicit availability annotation
