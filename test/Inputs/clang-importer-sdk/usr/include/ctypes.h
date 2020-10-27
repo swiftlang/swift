@@ -205,18 +205,18 @@ typedef int (*fptr)(int);
 fptr getFunctionPointer(void);
 void useFunctionPointer(fptr);
 
-int (*getFunctionPointer_(void))(int);
+size_t (*getFunctionPointer_(void))(size_t);
 
 struct FunctionPointerWrapper {
   fptr a;
   fptr b;
 };
 
-typedef void (*fptr2)(int, long, void *);
+typedef void (*fptr2)(size_t, long, void *);
 fptr2 getFunctionPointer2(void);
 void useFunctionPointer2(fptr2);
 
-int (*(*getHigherOrderFunctionPointer(void))(int (*)(int)))(int);
+size_t (*(*getHigherOrderFunctionPointer(void))(size_t (*)(size_t)))(size_t);
 
 typedef struct Dummy {
     int x;
@@ -231,6 +231,10 @@ typedef OpaqueTypedefForFP (*FunctionPointerReturningOpaqueTypedef)(void);
 
 typedef struct ForwardInTypedefForFP2 *OpaqueTypedefForFP2;
 typedef OpaqueTypedefForFP2 (*FunctionPointerReturningOpaqueTypedef2)(void);
+
+// Functions that get Swift types which cannot be used to re-derive the
+// Clang type.
+size_t returns_size_t();
 
 // This will probably never be serializable.
 typedef struct { int x; int y; } *(*UnserializableFunctionPointer)(void);

@@ -78,11 +78,14 @@ public:
   }
 
   /// If 'V' is an address projection within a formal access, return the
-  /// canonical address of the formal access. Otherwise, return 'V' itself,
-  /// which is either a reference or unknown pointer or address.
+  /// canonical address of the formal access if possible without looking past
+  /// any storage casts. Otherwise, a "best-effort" address
+  ///
+  /// If 'V' is an address, then the returned value is also an address.
   SILValue getValueAddress() {
     if (!cachedValueAddress) {
-      cachedValueAddress = V->getType().isAddress() ? getAccessedAddress(V) : V;
+      cachedValueAddress =
+          V->getType().isAddress() ? getTypedAccessAddress(V) : V;
     }
     return cachedValueAddress;
   }
@@ -147,7 +150,7 @@ public:
 
     case SILAccessKind::Modify:
       if (isLetValue()) {
-        assert(stripAccessMarkers(beginAccess) != getValueAddress()
+        assert(getAccessBase(beginAccess) != getValueAddress()
                && "let modification not allowed");
         return MemBehavior::None;
       }
@@ -251,8 +254,7 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // No store besides the initialization of a "let"-variable
   // can have any effect on the value of this "let" variable.
-  if (isLetValue()
-      && (getAccessedAddress(SI->getDest()) != getValueAddress())) {
+  if (isLetValue() && (getAccessBase(SI->getDest()) != getValueAddress())) {
     return MemBehavior::None;
   }
   // If the store dest cannot alias the pointer in question, then the
@@ -364,6 +366,7 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::EndAccessInst:
         // Those instructions have no result and cannot escape the address.
         break;
       case SILInstructionKind::ApplyInst:
@@ -373,6 +376,7 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
         // possible that an address, passed as an indirect parameter, escapes
         // the function in any way (which is not unsafe and undefined behavior).
         break;
+      case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::OpenExistentialAddrInst:
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
       case SILInstructionKind::StructElementAddrInst:

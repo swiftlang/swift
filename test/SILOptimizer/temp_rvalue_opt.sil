@@ -25,6 +25,7 @@ struct Str {
 
 sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
+sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -456,6 +457,25 @@ bb3:
   return %9 : $()
 }
 
+// CHECK-LABEL: sil @lifetime_beyond_last_use :
+// CHECK-NOT: copy_addr
+// CHECK:   [[V:%[0-9]+]] = load %0
+// CHECK:   apply {{%[0-9]+}}([[V]])
+// CHECK:   destroy_addr %0
+// CHECK: } // end sil function 'lifetime_beyond_last_use'
+sil @lifetime_beyond_last_use : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %2 = alloc_stack $Klass
+  copy_addr [take] %0 to [initialization] %2 : $*Klass
+  %4 = load %2 : $*Klass
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // Make sure that we can eliminate temporaries passed via a temporary rvalue to
 // an @in_guaranteed function.
 //
@@ -683,12 +703,13 @@ bb0(%0 : $*Builtin.NativeObject):
   return %v : $()
 }
 
-// Remove a copy that is released via a load as long as it was a copy [take].
 // CHECK-LABEL: sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK:   [[V:%.*]] = load %0 : $*Builtin.NativeObject
-// CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-// CHECK:   release_value [[V]] : $Builtin.NativeObject
+// CHECK:   [[STK:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [take] %0 to [initialization] [[STK]] : $*Builtin.NativeObject
+// CHECK:   [[VAL:%.*]] = load [[STK]] : $*Builtin.NativeObject
+// CHECK:   apply %{{.*}}([[VAL]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK:   release_value [[VAL]] : $Builtin.NativeObject
 // CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
 sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):

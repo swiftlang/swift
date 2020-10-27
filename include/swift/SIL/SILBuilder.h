@@ -1125,6 +1125,7 @@ public:
 
   UncheckedValueCastInst *createUncheckedValueCast(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
+    assert(hasOwnership());
     return insert(UncheckedValueCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
   }
@@ -2499,6 +2500,20 @@ public:
     assert(DS && "Instruction without debug scope associated!");
     setCurrentDebugScope(DS);
   }
+
+  /// If \p inst is a terminator apply site, then pass a builder to insert at
+  /// the first instruction of each successor to \p func. Otherwise, pass a
+  /// builder to insert at std::next(inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not \p inst is a terminator when inserting instructions
+  /// after \p inst.
+  ///
+  /// Precondition: It's the responsibility of the caller to ensure that if
+  /// \p inst is a terminator, all successor blocks have only a single
+  /// predecessor block: the parent of \p inst.
+  static void insertAfter(SILInstruction *inst,
+                          function_ref<void(SILBuilder &)> func);
 };
 
 class SavedInsertionPointRAII {

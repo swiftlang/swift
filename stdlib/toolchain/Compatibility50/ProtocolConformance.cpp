@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Overrides.h"
+#include "../Compatibility53/Overrides.h"
 #include "../../public/runtime/Private.h"
 #include "swift/Basic/Lazy.h"
 #include <dlfcn.h>
@@ -93,6 +94,13 @@ swift::swift50override_conformsToProtocol(const Metadata *type,
   // Register our add image callback if necessary.
   static OnceToken_t token;
   SWIFT_ONCE_F(token, registerAddImageCallback, nullptr);
+
+  // The Swift 5.4 runtime added support for builtin conformances. Call 5.3's
+  // backported implementation to handle that here.
+  if (auto result =
+        swift53override_conformsToProtocol(type, protocol,
+                                           original_conformsToProtocol))
+    return result;
 
   // The implementation of swift_conformsToProtocol in Swift 5.0 would return
   // a false negative answer when asking whether a subclass conforms using

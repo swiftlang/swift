@@ -1409,6 +1409,10 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
         Kind = DIUseKind::LoadForTypeOfSelf;
       }
     }
+    // value_metatype may also use the 'self' value directly, if it has an
+    // address-only type.
+    if (isa<ValueMetatypeInst>(User))
+      Kind = DIUseKind::TypeOfSelf;
 
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.

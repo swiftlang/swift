@@ -261,8 +261,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         }
       }
 
-      Type functionBuilderType= var->getFunctionBuilderType();
-      if (functionBuilderType) {
+      Type resultBuilderType= var->getResultBuilderType();
+      if (resultBuilderType) {
         // If the variable's type is structurally a function type, use that
         // type. Otherwise, form a non-escaping function type for the function
         // parameter.
@@ -287,9 +287,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
 
-      // Attach a function builder attribute if needed.
-      if (functionBuilderType) {
-        auto typeExpr = TypeExpr::createImplicit(functionBuilderType, ctx);
+      // Attach a result builder attribute if needed.
+      if (resultBuilderType) {
+        auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
         auto attr = CustomAttr::create(
             ctx, SourceLoc(), typeExpr, /*implicit=*/true);
         arg->getAttrs().add(attr);

@@ -22,6 +22,10 @@ module ExplicitClassSpecialization {
   header "explicit-class-specialization.h"
 }
 
+module FunctionTemplates {
+  header "function-templates.h"
+}
+
 module UsingDirective {
   header "using-directive.h"
 }
@@ -36,4 +40,16 @@ module Mangling {
 
 module LinkageOfSwiftSymbolsForImportedTypes {
   header "linkage-of-swift-symbols-for-imported-types.h"
+}
+
+module ClassTemplateVariadic {
+  header "class-template-variadic.h"
+}
+
+module ClassTemplateNonTypeParameter {
+  header "class-template-non-type-parameter.h"
+}
+
+module ClassTemplateTemplateParameter {
+  header "class-template-template-parameter.h"
 }

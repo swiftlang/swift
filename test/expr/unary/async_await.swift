@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-syntax-tree
 
+// REQUIRES: concurrency
+
 func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
   _ = await asyncfp() + asyncfp()
@@ -132,4 +134,13 @@ func testStringInterpolation() async throws {
   _ = "Eventually produces \(getInt())" // expected-error{{call is 'async' but is not marked with 'await'}}
   _ = "Eventually produces \(await getInt())"
   _ = await "Eventually produces \(getInt())"
+}
+
+// Make sure try await works too
+func invalidAsyncFunction() async {
+  _ = try await throwingAndAsync() // expected-error {{errors thrown from here are not handled}}
+}
+
+func validAsyncFunction() async throws {
+  _ = try await throwingAndAsync()
 }

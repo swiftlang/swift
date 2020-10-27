@@ -313,11 +313,11 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   // transformations.
   llvm::SaveAndRestore<DeclContext *> savedDC(currentDC, fn.getAsDeclContext());
 
-  // Apply the function builder transform, if there is one.
+  // Apply the result builder transform, if there is one.
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
-    // Apply the function builder to the closure. We want to be in the
+    // Apply the result builder to the closure. We want to be in the
     // context of the closure for subsequent transforms.
-    auto newBody = applyFunctionBuilderTransform(
+    auto newBody = applyResultBuilderTransform(
         solution, *transform, fn.getBody(), fn.getAsDeclContext(),
         [&](SolutionApplicationTarget target) {
           auto resultTarget = rewriteTarget(target);

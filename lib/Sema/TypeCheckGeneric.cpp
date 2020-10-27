@@ -905,7 +905,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   // Figure out the type resolution.
   auto options = TypeResolutionOptions(TypeResolverContext::GenericRequirement);
   if (owner.dc->isInSpecializeExtensionContext())
-    options |= TypeResolutionFlags::AllowInlinable;
+    options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:

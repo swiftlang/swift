@@ -1618,7 +1618,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "releasenone")
       kind = EffectsKind::ReleaseNone;
     else {
-      diagnose(Loc, diag::effects_attribute_unknown_option,
+      diagnose(Loc, diag::attr_unknown_option,
                Tok.getText(), AttrName);
       return false;
     }
@@ -1644,8 +1644,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
-               "none");
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "none");
       return false;
     }
 
@@ -1655,8 +1654,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "__always")
       kind = InlineKind::Always;
     else {
-      diagnose(Loc, diag::optimization_attribute_unknown_option,
-               Tok.getText(), AttrName);
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
       return false;
     }
     consumeToken(tok::identifier);
@@ -1674,6 +1672,45 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_ActorIndependent: {
+    // if no option is provided, then it's the 'safe' version.
+    if (!consumeIf(tok::l_paren)) {
+      if (!DiscardAttribute) {
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+        Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
+                                                  ActorIndependentKind::Safe));
+      }
+      break;
+    }
+
+    // otherwise, make sure it looks like an identifier.
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "unsafe");
+      return false;
+    }
+
+    // make sure the identifier is 'unsafe'
+    if (Tok.getText() != "unsafe") {
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
+      return false;
+    }
+
+    consumeToken(tok::identifier);
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
+                                                ActorIndependentKind::Unsafe));
+
+    break;
+  }
+
   case DAK_Optimize: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -1682,8 +1719,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
-               "speed");
+      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "speed");
       return false;
     }
 
@@ -1695,8 +1731,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "size")
       optMode = OptimizationMode::ForSize;
     else {
-      diagnose(Loc, diag::optimization_attribute_unknown_option,
-               Tok.getText(), AttrName);
+      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
       return false;
     }
     consumeToken(tok::identifier);
@@ -2708,6 +2743,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
   checkInvalidAttrName("_propertyWrapper", "propertyWrapper",
                        DAK_PropertyWrapper, diag::attr_renamed_warning);
 
+  // Historical name for result builders.
+  checkInvalidAttrName(
+      "_functionBuilder", "resultBuilder", DAK_ResultBuilder,
+      diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
@@ -3576,6 +3616,30 @@ static bool isParenthesizedUnowned(Parser &P) {
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
 
+static void skipAttribute(Parser &P) {
+  // Consider unexpected tokens to be incomplete attributes.
+
+  // Parse the attribute name, which can be qualified, have
+  // generic arguments, and so on.
+  do {
+    if (!P.consumeIf(tok::identifier) && !P.consumeIf(tok::code_complete))
+      return;
+
+    if (P.startsWithLess(P.Tok)) {
+      P.consumeStartingLess();
+      P.skipUntilGreaterInTypeList();
+    }
+  } while (P.consumeIf(tok::period));
+
+  // Skip an argument clause after the attribute name.
+  if (P.consumeIf(tok::l_paren)) {
+    while (P.Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+      if (P.consumeIf(tok::r_paren)) break;
+      P.skipSingle();
+    }
+  }
+}
+
 bool Parser::isStartOfSwiftDecl() {
   // If this is obviously not the start of a decl, then we're done.
   if (!isKeywordPossibleDeclStart(Tok)) return false;
@@ -3605,23 +3669,14 @@ bool Parser::isStartOfSwiftDecl() {
   if (Tok.is(tok::kw_try))
     return peekToken().isAny(tok::kw_let, tok::kw_var);
   
-  // Look through attribute list, because it may be an *type* attribute list.
+  // Skip an attribute, since it might be a type attribute.  This can't
+  // happen at the top level of a scope, but we do use isStartOfSwiftDecl()
+  // in positions like generic argument lists.
   if (Tok.is(tok::at_sign)) {
     BacktrackingScope backtrack(*this);
-    while (consumeIf(tok::at_sign)) {
-      // If not identifier or code complete token, consider '@' as an incomplete
-      // attribute.
-      if (Tok.isNot(tok::identifier, tok::code_complete))
-        continue;
-      consumeToken();
-      // Eat paren after attribute name; e.g. @foo(x)
-      if (consumeIf(tok::l_paren)) {
-        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
-          if (consumeIf(tok::r_paren)) break;
-          skipSingle();
-        }
-      }
-    }
+    while (consumeIf(tok::at_sign))
+      skipAttribute(*this);
+
     // If this attribute is the last element in the block,
     // consider it is a start of incomplete decl.
     if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))

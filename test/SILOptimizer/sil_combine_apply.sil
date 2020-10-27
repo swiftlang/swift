@@ -369,7 +369,8 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
   %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto
   // CHECK: [[M:%[0-9]+]] = witness_method $MStruct,
   %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  // CHECK: apply [[M]]<@opened("{{.*}}") MutatingProto>([[E]]) :
+  // CHECK:  [[C:%[0-9]+]] = unchecked_addr_cast [[E]] : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto to $*MStruct
+  // CHECK: apply [[M]]<MStruct>([[C]]) :
   %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto>(%11) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
   dealloc_stack %9 : $*MutatingProto

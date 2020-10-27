@@ -76,6 +76,7 @@ public:
 /// multi-threaded producers and consumers to signal each other in a safe way.
 class ConditionVariable {
   friend class Mutex;
+  friend class StaticMutex;
 
   ConditionVariable(const ConditionVariable &) = delete;
   ConditionVariable &operator=(const ConditionVariable &) = delete;
@@ -613,6 +614,9 @@ public:
 
   /// See Mutex::wait
   void wait(StaticConditionVariable &condition) {
+    ConditionPlatformHelper::wait(condition.Handle, Handle);
+  }
+  void wait(ConditionVariable &condition) {
     ConditionPlatformHelper::wait(condition.Handle, Handle);
   }
 

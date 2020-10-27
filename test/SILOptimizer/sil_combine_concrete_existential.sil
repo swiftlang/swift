@@ -470,7 +470,8 @@ sil [transparent] [reabstraction_thunk] @testDevirtExistentialEnumThunk : $@conv
 // CHECK: [[THUNK:%.*]] = function_ref @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
 // CHECK: [[TTF:%.*]] = thin_to_thick_function [[THUNK:%.*]] : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error) to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out (), @error Error)
 // CHECK: [[WM:%.*]] = witness_method $Array<Int>, #ContiguousBytes.withUnsafeBytes : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
-// CHECK: apply [nothrow] [[WM]]<@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, ()>(%{{.*}}, [[TTF]], [[OPENED]]) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[OPENED]]
+// CHECK: apply [nothrow] [[WM]]<Array<Int>, ()>(%{{.*}}, [[TTF]], [[CAST]]) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
 // CHECK: destroy_addr [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes
 // CHECK-LABEL: } // end sil function 'testDevirtExistentialEnum'
 sil shared [noinline] @testDevirtExistentialEnum : $@convention(thin) (@guaranteed Array<Int>) -> () {

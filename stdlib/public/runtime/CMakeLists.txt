@@ -29,9 +29,9 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     BackDeployment.cpp
+    BuiltinProtocolConformances.cpp
     Casting.cpp
     CompatibilityOverride.cpp
-    Concurrency.cpp
     CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp

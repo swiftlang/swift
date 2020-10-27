@@ -1,0 +1,26 @@
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// REQUIRES: asserts,no_asan
+
+func f(
+  collection1: [String],
+  collection2: [String],
+  collection3: [String],
+  collection4: [String],
+  collection5: [String],
+  collection6: [String],
+  collection7: [String],
+  collection8: [String],
+  collection9: [String],
+  collection10: [String]
+) {
+  _ = collection1 +
+      collection2 +
+      collection3 +
+      collection4 +
+      collection5 +
+      collection6 +
+      collection7 +
+      collection8 +
+      collection9 +
+      collection10
+}

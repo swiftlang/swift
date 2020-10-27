@@ -633,15 +633,15 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   CustomAttr *FuncBuilderAttr = nullptr;
   if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedFunctionBuilder();
+    FuncBuilderAttr = VD->getAttachedResultBuilder();
   }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
-    // Always print function builder attribute.
-    bool isFunctionBuilderAttr = DA == FuncBuilderAttr;
+    // Always print result builder attribute.
+    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isFunctionBuilderAttr &&
+        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
@@ -740,11 +740,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     if (!Options.IsForSwiftInterface)
       break;
-    // For Swift interface, we should print function builder attributes
+    // For Swift interface, we should print result builder attributes
     // on parameter decls and on protocol requirements.
     // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getAttachedFunctionBuilder() == this) {
+      if (VD->getAttachedResultBuilder() == this) {
         if (!isa<ParamDecl>(D) &&
             !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
           return false;
@@ -769,8 +769,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_ActorIndependent:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
+    } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
+      // Use @_functionBuilder in Swift interfaces to maintain backward
+      // compatibility.
+      Printer.printSimpleAttr("_functionBuilder", /*needAt=*/true);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
@@ -986,8 +991,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<TypeEraserAttr>(this);
     if (auto *repr = attr->getParsedTypeEraserTypeRepr())
       repr->print(Printer, Options);
-    else
-      attr->getTypeWithoutResolving()->print(Printer, Options);
+    else if (auto proto = dyn_cast<ProtocolDecl>(D))
+      attr->getResolvedType(proto)->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     Printer << ")";
     break;
@@ -1135,6 +1140,15 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(__always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DAK_ActorIndependent: {
+    switch (cast<ActorIndependentAttr>(this)->getKind()) {
+    case ActorIndependentKind::Safe:
+      return "actorIndependent";
+    case ActorIndependentKind::Unsafe:
+      return "actorIndependent(unsafe)";
+    }
+    llvm_unreachable("Invalid actorIndependent kind");
   }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {

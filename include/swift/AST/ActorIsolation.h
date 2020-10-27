@@ -48,6 +48,11 @@ public:
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
     Independent,
+    /// The declaration is explicitly specified to be independent of any actor,
+    /// but the programmer promises to protect the declaration from concurrent
+    /// accesses manually. Thus, it is okay if this declaration is a mutable 
+    /// variable that creates storage.
+    IndependentUnsafe,
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
@@ -70,8 +75,18 @@ public:
     return ActorIsolation(Unspecified, nullptr);
   }
 
-  static ActorIsolation forIndependent() {
-    return ActorIsolation(Independent, nullptr);
+  static ActorIsolation forIndependent(ActorIndependentKind indepKind) {
+    ActorIsolation::Kind isoKind;
+    switch (indepKind) {
+      case ActorIndependentKind::Safe:
+        isoKind = Independent;
+        break;
+        
+      case ActorIndependentKind::Unsafe:
+        isoKind = IndependentUnsafe;
+        break;
+    }
+    return ActorIsolation(isoKind, nullptr);
   }
 
   static ActorIsolation forActorInstance(ClassDecl *actor) {
@@ -112,6 +127,7 @@ public:
 
     switch (lhs.kind) {
     case Independent:
+    case IndependentUnsafe:
     case Unspecified:
       return true;
 

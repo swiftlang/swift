@@ -575,7 +575,6 @@ static TypeResolutionOptions
 adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options.setContext(None);
   options -= TypeResolutionFlags::SILType;
-  options -= TypeResolutionFlags::AllowUnavailableProtocol;
 
   return options;
 }
@@ -812,13 +811,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
   const auto result = TypeChecker::applyUnboundGenericArguments(
       decl, unboundType->getParent(), loc, resolution, args);
-
-  const auto genericOptions = genericResolution.getOptions();
-  if (!genericOptions.contains(TypeResolutionFlags::AllowUnavailable)) {
-    if (genericOptions.isAnyExpr() || dc->getParent()->isLocalContext())
-      if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        TypeChecker::diagnoseGenericTypeExportability(loc, result, dc);
-  }
 
   // Migration hack.
   bool isMutablePointer;
@@ -1322,8 +1314,8 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   }
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  if (options.contains(TypeResolutionFlags::AllowInlinable))
-    lookupOptions |= NameLookupFlags::IncludeInlineableAndUsableFromInline;
+  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
+    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
                                                     lookupOptions);
 
@@ -1526,8 +1518,8 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
   // Look for member types with the given name.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (options.contains(TypeResolutionFlags::AllowInlinable))
-    lookupOptions |= NameLookupFlags::IncludeInlineableAndUsableFromInline;
+  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
+    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(
@@ -1596,26 +1588,6 @@ resolveIdentTypeComponent(TypeResolution resolution,
   return resolveNestedIdentTypeComponent(resolution, silParams,
                                          parentTy, parentRange,
                                          comp);
-}
-
-static bool diagnoseAvailability(IdentTypeRepr *IdType,
-                                 DeclContext *DC,
-                                 bool AllowPotentiallyUnavailableProtocol) {
-  DeclAvailabilityFlags flags =
-    DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-  if (AllowPotentiallyUnavailableProtocol)
-    flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
-  auto componentRange = IdType->getComponentRange();
-  for (auto comp : componentRange) {
-    if (auto *typeDecl = comp->getBoundDecl()) {
-      if (diagnoseDeclAvailability(typeDecl, DC,
-                                   comp->getNameLoc().getSourceRange(), flags)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 // Hack to apply context-specific @escaping to an AST function type.
@@ -1904,9 +1876,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options.setContext(None);
   }
-
-  if (getASTContext().LangOpts.DisableAvailabilityChecking)
-    options |= TypeResolutionFlags::AllowUnavailable;
 
   bool isDirect = false;
   if ((options & TypeResolutionFlags::Direct) && !isa<SpecifierTypeRepr>(repr)){
@@ -3331,24 +3300,6 @@ Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
   if (result->is<FunctionType>())
     result = applyNonEscapingIfNecessary(result, options);
 
-  // Check the availability of the type.
-
-  // We allow a type to conform to a protocol that is less available than
-  // the type itself. This enables a type to retroactively model or directly
-  // conform to a protocol only available on newer OSes and yet still be used on
-  // older OSes.
-  // To support this, inside inheritance clauses we allow references to
-  // protocols that are unavailable in the current type refinement context.
-
-  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
-      diagnoseAvailability(
-          IdType, getDeclContext(),
-          options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
-    Components.back()->setInvalid();
-    return ErrorType::get(getASTContext());
-  }
-
   return result;
 }
 
@@ -3979,7 +3930,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
-  if (typeKind == CustomAttrTypeKind::PropertyDelegate) {
+  if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
     unboundTyOpener = [](auto unboundTy) {
       // FIXME: Don't let unbound generic types
       // escape type resolution. For now, just

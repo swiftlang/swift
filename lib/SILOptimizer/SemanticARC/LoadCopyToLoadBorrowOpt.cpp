@@ -193,7 +193,7 @@ public:
 
   void visitGlobalAccess(SILValue global) {
     return answer(
-        !AccessedStorage(global, AccessedStorage::Global).isLetAccess(&ctx.fn));
+        !AccessedStorage(global, AccessedStorage::Global).isLetAccess());
   }
 
   void visitClassAccess(RefElementAddrInst *field) {
@@ -266,8 +266,13 @@ public:
     return next(parentAddr->get());
   }
 
-  void visitPathComponent(SingleValueInstruction *projectedAddr,
-                          Operand *parentAddr) {
+  void visitStorageCast(SingleValueInstruction *projectedAddr,
+                        Operand *parentAddr) {
+    return next(parentAddr->get());
+  }
+
+  void visitAccessProjection(SingleValueInstruction *projectedAddr,
+                             Operand *parentAddr) {
     return next(parentAddr->get());
   }
 

@@ -16,7 +16,7 @@ struct Projection<T> {
     var item: T
 }
 
-@_functionBuilder
+@resultBuilder
 struct /*builder:def*/Other {
     public static func buildBlock(_ components: String...) -> String {
         return components.joined()

@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
@@ -255,6 +256,10 @@ private:
 
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
+
+  /// A trie of integer indices that gives pointer identity to a path of
+  /// projections, shared between all functions in the module.
+  std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
   /// The options passed into this SILModule.
   const SILOptions &Options;
@@ -654,6 +659,8 @@ public:
   void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
     PGOReader = std::move(IPR);
   }
+
+  IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
 
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?

@@ -15,7 +15,7 @@ import SwiftShims
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
   import WinSDK
 #else
 #error("Unsupported platform")
@@ -591,6 +591,7 @@ Runtime.test("Struct layout with reference storage types") {
   print(malkovich)
 }
 
+#if !(canImport(Darwin) && !_runtime(_ObjC))
 Runtime.test("SwiftError layout constants for LLDB") {
   let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
   let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
@@ -610,6 +611,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   _UnimplementedError()
 #endif
 }
+#endif
 
 var Reflection = TestSuite("Reflection")
 
@@ -762,7 +764,7 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
-#if canImport(Darwin)
+#if canImport(Darwin) && _runtime(_ObjC)
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.

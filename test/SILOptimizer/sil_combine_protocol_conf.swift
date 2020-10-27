@@ -356,3 +356,37 @@ internal class OtherKlass {
   }
 }
 
+// Don't assert on this following example.
+
+public struct SomeValue {}
+
+public protocol MyVariableProtocol : class {
+}
+
+extension MyVariableProtocol where Self: MyBaseClass {
+  @inline(never)
+  public var myVariable : SomeValue {
+    print(self)
+    return SomeValue()
+  }
+}
+public class MyBaseClass : MyVariableProtocol {}
+
+fileprivate protocol NonClassProto {
+  var myVariable : SomeValue { get }
+}
+
+
+fileprivate class ConformerClass : MyBaseClass, NonClassProto {}
+
+
+@inline(never)
+private func repo(_ c: NonClassProto) {
+  let p : NonClassProto = c
+  print(p.myVariable)
+}
+
+public func entryPoint() {
+  let c = ConformerClass()
+  repo(c)
+}

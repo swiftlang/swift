@@ -281,6 +281,9 @@ enum DIUseKind {
   /// This instruction is a load that's only used to answer a `type(of: self)`
   /// question.
   LoadForTypeOfSelf,
+
+  /// This instruction is a value_metatype on the address of 'self'.
+  TypeOfSelf
 };
 
 /// This struct represents a single classified access to the memory object

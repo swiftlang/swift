@@ -8,7 +8,7 @@ struct Generic<T> {
   init(_ value: T) {}
 }
 
-@_functionBuilder
+@resultBuilder
 struct Builder {
   static func buildBlock<C0, C1>(_ c0: C0, _ c1: C1) // expected-note 2 {{where 'C0' = 'Empty'}} expected-note {{where 'C1' = 'Test<Generic<(Empty, _)>>'}}
   // expected-note@-1 {{'buildBlock' declared here}}

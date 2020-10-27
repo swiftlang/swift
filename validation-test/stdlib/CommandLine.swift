@@ -10,5 +10,7 @@
 // REQUIRES: stress_test
 // UNSUPPORTED: single_threaded_runtime
 
+// REQUIRES: rdar70423908
+
 // This file is an empty stub to call into the command line stress test which
 // houses `main`.

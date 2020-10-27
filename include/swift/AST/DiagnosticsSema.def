@@ -1674,6 +1674,11 @@ ERROR(where_nongeneric_ctx,none,
 ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
+ERROR(unable_to_convert_generic_swift_types,none,
+      "could not generate C++ types from the generic Swift types provided. "
+      "The following Swift type(s) provided to '%0' were unable to be "
+      "converted: %1.",
+      (StringRef, StringRef))
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
@@ -4207,22 +4212,22 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       "requirement from protocol %3 isolated to global actor %4",
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
-ERROR(actorisolated_let,none,
-      "'@actorIsolated' is meaningless on 'let' declarations because "
+ERROR(actorindependent_let,none,
+      "'@actorIndependent' is meaningless on 'let' declarations because "
       "they are immutable",
       ())
-ERROR(actorisolated_mutable_storage,none,
-      "'@actorIsolated' can not be applied to stored properties",
+ERROR(actorindependent_mutable_storage,none,
+      "'@actorIndependent' can not be applied to stored properties",
       ())
-ERROR(actorisolated_local_var,none,
-      "'@actorIsolated' can not be applied to local variables",
+ERROR(actorindependent_local_var,none,
+      "'@actorIndependent' can not be applied to local variables",
       ())
-ERROR(actorisolated_not_actor_member,none,
-      "'@actorIsolated' can only be applied to actor members and "
+ERROR(actorindependent_not_actor_member,none,
+      "'@actorIndependent' can only be applied to actor members and "
       "global/static variables",
       ())
-ERROR(actorisolated_not_actor_instance_member,none,
-      "'@actorIsolated' can only be applied to instance members of actors",
+ERROR(actorindependent_not_actor_instance_member,none,
+      "'@actorIndependent' can only be applied to instance members of actors",
       ())
 
 ERROR(concurrency_lib_missing,none,
@@ -5056,12 +5061,12 @@ ERROR(local_type_in_inlinable_function,
       (Identifier, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
       (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
@@ -5352,83 +5357,83 @@ ERROR(property_wrapper_missing_arg_init, none, "missing argument for parameter "
       "arguments in '@%1(...)'", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
-// MARK: function builder diagnostics
+// MARK: result builder diagnostics
 //------------------------------------------------------------------------------
-ERROR(function_builder_decl, none,
-      "closure containing a declaration cannot be used with function "
+ERROR(result_builder_decl, none,
+      "closure containing a declaration cannot be used with result "
       "builder %0", (DeclName))
-NOTE(note_function_builder_decl, none,
-      "closure containing a declaration cannot be used with function "
+NOTE(note_result_builder_decl, none,
+      "closure containing a declaration cannot be used with result "
       "builder %0", (DeclName))
-ERROR(function_builder_control_flow, none,
-      "closure containing control flow statement cannot be used with function "
+ERROR(result_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with result "
       "builder %0", (DeclName))
-NOTE(note_function_builder_control_flow, none,
-      "closure containing control flow statement cannot be used with function "
+NOTE(note_result_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with result "
       "builder %0", (DeclName))
-ERROR(function_builder_attribute_not_allowed_here, none,
-      "function builder attribute %0 can only be applied to a parameter, "
+ERROR(result_builder_attribute_not_allowed_here, none,
+      "result builder attribute %0 can only be applied to a parameter, "
       "function, or computed property", (Identifier))
-ERROR(function_builder_attribute_on_storage_without_getter, none,
-      "function builder attribute %0 can only be applied to a "
+ERROR(result_builder_attribute_on_storage_without_getter, none,
+      "result builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",
       (DeclName, unsigned))
-ERROR(function_builder_parameter_not_of_function_type, none,
-      "function builder attribute %0 can only be applied to a parameter of "
+ERROR(result_builder_parameter_not_of_function_type, none,
+      "result builder attribute %0 can only be applied to a parameter of "
       "function type",
       (Identifier))
-ERROR(function_builder_parameter_autoclosure, none,
-      "function builder attribute %0 cannot be applied to an autoclosure "
+ERROR(result_builder_parameter_autoclosure, none,
+      "result builder attribute %0 cannot be applied to an autoclosure "
       "parameter",
       (Identifier))
-ERROR(function_builder_multiple, none,
-      "only one function builder attribute can be attached to a "
+ERROR(result_builder_multiple, none,
+      "only one result builder attribute can be attached to a "
       "%select{declaration|parameter}0", (bool))
-NOTE(previous_function_builder_here, none,
-     "previous function builder specified here", ())
-ERROR(function_builder_arguments, none,
-      "function builder attributes cannot have arguments", ())
-WARNING(function_builder_disabled_by_return, none,
-        "application of function builder %0 disabled by explicit 'return' "
+NOTE(previous_result_builder_here, none,
+     "previous result builder specified here", ())
+ERROR(result_builder_arguments, none,
+      "result builder attributes cannot have arguments", ())
+WARNING(result_builder_disabled_by_return, none,
+        "application of result builder %0 disabled by explicit 'return' "
         "statement", (Type))
-NOTE(function_builder_remove_attr, none,
-     "remove the attribute to explicitly disable the function builder", ())
-NOTE(function_builder_remove_returns, none,
-     "remove 'return' statements to apply the function builder", ())
-ERROR(function_builder_infer_ambig, none,
-      "ambiguous function builder inferred for %0: %1 or %2",
+NOTE(result_builder_remove_attr, none,
+     "remove the attribute to explicitly disable the result builder", ())
+NOTE(result_builder_remove_returns, none,
+     "remove 'return' statements to apply the result builder", ())
+ERROR(result_builder_infer_ambig, none,
+      "ambiguous result builder inferred for %0: %1 or %2",
       (DeclName, Type, Type))
-NOTE(function_builder_infer_add_return, none,
-     "add an explicit 'return' statement to not use a function builder", ())
-NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+NOTE(result_builder_infer_add_return, none,
+     "add an explicit 'return' statement to not use a result builder", ())
+NOTE(result_builder_infer_pick_specific, none,
+     "apply result builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
-WARNING(function_builder_missing_limited_availability, none,
-        "function builder %0 does not implement 'buildLimitedAvailability'; "
+WARNING(result_builder_missing_limited_availability, none,
+        "result builder %0 does not implement 'buildLimitedAvailability'; "
         "this code may crash on earlier versions of the OS",
         (Type))
-ERROR(function_builder_static_buildblock, none,
-      "function builder must provide at least one static 'buildBlock' "
+ERROR(result_builder_static_buildblock, none,
+      "result builder must provide at least one static 'buildBlock' "
       "method", ())
-NOTE(function_builder_non_static_buildblock, none,
+NOTE(result_builder_non_static_buildblock, none,
      "did you mean to make instance method 'buildBlock' static?", ())
-NOTE(function_builder_buildblock_enum_case, none,
-     "enum case 'buildBlock' cannot be used to satisfy the function builder "
+NOTE(result_builder_buildblock_enum_case, none,
+     "enum case 'buildBlock' cannot be used to satisfy the result builder "
      "requirement", ())
-NOTE(function_builder_buildblock_not_static_method, none,
+NOTE(result_builder_buildblock_not_static_method, none,
      "potential match 'buildBlock' is not a static method", ())
 
-NOTE(function_builder_missing_build_optional, none,
-     "add 'buildOptional(_:)' to the function builder %0 to add support for "
+NOTE(result_builder_missing_build_optional, none,
+     "add 'buildOptional(_:)' to the result builder %0 to add support for "
      "'if' statements without an 'else'", (Type))
-NOTE(function_builder_missing_build_either, none,
-     "add 'buildEither(first:)' and 'buildEither(second:)' to the function "
+NOTE(result_builder_missing_build_either, none,
+     "add 'buildEither(first:)' and 'buildEither(second:)' to the result "
      "builder %0 to add support for 'if'-'else' and 'switch'", (Type))
-NOTE(function_builder_missing_build_array, none,
-     "add 'buildArray(_:)' to the function builder %0 to add support for "
+NOTE(result_builder_missing_build_array, none,
+     "add 'buildArray(_:)' to the result builder %0 to add support for "
      "'for'..'in' loops", (Type))
-NOTE(function_builder_missing_build_limited_availability, none,
-     "add 'buildLimitedAvailability(_:)' to the function "
+NOTE(result_builder_missing_build_limited_availability, none,
+     "add 'buildLimitedAvailability(_:)' to the result "
      "builder %0 to erase type information for less-available types", (Type))
 
 //------------------------------------------------------------------------------

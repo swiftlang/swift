@@ -6,6 +6,8 @@
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_POSTFIX | %FileCheck %s --check-prefix=EXPR_POSTFIX
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_IMPLICITMEMBER | %FileCheck %s --check-prefix=EXPR_IMPLICITMEMBER
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=CALLARG | %FileCheck %s --check-prefix=CALLARG
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=WHERE | %FileCheck %s --check-prefix=WHERE
 
 struct MyStruct {
   init(x: Int) {}
@@ -113,3 +115,24 @@ func testArgument() -> MyStruct {
 // CALLARG-DAG: Pattern/ExprSpecific:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
 // CALLARG: End completions
 
+struct TestArchetypeAnnotations<T> {
+  func foo1<U>(u: U, t: T) {}
+  func foo2<S: Sequence>(s: S, elt: S.Element) {}
+}
+
+func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
+  arg.#^GENERIC^#
+}
+// GENERIC: Begin completions, 3 items
+// GENERIC-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>TestArchetypeAnnotations</typeid.user>&lt;<typeid.user>T</typeid.user>&gt;; name=self
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u: U, t: T)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo2(s: Sequence, elt: Sequence.Element)
+// GENERIC: End completions
+
+struct TestGenericParamAnnotations<T> {
+  func foo1<U>(u: U) where #^WHERE^#
+}
+// WHERE: Begin completions, 2 items
+// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>T</name>; typename=<typeid.user>T</typeid.user>; name=T
+// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>U</name>; typename=<typeid.user>U</typeid.user>; name=U
+// WHERE: End completions

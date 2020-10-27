@@ -2788,6 +2788,27 @@ public:
       return ParameterConvention::Indirect_In_Guaranteed;
     return ParameterConvention::Indirect_Inout;
   }
+  ResultConvention getResult(const TypeLowering &resultTL) const override {
+    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
+      // Represent the `this` pointer as an indirectly returned result.
+      // This gets us most of the way towards representing the ABI of a
+      // constructor correctly, but it's not guaranteed to be entirely correct.
+      // C++ constructor ABIs are complicated and can require passing additional
+      // "implicit" arguments that depend not only on the signature of the
+      // constructor but on the class on which it's defined (e.g. whether that
+      // class has a virtual base class).
+      // Effectively, we're making an assumption here that there are no implicit
+      // arguments and that the return type of the constructor ABI is void (and
+      // indeed we have no way to represent anything else here). If this assumed
+      // ABI doesn't match the actual ABI, we insert a thunk in IRGen. On some
+      // ABIs (e.g. Itanium x64), we get lucky and the ABI for a complete
+      // constructor call always matches the ABI we assume here. Even if the
+      // actual ABI doesn't match the assumed ABI, we try to get as close as
+      // possible to make it easy for LLVM to optimize away the thunk.
+      return ResultConvention::Indirect;
+    }
+    return CFunctionTypeConventions::getResult(resultTL);
+  }
   static bool classof(const Conventions *C) {
     return C->getKind() == ConventionsKind::CXXMethod;
   }
@@ -4201,7 +4222,17 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
 
-  bridgedParams.push_back(selfParam);
+  // If this is a C++ constructor, don't add the metatype "self" parameter
+  // because we'll never use it and it will cause problems in IRGen.
+  if (constant.getDecl()->getClangDecl() &&
+      isa<clang::CXXConstructorDecl>(constant.getDecl()->getClangDecl())) {
+    // But, make sure it is actually a metatype that we're not adding. If
+    // changes to the self parameter are made in the future, this logic may
+    // need to be updated.
+    assert(selfParam.getParameterType()->is<MetatypeType>());
+  } else {
+    bridgedParams.push_back(selfParam);
+  }
 
   auto uncurried =
     CanAnyFunctionType::get(genericSig,

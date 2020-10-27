@@ -323,6 +323,17 @@ namespace driver {
         return;
       }
 
+#ifndef NDEBUG
+      // If we can, assert that no compile jobs are scheduled beyond the second
+      // wave. If this assertion fails, it indicates one of:
+      // 1) A failure of the driver's job tracing machinery to follow a
+      // dependency arc.
+      // 2) A failure of the frontend to emit a dependency arc.
+      if (isa<CompileJobAction>(Cmd->getSource()) && Cmd->getWave() > 2) {
+        llvm_unreachable("Scheduled a command into a third wave!");
+      }
+#endif
+
       // Adding to scheduled means we've committed to its completion (not
       // distinguished from skipping). We never remove it once inserted.
       ScheduledCommands.insert(Cmd);
@@ -694,8 +705,16 @@ namespace driver {
                        "because of dependencies discovered later");
 
       scheduleCommandsInSortedOrder(DependentsInEffect);
-      for (const Job *Cmd : DependentsInEffect)
-        DeferredCommands.erase(Cmd);
+      for (const Job *Cmd : DependentsInEffect) {
+        if (DeferredCommands.erase(Cmd)) {
+#ifndef NDEBUG
+          if (isa<CompileJobAction>(FinishedCmd->getSource()))
+            Cmd->setWave(FinishedCmd->getWave() + 1);
+#else
+          continue;
+#endif
+        }
+      }
       return TaskFinishedResponse::ContinueExecution;
     }
 

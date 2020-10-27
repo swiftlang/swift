@@ -8,6 +8,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
 
@@ -27,15 +28,15 @@ class S {
   init()
 }
 
-// CHECK-LL: define hidden swiftcc void @classinstanceSVoidToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swiftcc void @classinstanceSVoidToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @classinstanceSVoidToVoid : $@async @convention(method) (@guaranteed S) -> () {
 bb0(%instance : $S):
-  %take_s = function_ref @take_S : $@convention(thin) (@guaranteed S) -> ()
-  %result = apply %take_s(%instance) : $@convention(thin) (@guaranteed S) -> ()
+  %take_s = function_ref @take_S : $@async @convention(thin) (@guaranteed S) -> ()
+  %result = apply %take_s(%instance) : $@async @convention(thin) (@guaranteed S) -> ()
   return %result : $()
 }
 
-sil hidden @take_S : $@convention(thin) (@guaranteed S) -> () {
+sil hidden @take_S : $@async @convention(thin) (@guaranteed S) -> () {
 bb0(%instance : $S):
   %any = alloc_stack $Any
   strong_retain %instance : $S
@@ -83,7 +84,7 @@ sil_vtable S {
   #S.deinit!deallocator: @S_deallocating_deinit
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
   %s_type = metatype $@thick S.Type

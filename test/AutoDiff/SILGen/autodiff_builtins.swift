@@ -98,14 +98,15 @@ func applyTranspose_f_direct_arity1(_ x: Float) -> Float {
 // CHECK:   [[NOESC_LINEAR:%.*]] = convert_escape_to_noescape [not_guaranteed] [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float to $@differentiable(linear) @noescape @callee_guaranteed (Float) -> Float
 // CHECK:   [[TRANS:%.*]] = linear_function_extract [transpose] [[NOESC_LINEAR]] : $@differentiable(linear) @noescape @callee_guaranteed (Float) -> Float
 // CHECK:   [[RESULT:%.*]] = apply [[TRANS]]([[X]]) : $@noescape @callee_guaranteed (Float) -> Float
-// CHECK:   destroy_value [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
 // CHECK:   return [[RESULT]] : $Float
+// CHECK: } // end sil function 'applyTranspose_f_direct_arity1'
 
 @_silgen_name("applyTranspose_f_direct_arity2")
 func applyTranspose_f_direct_arity2(_ x: Float) -> (Float, Float) {
   return Builtin.applyTranspose_arity2(f_direct_arity2, x)
 }
-// CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity2
+
+// CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity2 :
 // CHECK: bb0([[X:%.*]] : $Float)
 // CHECK:   [[ORIG:%.*]] = function_ref @f_direct_arity2 : $@convention(thin) (Float, Float) -> Float
 // CHECK:   [[THICK_ORIG:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float, Float) -> Float to $@callee_guaranteed (Float, Float) -> Float
@@ -114,9 +115,9 @@ func applyTranspose_f_direct_arity2(_ x: Float) -> (Float, Float) {
 // CHECK:   [[TRANS:%.*]] = linear_function_extract [transpose] [[NOESC_LINEAR]] : $@differentiable(linear) @noescape @callee_guaranteed (Float, Float) -> Float
 // CHECK:   [[RESULT:%.*]] = apply [[TRANS]]([[X]]) : $@noescape @callee_guaranteed (Float) -> (Float, Float)
 // CHECK:   ([[RES1:%.*]], [[RES2:%.*]]) = destructure_tuple [[RESULT]] : $(Float, Float)
-// CHECK:   destroy_value [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float, Float) -> Float
 // CHECK:   [[RESULT:%.*]] = tuple ([[RES1]] : $Float, [[RES2]] : $Float)
 // CHECK:   return [[RESULT]] : $(Float, Float)
+// CHECK: } // end sil function 'applyTranspose_f_direct_arity2'
 
 @_silgen_name("applyTranspose_f_indirect_arity1")
 func applyTranspose_f_indirect_arity1<T: AdditiveArithmetic & Differentiable>(_ x: T) -> T {

@@ -338,6 +338,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -404,6 +405,8 @@ private:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplDifferentiability:
     case Node::Kind::ImplFunctionAttribute:
+    case Node::Kind::ImplFunctionConvention:
+    case Node::Kind::ImplFunctionConventionName:
     case Node::Kind::ImplFunctionType:
     case Node::Kind::ImplInvocationSubstitutions:
     case Node::Kind::ImplPatternSubstitutions:
@@ -751,10 +754,21 @@ private:
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    if (node->getNumChildren() < 2 || node->getNumChildren() > 4) {
+    if (node->getNumChildren() < 2 || node->getNumChildren() > 5) {
       setInvalid();
       return;
     }
+
+    auto printConventionWithMangledCType = [this,
+                                            node](const char *convention) {
+      Printer << "@convention(" << convention;
+      if (node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+        Printer << ", mangledCType: \"";
+        print(node->getFirstChild());
+        Printer << '"';
+      }
+      Printer << ") ";
+    };
 
     switch (node->getKind()) {
     case Node::Kind::FunctionType:
@@ -767,11 +781,14 @@ private:
     case Node::Kind::ThinFunctionType:
       Printer << "@convention(thin) "; break;
     case Node::Kind::CFunctionPointer:
-      Printer << "@convention(c) "; break;
-    case Node::Kind::ObjCBlock:
-      Printer << "@convention(block) "; break;
+      printConventionWithMangledCType("c");
+      break;
     case Node::Kind::EscapingObjCBlock:
-      Printer << "@escaping @convention(block) "; break;
+      Printer << "@escaping ";
+      LLVM_FALLTHROUGH;
+    case Node::Kind::ObjCBlock:
+      printConventionWithMangledCType("block");
+      break;
     case Node::Kind::DifferentiableFunctionType:
       Printer << "@differentiable "; break;
     case Node::Kind::EscapingDifferentiableFunctionType:
@@ -786,6 +803,10 @@ private:
 
     unsigned startIndex = 0;
     bool isAsync = false, isThrows = false;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
+      // handled earlier
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
       ++startIndex;
       isThrows = true;
@@ -1301,6 +1322,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::LinearFunctionType:
   case Node::Kind::EscapingLinearFunctionType:
     printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::ClangType:
+    Printer << Node->getText();
     return nullptr;
   case Node::Kind::ArgumentTuple:
     printFunctionParameters(nullptr, Node, Options.ShowFunctionArgumentTypes);
@@ -2100,6 +2124,24 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ImplFunctionAttribute:
     Printer << Node->getText();
     return nullptr;
+  case Node::Kind::ImplFunctionConvention:
+    Printer << "@convention(";
+    switch (Node->getNumChildren()) {
+    case 1:
+      Printer << Node->getChild(0)->getText();
+      break;
+    case 2:
+      Printer << Node->getChild(0)->getText() << ", mangledCType: \"";
+      print(Node->getChild(1));
+      Printer << '"';
+      break;
+    default:
+      assert(false && "Unexpected numChildren for ImplFunctionConvention");
+    }
+    Printer << ')';
+    return nullptr;
+  case Node::Kind::ImplFunctionConventionName:
+    assert(false && "Already handled in ImplFunctionConvention");
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
     printChildren(Node, " ");

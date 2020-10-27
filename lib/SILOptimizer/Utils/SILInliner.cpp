@@ -688,6 +688,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
+  case SILInstructionKind::BindMemoryInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -789,6 +790,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::GetAsyncContinuationInst:
     return InlineCost::Free;
 
+  // Unconditional branch is free in empty blocks.
+  case SILInstructionKind::BranchInst:
+    return (I.getIterator() == I.getParent()->begin())
+      ? InlineCost::Free : InlineCost::Expensive;
+
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -798,13 +804,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocValueBufferInst:
-  case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
-  case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:

@@ -145,7 +145,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
-  bool includeInlineable = options & NL_IncludeUsableFromInlineAndInlineable;
+  bool includeUsableFromInline = options & NL_IncludeUsableFromInline;
 
   auto updateNewDecls = [&](const DeclContext *moduleScopeContext) {
     if (decls.size() == currentCount)
@@ -157,7 +157,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
           return true;
         if (respectAccessControl &&
-            !VD->isAccessibleFrom(moduleScopeContext, false, includeInlineable))
+            !VD->isAccessibleFrom(moduleScopeContext, false,
+                                  includeUsableFromInline))
           return true;
         return false;
       });

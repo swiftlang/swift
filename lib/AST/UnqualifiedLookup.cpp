@@ -384,8 +384,8 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
   auto nlOptions = NL_UnqualifiedDefault;
-  if (options.contains(Flags::IncludeInlineableAndUsableFromInline))
-    nlOptions |= NL_IncludeUsableFromInlineAndInlineable;
+  if (options.contains(Flags::IncludeUsableFromInline))
+    nlOptions |= NL_IncludeUsableFromInline;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 
