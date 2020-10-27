@@ -1227,7 +1227,7 @@ extension Array: RangeReplaceableCollection {
       // elements. It reduces code size, because the following code
       // can be removed by the optimizer by constant folding this check in a
       // generic specialization.
-      if newElements is [Element] {
+      if S.self == [Element].self {
         _internalInvariant(remainder.next() == nil)
         return
       }
