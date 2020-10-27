@@ -13,6 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+/// A partial task is a unit of scheduleable work.
 public struct PartialAsyncTask {
   private var context: UnsafeMutablePointer<_SwiftContext>
 
