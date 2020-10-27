@@ -2399,7 +2399,7 @@ bool swift::diagnoseExplicitUnavailability(
 }
 
 namespace {
-class AvailabilityWalker : public ASTWalker {
+class ExprAvailabilityWalker : public ASTWalker {
   /// Describes how the next member reference will be treated as we traverse
   /// the AST.
   enum class MemberAccessContext : unsigned {
@@ -2423,7 +2423,7 @@ class AvailabilityWalker : public ASTWalker {
   ExportContext Where;
 
 public:
-  AvailabilityWalker(ExportContext Where)
+  explicit ExprAvailabilityWalker(ExportContext Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
@@ -2694,7 +2694,7 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagnoseDeclRefAvailability(
+ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     ConcreteDeclRef declRef, SourceRange R, const ApplyExpr *call,
     DeclAvailabilityFlags Flags) const {
   if (!declRef)
@@ -2806,8 +2806,8 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
 /// If this is a call to an unavailable ++ / -- operator, try to diagnose it
 /// with a fixit hint and return true.  If not, or if we fail, return false.
 bool
-AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                                          const AvailableAttr *Attr) const {
+ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
+                                              const AvailableAttr *Attr) const {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getBaseName() == "++";
   if (!isInc && D->getBaseName() != "--")
@@ -2870,10 +2870,10 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 /// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
 bool
-AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                                  SourceRange R,
-                                                  const AvailableAttr *Attr,
-                                                  const ApplyExpr *call) const {
+ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
+                                                      SourceRange R,
+                                                      const AvailableAttr *Attr,
+                                                      const ApplyExpr *call) const {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
@@ -2946,7 +2946,7 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC);
   if (where.isImplicit())
     return;
-  AvailabilityWalker walker(where);
+  ExprAvailabilityWalker walker(where);
   const_cast<Expr*>(E)->walk(walker);
 }
 
