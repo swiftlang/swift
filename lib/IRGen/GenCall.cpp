@@ -111,6 +111,15 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     typeInfos.push_back(&ti);
   }
 
+  // TaskContinuationFunction * __ptrauth_swift_async_context_resume
+  //     ResumeParent;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getTaskContinuationFunctionPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);
