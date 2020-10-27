@@ -895,6 +895,7 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
+  const TypeInfo &getSwiftExecutorPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &
