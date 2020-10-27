@@ -26,4 +26,39 @@ struct MagicWrapper<SpecializedIntWrapper> {
 typedef MagicWrapper<SpecializedIntWrapper> WrapperWithSpecialization;
 typedef MagicWrapper<NonSpecializedIntWrapper> WrapperWithoutSpecialization;
 
+// Make sure these declarations don't cause a crash even though we can't import
+// them.
+
+template <class...> class HasSpecializations;
+
+template <> class HasSpecializations<> {
+  int value;
+  struct Child {};
+  enum Maybe : int { No, Yes };
+};
+
+template <> class HasSpecializations<int> {
+  int value;
+  struct Child {};
+  enum Maybe : int { No, Yes };
+};
+
+template <> class HasSpecializations<int, int> {
+  int value;
+  struct Child {};
+  enum Maybe : int { No, Yes };
+};
+
+template <class T> class HasSpecializations<T, int> {
+  int value;
+  struct Child {};
+  enum Maybe : int { No, Yes };
+};
+
+template <class T, class... Ts> class HasSpecializations<int, T, Ts...> {
+  int value;
+  struct Child {};
+  enum Maybe : int { No, Yes };
+};
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H

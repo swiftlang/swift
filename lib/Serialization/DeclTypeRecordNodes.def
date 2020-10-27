@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -146,6 +146,7 @@ PATTERN(ANY)
 PATTERN(TYPED)
 PATTERN(VAR)
 
+OTHER(XREF_CLANG_TEMPLATE_INSTANTIATION, 209)
 OTHER(PARAMETERLIST, 210)
 // 211 is unused
 OTHER(FOREIGN_ERROR_CONVENTION, 212)
@@ -194,7 +195,7 @@ OTHER(CLANG_TYPE, 253)
 
 OTHER(DERIVATIVE_FUNCTION_CONFIGURATION, 254)
 
-OTHER(XREF_CLANG_TEMPLATE_INSTANTIATION, 255)
+OTHER(BUILTIN_PROTOCOL_CONFORMANCE, 255)
 
 #undef RECORD
 #undef DECLTYPERECORDNODES_HAS_RECORD_VAL

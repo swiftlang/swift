@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -589,8 +589,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
@@ -971,6 +973,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // its own shared copy of it.
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
+
+  // If we happen to see a builtin witness table here, we can't emit those.
+  // The runtime has those for us.
+  if (isa<BuiltinProtocolConformance>(wt->getConformance()))
+    return false;
 
   NominalTypeDecl *ConformingTy =
     wt->getConformingType()->getNominalOrBoundGenericNominal();

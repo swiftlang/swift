@@ -4,6 +4,7 @@
 //
 // We can't yet call member functions correctly on Windows (SR-13129).
 // XFAIL: OS=windows-msvc
+// REQUIRES: fixing-after-30630
 
 import ClassTemplateVariadic
 import StdlibUnittest

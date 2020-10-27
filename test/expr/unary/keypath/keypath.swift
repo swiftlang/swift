@@ -873,7 +873,6 @@ func sr11562() {
   }
 
   _ = \S4.[1, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{12-12=(}} {{16-16=)}}
-  // expected-error@-1 {{subscript index of type '(Int, Int)' in a key path must be Hashable}}
 }
 
 // SR-12290: Ban keypaths with contextual root and without a leading dot
