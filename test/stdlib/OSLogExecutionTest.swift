@@ -7,6 +7,7 @@
 // RUN: %target-codesign %t/OSLogExecutionTest
 // RUN: %target-run %t/OSLogExecutionTest
 // REQUIRES: executable_test
+// REQUIRES: foundation
 //
 // REQUIRES: VENDOR=apple
 

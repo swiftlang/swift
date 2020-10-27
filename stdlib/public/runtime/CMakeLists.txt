@@ -29,6 +29,7 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     BackDeployment.cpp
+    BuiltinProtocolConformances.cpp
     Casting.cpp
     CompatibilityOverride.cpp
     CygwinPort.cpp

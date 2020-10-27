@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -193,6 +193,8 @@ OTHER(XREF_OPAQUE_RETURN_TYPE_PATH_PIECE, 252)
 OTHER(CLANG_TYPE, 253)
 
 OTHER(DERIVATIVE_FUNCTION_CONFIGURATION, 254)
+
+OTHER(BUILTIN_PROTOCOL_CONFORMANCE, 255)
 
 #undef RECORD
 #undef DECLTYPERECORDNODES_HAS_RECORD_VAL

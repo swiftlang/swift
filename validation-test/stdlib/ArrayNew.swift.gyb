@@ -1110,6 +1110,15 @@ ArrayTestSuite.test("BridgedToObjC.Nonverbatim.RoundtripThroughSwiftArray") {
   }
 }
 
+ArrayTestSuite.test("append(contentsOf: NSArray)") {
+  // A stray runtime `is` test caused this particular operation to fail in 5.3.
+  // rdar://70448247
+  let nsarray: NSArray = [2, 3, 4]
+  var array: [Any] = [1]
+  array.append(contentsOf: nsarray)
+  expectEqual(array as? [Int], [1, 2, 3, 4])
+}
+
 ArrayTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
   resetLeaksOfObjCDictionaryKeysValues()

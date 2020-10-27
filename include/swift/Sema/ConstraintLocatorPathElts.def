@@ -147,8 +147,8 @@ ABSTRACT_LOCATOR_PATH_ELT(AnyRequirement)
   /// A single requirement placed on the type parameters.
   CUSTOM_LOCATOR_PATH_ELT(TypeParameterRequirement)
 
-/// RValue adjustment.
-SIMPLE_LOCATOR_PATH_ELT(RValueAdjustment)
+/// Access to `.dynamicType` element
+SIMPLE_LOCATOR_PATH_ELT(DynamicType)
 
 /// The element type of a sequence in a for ... in ... loop.
 SIMPLE_LOCATOR_PATH_ELT(SequenceElementType)

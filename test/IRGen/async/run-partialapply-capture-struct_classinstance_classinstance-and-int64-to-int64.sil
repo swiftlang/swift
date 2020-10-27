@@ -60,8 +60,8 @@ sil_vtable C {
 
 struct S { var x: C, y: C }
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @structClassInstanceClassInstanceAndInt64ToInt64(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
-// CHECK-LL: define internal swiftcc void @"$s019structClassInstancebc10AndInt64ToE0TA"(%swift.context* {{%[0-9]*}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @structClassInstanceClassInstanceAndInt64ToInt64(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$s019structClassInstancebc10AndInt64ToE0TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
 sil @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64 {
 entry(%in : $Int64, %s : $S):
   %s_addr = alloc_stack $S
@@ -74,14 +74,14 @@ entry(%in : $Int64, %s : $S):
   return %in : $Int64
 }
 
-sil @partial_apply_guaranteed_class_pair_param : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64 {
+sil @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64 {
 bb0(%x : $S):
   %f = function_ref @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
   %p = partial_apply %f(%x) : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
   return %p : $@async @callee_owned (Int64) -> Int64
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %s_type = metatype $@thick C.Type
   %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick C.Type) -> @owned C
@@ -91,8 +91,8 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   strong_retain %instance2 : $C
   %instance = struct $S (%instance1 : $C, %instance2 : $C)
 
-  %partial_apply_guaranteed_class_pair_param = function_ref @partial_apply_guaranteed_class_pair_param : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
-  %partiallyApplied = apply %partial_apply_guaranteed_class_pair_param(%instance) : $@convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
+  %partial_apply_guaranteed_class_pair_param = function_ref @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
+  %partiallyApplied = apply %partial_apply_guaranteed_class_pair_param(%instance) : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
   %int_literal = integer_literal $Builtin.Int64, 9999
   %int = struct $Int64 (%int_literal : $Builtin.Int64)
   %result = apply %partiallyApplied(%int) : $@async @callee_owned (Int64) -> Int64

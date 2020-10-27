@@ -690,9 +690,12 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
 }
 
 void SignatureExpansion::addAsyncParameters() {
+  // using TaskContinuationFunction =
+  //   SWIFT_CC(swift)
+  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
+  ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
-  // TODO: Add actor.
-  // TODO: Add task.
   if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Thick) {
     IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
     ParamIRTypes.push_back(IGM.RefCountedPtrTy);
@@ -1757,6 +1760,8 @@ llvm::Value *irgen::getDynamicAsyncContextSize(IRGenFunction &IGF,
                                                AsyncContextLayout layout,
                                                CanSILFunctionType functionType,
                                                llvm::Value *thickContext) {
+  // TODO: This calculation should be extracted out into a standalone function
+  //       emitted on-demand per-module to improve codesize.
   switch (functionType->getRepresentation()) {
   case SILFunctionTypeRepresentation::Thick: {
     // If the called function is thick, the size of the called function's
@@ -2074,11 +2079,15 @@ class AsyncCallEmission final : public CallEmission {
   Size contextSize;
   Address context;
   llvm::Value *thickContext = nullptr;
+  Optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
-    return ::getAsyncContextLayout(IGF, getCallee().getOrigFunctionType(),
-                                   getCallee().getSubstFunctionType(),
-                                   getCallee().getSubstitutions());
+    if (!asyncContextLayout) {
+      asyncContextLayout.emplace(::getAsyncContextLayout(
+          IGF, getCallee().getOrigFunctionType(),
+          getCallee().getSubstFunctionType(), getCallee().getSubstitutions()));
+    }
+    return *asyncContextLayout;
   }
 
   void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {
@@ -2135,6 +2144,9 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
+    asyncExplosion.add(llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy));
+    asyncExplosion.add(
+        llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
     asyncExplosion.add(contextBuffer.getAddress());
     if (getCallee().getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {

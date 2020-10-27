@@ -56,7 +56,7 @@ sil_vtable S {
   #S.deinit!deallocator: @S_deallocating_deinit
 }
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classinstanceSToVoid(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classinstanceSToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @classinstanceSToVoid : $@async @convention(thin) (@owned S) -> () {
 entry(%c : $S):
   %class_addr = alloc_stack $S
@@ -74,7 +74,7 @@ entry(%instance : $S):
   return %partiallyApplied : $@async @callee_owned () -> ()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %s_type = metatype $@thick S.Type
   %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S

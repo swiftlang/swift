@@ -802,10 +802,12 @@ static int getThreadingCost(SILInstruction *I) {
   return 0;
 }
 
+static int maxBranchRecursionDepth = 6;
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
-static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
+static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
+                                   int recursionDepth = 0) {
   SILBasicBlock *BB = BBArg->getParent();
   int BudgetForBranch = 100;
 
@@ -833,6 +835,9 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
     }
 
     if (auto *BI = dyn_cast<BranchInst>(User)) {
+      if (recursionDepth >= maxBranchRecursionDepth) {
+        return false;
+      }
       if (BudgetForBranch > Budget) {
         BudgetForBranch = Budget;
         for (SILInstruction &I : *BB) {
@@ -844,7 +849,8 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
       if (BudgetForBranch > 0) {
         SILBasicBlock *DestBB = BI->getDestBB();
         unsigned OpIdx = UI->getOperandNumber();
-        if (couldSimplifyEnumUsers(DestBB->getArgument(OpIdx), BudgetForBranch))
+        if (couldSimplifyEnumUsers(DestBB->getArgument(OpIdx), BudgetForBranch,
+                                   recursionDepth + 1))
           return true;
       }
     }
@@ -1565,17 +1571,29 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  if (TrueArgs == FalseArgs && (TrueSide == FalseTrampolineDest ||
-                                FalseSide == TrueTrampolineDest)) {
-    LLVM_DEBUG(llvm::dbgs() << "replace cond_br with same dests with br: "
-                            << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
-                      TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
+  auto condBrToBr = [&](OperandValueArrayRef branchArgs,
+                        SILBasicBlock *newDest) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "replace cond_br with same dests with br: " << *BI);
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
-    addToWorklist(TrueSide);
     ++NumConstantFolded;
-    return true;
+  };
+  if (TrueArgs == FalseArgs) {
+    if (TrueTrampolineDest) {
+      if (TrueTrampolineDest == FalseSide
+          || TrueTrampolineDest == FalseTrampolineDest) {
+        condBrToBr(TrueArgs, TrueTrampolineDest);
+        removeIfDead(TrueSide);
+        removeIfDead(FalseSide);
+        return true;
+      }
+    } else if (FalseTrampolineDest == TrueSide) {
+      condBrToBr(TrueArgs, FalseTrampolineDest);
+      removeIfDead(FalseSide);
+      return true;
+    }
   }
 
   auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);

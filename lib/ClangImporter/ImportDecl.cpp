@@ -3547,6 +3547,14 @@ namespace {
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
+
+      // If this type is fully specialized (i.e. "Foo<>" or "Foo<int, int>"),
+      // bail to prevent a crash.
+      // TODO: we should be able to support fully specialized class templates.
+      // See SR-13775 for more info.
+      if (def->getTypeAsWritten())
+        return nullptr;
+
       // FIXME: This will instantiate all members of the specialization (and detect
       // instantiation failures in them), which can be more than is necessary
       // and is more than what Clang does. As a result we reject some C++
@@ -8561,11 +8569,19 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
-      if (type->getCanonicalType()->isBool()) {
-        auto *boolExpr =
-            new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
-                                             SourceLoc(),
-                                             /**Implicit=*/true);
+      bool isBool = type->getCanonicalType()->isBool();
+      // Check if "type" is a C++ enum with an underlying type of "bool".
+      if (!isBool && type->getStructOrBoundGenericStruct() &&
+          type->getStructOrBoundGenericStruct()->getClangDecl()) {
+        if (auto enumDecl = dyn_cast<clang::EnumDecl>(
+                type->getStructOrBoundGenericStruct()->getClangDecl())) {
+          isBool = enumDecl->getIntegerType()->isBooleanType();
+        }
+      }
+      if (isBool) {
+        auto *boolExpr = new (context)
+            BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
+                               /*Implicit=*/true);
 
         boolExpr->setBuiltinInitializer(
           context.getBoolBuiltinInitDecl());

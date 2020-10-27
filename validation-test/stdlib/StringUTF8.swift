@@ -6,6 +6,7 @@
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret
+// UNSUPPORTED: freestanding
 
 import StdlibUnittest
 import StdlibCollectionUnittest

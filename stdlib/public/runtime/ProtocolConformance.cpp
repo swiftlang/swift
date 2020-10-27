@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -83,11 +84,14 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   case TypeReferenceKind::IndirectTypeDescriptor:
     printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
+  case TypeReferenceKind::MetadataKind:
+    printf("metadata kind %i", getMetadataKind());
+    break;
   }
   
   printf(" => ");
   
-  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
+  printf("witness table pattern %p\n", symbolName(getWitnessTablePattern()));
 }
 #endif
 
@@ -113,6 +117,7 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor:
+  case TypeReferenceKind::MetadataKind:
     return nullptr;
   }
 
@@ -151,6 +156,9 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
       }
     }
 
+    return nullptr;
+  }
+  case TypeReferenceKind::MetadataKind: {
     return nullptr;
   }
   }
@@ -368,6 +376,52 @@ searchInConformanceCache(const Metadata *type,
   return {false, nullptr};
 }
 
+extern "C" const ProtocolDescriptor EQUATABLE_DESCRIPTOR;
+extern "C" const ProtocolDescriptor COMPARABLE_DESCRIPTOR;
+extern "C" const ProtocolDescriptor HASHABLE_DESCRIPTOR;
+
+static bool tupleConformsToProtocol(const Metadata *type,
+                                    const ProtocolDescriptor *protocol) {
+  auto tuple = cast<TupleTypeMetadata>(type);
+
+  // At the moment, tuples can only conform to Equatable, Comparable and
+  // Hashable, so reject all other protocols.
+  auto equatable = &EQUATABLE_DESCRIPTOR;
+  auto comparable = &COMPARABLE_DESCRIPTOR;
+  auto hashable = &HASHABLE_DESCRIPTOR;
+  if (protocol != equatable && protocol != comparable && protocol != hashable)
+    return false;
+
+  for (size_t i = 0; i != tuple->NumElements; i += 1) {
+    auto elt = tuple->getElement(i);
+    if (!swift_conformsToProtocol(elt.Type, protocol))
+      return false;
+  }
+
+  return true;
+}
+
+extern "C" const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleComparable_conf;
+extern "C" const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
+
+static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
+                                           const ProtocolDescriptor *protocol) {
+  if (protocol == &EQUATABLE_DESCRIPTOR) {
+    return &_swift_tupleEquatable_conf;
+  }
+
+  if (protocol == &COMPARABLE_DESCRIPTOR) {
+    return &_swift_tupleComparable_conf;
+  }
+
+  if (protocol == &HASHABLE_DESCRIPTOR) {
+    return &_swift_tupleHashable_conf;
+  }
+
+  return nullptr;
+}
+
 namespace {
   /// Describes a protocol conformance "candidate" that can be checked
   /// against a type metadata.
@@ -484,6 +538,16 @@ swift_conformsToProtocolImpl(const Metadata *const type,
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
       }
+    }
+  }
+
+  // If we're asking if a tuple conforms to a protocol, handle that here for
+  // builtin conformances.
+  if (auto tuple = dyn_cast<TupleTypeMetadata>(type)) {
+    if (tupleConformsToProtocol(tuple, protocol)) {
+      auto descriptor = getTupleConformanceDescriptor(protocol);
+      C.cacheResult(type, protocol, descriptor->getWitnessTable(type),
+                    /*always cache*/ 0);
     }
   }
 

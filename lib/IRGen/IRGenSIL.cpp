@@ -1231,6 +1231,8 @@ public:
 class AsyncNativeCCEntryPointArgumentEmission final
     : public NativeCCEntryPointArgumentEmission,
       public AsyncEntryPointArgumentEmission {
+  llvm::Value *task;
+  llvm::Value *executor;
   llvm::Value *context;
   /*const*/ AsyncContextLayout layout;
   const Address dataAddr;
@@ -1253,6 +1255,7 @@ public:
                                           SILBasicBlock &entry,
                                           Explosion &allParamValues)
       : AsyncEntryPointArgumentEmission(IGF, entry, allParamValues),
+        task(allParamValues.claimNext()), executor(allParamValues.claimNext()),
         context(allParamValues.claimNext()), layout(getAsyncContextLayout(IGF)),
         dataAddr(layout.emitCastTo(IGF, context)){};
 
@@ -1352,7 +1355,11 @@ std::unique_ptr<COrObjCEntryPointArgumentEmission>
 getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
                                      SILBasicBlock &entry,
                                      Explosion &allParamValues) {
-  if (IGF.CurSILFn->isAsync()) {
+  if (IGF.CurSILFn->isAsync() &&
+      !(/*FIXME: Remove this condition once Task.runDetached is
+                            available.  rdar://problem/70597390*/
+        IGF.CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer)) {
     llvm_unreachable("unsupported");
   } else {
     return std::make_unique<SyncCOrObjCEntryPointArgumentEmission>(
@@ -2707,7 +2714,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
-  Explosion llArgs;    
+  Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
       *this, origCalleeType, substCalleeType, calleeLV, selfValue,
@@ -3162,13 +3169,17 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
     retTI.initialize(IGF, result, IGF.IndirectReturn, false);
     IGF.Builder.CreateRetVoid();
-  } else if (IGF.isAsync()) {
+  } else if (IGF.isAsync() &&
+             !(/*FIXME: Remove this condition once Task.runDetached is
+                  available.  rdar://problem/70597390*/
+               IGF.CurSILFn->getLoweredFunctionType()
+                   ->getRepresentation() ==
+               SILFunctionTypeRepresentation::CFunctionPointer)) {
     // If we're generating an async function, store the result into the buffer.
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    Explosion parameters = IGF.collectParameters();
-    llvm::Value *context = parameters.claimNext();
+    llvm::Value *context = IGF.CurFn->getArg(2);
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);

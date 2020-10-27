@@ -28,7 +28,7 @@ struct I : P {
   init(int: Int64)
 }
 
-// CHECK-LL-LABEL: define hidden swiftcc void @I_printMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL-LABEL: define hidden swiftcc void @I_printMe(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @I_printMe : $@async @convention(method) (I) -> Int64 {
 bb0(%self : $I):
   %self_addr = alloc_stack $I
@@ -40,7 +40,7 @@ bb0(%self : $I):
   return %result : $Int64
 }
 
-// CHECK-LL-LABEL: define internal swiftcc void @I_P_printMe(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL-LABEL: define internal swiftcc void @I_P_printMe(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil private [transparent] [thunk] @I_P_printMe : $@async @convention(witness_method: P) (@in_guaranteed I) -> Int64 {
 bb0(%self_addr : $*I):
   %self = load %self_addr : $*I
@@ -49,14 +49,14 @@ bb0(%self_addr : $*I):
   return %result : $Int64
 }
 
-sil hidden @callPrintMe : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64 {
+sil hidden @callPrintMe : $@async @convention(thin) <T where T : P> (@in_guaranteed T) -> Int64 {
 bb0(%t : $*T):
   %I_P_printMe = witness_method $T, #P.printMe : <Self where Self : P> (Self) -> () async -> Int64 : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %result = apply %I_P_printMe<T>(%t) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   return %result : $Int64
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %i_type = metatype $@thin I.Type
   %i_int_literal = integer_literal $Builtin.Int64, 99
@@ -64,8 +64,8 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %i = struct $I (%i_int : $Int64)
   %i_addr = alloc_stack $I
   store %i to %i_addr : $*I
-  %callPrintMe = function_ref @callPrintMe : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %result = apply %callPrintMe<I>(%i_addr) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // users: %13, %11 // CHECK: I(int: 99)
+  %callPrintMe = function_ref @callPrintMe : $@async @convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %result = apply %callPrintMe<I>(%i_addr) : $@async @convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // users: %13, %11 // CHECK: I(int: 99)
   dealloc_stack %i_addr : $*I
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 99

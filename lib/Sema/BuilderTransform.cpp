@@ -810,10 +810,10 @@ protected:
     VarDecl *arrayVar = buildVar(loc);
     Type arrayElementType = cs->createTypeVariable(
         cs->getConstraintLocator(forEachStmt), 0);
-    cs->addConstraint(
-        ConstraintKind::Equal, cs->getType(bodyVar), arrayElementType,
-        cs->getConstraintLocator(
-          forEachStmt, ConstraintLocator::RValueAdjustment));
+    cs->addConstraint(ConstraintKind::Equal, cs->getType(bodyVar),
+                      arrayElementType,
+                      cs->getConstraintLocator(
+                          forEachStmt, ConstraintLocator::SequenceElementType));
     Type arrayType = ArraySliceType::get(arrayElementType);
     cs->setType(arrayVar, arrayType);
 
