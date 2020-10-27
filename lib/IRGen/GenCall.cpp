@@ -2185,7 +2185,7 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy));
+    asyncExplosion.add(IGF.getAsyncTask());
     asyncExplosion.add(
         llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
     asyncExplosion.add(contextBuffer.getAddress());
