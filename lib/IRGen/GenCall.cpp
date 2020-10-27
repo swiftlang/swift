@@ -120,6 +120,14 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     typeInfos.push_back(&ti);
   }
 
+  // ExecutorRef ResumeParentExecutor;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftExecutorPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);
