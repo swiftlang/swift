@@ -2313,16 +2313,16 @@ public:
 };
 
 class AllowInvalidStaticMemberRefOnProtocolMetatype final
-  : public ConstraintFix {
-  Type BaseType;
+    : public ConstraintFix {
+  Type ResultType;
 
   AllowInvalidStaticMemberRefOnProtocolMetatype(ConstraintSystem &cs,
-                                                Type baseType,
+                                                Type resultType,
                                                 ConstraintLocator *locator)
-    : ConstraintFix(cs,
-                    FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype,
-                    locator),
-      BaseType(baseType) {}
+      : ConstraintFix(cs,
+                      FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype,
+                      locator),
+        ResultType(resultType) {}
 
   public:
   std::string getName() const override {
@@ -2330,7 +2330,7 @@ class AllowInvalidStaticMemberRefOnProtocolMetatype final
   }
 
   static AllowInvalidStaticMemberRefOnProtocolMetatype *
-  create(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator);
+  create(ConstraintSystem &cs, Type resultType, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

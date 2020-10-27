@@ -7189,6 +7189,26 @@ bool MemberMissingExplicitBaseTypeFailure::diagnoseAsError() {
               .fixItInsert(UME->getDotLoc(), baseTypeName);
         });
   }
+
+  return true;
+}
+
+bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return false;
+
+  auto *member = overload->choice.getDeclOrNull();
+  assert(member);
+
+  auto *DC = member->getDeclContext()->getSelfProtocolDecl();
+  auto protocolTy = DC->getDeclaredInterfaceType();
+
+  emitDiagnostic(diag::type_does_not_conform_in_member_ref_on_protocol_type,
+                 member->getDescriptiveKind(), member->getName(),
+                 MetatypeType::get(protocolTy), ResultType);
+  emitDiagnosticAt(member, diag::decl_declared_here, member->getName());
   return true;
 }
 

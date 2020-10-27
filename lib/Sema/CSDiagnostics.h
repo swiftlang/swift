@@ -2472,6 +2472,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations when static member reference has invalid result
+/// type which disqualifies it from being used on a protocol metatype base.
+///
+/// \code
+/// protocol Foo {
+///   static var bar: Int
+/// }
+///
+/// _ = Foo.bar
+/// \endcode
+///
+/// `bar` can't be referenced from `P.Protocol` base because its result type
+/// `Int` doesn't conform to `Foo`.
+class InvalidMemberRefOnProtocolMetatype final : public FailureDiagnostic {
+  Type ResultType;
+
+public:
+  InvalidMemberRefOnProtocolMetatype(const Solution &solution, Type resultType,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ResultType(resultType) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
