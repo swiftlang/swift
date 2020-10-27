@@ -85,6 +85,10 @@ METADATAKIND(HeapGenericLocalVariable,
 METADATAKIND(ErrorObject,
              1 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
 
+/// A heap-allocated simple task.
+METADATAKIND(SimpleTask,
+             2 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
+
 // getEnumeratedMetadataKind assumes that all the enumerated values here
 // will be <= LastEnumeratedMetadataKind.
 

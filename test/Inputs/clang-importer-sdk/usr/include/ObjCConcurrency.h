@@ -10,10 +10,14 @@
 -(void)findAnswerAsynchronously:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswer(completionHandler:)")));
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
+-(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
+-(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
 
 -(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(NSInteger)doSomethingConflicted:(NSString *)operation;
+-(void)server:(NSString *)name restartWithCompletionHandler:(void (^)(void))block;
+-(void)server:(NSString *)name atPriority:(double)priority restartWithCompletionHandler:(void (^)(void))block;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

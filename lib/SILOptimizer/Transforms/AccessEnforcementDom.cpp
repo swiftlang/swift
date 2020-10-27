@@ -251,7 +251,7 @@ void DominatedAccessAnalysis::analyzeAccess(BeginAccessInst *BAI,
   // Only track dynamic access in the result. Static accesses still need to be
   // tracked by data flow, but they can't be optimized as "dominating".
   if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic) {
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    auto storage = AccessedStorage::compute(BAI->getSource());
     // Copy the AccessStorage into DomAccessedStorage. All pass-specific bits
     // are initialized to zero.
     domStorage = DomAccessedStorage(storage);

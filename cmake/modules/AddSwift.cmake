@@ -471,7 +471,7 @@ function(add_swift_host_library name)
       INSTALL_NAME_DIR "@rpath")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     set_target_properties(${name} PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
     set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")

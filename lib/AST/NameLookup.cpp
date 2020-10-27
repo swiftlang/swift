@@ -1502,8 +1502,9 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   // Check access.
   if (!(options & NL_IgnoreAccessControl) &&
       !dc->getASTContext().isAccessControlDisabled()) {
-    bool allowInlinable = options & NL_IncludeUsableFromInlineAndInlineable;
-    return decl->isAccessibleFrom(dc, /*forConformance*/ false, allowInlinable);
+    bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
+    return decl->isAccessibleFrom(dc, /*forConformance*/ false,
+                                  allowUsableFromInline);
   }
 
   return true;

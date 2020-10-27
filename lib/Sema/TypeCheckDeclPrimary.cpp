@@ -1318,13 +1318,21 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
-void TypeChecker::checkParameterList(ParameterList *params) {
+void TypeChecker::checkParameterList(ParameterList *params,
+                                     DeclContext *owner) {
   for (auto param: *params) {
     checkDeclAttributes(param);
   }
 
-  // Check for duplicate parameter names.
-  diagnoseDuplicateDecls(*params);
+  // For source compatibilty, allow duplicate internal parameter names
+  // on protocol requirements.
+  //
+  // FIXME: Consider turning this into a warning or error if we do
+  // another -swift-version.
+  if (!isa<ProtocolDecl>(owner->getParent())) {
+    // Check for duplicate parameter names.
+    diagnoseDuplicateDecls(*params);
+  }
 }
 
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
@@ -1542,6 +1550,8 @@ public:
         }
       }
     }
+
+    checkImplementationOnlyOverride(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
@@ -1764,12 +1774,14 @@ public:
       }
     }
 
+    checkImplementationOnlyOverride(SD);
+
     // Compute these requests in case they emit diagnostics.
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TypeChecker::checkParameterList(SD->getIndices());
+    TypeChecker::checkParameterList(SD->getIndices(), SD);
 
     checkDefaultArguments(SD->getIndices());
 
@@ -2329,7 +2341,7 @@ public:
 
       checkAccessControl(FD);
 
-      TypeChecker::checkParameterList(FD->getParameters());
+      TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
 
     TypeChecker::checkDeclAttributes(FD);
@@ -2355,6 +2367,8 @@ public:
         }
       }
     }
+
+    checkImplementationOnlyOverride(FD);
 
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
@@ -2440,7 +2454,7 @@ public:
     TypeChecker::checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TypeChecker::checkParameterList(PL);
+      TypeChecker::checkParameterList(PL, EED);
 
       checkDefaultArguments(PL);
     }
@@ -2596,7 +2610,7 @@ public:
     }
 
     TypeChecker::checkDeclAttributes(CD);
-    TypeChecker::checkParameterList(CD->getParameters());
+    TypeChecker::checkParameterList(CD->getParameters(), CD);
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -2663,6 +2677,8 @@ public:
                      OD->getName());
       }
     }
+
+    checkImplementationOnlyOverride(CD);
 
     // If this initializer overrides a 'required' initializer, it must itself
     // be marked 'required'.

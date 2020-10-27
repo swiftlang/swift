@@ -748,9 +748,9 @@ bool AddMissingArguments::diagnose(const Solution &solution,
 
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs,
-                            ArrayRef<SynthesizedParam> synthesizedArgs,
+                            ArrayRef<SynthesizedArg> synthesizedArgs,
                             ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<SynthesizedParam>(synthesizedArgs.size());
+  unsigned size = totalSizeToAlloc<SynthesizedArg>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
   return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }
@@ -1003,18 +1003,18 @@ DefaultGenericArgument::create(ConstraintSystem &cs, GenericTypeParamType *param
   return new (cs.getAllocator()) DefaultGenericArgument(cs, param, locator);
 }
 
-SkipUnhandledConstructInFunctionBuilder *
-SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+SkipUnhandledConstructInResultBuilder *
+SkipUnhandledConstructInResultBuilder::create(ConstraintSystem &cs,
                                                 UnhandledNode unhandled,
                                                 NominalTypeDecl *builder,
                                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+    SkipUnhandledConstructInResultBuilder(cs, unhandled, builder, locator);
 }
 
-bool SkipUnhandledConstructInFunctionBuilder::diagnose(const Solution &solution,
+bool SkipUnhandledConstructInResultBuilder::diagnose(const Solution &solution,
                                                        bool asNote) const {
-  SkipUnhandledConstructInFunctionBuilderFailure failure(solution, unhandled,
+  SkipUnhandledConstructInResultBuilderFailure failure(solution, unhandled,
                                                          builder, getLocator());
   return failure.diagnose(asNote);
 }
@@ -1552,14 +1552,14 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
 }
 
-bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
+bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
                                                 bool asNote) const {
   switch (Phase) {
   // Handled below
   case ErrorInPhase::PreCheck:
     break;
   case ErrorInPhase::ConstraintGeneration:
-    return true; // Already diagnosed by `matchFunctionBuilder`.
+    return true; // Already diagnosed by `matchResultBuilder`.
   }
 
   auto *S = getAnchor().get<Stmt *>();
@@ -1582,7 +1582,7 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
       return std::make_pair(true, S);
     }
 
-    // Ignore patterns because function builder pre-check does so as well.
+    // Ignore patterns because result builder pre-check does so as well.
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
       return std::make_pair(false, P);
     }
@@ -1598,10 +1598,10 @@ bool IgnoreInvalidFunctionBuilderBody::diagnose(const Solution &solution,
   return walker.diagnosed();
 }
 
-IgnoreInvalidFunctionBuilderBody *IgnoreInvalidFunctionBuilderBody::create(
+IgnoreInvalidResultBuilderBody *IgnoreInvalidResultBuilderBody::create(
     ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      IgnoreInvalidFunctionBuilderBody(cs, phase, locator);
+      IgnoreInvalidResultBuilderBody(cs, phase, locator);
 }
 
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,

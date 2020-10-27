@@ -22,6 +22,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::unittest;
@@ -73,4 +74,39 @@ Type SemaTest::getStdlibType(StringRef name) const {
   }
 
   return Type();
+}
+
+ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
+                                       Type parent) {
+  auto *PD = new (Context)
+      ProtocolDecl(DC, SourceLoc(), SourceLoc(),
+                   Context.getIdentifier(protocolName), /*Inherited=*/{},
+                   /*trailingWhere=*/nullptr);
+  PD->setImplicit();
+
+  return ProtocolType::get(PD, parent, Context);
+}
+
+ConstraintSystem::PotentialBindings
+SemaTest::inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar) {
+  llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+      cache;
+
+  for (auto *typeVar : cs.getTypeVariables()) {
+    if (!typeVar->getImpl().hasRepresentativeOrFixed())
+      cache.insert({typeVar, cs.inferBindingsFor(typeVar, /*finalize=*/false)});
+  }
+
+  for (auto *typeVar : cs.getTypeVariables()) {
+    auto cachedBindings = cache.find(typeVar);
+    if (cachedBindings == cache.end())
+      continue;
+
+    auto &bindings = cachedBindings->getSecond();
+    bindings.finalize(cs, cache);
+  }
+
+  auto result = cache.find(typeVar);
+  assert(result != cache.end());
+  return result->second;
 }

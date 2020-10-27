@@ -8,6 +8,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
 
@@ -61,7 +62,7 @@ sil_witness_table hidden E: Error module main {
 }
 
 
-sil hidden @call : $@convention(thin) () -> () {
+sil hidden @call : $@async @convention(thin) () -> () {
 bb0:
   %voidThrowsToInt = function_ref @voidThrowsToInt : $@async @convention(thin) () -> (Int, @error Error)
   try_apply %voidThrowsToInt() : $@async @convention(thin) () -> (Int, @error Error), normal bb1, error bb3
@@ -97,7 +98,7 @@ bb5:
   br bb2
 }
 
-// CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @voidThrowsToInt : $@async @convention(thin) () -> (Int, @error Error) {
 bb0:
   %e_type = metatype $@thin E.Type
@@ -112,10 +113,10 @@ bb0:
   throw %error : $Error
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %call = function_ref @call : $@convention(thin) () -> () // CHECK: 42
-  %result = apply %call() : $@convention(thin) () -> ()
+  %call = function_ref @call : $@async @convention(thin) () -> () // CHECK: 42
+  %result = apply %call() : $@async @convention(thin) () -> ()
 
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)

@@ -16,6 +16,7 @@
 
 #include "CompatibilityOverride.h"
 #include "Overrides.h"
+#include "../Compatibility53/Overrides.h"
 
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
@@ -33,6 +34,11 @@ struct OverrideSection {
 OverrideSection Swift51Overrides
 __attribute__((used, section("__DATA,__swift51_hooks"))) = {
   .version = 0,
+  // We use the same hook for conformsToProtocol as we do for a 5.3
+  // runtime, so reference the override from the Compatibility53 library.
+  // If we're back deploying to Swift 5.1, we also have to support 5.3, so
+  // the Compatibility53 library is always linked when the 51 library is.
+  .conformsToProtocol = swift53override_conformsToProtocol,
   .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
 

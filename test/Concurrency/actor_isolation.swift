@@ -1,17 +1,17 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-import _Concurrency
-
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 2{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
+func acceptEscapingClosure<T>(_: (String) -> ()) async -> T? { nil }
 
 func acceptAsyncClosure<T>(_: () async -> T) { }
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
+
 
 // ----------------------------------------------------------------------
 // Actor state isolation restrictions

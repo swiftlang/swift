@@ -593,10 +593,10 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
-// FunctionBuilder-related requests.
+// ResultBuilder-related requests.
 //----------------------------------------------------------------------------//
 
-bool AttachedFunctionBuilderRequest::isCached() const {
+bool AttachedResultBuilderRequest::isCached() const {
   // Only needs to be cached if there are any custom attributes.
   auto var = std::get<0>(getStorage());
   return var->getAttrs().hasAttribute<CustomAttr>();
@@ -1105,19 +1105,19 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 }
 
 //----------------------------------------------------------------------------//
-// PreCheckFunctionBuilderRequest computation.
+// PreCheckResultBuilderRequest computation.
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderBodyPreCheck value) {
+                           ResultBuilderBodyPreCheck value) {
   switch (value) {
-  case FunctionBuilderBodyPreCheck::Okay:
+  case ResultBuilderBodyPreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderBodyPreCheck::HasReturnStmt:
+  case ResultBuilderBodyPreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderBodyPreCheck::Error:
+  case ResultBuilderBodyPreCheck::Error:
     out << "error";
     break;
   }
@@ -1467,8 +1467,12 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "non-generic";
     return;
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
+  case CustomAttrTypeKind::PropertyWrapper:
+    out << "property-wrapper";
+    return;
+
+  case CustomAttrTypeKind::GlobalActor:
+    out << "global-actor";
     return;
   }
   llvm_unreachable("bad kind");
@@ -1491,24 +1495,28 @@ bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
   case Independent:
+  case IndependentUnsafe:
   case Unspecified:
     return false;
 
   case GlobalActor:
     return getGlobalActor()->hasTypeParameter();
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
   case Independent:
+  case IndependentUnsafe:
   case Unspecified:
     return *this;
 
   case GlobalActor:
     return forGlobalActor(getGlobalActor().subst(subs));
   }
+  llvm_unreachable("unhandled actor isolation kind!");
 }
 
 void swift::simple_display(
@@ -1520,6 +1528,10 @@ void swift::simple_display(
 
     case ActorIsolation::Independent:
       out << "actor-independent";
+      break;
+
+    case ActorIsolation::IndependentUnsafe:
+      out << "actor-independent (unsafe)";
       break;
 
     case ActorIsolation::Unspecified:

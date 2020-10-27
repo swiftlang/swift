@@ -754,6 +754,76 @@ private:
 
 } // end namespace
 
+// Determine if the target expression is the implicit BinaryExpr generated for
+// pattern-matching in a switch/if/guard case (<completion> ~= matchValue).
+static bool isForPatternMatch(SolutionApplicationTarget &target) {
+  if (target.getExprContextualTypePurpose() != CTP_Condition)
+    return false;
+  Expr *condition = target.getAsExpr();
+  if (!condition->isImplicit())
+    return false;
+  if (auto *BE = dyn_cast<BinaryExpr>(condition)) {
+    Identifier id;
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(BE->getFn())) {
+      id = ODRE->getDecls().front()->getBaseIdentifier();
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(BE->getFn())) {
+      id = DRE->getDecl()->getBaseIdentifier();
+    }
+    if (id != target.getDeclContext()->getASTContext().Id_MatchOperator)
+      return false;
+    return isa<CodeCompletionExpr>(BE->getArg()->getElement(0));
+  }
+  return false;
+}
+
+/// Remove any solutions from the provided vector with a score less than the best solution's.
+static void filterSolutions(SolutionApplicationTarget &target,
+                            SmallVectorImpl<Solution> &solutions) {
+  // FIXME: this is only needed because in pattern matching position, the
+  // code completion expression always becomes an expression pattern, which
+  // requires the ~= operator to be defined on the type being matched against.
+  // Pattern matching against an enum doesn't require that however, so valid
+  // solutions always end up having fixes. This is a problem because there will
+  // always be a valid solution as well. Optional defines ~= between Optional
+  // and _OptionalNilComparisonType (which defines a nilLiteral initializer),
+  // and the matched-against value can implicitly be made Optional if it isn't
+  // already, so _OptionalNilComparisonType is always a valid solution for the
+  // completion. That only generates the 'nil' completion, which is rarely what
+  // the user intends to write in this position and shouldn't be preferred over
+  // the other formed solutions (which require fixes). We should generate enum
+  // pattern completions separately.
+  if (isForPatternMatch(target))
+    return;
+
+  if (solutions.size() <= 1)
+    return;
+
+  auto min = std::min_element(solutions.begin(), solutions.end(),
+                              [](const Solution &a, const Solution &b) {
+    return a.getFixedScore() < b.getFixedScore();
+  });
+  auto fixStart = llvm::partition(solutions, [&](const Solution &S) {
+    return S.getFixedScore() == min->getFixedScore();
+  });
+
+  if (fixStart != solutions.begin() && fixStart != solutions.end())
+    solutions.erase(fixStart, solutions.end());
+}
+
+/// When solving for code completion we still consider solutions with holes as
+/// valid. Regular type-checking does not. This is intended to return true only
+/// if regular type-checking would consider this solution viable.
+static bool isViableForReTypeCheck(const Solution &S) {
+  if (llvm::any_of(S.Fixes, [&](const ConstraintFix *CF) {
+    return !CF->isWarning();
+  }))
+    return false;
+  using Binding = std::pair<swift::TypeVariableType *, swift::Type>;
+  return llvm::none_of(S.typeBindings, [&](const Binding& binding) {
+    return binding.second->hasHole();
+  });
+}
+
 bool TypeChecker::typeCheckForCodeCompletion(
     SolutionApplicationTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
@@ -793,7 +863,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // FIXME: There is currently no way to distinguish between
-  // multi-statement closures which are function builder bodies
+  // multi-statement closures which are result builder bodies
   // (that are type-checked together with enclosing context)
   // and regular closures which are type-checked separately.
 
@@ -828,6 +898,10 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Only keep the solution(s) with the best score.
+    filterSolutions(target, solutions);
+
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
     if (solutions.empty())
@@ -846,9 +920,9 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
       // At this point we know the code completion expression wasn't checked
       // with the closure's surrounding context. If a single valid solution
-      // was formed we can wait until body of the closure is type-checked and
-      // gather completions then.
-      if (solutions.size() == 1 && solution.Fixes.empty())
+      // was formed we can wait until the body of the closure is type-checked
+      // and gather completions then.
+      if (solutions.size() == 1 && isViableForReTypeCheck(solution))
         return CompletionResult::NotApplicable;
 
       // Otherwise, it's unlikely the body will ever be type-checked, so fall

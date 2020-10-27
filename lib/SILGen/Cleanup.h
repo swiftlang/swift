@@ -84,9 +84,9 @@ protected:
   //
   // Example: Distinguishing in between @owned cleanups with a writeback buffer
   // (ExclusiveBorrowCleanup) or ones that involve formal access cleanups.
-  enum class Flags : uint8_t {
+  enum Flags : uint8_t {
     None = 0,
-    ExclusiveBorrowCleanup = 1,
+    FormalAccessCleanup = 1,
   };
 
 private:
@@ -95,7 +95,7 @@ private:
   Flags flags : 8;
 
 protected:
-  Cleanup() {}
+  Cleanup() : flags(Flags::None) {}
   virtual ~Cleanup() {}
 
 public:
@@ -122,6 +122,14 @@ protected:
   /// false otherwise.
   virtual bool getWritebackBuffer(function_ref<void(SILValue)> func) {
     return false;
+  }
+
+  bool isFormalAccess() const {
+    return getFlags() & Flags::FormalAccessCleanup;
+  }
+
+  void setIsFormalAccess() {
+    flags = Flags(flags | Flags::FormalAccessCleanup);
   }
 };
 
@@ -310,9 +318,10 @@ private:
 /// writeback buffers.
 class CleanupCloner {
   SILGenFunction &SGF;
+  Optional<SILValue> writebackBuffer;
   bool hasCleanup;
   bool isLValue;
-  Optional<SILValue> writebackBuffer;
+  bool isFormalAccess;
 
 public:
   CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv);

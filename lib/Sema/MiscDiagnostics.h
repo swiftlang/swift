@@ -38,7 +38,7 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
-void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
+void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
 
 void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 

@@ -774,6 +774,15 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
 }
 
 void Remangler::mangleCFunctionPointer(Node *node) {
+  if (node->getNumChildren() > 0 &&
+      node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+    for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
+      mangleChildNode(node, Idx);
+    }
+    Buffer << "XzC";
+    mangleClangType(node->getFirstChild());
+    return;
+  }
   mangleChildNodesReversed(node); // argument tuple, result type
   Buffer << "XC";
 }
@@ -1444,6 +1453,37 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleImplFunctionConvention(Node *node) {
+  StringRef text =
+      (node->getNumChildren() > 0 && node->getFirstChild()->hasText())
+          ? node->getFirstChild()->getText()
+          : "";
+  char FuncAttr = llvm::StringSwitch<char>(text)
+                      .Case("block", 'B')
+                      .Case("c", 'C')
+                      .Case("method", 'M')
+                      .Case("objc_method", 'O')
+                      .Case("closure", 'K')
+                      .Case("witness_method", 'W')
+                      .Default(0);
+  assert(FuncAttr && "invalid impl function convention");
+  if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
+      node->getChild(1)->getKind() == Node::Kind::ClangType) {
+    Buffer << 'z' << FuncAttr;
+    mangleClangType(node->getChild(1));
+    return;
+  }
+  Buffer << FuncAttr;
+}
+
+void Remangler::mangleImplFunctionConventionName(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleClangType(Node *node) {
+  Buffer << node->getText().size() << node->getText();
+}
+
 void Remangler::mangleImplInvocationSubstitutions(Node *node) {
   unreachable("handled inline");
 }
@@ -1535,14 +1575,12 @@ void Remangler::mangleImplFunctionType(Node *node) {
         Buffer << ConvCh;
         break;
       }
+      case Node::Kind::ImplFunctionConvention: {
+        mangleImplFunctionConvention(Child);
+        break;
+      }
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
-                        .Case("@convention(block)", 'B')
-                        .Case("@convention(c)", 'C')
-                        .Case("@convention(method)", 'M')
-                        .Case("@convention(objc_method)", 'O')
-                        .Case("@convention(closure)", 'K')
-                        .Case("@convention(witness_method)", 'W')
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
                         .Case("@async", 'H')
@@ -1791,6 +1829,15 @@ void Remangler::mangleObjCAttribute(Node *node) {
 }
 
 void Remangler::mangleObjCBlock(Node *node) {
+  if (node->getNumChildren() > 0 &&
+      node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+    for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
+      mangleChildNode(node, Idx);
+    }
+    Buffer << "XzB";
+    mangleClangType(node->getFirstChild());
+    return;
+  }
   mangleChildNodesReversed(node);
   Buffer << "XB";
 }

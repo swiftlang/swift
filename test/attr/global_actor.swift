@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-import _Concurrency
-
 actor class SomeActor { }
 
 // -----------------------------------------------------------------------

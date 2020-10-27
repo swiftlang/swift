@@ -950,9 +950,6 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
-  /// Returns true if this Decl cannot be seen by any other source file
-  bool isPrivateToEnclosingFile() const;
-
   /// Retrieve the global actor attribute that applies to this declaration,
   /// if any.
   ///
@@ -2188,7 +2185,7 @@ public:
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
                         bool forConformance = false,
-                        bool includeInlineable = false) const;
+                        bool allowUsableFromInline = false) const;
 
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes
@@ -2402,12 +2399,12 @@ public:
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Retrieve the attribute associating this declaration with a
-  /// function builder, if there is one.
-  CustomAttr *getAttachedFunctionBuilder() const;
+  /// result builder, if there is one.
+  CustomAttr *getAttachedResultBuilder() const;
 
-  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// Retrieve the @resultBuilder type attached to this declaration,
   /// if there is one.
-  Type getFunctionBuilderType() const;
+  Type getResultBuilderType() const;
 
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration
@@ -3762,6 +3759,7 @@ public:
     case Contravariant:
       return Covariant;
     }
+    llvm_unreachable("unhandled self reference position!");
   }
 
   explicit operator bool() const { return kind > None; }
@@ -4762,11 +4760,19 @@ public:
 
   /// Determines if this var has an initializer expression that should be
   /// exposed to clients.
+  ///
   /// There's a very narrow case when we would: if the decl is an instance
   /// member with an initializer expression and the parent type is
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
-  
+
+  /// Determines if this var is exposed as part of the layout of a
+  /// @frozen struct.
+  ///
+  /// From the standpoint of access control and exportability checking, this
+  /// var will behave as if it was public, even if it is internal or private.
+  bool isLayoutExposedToClients() const;
+
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
   void setDebuggerVar(bool IsDebuggerVar) {
@@ -5959,9 +5965,10 @@ public:
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
-                                  DeclName Name, SourceLoc NameLoc,
-                                  bool Async, bool Throws,
-                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclName Name, SourceLoc NameLoc, bool Async,
+                                  bool Throws, ParameterList *BodyParams,
+                                  Type FnRetType,
+                                  GenericParamList *GenericParams,
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;

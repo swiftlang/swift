@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-import _Concurrency
-
 actor class SomeActor { }
 
 @globalActor

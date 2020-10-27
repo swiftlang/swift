@@ -531,6 +531,11 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   if (d->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 
+  // Enum element constructors are serializable if the enum is
+  // @usableFromInline or public.
+  if (isEnumElement())
+    return IsSerializable;
+
   // 'read' and 'modify' accessors synthesized on-demand are serialized if
   // visible outside the module.
   if (auto fn = dyn_cast<FuncDecl>(d))

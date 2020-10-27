@@ -3695,7 +3695,7 @@ public:
     ReadyForTypeChecking,
 
     /// The body was typechecked with the enclosing closure.
-    /// i.e. single expression closure or function builder closure.
+    /// i.e. single expression closure or result builder closure.
     TypeCheckedWithSignature,
 
     /// The body was type checked separately from the enclosing closure.

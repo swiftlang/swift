@@ -719,10 +719,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // be tightened, though we want to be careful that passes that try to do
   // code motion or eliminate this instruction don't do so without awareness of
   // its structural requirements.
-  SINGLE_VALUE_INST(GetAsyncContinuationInst, get_async_continuation,
-                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  SINGLE_VALUE_INST(GetAsyncContinuationAddrInst, get_async_continuation_addr,
-                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  ABSTRACT_SINGLE_VALUE_INST(GetAsyncContinuationInstBase, SingleValueInstruction)
+    SINGLE_VALUE_INST(GetAsyncContinuationInst, get_async_continuation,
+                      GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
+    SINGLE_VALUE_INST(GetAsyncContinuationAddrInst, get_async_continuation_addr,
+                      GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
+    SINGLE_VALUE_INST_RANGE(GetAsyncContinuationInstBase, GetAsyncContinuationInst, GetAsyncContinuationAddrInst)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path

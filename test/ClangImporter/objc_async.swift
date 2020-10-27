@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
 
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
 
@@ -18,6 +19,12 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // still async version...
   let _: Int = slowServer.doSomethingConflicted("thinking")
   // expected-error@-1{{call is 'async' but is not marked with 'await'}}
+
+  let _: String? = await try slowServer.fortune()
+  let _: Int = await try slowServer.magicNumber(withSeed: 42)
+
+  await slowServer.serverRestart("localhost")
+  await slowServer.server("localhost", atPriorityRestart: 0.8)
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {

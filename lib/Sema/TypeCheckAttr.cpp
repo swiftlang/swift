@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -250,7 +251,7 @@ public:
 
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
-  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
+  void visitResultBuilderAttr(ResultBuilderAttr *attr);
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
@@ -286,19 +287,26 @@ public:
     if (auto var = dyn_cast<VarDecl>(D)) {
       // @actorIndependent is meaningless on a `let`.
       if (var->isLet()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_let);
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
         return;
       }
 
-      // @actorIndependent can not be applied to stored properties.
+      // @actorIndependent can not be applied to stored properties, unless if
+      // the 'unsafe' option was specified
       if (var->hasStorage()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_mutable_storage);
-        return;
+        switch (attr->getKind()) {
+          case ActorIndependentKind::Safe:
+            diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
+            return;
+            
+          case ActorIndependentKind::Unsafe:
+            break;
+        }
       }
 
       // @actorIndependent can not be applied to local properties.
       if (dc->isLocalContext()) {
-        diagnoseAndRemoveAttr(attr, diag::actorisolated_local_var);
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
         return;
       }
 
@@ -315,14 +323,14 @@ public:
     // @actorIndependent only makes sense on an actor instance member.
     if (!dc->getSelfClassDecl() ||
         !dc->getSelfClassDecl()->isActor()) {
-      diagnoseAndRemoveAttr(attr, diag::actorisolated_not_actor_member);
+      diagnoseAndRemoveAttr(attr, diag::actorindependent_not_actor_member);
       return;
     }
 
     auto VD = cast<ValueDecl>(D);
     if (!VD->isInstanceMember()) {
       diagnoseAndRemoveAttr(
-          attr, diag::actorisolated_not_actor_instance_member);
+          attr, diag::actorindependent_not_actor_instance_member);
       return;
     }
 
@@ -959,14 +967,15 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     }
 
     // Forbid stored properties marked SPI in frozen types.
-    if (auto property = dyn_cast<AbstractStorageDecl>(VD))
-      if (auto DC = dyn_cast<NominalTypeDecl>(D->getDeclContext()))
-        if (property->hasStorage() &&
-            !DC->isFormallyResilient() &&
-            !DC->isSPI())
+    if (auto property = dyn_cast<VarDecl>(VD)) {
+      if (auto NTD = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
+        if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD->getName());
+        }
+      }
+    }
   }
 }
 
@@ -1980,6 +1989,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     mainFunction = viableCandidates[0];
   }
 
+  auto where = ExportContext::forDeclSignature(D);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), where, None);
+
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
@@ -2458,7 +2470,7 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
 
   auto options = NL_QualifiedDefault;
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NL_IncludeUsableFromInlineAndInlineable;
+    options |= NL_IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName, options,
@@ -3034,9 +3046,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  // If the nominal type is a function builder type, verify that D is a
+  // If the nominal type is a result builder type, verify that D is a
   // function, storage with an explicit getter, or parameter of function type.
-  if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+  if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
     ValueDecl *decl;
     if (auto param = dyn_cast<ParamDecl>(D)) {
       decl = param;
@@ -3046,7 +3058,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = storage;
 
       // Check whether this is a storage declaration that is not permitted
-      // to have a function builder attached.
+      // to have a result builder attached.
       auto shouldDiagnose = [&]() -> bool {
         // An uninitialized stored property in a struct can have a function
         // builder attached.
@@ -3076,7 +3088,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
       if (shouldDiagnose()) {
         diagnose(attr->getLocation(),
-                 diag::function_builder_attribute_on_storage_without_getter,
+                 diag::result_builder_attribute_on_storage_without_getter,
                  nominal->getName(),
                  isa<SubscriptDecl>(storage) ? 0
                    : storage->getDeclContext()->isTypeContext() ? 1
@@ -3086,7 +3098,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       }
     } else {
       diagnose(attr->getLocation(),
-               diag::function_builder_attribute_not_allowed_here,
+               diag::result_builder_attribute_not_allowed_here,
                nominal->getName());
       attr->setInvalid();
       return;
@@ -3094,22 +3106,22 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
     // Diagnose and ignore arguments.
     if (attr->getArg()) {
-      diagnose(attr->getLocation(), diag::function_builder_arguments)
+      diagnose(attr->getLocation(), diag::result_builder_arguments)
         .highlight(attr->getArg()->getSourceRange());
     }
 
-    // Complain if this isn't the primary function-builder attribute.
-    auto attached = decl->getAttachedFunctionBuilder();
+    // Complain if this isn't the primary result-builder attribute.
+    auto attached = decl->getAttachedResultBuilder();
     if (attached != attr) {
-      diagnose(attr->getLocation(), diag::function_builder_multiple,
+      diagnose(attr->getLocation(), diag::result_builder_multiple,
                isa<ParamDecl>(decl));
-      diagnose(attached->getLocation(), diag::previous_function_builder_here);
+      diagnose(attached->getLocation(), diag::previous_result_builder_here);
       attr->setInvalid();
       return;
     } else {
-      // Force any diagnostics associated with computing the function-builder
+      // Force any diagnostics associated with computing the result-builder
       // type.
-      (void) decl->getFunctionBuilderType();
+      (void) decl->getResultBuilderType();
     }
 
     return;
@@ -3140,7 +3152,7 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   (void)nominal->getPropertyWrapperTypeInfo();
 }
 
-void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
+void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
   auto *nominal = dyn_cast<NominalTypeDecl>(D);
   SmallVector<ValueDecl *, 4> potentialMatches;
   bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
@@ -3150,21 +3162,21 @@ void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
   if (!supportsBuildBlock) {
     {
       auto diag = diagnose(
-          nominal->getLoc(), diag::function_builder_static_buildblock);
+          nominal->getLoc(), diag::result_builder_static_buildblock);
 
       // If there were no close matches, propose adding a stub.
       SourceLoc buildInsertionLoc;
       std::string stubIndent;
       Type componentType;
       std::tie(buildInsertionLoc, stubIndent, componentType) =
-          determineFunctionBuilderBuildFixItInfo(nominal);
+          determineResultBuilderBuildFixItInfo(nominal);
       if (buildInsertionLoc.isValid() && potentialMatches.empty()) {
         std::string fixItString;
         {
           llvm::raw_string_ostream out(fixItString);
-          printFunctionBuilderBuildFunction(
+          printResultBuilderBuildFunction(
               nominal, componentType,
-              FunctionBuilderBuildFunction::BuildBlock,
+              ResultBuilderBuildFunction::BuildBlock,
               stubIndent, out);
         }
 
@@ -3180,13 +3192,13 @@ void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
 
       if (isa<FuncDecl>(member) &&
           member->getDeclContext()->getSelfNominalTypeDecl() == nominal)
-        diagnose(member->getLoc(), diag::function_builder_non_static_buildblock)
+        diagnose(member->getLoc(), diag::result_builder_non_static_buildblock)
           .fixItInsert(member->getAttributeInsertionLoc(true), "static ");
       else if (isa<EnumElementDecl>(member))
-        diagnose(member->getLoc(), diag::function_builder_buildblock_enum_case);
+        diagnose(member->getLoc(), diag::result_builder_buildblock_enum_case);
       else
         diagnose(member->getLoc(),
-                 diag::function_builder_buildblock_not_static_method);
+                 diag::result_builder_buildblock_not_static_method);
     }
   }
 }

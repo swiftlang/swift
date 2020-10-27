@@ -1025,8 +1025,8 @@ public:
         return true;
     }
 
-    auto ElementTypes = Layout.getElementTypes().slice(
-        Layout.hasBindings() ? 1 : 0);
+    auto ElementTypes =
+        Layout.getElementTypes().slice(Layout.getIndexAfterBindings());
     for (auto ElementType : ElementTypes) {
       auto SwiftType = ElementType.getASTType();
       if (SwiftType->hasOpenedExistential())
@@ -1040,7 +1040,7 @@ public:
   /// We'll keep track of how many things are in the bindings struct with its
   /// own count in the capture descriptor.
   ArrayRef<SILType> getElementTypes() {
-    return Layout.getElementTypes().slice(Layout.hasBindings() ? 1 : 0);
+    return Layout.getElementTypes().slice(Layout.getIndexAfterBindings());
   }
 
   /// Build a map from generic parameter -> source of its metadata at runtime.

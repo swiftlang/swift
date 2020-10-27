@@ -566,7 +566,7 @@ bool AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       // now, since this optimization runs at the end of the pipeline, we
       // gracefully ignore unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
-      AccessedStorage storage = findAccessedStorage(beginAccess->getSource());
+      auto storage = AccessedStorage::compute(beginAccess->getSource());
 
       auto iterAndInserted = storageSet.insert(storage);
 

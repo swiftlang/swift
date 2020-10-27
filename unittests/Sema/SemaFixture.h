@@ -15,15 +15,19 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
-#include "llvm/ADT/StringRef.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
 #include "gtest/gtest.h"
 #include <string>
+
+using namespace swift::constraints;
 
 namespace swift {
 namespace unittest {
@@ -62,6 +66,12 @@ public:
 
 protected:
   Type getStdlibType(StringRef name) const;
+
+  ProtocolType *createProtocol(llvm::StringRef protocolName,
+                               Type parent = Type());
+
+  static ConstraintSystem::PotentialBindings
+  inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

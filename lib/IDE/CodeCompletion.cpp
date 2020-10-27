@@ -1813,6 +1813,9 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
+  bool CheckForDuplicates = false;
+  llvm::DenseSet<std::pair<const Decl *, Type>> PreviouslySeen;
+
   bool IncludeInstanceMembers = false;
 
   /// True if we are code completing inside a static method.
@@ -1996,6 +1999,10 @@ public:
 
   void setIsKeyPathExpr() {
     IsKeyPathExpr = true;
+  }
+
+  void shouldCheckForDuplicates(bool value = true) {
+    CheckForDuplicates = value;
   }
 
   void setIsSwiftKeyPathExpr(bool onRoot) {
@@ -2895,8 +2902,13 @@ public:
       IsImplicitlyCurriedInstanceMethod = isImplicitlyCurriedInstanceMethod(FD);
 
       // Strip off '(_ self: Self)' if needed.
-      if (AFT && !IsImplicitlyCurriedInstanceMethod)
+      if (AFT && !IsImplicitlyCurriedInstanceMethod) {
         AFT = AFT->getResult()->getAs<AnyFunctionType>();
+
+        // Check for duplicates with the adjusted type too.
+        if (isDuplicate(FD, AFT))
+          return;
+      }
     }
 
     bool trivialTrailingClosure = false;
@@ -3369,10 +3381,10 @@ public:
                                          DynamicLookupInfo dynamicLookupInfo) {
     auto funcTy =
         getTypeOfMember(AFD, dynamicLookupInfo)->getAs<AnyFunctionType>();
-    if (funcTy && AFD->getDeclContext()->isTypeContext() &&
-        !isImplicitlyCurriedInstanceMethod(AFD)) {
+    bool dropCurryLevel = funcTy && AFD->getDeclContext()->isTypeContext() &&
+        !isImplicitlyCurriedInstanceMethod(AFD);
+    if (dropCurryLevel)
       funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
-    }
 
     bool useFunctionReference = PreferFunctionReferencesToCalls;
     if (!useFunctionReference && funcTy) {
@@ -3383,6 +3395,10 @@ public:
     }
     if (!useFunctionReference)
       return false;
+
+    // Check for duplicates with the adjusted type too.
+    if (dropCurryLevel && isDuplicate(AFD, funcTy))
+      return true;
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -3421,6 +3437,29 @@ public:
     return true;
   }
 
+private:
+
+  /// Returns true if duplicate checking is enabled (via
+  /// \c shouldCheckForDuplicates) and this decl + type combination has been
+  /// checked previously. Returns false otherwise.
+  bool isDuplicate(const ValueDecl *D, Type Ty) {
+    if (!CheckForDuplicates)
+      return false;
+    return !PreviouslySeen.insert({D, Ty}).second;
+  }
+
+  /// Returns true if duplicate checking is enabled (via
+  /// \c shouldCheckForDuplicates) and this decl has been checked previously
+  /// with the type according to \c getTypeOfMember. Returns false otherwise.
+  bool isDuplicate(const ValueDecl *D, DynamicLookupInfo dynamicLookupInfo) {
+    if (!CheckForDuplicates)
+      return false;
+    Type Ty = getTypeOfMember(D, dynamicLookupInfo);
+    return !PreviouslySeen.insert({D, Ty}).second;
+  }
+
+public:
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
@@ -3435,6 +3474,11 @@ public:
       return;
 
     if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
+      return;
+
+    // If we've seen this decl+type before (possible when multiple lookups are
+    // performed e.g. because of ambiguous base types), bail.
+    if (isDuplicate(D, dynamicLookupInfo))
       return;
     
     // FIXME(InterfaceTypeRequest): Remove this.
@@ -3526,6 +3570,11 @@ public:
           Type funcType = getTypeOfMember(FD, dynamicLookupInfo)
                               ->castTo<AnyFunctionType>()
                               ->getResult();
+
+          // Check for duplicates with the adjusted type too.
+          if (isDuplicate(FD, funcType))
+            return;
+
           addFunctionCallPattern(
               funcType->castTo<AnyFunctionType>(), FD,
               getSemanticContext(FD, Reason, dynamicLookupInfo));
@@ -5124,48 +5173,48 @@ public:
     }
   }
 
-  static StringRef getFunctionBuilderDocComment(
-      FunctionBuilderBuildFunction function) {
+  static StringRef getResultBuilderDocComment(
+      ResultBuilderBuildFunction function) {
     switch (function) {
-    case FunctionBuilderBuildFunction::BuildArray:
-      return "Enables support for..in loops in a function builder by "
+    case ResultBuilderBuildFunction::BuildArray:
+      return "Enables support for..in loops in a result builder by "
         "combining the results of all iterations into a single result";
 
-    case FunctionBuilderBuildFunction::BuildBlock:
-      return "Required by every function builder to build combined results "
+    case ResultBuilderBuildFunction::BuildBlock:
+      return "Required by every result builder to build combined results "
           "from statement blocks";
 
-    case FunctionBuilderBuildFunction::BuildEitherFirst:
+    case ResultBuilderBuildFunction::BuildEitherFirst:
       return "With buildEither(second:), enables support for 'if-else' and "
           "'switch' statements by folding conditional results into a single "
           "result";
 
-    case FunctionBuilderBuildFunction::BuildEitherSecond:
+    case ResultBuilderBuildFunction::BuildEitherSecond:
       return "With buildEither(first:), enables support for 'if-else' and "
           "'switch' statements by folding conditional results into a single "
           "result";
 
-    case FunctionBuilderBuildFunction::BuildExpression:
+    case ResultBuilderBuildFunction::BuildExpression:
       return "If declared, provides contextual type information for statement "
           "expressions to translate them into partial results";
 
-    case FunctionBuilderBuildFunction::BuildFinalResult:
+    case ResultBuilderBuildFunction::BuildFinalResult:
       return "If declared, this will be called on the partial result from the "
           "outermost block statement to produce the final returned result";
 
-    case FunctionBuilderBuildFunction::BuildLimitedAvailability:
+    case ResultBuilderBuildFunction::BuildLimitedAvailability:
       return "If declared, this will be called on the partial result of "
-        "an 'if #available' block to allow the function builder to erase "
+        "an 'if #available' block to allow the result builder to erase "
         "type information";
 
-    case FunctionBuilderBuildFunction::BuildOptional:
+    case ResultBuilderBuildFunction::BuildOptional:
       return "Enables support for `if` statements that do not have an `else`";
     }
   }
 
-  void addFunctionBuilderBuildCompletion(
+  void addResultBuilderBuildCompletion(
       NominalTypeDecl *builder, Type componentType,
-      FunctionBuilderBuildFunction function) {
+      ResultBuilderBuildFunction function) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Pattern,
@@ -5187,35 +5236,35 @@ public:
     std::string declStringWithoutFunc;
     {
       llvm::raw_string_ostream out(declStringWithoutFunc);
-      printFunctionBuilderBuildFunction(
+      printResultBuilderBuildFunction(
           builder, componentType, function, None, out);
     }
     Builder.addTextChunk(declStringWithoutFunc);
     Builder.addBraceStmtWithCursor();
-    Builder.setBriefDocComment(getFunctionBuilderDocComment(function));
+    Builder.setBriefDocComment(getResultBuilderDocComment(function));
   }
 
-  /// Add completions for the various "build" functions in a function builder.
-  void addFunctionBuilderBuildCompletions(NominalTypeDecl *builder) {
-    Type componentType = inferFunctionBuilderComponentType(builder);
+  /// Add completions for the various "build" functions in a result builder.
+  void addResultBuilderBuildCompletions(NominalTypeDecl *builder) {
+    Type componentType = inferResultBuilderComponentType(builder);
 
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildBlock);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildExpression);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildOptional);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildEitherFirst);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildEitherSecond);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildArray);
-    addFunctionBuilderBuildCompletion(
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildBlock);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildExpression);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildOptional);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildEitherFirst);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildEitherSecond);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildArray);
+    addResultBuilderBuildCompletion(
         builder, componentType,
-        FunctionBuilderBuildFunction::BuildLimitedAvailability);
-    addFunctionBuilderBuildCompletion(
-        builder, componentType, FunctionBuilderBuildFunction::BuildFinalResult);
+        ResultBuilderBuildFunction::BuildLimitedAvailability);
+    addResultBuilderBuildCompletion(
+        builder, componentType, ResultBuilderBuildFunction::BuildFinalResult);
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
@@ -5237,8 +5286,8 @@ public:
       addAssociatedTypes(NTD);
     }
 
-    if (NTD && NTD->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
-      addFunctionBuilderBuildCompletions(NTD);
+    if (NTD && NTD->getAttrs().hasAttribute<ResultBuilderAttr>()) {
+      addResultBuilderBuildCompletions(NTD);
     }
   }
 };
@@ -6039,6 +6088,7 @@ void deliverDotExprResults(
     Lookup.setPreferFunctionReferencesToCalls();
   }
 
+  Lookup.shouldCheckForDuplicates(Results.size() > 1);
   for (auto &Result: Results) {
     Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);

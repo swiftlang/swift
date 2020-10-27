@@ -2926,6 +2926,24 @@ public:
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
+  /// Returns true if the function type stores a Clang type that cannot
+  /// be derived from its Swift type. Returns false otherwise, including if
+  /// the function type is not @convention(c) or @convention(block).
+  ///
+  /// For example, if you have a function pointer from C getting imported with
+  /// the following type:
+  ///
+  /// @convention(c, cType: "void (*)(size_t (*)(size_t))")
+  ///   (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)) -> Void
+  ///
+  /// The parameter's function type will have hasNonDerivableClangType() = true,
+  /// but the outer function type will have hasNonDerivableClangType() = false,
+  /// because the parameter and result type are sufficient to correctly derive
+  /// the Clang type for the outer function type. In terms of mangling,
+  /// the parameter type's mangling will incorporate the Clang type but the
+  /// outer function type's mangling doesn't need to duplicate that information.
+  bool hasNonDerivableClangType();
+
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo());
   }
@@ -4307,6 +4325,11 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
 
+  /// Returns true if the function type stores a Clang type that cannot
+  /// be derived from its Swift type. Returns false otherwise, including if
+  /// the function type is not @convention(c) or @convention(block).
+  bool hasNonDerivableClangType();
+
   bool hasSameExtInfoAs(const SILFunctionType *otherFn);
 
   /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
@@ -5195,6 +5218,10 @@ public:
   /// Retrieve the generic environment in which this archetype resides.
   GenericEnvironment *getGenericEnvironment() const {
     return Environment;
+  }
+
+  GenericTypeParamType *getInterfaceType() const {
+    return cast<GenericTypeParamType>(InterfaceType.getPointer());
   }
       
   static bool classof(const TypeBase *T) {

@@ -53,9 +53,15 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # TODO: Remove this constant, it's really not helpful.
 HOME = os.environ.get("HOME", "/")
 
+# These versions are community sourced. At any given time only the Xcode
+# version used by Swift CI is officially supported. See ci.swift.org
+_SUPPORTED_XCODE_BUILDS = [
+    ("12.2 beta 3", "12B5035g"),
+]
 
 # -----------------------------------------------------------------------------
 # Helpers
+
 
 def print_note(message, stream=sys.stdout):
     """Writes a diagnostic message to the given stream. By default this
@@ -146,6 +152,30 @@ def print_xcodebuild_versions(file=sys.stdout):
 
     print(fmt.format(version=version, sdks=sdks), file=file)
     file.flush()
+
+
+def validate_xcode_compatibility():
+    if sys.platform != 'darwin':
+        return
+
+    if os.getenv("SKIP_XCODE_VERSION_CHECK"):
+        print("note: skipping Xcode version check")
+        return
+
+    version = shell.capture(
+        ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
+
+    valid_build_numbers = tuple(x[1] for x in _SUPPORTED_XCODE_BUILDS)
+    if not version.endswith(valid_build_numbers):
+        valid_versions_string = "\n".join(
+            "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
+        raise SystemExit(
+            "error: using unsupported Xcode version:\n\n{}\n\n"
+            "Install one of:\n{}\n\n"
+            "Or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
+                version, valid_versions_string
+            )
+        )
 
 
 def tar(source, destination):
@@ -1334,6 +1364,8 @@ def main():
             "source root directory \'" + SWIFT_SOURCE_ROOT +
             "\' does not exist " +
             "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
+
+    validate_xcode_compatibility()
 
     # Determine if we are invoked in the preset mode and dispatch accordingly.
     if any([(opt.startswith("--preset") or opt == "--show-presets")

@@ -24,6 +24,7 @@
 // RUN: %target-run %t/a.swift5.O.out
 //
 // REQUIRES: executable_test
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest

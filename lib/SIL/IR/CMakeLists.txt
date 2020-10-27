@@ -1,5 +1,6 @@
 target_sources(swiftSIL PRIVATE
   AbstractionPattern.cpp
+  ApplySite.cpp
   Bridging.cpp
   Linker.cpp
   Notifications.cpp

@@ -17,7 +17,7 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 #endif
 
 #if _runtime(_ObjC)

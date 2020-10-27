@@ -793,12 +793,12 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILValue v) {
 }
 
 bool swift::mayBindDynamicSelf(SILFunction *F) {
-  if (!F->hasSelfMetadataParam())
+  if (!F->hasDynamicSelfMetadata())
     return false;
 
-  SILValue mdArg = F->getSelfMetadataArgument();
+  SILValue mdArg = F->getDynamicSelfMetadata();
 
-  for (Operand *mdUse : F->getSelfMetadataArgument()->getUses()) {
+  for (Operand *mdUse : mdArg->getUses()) {
     SILInstruction *mdUser = mdUse->getUser();
     for (Operand &typeDepOp : mdUser->getTypeDependentOperands()) {
       if (typeDepOp.get() == mdArg)

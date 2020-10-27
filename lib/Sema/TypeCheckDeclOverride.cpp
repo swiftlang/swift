@@ -1510,7 +1510,7 @@ namespace  {
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
-    UNINTERESTING_ATTR(FunctionBuilder)
+    UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
@@ -2155,4 +2155,54 @@ bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
 
   return derivedInterfaceTy->matches(overrideInterfaceTy,
                                      TypeMatchFlags::AllowABICompatible);
+}
+
+void swift::checkImplementationOnlyOverride(const ValueDecl *VD) {
+  if (VD->isImplicit())
+    return;
+
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return;
+
+  if (isa<AccessorDecl>(VD))
+    return;
+
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  if (!accessScope.isPublic())
+    return;
+
+  const ValueDecl *overridden = VD->getOverriddenDecl();
+  if (!overridden)
+    return;
+
+  auto *SF = VD->getDeclContext()->getParentSourceFile();
+  assert(SF && "checking a non-source declaration?");
+
+  ModuleDecl *M = overridden->getModuleContext();
+  if (SF->isImportedImplementationOnly(M)) {
+    VD->diagnose(diag::implementation_only_override_import_without_attr,
+                 overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+    overridden->diagnose(diag::overridden_here);
+    return;
+  }
+
+  if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    VD->diagnose(diag::implementation_only_override_without_attr,
+                 overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+    overridden->diagnose(diag::overridden_here);
+    return;
+  }
+
+  // FIXME: Check storage decls where the setter is in a separate module from
+  // the getter, which is a thing Objective-C can do. The ClangImporter
+  // doesn't make this easy, though, because it just gives the setter the same
+  // DeclContext as the property or subscript, which means we've lost the
+  // information about whether its module was implementation-only imported.
 }

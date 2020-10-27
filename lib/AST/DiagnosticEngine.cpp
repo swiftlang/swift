@@ -676,6 +676,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "actor-independent";
       break;
 
+    case ActorIsolation::IndependentUnsafe:
+      Out << "actor-independent-unsafe";
+      break;
+
     case ActorIsolation::Unspecified:
       Out << "non-actor-isolated";
       break;

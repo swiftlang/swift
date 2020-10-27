@@ -269,7 +269,6 @@ bb2(%8 : $Error):
   unreachable
 }
 
-
 // CHECK-LABEL:  @beginapply_allocstack_and_copyaddr
 // CHECK:        PAIR #0.
 // CHECK-NEXT:       (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
@@ -322,6 +321,23 @@ bb0(%0 : $X):
   %2 = function_ref @single_reference : $@convention(thin) (@guaranteed X) -> Int32
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> Int32
   return %3 : $Int32
+}
+
+// CHECK-LABEL: @apply_and_begin_access
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %6 = apply %5(%1) : $@convention(thin) (@in Int32) -> Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:    r=0,w=0
+sil @apply_and_begin_access : $@convention(thin) (@in Int32) -> Int32 {
+bb0(%0 : $*Int32):
+  %1 = alloc_stack $Int32
+  %2 = begin_access [read] [static] %0 : $*Int32
+  copy_addr %2 to %1 : $*Int32
+  end_access %2 : $*Int32
+  %5 = function_ref @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
+  %6 = apply %5(%1) : $@convention(thin) (@in Int32) -> Int32
+  dealloc_stack %1 : $*Int32
+  return %6 : $Int32
 }
 
 sil @load_from_in : $@convention(thin) (@in X) -> () {
