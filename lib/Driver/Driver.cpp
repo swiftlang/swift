@@ -2350,7 +2350,8 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     if (Args.hasFlag(options::OPT_static_executable,
                      options::OPT_no_static_executable, false) ||
         Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
-                     false)) {
+                     false) ||
+        TC.getTriple().isOSBinFormatWasm()) {
       commandLine.push_back("-use-static-resource-dir");
     }
 
