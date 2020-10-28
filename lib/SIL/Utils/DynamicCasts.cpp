@@ -208,6 +208,50 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
   return hashable->getDeclaredInterfaceType()->getCanonicalType();
 }
 
+static bool canBeExistential(CanType ty) {
+  // If ty is an archetype, conservatively assume it's an existential.
+  return ty.isAnyExistentialType() || ty->is<ArchetypeType>();
+}
+
+static bool canBeClass(CanType ty) {
+  // If ty is an archetype, conservatively assume it's an existential.
+  return ty.getClassOrBoundGenericClass() || ty->is<ArchetypeType>();
+}
+
+bool SILDynamicCastInst::isRCIdentityPreserving() const {
+  // Casts which cast from a trivial type, like a metatype, to something which
+  // is retainable (or vice versa), like an AnyObject, are not RC identity
+  // preserving.
+  // On some platforms such casts dynamically allocate a ref-counted box for the
+  // metatype. Naturally that is the place where a new rc-identity begins.
+  // Therefore such a cast is introducing a new rc identical object.
+  //
+  // If RCIdentityAnalysis would look through such a cast, ARC optimizations
+  // would get confused and might eliminate a retain of such an object
+  // completely.
+  SILFunction &f = *getFunction();
+  if (getSourceLoweredType().isTrivial(f) != getTargetLoweredType().isTrivial(f))
+    return false;
+
+  CanType source = getSourceFormalType();
+  CanType target = getTargetFormalType();
+
+  // An existential may be holding a reference to a bridgeable struct.
+  // In this case, ARC on the existential affects the refcount of the container
+  // holding the struct, not the class to which the struct is bridged.
+  // Therefore, don't assume RC identity when casting between existentials and
+  // classes (and also between two existentials).
+  if (canBeExistential(source) &&
+      (canBeClass(target) || canBeExistential(target)))
+    return false;
+
+  // And vice versa.
+  if (canBeClass(source) && canBeExistential(target))
+    return false;
+
+  return true;
+}
+
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
 bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
