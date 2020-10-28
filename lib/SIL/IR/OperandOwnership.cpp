@@ -913,6 +913,19 @@ OwnershipConstraintClassifier::visitBuiltinInst(BuiltinInst *bi) {
 Optional<OwnershipConstraint> Operand::getOwnershipConstraint() const {
   if (isTypeDependent())
     return None;
+
+  // If we do not have ownership enabled, just return any. This ensures that we
+  // do not have any consuming uses and everything from an ownership perspective
+  // is just a liveness use short-circuiting many of the optimizations.
+  //
+  // We do not ever call this function when an instruction isn't in a block.
+  assert(getUser()->getParent() &&
+         "Can not lookup ownership constraint unless inserted into block");
+  if (auto *block = getUser()->getParent())
+    if (auto *func = block->getParent())
+      if (!func->hasOwnership())
+        return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+
   OwnershipConstraintClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }
