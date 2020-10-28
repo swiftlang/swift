@@ -522,12 +522,7 @@ class ClassInt: Equatable, Hashable {
   static func == (lhs: ClassInt, rhs: ClassInt) -> Bool {return true}
   func hash(into hasher: inout Hasher) {}
 }
-CastsTests.test("AnyHashable(Class) -> Obj-C -> Class")
-.skip(.custom({
-      !_isDebugAssertConfiguration()
-    },
-    reason: "Cast optimizer breaks this test"))
-.code {
+CastsTests.test("AnyHashable(Class) -> Obj-C -> Class") {
   let a = ClassInt()
   let b = runtimeCast(a, to: AnyHashable.self)!
   let c = _bridgeAnythingToObjectiveC(b)

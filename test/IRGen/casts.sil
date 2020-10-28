@@ -298,9 +298,9 @@ bb3(%9 : $Optional<CP>):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checked_metatype_to_object_casts
 sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
-  %a = metatype $@thin NotClass.Type
-  // CHECK: br i1 false
-  checked_cast_br %a : $@thin NotClass.Type to AnyObject, a_yea, a_nay
+  %a = metatype $@thick NotClass.Type
+  // CHECK: call i1 @swift_dynamicCast({{.*}})
+  checked_cast_br %a : $@thick NotClass.Type to AnyObject, a_yea, a_nay
 a_yea(%1 : $AnyObject):
   %b = metatype $@thick A.Type
   // CHECK: bitcast %swift.type* {{%.*}} to %objc_object*
