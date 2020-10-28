@@ -42,6 +42,7 @@ enum class ArrayCallKind {
   // a function, and it has a self parameter, make sure that it is defined
   // before this comment.
   kArrayInit,
+  kArrayInitEmpty,
   kArrayUninitialized,
   kArrayUninitializedIntrinsic,
   kArrayFinalizeIntrinsic
@@ -187,7 +188,7 @@ public:
 
   /// Could this array be backed by an NSArray.
   bool mayHaveBridgedObjectElementType() const;
-  
+
   /// Can this function be inlined by the early inliner.
   bool canInlineEarly() const;
 

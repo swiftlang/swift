@@ -1943,6 +1943,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       !isa<BeginApplyInst>(I)) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
+      // TODO: Model ReserveCapacityForAppend, AppendContentsOf, AppendElement.
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
       case ArrayCallKind::kCheckSubscript:
       case ArrayCallKind::kCheckIndex:
@@ -2022,36 +2023,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       default:
         break;
       }
-
-    if (FAS.getReferencedFunctionOrNull() &&
-        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
-            "self_no_escaping_closure") &&
-        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3) ||
-         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2)) &&
-        FAS.hasSelfArgument()) {
-      // The programmer has guaranteed that the closure will not capture the
-      // self pointer passed to it or anything that is transitively reachable
-      // from the pointer.
-      auto Args = FAS.getArgumentsWithoutIndirectResults();
-      // The first not indirect result argument is the closure.
-      ConGraph->setEscapesGlobal(Args[0]);
-      return;
-    }
-
-    if (FAS.getReferencedFunctionOrNull() &&
-        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
-            "pair_no_escaping_closure") &&
-        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4) ||
-         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)) &&
-        FAS.hasSelfArgument()) {
-      // The programmer has guaranteed that the closure will not capture the
-      // self pointer passed to it or anything that is transitively reachable
-      // from the pointer.
-      auto Args = FAS.getArgumentsWithoutIndirectResults();
-      // The second not indirect result argument is the closure.
-      ConGraph->setEscapesGlobal(Args[1]);
-      return;
-    }
 
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);
