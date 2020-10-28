@@ -79,7 +79,7 @@ public:
   /// If we are not emitting CodeView, this does nothing since the ``llvm.trap``
   /// instructions should already have an artificial location of zero.
   /// In CodeView, since zero is not an artificial location, we emit the
-  /// location of the unified trap block at the end of the fuction as an
+  /// location of the unified trap block at the end of the function as an
   /// artificial inline location pointing to the user's instruction.
   void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope);
 
