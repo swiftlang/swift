@@ -601,7 +601,7 @@ private:
   /// rounds up to the next allocation quantum by calling `malloc_good_size`.
   /// Otherwise, just return the passed-in size, which is always valid even if
   /// not necessarily optimal.
-  size_t goodSize(size_t size) {
+  static size_t goodSize(size_t size) {
 #if defined(__APPLE__) && defined(__MACH__)
     return malloc_good_size(size);
 #else
@@ -693,6 +693,29 @@ private:
     }
   };
 
+  /// The struct used for element storage. The `Elem` member is considered to be
+  /// the first element of a variable-length array, whose size is determined by
+  /// the allocation.
+  struct ElementStorage {
+    uint32_t Capacity;
+    ElemTy Elem;
+
+    static ElementStorage *allocate(size_t capacity) {
+      auto headerSize = offsetof(ElementStorage, Elem);
+      auto size = goodSize(headerSize + capacity * sizeof(ElemTy));
+
+      auto *ptr = reinterpret_cast<ElementStorage *>(malloc(size));
+      if (!ptr)
+        swift::crash("Could not allocate memory.");
+
+      ptr->Capacity = (size - headerSize) / sizeof(ElemTy);
+
+      return ptr;
+    }
+
+    ElemTy *data() { return &Elem; }
+  };
+
   /// A simple linked list representing pointers that need to be freed.
   struct FreeListNode {
     FreeListNode *Next;
@@ -723,16 +746,13 @@ private:
   std::atomic<uint32_t> ElementCount{0};
 
   /// The array of elements.
-  std::atomic<ElemTy *> Elements{nullptr};
+  std::atomic<ElementStorage *> Elements{nullptr};
 
   /// The array of indices.
   std::atomic<IndexStorage *> Indices{nullptr};
 
   /// The writer lock, which must be taken before any mutation of the table.
   StaticMutex WriterLock;
-
-  /// The maximum number of elements that the current elements array can hold.
-  uint32_t ElementCapacity{0};
 
   /// The list of pointers to be freed once no readers are active.
   FreeListNode *FreeList{nullptr};
@@ -754,22 +774,18 @@ private:
 
   /// Grow the elements array, adding the old array to the free list and
   /// returning the new array with all existing elements copied into it.
-  ElemTy *resize(ElemTy *elements, size_t elementCount) {
+  ElementStorage *resize(ElementStorage *elements, size_t elementCount) {
     // Grow capacity by 25%, making sure we grow by at least 1.
     size_t newCapacity =
         std::max(elementCount + (elementCount >> 2), elementCount + 1);
-    size_t newSize = newCapacity * sizeof(ElemTy);
+    auto *newElements = ElementStorage::allocate(newCapacity);
 
-    newSize = goodSize(newSize);
-    newCapacity = newSize / sizeof(ElemTy);
-
-    ElemTy *newElements = static_cast<ElemTy *>(malloc(newSize));
     if (elements) {
-      memcpy(newElements, elements, elementCount * sizeof(ElemTy));
+      memcpy(newElements->data(), elements->data(),
+             elementCount * sizeof(ElemTy));
       FreeListNode::add(&FreeList, elements);
     }
 
-    ElementCapacity = newCapacity;
     Elements.store(newElements, std::memory_order_release);
     return newElements;
   }
@@ -919,8 +935,8 @@ public:
     // should not happen often.
     IndexStorage *indices;
     size_t elementCount;
-    ElemTy *elements;
-    ElemTy *elements2;
+    ElementStorage *elements;
+    ElementStorage *elements2;
     do {
       elements = Elements.load(std::memory_order_acquire);
       indices = Indices.load(std::memory_order_acquire);
@@ -928,7 +944,8 @@ public:
       elements2 = Elements.load(std::memory_order_acquire);
     } while (elements != elements2);
 
-    return Snapshot(this, indices, elements, elementCount);
+    ElemTy *elementsPtr = elements ? elements->data() : nullptr;
+    return Snapshot(this, indices, elementsPtr, elementCount);
   }
 
   /// Get an element by key, or insert a new element for that key if one is not
@@ -958,8 +975,9 @@ public:
     auto indicesCapacityLog2 = indices->CapacityLog2;
     auto elementCount = ElementCount.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
+    auto *elementsPtr = elements ? elements->data() : nullptr;
 
-    auto found = this->find(key, indices, elementCount, elements);
+    auto found = this->find(key, indices, elementCount, elementsPtr);
     if (found.first) {
       call(found.first, false);
       deallocateFreeListIfSafe();
@@ -973,15 +991,15 @@ public:
     auto emptyCount = indicesCapacity - (elementCount + 1);
     auto proportion = indicesCapacity / emptyCount;
     if (proportion >= ResizeProportion) {
-      indices = resize(indices, indicesCapacityLog2, elements);
-      found = find(key, indices, elementCount, elements);
+      indices = resize(indices, indicesCapacityLog2, elementsPtr);
+      found = find(key, indices, elementCount, elementsPtr);
       assert(!found.first && "Shouldn't suddenly find the key after rehashing");
     }
 
-    if (elementCount >= ElementCapacity) {
+    if (!elements || elementCount >= elements->Capacity) {
       elements = resize(elements, elementCount);
     }
-    auto *element = &elements[elementCount];
+    auto *element = &elements->data()[elementCount];
 
     // Order matters: fill out the element, then update the count,
     // then update the index.
@@ -1010,7 +1028,6 @@ public:
     Indices.store(nullptr, std::memory_order_relaxed);
     ElementCount.store(0, std::memory_order_relaxed);
     Elements.store(nullptr, std::memory_order_relaxed);
-    ElementCapacity = 0;
 
     FreeListNode::add(&FreeList, indices);
     FreeListNode::add(&FreeList, elements);
