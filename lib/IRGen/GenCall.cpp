@@ -109,6 +109,12 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
   };
+  auto addExecutor = [&]() {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftExecutorPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  };
 
   // AsyncContext * __ptrauth_swift_async_context_parent Parent;
   {
@@ -123,12 +129,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   addTaskContinuationFunction();
 
   // ExecutorRef ResumeParentExecutor;
-  {
-    auto ty = SILType();
-    auto &ti = IGF.IGM.getSwiftExecutorPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  }
+  addExecutor();
 
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
