@@ -39,13 +39,38 @@ enum class InlineSelection {
   OnlyInlineAlways,
 };
 
-// Returns the callee of an apply_inst if it is basically inlinable.
+/// Check if this ApplySite is eligible for inlining. If so, return the callee.
 SILFunction *getEligibleFunction(FullApplySite AI,
                                  InlineSelection WhatToInline);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.
 bool isPureCall(FullApplySite AI, SideEffectAnalysis *SEA);
+
+/// Fundamental @_semantic tags provide additional semantics for optimization
+/// beyond what SIL analysis can discover from the function body. They should be
+/// preserved until semantic passes can process them. For example, they may need
+/// to be hoisted by LICM after inlining up to the highest level caller.
+///
+/// Nested @_semantic tags also provide semantics beyond the function body but
+/// they hide the semantics of underlying calls. These need to be inlined into
+/// the highest level caller before semantics passes can process the underlying
+/// Fundamental semantic functions.
+///
+/// Transient @_semantic tags are not required for optimization.
+enum class SemanticFunctionLevel { Fundamental, Transient, Nested };
+
+/// Return the SemanticFunctionLevel of \p callee.
+SemanticFunctionLevel getSemanticFunctionLevel(SILFunction *function);
+
+inline bool isOptimizableSemanticFunction(SILFunction *function) {
+  return getSemanticFunctionLevel(function) != SemanticFunctionLevel::Transient;
+}
+
+/// Return true if \p apply calls into an optimizable semantic function from
+/// within another semantic function, or from a "trivial" wrapper.
+bool isNestedSemanticCall(FullApplySite apply);
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
