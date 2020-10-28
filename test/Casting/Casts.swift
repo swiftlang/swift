@@ -761,26 +761,35 @@ CastsTests.test("Async function types") {
   expectFalse(asyncFnType is (() -> Void).Type)
 }
 
+#if _runtime(_ObjC)
+// See below for notes about missing Linux functionality
+// that prevents us from running this test there.
 CastsTests.test("AnyObject.Type -> AnyObject") {
   class C {}
   let a = C.self
   let b = a as? AnyObject.Type
   expectNotNil(b)
+  // Note: On macOS, the following cast generates a call to
+  // `swift_dynamicCastMetatypeToObjectConditional` That function is currently
+  // unimplemented on Linux, so this cast always fails on Linux.
   let c = b as? AnyObject
   expectNotNil(c)
+  // Note: The following cast currently succeeds on Linux only by stuffing the
+  // source into a `__SwiftValue` container, which breaks the checks below.
   let d = runtimeCast(b, to: AnyObject.self)
   expectNotNil(d)
   let e = c as? C.Type
   expectNotNil(e)
   let f = runtimeCast(d, to: C.Type.self)
   expectNotNil(f)
-#if _runtime(_ObjC)
-  // Known bug: === does not support metatypes on Linux
+  // Verify that the round-trip casts yield exactly the same pointer.  In
+  // particular, none of the casts above should fall back on stuffing the source
+  // into a `__SwiftValue` container.
   expectTrue(c! === a)
   expectTrue(d! === a)
   expectTrue(e! === a)
   expectTrue(f! === a)
-#endif
 }
+#endif
 
 runAllTests()
