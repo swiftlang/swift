@@ -2959,6 +2959,14 @@ public:
   explicit StmtAvailabilityWalker(ExportContext where)
     : Where(where) {}
 
+  /// We'll visit each element of a BraceStmt individually.
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (isa<BraceStmt>(S))
+      return std::make_pair(false, S);
+
+    return std::make_pair(true, S);
+  }
+
   /// We'll visit the expression from performSyntacticExprDiagnostics().
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     return std::make_pair(false, E);
