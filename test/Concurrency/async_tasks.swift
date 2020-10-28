@@ -87,9 +87,3 @@ func test_detached_throwing() async -> String {
     print("caught: \(error)")
   }
 }
-
-// ==== Current Task -----------------------------------------------------------
-
-func test_current_task() async {
-    _ = await Task.current() // yay, we know "in" what task we're executing
-}

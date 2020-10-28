@@ -18,6 +18,12 @@ import Swift
 /// An asynchronous task (just "Task" hereafter) is the analogue of a thread for
 /// asynchronous functions. All asynchronous functions run as part of some task.
 ///
+/// A task can only be interacted with by code running "in" the task,
+/// by invoking the appropriate context sensitive static functions which operate
+/// on the "current" task. Because all such functions are `async` they can only
+/// be invoked as part of an existing task, and therefore are guaranteed to be
+/// effective.
+///
 /// A task's execution can be seen as a series of periods where the task was
 /// running. Each such period ends at a suspension point or -- finally -- the
 /// completion of the task.
@@ -25,20 +31,7 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
-public struct Task {
-}
-
-// ==== Current Task -----------------------------------------------------------
-
-extension Task {
-  /// Returns the currently executing `Task`.
-  ///
-  /// As invoking this function is only possible from an asynchronous context
-  /// it is always able to return the current `Task` in which we are currently
-  /// running.
-  public static func current() async -> Task {
-    fatalError("\(#function) not implemented yet.") // TODO: needs a built-in function
-  }
+public enum Task {
 }
 
 // ==== Task Priority ----------------------------------------------------------
