@@ -270,7 +270,8 @@ TEST_F(SemaTest, TestComplexTransitiveProtocolInference) {
   // T2 <: T3, T2 <: T1, T3 == T1
   cs.addConstraint(ConstraintKind::Subtype, typeVar2, typeVar3, nilLocator);
   cs.addConstraint(ConstraintKind::Conversion, typeVar2, typeVar1, nilLocator);
-  cs.addConstraint(ConstraintKind::Equal, typeVar3, typeVar1, nilLocator);
+  cs.addConstraint(ConstraintKind::UnresolvedMemberChainBase, typeVar3,
+                   typeVar1, nilLocator);
   // T1 == T5, T <: T6
   cs.addConstraint(ConstraintKind::Equal, typeVar1, typeVar5, nilLocator);
   cs.addConstraint(ConstraintKind::Conversion, typeVar5, typeVar6, nilLocator);

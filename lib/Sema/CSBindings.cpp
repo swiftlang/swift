@@ -1004,8 +1004,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
-    if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>() &&
-        kind == AllowedBindingKind::Supertypes && type->is<ProtocolType>())
+    if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
+        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>())
       return None;
   }
 
@@ -1103,7 +1103,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
-    case ConstraintKind::Equal: {
+    case ConstraintKind::Equal:
+    case ConstraintKind::UnresolvedMemberChainBase: {
       EquivalentTo.insert({bindingTypeVar, constraint});
       break;
     }
