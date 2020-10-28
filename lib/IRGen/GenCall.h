@@ -239,8 +239,8 @@ namespace irgen {
         SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
         Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
         bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
-        ArrayRef<SILResultInfo> directReturnInfos,
         ArrayRef<SILResultInfo> indirectReturnInfos,
+        ArrayRef<SILResultInfo> directReturnInfos,
         Optional<ArgumentInfo> localContextInfo);
   };
 
