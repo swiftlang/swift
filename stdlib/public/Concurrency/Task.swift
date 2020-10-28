@@ -39,6 +39,10 @@ public enum Task {
 extension Task {
 
   /// Returns the current task's priority.
+  ///
+  /// ### Suspension
+  /// This function returns instantly and will never suspend.
+  /* @instantaneous */
   public static func currentPriority() async -> Priority {
     fatalError("\(#function) not implemented yet.")
   }
@@ -251,6 +255,10 @@ extension Task {
   /// The operation functions must resume the continuation *exactly once*.
   ///
   /// The continuation will not begin executing until the operation function returns.
+  ///
+  /// ### Suspension
+  /// This function returns instantly and will never suspend.
+  /* @instantaneous */
   public static func withUnsafeContinuation<T>(
     operation: (UnsafeContinuation<T>) -> Void
   ) async -> T {
@@ -260,6 +268,10 @@ extension Task {
   /// The operation functions must resume the continuation *exactly once*.
   ///
   /// The continuation will not begin executing until the operation function returns.
+  ///
+  /// ### Suspension
+  /// This function returns instantly and will never suspend.
+  /* @instantaneous */
   public static func withUnsafeThrowingContinuation<T>(
     operation: (UnsafeThrowingContinuation<T, Error>) -> Void
   ) async throws -> T {
