@@ -2522,7 +2522,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
   switch (methodInfo.getKind()) {
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
-    auto offset = methodInfo.getOffsett();
+    auto offset = methodInfo.getOffset();
 
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
