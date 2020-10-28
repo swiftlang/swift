@@ -93,9 +93,15 @@ namespace irgen {
 
   private:
     enum class FixedIndex : unsigned {
-      Error = 0,
+      Parent = 0,
+      ResumeParent = 1,
+      ResumeParentExecutor = 2,
+      Error = 3,
     };
     enum class FixedCount : unsigned {
+      Parent = 1,
+      ResumeParent = 1,
+      ResumeParentExecutor = 1,
       Error = 1,
     };
     IRGenFunction &IGF;
@@ -111,6 +117,13 @@ namespace irgen {
     Optional<TrailingWitnessInfo> trailingWitnessInfo;
     SmallVector<ArgumentInfo, 4> argumentInfos;
 
+    unsigned getParentIndex() { return (unsigned)FixedIndex::Parent; }
+    unsigned getResumeParentIndex() {
+      return (unsigned)FixedIndex::ResumeParent;
+    }
+    unsigned getResumeParentExecutorIndex() {
+      return (unsigned)FixedIndex::ResumeParentExecutor;
+    }
     unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
     unsigned getFirstIndirectReturnIndex() {
       return getErrorIndex() + getErrorCount();
@@ -156,6 +169,13 @@ namespace irgen {
     }
 
   public:
+    ElementLayout getParentLayout() { return getElement(getParentIndex()); }
+    ElementLayout getResumeParentLayout() {
+      return getElement(getResumeParentIndex());
+    }
+    ElementLayout getResumeParentExecutorLayout() {
+      return getElement(getResumeParentExecutorIndex());
+    }
     bool canHaveError() { return canHaveValidError; }
     ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
     unsigned getErrorCount() { return (unsigned)FixedCount::Error; }

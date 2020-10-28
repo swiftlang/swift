@@ -103,6 +103,31 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   auto parameters = substitutedType->getParameters();
   SILFunctionConventions fnConv(substitutedType, IGF.getSILModule());
 
+  // AsyncContext * __ptrauth_swift_async_context_parent Parent;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftContextPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
+  // TaskContinuationFunction * __ptrauth_swift_async_context_resume
+  //     ResumeParent;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getTaskContinuationFunctionPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
+  // ExecutorRef ResumeParentExecutor;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftExecutorPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);
@@ -266,11 +291,6 @@ static Size getAsyncContextSize(AsyncContextLayout layout) {
 
 static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
-}
-
-static llvm::Value *getAsyncTask(IRGenFunction &IGF) {
-  // TODO: Return the appropriate task.
-  return llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy);
 }
 
 llvm::Value *IRGenFunction::getAsyncTask() {
@@ -2165,9 +2185,8 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy));
-    asyncExplosion.add(
-        llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
+    asyncExplosion.add(IGF.getAsyncTask());
+    asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
     if (getCallee().getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {
@@ -2176,9 +2195,22 @@ public:
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
-
-    // Move all the arguments into the context.
     auto layout = getAsyncContextLayout();
+
+    // Set caller info into the context.
+    { // caller context
+      Explosion explosion;
+      explosion.add(IGF.getAsyncContext());
+      auto fieldLayout = layout.getParentLayout();
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    { // caller executor
+      Explosion explosion;
+      explosion.add(IGF.getAsyncExecutor());
+      auto fieldLayout = layout.getResumeParentExecutorLayout();
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    // Move all the arguments into the context.
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
@@ -3354,7 +3386,7 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
 Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                              Alignment alignment) {
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
-                                      {getAsyncTask(IGF), size});
+                                      {IGF.getAsyncTask(), size});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -3366,7 +3398,7 @@ Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
 void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
                             llvm::Value *size) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskDeallocFn(), {getAsyncTask(IGF), address.getAddress()});
+      IGF.IGM.getTaskDeallocFn(), {IGF.getAsyncTask(), address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
