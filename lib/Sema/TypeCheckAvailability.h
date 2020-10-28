@@ -62,6 +62,7 @@ using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 enum class ExportabilityReason : unsigned {
   General,
   PropertyWrapper,
+  ResultBuilder,
   ExtensionWithPublicMembers,
   ExtensionWithConditionalConformances
 };
@@ -101,7 +102,7 @@ class ExportContext {
   unsigned Implicit : 1;
   unsigned Unavailable : 1;
   unsigned Platform : 8;
-  unsigned Reason : 2;
+  unsigned Reason : 3;
 
   ExportContext(DeclContext *DC,
                 AvailabilityContext runningOSVersion,

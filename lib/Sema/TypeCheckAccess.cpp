@@ -1591,10 +1591,18 @@ public:
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD);
 
     // Check the property wrapper types.
-    if (anyVar)
-      for (auto attr : anyVar->getAttachedPropertyWrappers())
+    if (anyVar) {
+      for (auto attr : anyVar->getAttachedPropertyWrappers()) {
         checkType(attr->getType(), attr->getTypeRepr(), anyVar,
                   ExportabilityReason::PropertyWrapper);
+      }
+
+      if (auto attr = anyVar->getAttachedResultBuilder()) {
+        checkType(anyVar->getResultBuilderType(),
+                  attr->getTypeRepr(), anyVar,
+                  ExportabilityReason::ResultBuilder);
+      }
+    }
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -1683,6 +1691,12 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     visitAbstractFunctionDecl(FD);
     checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD);
+
+    if (auto attr = FD->getAttachedResultBuilder()) {
+      checkType(FD->getResultBuilderType(),
+                attr->getTypeRepr(), FD,
+                ExportabilityReason::ResultBuilder);
+    }
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
