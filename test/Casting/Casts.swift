@@ -761,4 +761,27 @@ CastsTests.test("Async function types") {
   expectFalse(asyncFnType is (() -> Void).Type)
 }
 
+CastsTests.test("AnyObject.Type -> AnyObject") {
+  class C {}
+  let a = C.self
+  let b = a as? AnyObject.Type
+  expectNotNil(b)
+  let c = b as? AnyObject
+  expectNotNil(c)
+  expectTrue(c! === a)
+  let d = runtimeCast(b, to: AnyObject.self)
+  expectNotNil(d)
+  expectTrue(d! === a)
+  let e = c as? C.Type
+  expectNotNil(e)
+  expectTrue(e! === a)
+  let f = runtimeCast(d, to: C.Type.self)
+  expectNotNil(f)
+  expectTrue(f! === a)
+  blackhole(c)
+  blackhole(d)
+  blackhole(e)
+  blackhole(f)
+}
+
 runAllTests()
