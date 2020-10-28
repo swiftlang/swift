@@ -598,6 +598,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
 
+  // using TaskContinuationFunction =
+  //   SWIFT_CC(swift)
+  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  TaskContinuationFunctionTy = llvm::FunctionType::get(
+      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
+      /*isVarArg*/ false);
+  TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
