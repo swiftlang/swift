@@ -10,11 +10,11 @@
 
 // In this test case, UserA and UserB both textually include `helper.h`,
 // therefore both export `getFortyTwo()`.
-// This test verifies that even if Swift chooses UserA.getFortyTwo(), it
-// doesn't error out, because the symbol is also exported from UserB.
+// This test verifies that even if Swift chooses UserB.getFortyTwo(), it
+// doesn't error out, because the symbol is also exported from UserA.
 
-@_implementationOnly import UserA
-import UserB
+import UserA
+@_implementationOnly import UserB
 
 @_inlineable
 public func callFortyTwo() -> CInt {

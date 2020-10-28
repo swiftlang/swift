@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -130,6 +131,7 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
+  // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
 
   auto fragileKind = where.getFragileFunctionKind();
