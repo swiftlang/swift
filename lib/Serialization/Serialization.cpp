@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -689,6 +689,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
   return addDeclBaseNameRef(exportedModuleID);
 }
 
+IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
+  if (module == this->M)
+    return CURRENT_MODULE_ID;
+  if (module == this->M->getASTContext().TheBuiltinModule)
+    return BUILTIN_MODULE_ID;
+  auto moduleName =
+      module->getASTContext().getIdentifier(module->getName().str());
+  return addDeclBaseNameRef(moduleName);
+}
+
 SILLayoutID Serializer::addSILLayoutRef(const SILLayout *layout) {
   return SILLayoutsToSerialize.addRef(layout);
 }
@@ -843,6 +853,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::BUILTIN_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE_ID);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::PROTOCOL_CONFORMANCE_XREF);
@@ -960,7 +972,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-static void flattenImportPath(const ModuleDecl::ImportedModule &import,
+static void flattenImportPath(const ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
   import.importedModule->getReverseFullModuleName().printForward(
@@ -981,11 +993,10 @@ uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
   return dep.getModificationTime();
 }
 
-using ImportSet = llvm::SmallSet<ModuleDecl::ImportedModule, 8,
-                                 ModuleDecl::OrderImportedModules>;
+using ImportSet = llvm::SmallSet<ImportedModule, 8, ImportedModule::Order>;
 static ImportSet getImportsAsSet(const ModuleDecl *M,
                                  ModuleDecl::ImportFilter filter) {
-  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  SmallVector<ImportedModule, 8> imports;
   M->getImportedModules(imports, filter);
   ImportSet importSet;
   importSet.insert(imports.begin(), imports.end());
@@ -994,7 +1005,7 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 
 void Serializer::writeInputBlock(const SerializationOptions &options) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
-  input_block::ImportedModuleLayout ImportedModule(Out);
+  input_block::ImportedModuleLayout importedModule(Out);
   input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
@@ -1038,13 +1049,13 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
-  SmallVector<ModuleDecl::ImportedModule, 8> allImports;
+  SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports,
                         {ModuleDecl::ImportFilterKind::Exported,
                          ModuleDecl::ImportFilterKind::Default,
                          ModuleDecl::ImportFilterKind::ImplementationOnly,
                          ModuleDecl::ImportFilterKind::SPIAccessControl});
-  ModuleDecl::removeDuplicateImports(allImports);
+  ImportedModule::removeDuplicates(allImports);
 
   // Collect the public and private imports as a subset so that we can
   // distinguish them.
@@ -1053,17 +1064,13 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
   ImportSet spiImportSet =
-      getImportsAsSet(M, {
-          ModuleDecl::ImportFilterKind::Exported,
-          ModuleDecl::ImportFilterKind::Default,
-          ModuleDecl::ImportFilterKind::SPIAccessControl
-      });
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{ImportPath::Access(),
-                                                  bridgingHeaderModule};
+  ImportedModule bridgingHeaderImport{ImportPath::Access(),
+                                      bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
@@ -1111,7 +1118,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    ImportedModule.emit(ScratchRecord,
+    importedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
                         !import.accessPath.empty(), !spis.empty(), importPath);
 
@@ -1504,6 +1511,17 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
+  case ProtocolConformanceKind::Builtin:
+    auto builtin = cast<BuiltinProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
+    auto typeID = addTypeRef(builtin->getType());
+    auto protocolID = addDeclRef(builtin->getProtocol());
+    BuiltinProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                 typeID, protocolID,
+                                             builtin->getConformances().size());
+
+    writeConformances(builtin->getConformances(), abbrCodes);
+    break;
   }
 }
 
@@ -2292,6 +2310,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_ActorIndependent: {
+      auto *theAttr = cast<ActorIndependentAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ActorIndependentDeclAttrLayout::Code];
+      ActorIndependentDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+                                        abbrCode, (unsigned)theAttr->getKind());
+      return;
+    }
+
     case DAK_Optimize: {
       auto *theAttr = cast<OptimizeAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
@@ -2370,13 +2396,39 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DAK_Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-      auto SA = cast<SpecializeAttr>(DA);
+      auto attr = cast<SpecializeAttr>(DA);
+      auto targetFun = attr->getTargetFunctionName();
+      auto *targetFunDecl = attr->getTargetFunctionDecl(cast<ValueDecl>(D));
+
+      SmallVector<IdentifierID, 4> pieces;
+
+      // encodes whether this a a simple or compound name by adding one.
+      size_t numArgs = 0;
+      if (targetFun) {
+        pieces.push_back(S.addDeclBaseNameRef(targetFun.getBaseName()));
+        for (auto argName : targetFun.getArgumentNames())
+          pieces.push_back(S.addDeclBaseNameRef(argName));
+        if (targetFun.isSimpleName()) {
+          assert(pieces.size() == 1);
+          numArgs = 1;
+        } else
+          numArgs = pieces.size() + 1;
+      }
+
+      for (auto spi : attr->getSPIGroups()) {
+        assert(!spi.empty() && "Empty SPI name");
+        pieces.push_back(S.addDeclBaseNameRef(spi));
+      }
+
+      auto numSPIGroups = attr->getSPIGroups().size();
+      assert(pieces.size() == numArgs + numSPIGroups ||
+             pieces.size() == (numArgs - 1 + numSPIGroups));
 
       SpecializeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          (unsigned)SA->isExported(),
-          (unsigned)SA->getSpecializationKind(),
-          S.addGenericSignatureRef(SA->getSpecializedSignature()));
+          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
+          (unsigned)attr->getSpecializationKind(),
+          S.addGenericSignatureRef(attr->getSpecializedSignature()),
+          S.addDeclRef(targetFunDecl), numArgs, numSPIGroups, pieces);
       return;
     }
 
@@ -4552,6 +4604,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
+  registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 

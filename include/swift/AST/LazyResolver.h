@@ -114,6 +114,10 @@ public:
   /// Returns the type for a given @_typeEraser() attribute.
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) = 0;
+
+  // Returns the target parameter of the `@_specialize` attribute or null.
+  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                            uint64_t contextData) = 0;
 };
 
 /// A class that can lazily load conformances from a serialized format.

@@ -67,10 +67,7 @@ StaticVarTestSuite.test("static-non-trivial-write-from-cxx") {
 
 StaticVarTestSuite.test("static-non-trivial-write-from-swift") {
   expectNotEqual(1026, staticNonTrivial.val)
-  //TODO: Delete `NonTrivial()` adn use `NonTrivial(int)` constructor once
-  // apple/swift/pull/30630 is merged.
-  staticNonTrivial = NonTrivial()
-  staticNonTrivial.val = 1026
+  staticNonTrivial = NonTrivial(1026)
   expectEqual(1026, getstaticNonTrivialFromCxx().pointee.val)
 }
 

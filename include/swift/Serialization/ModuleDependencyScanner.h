@@ -40,18 +40,13 @@ namespace swift {
     public:
       Optional<ModuleDependencies> dependencies;
 
-      /// Describes the kind of dependencies this scanner is able to identify
-      ModuleDependenciesKind dependencyKind;
-
       ModuleDependencyScanner(
           ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
           InterfaceSubContextDelegate &astDelegate,
-          ModuleDependenciesKind dependencyKind = ModuleDependenciesKind::Swift,
           ScannerKind kind = MDS_plain)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
-            kind(kind), moduleName(moduleName), astDelegate(astDelegate),
-            dependencyKind(dependencyKind) {}
+            kind(kind), moduleName(moduleName), astDelegate(astDelegate) {}
 
       std::error_code findModuleFilesInDirectory(
           ImportPath::Element ModuleID,
@@ -60,7 +55,7 @@ namespace swift {
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                                 bool IsFramework) override;
+          bool IsFramework) override;
 
       virtual void collectVisibleTopLevelModuleNames(
           SmallVectorImpl<Identifier> &names) const override {
@@ -106,7 +101,6 @@ namespace swift {
                                     StringRef PlaceholderDependencyModuleMap,
                                     InterfaceSubContextDelegate &astDelegate)
           : ModuleDependencyScanner(ctx, LoadMode, moduleName, astDelegate,
-                                    ModuleDependenciesKind::SwiftPlaceholder,
                                     MDS_placeholder) {
 
         // FIXME: Find a better place for this map to live, to avoid

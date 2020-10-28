@@ -88,6 +88,7 @@ public:
     case Kind::Struct:
       return false;
     }
+    llvm_unreachable("unhandled operand kind!");
   }
 
   bool operator<(const OwnershipPhiOperand &other) const {
@@ -113,6 +114,7 @@ public:
           });
     }
     }
+    llvm_unreachable("unhandled operand kind!");
   }
 };
 

@@ -52,11 +52,15 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
 
     if (FullApplySite FAI = FullApplySite::isa(&I)) {
       // Don't touch dynamic dispatch.
-      if (isa<ObjCMethodInst>(FAI.getCallee()))
+      const auto callee = FAI.getCallee();
+      if (isa<SuperMethodInst>(callee) ||
+          isa<ObjCSuperMethodInst>(callee) ||
+          isa<ObjCMethodInst>(callee)) {
         continue;
+      }
 
       auto &M = FAI.getModule();
-      if (auto *CMI = dyn_cast<ClassMethodInst>(FAI.getCallee())) {
+      if (auto *CMI = dyn_cast<ClassMethodInst>(callee)) {
         auto ClassType = CMI->getOperand()->getType().getASTType();
 
         // FIXME: If we're not inside the module context of the method,
@@ -71,6 +75,18 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
           continue;
         }
 
+        if (!calleesAreStaticallyKnowable(FAI.getModule(), CMI->getMember())) {
+          continue;
+        }
+
+        // The "statically knowable" check just means that we have all the
+        // callee candidates available for analysis. We still need to check
+        // if the current function has a known override point.
+        auto *method = CMI->getMember().getAbstractFunctionDecl();
+        if (method->isOverridden()) {
+          continue;
+        }
+
         auto *F = getTargetClassMethod(M, CD, CMI);
         if (F == Target)
           return true;
@@ -78,7 +94,7 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
         continue;
       }
 
-      if (auto *WMI = dyn_cast<WitnessMethodInst>(FAI.getCallee())) {
+      if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
         SILFunction *F;
         SILWitnessTable *WT;
 

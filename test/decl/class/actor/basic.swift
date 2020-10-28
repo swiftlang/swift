@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 actor class MyActor { }
 
 class MyActorSubclass1: MyActor { }

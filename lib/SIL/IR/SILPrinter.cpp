@@ -349,9 +349,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   if (isForeign)
     OS << (isDot ? '.' : '!')  << "foreign";
 
-  if (derivativeFunctionIdentifier) {
+  if (getDerivativeFunctionIdentifier()) {
     OS << ((isDot || isForeign) ? '.' : '!');
-    switch (derivativeFunctionIdentifier->getKind()) {
+    switch (getDerivativeFunctionIdentifier()->getKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
       OS << "jvp.";
       break;
@@ -359,9 +359,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       OS << "vjp.";
       break;
     }
-    OS << derivativeFunctionIdentifier->getParameterIndices()->getString();
+    OS << getDerivativeFunctionIdentifier()->getParameterIndices()->getString();
     if (auto derivativeGenSig =
-            derivativeFunctionIdentifier->getDerivativeGenericSignature()) {
+            getDerivativeFunctionIdentifier()->getDerivativeGenericSignature()) {
       OS << "." << derivativeGenSig;
     }
   }
@@ -3465,6 +3465,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
+  if (!getSPIGroup().empty()) {
+    OS << "spi: " << getSPIGroup() << ", ";
+    OS << "spiModule: ";
+    getSPIModule()->getReverseFullModuleName().printForward(OS);
+    OS << ", ";
+  }
 
   auto *genericEnv = getFunction()->getGenericEnvironment();
   GenericSignature genericSig;
@@ -3481,6 +3487,9 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     } else {
       requirements = specializedSig->getRequirements();
     }
+  }
+  if (targetFunction) {
+    OS << "target: \"" << targetFunction->getName() << "\", ";
   }
   if (!requirements.empty()) {
     OS << "where ";

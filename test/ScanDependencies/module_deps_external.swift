@@ -76,7 +76,7 @@ import SomeExternalModule
 // CHECK-NEXT: "details": {
 // CHECK-NEXT: "swiftPlaceholder": {
 // CHECK-NEXT: "moduleDocPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
-// CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo",
+// CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo"
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",

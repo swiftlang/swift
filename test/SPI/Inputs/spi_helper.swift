@@ -1,4 +1,4 @@
-/// Library defining SPI decls
+ /// Library defining SPI decls
 
 public protocol PublicProto {
   associatedtype Assoc
@@ -7,6 +7,9 @@ public protocol PublicProto {
 public func publicFunc() { print("publicFunc") }
 
 func internalFunc() {}
+
+@_specialize(exported: true, spi: HelperSPI, where T == Int)
+public func genericFunc<T>(_ t: T) { print(t) }
 
 @_spi(HelperSPI) public func spiFunc() { print("spiFunc") }
 
@@ -28,6 +31,9 @@ func internalFunc() {}
 
   public func spiInherit() {}
   @_spi(DifferentSPI) public func spiDontInherit() {}
+
+  @_specialize(exported: true, spi: HelperSPI, where T == Int)
+  @_spi(HelperSPI) public func genericFunc2<T>(_ t: T) { print(t) }
 }
 
 public extension SPIStruct {
@@ -43,6 +49,9 @@ public extension SPIStruct {
   @_spi(HelperSPI) public init() { print("SPIClass.init") }
   @_spi(HelperSPI) public func spiMethod() { print("SPIClass.spiMethod") }
   @_spi(HelperSPI) public var spiVar = "text"
+
+  @_specialize(exported: true, spi: HelperSPI, where T == Int)
+  @_spi(HelperSPI) public func genericFunc3<T>(_ t: T) { print(t) }
 }
 
 @_spi(HelperSPI) public enum SPIEnum {
@@ -55,6 +64,9 @@ public extension SPIStruct {
   }
 
   @_spi(HelperSPI) public func spiMethod() { print("SPIEnum.spiMethod") }
+
+  @_specialize(exported: true, spi: HelperSPI, where T == Int)
+  public func genericFunc4<T>(_ t: T) { print(t) }
 }
 
 public struct PublicStruct {
@@ -63,6 +75,9 @@ public struct PublicStruct {
   @_spi(HelperSPI) public init(alt_init: Int) { print("PublicStruct.init alt_init") }
   @_spi(HelperSPI) public func spiMethod() { print("PublicStruct.spiMethod") }
   @_spi(HelperSPI) public var spiVar = "text"
+
+  @_specialize(exported: true, spi: HelperSPI, where T == Int)
+  public func prespecializedMethod<T>(_ t: T) { print(t) }
 }
 
 @_spi(OtherSPI) public func otherApiFunc() {}

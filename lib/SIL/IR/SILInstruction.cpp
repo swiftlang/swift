@@ -1519,6 +1519,21 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
   return reinterpret_cast<MultipleValueInstruction *>(value);
 }
 
+/// Returns true if evaluation of this node may cause suspension of an
+/// async task.
+bool SILInstruction::maySuspend() const {
+  // await_async_continuation always suspends the current task.
+  if (isa<AwaitAsyncContinuationInst>(this))
+    return true;
+  
+  // Fully applying an async function may suspend the caller.
+  if (auto applySite = FullApplySite::isa(const_cast<SILInstruction*>(this))) {
+    return applySite.getOrigCalleeType()->isAsync();
+  }
+  
+  return false;
+}
+
 #ifndef NDEBUG
 
 //---
@@ -1536,7 +1551,7 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
 // Check that all subclasses of MultipleValueInstructionResult are the same size
 // as MultipleValueInstructionResult.
 //
-// If this changes, we just need to expand the size fo SILInstructionResultArray
+// If this changes, we just need to expand the size of SILInstructionResultArray
 // to contain a stride. But we assume this now so we should enforce it.
 #define MULTIPLE_VALUE_INST_RESULT(ID, PARENT)                                 \
   static_assert(                                                               \

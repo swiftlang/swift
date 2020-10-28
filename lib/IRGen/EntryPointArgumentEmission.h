@@ -20,6 +20,7 @@ namespace swift {
 namespace irgen {
 
 class Explosion;
+struct GenericRequirement;
 
 class EntryPointArgumentEmission {
 
@@ -28,6 +29,9 @@ public:
   virtual bool requiresIndirectResult(SILType retType) = 0;
   virtual llvm::Value *getIndirectResultForFormallyDirectResult() = 0;
   virtual llvm::Value *getIndirectResult(unsigned index) = 0;
+  virtual llvm::Value *getNextPolymorphicParameterAsMetadata() = 0;
+  virtual llvm::Value *
+  getNextPolymorphicParameter(GenericRequirement &requirement) = 0;
 };
 
 class NativeCCEntryPointArgumentEmission

@@ -25,16 +25,16 @@
 #include "llvm/ADT/SetVector.h"
 #include "swift/AST/Types.h"
 
-#include "Explosion.h"
-
 namespace swift {
   class CanType;
   enum class MetadataState : size_t;
   class ProtocolDecl;
   class ProtocolConformanceRef;
+  class SpecializedProtocolConformance;
 
-namespace irgen {
+  namespace irgen {
   class Address;
+  class Explosion;
   class IRGenFunction;
   class IRGenModule;
   class Size;
@@ -42,14 +42,32 @@ namespace irgen {
 /// NecessaryBindings - The set of metadata that must be saved in
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
-  llvm::SetVector<GenericRequirement> Requirements;
+  enum class Kind {
+    /// Are the bindings to be computed for a partial apply forwarder.
+    /// In the case this is true we need to store/restore the conformance of a
+    /// specialized type with conditional conformance because the conditional
+    /// requirements are not available in the partial apply forwarder.
+    PartialApply,
+    AsyncFunction,
+  };
+  Kind kind;
+  llvm::SetVector<GenericRequirement> RequirementsSet;
+  llvm::SmallVector<GenericRequirement, 2> RequirementsVector;
   llvm::DenseMap<GenericRequirement, ProtocolConformanceRef> Conformances;
 
-  /// Are the bindings to be computed for a partial apply forwarder.
-  /// In the case this is true we need to store/restore the conformance of a
-  /// specialized type with conditional conformance because the conditional
-  /// requirements are not available in the partial apply forwarder.
-  bool forPartialApply = false;
+  void addRequirement(GenericRequirement requirement) {
+    switch (kind) {
+    case Kind::PartialApply:
+      RequirementsSet.insert(requirement);
+      break;
+    case Kind::AsyncFunction:
+      RequirementsVector.push_back(requirement);
+      break;
+    }
+  }
+
+  void addAbstractConditionalRequirements(
+      SpecializedProtocolConformance *specializedConformance);
 
 public:
   NecessaryBindings() = default;
@@ -70,7 +88,12 @@ public:
 
   /// Get the requirement from the bindings at index i.
   const GenericRequirement &operator[](size_t i) const {
-    return Requirements[i];
+    switch (kind) {
+    case Kind::PartialApply:
+      return RequirementsSet[i];
+    case Kind::AsyncFunction:
+      return RequirementsVector[i];
+    }
   }
 
   ProtocolConformanceRef
@@ -78,16 +101,14 @@ public:
     return Conformances.lookup(requirement);
   }
 
-  size_t size() const {
-    return Requirements.size();
-  }
+  size_t size() const { return getRequirements().size(); }
 
   /// Add whatever information is necessary to reconstruct a witness table
   /// reference for the given type.
   void addProtocolConformance(CanType type, ProtocolConformanceRef conf);
 
   /// Is the work to do trivial?
-  bool empty() const { return Requirements.empty(); }
+  bool empty() const { return getRequirements().empty(); }
 
   /// Returns the required size of the bindings.
   /// Pointer alignment is sufficient.
@@ -101,11 +122,17 @@ public:
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
 
-  const llvm::SetVector<GenericRequirement> &getRequirements() const {
-    return Requirements;
+  const llvm::ArrayRef<GenericRequirement> getRequirements() const {
+    switch (kind) {
+    case Kind::PartialApply:
+      return RequirementsSet.getArrayRef();
+    case Kind::AsyncFunction:
+      return RequirementsVector;
+    }
   }
 
-  bool forAsyncFunction() { return !forPartialApply; }
+  bool forPartialApply() { return kind == Kind::PartialApply; }
+  bool forAsyncFunction() { return kind == Kind::AsyncFunction; }
 
 private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,

@@ -38,7 +38,9 @@ SWIFT_TYPEID_NAMED(std::string, String)
 SWIFT_TYPEID_NAMED(evaluator::SideEffect, SideEffect)
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::vector, Vector, typename T, T)
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::unique_ptr, UniquePtr, typename T, T)
+SWIFT_TYPEID_TEMPLATE2_NAMED(std::pair, Pair, typename T1, T1, typename T2, T2)
 
 // LLVM ADT types.
 SWIFT_TYPEID_TEMPLATE1_NAMED(llvm::TinyPtrVector, TinyPtrVector, typename T, T)
 SWIFT_TYPEID_TEMPLATE1_NAMED(llvm::ArrayRef, ArrayRef, typename T, T)
+SWIFT_TYPEID_TEMPLATE1_NAMED(llvm::Optional, Optional, typename T, T)

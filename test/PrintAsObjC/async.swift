@@ -9,6 +9,7 @@
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
+// REQUIRES: concurrency
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %s -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/async.h -import-objc-header %S/../Inputs/empty.h  -enable-experimental-concurrency -typecheck
 // RUN: %FileCheck %s < %t/async.h

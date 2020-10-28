@@ -28,12 +28,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     endif()
   endif()
 
-  set(swift_runtime_test_extra_libraries)
-  if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    list(APPEND swift_runtime_test_extra_libraries 
-      $<TARGET_FILE:swiftImageInspectionShared-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}>)
-  endif()
-
   add_subdirectory(LongTests)
 
   set(PLATFORM_SOURCES)
@@ -58,6 +52,21 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   elseif(SWIFT_HOST_VARIANT STREQUAL windows)
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND PLATFORM_SOURCES
+      TaskStatus.cpp
+      )
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+      swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      )
+  endif()
+
+  # Don't complain about these files not being in the sources list.
+  set(LLVM_OPTIONAL_SOURCES
+    weak.mm
+    Refcounting.mm
+    TaskStatus.cpp)
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
@@ -94,7 +103,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
-    ${swift_runtime_test_extra_libraries}
     )
 endif()
 

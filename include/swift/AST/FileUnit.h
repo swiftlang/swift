@@ -235,12 +235,12 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   virtual void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+  getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
 
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
-      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
+      SmallVectorImpl<ImportedModule> &imports) const {
     return getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
   }
 

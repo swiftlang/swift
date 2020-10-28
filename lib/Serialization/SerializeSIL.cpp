@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -452,11 +452,23 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
+    IdentifierID targetFunctionNameID = 0;
+    if (auto *target = SA->getTargetFunction()) {
+      addReferencedSILFunction(target, true);
+      targetFunctionNameID = S.addUniquedStringRef(target->getName());
+    }
+    IdentifierID spiGroupID = 0;
+    IdentifierID spiModuleDeclID = 0;
+    auto ident = SA->getSPIGroup();
+    if (!ident.empty()) {
+      spiGroupID = S.addUniquedStringRef(ident.str());
+      spiModuleDeclID = S.addModuleRef(SA->getSPIModule());
+    }
     SILSpecializeAttrLayout::emitRecord(
-        Out, ScratchRecord, specAttrAbbrCode,
-        (unsigned)SA->isExported(),
+        Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
-        S.addGenericSignatureRef(SA->getSpecializedSignature()));
+        S.addGenericSignatureRef(SA->getSpecializedSignature()),
+        targetFunctionNameID, spiGroupID, spiModuleDeclID);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -2720,6 +2732,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::BuiltinProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();

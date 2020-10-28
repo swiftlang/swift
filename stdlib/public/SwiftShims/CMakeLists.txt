@@ -197,13 +197,13 @@ endif()
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                            DESTINATION "lib/swift/clang"
                            COMPONENT clang-builtin-headers
-                           FILES_MATCHING PATTERN "*.h")
+                           PATTERN "*.h")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                              DESTINATION "lib/swift_static/clang"
                              COMPONENT clang-builtin-headers
-                             FILES_MATCHING PATTERN "*.h")
+                             PATTERN "*.h")
 endif()
 
 
@@ -223,8 +223,8 @@ endif()
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
 file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
-  _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
-swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
+  _SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD)
+swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD}/clang"
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
-                           FILES_MATCHING PATTERN "*.h")
+                           PATTERN "*.h")

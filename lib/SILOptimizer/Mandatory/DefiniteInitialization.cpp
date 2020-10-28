@@ -394,7 +394,7 @@ namespace {
 
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
-    llvm::SmallDenseMap<SILInstruction*, unsigned, 16> NonLoadUses;
+    llvm::SmallDenseMap<SILInstruction*, SmallVector<unsigned, 1>, 16> NonLoadUses;
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
@@ -460,6 +460,7 @@ namespace {
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(const DIMemoryUse &Use);
     void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
+    void handleTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -472,7 +473,7 @@ namespace {
 
     void handleSelfInitUse(unsigned UseID);
 
-    void updateInstructionForInitState(DIMemoryUse &Use);
+    void updateInstructionForInitState(unsigned UseID);
 
 
     void processUninitializedRelease(SILInstruction *Release,
@@ -530,6 +531,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     switch (Use.Kind) {
     case DIUseKind::Load:
     case DIUseKind::LoadForTypeOfSelf:
+    case DIUseKind::TypeOfSelf:
     case DIUseKind::Escape:
       continue;
     case DIUseKind::Assign:
@@ -544,7 +546,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
       break;
     }
 
-    NonLoadUses[Use.Inst] = ui;
+    NonLoadUses[Use.Inst].push_back(ui);
 
     auto &BBInfo = getBlockInfo(Use.Inst->getParent());
     BBInfo.HasNonLoadUse = true;
@@ -562,9 +564,8 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     getBlockInfo(bb).markStoreToSelf();
   }
 
-  // If isn't really a use, but we account for the mark_uninitialized or
+  // It isn't really a use, but we account for the mark_uninitialized or
   // project_box as a use so we see it in our dataflow walks.
-  NonLoadUses[TheMemory.getUninitializedValue()] = ~0U;
   auto &MemBBInfo = getBlockInfo(TheMemory.getParentBlock());
   MemBBInfo.HasNonLoadUse = true;
 
@@ -788,6 +789,9 @@ void LifetimeChecker::doIt() {
     case DIUseKind::LoadForTypeOfSelf:
       handleLoadForTypeOfSelfUse(Use);
       break;
+    case DIUseKind::TypeOfSelf:
+      handleTypeOfSelfUse(Use);
+      break;
     }
   }
 
@@ -826,7 +830,7 @@ void LifetimeChecker::doIt() {
   // postpone lowering of assignment instructions to avoid deleting
   // instructions that still appear in the Uses list.
   for (unsigned UseID : NeedsUpdateForInitState)
-    updateInstructionForInitState(Uses[UseID]);
+    updateInstructionForInitState(UseID);
 }
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
@@ -834,6 +838,35 @@ void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
   // If the value is not definitively initialized, emit an error.
   if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
+}
+
+static void replaceValueMetatypeInstWithMetatypeArgument(
+    ValueMetatypeInst *valueMetatype) {
+  SILValue metatypeArgument = valueMetatype->getFunction()->getSelfArgument();
+
+  // SILFunction parameter types never have a DynamicSelfType, since it only
+  // makes sense in the context of a given method's body. Since the
+  // value_metatype instruction might produce a DynamicSelfType we have to
+  // cast the metatype argument.
+  //
+  // FIXME: Semantically, we're "opening" the class metatype here to produce
+  // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
+  // archetype associated with the original metatype or class instance value,
+  // instead of as a "global" type.
+  auto metatypeSelfType = metatypeArgument->getType()
+      .castTo<MetatypeType>().getInstanceType();
+  auto valueSelfType = valueMetatype->getType()
+      .castTo<MetatypeType>().getInstanceType();
+  if (metatypeSelfType != valueSelfType) {
+    assert(metatypeSelfType ==
+           cast<DynamicSelfType>(valueSelfType).getSelfType());
+
+    SILBuilderWithScope B(valueMetatype);
+    metatypeArgument = B.createUncheckedTrivialBitCast(
+        valueMetatype->getLoc(), metatypeArgument,
+        valueMetatype->getType());
+  }
+  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
 }
 
 void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
@@ -850,32 +883,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
       if (valueMetatype)
         break;
     }
-    assert(valueMetatype);
-    SILValue metatypeArgument = load->getFunction()->getSelfMetadataArgument();
-
-    // SILFunction parameter types never have a DynamicSelfType, since it only
-    // makes sense in the context of a given method's body. Since the
-    // value_metatype instruction might produce a DynamicSelfType we have to
-    // cast the metatype argument.
-    //
-    // FIXME: Semantically, we're "opening" the class metatype here to produce
-    // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
-    // archetype associated with the original metatype or class instance value,
-    // instead of as a "global" type.
-    auto metatypeSelfType = metatypeArgument->getType()
-        .castTo<MetatypeType>().getInstanceType();
-    auto valueSelfType = valueMetatype->getType()
-        .castTo<MetatypeType>().getInstanceType();
-    if (metatypeSelfType != valueSelfType) {
-      assert(metatypeSelfType ==
-             cast<DynamicSelfType>(valueSelfType).getSelfType());
-
-      SILBuilderWithScope B(valueMetatype);
-      metatypeArgument = B.createUncheckedTrivialBitCast(
-          valueMetatype->getLoc(), metatypeArgument,
-          valueMetatype->getType());
-    }
-    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+    replaceValueMetatypeInstWithMetatypeArgument(valueMetatype);
 
     // Dead loads for type-of-self must be removed.
     // Otherwise it's a violation of memory lifetime.
@@ -885,6 +893,20 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
     }
     assert(load->use_empty());
     load->eraseFromParent();
+    // Clear the Inst pointer just to be sure to avoid use-after-free.
+    Use.Inst = nullptr;
+  }
+}
+
+void LifetimeChecker::handleTypeOfSelfUse(DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+  // If the value is not definitively initialized, replace the
+  // value_metatype instruction with the metatype argument that was passed into
+  // the initializer.
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    auto *valueMetatype = cast<ValueMetatypeInst>(Use.Inst);
+    replaceValueMetatypeInstWithMetatypeArgument(valueMetatype);
+
     // Clear the Inst pointer just to be sure to avoid use-after-free.
     Use.Inst = nullptr;
   }
@@ -1911,7 +1933,8 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
 /// from being InitOrAssign to some concrete state, update it for that state.
 /// This includes rewriting them from assign instructions into their composite
 /// operations.
-void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
+void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
+  DIMemoryUse &Use = Uses[UseID];
   SILInstruction *Inst = Use.Inst;
 
   IsInitialization_t InitKind;
@@ -1945,10 +1968,11 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;
-    NonLoadUses.erase(Inst);
+    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
 
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
@@ -1966,7 +1990,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;
-    NonLoadUses.erase(Inst);
+    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
 
     switch (Use.Kind) {
     case DIUseKind::Initialization:
@@ -2819,17 +2843,17 @@ LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
       --BBI;
       SILInstruction *TheInst = &*BBI;
 
-      // If this instruction is unrelated to the memory, ignore it.
-      if (!NonLoadUses.count(TheInst))
-        continue;
+      if (TheInst == TheMemory.getUninitializedValue()) {
+        Result.set(0, DIKind::No);
+        return Result;
+      }
 
-      // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.  Otherwise, we've found a definition, or
-      // something else that will require that the memory is initialized at
-      // this point.
-      Result.set(0, TheInst == TheMemory.getUninitializedValue() ? DIKind::No
-                                                                 : DIKind::Yes);
-      return Result;
+      if (NonLoadUses.count(TheInst)) {
+        // We've found a definition, or something else that will require that
+        // the memory is initialized at this point.
+        Result.set(0, DIKind::Yes);
+        return Result;
+      }
     }
   }
 
@@ -2882,11 +2906,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
       --BBI;
       SILInstruction *TheInst = &*BBI;
 
-      // If this instruction is unrelated to the memory, ignore it.
-      auto It = NonLoadUses.find(TheInst);
-      if (It == NonLoadUses.end())
-        continue;
-      
       // If we found the allocation itself, then we are loading something that
       // is not defined at all yet.  Scan no further.
       if (TheInst == TheMemory.getUninitializedValue()) {
@@ -2896,11 +2915,19 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
         return Result;
       }
 
+      // If this instruction is unrelated to the memory, ignore it.
+      auto It = NonLoadUses.find(TheInst);
+      if (It == NonLoadUses.end())
+        continue;
+
       // Check to see which tuple elements this instruction defines.  Clear them
       // from the set we're scanning from.
-      auto &TheInstUse = Uses[It->second];
-      NeededElements.reset(TheInstUse.FirstElement,
-                           TheInstUse.FirstElement+TheInstUse.NumElements);
+      for (unsigned TheUse : It->second) {
+        auto &TheInstUse = Uses[TheUse];
+        NeededElements.reset(TheInstUse.FirstElement,
+                             TheInstUse.FirstElement+TheInstUse.NumElements);
+      }
+
       // If that satisfied all of the elements we're looking for, then we're
       // done.  Otherwise, keep going.
       if (NeededElements.none()) {

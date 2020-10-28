@@ -1,5 +1,6 @@
 // RUN: %target-run-stdlib-swift | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: foundation
 //
 // Parts of this test depend on memory allocator specifics.  The test
 // should be rewritten soon so it doesn't expose legacy components

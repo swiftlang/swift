@@ -35,7 +35,7 @@ struct SupplementaryOutputPaths {
   ///
   /// This binary format is used to describe the interface of a module when
   /// imported by client source code. The swiftmodule format is described in
-  /// docs/Serialization.rst.
+  /// docs/Serialization.md.
   ///
   /// \sa swift::serialize
   std::string ModuleOutputPath;

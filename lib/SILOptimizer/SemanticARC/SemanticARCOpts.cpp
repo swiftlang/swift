@@ -100,8 +100,10 @@ struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
     SILFunction &f = *getFunction();
 
-    // Return early if we are not performing OSSA optimizations.
-    if (!f.getModule().getOptions().EnableOSSAOptimizations)
+    // Return early if we are not performing OSSA optimizations or we are not in
+    // ownership.
+    if (!f.getModule().getOptions().EnableOSSAOptimizations ||
+        !f.hasOwnership())
       return;
 
     // Make sure we are running with ownership verification enabled.

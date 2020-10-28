@@ -3176,7 +3176,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    SmallVector<ModuleDecl::ImportedModule, 16> scratch;
+    SmallVector<ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.importedModule->getName();
       if (next.importedModule->isNonSwiftModule())

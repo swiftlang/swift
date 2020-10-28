@@ -15,11 +15,7 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
-#include "ConstraintGraph.h"
 #include "CSDiagnostics.h"
-#include "CSFix.h"
-#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
@@ -27,6 +23,10 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSFix.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -1871,8 +1871,9 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     FunctionType::Param inputArg(input,
                                  CS.getASTContext().getIdentifier("of"));
 
-    CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
-        CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
+    CS.addConstraint(
+        ConstraintKind::DynamicTypeOf, output, input,
+        CS.getConstraintLocator(locator, ConstraintLocator::DynamicType));
     auto refType = FunctionType::get({inputArg}, output);
     return {refType, refType};
   }
@@ -1886,9 +1887,8 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto escapeClosure = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
         TVO_CanBindToNoEscape);
-    CS.addConstraint(ConstraintKind::EscapableFunctionOf,
-         escapeClosure, noescapeClosure,
-         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
+    CS.addConstraint(ConstraintKind::EscapableFunctionOf, escapeClosure,
+                     noescapeClosure, CS.getConstraintLocator(locator));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
@@ -1919,9 +1919,8 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto existentialTy = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
         TVO_CanBindToNoEscape);
-    CS.addConstraint(ConstraintKind::OpenedExistentialOf,
-         openedTy, existentialTy,
-         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
+    CS.addConstraint(ConstraintKind::OpenedExistentialOf, openedTy,
+                     existentialTy, CS.getConstraintLocator(locator));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
@@ -3932,7 +3931,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
-    case ConstraintLocator::RValueAdjustment:
+    case ConstraintLocator::DynamicType:
     case ConstraintLocator::UnresolvedMember:
     case ConstraintLocator::ImplicitCallAsFunction:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments,
@@ -4079,7 +4078,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::FunctionBuilderBodyResult: {
+    case ConstraintLocator::ResultBuilderBodyResult: {
       path = path.slice(1);
       break;
     }

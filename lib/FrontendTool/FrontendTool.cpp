@@ -318,10 +318,10 @@ static void getImmediateImports(
       ModuleDecl::ImportFilterKind::SPIAccessControl,
       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay
     }) {
-  SmallVector<ModuleDecl::ImportedModule, 8> importList;
+  SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 
-  for (ModuleDecl::ImportedModule &import : importList)
+  for (ImportedModule &import : importList)
     imports.insert(import.importedModule);
 }
 

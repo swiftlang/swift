@@ -2716,8 +2716,8 @@ namespace {
         // Unpack as an instance of the payload type and use its fixLifetime
         // operation.
         Explosion srcAsPayload;
-        unpackIntoPayloadExplosion(IGF, srcAsPayload, srcAsPayload);
-        payloadTI.fixLifetime(IGF, src);
+        unpackIntoPayloadExplosion(IGF, src, srcAsPayload);
+        payloadTI.fixLifetime(IGF, srcAsPayload);
         return;
       }
       }

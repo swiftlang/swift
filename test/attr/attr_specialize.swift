@@ -128,7 +128,7 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 }
 
 @_specialize(where X == Int, Y == Int)
-@_specialize(exported: true, where X == Int, Y == Int) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, where X == Int, Y == Int)
 @_specialize(exported: false, where X == Int, Y == Int)
 @_specialize(exported: false where X == Int, Y == Int) // expected-error{{missing ',' in '_specialize' attribute}}
 @_specialize(exported: yes, where X == Int, Y == Int) // expected-error{{expected a boolean true or false value in '_specialize' attribute}}
@@ -143,9 +143,9 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(kind: partial, where X == Int, Y == Int)
 @_specialize(kind: , where X == Int, Y == Int)
 
-@_specialize(exported: true, kind: partial, where X == Int, Y == Int) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, exported: true, where X == Int, Y == Int) // expected-error{{parameter 'exported' was already defined in '_specialize' attribute}} expected-warning2{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(kind: partial, exported: true, where X == Int, Y == Int) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, kind: partial, where X == Int, Y == Int)
+@_specialize(exported: true, exported: true, where X == Int, Y == Int) // expected-error{{parameter 'exported' was already defined in '_specialize' attribute}}
+@_specialize(kind: partial, exported: true, where X == Int, Y == Int)
 @_specialize(kind: partial, kind: partial, where X == Int, Y == Int) // expected-error{{parameter 'kind' was already defined in '_specialize' attribute}}
 
 @_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{cannot find type 'exported' in scope}} expected-error{{cannot find type 'kind' in scope}} expected-error{{cannot find type 'partial' in scope}} expected-error{{expected type}}
@@ -200,22 +200,22 @@ public func simpleGeneric<T>(t: T) -> T {
 }
 
 
-@_specialize(exported: true, where S: _Trivial(64)) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, where S: _Trivial(64))
 // Check that any bitsize size is OK, not only powers of 8.
 @_specialize(where S: _Trivial(60))
-@_specialize(exported: true, where S: _RefCountedObject) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, where S: _RefCountedObject)
 @inline(never)
 public func copyValue<S>(_ t: S, s: inout S) -> Int64 where S: P{
   return 1
 }
 
-@_specialize(exported: true, where S: _Trivial) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _Trivial(64)) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _Trivial(32)) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _RefCountedObject) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _NativeRefCountedObject) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _Class) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
-@_specialize(exported: true, where S: _NativeClass) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, where S: _Trivial)
+@_specialize(exported: true, where S: _Trivial(64))
+@_specialize(exported: true, where S: _Trivial(32))
+@_specialize(exported: true, where S: _RefCountedObject)
+@_specialize(exported: true, where S: _NativeRefCountedObject)
+@_specialize(exported: true, where S: _Class)
+@_specialize(exported: true, where S: _NativeClass)
 @inline(never)
 public func copyValueAndReturn<S>(_ t: S, s: inout S) -> S where S: P{
   return s
@@ -234,7 +234,7 @@ struct OuterStruct<S> {
 }
 
 // Check _TrivialAtMostN constraints.
-@_specialize(exported: true, where S: _TrivialAtMost(64)) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
+@_specialize(exported: true, where S: _TrivialAtMost(64))
 @inline(never)
 public func copy2<S>(_ t: S, s: inout S) -> S where S: P{
   return s
@@ -278,4 +278,22 @@ public struct MyStruct4 : P2 {
 
 @_specialize(where T==MyStruct4)
 public func foo<T: P2>(_ t: T) where T.DP2.DP11 == H<T.DP2.DP1> {
+}
+
+public func targetFun<T>(_ t: T) {}
+
+@_specialize(exported: true, target: targetFun(_:), where T == Int)
+public func specifyTargetFunc<T>(_ t: T) {
+}
+
+public struct Container {
+  public func targetFun<T>(_ t: T) {}
+}
+
+extension Container {
+  @_specialize(exported: true, target: targetFun(_:), where T == Int)
+  public func specifyTargetFunc<T>(_ t: T) { }
+
+  @_specialize(exported: true, target: targetFun2(_:), where T == Int) // expected-error{{target function 'targetFun2' could not be found}}
+  public func specifyTargetFunc2<T>(_ t: T) { }
 }

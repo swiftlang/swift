@@ -157,6 +157,16 @@ private:
 
   /// The Jobs which will be performed by this compilation.
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
+  // The Jobs which represent external actions performed by other drivers in
+  // the build graph.
+  //
+  // These Jobs are never scheduled into the build graph. This vector is
+  // populated by the routine that computes the set of incremental external
+  // dependencies that affect the current computation. Due to the way the
+  // Driver models multiple aspects of the incremental compilation scheduler
+  // by mapping to and from Jobs, it is necessary to lie and retain a set of
+  // pseudo-Jobs.
+  SmallVector<std::unique_ptr<const Job>, 32> ExternalJobs;
 
   /// The original (untranslated) input argument list.
   ///
@@ -348,7 +358,6 @@ public:
   UnwrappedArrayView<const Job> getJobs() const {
     return llvm::makeArrayRef(Jobs);
   }
-  Job *addJob(std::unique_ptr<Job> J);
 
   /// To send job list to places that don't truck in fancy array views.
   std::vector<const Job *> getJobsSimply() const {
@@ -514,6 +523,13 @@ public:
   void sortJobsToMatchCompilationInputs(
       const JobCollection &unsortedJobs,
       SmallVectorImpl<const Job *> &sortedJobs) const;
+
+private:
+  friend class Driver;
+  friend class PerformJobsState;
+
+  Job *addJob(std::unique_ptr<Job> J);
+  Job *addExternalJob(std::unique_ptr<Job> J);
 
 private:
   /// Perform all jobs.

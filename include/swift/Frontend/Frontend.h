@@ -337,6 +337,10 @@ public:
   /// Whether the Swift -Onone support library should be implicitly imported.
   bool shouldImportSwiftONoneSupport() const;
 
+  /// Whether the Swift Concurrency support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftConcurrency() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.

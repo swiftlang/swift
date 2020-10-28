@@ -1077,13 +1077,11 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType
-  importFunctionParamsAndReturnType(DeclContext *dc,
-                                    const clang::FunctionDecl *clangDecl,
-                                    ArrayRef<const clang::ParmVarDecl *> params,
-                                    bool isVariadic, bool isFromSystemModule,
-                                    DeclName name,
-                                    ParameterList *&parameterList);
+  ImportedType importFunctionParamsAndReturnType(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   /// Import the given function return type.
   ///
@@ -1110,12 +1108,11 @@ public:
   /// \param argNames The argument names
   ///
   /// \returns The imported parameter list on success, or null on failure
-  ParameterList *
-  importFunctionParameterList(DeclContext *dc,
-                              const clang::FunctionDecl *clangDecl,
-                              ArrayRef<const clang::ParmVarDecl *> params,
-                              bool isVariadic, bool allowNSUIntegerAsInt,
-                              ArrayRef<Identifier> argNames);
+  ParameterList *importFunctionParameterList(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
@@ -1297,6 +1294,11 @@ public:
 
   Type loadTypeEraserType(const TypeEraserAttr *TRA,
                           uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                    uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

@@ -27,6 +27,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -147,7 +148,7 @@ namespace {
 
 #pragma mark context-based lookup declarations
 
-    bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
+    bool isInsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
     /// For diagnostic purposes, move aside the unavailables, and put
     /// them back as a last-ditch effort.
@@ -319,11 +320,11 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 
 #pragma mark context-based lookup definitions
 
-bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
+bool UnqualifiedLookupFactory::isInsideBodyOfFunction(
     const AbstractFunctionDecl *const AFD) const {
-  return !AFD->isImplicit() && Loc.isValid() &&
-         AFD->getBodySourceRange().isValid() &&
-         !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
+  auto range = Lexer::getCharSourceRangeFromSourceRange(
+      SM, AFD->getBodySourceRange());
+  return range.contains(Loc);
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
@@ -382,8 +383,11 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
+  auto nlOptions = NL_UnqualifiedDefault;
+  if (options.contains(Flags::IncludeUsableFromInline))
+    nlOptions |= NL_IncludeUsableFromInline;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
-                 NLKind::UnqualifiedLookup, resolutionKind, dc);
+                 NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -635,7 +639,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
     NominalTypeDecl *const nominal) {
   if (candidateSelfDC) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
-      assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
+      assert(factory.isInsideBodyOfFunction(afd) && "Should be inside");
     }
   }
 

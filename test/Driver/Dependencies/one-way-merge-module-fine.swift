@@ -15,4 +15,4 @@
 
 // CHECK-SECOND-NOT: warning
 // CHECK-SECOND-NOT: Handled
-// CHECK-SECOND: Produced master.swiftmodule
+// CHECK-SECOND-NOT: Produced master.swiftmodule

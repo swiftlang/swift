@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -193,6 +194,9 @@ computeMetadataBoundsForSuperclass(const void *ref,
     break;
 #endif
   }
+  // Type metadata type ref is unsupported here.
+  case TypeReferenceKind::MetadataKind:
+    break;
   }
   swift_unreachable("unsupported superclass reference kind");
 }
@@ -998,8 +1002,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.Class);
     }
 
-    int compareWithKey(const ClassMetadata *theClass) const {
-      return comparePointers(theClass, Data.Class);
+    bool matchesKey(const ClassMetadata *theClass) const {
+      return theClass == Data.Class;
+    }
+
+    friend llvm::hash_code hash_value(const ObjCClassCacheEntry &value) {
+      return llvm::hash_value(value.Data.Class);
     }
 
     static size_t getExtraAllocationSize(const ClassMetadata *key) {
@@ -1094,6 +1102,15 @@ public:
       auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
       return ParameterFlags::fromIntValue(flags);
     }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+        hash = llvm::hash_combine(hash, key.getParameter(i));
+        hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
+      }
+      return hash;
+    }
   };
 
   FunctionCacheEntry(const Key &key);
@@ -1102,28 +1119,27 @@ public:
     return 0; // No single meaningful value here.
   }
 
-  int compareWithKey(const Key &key) const {
-    auto keyFlags = key.getFlags();
-    if (auto result = compareIntegers(keyFlags.getIntValue(),
-                                      Data.Flags.getIntValue()))
-      return result;
-
-    if (auto result = comparePointers(key.getResult(), Data.ResultType))
-      return result;
-
-    for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
-      if (auto result =
-              comparePointers(key.getParameter(i), Data.getParameter(i)))
-        return result;
-
-      if (auto result =
-              compareIntegers(key.getParameterFlags(i).getIntValue(),
-                              Data.getParameterFlags(i).getIntValue()))
-        return result;
+  bool matchesKey(const Key &key) const {
+    if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
+      return false;
+    if (key.getResult() != Data.ResultType)
+      return false;
+    for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+      if (key.getParameter(i) != Data.getParameter(i))
+        return false;
+      if (key.getParameterFlags(i).getIntValue() !=
+          Data.getParameterFlags(i).getIntValue())
+        return false;
     }
-
-    return 0;
+    return true;
   }
+
+  friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
+    Key key = {value.Data.Flags, value.Data.getParameters(),
+               value.Data.getParameterFlags(), value.Data.ResultType};
+    return hash_value(key);
+  }
+
   static size_t getExtraAllocationSize(const Key &key) {
     return getExtraAllocationSize(key.Flags);
   }
@@ -1985,6 +2001,9 @@ namespace {
 
     bool operator==(const TypeContextIdentity &other) const {
       return Name == other.Name;
+    }
+    friend llvm::hash_code hash_value(const TypeContextIdentity &value) {
+      return llvm::hash_value(value.Name);
     }
     int compare(const TypeContextIdentity &other) const {
       return Name.compare(other.Name);
@@ -3261,8 +3280,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.InstanceType);
     }
 
-    int compareWithKey(const Metadata *instanceType) const {
-      return comparePointers(instanceType, Data.InstanceType);
+    bool matchesKey(const Metadata *instanceType) const {
+      return instanceType == Data.InstanceType;
+    }
+
+    friend llvm::hash_code hash_value(const MetatypeCacheEntry &value) {
+      return llvm::hash_value(value.Data.InstanceType);
     }
 
     static size_t getExtraAllocationSize(const Metadata *instanceType) {
@@ -3306,8 +3329,11 @@ public:
     return static_cast<intptr_t>(getNumWitnessTables());
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3328,8 +3354,13 @@ public:
     return reinterpret_cast<intptr_t>(Data.InstanceType);
   }
 
-  int compareWithKey(const Metadata *instanceType) const {
-    return comparePointers(instanceType, Data.InstanceType);
+  bool matchesKey(const Metadata *instanceType) const {
+    return instanceType == Data.InstanceType;
+  }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeCacheEntry &value) {
+    return llvm::hash_value(value.Data.InstanceType);
   }
 
   static size_t getExtraAllocationSize(const Metadata *key) {
@@ -3442,6 +3473,14 @@ public:
     ProtocolClassConstraint ClassConstraint : 1;
     uint32_t NumProtocols : 31;
     const ProtocolDescriptorRef *Protocols;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.SuperclassConstraint,
+                                     key.ClassConstraint, key.NumProtocols);
+      for (size_t i = 0; i != key.NumProtocols; i++)
+        hash = llvm::hash_combine(hash, key.Protocols[i].getRawData());
+      return hash;
+    }
   };
 
   ExistentialCacheEntry(Key key);
@@ -3450,27 +3489,30 @@ public:
     return 0;
   }
 
-  int compareWithKey(Key key) const {
-    if (auto result = compareIntegers(key.ClassConstraint,
-                                      Data.Flags.getClassConstraint()))
-      return result;
+  bool matchesKey(Key key) const {
+    if (key.ClassConstraint != Data.Flags.getClassConstraint())
+      return false;
 
-    if (auto result = comparePointers(key.SuperclassConstraint,
-                                      Data.getSuperclassConstraint()))
-      return result;
+    if (key.SuperclassConstraint != Data.getSuperclassConstraint())
+      return false;
 
-    if (auto result = compareIntegers(key.NumProtocols,
-                                      Data.NumProtocols))
-      return result;
+    if (key.NumProtocols != Data.NumProtocols)
+      return false;
 
     auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result = compareIntegers(key.Protocols[i].getRawData(),
-                                        dataProtocols[i].getRawData()))
-        return result;
+      if (key.Protocols[i].getRawData() != dataProtocols[i].getRawData())
+        return false;
     }
 
-    return 0;
+    return true;
+  }
+
+  friend llvm::hash_code hash_value(const ExistentialCacheEntry &value) {
+    Key key = {value.Data.getSuperclassConstraint(),
+               value.Data.Flags.getClassConstraint(), value.Data.NumProtocols,
+               value.Data.getProtocols().data()};
+    return hash_value(key);
   }
 
   static size_t getExtraAllocationSize(Key key) {
@@ -3501,8 +3543,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const OpaqueExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3528,8 +3573,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ClassExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -4146,24 +4194,34 @@ namespace {
     struct Key {
       const TypeContextDescriptor *type;
       const ProtocolDescriptor *protocol;
+
+      friend llvm::hash_code hash_value(const Key &value) {
+        return llvm::hash_combine(value.protocol,
+                                  TypeContextIdentity(value.type));
+      }
     };
 
-    const Key key;
+    const TypeContextDescriptor *type;
+    const ProtocolDescriptor *protocol;
     const WitnessTable *data;
 
     ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
                                   const WitnessTable *d)
-        : key(k), data(d) {}
+        : type(k.type), protocol(k.protocol), data(d) {}
 
     intptr_t getKeyIntValueForDump() {
-      return reinterpret_cast<intptr_t>(key.type);
+      return reinterpret_cast<intptr_t>(type);
     }
 
-    int compareWithKey(const Key other) const {
-      if (auto r = comparePointers(other.protocol, key.protocol))
-        return r;
+    bool matchesKey(const Key other) const {
+      return other.protocol == protocol &&
+             TypeContextIdentity(other.type) == TypeContextIdentity(type);
+    }
 
-      return TypeContextIdentity(other.type).compare(TypeContextIdentity(key.type));
+    friend llvm::hash_code
+    hash_value(const ForeignWitnessTableCacheEntry &value) {
+      Key key{value.type, value.protocol};
+      return hash_value(key);
     }
 
     static size_t getExtraAllocationSize(const Key,
@@ -4177,19 +4235,23 @@ namespace {
   };
 }
 
-static SimpleGlobalCache<ForeignWitnessTableCacheEntry,
-                         ForeignWitnessTablesTag> ForeignWitnessTables;
+static ConcurrentReadableHashMap<ForeignWitnessTableCacheEntry>
+    ForeignWitnessTables;
 
 static const WitnessTable *_getForeignWitnessTable(
     const WitnessTable *witnessTableCandidate,
     const TypeContextDescriptor *contextDescriptor,
     const ProtocolDescriptor *protocol) {
-  auto result =
-      ForeignWitnessTables
-          .getOrInsert(
-              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
-              witnessTableCandidate)
-          .first->data;
+  const WitnessTable *result = nullptr;
+  ForeignWitnessTableCacheEntry::Key key{contextDescriptor, protocol};
+  ForeignWitnessTables.getOrInsert(
+      key, [&](ForeignWitnessTableCacheEntry *entryPtr, bool created) {
+        if (created)
+          new (entryPtr)
+              ForeignWitnessTableCacheEntry(key, witnessTableCandidate);
+        result = entryPtr->data;
+        return true;
+      });
   return result;
 }
 
@@ -4416,18 +4478,27 @@ public:
                              const Metadata *type,
                              const ProtocolConformanceDescriptor *conformance,
                              const void * const *instantiationArgs) {
-    return getWitnessTableSize(conformance);
+    return getWitnessTableSize(type, conformance);
   }
 
   size_t getExtraAllocationSize() const {
-    return getWitnessTableSize(Conformance);
+    return getWitnessTableSize(Type, Conformance);
   }
 
-  static size_t getWitnessTableSize(
+  static size_t getWitnessTableSize(const Metadata *type,
                             const ProtocolConformanceDescriptor *conformance) {
     auto protocol = conformance->getProtocol();
     auto genericTable = conformance->getGenericWitnessTable();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have their private size in words be determined via the number of elements
+    // the type has.
+    if (conformance->isBuiltin()) {
+      auto tuple = cast<TupleTypeMetadata>(type);
+      numPrivateWords = tuple->NumElements;
+    }
+
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
@@ -4683,6 +4754,14 @@ instantiateWitnessTable(const Metadata *Type,
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
 
+  // Builtin conformance descriptors, namely tuple conformances at the moment,
+  // have their private size in words be determined via the number of elements
+  // the type has.
+  if (conformance->isBuiltin()) {
+    auto tuple = cast<TupleTypeMetadata>(Type);
+    privateSizeInWords = tuple->NumElements;
+  }
+
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
@@ -4725,6 +4804,16 @@ instantiateWitnessTable(const Metadata *Type,
       if (conditionalRequirement.Flags.hasExtraArgument())
         copyNextInstantiationArg();
     }
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have instantiation arguments equal to the number of element conformances.
+    if (conformance->isBuiltin()) {
+      auto tuple = cast<TupleTypeMetadata>(Type);
+      
+      for (size_t i = 0; i != tuple->NumElements; i += 1) {
+        copyNextInstantiationArg();
+      }
+    }
   }
 
   // Fill in any default requirements.
@@ -4748,7 +4837,7 @@ WitnessTableCacheEntry::allocate(
   void **fullTable = reinterpret_cast<void**>(this + 1);
 
   // Zero out the witness table.
-  memset(fullTable, 0, getWitnessTableSize(conformance));
+  memset(fullTable, 0, getWitnessTableSize(Type, conformance));
 
   // Instantiate the table.
   return instantiateWitnessTable(Type, Conformance, instantiationArgs, fullTable);
@@ -4769,7 +4858,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   }
 
   // Allocate space for the table.
-  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(conformance);
+  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(type, conformance);
   TaggedMetadataAllocator<SingletonGenericWitnessTableCacheTag> allocator;
   auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
   memset(buffer, 0, tableSize);
@@ -5970,3 +6059,8 @@ inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
 }
 }
 #endif
+
+// Autolink with libc++, for cases where libswiftCore is linked statically.
+#if defined(__MACH__)
+asm(".linker_option \"-lc++\"\n");
+#endif // defined(__MACH__)

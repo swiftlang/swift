@@ -15,11 +15,11 @@
 // a particular constraint was derived.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintLocator.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -44,7 +44,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
-  case ConstraintLocator::FunctionBuilderBodyResult:
+  case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalPayload:
@@ -54,7 +54,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ParentType:
   case ConstraintLocator::ExistentialSuperclassType:
   case ConstraintLocator::LValueConversion:
-  case ConstraintLocator::RValueAdjustment:
+  case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
   case ConstraintLocator::GenericParameter:
@@ -198,8 +198,8 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-bool ConstraintLocator::isForFunctionBuilderBodyResult() const {
-  return isFirstElement<LocatorPathElt::FunctionBuilderBodyResult>();
+bool ConstraintLocator::isForResultBuilderBodyResult() const {
+  return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
@@ -300,8 +300,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "function result";
       break;
 
-    case FunctionBuilderBodyResult:
-      out << "function builder body result";
+    case ResultBuilderBodyResult:
+      out << "result builder body result";
       break;
 
     case SequenceElementType:
@@ -350,8 +350,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "@lvalue-to-inout conversion";
       break;
 
-    case RValueAdjustment:
-      out << "rvalue adjustment";
+    case DynamicType:
+      out << "`.dynamicType` reference";
       break;
 
     case SubscriptMember:

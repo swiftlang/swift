@@ -22,7 +22,7 @@ extension NormalClass: NormalProto {
 }
 
 @_spi(X)
-public struct BadStruct {} // expected-note 27 {{type declared here}}
+public struct BadStruct {} // expected-note 34 {{type declared here}}
 @_spi(X)
 public protocol BadProto {} // expected-note 20 {{type declared here}}
 @_spi(X)
@@ -107,7 +107,6 @@ public protocol TestAssocTypeWhereClause {
 
 public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; it is SPI}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; the conformance is declared as SPI}}
 }
 
 public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; it is SPI}}
@@ -170,33 +169,36 @@ extension Array: TestConstrainedExtensionProto where Element == BadStruct { // e
 //  higherThan: BadPrecedence
 //}
 
-public struct PublicStructStoredProperties {
+@frozen public struct PublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-@usableFromInline internal struct UFIStructStoredProperties {
+@frozen @usableFromInline internal struct UFIStructStoredProperties {
   @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
 }
 
-public class PublicClassStoredProperties {
+@_fixed_layout public class PublicClassStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
   private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
@@ -210,6 +212,13 @@ public struct NormalProtoAssocHolder<T: NormalProto> {
   public var value: T.Assoc
 }
 public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
+
+public struct OuterGenericHolder<T> {
+  public struct Nested where T : NormalProto {
+    public var value: T.Assoc
+  }
+}
+public func testConformanceInNestedNonGeneric(_: OuterGenericHolder<NormalStruct>.Nested) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; the conformance is declared as SPI}}
 
 public class SubclassOfNormalClass: NormalClass {}
 

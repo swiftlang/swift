@@ -4,10 +4,11 @@
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
 import Builtin
@@ -99,7 +100,7 @@ bb0(%0 : $@thin Big.Type):
   return %62 : $Big
 }
 
-// CHECK-LL: define hidden swiftcc void @getBig(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swiftcc void @getBig(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @getBig : $@async @convention(thin) () -> Big {
 bb0:
   %0 = metatype $@thin Big.Type
@@ -109,7 +110,7 @@ bb0:
   return %2 : $Big
 }
 
-sil hidden @printBig : $@convention(thin) () -> () {
+sil hidden @printBig : $@async @convention(thin) () -> () {
     %getBig = function_ref @getBig : $@async @convention(thin) () -> Big
     %big = apply %getBig() : $@async @convention(thin) () -> Big
     %big_addr = alloc_stack $Big
@@ -121,10 +122,10 @@ sil hidden @printBig : $@convention(thin) () -> () {
     return %out : $()
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %printBig = function_ref @printBig : $@convention(thin) () -> ()
-  %result = apply %printBig() : $@convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)
+  %printBig = function_ref @printBig : $@async @convention(thin) () -> ()
+  %result = apply %printBig() : $@async @convention(thin) () -> () // CHECK: Big(i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, i8: 8, i9: 9, i0: 0)
 
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)

@@ -543,7 +543,7 @@ bool InteriorPointerOperand::getImplicitUses(
         isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
-        isa<SelectEnumAddrInst>(user)) {
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
       continue;
     }
 
@@ -551,8 +551,10 @@ bool InteriorPointerOperand::getImplicitUses(
     if (Projection::isAddressProjection(user) ||
         isa<ProjectBlockStorageInst>(user) ||
         isa<OpenExistentialAddrInst>(user) ||
-        isa<InitExistentialAddrInst>(user) || isa<BeginAccessInst>(user) ||
-        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user)) {
+        isa<InitExistentialAddrInst>(user) ||
+        isa<InitEnumDataAddrInst>(user) || isa<BeginAccessInst>(user) ||
+        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user) ||
+        isa<UnconditionalCheckedCastAddrInst>(user)) {
       for (SILValue r : user->getResults()) {
         llvm::copy(r->getUses(), std::back_inserter(worklist));
       }

@@ -223,12 +223,16 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake3BoxV7Wrappedxmfp",
     key.offset: 79,
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:ST7ElementQa",
     key.offset: 87,
     key.length: 7
   },
@@ -238,7 +242,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake3BoxV7Wrappedxmfp",
     key.offset: 103,
     key.length: 7
   },
@@ -1126,7 +1132,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:4cake2P5P7ElementQa",
     key.offset: 1349,
     key.length: 7
   },
@@ -1278,7 +1286,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:4cake4ProtP7ElementQa",
     key.offset: 1580,
     key.length: 7
   },
@@ -1547,7 +1557,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake2S3V7Wrappedxmfp",
     key.offset: 1928,
     key.length: 7
   },
@@ -1574,12 +1586,16 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake2S3V7Wrappedxmfp",
     key.offset: 1973,
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:4cake2P5P7ElementQa",
     key.offset: 1981,
     key.length: 7
   },
@@ -1601,7 +1617,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp",
     key.offset: 2011,
     key.length: 7
   },
@@ -1623,12 +1641,16 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Wrapped",
+    key.usr: "s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp",
     key.offset: 2041,
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:4cake2P5P7ElementQa",
     key.offset: 2049,
     key.length: 7
   },
@@ -1668,7 +1690,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T1",
+    key.usr: "s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp",
     key.offset: 2095,
     key.length: 2
   },
@@ -1683,7 +1707,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T2",
+    key.usr: "s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp",
     key.offset: 2105,
     key.length: 2
   },
@@ -1693,7 +1719,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T1",
+    key.usr: "s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp",
     key.offset: 2115,
     key.length: 2
   },
@@ -1710,7 +1738,9 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T2",
+    key.usr: "s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp",
     key.offset: 2131,
     key.length: 2
   },
@@ -1727,12 +1757,16 @@ func shouldPrintAnyAsKeyword(x x: Any)
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T1",
+    key.usr: "s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp",
     key.offset: 2145,
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:4cake4ProtP7ElementQa",
     key.offset: 2148,
     key.length: 7
   },
@@ -1794,7 +1828,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
         ],
         key.offset: 53,
         key.length: 68,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>boxes</decl.name>() -&gt; <decl.function.returntype>[<ref.struct usr=\"s:4cake3BoxV\">Box</ref.struct>&lt;Wrapped.Element&gt;]</decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Wrapped : <ref.protocol usr=\"s:ST\">Sequence</ref.protocol></decl.generic_type_requirement></decl.function.method.instance>"
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>boxes</decl.name>() -&gt; <decl.function.returntype>[<ref.struct usr=\"s:4cake3BoxV\">Box</ref.struct>&lt;<ref.generic_type_param usr=\"s:4cake3BoxV7Wrappedxmfp\">Wrapped</ref.generic_type_param>.<ref.associatedtype usr=\"s:ST7ElementQa\">Element</ref.associatedtype>&gt;]</decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake3BoxV7Wrappedxmfp\">Wrapped</ref.generic_type_param> : <ref.protocol usr=\"s:ST\">Sequence</ref.protocol></decl.generic_type_requirement></decl.function.method.instance>"
       }
     ]
   },
@@ -2394,7 +2428,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
         key.usr: "s:4cake2P6PAAE4null7ElementQzSgvp",
         key.offset: 1334,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type><ref.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\">Self</ref.generic_type_param>.Element?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type><ref.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake2P5P7ElementQa\">Element</ref.associatedtype>?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       }
     ]
   },
@@ -2488,7 +2522,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 1554,
     key.length: 63,
-    key.fully_annotated_decl: "<decl.extension.protocol>extension <decl.name><ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\">Self</ref.generic_type_param>.Element == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.extension.protocol>",
+    key.fully_annotated_decl: "<decl.extension.protocol>extension <decl.name><ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake4ProtP7ElementQa\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.extension.protocol>",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "Prot",
@@ -2661,7 +2695,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 1893,
     key.length: 97,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S3</decl.name>&lt;<decl.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\"><decl.generic_type_param.name>Wrapped</decl.generic_type_param.name></decl.generic_type_param>&gt; : <ref.protocol usr=\"s:4cake2P5P\">P5</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Wrapped : <ref.protocol usr=\"s:4cake2P5P\">P5</ref.protocol></decl.generic_type_requirement></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S3</decl.name>&lt;<decl.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\"><decl.generic_type_param.name>Wrapped</decl.generic_type_param.name></decl.generic_type_param>&gt; : <ref.protocol usr=\"s:4cake2P5P\">P5</ref.protocol> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\">Wrapped</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P5P\">P5</ref.protocol></decl.generic_type_requirement></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -2676,7 +2710,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
         key.usr: "s:4cake2S3V7Elementa",
         key.offset: 1953,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct>&lt;Wrapped&gt;.<decl.name>Element</decl.name> = Wrapped.Element</decl.typealias>",
+        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct>&lt;<ref.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\">Wrapped</ref.generic_type_param>&gt;.<decl.name>Element</decl.name> = <ref.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\">Wrapped</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake2P5P7ElementQa\">Element</ref.associatedtype></decl.typealias>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.associatedtype,
@@ -2696,7 +2730,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 1992,
     key.length: 75,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Wrapped : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>",
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:4cake2S3V\">S3</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp\">Wrapped</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "S3",
@@ -2710,7 +2744,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
         key.original_usr: "s:4cake2P6PAAE4null7ElementQzSgvp",
         key.offset: 2031,
         key.length: 34,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type>Wrapped.Element?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type><ref.generic_type_param usr=\"s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp\">Wrapped</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake2P5P7ElementQa\">Element</ref.associatedtype>?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       }
     ]
   },
@@ -2739,7 +2773,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
     ],
     key.offset: 2069,
     key.length: 93,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp\"><decl.generic_type_param.name>T1</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp\"><decl.generic_type_param.name>T2</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label> <decl.var.parameter.name>ix</decl.var.parameter.name>: <decl.var.parameter.type>T1</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label> <decl.var.parameter.name>iy</decl.var.parameter.name>: <decl.var.parameter.type>T2</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T1 : <ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement>T2 : <ref.class usr=\"s:4cake2C1C\">C1</ref.class></decl.generic_type_requirement>, <decl.generic_type_requirement>T1.Element == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp\"><decl.generic_type_param.name>T1</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp\"><decl.generic_type_param.name>T2</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label> <decl.var.parameter.name>ix</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp\">T1</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label> <decl.var.parameter.name>iy</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp\">T2</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp\">T1</ref.generic_type_param> : <ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T2L_q_mfp\">T2</ref.generic_type_param> : <ref.class usr=\"s:4cake2C1C\">C1</ref.class></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake6genfoo1x1yyx_q_tAA4ProtRzAA2C1CRb_Si7ElementRtzr0_lF2T1L_xmfp\">T1</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake4ProtP7ElementQa\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,

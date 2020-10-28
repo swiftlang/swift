@@ -245,6 +245,15 @@ void ClangImporter::recordModuleDependencies(
       }
     }
 
+    // Add all args the non-path arguments required to be passed in, according
+    // to the Clang scanner
+    for (const auto &clangArg : clangModuleDep.NonPathCommandLine) {
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back("-Xclang");
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back(clangArg);
+    }
+
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
@@ -267,7 +276,6 @@ void ClangImporter::recordModuleDependencies(
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
-        clangModuleDep.ImplicitModulePCMPath,
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ContextHash,
         swiftArgs,
@@ -277,8 +285,7 @@ void ClangImporter::recordModuleDependencies(
     }
 
     cache.recordDependencies(clangModuleDep.ModuleName,
-                             std::move(dependencies),
-                             ModuleDependenciesKind::Clang);
+                             std::move(dependencies));
   }
 }
 
@@ -327,10 +334,10 @@ bool ClangImporter::addBridgingHeaderDependencies(
     StringRef moduleName,
     ModuleDependenciesCache &cache) {
   auto targetModule = *cache.findDependencies(
-      moduleName, ModuleDependenciesKind::Swift);
+      moduleName, ModuleDependenciesKind::SwiftTextual);
 
   // If we've already recorded bridging header dependencies, we're done.
-  auto swiftDeps = targetModule.getAsSwiftModule();
+  auto swiftDeps = targetModule.getAsSwiftTextualModule();
   if (!swiftDeps->bridgingSourceFiles.empty() ||
       !swiftDeps->bridgingModuleDependencies.empty())
     return false;
@@ -376,7 +383,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // Update the cache with the new information for the module.
   cache.updateDependencies(
-     {moduleName.str(), ModuleDependenciesKind::Swift},
+     {moduleName.str(), ModuleDependenciesKind::SwiftTextual},
      std::move(targetModule));
 
   return false;

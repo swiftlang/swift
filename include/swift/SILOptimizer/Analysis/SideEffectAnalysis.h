@@ -389,6 +389,13 @@ public:
   /// instructions are considered as side effects.
   MemoryBehavior getMemBehavior(RetainObserveKind ScanKind) const;
 
+  /// Gets the memory behavior for an argument.
+  ///
+  /// This is derived from the combined argument and the global effects.
+  /// Also the argument type and convention are considered.
+  MemoryBehavior getArgumentBehavior(FullApplySite applySite,
+                                                unsigned argIdx);
+
   /// Get the global effects for the function. These are effects which cannot
   /// be associated to a specific parameter, e.g. writes to global variables
   /// or writes to unknown pointers.

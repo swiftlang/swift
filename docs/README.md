@@ -120,7 +120,7 @@ documentation, please create a thread on the Swift forums under the
     lazy type-checking and efficient caching.
   - [Literals.md](/docs/Literals.md):
     Describes type-checking and inference specifically for literals.
-- [Serialization.rst](/docs/Serialization.rst):
+- [Serialization.md](/docs/Serialization.md):
   Gives an overview of the LLVM bitcode format used for swiftmodules.
   - [StableBitcode.md](/docs/StableBitcode.md):
     Describes how to maintain compatibility when changing the serialization

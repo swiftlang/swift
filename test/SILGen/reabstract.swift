@@ -21,7 +21,6 @@ func test0() {
 // CHECK-NEXT: [[T5:%.*]] = convert_function [[T4]]
 // CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T5]]
 // CHECK: destroy_value [[T5]]
-// CHECK-NEXT: destroy_value [[T2]]
 // CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
 // CHECK-NEXT: tuple ()
@@ -34,6 +33,7 @@ func test0() {
 // MANDATORY:      reabstract.liftOptional
 // MANDATORY-NEXT: [[T1:%.*]] = function_ref @$s10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
+// MANDATORY-NEXT: strong_retain [[T2]]
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T2]]
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :

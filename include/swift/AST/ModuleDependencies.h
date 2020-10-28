@@ -19,6 +19,7 @@
 #define SWIFT_AST_MODULE_DEPENDENCIES_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Import.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
@@ -34,7 +35,8 @@ class Identifier;
 
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
-  Swift,
+  SwiftTextual,
+  SwiftBinary,
   // Placeholder dependencies are a kind of dependencies used only by the
   // dependency scanner. They are swift modules that the scanner will not be
   // able to locate in its search paths and which are the responsibility of the
@@ -68,17 +70,12 @@ class ModuleDependenciesStorageBase {
 public:
   const ModuleDependenciesKind dependencyKind;
 
-  ModuleDependenciesStorageBase(ModuleDependenciesKind dependencyKind,
-                                const std::string &compiledModulePath)
-      : dependencyKind(dependencyKind),
-        compiledModulePath(compiledModulePath) { }
+  ModuleDependenciesStorageBase(ModuleDependenciesKind dependencyKind)
+      : dependencyKind(dependencyKind) { }
 
   virtual ModuleDependenciesStorageBase *clone() const = 0;
 
   virtual ~ModuleDependenciesStorageBase();
-
-  /// The path to the compiled module file.
-  const std::string compiledModulePath;
 
   /// The set of modules on which this module depends.
   std::vector<std::string> moduleDependencies;
@@ -87,7 +84,8 @@ public:
 /// Describes the dependencies of a Swift module.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
-class SwiftModuleDependenciesStorage : public ModuleDependenciesStorageBase {
+class SwiftTextualModuleDependenciesStorage :
+  public ModuleDependenciesStorageBase {
 public:
   /// The Swift interface file, if it can be used to generate the module file.
   const Optional<std::string> swiftInterfaceFile;
@@ -122,16 +120,14 @@ public:
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
 
-  SwiftModuleDependenciesStorage(
-      const std::string &compiledModulePath,
+  SwiftTextualModuleDependenciesStorage(
       const Optional<std::string> &swiftInterfaceFile,
       ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash,
       bool isFramework
-  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Swift,
-                                    compiledModulePath),
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftTextual),
       swiftInterfaceFile(swiftInterfaceFile),
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
@@ -140,11 +136,47 @@ public:
       contextHash(contextHash), isFramework(isFramework) { }
 
   ModuleDependenciesStorageBase *clone() const override {
-    return new SwiftModuleDependenciesStorage(*this);
+    return new SwiftTextualModuleDependenciesStorage(*this);
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->dependencyKind == ModuleDependenciesKind::Swift;
+    return base->dependencyKind == ModuleDependenciesKind::SwiftTextual;
+  }
+};
+
+/// Describes the dependencies of a pre-built Swift module (with no .swiftinterface).
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
+class SwiftBinaryModuleDependencyStorage : public ModuleDependenciesStorageBase {
+public:
+  SwiftBinaryModuleDependencyStorage(const std::string &compiledModulePath,
+                                     const std::string &moduleDocPath,
+                                     const std::string &sourceInfoPath,
+                                     const bool isFramework)
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftBinary),
+        compiledModulePath(compiledModulePath),
+        moduleDocPath(moduleDocPath),
+        sourceInfoPath(sourceInfoPath),
+        isFramework(isFramework) {}
+
+  ModuleDependenciesStorageBase *clone() const override {
+    return new SwiftBinaryModuleDependencyStorage(*this);
+  }
+
+  /// The path to the .swiftmodule file.
+  const std::string compiledModulePath;
+
+  /// The path to the .swiftModuleDoc file.
+  const std::string moduleDocPath;
+
+  /// The path to the .swiftSourceInfo file.
+  const std::string sourceInfoPath;
+
+  /// A flag that indicates this dependency is a framework
+  const bool isFramework;
+
+  static bool classof(const ModuleDependenciesStorageBase *base) {
+    return base->dependencyKind == ModuleDependenciesKind::SwiftBinary;
   }
 };
 
@@ -166,13 +198,11 @@ public:
   const std::vector<std::string> fileDependencies;
 
   ClangModuleDependenciesStorage(
-      const std::string &compiledModulePath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies
-  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang,
-                                    compiledModulePath),
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
       nonPathCommandLine(nonPathCommandLine),
@@ -190,19 +220,23 @@ public:
 /// Describes an placeholder Swift module dependency module stub.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
-class PlaceholderSwiftModuleDependencyStorage : public ModuleDependenciesStorageBase {
+
+class SwiftPlaceholderModuleDependencyStorage : public ModuleDependenciesStorageBase {
 public:
-  PlaceholderSwiftModuleDependencyStorage(const std::string &compiledModulePath,
-                                       const std::string &moduleDocPath,
-                                       const std::string &sourceInfoPath)
-      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftPlaceholder,
-                                      compiledModulePath),
+  SwiftPlaceholderModuleDependencyStorage(const std::string &compiledModulePath,
+                                          const std::string &moduleDocPath,
+                                          const std::string &sourceInfoPath)
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftPlaceholder),
+        compiledModulePath(compiledModulePath),
         moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath) {}
 
   ModuleDependenciesStorageBase *clone() const override {
-    return new PlaceholderSwiftModuleDependencyStorage(*this);
+    return new SwiftPlaceholderModuleDependencyStorage(*this);
   }
+
+  /// The path to the .swiftmodule file.
+  const std::string compiledModulePath;
 
   /// The path to the .swiftModuleDoc file.
   const std::string moduleDocPath;
@@ -248,43 +282,41 @@ public:
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash,
       bool isFramework) {
-    std::string compiledModulePath;
     return ModuleDependencies(
-        std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, swiftInterfaceFile, compiledCandidates, buildCommands,
+        std::make_unique<SwiftTextualModuleDependenciesStorage>(
+          swiftInterfaceFile, compiledCandidates, buildCommands,
           extraPCMArgs, contextHash, isFramework));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
-  static ModuleDependencies forSwiftModule(
-      const std::string &compiledModulePath, bool isFramework) {
+  static ModuleDependencies forSwiftBinaryModule(
+      const std::string &compiledModulePath,
+      const std::string &moduleDocPath,
+      const std::string &sourceInfoPath,
+      bool isFramework) {
     return ModuleDependencies(
-        std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
-          ArrayRef<StringRef>(), StringRef(), isFramework));
+        std::make_unique<SwiftBinaryModuleDependencyStorage>(
+          compiledModulePath, moduleDocPath, sourceInfoPath, isFramework));
   }
 
   /// Describe the main Swift module.
   static ModuleDependencies forMainSwiftModule(ArrayRef<StringRef> extraPCMArgs) {
-    std::string compiledModulePath;
     return ModuleDependencies(
-        std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<std::string>(),
-          ArrayRef<StringRef>(), extraPCMArgs, StringRef(), false));
+        std::make_unique<SwiftTextualModuleDependenciesStorage>(
+          None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
+          extraPCMArgs, StringRef(), false));
   }
 
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencies forClangModule(
-      const std::string &compiledModulePath,
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies) {
     return ModuleDependencies(
         std::make_unique<ClangModuleDependenciesStorage>(
-          compiledModulePath, moduleMapFile, contextHash, nonPathCommandLine,
-          fileDependencies));
+          moduleMapFile, contextHash, nonPathCommandLine, fileDependencies));
   }
 
   /// Describe a placeholder dependency swift module.
@@ -293,13 +325,8 @@ public:
       const std::string &moduleDocPath,
       const std::string &sourceInfoPath) {
     return ModuleDependencies(
-        std::make_unique<PlaceholderSwiftModuleDependencyStorage>(
+        std::make_unique<SwiftPlaceholderModuleDependencyStorage>(
           compiledModulePath, moduleDocPath, sourceInfoPath));
-  }
-
-  /// Retrieve the path to the compiled module.
-  const std::string getCompiledModulePath() const {
-    return storage->compiledModulePath;
   }
 
   /// Retrieve the module-level dependencies.
@@ -307,28 +334,46 @@ public:
     return storage->moduleDependencies;
   }
 
-  /// Whether the dependencies are for a Swift module.
+  /// Whether the dependencies are for a Swift module: either Textual, Binary, or Placeholder.
   bool isSwiftModule() const;
 
+  /// Whether the dependencies are for a textual Swift module.
+  bool isSwiftTextualModule() const;
+
+  /// Whether the dependencies are for a binary Swift module.
+  bool isSwiftBinaryModule() const;
+
   /// Whether this represents a placeholder module stub
-  bool isPlaceholderSwiftModule() const;
+  bool isSwiftPlaceholderModule() const;
+
+  /// Whether the dependencies are for a Clang module.
+  bool isClangModule() const;
 
   ModuleDependenciesKind getKind() const {
     return storage->dependencyKind;
   }
   /// Retrieve the dependencies for a Swift module.
-  const SwiftModuleDependenciesStorage *getAsSwiftModule() const;
+  const SwiftTextualModuleDependenciesStorage *getAsSwiftTextualModule() const;
+
+  /// Retrieve the dependencies for a binary Swift module.
+  const SwiftBinaryModuleDependencyStorage *getAsSwiftBinaryModule() const;
 
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependenciesStorage *getAsClangModule() const;
 
   /// Retrieve the dependencies for a placeholder dependency module stub.
-  const PlaceholderSwiftModuleDependencyStorage *
-  getAsPlaceholderDependencyModule() const;
+  const SwiftPlaceholderModuleDependencyStorage *
+    getAsPlaceholderDependencyModule() const;
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,
                            llvm::StringSet<> *alreadyAddedModules = nullptr);
+
+  /// Add a dependency on the given module, if it was not already in the set.
+  void addModuleDependency(ImportPath::Module module,
+                           llvm::StringSet<> *alreadyAddedModules = nullptr) {
+    addModuleDependency(module.front().Item.str(), alreadyAddedModules);
+  }
 
   /// Add all of the module dependencies for the imports in the given source
   /// file to the set of module dependencies.
@@ -363,11 +408,14 @@ class ModuleDependenciesCache {
   /// encountered.
   std::vector<ModuleDependencyID> AllModules;
 
-  /// Dependencies for Swift modules that have already been computed.
-  llvm::StringMap<ModuleDependencies> SwiftModuleDependencies;
+  /// Dependencies for Textual Swift modules that have already been computed.
+  llvm::StringMap<ModuleDependencies> SwiftTextualModuleDependencies;
 
-  /// Dependencies for Swift placeholder dependency modules.
-  llvm::StringMap<ModuleDependencies> PlaceholderSwiftModuleDependencies;
+  /// Dependencies for Binary Swift modules that have already been computed.
+  llvm::StringMap<ModuleDependencies> SwiftBinaryModuleDependencies;
+
+  /// Dependencies for Swift placeholder dependency modules that have already been computed.
+  llvm::StringMap<ModuleDependencies> SwiftPlaceholderModuleDependencies;
 
   /// Dependencies for Clang modules that have already been computed.
   llvm::StringMap<ModuleDependencies> ClangModuleDependencies;
@@ -429,8 +477,7 @@ public:
 
   /// Record dependencies for the given module.
   void recordDependencies(StringRef moduleName,
-                          ModuleDependencies dependencies,
-                          ModuleDependenciesKind kind);
+                          ModuleDependencies dependencies);
 
   /// Update stored dependencies for the given module.
   void updateDependencies(ModuleDependencyID moduleID,

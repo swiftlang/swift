@@ -5,7 +5,6 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=macosx
 
-import _Concurrency
 import Swift
 
 public actor class A1 {

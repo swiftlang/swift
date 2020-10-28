@@ -462,6 +462,7 @@ bool swift::operator==(const TangentPropertyInfo::Error &lhs,
   case TangentPropertyInfo::Error::Kind::TangentPropertyWrongType:
     return lhs.getType()->isEqual(rhs.getType());
   }
+  llvm_unreachable("unhandled tangent property!");
 }
 
 void swift::simple_display(llvm::raw_ostream &os, TangentPropertyInfo info) {

@@ -51,16 +51,17 @@ public:
   }
 };
 
-template<uint16_t StaticTag>
-class TaggedMetadataAllocator: public MetadataAllocator {
+template <uint16_t StaticTag>
+class TaggedMetadataAllocator : public MetadataAllocator {
 public:
   constexpr TaggedMetadataAllocator() : MetadataAllocator(StaticTag) {}
 };
 
-/// A typedef for simple global caches.
+/// A typedef for simple global caches with stable addresses for the entries.
 template <class EntryTy, uint16_t Tag>
 using SimpleGlobalCache =
-  ConcurrentMap<EntryTy, /*destructor*/ false, TaggedMetadataAllocator<Tag>>;
+    StableAddressConcurrentReadableHashMap<EntryTy,
+                                           TaggedMetadataAllocator<Tag>>;
 
 template <class T, bool ProvideDestructor = true>
 class StaticOwningPointer {

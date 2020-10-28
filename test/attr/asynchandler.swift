@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 func globalAsyncFunction() async -> Int { 0 }
 
 @asyncHandler func asyncHandler1() {

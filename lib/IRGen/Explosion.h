@@ -152,11 +152,6 @@ public:
     return Values[NextValue-1];
   }
 
-  llvm::Value *peek(unsigned n) {
-    assert(n < Values.size());
-    return Values[n];
-  }
-
   /// Claim and remove the last item in the array.
   /// Unlike the normal 'claim' methods, the item is gone forever.
   llvm::Value *takeLast() {

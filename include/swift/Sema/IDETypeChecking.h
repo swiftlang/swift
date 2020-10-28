@@ -255,9 +255,9 @@ namespace swift {
                             bool IncludeProtocolRequirements = true,
                             bool Transitive = false);
 
-  /// Enumerates the various kinds of "build" functions within a function
+  /// Enumerates the various kinds of "build" functions within a result
   /// builder.
-  enum class FunctionBuilderBuildFunction {
+  enum class ResultBuilderBuildFunction {
     BuildBlock,
     BuildExpression,
     BuildOptional,
@@ -268,21 +268,21 @@ namespace swift {
     BuildFinalResult,
   };
 
-  /// Try to infer the component type of a function builder from the type
+  /// Try to infer the component type of a result builder from the type
   /// of buildBlock or buildExpression, if it was there.
-  Type inferFunctionBuilderComponentType(NominalTypeDecl *builder);
+  Type inferResultBuilderComponentType(NominalTypeDecl *builder);
 
-  /// Print the declaration for a function builder "build" function, for use
+  /// Print the declaration for a result builder "build" function, for use
   /// in Fix-Its, code completion, and so on.
-  void printFunctionBuilderBuildFunction(
+  void printResultBuilderBuildFunction(
       NominalTypeDecl *builder, Type componentType,
-      FunctionBuilderBuildFunction function,
+      ResultBuilderBuildFunction function,
       Optional<std::string> stubIndent, llvm::raw_ostream &out);
 
   /// Compute the insertion location, indentation string, and component type
-  /// for a Fix-It that adds a new build* function to a function builder.
+  /// for a Fix-It that adds a new build* function to a result builder.
   std::tuple<SourceLoc, std::string, Type>
-  determineFunctionBuilderBuildFixItInfo(NominalTypeDecl *builder);
+  determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder);
 }
 
 #endif

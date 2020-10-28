@@ -16,9 +16,6 @@
 #ifndef SWIFT_SEMA_CSDIAGNOSTICS_H
 #define SWIFT_SEMA_CSDIAGNOSTICS_H
 
-#include "Constraint.h"
-#include "ConstraintSystem.h"
-#include "OverloadChoice.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
@@ -29,6 +26,8 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
 
@@ -1272,13 +1271,11 @@ public:
 };
 
 class MissingArgumentsFailure final : public FailureDiagnostic {
-  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
-
-  SmallVector<SynthesizedParam, 4> SynthesizedArgs;
+  SmallVector<SynthesizedArg, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(const Solution &solution,
-                          ArrayRef<SynthesizedParam> synthesizedArgs,
+                          ArrayRef<SynthesizedArg> synthesizedArgs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
@@ -1736,7 +1733,7 @@ private:
       llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
-class SkipUnhandledConstructInFunctionBuilderFailure final
+class SkipUnhandledConstructInResultBuilderFailure final
     : public FailureDiagnostic {
 public:
   using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
@@ -1747,7 +1744,7 @@ public:
   void diagnosePrimary(bool asNote);
 
 public:
-  SkipUnhandledConstructInFunctionBuilderFailure(const Solution &solution,
+  SkipUnhandledConstructInResultBuilderFailure(const Solution &solution,
                                                  UnhandledNode unhandled,
                                                  NominalTypeDecl *builder,
                                                  ConstraintLocator *locator)

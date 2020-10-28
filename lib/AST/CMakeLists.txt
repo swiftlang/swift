@@ -126,15 +126,14 @@ target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftSyntax)
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  # Add clangBasic as a single direct dependency to avoid bringing along some
-  # llvm libraries that we don't need.
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-    target_link_libraries(swiftAST PRIVATE
-      "${LLVM_LIBRARY_OUTPUT_INTDIR}/clangBasic.lib")
-  else()
-    target_link_libraries(swiftAST PRIVATE
-      "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclangBasic.a")
-  endif()
+  # Remove dependencies from clangBasic to avoid bringing along some llvm
+  # libraries that we don't need to be building.
+  set_property(TARGET clangBasic PROPERTY LINK_LIBRARIES "")
+  set_property(TARGET clangBasic PROPERTY LINK_DEPENDS "")
+  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_LIBRARIES "")
+  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_DEPENDS "")
+  target_link_libraries(swiftAST
+    PRIVATE clangBasic)
   target_compile_definitions(swiftAST PRIVATE
     SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
 else()

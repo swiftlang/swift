@@ -179,17 +179,22 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
   // Mimic getModuleDefiningPath() for Swift and Clang module.
-  if (auto *swiftDep = dyn_cast<SwiftModuleDependenciesStorage>(storage.get())) {
+  if (auto *swiftDep = getAsSwiftTextualModule()) {
     // Prefer interface path to binary module path if we have it.
     modulePath = swiftDep->swiftInterfaceFile;
-    if (!modulePath.hasValue())
-      modulePath = swiftDep->compiledModulePath;
     assert(modulePath.hasValue());
     StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
     if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
       modulePath = parentDir.str();
     }
-  } else if (auto *clangDep = dyn_cast<ClangModuleDependenciesStorage>(storage.get())){
+  } else if (auto *swiftBinaryDep = getAsSwiftBinaryModule()) {
+    modulePath = swiftBinaryDep->compiledModulePath;
+    assert(modulePath.hasValue());
+    StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
+    if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
+      modulePath = parentDir.str();
+    }
+  } else if (auto *clangDep = getAsClangModule()) {
     modulePath = clangDep->moduleMapFile;
     assert(modulePath.hasValue());
   } else { // PlaceholderSwiftModuleDependencies

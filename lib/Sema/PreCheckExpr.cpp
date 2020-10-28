@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -31,6 +30,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -1326,11 +1326,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
-    // Disable availability diagnostics here, because the final
-    // TypeRepr will be resolved again when generating constraints.
     const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::AllowUnavailable;
+        TypeResolutionOptions(TypeResolverContext::InExpression);
     const auto resolution =
         TypeResolution::forContextual(DC, options, [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.

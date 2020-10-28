@@ -2515,7 +2515,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   resultInitArgs.add(E, std::move(interpolation));
 
   return SGF.emitApplyAllocatingInitializer(
-      E, E->getResultInit(), std::move(resultInitArgs), Type(), C);
+      E, E->getInitializer(), std::move(resultInitArgs), Type(), C);
 }
 
 RValue RValueEmitter::

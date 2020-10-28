@@ -401,6 +401,11 @@ def require_explicit_availability_target : Separate<["-"], "require-explicit-ava
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
   MetaVarName<"<target>">;
 
+def define_availability : Separate<["-"], "define-availability">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
+  MetaVarName<"<macro>">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
@@ -667,7 +672,7 @@ def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
 def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Add directory to library link search path">;
-def L_EQ : Joined<["-"], "L=">,
+def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<L>;
 
@@ -756,10 +761,10 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   HelpText<"Emit full DWARF type info.">;
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
-    HelpText<"Remap source paths in debug info">;
+    HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
-  HelpText<"Remap source paths in coverage info">;
+  HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,

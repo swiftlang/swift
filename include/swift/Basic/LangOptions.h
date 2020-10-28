@@ -115,6 +115,9 @@ namespace swift {
     /// when using RequireExplicitAvailability.
     std::string RequireExplicitAvailabilityTarget;
 
+    // Availability macros definitions to be expanded at parsing.
+    SmallVector<StringRef, 4> AvailabilityMacros;
+
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
@@ -543,10 +546,6 @@ namespace swift {
     
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
-
-    /// Enable constraint solver support for experimental
-    ///        operator protocol designator feature.
-    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// Enable experimental support for one-way constraints for the
     /// parameters of closures.

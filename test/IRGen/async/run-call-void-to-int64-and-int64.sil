@@ -4,10 +4,11 @@
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
 
@@ -17,7 +18,7 @@ import PrintShims
 
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @voidToInt64AndInt64(%swift.context* {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @voidToInt64AndInt64(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @voidToInt64AndInt64 : $@async @convention(thin) () -> (Int64, Int64) {
   %int_literal1 = integer_literal $Builtin.Int64, 42
   %int1 = struct $Int64 (%int_literal1 : $Builtin.Int64)
@@ -27,7 +28,7 @@ sil @voidToInt64AndInt64 : $@async @convention(thin) () -> (Int64, Int64) {
   return %tuple : $(Int64, Int64)
 }
 
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
   %voidToInt64AndInt64 = function_ref @voidToInt64AndInt64 : $@async @convention(thin) () -> (Int64, Int64)

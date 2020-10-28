@@ -3197,7 +3197,7 @@ UTF-8 data.
 class Employee {
 public:
   std::string DebugDescription() const;
-  [[swift::import_as_std_string]] std::string SeriaziledAsProtobuf() const;
+  [[swift::import_as_std_string]] std::string SerializedAsProtobuf() const;
 };
 ```
 

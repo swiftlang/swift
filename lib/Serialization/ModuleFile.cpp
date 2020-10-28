@@ -167,8 +167,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
           return error(Status::FailedToLoadBridgingHeader);
       }
       ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-      dependency.Import = ModuleDecl::ImportedModule{ImportPath::Access(),
-                                                     importedHeaderModule};
+      dependency.Import = ImportedModule{ImportPath::Access(),
+                                         importedHeaderModule};
       continue;
     }
 
@@ -212,7 +212,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
       continue;
     }
 
-    dependency.Import = ModuleDecl::ImportedModule{accessPath, module};
+    dependency.Import = ImportedModule{accessPath, module};
 
     // SPI
     StringRef spisStr = dependency.Core.RawSPIs;
@@ -420,9 +420,8 @@ PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
   return cast<PrecedenceGroupDecl>(getDecl(data[0].second));
 }
 
-void ModuleFile::getImportedModules(
-    SmallVectorImpl<ModuleDecl::ImportedModule> &results,
-    ModuleDecl::ImportFilter filter) {
+void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
+                                    ModuleDecl::ImportFilter filter) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {

@@ -871,7 +871,7 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
                                      bool Implicit)
-    : LiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
+    : BuiltinLiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
       Range(Range) {
   Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(UTF8);
   Bits.StringLiteralExpr.IsSingleUnicodeScalar =

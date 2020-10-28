@@ -12,6 +12,9 @@
 
 /// A unique identifier for a class instance or metatype.
 ///
+/// This unique identifier is only valid for comparisons during the lifetime
+/// of the instance.
+///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 @frozen // trivial-implementation

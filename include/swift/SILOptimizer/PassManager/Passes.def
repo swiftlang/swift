@@ -70,6 +70,8 @@ PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
 PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
      "Dump Accessed Storage Analysis Summaries")
+PASS(AccessPathVerification, "access-path-verification",
+     "Verify Access Paths (and Accessed Storage)")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
      "Dump Accessed Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
@@ -161,6 +163,8 @@ PASS(DifferentiabilityWitnessDevirtualizer,
      "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
+PASS(OnonePrespecializations, "onone-prespecializer",
+     "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
 PASS(EarlyInliner, "early-inline",

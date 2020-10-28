@@ -90,7 +90,7 @@ public:
   public:
     const ModuleFileSharedCore::Dependency &Core;
 
-    llvm::Optional<ModuleDecl::ImportedModule> Import = llvm::None;
+    llvm::Optional<ImportedModule> Import = llvm::None;
     SmallVector<Identifier, 4> spiGroups;
 
     Dependency(const ModuleFileSharedCore::Dependency &coreDependency)
@@ -527,7 +527,7 @@ public:
   PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name);
 
   /// Adds any imported modules to the given vector.
-  void getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &results,
+  void getImportedModules(SmallVectorImpl<ImportedModule> &results,
                           ModuleDecl::ImportFilter filter);
 
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
@@ -658,6 +658,8 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
+  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                            uint64_t contextData) override;
   virtual AbstractFunctionDecl *
   loadReferencedFunctionDecl(const DerivativeAttr *DA,
                              uint64_t contextData) override;

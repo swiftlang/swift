@@ -67,11 +67,11 @@ public:
   getDisplayDecls(SmallVectorImpl<Decl *> &results) const override {}
 
   virtual void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+  getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override {}
 
   virtual void getImportedModulesForLookup(
-      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const override {};
+      SmallVectorImpl<ImportedModule> &imports) const override {};
 
   virtual void collectLinkLibraries(
       ModuleDecl::LinkLibraryCallback callback) const override {};

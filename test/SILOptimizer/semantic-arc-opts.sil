@@ -79,6 +79,16 @@ class SubclassLet: ClassLet {}
 sil_global [let] @a_let_global : $Klass
 sil_global @a_var_global : $Klass
 
+enum EnumWithIndirectCase {
+case first
+indirect case second(Builtin.NativeObject)
+}
+
+struct StructWithEnumWithIndirectCaseField {
+  var i: Builtin.Int23
+  var field : EnumWithIndirectCase
+}
+
 ///////////
 // Tests //
 ///////////
@@ -2727,3 +2737,72 @@ bbEnd:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @enum_with_indirect_case_projectbox_copyvalue_deadend : $@convention(thin) (@guaranteed StructWithEnumWithIndirectCaseField) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'enum_with_indirect_case_projectbox_copyvalue_deadend'
+sil [ossa] @enum_with_indirect_case_projectbox_copyvalue_deadend : $@convention(thin) (@guaranteed StructWithEnumWithIndirectCaseField) -> () {
+bb0(%0 : @guaranteed $StructWithEnumWithIndirectCaseField):
+  %1 = struct_extract %0 : $StructWithEnumWithIndirectCaseField, #StructWithEnumWithIndirectCaseField.field
+  %1a = copy_value %1 : $EnumWithIndirectCase
+  switch_enum %1a : $EnumWithIndirectCase, case #EnumWithIndirectCase.first!enumelt: bb1, case #EnumWithIndirectCase.second!enumelt: bb2
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
+
+// NOTE: Eventually this will need to be changed when project_box has to be
+// guarded by begin_borrow.
+bb2(%2 : @owned ${ var Builtin.NativeObject }):
+  %3 = project_box %2 : ${ var Builtin.NativeObject }, 0
+  %4 = load [copy] %3 : $*Builtin.NativeObject
+  %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
+// CHECK: bb0
+// CHECK-NEXT: load_borrow
+// CHECK: } // end sil function 'enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend'
+sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
+bb0(%0 : $*EnumWithIndirectCase):
+  %1 = load [copy] %0 : $*EnumWithIndirectCase
+  switch_enum %1 : $EnumWithIndirectCase, case #EnumWithIndirectCase.first!enumelt: bb1, case #EnumWithIndirectCase.second!enumelt: bb2
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
+
+// NOTE: Eventually this will need to be changed when project_box has to be
+// guarded by begin_borrow.
+bb2(%2 : @owned ${ var Builtin.NativeObject }):
+  %3 = project_box %2 : ${ var Builtin.NativeObject }, 0
+  %4 = load [copy] %3 : $*Builtin.NativeObject
+  %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2 : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
+// CHECK: bb0
+// CHECK-NEXT: load_borrow
+// CHECK: } // end sil function 'enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2'
+sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2 : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
+bb0(%0 : $*EnumWithIndirectCase):
+  %1 = load [copy] %0 : $*EnumWithIndirectCase
+  switch_enum %1 : $EnumWithIndirectCase, case #EnumWithIndirectCase.first!enumelt: bb1, case #EnumWithIndirectCase.second!enumelt: bb2
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
+
+// NOTE: Eventually this will need to be changed when project_box has to be
+// guarded by begin_borrow.
+bb2(%2 : @owned ${ var Builtin.NativeObject }):
+  %3 = project_box %2 : ${ var Builtin.NativeObject }, 0
+  %4 = load [copy] %3 : $*Builtin.NativeObject
+  %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : ${ var Builtin.NativeObject }
+  unreachable
+}

@@ -177,8 +177,8 @@ struct AnythingGoes<T> {
 extension AnythingGoes where T : VeryConstrained {
   // CHECK-LABEL: sil hidden [ossa] @$s22constrained_extensions12AnythingGoesVA2A15VeryConstrainedRzlE13fromExtensionACyxGyt_tcfC : $@convention(method) <T where T : VeryConstrained> (@thin AnythingGoes<T>.Type) -> @out AnythingGoes<T> {
 
+  // CHECK: [[RESULT:%.*]] = struct_element_addr {{%.*}} : $*AnythingGoes<T>, #AnythingGoes.meaningOfLife
   // CHECK: [[INIT:%.*]] = function_ref @$s22constrained_extensions12AnythingGoesV13meaningOfLifexSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
-  // CHECK: [[RESULT:%.*]] = alloc_stack $Optional<T>
   // CHECK: apply [[INIT]]<T>([[RESULT]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
   // CHECK: return
   init(fromExtension: ()) {}

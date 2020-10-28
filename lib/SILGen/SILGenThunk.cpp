@@ -175,7 +175,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
 
 SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
-  auto *derivativeId = derivativeFnDeclRef.derivativeFunctionIdentifier;
+  auto *derivativeId = derivativeFnDeclRef.getDerivativeFunctionIdentifier();
   assert(derivativeId);
   auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 

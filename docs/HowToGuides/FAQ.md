@@ -42,7 +42,7 @@ built compiler to compile both packages and Xcode projects.
    Create a build setting `SWIFT_EXEC` with the value set to `/path/to/swiftc`.
    If you now do a clean build, your locally built compiler will be used.
 
-   At the time of writing, in the latest Xcode 12 beta, `SWIFT_EXEC` does not
+   At the time of writing, in the latest Xcode 12.2 beta 3, `SWIFT_EXEC` does not
    work for SwiftPM integration inside Xcode, so this will not work for Xcode
    projects that depend on SwiftPM packages.
 
