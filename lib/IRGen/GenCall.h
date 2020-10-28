@@ -97,7 +97,7 @@ namespace irgen {
       ResumeParent = 1,
       ResumeParentExecutor = 2,
       Flags = 3,
-      Error = 4,
+      YieldToParent = 4,
     };
     enum class FixedCount : unsigned {
       Parent = 1,
@@ -111,6 +111,8 @@ namespace irgen {
     SubstitutionMap substitutionMap;
     SILType errorType;
     bool canHaveValidError;
+    bool isCoroutine;
+    SmallVector<SILYieldInfo, 4> yieldInfos;
     SmallVector<SILResultInfo, 4> directReturnInfos;
     SmallVector<SILResultInfo, 4> indirectReturnInfos;
     Optional<ArgumentInfo> localContextInfo;
@@ -126,7 +128,13 @@ namespace irgen {
       return (unsigned)FixedIndex::ResumeParentExecutor;
     }
     unsigned getFlagsIndex() { return (unsigned)FixedIndex::Flags; }
-    unsigned getErrorIndex() { return (unsigned)FixedIndex::Error; }
+    unsigned getYieldToParentIndex() {
+      assert(isCoroutine);
+      return (unsigned)FixedIndex::YieldToParent;
+    }
+    unsigned getErrorIndex() {
+      return (isCoroutine ? getYieldToParentIndex() : getFlagsIndex()) + 1;
+    }
     unsigned getFirstIndirectReturnIndex() {
       return getErrorIndex() + getErrorCount();
     }
@@ -134,12 +142,42 @@ namespace irgen {
       return getFirstIndirectReturnIndex() + getIndirectReturnCount();
     }
     unsigned getFirstDirectReturnIndex() {
+      assert(!isCoroutine);
       return getIndexAfterIndirectReturns();
     }
     unsigned getIndexAfterDirectReturns() {
+      assert(!isCoroutine);
       return getFirstDirectReturnIndex() + getDirectReturnCount();
     }
-    unsigned getFirstArgumentIndex() { return getIndexAfterDirectReturns(); }
+    unsigned getResumeFromYieldIndex() {
+      assert(isCoroutine);
+      return getIndexAfterIndirectReturns();
+    }
+    unsigned getAbortFromYieldIndex() {
+      assert(isCoroutine);
+      return getResumeFromYieldIndex() + 1;
+      ;
+    }
+    unsigned getCalleeExecutorDuringYieldIndex() {
+      assert(isCoroutine);
+      return getAbortFromYieldIndex() + 1;
+    }
+    unsigned getFirstYieldIndex() {
+      assert(isCoroutine);
+      return getCalleeExecutorDuringYieldIndex() + 1;
+    }
+    unsigned getIndexAfterYields() {
+      assert(isCoroutine);
+      return getFirstYieldIndex() + getYieldCount();
+    }
+    unsigned getIndexAfterUnion() {
+      if (isCoroutine) {
+        return getIndexAfterYields();
+      } else {
+        return getIndexAfterDirectReturns();
+      }
+    }
+    unsigned getFirstArgumentIndex() { return getIndexAfterUnion(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
@@ -230,9 +268,17 @@ namespace irgen {
       return getElement(getSelfWitnessTableIndex());
     }
 
-    unsigned getDirectReturnCount() { return directReturnInfos.size(); }
+    unsigned getDirectReturnCount() {
+      assert(!isCoroutine);
+      return directReturnInfos.size();
+    }
     ElementLayout getDirectReturnLayout(unsigned index) {
+      assert(!isCoroutine);
       return getElement(getFirstDirectReturnIndex() + index);
+    }
+    unsigned getYieldCount() {
+      assert(isCoroutine);
+      return yieldInfos.size();
     }
 
     AsyncContextLayout(
@@ -242,6 +288,7 @@ namespace irgen {
         SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
         Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
         bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
+        bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,
         ArrayRef<SILResultInfo> indirectReturnInfos,
         ArrayRef<SILResultInfo> directReturnInfos,
         Optional<ArgumentInfo> localContextInfo);
