@@ -761,7 +761,7 @@ CastsTests.test("Async function types") {
   expectFalse(asyncFnType is (() -> Void).Type)
 }
 
-  // `Optional<Int>` is Hashable, so it must cast to AnyHashable,
+// `Optional<Int>` is Hashable, so it must cast to AnyHashable,
 // even if it contains a nil.  (This was broken in 5.3 and earlier,
 // but was fixed by the new dynamic cast runtime.)
 CastsTests.test("Optional nil -> AnyHashable") {
