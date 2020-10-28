@@ -6,19 +6,19 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 5 -I %t/use_module_a -I %t/use_module_b -I %S/Inputs -enable-cxx-interop %s
 
 
-// If a symbol comes from two modules, one of which is marked as
+// If a decl comes from two modules, one of which is marked as
 // @_implementationOnly, Swift may choose the @_implementationOnly source
-// and then error out due to the symbol being hidden.
+// and then error out due to the decl being hidden.
 
-// Swift should consider all sources for the symbol and recognize that the
-// symbol is not hidden behind @_implementationOnly in all modules.
+// Swift should consider all sources for the decl and recognize that the
+// decl is not hidden behind @_implementationOnly in all modules.
 
-// This test, as well as the `lookup-visible-symbols-recursively-inversed.swift
-// check that the `getFortyTwo` symbol can be found when at least one of the
+// This test, as well as `lookup-visible-decls-recursively.swift` checks
+// that the `getFortyTwo` decl can be found when at least one of the
 // modules is not `@_implementationOnly`.
 
-import UseModuleA
-@_implementationOnly import UseModuleB
+@_implementationOnly import UseModuleA
+import UseModuleB
 
 @inlinable
 public func callFortyTwo() -> CInt {
