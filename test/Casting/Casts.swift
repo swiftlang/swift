@@ -778,10 +778,6 @@ CastsTests.test("AnyObject.Type -> AnyObject") {
   let f = runtimeCast(d, to: C.Type.self)
   expectNotNil(f)
   expectTrue(f! === a)
-  blackhole(c)
-  blackhole(d)
-  blackhole(e)
-  blackhole(f)
 }
 
 runAllTests()
