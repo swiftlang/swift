@@ -2743,36 +2743,6 @@ void ClangImporter::lookupRelatedEntity(
   }
 }
 
-NominalTypeDecl *
-ClangImporter::instantiateCXXClassTemplate(
-    clang::ClassTemplateDecl *decl,
-    ArrayRef<clang::TemplateArgument> arguments) {
-  void *InsertPos = nullptr;
-  auto *ctsd = decl->findSpecialization(arguments, InsertPos);
-  if (!ctsd) {
-    ctsd = clang::ClassTemplateSpecializationDecl::Create(
-        decl->getASTContext(), decl->getTemplatedDecl()->getTagKind(),
-        decl->getDeclContext(), decl->getTemplatedDecl()->getBeginLoc(),
-        decl->getLocation(), decl, arguments, nullptr);
-    decl->AddSpecialization(ctsd, InsertPos);
-  }
-
-  auto CanonType = decl->getASTContext().getTypeDeclType(ctsd);
-  assert(isa<clang::RecordType>(CanonType) &&
-          "type of non-dependent specialization is not a RecordType");
-
-  auto *swiftDecl = Impl.importDecl(ctsd, Impl.CurrentVersion);
-  if (swiftDecl) {
-    return dyn_cast<NominalTypeDecl>(swiftDecl);
-  }
-  return nullptr;
-}
-
-Identifier
-ClangImporter::lookupIdentifier(const clang::IdentifierInfo* declName) {
-  return Impl.importIdentifier(declName);
-}
-
 void ClangModuleUnit::lookupVisibleDecls(ImportPath::Access accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
@@ -4139,4 +4109,34 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
                                                    clang::SourceLocation());
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
   return spec;
+}
+
+NominalTypeDecl *
+ClangImporter::instantiateCXXClassTemplate(
+    clang::ClassTemplateDecl *decl,
+    ArrayRef<clang::TemplateArgument> arguments) {
+  void *InsertPos = nullptr;
+  auto *ctsd = decl->findSpecialization(arguments, InsertPos);
+  if (!ctsd) {
+    ctsd = clang::ClassTemplateSpecializationDecl::Create(
+        decl->getASTContext(), decl->getTemplatedDecl()->getTagKind(),
+        decl->getDeclContext(), decl->getTemplatedDecl()->getBeginLoc(),
+        decl->getLocation(), decl, arguments, nullptr);
+    decl->AddSpecialization(ctsd, InsertPos);
+  }
+
+  auto CanonType = decl->getASTContext().getTypeDeclType(ctsd);
+  assert(isa<clang::RecordType>(CanonType) &&
+          "type of non-dependent specialization is not a RecordType");
+
+  auto *swiftDecl = Impl.importDecl(ctsd, Impl.CurrentVersion);
+  if (swiftDecl) {
+    return dyn_cast<NominalTypeDecl>(swiftDecl);
+  }
+  return nullptr;
+}
+
+Identifier
+ClangImporter::lookupIdentifier(const clang::IdentifierInfo* declName) {
+  return Impl.importIdentifier(declName);
 }

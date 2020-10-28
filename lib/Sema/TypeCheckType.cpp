@@ -829,20 +829,28 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   if (auto clangDecl = decl->getClangDecl()) {
     if (auto classTemplateDecl =
             dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
-      SmallVector<clang::TemplateArgument, 2> templateArguments;
-      for (auto &argTypeRepr : generic->getGenericArgs()) {
-        Type argType = resolution.resolveType(argTypeRepr);
-        auto *clangDecl = argType->getAnyNominal()->getDecl()->getClangDecl();
-        if (clangDecl) {
-          auto *tagDecl = cast<clang::TagDecl>(clangDecl);
-          auto type =
-              classTemplateDecl->getASTContext().getTagDeclType(tagDecl);
-          templateArguments.push_back(clang::TemplateArgument(type));
-        } else {
-          diags.diagnose(loc, diag::cxx_class_instantiation_non_cxx_argument);
-          return ErrorType::get(ctx);
-        }
+      SmallVector<Type, 2> typesOfgenericArgs;
+      for (auto typeRepr : generic->getGenericArgs()) {
+        typesOfgenericArgs.push_back(resolution.resolveType(typeRepr));
       }
+
+      SmallVector<clang::TemplateArgument, 2> templateArguments;
+      std::unique_ptr<TemplateInstantiationError> error =
+        ctx.getClangTemplateArguments(
+          classTemplateDecl->getTemplateParameters(),
+          typesOfgenericArgs, templateArguments);
+
+        if (error) {
+            std::string failedTypesStr;
+            llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
+            llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+            // TODO: This error message should not reference implementation details.
+            // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
+            ctx.Diags.diagnose(loc,
+                              diag::unable_to_convert_generic_swift_types.ID,
+                              {classTemplateDecl->getName(), StringRef(failedTypesStr)});
+            return ErrorType::get(ctx);
+          }
 
       auto *clangModuleLoader = decl->getASTContext().getClangModuleLoader();
       auto instantiatedDecl = clangModuleLoader->instantiateCXXClassTemplate(

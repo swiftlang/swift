@@ -2766,9 +2766,6 @@ ERROR(unexportable_clang_function_type,none,
 ERROR(cxx_class_instantiation_failed,none,
       "clang couldn't instantiate class template",
       ())
-ERROR(cxx_class_instantiation_non_cxx_argument,none,
-      "only C++ types supported",
-      ())
 
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",

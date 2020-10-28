@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-// CHECK: class-template-instantiation-error-handling.swift:10:21: error: only C++ types supported
+// CHECK: class-template-instantiation-error-handling.swift:10:21: error: could not generate C++ types from the generic Swift types provided. The following Swift type(s) provided to 'MagicWrapper' were unable to be converted: String.
 TemplatesTestSuite.test("swift-template-arg-not-supported") {
   var magicString = MagicWrapper<String>(t: "asdf")
 }
