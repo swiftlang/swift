@@ -1541,6 +1541,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::UnresolvedMemberChainBase:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1678,6 +1679,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::UnresolvedMemberChainBase:
     return true;
   }
 
@@ -2032,6 +2034,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::UnresolvedMemberChainBase:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -4896,6 +4899,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
+    case ConstraintKind::UnresolvedMemberChainBase:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -7955,6 +7959,27 @@ ConstraintSystem::simplifyOneWayConstraint(
       secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto resultTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
+  auto baseTy = getFixedTypeRecursive(second, flags, /*wantRValue=*/true);
+
+  if (baseTy->isTypeVariableOrMember() || resultTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+          Constraint::create(*this, ConstraintKind::UnresolvedMemberChainBase,
+                             first, second, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  return matchTypes(baseTy, resultTy, ConstraintKind::Equal, flags, locator);
+}
+
 static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
                                             ConstraintLocatorBuilder locator) {
   auto lastElt = locator.last();
@@ -10761,6 +10786,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(kind, first, second, subflags, locator);
 
+  case ConstraintKind::UnresolvedMemberChainBase:
+    return simplifyUnresolvedMemberChainBaseConstraint(first, second, subflags,
+                                                       locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -11280,6 +11309,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getFirstType(),
                                     constraint.getSecondType(),
                                     /*flags*/ None, constraint.getLocator());
+
+  case ConstraintKind::UnresolvedMemberChainBase:
+    return simplifyUnresolvedMemberChainBaseConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags=*/None, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

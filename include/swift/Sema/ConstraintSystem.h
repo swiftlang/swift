@@ -4568,6 +4568,12 @@ private:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
+  /// Simplify an equality constraint between result and base types of
+  /// a unresolved member chain.
+  SolutionKind simplifyUnresolvedMemberChainBaseConstraint(
+      Type first, Type second, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraintImpl(
