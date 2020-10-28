@@ -2637,7 +2637,7 @@ public:
   UnboundGenericType *getUnboundGenericType() const;
 
   /// Retrieve a sugared interface type containing the structure of the interface
-  /// type before any semantic validation has occured.
+  /// type before any semantic validation has occurred.
   Type getStructuralType() const;
 
   /// Whether the typealias forwards perfectly to its underlying type.

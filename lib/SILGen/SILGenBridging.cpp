@@ -336,10 +336,17 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
 
 /// Get the type of each parameter, filtering out empty tuples.
 static SmallVector<CanType, 8>
-getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
+getParameterTypes(AnyFunctionType::CanParamArrayRef params,
+                  bool hasSelfParam=false) {
   SmallVector<CanType, 8> results;
-  for (auto param : params) {
-    assert(!param.isInOut() && !param.isVariadic());
+  for (auto n : indices(params)) {
+    bool isSelf = (hasSelfParam ? n == params.size() - 1 : false);
+
+    const auto &param = params[n];
+    assert(isSelf || !param.isInOut() &&
+           "Only the 'self' parameter can be inout in a bridging thunk");
+    assert(!param.isVariadic());
+
     if (param.getPlainType()->isVoid())
       continue;
     results.push_back(param.getPlainType());
@@ -1723,10 +1730,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     };
 
     {
+      bool hasSelfParam = fd->hasImplicitSelfDecl();
       auto foreignFormalParams =
-        getParameterTypes(foreignCI.LoweredType.getParams());
+        getParameterTypes(foreignCI.LoweredType.getParams(), hasSelfParam);
       auto nativeFormalParams =
-        getParameterTypes(nativeCI.LoweredType.getParams());
+        getParameterTypes(nativeCI.LoweredType.getParams(), hasSelfParam);
 
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.
@@ -1762,7 +1770,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
         maybeAddForeignErrorArg();
 
-        bool isSelf = nativeParamIndex == params.size() - 1;
+        bool isSelf = (hasSelfParam && nativeParamIndex == params.size() - 1);
 
         if (memberStatus.isInstance()) {
           // Leave space for `self` to be filled in later.
@@ -1786,6 +1794,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         CanType foreignFormalType =
           F.mapTypeIntoContext(foreignFormalParams[nativeParamIndex])
             ->getCanonicalType();
+
+        if (isSelf) {
+          assert(!nativeCI.LoweredType.getParams()[nativeParamIndex].isInOut() ||
+                 nativeFormalType == foreignFormalType &&
+                 "Cannot bridge 'self' parameter if passed inout");
+        }
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
         SILType foreignLoweredTy =

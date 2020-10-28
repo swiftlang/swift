@@ -30,7 +30,8 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
         llvm::StringSwitch<ArrayCallKind>(Attrs)
             .Case("array.props.isNativeTypeChecked",
                   ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-            .StartsWith("array.init", ArrayCallKind::kArrayInit)
+            .Case("array.init", ArrayCallKind::kArrayInit)
+            .Case("array.init.empty", ArrayCallKind::kArrayInitEmpty)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
             .Case("array.finalize_intrinsic", ArrayCallKind::kArrayFinalizeIntrinsic)
@@ -682,8 +683,10 @@ static SILValue getArrayUninitializedInitResult(ArraySemanticsCall arrayCall,
 
 SILValue swift::ArraySemanticsCall::getArrayValue() const {
   ArrayCallKind arrayCallKind = getKind();
-  if (arrayCallKind == ArrayCallKind::kArrayInit)
+  if (arrayCallKind == ArrayCallKind::kArrayInit
+      || arrayCallKind == ArrayCallKind::kArrayInitEmpty) {
     return SILValue(SemanticsCall);
+  }
   return getArrayUninitializedInitResult(*this, 0);
 }
 

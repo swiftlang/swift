@@ -2542,7 +2542,7 @@ As defined above, the `@differentiable` function type attributes requires all
 non-`@noDerivative` arguments and results to conform to the `@differentiable`
 attribute. However, there is one exception: when the type of an argument or
 result is a function type, e.g. `@differentiable (T) -> @differentiable (U) ->
-V`. This is because we need to differentiate higher-order funtions.
+V`. This is because we need to differentiate higher-order functions.
 
 Mathematically, the differentiability of `@differentiable (T, U) -> V` is
 similar to that of `@differentiable (T) -> @differentiable (U) -> V` in that

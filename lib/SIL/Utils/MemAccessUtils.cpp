@@ -15,6 +15,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -388,9 +389,7 @@ bool swift::isRCIdentityPreservingCast(SingleValueInstruction *svi) {
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
-    // If the source is nontrivial, then this checked cast may actually create a
-    // new object, so its source is not ref-count equivalent.
-    return !svi->getOperand(0)->getType().isTrivial(*svi->getFunction());
+    return SILDynamicCastInst(svi).isRCIdentityPreserving();
   }
 }
 
