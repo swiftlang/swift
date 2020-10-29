@@ -7199,6 +7199,10 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   if (!overload)
     return false;
 
+  auto resultTy = overload->openedType;
+  if (auto *fnType = resultTy->getAs<FunctionType>())
+    resultTy = fnType->getResult();
+
   auto *member = overload->choice.getDeclOrNull();
   assert(member);
 
@@ -7207,7 +7211,7 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
 
   emitDiagnostic(diag::type_does_not_conform_in_member_ref_on_protocol_type,
                  member->getDescriptiveKind(), member->getName(),
-                 MetatypeType::get(protocolTy), ResultType);
+                 MetatypeType::get(protocolTy), resultTy);
   emitDiagnosticAt(member, diag::decl_declared_here, member->getName());
   return true;
 }

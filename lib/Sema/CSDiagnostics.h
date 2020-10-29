@@ -2486,12 +2486,10 @@ public:
 /// `bar` can't be referenced from `P.Protocol` base because its result type
 /// `Int` doesn't conform to `Foo`.
 class InvalidMemberRefOnProtocolMetatype final : public FailureDiagnostic {
-  Type ResultType;
-
 public:
-  InvalidMemberRefOnProtocolMetatype(const Solution &solution, Type resultType,
+  InvalidMemberRefOnProtocolMetatype(const Solution &solution,
                                      ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), ResultType(resultType) {}
+      : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
 };
