@@ -173,6 +173,9 @@ SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain
 SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
 
+# Instructs swift-driver, et al to use local clones.
+export SWIFTCI_USE_LOCAL_DEPS=1
+
 if [ ${INSTALLER_PACKAGE} ]; then
   INSTALLER_PACKAGE="darwin_toolchain_installer_package=${TOOLCHAIN_NAME}-osx.pkg"
 fi
