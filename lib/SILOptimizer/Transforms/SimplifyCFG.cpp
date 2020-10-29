@@ -180,6 +180,7 @@ namespace {
     bool tryJumpThreading(BranchInst *BI);
     bool tailDuplicateObjCMethodCallSuccessorBlocks();
     bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
+    bool addToWorklistAfterSplittingEdges(SILBasicBlock *BB);
 
     bool simplifyBranchOperands(OperandValueArrayRef Operands);
     bool simplifyBranchBlock(BranchInst *BI);
@@ -715,6 +716,18 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   return false;
 }
 
+/// This is called after \p BB has been cloned during jump-threading
+/// (tail-duplication) and the new critical edge on its successor has been
+/// split. This is necessary to continue jump-threading through the split
+/// critical edge (since we only jump-thread one block at a time).
+bool SimplifyCFG::addToWorklistAfterSplittingEdges(SILBasicBlock *BB) {
+  addToWorklist(BB);
+  for (auto *succBB : BB->getSuccessorBlocks()) {
+    addToWorklist(succBB);
+  }
+  return false;
+}
+
 static NullablePtr<EnumElementDecl>
 getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
                      llvm::SmallPtrSetImpl<SILArgument *> &HandledArgs) {
@@ -1075,7 +1088,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // the threaded and edge block to the worklist now that they (likely) can be
   // simplified.
   addToWorklist(SrcBB);
-  addToWorklist(Cloner.getNewBB());
+
+  // Simplify the cloned block and continue jump-threading through its new
+  // successors edges.
+  addToWorklistAfterSplittingEdges(Cloner.getNewBB());
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
@@ -2816,7 +2832,9 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     Cloner.updateSSAAfterCloning();
 
     Changed = true;
-    addToWorklist(Cloner.getNewBB());
+    // Simplify the cloned block and continue tail duplicating through its new
+    // successors edges.
+    addToWorklistAfterSplittingEdges(Cloner.getNewBB());
   }
   return Changed;
 }
