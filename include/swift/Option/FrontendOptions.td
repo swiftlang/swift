@@ -665,7 +665,8 @@ def experimental_spi_imports :
 def experimental_print_full_convention :
  Flag<["-"], "experimental-print-full-convention">,
  HelpText<"When emitting a module interface or SIL, emit additional @convention"
-          " arguments, regardless of whether they were written in the source">;
+          " arguments, regardless of whether they were written in the source."
+          " Also requires -use-clang-function-types to be enabled.">;
 
 def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
