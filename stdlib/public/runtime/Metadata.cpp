@@ -2063,6 +2063,11 @@ bool swift::equalContexts(const ContextDescriptor *a,
 SWIFT_CC(swift)
 bool swift::swift_compareTypeContextDescriptors(
     const TypeContextDescriptor *a, const TypeContextDescriptor *b) {
+  a = swift_auth_data_non_address(
+      a, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  b = swift_auth_data_non_address(
+      b, SpecialPointerAuthDiscriminators::TypeDescriptor);
+
   // The implementation is the same as the implementation of
   // swift::equalContexts except that the handling of non-type
   // context descriptors and casts to TypeContextDescriptor are removed.

@@ -522,12 +522,7 @@ class ClassInt: Equatable, Hashable {
   static func == (lhs: ClassInt, rhs: ClassInt) -> Bool {return true}
   func hash(into hasher: inout Hasher) {}
 }
-CastsTests.test("AnyHashable(Class) -> Obj-C -> Class")
-.skip(.custom({
-      !_isDebugAssertConfiguration()
-    },
-    reason: "Cast optimizer breaks this test"))
-.code {
+CastsTests.test("AnyHashable(Class) -> Obj-C -> Class") {
   let a = ClassInt()
   let b = runtimeCast(a, to: AnyHashable.self)!
   let c = _bridgeAnythingToObjectiveC(b)
@@ -759,6 +754,14 @@ CastsTests.test("Async function types") {
   expectTrue(asyncFnType is (() async -> Void).Type)
   expectFalse(fnType is (() async -> Void).Type)
   expectFalse(asyncFnType is (() -> Void).Type)
+}
+
+// `Optional<Int>` is Hashable, so it must cast to AnyHashable,
+// even if it contains a nil.  (This was broken in 5.3 and earlier,
+// but was fixed by the new dynamic cast runtime.)
+CastsTests.test("Optional nil -> AnyHashable") {
+  let a : Int? = nil
+  expectNotNil(a as? AnyHashable)
 }
 
 runAllTests()
