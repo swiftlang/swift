@@ -1198,27 +1198,6 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
   destBB = targetBranch->getDestBB();
 }
 
-/// \return If this is a basic block without any arguments and it has
-/// a single br instruction, return this br.
-static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
-  if (!SBB->args_empty())
-    return nullptr;
-
-  // Ignore blocks with more than one instruction.
-  if (!onlyHasTerminatorAndDebugInsts(SBB))
-    return nullptr;
-
-  auto *BI = dyn_cast<BranchInst>(SBB->getTerminator());
-  if (!BI)
-    return nullptr;
-
-  // Disallow infinite loops.
-  if (BI->getDestBB() == SBB)
-    return nullptr;
-
-  return BI;
-}
-
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
@@ -1390,20 +1369,6 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     return true;
 
   return Simplified;
-}
-
-/// Check if replacing an existing edge of the terminator by another
-/// one which has a DestBB as its destination would create a critical edge.
-static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
-  auto SrcSuccs = T->getSuccessors();
-  if (SrcSuccs.size() <= 1)
-    return false;
-
-  assert(!DestBB->pred_empty() && "There should be a predecessor");
-  if (DestBB->getSinglePredecessorBlock())
-    return false;
-
-  return true;
 }
 
 /// Returns the original boolean value, looking through possible invert
@@ -1631,44 +1596,6 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                trueTrampolineDest.destBB);
     removeIfDead(TrueSide);
     removeIfDead(FalseSide);
-    return true;
-  }
-  auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);
-  if (TrueTrampolineBr &&
-      !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
-    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID()
-                            << " to bb"
-                            << TrueTrampolineBr->getDestBB()->getDebugID()
-                            << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueTrampolineBr->getDestBB(),
-        TrueTrampolineBr->getArgs(), FalseSide, FalseArgs, BI->getTrueBBCount(),
-        BI->getFalseBBCount());
-    BI->eraseFromParent();
-
-    if (LoopHeaders.count(TrueSide))
-      LoopHeaders.insert(ThisBB);
-    removeIfDead(TrueSide);
-    addToWorklist(ThisBB);
-    return true;
-  }
-
-  auto *FalseTrampolineBr = getTrampolineWithoutBBArgsTerminator(FalseSide);
-  if (FalseTrampolineBr &&
-      !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
-    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb"
-                            << ThisBB->getDebugID() << " to bb"
-                            << FalseTrampolineBr->getDestBB()->getDebugID()
-                            << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
-        FalseTrampolineBr->getDestBB(), FalseTrampolineBr->getArgs(),
-        BI->getTrueBBCount(), BI->getFalseBBCount());
-    BI->eraseFromParent();
-    if (LoopHeaders.count(FalseSide))
-      LoopHeaders.insert(ThisBB);
-    removeIfDead(FalseSide);
-    addToWorklist(ThisBB);
     return true;
   }
   // If we have a (cond (select_enum)) on a two element enum, always have the
