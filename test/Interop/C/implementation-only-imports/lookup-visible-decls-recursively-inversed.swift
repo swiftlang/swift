@@ -17,10 +17,10 @@
 // that the `getFortyTwo` decl can be found when at least one of the
 // modules is not `@_implementationOnly`.
 
-@_implementationOnly import UseModuleA
-import UseModuleB
+import UseModuleA
+@_implementationOnly import UseModuleB
 
 @inlinable
 public func callFortyTwo() -> CInt {
-    return getFortyTwo()
+  return getFortyTwo()
 }

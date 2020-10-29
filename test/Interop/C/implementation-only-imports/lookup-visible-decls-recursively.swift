@@ -22,5 +22,5 @@ import UseModuleA
 
 @inlinable
 public func callFortyTwo() -> CInt {
-    return getFortyTwo()
+  return getFortyTwo()
 }

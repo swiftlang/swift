@@ -18,5 +18,5 @@ import UserA
 
 @_inlineable
 public func callFortyTwo() -> CInt {
-    return getFortyTwo()
+  return getFortyTwo()
 }
