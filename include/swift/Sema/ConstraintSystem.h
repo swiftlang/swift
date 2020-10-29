@@ -1460,7 +1460,11 @@ struct MemberLookupResult {
     UR_ReferenceWritableKeyPathOnMutatingMember,
 
     /// This is a KeyPath whose root type is AnyObject
-    UR_KeyPathWithAnyObjectRootType
+    UR_KeyPathWithAnyObjectRootType,
+
+    /// This is a static member being access through a protocol metatype
+    /// but its result type doesn't conform to this protocol.
+    UR_InvalidStaticMemberOnProtocolMetatype,
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

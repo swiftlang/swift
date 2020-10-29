@@ -7369,7 +7369,10 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       break;
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       return AllowAnyObjectKeyPathRoot::create(cs, locator);
-   }
+
+    case MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype:
+      return AllowInvalidStaticMemberRefOnProtocolMetatype::create(cs, locator);
+    }
   }
 
   return nullptr;
