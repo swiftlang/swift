@@ -1,5 +1,7 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs -emit-ir -o - %s | %FileCheck %s
 
+// UNSUPPORTED: OS=linux-android
+
 import MemoryLayout
 
 var v = PrivateMemberLayout()

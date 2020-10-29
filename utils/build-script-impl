@@ -474,11 +474,11 @@ function set_build_options_for_host() {
             fi
             case ${host} in
                 android-aarch64)
-                    SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
+                    SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android${ANDROID_API_LEVEL}"
                     llvm_target_arch="AArch64"
                     ;;
                 android-armv7)
-                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi${ANDROID_API_LEVEL}"
                     llvm_target_arch="ARM"
                     ;;
                 android-x86_64)
