@@ -1189,24 +1189,10 @@ namespace {
         // Here `P.foo` would be replaced with `S.foo`
         if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
             member->isStatic()) {
-          auto refKind = choice.getFunctionRefKind();
-          Type baseTy;
-
-          bool isMethod = isa<AbstractFunctionDecl>(member);
-          switch (refKind) {
-          case FunctionRefKind::Compound:
-          case FunctionRefKind::Unapplied:
-          case FunctionRefKind::SingleApply: {
-            baseTy = isMethod ? openedType->castTo<FunctionType>()->getResult()
-                              : openedType;
-            break;
-          }
-
-          case FunctionRefKind::DoubleApply: {
-            llvm_unreachable("not implemented yet");
-          }
-          }
-
+          Type baseTy =
+              simplifyType(openedType->is<FunctionType>()
+                               ? openedType->castTo<FunctionType>()->getResult()
+                               : openedType);
           base = TypeExpr::createImplicitHack(base->getLoc(), baseTy, context);
           cs.cacheType(base);
         }

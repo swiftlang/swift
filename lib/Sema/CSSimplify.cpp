@@ -5511,19 +5511,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
-
-    if (elt->is<LocatorPathElt::UnresolvedMemberChainResult>()) {
-      if (type1->is<ProtocolType>() && !type2->isTypeVariableOrMember()) {
-        auto result = simplifyConformsToConstraint(
-            type2, type1, ConstraintKind::ConformsTo,
-            locator.withPathElement(LocatorPathElt::TypeParameterRequirement(
-                0, RequirementKind::Conformance)),
-            subflags);
-
-        return result == SolutionKind::Error ? getTypeMatchFailure(locator)
-                                             : getTypeMatchSuccess();
-      }
-    }
   }
 
   if (kind == ConstraintKind::BindParam) {
@@ -6839,7 +6826,50 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     ->hasTypeParameter()) {
 
       /* We're OK */
+    } else if (baseObjTy->is<MetatypeType>() &&
+               instanceTy->isExistentialType()) {
+      // Static member lookup on protocol metatype requires that result type
+      // of a selected member to conform to protocol this method is being
+      // referred from.
+      assert(hasStaticMembers);
 
+      Type resultTy;
+
+      // Cannot instantiate a protocol or reference a member on
+      // protocol composition type.
+      if (isa<ConstructorDecl>(decl) ||
+          instanceTy->is<ProtocolCompositionType>()) {
+        result.addUnviable(candidate,
+                           MemberLookupResult::UR_TypeMemberOnInstance);
+        return;
+      }
+
+      if (isa<AbstractFunctionDecl>(decl)) {
+        auto refTy =
+            decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+        resultTy = refTy->castTo<FunctionType>()->getResult();
+      } else if (isa<SubscriptDecl>(decl)) {
+        resultTy =
+            decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+      } else {
+        resultTy = decl->getInterfaceType();
+      }
+
+      if (auto *fnType = resultTy->getAs<FunctionType>())
+        resultTy = fnType->getResult();
+
+      // If result is not a concrete type which could conform to the
+      // expected protocol, this method is only viable for diagnostics.
+      if (!(resultTy->is<NominalType>() || resultTy->is<BoundGenericType>()) ||
+          resultTy->isExistentialType()) {
+        result.addUnviable(
+            candidate,
+            MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
+        return;
+      }
+
+      result.addViable(candidate);
+      return;
     } else {
       if (!hasStaticMembers) {
         result.addUnviable(candidate,
@@ -7978,6 +8008,24 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     }
 
     return SolutionKind::Unsolved;
+  }
+
+  if (baseTy->is<ProtocolType>()) {
+    auto *baseExpr =
+        castToExpr<UnresolvedMemberChainResultExpr>(locator.getAnchor())
+            ->getChainBase();
+    auto *memberLoc =
+        getConstraintLocator(baseExpr, ConstraintLocator::UnresolvedMember);
+
+    auto *memberRef = findResolvedMemberRef(memberLoc);
+    assert(memberRef);
+
+    if (memberRef->isStatic()) {
+      return simplifyConformsToConstraint(
+          resultTy, baseTy, ConstraintKind::ConformsTo,
+          getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
+          flags);
+    }
   }
 
   return matchTypes(baseTy, resultTy, ConstraintKind::Equal, flags, locator);

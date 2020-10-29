@@ -1577,22 +1577,15 @@ ConstraintSystem::getTypeOfMemberReference(
   Type baseOpenedTy = baseObjTy;
 
   if (isStaticMemberRefOnProtocol) {
-    auto refTy = openedType->castTo<FunctionType>();
-    switch (functionRefKind) {
-    // Either variable or use of method as a value
-    case FunctionRefKind::Unapplied:
-    case FunctionRefKind::SingleApply:
-    case FunctionRefKind::Compound: {
-      baseOpenedTy =
-          isa<AbstractFunctionDecl>(value)
-              ? refTy->getResult()->castTo<FunctionType>()->getResult()
-              : refTy->getResult();
-      break;
-    }
-
-    case FunctionRefKind::DoubleApply:
-      llvm_unreachable("not implemented yet");
-    }
+    // Member type with Self applied.
+    auto refTy = openedType->castTo<FunctionType>()->getResult();
+    // If member is a function type, let's use its result type
+    // since it could be either a static method or a property
+    // which returns a function type.
+    if (auto *funcTy = refTy->getAs<FunctionType>())
+      baseOpenedTy = funcTy->getResult();
+    else
+      baseOpenedTy = refTy;
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back(
@@ -1611,23 +1604,6 @@ ConstraintSystem::getTypeOfMemberReference(
     // if it didn't conform.
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
-
-    if (isStaticMemberRefOnProtocol) {
-      // Since base is a protocol metatype we could use to make sure that
-      // self type inferred from result of the member does indeed conform
-      // to the expected protocol.
-      //
-      // Delay solving this constraint until after member choice has
-      // been completely resolved by the constraint system, so that
-      // conformance failure has access to a referenced declaration.
-      auto *constraint = Constraint::create(
-          *this, ConstraintKind::ConformsTo, selfObjTy, baseObjTy,
-          getConstraintLocator(
-              locator.withPathElement(ConstraintLocator::MemberRefBase)));
-
-      addUnsolvedConstraint(constraint);
-      activateConstraint(constraint);
-    }
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
   }
