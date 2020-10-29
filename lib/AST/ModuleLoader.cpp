@@ -24,14 +24,14 @@
 #include "swift/ClangImporter/ClangImporter.h"
 
 namespace llvm {
-class FileCollector;
+class FileCollectorBase;
 }
 
 namespace swift {
 
 DependencyTracker::DependencyTracker(
     IntermoduleDepTrackingMode Mode,
-    std::shared_ptr<llvm::FileCollector> FileCollector)
+    std::shared_ptr<llvm::FileCollectorBase> FileCollector)
     // NB: The ClangImporter believes it's responsible for the construction of
     // this instance, and it static_cast<>s the instance pointer to its own
     // subclass based on that belief. If you change this to be some other

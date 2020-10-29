@@ -2096,6 +2096,10 @@ public:
     }
   }
 
+  void visitHopToExecutorInst(HopToExecutorInst *HTEI) {
+    *this << getIDAndType(HTEI->getActor());
+  }
+
   void visitSwitchValueInst(SwitchValueInst *SII) {
     *this << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
