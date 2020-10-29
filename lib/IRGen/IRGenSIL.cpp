@@ -1136,6 +1136,10 @@ public:
     llvm_unreachable("not implemented");
   }
 
+  void visitHopToExecutorInst(HopToExecutorInst *i) {
+    //TODO(async)
+  }
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);

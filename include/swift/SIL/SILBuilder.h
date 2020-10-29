@@ -1935,6 +1935,10 @@ public:
         getSILDebugLocation(Loc), Operand, Index));
   }
 
+  //===--------------------------------------------------------------------===//
+  // Concurrency instructions
+  //===--------------------------------------------------------------------===//
+
   GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
                                                        SILType ContinuationTy) {
     return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
@@ -1947,6 +1951,11 @@ public:
     return insert(new (getModule()) GetAsyncContinuationAddrInst(getSILDebugLocation(Loc),
                                                                  Operand,
                                                                  ContinuationTy));
+  }
+
+  HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {
+    return insert(new (getModule()) HopToExecutorInst(getSILDebugLocation(Loc),
+                                                      Actor, hasOwnership()));
   }
 
   //===--------------------------------------------------------------------===//
