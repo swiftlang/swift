@@ -1336,7 +1336,11 @@ public:
       SILFunction *Func = entry.getMethodWitness().Witness;
       llvm::Constant *witness = nullptr;
       if (Func) {
-        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+        if (Func->isAsync()) {
+          witness = IGM.getAddrOfAsyncFunctionPointer(Func);
+        } else {
+          witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+        }
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
