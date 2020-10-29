@@ -37,10 +37,12 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-ExportContext::ExportContext(DeclContext *DC, FragileFunctionKind kind,
+ExportContext::ExportContext(DeclContext *DC,
+                             AvailabilityContext runningOSVersion,
+                             FragileFunctionKind kind,
                              bool spi, bool exported, bool implicit, bool deprecated,
                              Optional<PlatformKind> unavailablePlatformKind)
-    : DC(DC), FragileKind(kind) {
+    : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
   Implicit = implicit;
@@ -169,7 +171,10 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
-
+  auto runningOSVersion =
+      (Ctx.LangOpts.DisableAvailabilityChecking
+       ? AvailabilityContext::alwaysAvailable()
+       : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
   bool spi = false;
   bool implicit = false;
   bool deprecated = false;
@@ -185,14 +190,19 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+  return ExportContext(DC, runningOSVersion, fragileKind,
+                       spi, exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 
-ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
+ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
+  auto runningOSVersion =
+      (Ctx.LangOpts.DisableAvailabilityChecking
+       ? AvailabilityContext::alwaysAvailable()
+       : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
   bool spi = false;
   bool implicit = false;
@@ -207,7 +217,8 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC) {
 
   bool exported = false;
 
-  return ExportContext(DC, fragileKind, spi, exported, implicit, deprecated,
+  return ExportContext(DC, runningOSVersion, fragileKind,
+                       spi, exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 
@@ -915,8 +926,9 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 }
 
 Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
-                                          const DeclContext *referenceDC) {
+TypeChecker::checkDeclarationAvailability(const Decl *D,
+                                          const ExportContext &where) {
+  auto *referenceDC = where.getDeclContext();
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
     return None;
@@ -929,7 +941,7 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
   }
 
   AvailabilityContext runningOSOverApprox =
-      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
+      where.getAvailabilityContext();
 
   AvailabilityContext safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
@@ -1657,7 +1669,7 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const ValueDecl *D, ExportContext where,
+    const ValueDecl *D, const ExportContext &where,
     const AvailableAttr *attr) {
   auto referencedPlatform = where.getUnavailablePlatformKind();
   if (!referencedPlatform)
@@ -2056,7 +2068,7 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
-                                       ExportContext Where,
+                                       const ExportContext &Where,
                                        const ValueDecl *DeprecatedDecl,
                                        const ApplyExpr *Call) {
   const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
@@ -2073,8 +2085,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityContext RunningOSVersions =
-        overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
+    AvailabilityContext RunningOSVersions = Where.getAvailabilityContext();
     if (RunningOSVersions.isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
@@ -2191,7 +2202,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
                                            SourceRange R,
-                                           ExportContext Where,
+                                           const ExportContext &Where,
                                            const ApplyExpr *call,
                                            DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(D, R, Where, Flags,
@@ -2265,7 +2276,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
-    ExportContext Where,
+    const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
@@ -2399,7 +2410,7 @@ bool swift::diagnoseExplicitUnavailability(
 }
 
 namespace {
-class AvailabilityWalker : public ASTWalker {
+class ExprAvailabilityWalker : public ASTWalker {
   /// Describes how the next member reference will be treated as we traverse
   /// the AST.
   enum class MemberAccessContext : unsigned {
@@ -2420,10 +2431,10 @@ class AvailabilityWalker : public ASTWalker {
   ASTContext &Context;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  ExportContext Where;
+  const ExportContext &Where;
 
 public:
-  AvailabilityWalker(ExportContext Where)
+  explicit ExprAvailabilityWalker(const ExportContext &Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
@@ -2444,8 +2455,8 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
-      diagAvailability(DR->getDeclRef(), DR->getSourceRange(),
-                       getEnclosingApplyExpr(), None);
+      diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
+                                  getEnclosingApplyExpr(), None);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -2453,18 +2464,18 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDeclRef(),
-                       OCDR->getConstructorLoc().getSourceRange(),
-                       getEnclosingApplyExpr());
+      diagnoseDeclRefAvailability(OCDR->getDeclRef(),
+                                  OCDR->getConstructorLoc().getSourceRange(),
+                                  getEnclosingApplyExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember(),
-                       DMR->getNameLoc().getSourceRange(),
-                       getEnclosingApplyExpr());
+      diagnoseDeclRefAvailability(DMR->getMember(),
+                                  DMR->getNameLoc().getSourceRange(),
+                                  getEnclosingApplyExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(DS->getMember(), DS->getSourceRange());
+      diagnoseDeclRefAvailability(DS->getMember(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
-        diagAvailability(S->getDecl(), S->getSourceRange());
+        diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange());
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
@@ -2510,9 +2521,20 @@ public:
     return E;
   }
 
-  bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
-                        const ApplyExpr *call = nullptr,
-                        DeclAvailabilityFlags flags = None) const;
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    // We end up here when checking the output of the result builder transform,
+    // which includes closures that are not "separately typechecked" and yet
+    // contain statements and declarations. We need to walk them recursively,
+    // since these availability for these statements is not diagnosed from
+    // typeCheckStmt() as usual.
+    diagnoseStmtAvailability(S, Where.getDeclContext(),
+                             /*walkRecursively=*/true);
+    return std::make_pair(false, S);
+  }
+
+  bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
+                                   const ApplyExpr *call = nullptr,
+                                   DeclAvailabilityFlags flags = None) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -2577,7 +2599,8 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(D, E->getNameLoc().getSourceRange()))
+    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange(),
+                                 nullptr, Where))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
@@ -2596,10 +2619,9 @@ private:
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::Subscript: {
-        auto *decl = component.getDeclRef().getDecl();
+        auto decl = component.getDeclRef();
         auto loc = component.getLoc();
-        SourceRange range(loc, loc);
-        diagAvailability(decl, range, nullptr, flags);
+        diagnoseDeclRefAvailability(decl, loc, nullptr, flags);
         break;
       }
 
@@ -2679,9 +2701,13 @@ private:
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 DeclAvailabilityFlags Flags) const {
+    if (!D)
+      return;
+
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
+    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr,
+                                 Where, Flags))
       return;
   }
 };
@@ -2690,16 +2716,12 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
-                                     const ApplyExpr *call,
-                                     DeclAvailabilityFlags Flags) const {
+ExprAvailabilityWalker::diagnoseDeclRefAvailability(
+    ConcreteDeclRef declRef, SourceRange R, const ApplyExpr *call,
+    DeclAvailabilityFlags Flags) const {
   if (!declRef)
     return false;
   const ValueDecl *D = declRef.getDecl();
-
-  // Generic parameters are always available.
-  if (isa<GenericTypeParamDecl>(D))
-    return false;
 
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
@@ -2707,6 +2729,32 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
     if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
       return true;
   }
+
+  diagnoseDeclAvailability(D, R, call, Where, Flags);
+
+  if (R.isValid()) {
+    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
+                                            Where)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+bool
+swift::diagnoseDeclAvailability(const ValueDecl *D,
+                                SourceRange R,
+                                const ApplyExpr *call,
+                                const ExportContext &Where,
+                                DeclAvailabilityFlags Flags) {
+  assert(!Where.isImplicit());
+
+  // Generic parameters are always available.
+  if (isa<GenericTypeParamDecl>(D))
+    return false;
 
   // Keep track if this is an accessor.
   auto accessor = dyn_cast<AccessorDecl>(D);
@@ -2726,13 +2774,6 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return true;
   }
 
-  if (R.isValid()) {
-    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
-                                            Where)) {
-      return true;
-    }
-  }
-
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
     return true;
 
@@ -2749,11 +2790,11 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
         && isa<ProtocolDecl>(D))
     return false;
 
-  auto *DC = Where.getDeclContext();
-
   // Diagnose (and possibly signal) for potential unavailability
-  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, R.Start, DC);
+  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, Where);
   if (maybeUnavail.hasValue()) {
+    auto *DC = Where.getDeclContext();
+
     if (accessor) {
       bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
       TypeChecker::diagnosePotentialAccessorUnavailability(accessor, R, DC,
@@ -2787,8 +2828,8 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
 /// If this is a call to an unavailable ++ / -- operator, try to diagnose it
 /// with a fixit hint and return true.  If not, or if we fail, return false.
 bool
-AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                                          const AvailableAttr *Attr) const {
+ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
+                                              const AvailableAttr *Attr) const {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getBaseName() == "++";
   if (!isInc && D->getBaseName() != "--")
@@ -2851,10 +2892,10 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 /// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
 bool
-AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                                  SourceRange R,
-                                                  const AvailableAttr *Attr,
-                                                  const ApplyExpr *call) const {
+ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
+                                                      SourceRange R,
+                                                      const AvailableAttr *Attr,
+                                                      const ApplyExpr *call) const {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
@@ -2923,36 +2964,48 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 }
 
 /// Diagnose uses of unavailable declarations.
-void swift::diagAvailability(const Expr *E, DeclContext *DC) {
-  auto where = ExportContext::forFunctionBody(DC);
+void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
+  auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
   if (where.isImplicit())
     return;
-  AvailabilityWalker walker(where);
+  ExprAvailabilityWalker walker(where);
   const_cast<Expr*>(E)->walk(walker);
 }
 
 namespace {
 
 class StmtAvailabilityWalker : public ASTWalker {
-  ExportContext Where;
+  DeclContext *DC;
+  bool WalkRecursively;
 
 public:
-  explicit StmtAvailabilityWalker(ExportContext where)
-    : Where(where) {}
+  explicit StmtAvailabilityWalker(DeclContext *dc, bool walkRecursively)
+    : DC(dc), WalkRecursively(walkRecursively) {}
 
-  /// We'll visit the expression from performSyntacticExprDiagnostics().
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (!WalkRecursively && isa<BraceStmt>(S))
+      return std::make_pair(false, S);
+
+    return std::make_pair(true, S);
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (WalkRecursively)
+      diagnoseExprAvailability(E, DC);
     return std::make_pair(false, E);
   }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
-    diagnoseTypeReprAvailability(T, Where);
+    auto where = ExportContext::forFunctionBody(DC, T->getStartLoc());
+    diagnoseTypeReprAvailability(T, where);
     return false;
   }
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-    if (auto *IP = dyn_cast<IsPattern>(P))
-      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), Where);
+    if (auto *IP = dyn_cast<IsPattern>(P)) {
+      auto where = ExportContext::forFunctionBody(DC, P->getLoc());
+      diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), where);
+    }
 
     return std::make_pair(true, P);
   }
@@ -2960,29 +3013,26 @@ public:
 
 }
 
-void swift::diagAvailability(const Stmt *S, DeclContext *DC) {
+void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
+                                     bool walkRecursively) {
   // We'll visit the individual statements when we check them.
-  if (isa<BraceStmt>(S))
+  if (!walkRecursively && isa<BraceStmt>(S))
     return;
 
-  auto where = ExportContext::forFunctionBody(DC);
-  if (where.isImplicit())
-    return;
-
-  StmtAvailabilityWalker walker(where);
+  StmtAvailabilityWalker walker(DC, walkRecursively);
   const_cast<Stmt*>(S)->walk(walker);
 }
 
 namespace {
 
 class TypeReprAvailabilityWalker : public ASTWalker {
-  ExportContext where;
+  const ExportContext &where;
   DeclAvailabilityFlags flags;
 
   bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
-      if (diagnoseDeclAvailability(typeDecl, range, where, flags))
+      if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
         return true;
     }
 
@@ -3004,7 +3054,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
 public:
   bool foundAnyIssues = false;
 
-  TypeReprAvailabilityWalker(ExportContext where,
+  TypeReprAvailabilityWalker(const ExportContext &where,
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
 
@@ -3039,7 +3089,8 @@ public:
 
 }
 
-bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, ExportContext where,
+bool swift::diagnoseTypeReprAvailability(const TypeRepr *T,
+                                         const ExportContext &where,
                                          DeclAvailabilityFlags flags) {
   if (!T)
     return false;
@@ -3052,11 +3103,11 @@ namespace {
 
 class ProblematicTypeFinder : public TypeDeclFinder {
   SourceLoc Loc;
-  ExportContext Where;
+  const ExportContext &Where;
   DeclAvailabilityFlags Flags;
 
 public:
-  ProblematicTypeFinder(SourceLoc Loc, ExportContext Where,
+  ProblematicTypeFinder(SourceLoc Loc, const ExportContext &Where,
                         DeclAvailabilityFlags Flags)
       : Loc(Loc), Where(Where), Flags(Flags) {}
 
@@ -3130,7 +3181,8 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, ExportContext where,
+void swift::diagnoseTypeAvailability(Type T, SourceLoc loc,
+                                     const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (!T)
     return;
@@ -3138,7 +3190,7 @@ void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, ExportContext where,
 }
 
 void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
-                                     ExportContext where,
+                                     const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
     return;
@@ -3148,7 +3200,7 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
-                                       ExportContext where) {
+                                       const ExportContext &where) {
   if (!conformance.isConcrete())
     return false;
   const ProtocolConformance *concreteConf = conformance.getConcrete();
@@ -3167,26 +3219,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
-                                           ExportContext where) {
+                                           const ExportContext &where) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where))
       hadAnyIssues = true;
   }
   return hadAnyIssues;
-}
-
-/// Run the Availability-diagnostics algorithm otherwise used in an expr
-/// context, but for non-expr contexts such as TypeDecls referenced from
-/// TypeReprs.
-bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
-                                     SourceRange R,
-                                     ExportContext Where,
-                                     DeclAvailabilityFlags Flags)
-{
-  assert(!Where.isImplicit());
-  AvailabilityWalker AW(Where);
-  return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
 /// Should we warn that \p decl needs an explicit availability annotation

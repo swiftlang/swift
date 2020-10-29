@@ -4600,7 +4600,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
@@ -4623,7 +4623,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
       checkImplicitPromotionsInCondition(elt, ctx);
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagAvailability(S, const_cast<DeclContext*>(DC));
+    diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
 }
 
 //===----------------------------------------------------------------------===//
