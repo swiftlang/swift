@@ -6,7 +6,7 @@ import DeclB
 
 @_inlineable
 public func callFortySomething() -> CInt {
-    return getFortySomething()
+  return getFortySomething()
 }
 
 // CHECK: 'getFortySomething' has different definitions in different modules

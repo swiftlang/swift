@@ -130,7 +130,6 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
 
   auto fragileKind = where.getFragileFunctionKind();

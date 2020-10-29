@@ -8,5 +8,5 @@ import UserB
 
 @_inlineable
 public func createAWrapper() {
-    let _wrapper = MagicWrapper();
+  let _wrapper = MagicWrapper()
 }

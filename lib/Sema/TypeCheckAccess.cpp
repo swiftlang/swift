@@ -1448,14 +1448,13 @@ public:
 ///
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
-swift::getDisallowedOriginKind(const Decl *decl, ExportContext where,
+swift::getDisallowedOriginKind(const Decl *decl,
+                               ExportContext where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
-
   auto *SF = where.getDeclContext()->getParentSourceFile();
   if (SF->isImportedImplementationOnly(M)) {
-
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
     if (where.isSPI())
@@ -1494,9 +1493,9 @@ swift::getDisallowedOriginKind(const Decl *decl, ExportContext where,
     return DisallowedOriginKind::ImplementationOnly;
   } else if (decl->isSPI() && !where.isSPI()) {
     // SPI can only be exported in SPI.
-    return where.getDeclContext()->getParentModule() == M
-               ? DisallowedOriginKind::SPILocal
-               : DisallowedOriginKind::SPIImported;
+    return where.getDeclContext()->getParentModule() == M ?
+      DisallowedOriginKind::SPILocal :
+      DisallowedOriginKind::SPIImported;
   }
 
   return DisallowedOriginKind::None;
