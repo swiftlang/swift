@@ -1448,7 +1448,7 @@ public:
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
 swift::getDisallowedOriginKind(const Decl *decl,
-                               ExportContext where,
+                               const ExportContext &where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
@@ -1826,7 +1826,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
 }
 
 DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
-                                                    ExportContext where) {
+                                                    const ExportContext &where) {
   auto downgradeToWarning = DowngradeToWarning::No;
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
 }

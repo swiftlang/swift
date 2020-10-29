@@ -926,7 +926,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 }
 
 Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(const Decl *D, ExportContext where) {
+TypeChecker::checkDeclarationAvailability(const Decl *D,
+                                          const ExportContext &where) {
   auto *referenceDC = where.getDeclContext();
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
@@ -1668,7 +1669,7 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const ValueDecl *D, ExportContext where,
+    const ValueDecl *D, const ExportContext &where,
     const AvailableAttr *attr) {
   auto referencedPlatform = where.getUnavailablePlatformKind();
   if (!referencedPlatform)
@@ -2067,7 +2068,7 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
-                                       ExportContext Where,
+                                       const ExportContext &Where,
                                        const ValueDecl *DeprecatedDecl,
                                        const ApplyExpr *Call) {
   const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
@@ -2201,7 +2202,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
                                            SourceRange R,
-                                           ExportContext Where,
+                                           const ExportContext &Where,
                                            const ApplyExpr *call,
                                            DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(D, R, Where, Flags,
@@ -2275,7 +2276,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
-    ExportContext Where,
+    const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
@@ -2430,10 +2431,10 @@ class ExprAvailabilityWalker : public ASTWalker {
   ASTContext &Context;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  ExportContext Where;
+  const ExportContext &Where;
 
 public:
-  explicit ExprAvailabilityWalker(ExportContext Where)
+  explicit ExprAvailabilityWalker(const ExportContext &Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
@@ -2747,7 +2748,7 @@ bool
 swift::diagnoseDeclAvailability(const ValueDecl *D,
                                 SourceRange R,
                                 const ApplyExpr *call,
-                                ExportContext Where,
+                                const ExportContext &Where,
                                 DeclAvailabilityFlags Flags) {
   assert(!Where.isImplicit());
 
@@ -3025,7 +3026,7 @@ void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
 namespace {
 
 class TypeReprAvailabilityWalker : public ASTWalker {
-  ExportContext where;
+  const ExportContext &where;
   DeclAvailabilityFlags flags;
 
   bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
@@ -3053,7 +3054,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
 public:
   bool foundAnyIssues = false;
 
-  TypeReprAvailabilityWalker(ExportContext where,
+  TypeReprAvailabilityWalker(const ExportContext &where,
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
 
@@ -3088,7 +3089,8 @@ public:
 
 }
 
-bool swift::diagnoseTypeReprAvailability(const TypeRepr *T, ExportContext where,
+bool swift::diagnoseTypeReprAvailability(const TypeRepr *T,
+                                         const ExportContext &where,
                                          DeclAvailabilityFlags flags) {
   if (!T)
     return false;
@@ -3101,11 +3103,11 @@ namespace {
 
 class ProblematicTypeFinder : public TypeDeclFinder {
   SourceLoc Loc;
-  ExportContext Where;
+  const ExportContext &Where;
   DeclAvailabilityFlags Flags;
 
 public:
-  ProblematicTypeFinder(SourceLoc Loc, ExportContext Where,
+  ProblematicTypeFinder(SourceLoc Loc, const ExportContext &Where,
                         DeclAvailabilityFlags Flags)
       : Loc(Loc), Where(Where), Flags(Flags) {}
 
@@ -3179,7 +3181,8 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, ExportContext where,
+void swift::diagnoseTypeAvailability(Type T, SourceLoc loc,
+                                     const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (!T)
     return;
@@ -3187,7 +3190,7 @@ void swift::diagnoseTypeAvailability(Type T, SourceLoc loc, ExportContext where,
 }
 
 void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
-                                     ExportContext where,
+                                     const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
     return;
@@ -3197,7 +3200,7 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
-                                       ExportContext where) {
+                                       const ExportContext &where) {
   if (!conformance.isConcrete())
     return false;
   const ProtocolConformance *concreteConf = conformance.getConcrete();
@@ -3216,7 +3219,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
-                                           ExportContext where) {
+                                           const ExportContext &where) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where))

@@ -193,36 +193,36 @@ void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
 
 /// Diagnose uses of unavailable declarations in types.
 bool diagnoseTypeReprAvailability(const TypeRepr *T,
-                                  ExportContext context,
+                                  const ExportContext &context,
                                   DeclAvailabilityFlags flags = None);
 
 /// Diagnose uses of unavailable conformances in types.
 void diagnoseTypeAvailability(Type T, SourceLoc loc,
-                              ExportContext context,
+                              const ExportContext &context,
                               DeclAvailabilityFlags flags = None);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
 void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
-                              ExportContext context,
+                              const ExportContext &context,
                               DeclAvailabilityFlags flags = None);
 
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
-                                ExportContext context);
+                                const ExportContext &context);
 
 bool
 diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
-                                    ExportContext context);
+                                    const ExportContext &context);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool diagnoseDeclAvailability(const ValueDecl *D,
                               SourceRange R,
                               const ApplyExpr *call,
-                              ExportContext where,
+                              const ExportContext &where,
                               DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
@@ -233,7 +233,7 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                     SourceRange R,
-                                    ExportContext Where,
+                                    const ExportContext &Where,
                                     const ApplyExpr *call,
                                     DeclAvailabilityFlags Flags = None);
 
@@ -242,7 +242,7 @@ bool diagnoseExplicitUnavailability(const ValueDecl *D,
 bool diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
-    ExportContext Where,
+    const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
 
