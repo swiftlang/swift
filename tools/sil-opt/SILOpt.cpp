@@ -303,6 +303,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE  "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
