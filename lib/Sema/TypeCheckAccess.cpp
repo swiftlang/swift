@@ -1447,25 +1447,55 @@ public:
 ///
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
-swift::getDisallowedOriginKind(const Decl *decl,
-                               ExportContext where,
+swift::getDisallowedOriginKind(const Decl *decl, ExportContext where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
+
   auto *SF = where.getDeclContext()->getParentSourceFile();
   if (SF->isImportedImplementationOnly(M)) {
+
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
     if (where.isSPI())
       downgradeToWarning = DowngradeToWarning::Yes;
 
+    // Even if the current module is @_implementationOnly, Swift should
+    // not report an error in the cases where the decl is also exported from
+    // a non @_implementationOnly module. Thus, we look at all the imported
+    // modules and see if we can find the decl in a non @_implementationOnly
+    // module.
+
+    SmallVector<ImportedModule, 4> importedModules;
+    SF->getImportedModules(
+        importedModules,
+        ModuleDecl::ImportFilter(
+            {ModuleDecl::ImportFilterKind::Exported,
+             ModuleDecl::ImportFilterKind::Default,
+             ModuleDecl::ImportFilterKind::SPIAccessControl,
+             ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay}));
+    auto nlOptions = NL_QualifiedDefault | NL_IncludeUsableFromInline;
+    if (auto val = dyn_cast<ValueDecl>(decl)) {
+      for (auto &importedModule : importedModules) {
+        SmallVector<ValueDecl *, 4> candidateDecls;
+        namelookup::lookupInModule(
+            importedModule.importedModule, val->getName(), candidateDecls,
+            NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
+            importedModule.importedModule, nlOptions);
+        for (auto *candidateDecl : candidateDecls) {
+          if (candidateDecl->getFormalAccess() >= AccessLevel::Public) {
+            return DisallowedOriginKind::None;
+          }
+        }
+      }
+    }
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
   } else if (decl->isSPI() && !where.isSPI()) {
     // SPI can only be exported in SPI.
-    return where.getDeclContext()->getParentModule() == M ?
-      DisallowedOriginKind::SPILocal :
-      DisallowedOriginKind::SPIImported;
+    return where.getDeclContext()->getParentModule() == M
+               ? DisallowedOriginKind::SPILocal
+               : DisallowedOriginKind::SPIImported;
   }
 
   return DisallowedOriginKind::None;
