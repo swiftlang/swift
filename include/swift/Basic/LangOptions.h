@@ -94,6 +94,9 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
+    /// Should conformance availability violations be diagnosed as errors?
+    bool EnableConformanceAvailabilityErrors = false;
+
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
