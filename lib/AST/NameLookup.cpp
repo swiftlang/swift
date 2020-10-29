@@ -146,6 +146,34 @@ void AccessFilteringDeclConsumer::foundDecl(
   ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
 }
 
+void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
+    DeclVisibilityKind reason, DynamicLookupInfo dynamicLookupInfo) {
+  // Skip when Loc is within the decl's own initializer
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (auto *init = VD->getParentInitializer()) {
+      auto initRange = init->getSourceRange();
+      if (initRange.isValid() && SM.rangeContainsTokenLoc(initRange, Loc))
+        return;
+    }
+  }
+
+  switch (reason) {
+  case DeclVisibilityKind::LocalVariable:
+    // Skip if Loc is before the found decl, unless its a TypeDecl (whose use
+    // before its declaration is still allowed)
+    if (!isa<TypeDecl>(D) && !SM.isBeforeInBuffer(D->getLoc(), Loc))
+      return;
+    break;
+  default:
+    // The rest of the file is currently skipped, so no need to check
+    // decl location for VisibleAtTopLevel. Other visibility kinds are always
+    // usable
+    break;
+  }
+
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
+}
+
 void LookupResultEntry::print(llvm::raw_ostream& out) const {
   getValueDecl()->print(out);
   if (auto dc = getBaseDecl()) {
