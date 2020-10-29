@@ -1965,12 +1965,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           method->hasRelatedResultType(), method->isInstanceMethod(),
           result.getAsyncInfo().map(
             [](const ForeignAsyncConvention::Info &info) {
-              return info.CompletionHandlerParamIndex;
+              return info.completionHandlerParamIndex();
             }),
           result.getAsyncInfo().map(
             [&](const ForeignAsyncConvention::Info &info) {
               return method->getDeclName().getObjCSelector().getNameForSlot(
-                  info.CompletionHandlerParamIndex);
+                                            info.completionHandlerParamIndex());
             }),
           *this);
     }
