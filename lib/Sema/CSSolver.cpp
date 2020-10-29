@@ -2015,7 +2015,9 @@ static Constraint *tryOptimizeGenericDisjunction(
 
 // Performance hack: favor operator overloads with decl or type we're already
 // binding elsewhere in this expression.
-static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRef<Constraint *> constraints, SmallVectorImpl<Constraint *> &found) {
+static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
+                                                   ArrayRef<Constraint *> constraints,
+                                                   SmallVectorImpl<unsigned> &found) {
   auto *choice = constraints.front();
   if (choice->getKind() != ConstraintKind::BindOverload)
     return;
@@ -2026,58 +2028,34 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRe
   auto decl = overload.getDecl();
   if (!decl->isOperator())
     return;
-  auto baseName = decl->getBaseName();
 
-  SmallSet<TypeBase *, 8> typesFound;
-
+  SmallSet<CanType, 8> typesFound;
   for (auto overload : CS.getResolvedOverloads()) {
     auto resolved = overload.second;
     if (!resolved.choice.isDecl())
       continue;
-    auto representativeDecl = resolved.choice.getDecl();
 
+    auto representativeDecl = resolved.choice.getDecl();
     if (!representativeDecl->isOperator())
       continue;
 
-    if (representativeDecl->getBaseName() == baseName) {
-      // Favor exactly the same decl, if we have a binding to the same name.
-      for (auto *constraint : constraints) {
-        if (constraint->isFavored())
-          continue;
-        auto choice = constraint->getOverloadChoice();
-        if (choice.getDecl() == representativeDecl) {
-          found.push_back(constraint);
-          break;
-        }
-      }
-    } else {
-      // Favor the same type, if we have a binding to an operator of that type.
-      auto representativeType = representativeDecl->getInterfaceType();
-      if (typesFound.count(representativeType.getPointer()))
-        continue;
-      typesFound.insert(representativeType.getPointer());
+    typesFound.insert(representativeDecl->getInterfaceType()->getCanonicalType());
+  }
 
-      for (auto *constraint : constraints) {
-        if (constraint->isFavored())
-          continue;
-        auto choice = constraint->getOverloadChoice();
-        if (choice.getDecl()->getInterfaceType()->isEqual(representativeType)) {
-          found.push_back(constraint);
-          break;
-        }
-      }
-    }
+  for (auto index : indices(constraints)) {
+    auto *constraint = constraints[index];
+    if (constraint->isFavored())
+      continue;
+
+    auto *decl = constraint->getOverloadChoice().getDecl();
+    if (typesFound.count(decl->getInterfaceType()->getCanonicalType()))
+      found.push_back(index);
   }
 }
 
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
-
-  SmallVector<Constraint *, 4> existing;
-  existingOperatorBindingsForDisjunction(*this, Choices, existing);
-  for (auto constraint : existing)
-    favorConstraint(constraint);
 
   // Apply a special-case rule for favoring one generic function over
   // another.
@@ -2105,11 +2083,17 @@ void ConstraintSystem::partitionDisjunction(
 
   // First collect some things that we'll generally put near the beginning or
   // end of the partitioning.
-
   SmallVector<unsigned, 4> favored;
+  SmallVector<unsigned, 4> everythingElse;
   SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
+
+  // Add existing operator bindings to the main partition first. This often
+  // helps the solver find a solution fast.
+  existingOperatorBindingsForDisjunction(*this, Choices, everythingElse);
+  for (auto index : everythingElse)
+    taken.insert(Choices[index]);
 
   // First collect disabled and favored constraints.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
@@ -2170,7 +2154,6 @@ void ConstraintSystem::partitionDisjunction(
         }
       };
 
-  SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
     everythingElse.push_back(index);
@@ -2206,8 +2189,8 @@ Constraint *ConstraintSystem::selectDisjunction() {
 
         if (firstFavored == secondFavored) {
           // Look for additional choices to favor
-          SmallVector<Constraint *, 4> firstExisting;
-          SmallVector<Constraint *, 4> secondExisting;
+          SmallVector<unsigned, 4> firstExisting;
+          SmallVector<unsigned, 4> secondExisting;
 
           existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
           firstFavored = firstExisting.size() ? firstExisting.size() : first->countActiveNestedConstraints();
