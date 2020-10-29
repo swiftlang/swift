@@ -2217,7 +2217,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     bool paramIsCompletionHandler =
-        asyncInfo && paramIndex == asyncInfo->CompletionHandlerParamIndex;
+        asyncInfo && paramIndex == asyncInfo->completionHandlerParamIndex();
 
     // Import the parameter type into Swift.
 
@@ -2391,8 +2391,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   if (asyncInfo) {
     asyncConvention = ForeignAsyncConvention(
-        completionHandlerType, asyncInfo->CompletionHandlerParamIndex,
-        asyncInfo->CompletionHandlerErrorParamIndex);
+        completionHandlerType, asyncInfo->completionHandlerParamIndex(),
+        asyncInfo->completionHandlerErrorParamIndex());
   }
 
   if (errorInfo) {

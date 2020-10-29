@@ -1519,7 +1519,12 @@ class DestructureInputs {
   TypeConverter &TC;
   const Conventions &Convs;
   const ForeignInfo &Foreign;
-  Optional<llvm::function_ref<void()>> HandleForeignSelf;
+  struct ForeignSelfInfo {
+    AbstractionPattern OrigSelfParam;
+    AnyFunctionType::CanParam SubstSelfParam;
+  };
+  Optional<ForeignSelfInfo> ForeignSelf;
+  AbstractionPattern TopLevelOrigType = AbstractionPattern::getInvalid();
   SmallVectorImpl<SILParameterInfo> &Inputs;
   SubstFunctionTypeCollector &Subst;
   unsigned NextOrigParamIndex = 0;
@@ -1556,29 +1561,15 @@ private:
     bool hasSelf =
         (extInfoBuilder.hasSelfParam() || Foreign.Self.isImportAsMember());
     unsigned numNonSelfParams = (hasSelf ? numEltTypes - 1 : numEltTypes);
-
-    auto silRepresentation = extInfoBuilder.getRepresentation();
-
-    // We have to declare this out here so that the lambda scope lasts for
-    // the duration of the loop below.
-    auto handleForeignSelf = [&] {
-      // This is a "self", but it's not a Swift self, we handle it differently.
-      auto selfParam = params[numNonSelfParams];
-      visit(selfParam.getValueOwnership(),
-            /*forSelf=*/false,
-            origType.getFunctionParamType(numNonSelfParams),
-            selfParam.getParameterType(), silRepresentation);
-    };
-
+    TopLevelOrigType = origType;
     // If we have a foreign-self, install handleSelf as the handler.
     if (Foreign.Self.isInstance()) {
       assert(hasSelf && numEltTypes > 0);
-      // This is safe because function_ref just stores a pointer to the
-      // existing lambda object.
-      HandleForeignSelf = handleForeignSelf;
+      ForeignSelf = ForeignSelfInfo{origType.getFunctionParamType(numNonSelfParams),
+                                    params[numNonSelfParams]};
     }
 
-    // Add any leading foreign parameters.
+    // Add any foreign parameters that are positioned here.
     maybeAddForeignParameters();
 
     // Process all the non-self parameters.
@@ -1588,7 +1579,7 @@ private:
       auto flags = params[i].getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
-            silRepresentation, flags.isNoDerivative());
+            flags.isNoDerivative());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1600,16 +1591,15 @@ private:
       auto flags = selfParam.getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/true,
-            eltPattern, ty, silRepresentation);
+            eltPattern, ty);
     }
 
-    // Clear the foreign-self handler for safety.
-    HandleForeignSelf.reset();
+    TopLevelOrigType = AbstractionPattern::getInvalid();
+    ForeignSelf = None;
   }
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             SILFunctionTypeRepresentation rep,
              bool isNonDifferentiable = false) {
     assert(!isa<InOutType>(substType));
 
@@ -1629,7 +1619,7 @@ private:
           assert(!elt.isVararg());
           visit(ownership, forSelf,
                 origType.getTupleElementType(i),
-                CanType(elt.getRawType()), rep);
+                CanType(elt.getRawType()));
         }
         return;
       case ValueOwnership::InOut:
@@ -1674,13 +1664,52 @@ private:
   /// Given that we've just reached an argument index for the
   /// first time, add any foreign parameters.
   void maybeAddForeignParameters() {
-    while (maybeAddForeignErrorParameter() ||
+    while (maybeAddForeignAsyncParameter() ||
+           maybeAddForeignErrorParameter() ||
            maybeAddForeignSelfParameter()) {
       // Continue to see, just in case there are more parameters to add.
     }
   }
+  
+  bool maybeAddForeignAsyncParameter() {
+    if (!Foreign.Async
+        || NextOrigParamIndex != Foreign.Async->completionHandlerParamIndex())
+      return false;
+    
+    auto nativeCHTy = Foreign.Async->completionHandlerType();
+
+    // Use the abstraction pattern we're lowering against in order to lower
+    // the completion handler type, so we can preserve C/ObjC distinctions that
+    // normally get abstracted away by the importer.
+    auto completionHandlerNativeOrigTy = TopLevelOrigType
+      .getObjCMethodAsyncCompletionHandlerType(nativeCHTy);
+    
+    // Bridge the Swift completion handler type back to its
+    // foreign representation.
+    auto foreignCHTy = TC.getLoweredBridgedType(completionHandlerNativeOrigTy,
+                                      nativeCHTy,
+                                      Bridgeability::Full,
+                                      SILFunctionTypeRepresentation::ObjCMethod,
+                                      TypeConverter::ForArgument)
+      ->getCanonicalType();
+    
+    auto completionHandlerOrigTy = TopLevelOrigType
+      .getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
+    auto completionHandlerTy = TC.getLoweredType(completionHandlerOrigTy,
+                                                 foreignCHTy, expansion)
+      .getASTType();
+    Inputs.push_back(SILParameterInfo(completionHandlerTy,
+                                      ParameterConvention::Direct_Unowned));
+    ++NextOrigParamIndex;
+    return true;
+  }
 
   bool maybeAddForeignErrorParameter() {
+    // A foreign async convention absorbs any error parameter, making it into
+    // an argument to the callback.
+    if (Foreign.Async)
+      return false;
+    
     if (!Foreign.Error ||
         NextOrigParamIndex != Foreign.Error->getErrorParameterIndex())
       return false;
@@ -1700,7 +1729,13 @@ private:
         NextOrigParamIndex != Foreign.Self.getSelfIndex())
       return false;
 
-    (*HandleForeignSelf)();
+    if (ForeignSelf) {
+      // This is a "self", but it's not a Swift self, we handle it differently.
+      visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
+            /*forSelf=*/false,
+            ForeignSelf->OrigSelfParam,
+            ForeignSelf->SubstSelfParam.getParameterType());
+    }
     return true;
   }
 };
@@ -1738,9 +1773,26 @@ static bool isPseudogeneric(SILDeclRef c) {
 
 /// Update the result type given the foreign error convention that we will be
 /// using.
-static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
-    ForeignErrorConvention convention, CanGenericSignature genericSig,
-    AbstractionPattern origResultType, CanType substFormalResultType) {
+void updateResultTypeForForeignInfo(
+    const ForeignInfo &foreignInfo, CanGenericSignature genericSig,
+    AbstractionPattern &origResultType, CanType &substFormalResultType) {
+  // If there's no error or async convention, the return type is unchanged.
+  if (!foreignInfo.Async && !foreignInfo.Error) {
+    return;
+  }
+  
+  // A foreign async convention means our lowered return type is Void, since
+  // the imported semantic return and/or error type map to the completion
+  // callback's argument(s).
+  auto &C = substFormalResultType->getASTContext();
+  if (auto async = foreignInfo.Async) {
+    substFormalResultType = TupleType::getEmpty(C);
+    origResultType = AbstractionPattern(genericSig, substFormalResultType);
+    return;
+  }
+  
+  // Otherwise, adjust the return type to match the foreign error convention.
+  auto convention = *foreignInfo.Error;
   switch (convention.getKind()) {
   // These conventions replace the result type.
   case ForeignErrorConvention::ZeroResult:
@@ -1748,7 +1800,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
     assert(substFormalResultType->isVoid());
     substFormalResultType = convention.getResultType();
     origResultType = AbstractionPattern(genericSig, substFormalResultType);
-    return {origResultType, substFormalResultType};
+    return;
 
   // These conventions wrap the result type in a level of optionality.
   case ForeignErrorConvention::NilResult:
@@ -1757,12 +1809,12 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
         AbstractionPattern::getOptional(origResultType);
-    return {origResultType, substFormalResultType};
+    return;
 
   // These conventions don't require changes to the formal error type.
   case ForeignErrorConvention::ZeroPreservedResult:
   case ForeignErrorConvention::NonNilError:
-    return {origResultType, substFormalResultType};
+    return;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -2047,14 +2099,28 @@ static CanSILFunctionType getSILFunctionType(
                                   substFnInterfaceType);
   }
 
-  // Map 'throws' to the appropriate error convention.
   Optional<SILResultInfo> errorResult;
   assert(
-      (!foreignInfo.Error || substFnInterfaceType->getExtInfo().isThrowing()) &&
-      "foreignError was set but function type does not throw?");
-  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.Error) {
-    assert(!origType.isForeign() &&
-           "using native Swift error convention for foreign type!");
+      (!foreignInfo.Error || substFnInterfaceType->getExtInfo().isThrowing())
+      && "foreignError was set but function type does not throw?");
+  assert(
+      (!foreignInfo.Async || substFnInterfaceType->getExtInfo().isAsync())
+      && "foreignAsync was set but function type is not async?");
+  
+  // Map 'async' to the appropriate `@async` modifier.
+  bool isAsync = false;
+  if (substFnInterfaceType->getExtInfo().isAsync() && !foreignInfo.Async) {
+    assert(!origType.isForeign()
+           && "using native Swift async for foreign type!");
+    isAsync = true;
+  }
+  
+  // Map 'throws' to the appropriate error convention.
+  if (substFnInterfaceType->getExtInfo().isThrowing()
+      && !foreignInfo.Error
+      && !foreignInfo.Async) {
+    assert(!origType.isForeign()
+           && "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(TC.Context);
     assert(exnType.isObject());
     errorResult = SILResultInfo(exnType.getASTType(),
@@ -2065,12 +2131,10 @@ static CanSILFunctionType getSILFunctionType(
   AbstractionPattern origResultType = origType.getFunctionResultType();
   CanType substFormalResultType = substFnInterfaceType.getResult();
 
-  // If we have a foreign error convention, restore the original result type.
-  if (auto convention = foreignInfo.Error) {
-    std::tie(origResultType, substFormalResultType) =
-        updateResultTypeForForeignError(*convention, genericSig, origResultType,
-                                        substFormalResultType);
-  }
+  // If we have a foreign error and/or async convention, adjust the
+  // lowered result type.
+  updateResultTypeForForeignInfo(foreignInfo, genericSig, origResultType,
+                                 substFormalResultType);
 
   bool shouldBuildSubstFunctionType = [&]{
     if (!TC.Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues)
@@ -2160,6 +2224,7 @@ static CanSILFunctionType getSILFunctionType(
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)
+                        .withAsync(isAsync)
                         .build();
 
   // Build the substituted generic signature we extracted.
@@ -2825,7 +2890,9 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     Optional<SILDeclRef> constant) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     auto origPattern =
-      AbstractionPattern::getObjCMethod(origType, method, foreignInfo.Error);
+      AbstractionPattern::getObjCMethod(origType, method,
+                                        foreignInfo.Error,
+                                        foreignInfo.Async);
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, ObjCMethodConventions(method), foreignInfo, constant,
@@ -3128,8 +3195,11 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
     if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-      foreignInfo.Error = funcDecl->getForeignErrorConvention();
-      foreignInfo.Self = funcDecl->getImportAsMemberStatus();
+      foreignInfo = ForeignInfo{
+        funcDecl->getImportAsMemberStatus(),
+        funcDecl->getForeignErrorConvention(),
+        funcDecl->getForeignAsyncConvention(),
+      };
     }
 
     if (auto clangDecl = findClangMethod(decl)) {
@@ -4076,9 +4146,9 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
   // for nil results.
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     assert(numParameterLists == 2 && "getting curried ObjC method type?");
-    auto foreignError = bridgedFn->getForeignErrorConvention();
     return AbstractionPattern::getCurriedObjCMethod(fnType, method,
-                                                    foreignError);
+                                      bridgedFn->getForeignErrorConvention(),
+                                      bridgedFn->getForeignAsyncConvention());
   } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
     if (numParameterLists == 1) {
       // C function imported as a function.
