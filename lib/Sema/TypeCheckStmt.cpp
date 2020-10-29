@@ -1696,9 +1696,10 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
+    auto loc = fromCtor->getLoc();
     diagnoseDeclAvailability(
-        ctor, fromCtor->getLoc(),
-        ExportContext::forFunctionBody(fromCtor));
+        ctor, loc, nullptr,
+        ExportContext::forFunctionBody(fromCtor, loc));
   }
 
 
@@ -1933,11 +1934,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
   // the closure itself. So we need to try type checking the enclosing closure
-  // signature first.
+  // signature first unless it has already been type checked.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
-    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
-    if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
-      return false;
+    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+      swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
+        return false;
+    }
   }
 
   TypeChecker::typeCheckASTNode(finder.getRef(), DC,

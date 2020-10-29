@@ -28,7 +28,7 @@
 #include <system_error>
 
 namespace llvm {
-class FileCollector;
+class FileCollectorBase;
 }
 
 namespace clang {
@@ -84,7 +84,7 @@ class DependencyTracker {
 public:
   explicit DependencyTracker(
       IntermoduleDepTrackingMode Mode,
-      std::shared_ptr<llvm::FileCollector> FileCollector = {});
+      std::shared_ptr<llvm::FileCollectorBase> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///

@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_CALLEE_H
 #define SWIFT_SILGEN_CALLEE_H
 
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -25,8 +26,12 @@ public:
   CanSILFunctionType substFnType;
   Optional<AbstractionPattern> origResultType;
   CanType substResultType;
-  Optional<ForeignErrorConvention> foreignError;
-  ImportAsMemberStatus foreignSelf;
+  struct ForeignInfo {
+    Optional<ForeignErrorConvention> error;
+    Optional<ForeignAsyncConvention> async;
+    ImportAsMemberStatus self;
+  };
+  ForeignInfo foreign;
 
 private:
   Optional<SILFunctionTypeRepresentation> overrideRep;
@@ -37,17 +42,19 @@ public:
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
                  const Optional<ForeignErrorConvention> &foreignError,
+                 const Optional<ForeignAsyncConvention> &foreignAsync,
                  ImportAsMemberStatus foreignSelf,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
       : substFnType(substFnType), origResultType(origResultType),
-        substResultType(substResultType), foreignError(foreignError),
-        foreignSelf(foreignSelf), overrideRep(overrideRep) {}
+        substResultType(substResultType),
+        foreign{foreignError, foreignAsync, foreignSelf},
+        overrideRep(overrideRep) {}
 
   CalleeTypeInfo(CanSILFunctionType substFnType,
                  AbstractionPattern origResultType, CanType substResultType,
                  Optional<SILFunctionTypeRepresentation> overrideRep = None)
       : substFnType(substFnType), origResultType(origResultType),
-        substResultType(substResultType), foreignError(), foreignSelf(),
+        substResultType(substResultType), foreign(),
         overrideRep(overrideRep) {}
 
   SILFunctionTypeRepresentation getOverrideRep() const {
