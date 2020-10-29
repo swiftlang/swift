@@ -2734,6 +2734,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
@@ -2742,12 +2743,14 @@ ERROR(decl_from_hidden_module,none,
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "as result builder in SPI|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"

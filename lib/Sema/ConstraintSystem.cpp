@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -5057,7 +5058,8 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   }
 
   // If not, let's check contextual unavailability.
-  auto result = TypeChecker::checkDeclarationAvailability(D, loc, DC);
+  ExportContext where = ExportContext::forFunctionBody(DC, loc);
+  auto result = TypeChecker::checkDeclarationAvailability(D, where);
   return result.hasValue();
 }
 
@@ -5242,8 +5244,9 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
+    ExportContext where = ExportContext::forFunctionBody(DC, referenceLoc);
     auto maybeUnavail =
-        TypeChecker::checkDeclarationAvailability(setter, referenceLoc, DC);
+        TypeChecker::checkDeclarationAvailability(setter, where);
     if (maybeUnavail.hasValue()) {
       return true;
     }

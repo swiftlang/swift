@@ -18,8 +18,8 @@ func internalFunction() {}
 public func publicFunction() {}
 
 private struct PrivateStruct {}
-// expected-note@-1 3{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
-// expected-note@-2 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-note@-1 5{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
+// expected-note@-2 2{{initializer 'init()' is not '@usableFromInline' or public}}
 struct InternalStruct {}
 // expected-note@-1 3{{struct 'InternalStruct' is not '@usableFromInline' or public}}
 // expected-note@-2 {{initializer 'init()' is not '@usableFromInline' or public}}
@@ -350,3 +350,10 @@ public struct PrivateInlinableCrash {
   // expected-error@-1 {{'@inlinable' attribute cannot be applied to stored properties}}
 }
 
+@inlinable public func nestedBraceStmtTest() {
+  if true {
+    let _: PrivateStruct = PrivateStruct()
+    // expected-error@-1 2{{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
+    // expected-error@-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
+  }
+}
