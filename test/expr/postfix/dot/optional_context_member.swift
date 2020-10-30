@@ -76,13 +76,14 @@ func nestedOptContext() -> Foo?? {
 
 // This should diagnose instead of crashing in SILGen
 protocol Horse {
-  static var palomino: Horse { get }
+  static var palomino: Horse { get } // expected-note {{'palomino' declared here}}
 }
 
 func rideAHorse(_ horse: Horse?) {}
 
 rideAHorse(.palomino)
-// expected-error@-1 {{static member 'palomino' cannot be used on protocol metatype 'Horse.Protocol'}}
+// expected-error@-1 {{cannot reference static property 'palomino' on 'Horse.Protocol' with non-conforming result type 'Horse'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
 // FIXME: This should work if the static member is part of a class though
 class Donkey {

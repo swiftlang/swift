@@ -6881,6 +6881,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (auto *fnType = resultTy->getAs<FunctionType>())
         resultTy = fnType->getResult();
 
+      // No reason to suggest that `Void` doesn't conform to some protocol.
+      if (resultTy->isVoid()) {
+        result.addUnviable(candidate,
+                           MemberLookupResult::UR_TypeMemberOnInstance);
+        return;
+      }
+
       // If result is not a concrete type which could conform to the
       // expected protocol, this method is only viable for diagnostics.
       if (!(resultTy->is<NominalType>() || resultTy->is<BoundGenericType>()) ||
