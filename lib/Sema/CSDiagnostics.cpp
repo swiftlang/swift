@@ -7199,7 +7199,7 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   if (!overload)
     return false;
 
-  auto resultTy = overload->openedType;
+  auto resultTy = resolveType(overload->openedType);
   if (auto *fnType = resultTy->getAs<FunctionType>())
     resultTy = fnType->getResult();
 

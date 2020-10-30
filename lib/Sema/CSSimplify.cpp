@@ -5955,7 +5955,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto anchor = locator.getAnchor();
 
       if ((isExpr<UnresolvedDotExpr>(anchor) ||
-           isExpr<UnresolvedMemberExpr>(anchor)) &&
+           isExpr<UnresolvedMemberExpr>(anchor) ||
+           isExpr<SubscriptExpr>(anchor)) &&
           req->is<LocatorPathElt::TypeParameterRequirement>()) {
         auto signature = path[path.size() - 2]
                              .castTo<LocatorPathElt::OpenedGeneric>()
@@ -6890,8 +6891,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       // If result is not a concrete type which could conform to the
       // expected protocol, this method is only viable for diagnostics.
-      if (!(resultTy->is<NominalType>() || resultTy->is<BoundGenericType>()) ||
-          resultTy->isExistentialType()) {
+      if (resultTy->isExistentialType() || resultTy->is<AnyFunctionType>() ||
+          resultTy->is<TupleType>() || resultTy->is<AnyMetatypeType>()) {
         result.addUnviable(
             candidate,
             MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
