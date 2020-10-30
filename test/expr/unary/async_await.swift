@@ -7,7 +7,7 @@ func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp() + asyncfp()
   _ = await asyncfp() + fp()
   _ = await fp() + 42  // expected-warning {{no calls to 'async' functions occur within 'await' expression}}
-  _ = asyncfp() // expected-error {{call is 'async' but is not marked with 'await'}}
+  _ = asyncfp() // expected-error {{call is 'async' but is not marked with 'await'}}{{7-7=await }}
 }
 
 func getInt() async -> Int { return 5 }
@@ -49,13 +49,13 @@ struct HasAsyncBad {
 }
 
 func testAutoclosure() async {
-  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}{{32-32=await }}
   await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
   await acceptAutoclosureAsync(await getInt())
   await acceptAutoclosureNonAsync(await getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
-  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}{{32-32=await }}
   await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 }
 
@@ -93,7 +93,7 @@ func testThrowingAndAsync() async throws {
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to handle error as optional value?}}
   // expected-note@-3{{did you mean to disable error propagation?}}
-  _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}{{11-11=await }}
 }
 
 func testExhaustiveDoCatch() async {
