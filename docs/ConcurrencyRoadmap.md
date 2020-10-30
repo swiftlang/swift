@@ -83,7 +83,7 @@ class PlayerRefreshController {
 This is a common pattern: a class with a private queue and some properties that should only be accessed on the queue. We replace this manual queue management with an actor class:
 
 ```swift
-actor class PlayerRefreshControler {
+actor class PlayerRefreshController {
   var players: [String] = []
   var gameSession: GameSession
 
@@ -101,11 +101,11 @@ Having this static relationship between the actor and its functions and properti
 
 Above we've shown an actor class, where you’ve got a tightly-encapsulated set of properties and code. But the way we do UI programming today often spreads code across a large number of classes that you’re supposed to use from a single main thread. That main thread is still a kind of actor — it’s what we call a global actor.
 
-You can mark classes and functions as being tied to that actor with an attribute. The compiler will let you reference this class from anywhere, but to actually call this method, you need to be on the UI actor. So, if it was appropriate for all the actions of `PlayerRefreshControler` to be performed on the global UI actor, we would represent it like this:
+You can mark classes and functions as being tied to that actor with an attribute. The compiler will let you reference this class from anywhere, but to actually call this method, you need to be on the UI actor. So, if it was appropriate for all the actions of `PlayerRefreshController` to be performed on the global UI actor, we would represent it like this:
 
 ```swift
 @UIActor
-class PlayerRefreshControler {
+class PlayerRefreshController {
   var players: [String] = []
   var gameSession: GameSession
     
@@ -141,7 +141,7 @@ The problem of actor isolation reduces to the problem of ensuring that all ordin
 * Immutable memory (such as a `let` constant), local memory (such as a local variable that’s never captured), and value component memory (such as a properties of a struct, or an enum case), are already protected from data races.
 * Unsafe memory (such as an arbitrary allocation referenced by an `UnsafeMutablePointer`) is associated with an unsafe abstraction.  It’s actively undesirable to try to force these abstractions to be used safely, because these abstractions are meant to be usable to bypass safe language rules when necessary. Instead, we have to trust the programmer to use these correctly.
 * Global memory (such as a global or static variable) can in principle be accessed by any code anywhere, so is subject to data races.
-* Class component memory can also be accessed from any code that hold a reference to the class. This means that while the _reference_ to the class may be protected by an actor, passing that reference between actors exposes its properties to data races. Note that this also references to classes held within value types when these are passsed between actors.
+* Class component memory can also be accessed from any code that hold a reference to the class. This means that while the _reference_ to the class may be protected by an actor, passing that reference between actors exposes its properties to data races. This also includes references to classes held within value types, when these are passed between actors.
 
 The goal of **full actor isolation** is to ensure that these last two categorizations are protected by default.
 
@@ -163,7 +163,7 @@ actor class MyActor {
 
 extension MyActor {
 
-  func asyncFunction(otherActor: MyActor) async {
+  func asyncFunction(other: MyActor) async {
     // allowed: an actor can access its internal state, even in an extension
     self.mutableArray += ["asyncFunction called"]
   
