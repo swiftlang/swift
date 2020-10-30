@@ -554,7 +554,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                                  MainInputFilenameForDebugInfo,
                                                      PrivateDiscriminator);
 
-  initClangTypeConverter();
+  if (auto loader = Context.getClangModuleLoader()) {
+    ClangASTContext =
+        &static_cast<ClangImporter *>(loader)->getClangASTContext();
+  }
 
   if (ClangASTContext) {
     auto atomicBoolTy = ClangASTContext->getAtomicType(ClangASTContext->BoolTy);
@@ -611,7 +614,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 }
 
 IRGenModule::~IRGenModule() {
-  destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;
