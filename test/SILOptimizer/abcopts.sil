@@ -1148,19 +1148,21 @@ sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (I
 
 // CHECK-LABEL: sil @rangeCheck
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb2, bb1
+// CHECK:   cond_br {{.*}}, bb1, bb2
 // CHECK: bb1
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   br bb3
 // CHECK: bb2
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:   br bb4
+// CHECK: bb3
 // CHECK:   return
-// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb2, bb4
-// CHECK: bb4:
-// CHECK:   br bb3
+// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb4
 // CHECK: }
 sil @rangeCheck : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
@@ -1197,21 +1199,23 @@ bb3(%15 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @rangeCheck2
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb2, bb1
+// CHECK:   cond_br {{.*}}, bb1, bb2
 // CHECK: bb1
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:   br bb3
 // CHECK: bb2
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:   br bb4
+// CHECK: bb3
 // CHECK:   return
-// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "or_Int1"([[FALSE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb2, bb4
-// CHECK: bb4:
-// CHECK:   br bb3
+// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb4
 // CHECK: }
 sil @rangeCheck2 : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):

@@ -5029,8 +5029,11 @@ public:
           SILValue op = i.getOperand(0);
           require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
-          require(op == state.Stack.back(),
-                  "stack dealloc does not match most recent stack alloc");
+          if (op != state.Stack.back()) {
+            llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
+            require(op == state.Stack.back(),
+                    "stack dealloc does not match most recent stack alloc");
+          }
           state.Stack.pop_back();
 
         } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
