@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1837,6 +1838,17 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
     if (!decl->isObjC())
       continue;
 
+    // If the declaration is objc_direct, it cannot be called dynamically.
+    if (auto clangDecl = decl->getClangDecl()) {
+      if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+        if (objCMethod->isDirectMethod())
+          continue;
+      } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+        if (objCProperty->isDirectProperty())
+          continue;
+      }
+    }
+
     // If the declaration has an override, name lookup will also have
     // found the overridden method. Skip this declaration, because we
     // prefer the overridden method.
@@ -1848,7 +1860,6 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
 
     // If we didn't see this declaration before, and it's an acceptable
     // result, add it to the list.
-    // declaration to the list.
     if (knownDecls.insert(decl).second &&
         isAcceptableLookupResult(dc, options, decl,
                                  /*onlyCompleteObjectInits=*/false))
