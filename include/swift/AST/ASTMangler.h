@@ -155,6 +155,9 @@ public:
                                              Type SelfType,
                                              ModuleDecl *Module);
 
+  std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
+                                                   CanType ResultType);
+  
   /// Mangle the derivative function (JVP/VJP) for the given:
   /// - Mangled original function name.
   /// - Derivative function kind.

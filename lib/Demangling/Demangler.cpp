@@ -2264,8 +2264,10 @@ NodePointer Demangler::popProtocolConformance() {
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
     }
     case 'z': {
-      NodePointer implType = popNode(Node::Kind::ImplFunctionType);
-      return createWithChild(Node::Kind::ObjCAsyncCompletionHandlerImpl, implType);
+      NodePointer resultType = popNode(Node::Kind::Type);
+      NodePointer implType = popNode(Node::Kind::Type);
+      return createWithChildren(Node::Kind::ObjCAsyncCompletionHandlerImpl,
+                                implType, resultType);
     }
     case 'V': {
       NodePointer Base = popNode(isEntity);

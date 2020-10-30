@@ -163,6 +163,13 @@ public:
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
                                            CanType dynamicSelfType);
+  
+  /// Get or create the declaration of a completion handler block
+  /// implementation function for an ObjC API that was imported
+  /// as `async` in Swift.
+  SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
+                                           CanSILFunctionType blockType,
+                                           CanType continuationTy);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

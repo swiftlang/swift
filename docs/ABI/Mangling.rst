@@ -219,7 +219,7 @@ types where the metadata itself has unknown layout.)
   global ::= entity                      // some identifiable thing
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= impl-function-type 'Tz'     // objc-to-swift-async completion handler block implementation
+  global ::= impl-function-type type 'Tz'     // objc-to-swift-async completion handler block implementation
   global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter

@@ -394,6 +394,16 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
+                                                   CanSILFunctionType BlockType,
+                                                   CanType ResultType) {
+  beginMangling();
+  appendType(BlockType);
+  appendType(ResultType);
+  appendOperator("Tz");
+  return finalize();
+}
+
 std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     StringRef name, AutoDiffDerivativeFunctionKind kind,
     AutoDiffConfig config) {
