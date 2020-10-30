@@ -6757,7 +6757,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         hasStaticMembers = true;
       } else if (instanceTy->isExistentialType()) {
         // A protocol metatype has instance methods with type P -> T -> U, but
-        // not instance properties or static members -- the metatype value itself
+        // not instance properties or static members, unless result type of a
+        // member conforms to this protocol -- the metatype value itself
         // doesn't give us a witness so there's no static method to bind.
         hasInstanceMethods = true;
         hasStaticMembers = true;
