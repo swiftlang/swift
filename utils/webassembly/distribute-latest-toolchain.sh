@@ -175,13 +175,37 @@ unzip ubuntu18.04-installable.zip
 unzip ubuntu20.04-installable.zip
 unzip macos-installable.zip
 
-toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz | head -n1))
+original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz | head -n1))
+toolchain_name=${3:-$original_toolchain_name}
 
 if is_released $toolchain_name; then
   echo "Latest toolchain $toolchain_name has been already released"
   exit 0
 fi
 
+if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
+  tar xfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz
+  mv "$original_toolchain_name" "$toolchain_name"
+  tar cfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz "$toolchain_name"
+  rm -rf "$toolchain_name"
+
+  tar xfz swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz
+  mv "$original_toolchain_name" "$toolchain_name"
+  tar cfz swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz "$toolchain_name"
+  rm -rf "$toolchain_name"
+
+  tar xfz swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz
+  mv "$original_toolchain_name" "$toolchain_name"
+  darwin_toolchain_info_plist="$toolchain_name/Info.plist"
+  if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME}" ]]; then
+    /usr/libexec/PlistBuddy -c "Set DisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${darwin_toolchain_info_plist}"
+  fi
+  if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}" ]]; then
+    /usr/libexec/PlistBuddy -c "Set ShortDisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${darwin_toolchain_info_plist}"
+  fi
+  tar cfz swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz "$toolchain_name"
+  rm -rf "$toolchain_name"
+fi
 
 mv swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz "$toolchain_name-ubuntu18.04_x86_64.tar.gz"
 mv swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz "$toolchain_name-ubuntu20.04_x86_64.tar.gz"
