@@ -763,7 +763,15 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   if (Invocation.shouldImportSwiftConcurrency()) {
-    pushImport(SWIFT_CONCURRENCY_NAME);
+    switch (imports.StdlibKind) {
+    case ImplicitStdlibKind::Builtin:
+    case ImplicitStdlibKind::None:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      pushImport(SWIFT_CONCURRENCY_NAME);
+      break;
+    }
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;

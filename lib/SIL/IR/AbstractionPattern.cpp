@@ -532,10 +532,17 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
           callbackResultIndex = 1;
         }
       }
+
+      const clang::Type *clangResultType = nullptr;
+      if (callbackResultIndex < callbackParamTy->getNumParams()) {
+        clangResultType = callbackParamTy->getParamType(callbackResultIndex)
+            .getTypePtr();
+      } else {
+        clangResultType = getObjCMethod()->getASTContext().VoidTy.getTypePtr();
+      }
+
       return AbstractionPattern(getGenericSignatureForFunctionComponent(),
-                          getResultType(getType()),
-                          callbackParamTy->getParamType(callbackResultIndex)
-                                          .getTypePtr());
+                          getResultType(getType()), clangResultType);
     }
     
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
