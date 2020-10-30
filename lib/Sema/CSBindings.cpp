@@ -432,6 +432,32 @@ void PotentialBindings::finalize(
         FullyBound = true;
       }
     }
+
+    if (cs.shouldAttemptFixes() &&
+        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      // Let's see whether this chain is valid, is it isn't then to avoid
+      // diagnosing the same issue multiple different ways, let's infer
+      // result of the chain to be a hole.
+      auto *resultExpr =
+          castToExpr<UnresolvedMemberChainResultExpr>(locator->getAnchor());
+      auto *baseLocator = cs.getConstraintLocator(
+          resultExpr->getChainBase(), ConstraintLocator::UnresolvedMember);
+
+      if (cs.hasFixFor(
+              baseLocator,
+              FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype)) {
+        cs.recordPotentialHole(TypeVar);
+        // Clear all of the previously inferred bindings which are inferred
+        // from inside of a member chain.
+        Bindings.erase(
+            llvm::remove_if(
+                Bindings,
+                [](const ConstraintSystem::PotentialBinding &binding) {
+                  return binding.Kind == AllowedBindingKind::Supertypes;
+                }),
+            Bindings.end());
+      }
+    }
   }
 }
 
