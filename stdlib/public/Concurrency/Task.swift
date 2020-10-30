@@ -18,6 +18,12 @@ import Swift
 /// An asynchronous task (just "Task" hereafter) is the analogue of a thread for
 /// asynchronous functions. All asynchronous functions run as part of some task.
 ///
+/// A task can only be interacted with by code running "in" the task,
+/// by invoking the appropriate context sensitive static functions which operate
+/// on the "current" task. Because all such functions are `async` they can only
+/// be invoked as part of an existing task, and therefore are guaranteed to be
+/// effective.
+///
 /// A task's execution can be seen as a series of periods where the task was
 /// running. Each such period ends at a suspension point or -- finally -- the
 /// completion of the task.
@@ -25,25 +31,18 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
-public struct Task {
-}
-
-// ==== Current Task -----------------------------------------------------------
-
-extension Task {
-  /// Returns the currently executing `Task`.
-  ///
-  /// As invoking this function is only possible from an asynchronous context
-  /// it is always able to return the current `Task` in which we are currently
-  /// running.
-  public static func current() async -> Task {
-    fatalError("\(#function) not implemented yet.") // TODO: needs a built-in function
-  }
+public enum Task {
 }
 
 // ==== Task Priority ----------------------------------------------------------
 
 extension Task {
+
+  /// Returns the current task's priority.
+  public static func currentPriority() async -> Priority {
+    fatalError("\(#function) not implemented yet.")
+  }
+
   /// Task priority may inform decisions an `Executor` makes about how and when
   /// to schedule tasks submitted to it.
   ///
@@ -61,7 +60,7 @@ extension Task {
   /// as they are "detached" from their parent tasks after all.
   ///
   /// ### Priority elevation
-  /// In some situations the priority of a task must be elevated ("raised"):
+  /// In some situations the priority of a task must be elevated (or "escalated", "raised"):
   ///
   /// - if a `Task` running on behalf of an actor, and a new higher-priority
   ///   task is enqueued to the actor, its current task must be temporarily
@@ -99,7 +98,7 @@ extension Task {
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
-  public final class Handle<Success, Failure: Error> {
+  public final class Handle<Success> {
     /// Wait for the task to complete, returning (or throwing) its result.
     ///
     /// ### Priority
@@ -108,7 +107,12 @@ extension Task {
     /// creating the task with the "right" priority to in the first place.
     ///
     /// ### Cancellation
-    /// If the awaited on task gets cancelled the `get()` will throw a cancellation error.
+    /// If the awaited on task gets cancelled externally the `get()` will throw
+    /// a cancellation error.
+    ///
+    /// If the task gets cancelled internally, e.g. by checking for cancellation
+    /// and throwing a specific error or using `checkCancellation` the error
+    /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
       fatalError("\(#function) not implemented yet.")
     }
@@ -148,21 +152,21 @@ extension Task {
   ///
   /// Canceling a task must be performed explicitly via `handle.cancel()`.
   ///
-  /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
-  ///   - operation:
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it.
-  ///
   /// - Note: it is generally preferable to use child tasks rather than detached
   ///   tasks. Child tasks automatically carry priorities, task-local state,
   ///   deadlines and have other benefits resulting from the structured
   ///   concurrency concepts that they model. Consider using detached tasks only
   ///   when strictly necessary and impossible to model operations otherwise.
+  ///
+  /// - Parameters:
+  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
+  ///   - operation: the operation to execute
+  /// - Returns: handle to the task, allowing to `await handle.get()` on the
+  ///     tasks result or `cancel` it.
   public static func runDetached<T>(
     priority: Priority = .default,
     operation: () async -> T
-  ) -> Handle<T, Never> {
+  ) -> Handle<T> {
     fatalError("\(#function) not implemented yet.")
   }
 
@@ -184,22 +188,22 @@ extension Task {
   ///
   /// Canceling a task must be performed explicitly via `handle.cancel()`.
   ///
-  /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
-  ///   - operation:
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it. If the operation fails the handle will
-  ///     throw the error the operation has thrown when awaited on.
-  ///
   /// - Note: it is generally preferable to use child tasks rather than detached
   ///   tasks. Child tasks automatically carry priorities, task-local state,
   ///   deadlines and have other benefits resulting from the structured
   ///   concurrency concepts that they model. Consider using detached tasks only
   ///   when strictly necessary and impossible to model operations otherwise.
+  ///
+  /// - Parameters:
+  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
+  ///   - operation: the operation to execute
+  /// - Returns: handle to the task, allowing to `await handle.get()` on the
+  ///     tasks result or `cancel` it. If the operation fails the handle will
+  ///     throw the error the operation has thrown when awaited on.
   public static func runDetached<T>(
     priority: Priority = .default,
     operation: () async throws -> T
-  ) -> Handle<T, Error> {
+  ) -> Handle<T> {
     fatalError("\(#function) not implemented yet.")
   }
 }
