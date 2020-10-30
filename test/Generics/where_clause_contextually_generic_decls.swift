@@ -147,7 +147,7 @@ extension Container.NestedStruct3 {
 _ = Container<String>.NestedAlias2.self // expected-error {{type 'String' does not conform to protocol 'FixedWidthInteger'}}
 _ = Container<Container<Bool>>.NestedClass.self // expected-error {{type 'Container<Bool>' does not conform to protocol 'Equatable'}}
 _ = Container<Void>.NestedStruct.self // expected-error {{type 'Void' does not conform to protocol 'Sequence'}}
-_ = Container<Array<Void>>.NestedStruct2.self
+_ = Container<Array<Void>>.NestedStruct2.self // expected-error {{type 'Void' does not conform to protocol 'Comparable'}}
 _ = Container<String>.NestedStruct2.NestedEnum.self // expected-error {{'Container<T>.NestedStruct2.NestedEnum' requires the types 'String.Element' (aka 'Character') and 'Double' be equivalent}}
 _ = Container<Int>.NestedAlias2.self
 _ = Container<Bool>.NestedClass.self
