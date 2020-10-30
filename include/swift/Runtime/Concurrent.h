@@ -584,7 +584,8 @@ using llvm::hash_value;
 /// process. It has no destructor, to avoid generating useless global destructor
 /// calls. The memory it allocates can be freed by calling clear() with no
 /// outstanding readers, but this won't destroy the static mutex it uses.
-template <class ElemTy> struct ConcurrentReadableHashMap {
+template <class ElemTy, class MutexTy = StaticMutex>
+struct ConcurrentReadableHashMap {
   // We use memcpy and don't call destructors. Make sure the elements will put
   // up with this.
   static_assert(std::is_trivially_copyable<ElemTy>::value,
@@ -593,6 +594,9 @@ template <class ElemTy> struct ConcurrentReadableHashMap {
                 "Elements must not have destructors (they won't be called).");
 
 private:
+  // A scoped lock type to use on MutexTy.
+  using ScopedLockTy = ScopedLockT<MutexTy, false>;
+
   /// The reciprocal of the load factor at which we expand the table. A value of
   /// 4 means that we resize at 1/4 = 75% load factor.
   static const size_t ResizeProportion = 4;
@@ -752,7 +756,7 @@ private:
   std::atomic<IndexStorage *> Indices{nullptr};
 
   /// The writer lock, which must be taken before any mutation of the table.
-  StaticMutex WriterLock;
+  MutexTy WriterLock;
 
   /// The list of pointers to be freed once no readers are active.
   FreeListNode *FreeList{nullptr};
@@ -966,7 +970,7 @@ public:
   /// The return value is ignored when `created` is `false`.
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
-    StaticScopedLock guard(WriterLock);
+    ScopedLockTy guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     if (!indices)
@@ -1018,7 +1022,7 @@ public:
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
   void clear() {
-    StaticScopedLock guard(WriterLock);
+    ScopedLockTy guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
@@ -1054,9 +1058,9 @@ template <class ElemTy> struct HashMapElementWrapper {
 /// by allocating them separately and storing pointers to them. The elements of
 /// the hash table are instances of HashMapElementWrapper. A new getOrInsert
 /// method is provided that directly returns the stable element pointer.
-template <class ElemTy, class Allocator>
+template <class ElemTy, class Allocator, class MutexTy = StaticMutex>
 struct StableAddressConcurrentReadableHashMap
-    : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>> {
+    : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy> {
   // Implicitly trivial destructor.
   ~StableAddressConcurrentReadableHashMap() = default;
 
@@ -1083,8 +1087,9 @@ struct StableAddressConcurrentReadableHashMap
     // it in the meantime, so we still have to handle both cases!
     ElemTy *ptr = nullptr;
     bool outerCreated = false;
-    ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>>::getOrInsert(
-        key, [&](HashMapElementWrapper<ElemTy> *wrapper, bool created) {
+    ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy>::
+        getOrInsert(key, [&](HashMapElementWrapper<ElemTy> *wrapper,
+                             bool created) {
           if (created) {
             // Created the indirect entry. Allocate the actual storage.
             size_t allocSize =
