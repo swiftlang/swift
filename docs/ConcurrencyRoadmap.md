@@ -157,7 +157,7 @@ actor class MyActor {
   var mutableArray: [String] = []
 
   func synchronousFunction() {
-	  mutableArray += ["syncFunction called"]
+    mutableArray += ["syncFunction called"]
   }
 }
 
@@ -177,7 +177,7 @@ extension MyActor {
     print(other.mutableArray.first)
     
     // allowed: async functions can call async functions on other actors
-    other.asyncFunction(otherActor: self)
+    await other.asyncFunction(otherActor: self)
     
     // error: only asynchronous functions can be called from outside the actor
     other.synchronousFunction()    
@@ -195,13 +195,13 @@ Even after the introduction of actors, there will still exist the possibility fo
 var racyGlobal: [String] = []
 
 @MyGlobalActor
-Var safeGlobal: [String] = []
+var safeGlobal: [String] = []
 
 class PlainOldClass {
   var unprotectedState: String = []
 }
 
-actor RacyActor {
+actor class RacyActor {
   let immutableClassReference: PlainOldClass
 
   func racyFunction(other: RacyActor) async {
@@ -216,8 +216,8 @@ actor RacyActor {
     other.takeClass(immutableClassReference)
   }
   
-  func takeClass(_ class: PlainOldClass) {
-    class.unprotectedState += ["Racy access"]  
+  func takeClass(_ plainClass: PlainOldClass) {
+    plainClass.unprotectedState += ["Racy access"]  
   }
 }
 ```
