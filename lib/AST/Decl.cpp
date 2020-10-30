@@ -4829,6 +4829,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return info;
   }
 
+  // Opaque result types of protocol extension members contain an invariant
+  // reference to 'Self'.
+  if (type->is<OpaqueTypeArchetypeType>())
+    return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
+
   // A direct reference to 'Self'.
   if (proto->getSelfInterfaceType()->isEqual(type))
     return SelfReferenceInfo::forSelfRef(position);
