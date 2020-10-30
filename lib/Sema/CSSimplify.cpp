@@ -5787,20 +5787,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Solved;
   }
 
-  // If we hit a type variable without a fixed type, we can't
-  // solve this yet.
-  if (type->isTypeVariableOrMember()) {
+  auto formUnsolved = [&](bool activate = false) {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::create(*this, kind, type,
-                           protocol->getDeclaredInterfaceType(),
-                           getConstraintLocator(locator)));
+      auto *conformance = Constraint::create(
+          *this, kind, type, protocol->getDeclaredInterfaceType(),
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(conformance);
+      if (activate)
+        activateConstraint(conformance);
+
       return SolutionKind::Solved;
     }
 
     return SolutionKind::Unsolved;
-  }
+  };
+
+  // If we hit a type variable without a fixed type, we can't
+  // solve this yet.
+  if (type->isTypeVariableOrMember())
+    return formUnsolved();
 
   auto *loc = getConstraintLocator(locator);
 
@@ -5922,7 +5929,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
-    if (path.back().is<LocatorPathElt::AnyRequirement>()) {
+    if (auto req = path.back().getAs<LocatorPathElt::AnyRequirement>()) {
       // If this is a requirement associated with `Self` which is bound
       // to `Any`, let's consider this "too incorrect" to continue.
       //
@@ -5941,6 +5948,39 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         }
       }
 
+      auto anchor = locator.getAnchor();
+
+      if ((isExpr<UnresolvedDotExpr>(anchor) ||
+           isExpr<UnresolvedMemberExpr>(anchor)) &&
+          req->is<LocatorPathElt::TypeParameterRequirement>()) {
+        auto signature = path[path.size() - 2]
+                             .castTo<LocatorPathElt::OpenedGeneric>()
+                             .getSignature();
+        auto requirement = signature->getRequirements()[req->getIndex()];
+
+        auto *memberLoc = getConstraintLocator(anchor, path.front());
+        auto *memberRef = findResolvedMemberRef(memberLoc);
+
+        // To figure out what is going on here we need to wait until
+        // member overload is set in the constraint system.
+        if (!memberRef)
+          return formUnsolved(/*activate=*/true);
+
+        // If this is a `Self` conformance requirement from a static member
+        // reference on a protocol metatype, let's produce a tailored diagnostic.
+        if (memberRef->isStatic()) {
+          if (auto *protocolDecl =
+                  memberRef->getDeclContext()->getSelfProtocolDecl()) {
+            auto selfTy = protocolDecl->getProtocolSelfType();
+            if (selfTy->isEqual(requirement.getFirstType())) {
+              auto *fix = AllowInvalidStaticMemberRefOnProtocolMetatype::create(
+                *this, memberLoc);
+              return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+            }
+          }
+        }
+      }
+
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
         auto impact = assessRequirementFailureImpact(*this, rawType, locator);
@@ -5950,27 +5990,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  protocolTy);
           return SolutionKind::Solved;
         }
-      }
-    }
-
-    if (path.back().is<LocatorPathElt::MemberRefBase>()) {
-      path.pop_back();
-
-      auto *memberLoc = getConstraintLocator(anchor, path);
-      if (auto overload = findSelectedOverloadFor(memberLoc)) {
-        const auto &choice = overload->choice;
-        assert(choice.isDecl());
-
-        auto *decl = choice.getDecl();
-        auto nameRef = choice.getFunctionRefKind() == FunctionRefKind::Compound
-                           ? decl->createNameRef()
-                           : DeclNameRef(decl->getBaseName());
-
-        auto *fix = AllowTypeOrInstanceMember::create(
-            *this, MetatypeType::get(protocolTy, getASTContext()), decl,
-            nameRef, memberLoc);
-
-        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
       }
     }
 
@@ -6833,8 +6852,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       // referred from.
       assert(hasStaticMembers);
 
-      Type resultTy;
-
       // Cannot instantiate a protocol or reference a member on
       // protocol composition type.
       if (isa<ConstructorDecl>(decl) ||
@@ -6843,6 +6860,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                            MemberLookupResult::UR_TypeMemberOnInstance);
         return;
       }
+
+      Type resultTy;
 
       if (isa<AbstractFunctionDecl>(decl)) {
         auto refTy =
@@ -8017,10 +8036,11 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     auto *memberLoc =
         getConstraintLocator(baseExpr, ConstraintLocator::UnresolvedMember);
 
-    auto *memberRef = findResolvedMemberRef(memberLoc);
-    assert(memberRef);
+    if (shouldAttemptFixes() && hasFixFor(memberLoc))
+      return SolutionKind::Solved;
 
-    if (memberRef->isStatic()) {
+    auto *memberRef = findResolvedMemberRef(memberLoc);
+    if (memberRef && memberRef->isStatic()) {
       return simplifyConformsToConstraint(
           resultTy, baseTy, ConstraintKind::ConformsTo,
           getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),

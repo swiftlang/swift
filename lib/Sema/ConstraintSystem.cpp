@@ -1577,15 +1577,21 @@ ConstraintSystem::getTypeOfMemberReference(
   Type baseOpenedTy = baseObjTy;
 
   if (isStaticMemberRefOnProtocol) {
-    // Member type with Self applied.
-    auto refTy = openedType->castTo<FunctionType>()->getResult();
-    // If member is a function type, let's use its result type
-    // since it could be either a static method or a property
-    // which returns a function type.
-    if (auto *funcTy = refTy->getAs<FunctionType>())
-      baseOpenedTy = funcTy->getResult();
-    else
-      baseOpenedTy = refTy;
+    // In diagnostic mode, let's not try to replace base type
+    // if there is already a known issue associated with this
+    // reference e.g. it might be incorrect initializer call
+    // or result type is invalid.
+    if (!(shouldAttemptFixes() && hasFixFor(getConstraintLocator(locator)))) {
+      // Member type with Self applied.
+      auto refTy = openedType->castTo<FunctionType>()->getResult();
+      // If member is a function type, let's use its result type
+      // since it could be either a static method or a property
+      // which returns a function type.
+      if (auto *funcTy = refTy->getAs<FunctionType>())
+        baseOpenedTy = funcTy->getResult();
+      else
+        baseOpenedTy = refTy;
+    }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back(
