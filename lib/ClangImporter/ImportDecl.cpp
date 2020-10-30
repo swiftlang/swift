@@ -4579,7 +4579,8 @@ namespace {
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
-      result->setAccess(getOverridableAccessLevel(dc));
+      result->setAccess(decl->isDirectMethod() ? AccessLevel::Public
+                                               : getOverridableAccessLevel(dc));
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -5331,8 +5332,9 @@ namespace {
       }
 
       auto type = importedType.getType();
-      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-          getOverridableAccessLevel(dc),
+      const auto access = decl->isDirectProperty() ? AccessLevel::Public
+                                                   : getOverridableAccessLevel(dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(decl, access,
           /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
       result->setInterfaceType(type);
@@ -7023,7 +7025,13 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                                                         bodyParams, decl->getLoc(),
                                                         elementTy, dc,
                                                         getter->getClangNode());
-  const auto access = getOverridableAccessLevel(dc);
+
+  bool IsObjCDirect = false;
+  if (auto objCDecl = dyn_cast<clang::ObjCMethodDecl>(getter->getClangDecl())) {
+    IsObjCDirect = objCDecl->isDirectMethod();
+  }
+  const auto access = IsObjCDirect ? AccessLevel::Public
+                                   : getOverridableAccessLevel(dc);
   subscript->setAccess(access);
   subscript->setSetterAccess(access);
 
@@ -7877,10 +7885,13 @@ void ClangImporter::Implementation::importAttributes(
 
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
     if (method->isDirectMethod() && !AnyUnavailable) {
-      auto attr = AvailableAttr::createPlatformAgnostic(
-          C, "", "", PlatformAgnosticAvailabilityKind::UnavailableInSwift);
-      MappedDecl->getAttrs().add(attr);
-      AnyUnavailable = true;
+      assert(isa<AbstractFunctionDecl>(MappedDecl) &&
+             "objc_direct declarations are expected to be an AbstractFunctionDecl");
+      MappedDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+      if (auto accessorDecl = dyn_cast<AccessorDecl>(MappedDecl)) {
+        auto attr = new (C) FinalAttr(/*isImplicit=*/true);
+        accessorDecl->getStorage()->getAttrs().add(attr);
+      }
     }
   }
 
