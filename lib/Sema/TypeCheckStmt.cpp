@@ -1841,12 +1841,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
+        auto braceCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, brace->getSourceRange());
+        // Unless this brace contains the loc, there's nothing to do.
+        if (!braceCharRange.contains(Loc))
+          return {false, S};
+
+        // Reset the node found in a parent context.
+        if (!brace->isImplicit())
+          FoundNode = nullptr;
+
         for (ASTNode &node : brace->getElements()) {
           if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
             break;
 
           // NOTE: We need to check the character loc here because the target
-          // loc can be inside the last token of the node. i.e. interpolated string.
+          // loc can be inside the last token of the node. i.e. interpolated
+          // string.
           SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, node.getEndLoc());
           if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)
             continue;
@@ -1858,8 +1869,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
           // Walk into the node to narrow down.
           node.walk(*this);
-        }
 
+          break;
+        }
         // Already walked into.
         return {false, nullptr};
       }
