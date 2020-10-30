@@ -103,7 +103,6 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
-  class BuiltinProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
   enum PointerTypeKind : unsigned;
@@ -980,11 +979,6 @@ public:
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
   getSelfConformance(ProtocolDecl *protocol);
-
-  /// Produce the builtin conformance for some structural type to some protocol.
-  BuiltinProtocolConformance *
-  getBuiltinConformance(Type type, ProtocolDecl *protocol,
-                        ArrayRef<ProtocolConformanceRef> conformances);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

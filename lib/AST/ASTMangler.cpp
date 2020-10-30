@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -200,11 +200,9 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
   if (isa<NormalProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
-  } else if (isa<SelfProtocolConformance>(C)) {
+  } else {
     appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
     appendOperator("WS");
-  } else {
-    llvm_unreachable("mangling unknown conformance kind");
   }
   return finalize();
 }
@@ -228,11 +226,7 @@ std::string ASTMangler::mangleWitnessThunk(
   }
 
   if (Conformance) {
-    if (isa<SelfProtocolConformance>(Conformance)) {
-      appendOperator("TS");
-    } else {
-      appendOperator("TW");
-    }
+    appendOperator(isa<SelfProtocolConformance>(Conformance) ? "TS" : "TW");
   }
   return finalize();
 }
@@ -1468,8 +1462,7 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 static bool conformanceHasIdentity(const RootProtocolConformance *root) {
   auto conformance = dyn_cast<NormalProtocolConformance>(root);
   if (!conformance) {
-    assert(isa<SelfProtocolConformance>(root) ||
-           isa<BuiltinProtocolConformance>(root));
+    assert(isa<SelfProtocolConformance>(root));
     return true;
   }
 
@@ -1490,9 +1483,8 @@ static bool conformanceHasIdentity(const RootProtocolConformance *root) {
 static bool isRetroactiveConformance(const RootProtocolConformance *root) {
   auto conformance = dyn_cast<NormalProtocolConformance>(root);
   if (!conformance) {
-    assert(isa<SelfProtocolConformance>(root) ||
-           isa<BuiltinProtocolConformance>(root));
-    return false; // self-conformances are never retroactive. nor are builtin.
+    assert(isa<SelfProtocolConformance>(root));
+    return false; // self-conformances are never retroactive.
   }
 
   return conformance->isRetroactive();
@@ -2918,10 +2910,6 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
     appendModule(Mod, DC->getAsDecl()->getAlternateModuleName());
   }
 
-  // If this is a non-nominal type, we're done.
-  if (!conformingType->getAnyNominal())
-    return;
-
   contextSig =
     conformingType->getAnyNominal()->getGenericSignatureOfContext();
 
@@ -2946,9 +2934,6 @@ void ASTMangler::appendProtocolConformanceRef(
     assert(DC->getAsDecl());
     appendModule(conformance->getDeclContext()->getParentModule(),
                  DC->getAsDecl()->getAlternateModuleName());
-  // Builtin conformances are always from the Swift module.
-  } else if (isa<BuiltinProtocolConformance>(conformance)) {
-    appendOperator("HP");
   } else if (conformance->getDeclContext()->getParentModule() ==
                conformance->getType()->getAnyNominal()->getParentModule()) {
     appendOperator("HP");

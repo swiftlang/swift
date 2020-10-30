@@ -228,17 +228,12 @@ func test_genericAdd() {
   #assert(genericAdd(1, 1) == 2)
 }
 
-// FIXME: The following is disabled for now because tuples conform to Equatable
-// now, but the work needed for SIL to optimize away the witness method is not
-// there yet.
-/*
 func test_tupleAsGeneric() {
   func identity<T>(_ t: T) -> T {
     return t
   }
   #assert(identity((1, 2)) == (1, 2))
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // Reduced testcase propagating substitutions around.

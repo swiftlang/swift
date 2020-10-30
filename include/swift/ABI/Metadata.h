@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2295,28 +2295,37 @@ private:
   union {
     /// A direct reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       IndirectNominalTypeDescriptor;
+
+    // We only allow a subset of the TypeReferenceKinds here.
+    // Should we just acknowledge that this is a different enum?
   };
 
 public:
-  TypeMetadataRecordKind getTypeKind() const {
+  TypeReferenceKind getTypeKind() const {
     return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetContextDescriptor<Runtime> *
   getContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeMetadataRecordKind::DirectTypeDescriptor:
+    case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeMetadataRecordKind::IndirectTypeDescriptor:
+    case TypeReferenceKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
+
+    // These types (and any others we might add to TypeReferenceKind
+    // in the future) are just never used in these lists.
+    case TypeReferenceKind::DirectObjCClassName:
+    case TypeReferenceKind::IndirectObjCClass:
+      return nullptr;
     }
     
     return nullptr;
@@ -2406,9 +2415,6 @@ struct TargetTypeReference {
     /// A direct reference to an Objective-C class name.
     RelativeDirectPointer<const char>
       DirectObjCClassName;
-
-    /// A "reference" to some metadata kind, e.g. tuple.
-    MetadataKind MetadataKind;
   };
 
   const TargetContextDescriptor<Runtime> *
@@ -2422,16 +2428,10 @@ struct TargetTypeReference {
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
-    case TypeReferenceKind::MetadataKind:
       return nullptr;
     }
 
     return nullptr;
-  }
-
-  enum MetadataKind getMetadataKind(TypeReferenceKind kind) const {
-    assert(kind == TypeReferenceKind::MetadataKind);
-    return MetadataKind;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -2519,10 +2519,6 @@ public:
     return Flags.getTypeReferenceKind();
   }
 
-  enum MetadataKind getMetadataKind() const {
-    return TypeRef.getMetadataKind(getTypeKind());
-  }
-
   const char *getDirectObjCClassName() const {
     return TypeRef.getDirectObjCClassName(getTypeKind());
   }
@@ -2548,11 +2544,6 @@ public:
 
     return this->template getTrailingObjects<
         TargetRelativeContextPointer<Runtime>>();
-  }
-
-  /// Whether this conformance is builtin by the compiler + runtime.
-  bool isBuiltin() const {
-    return getTypeKind() == TypeReferenceKind::MetadataKind;
   }
 
   /// Whether this conformance is non-unique because it has been synthesized
