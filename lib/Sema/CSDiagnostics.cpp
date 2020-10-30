@@ -7212,6 +7212,11 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   emitDiagnostic(diag::type_does_not_conform_in_member_ref_on_protocol_type,
                  member->getDescriptiveKind(), member->getName(),
                  MetatypeType::get(protocolTy), resultTy);
+
+  if (resultTy->is<FunctionType>() || resultTy->is<TupleType>() ||
+      resultTy->isExistentialType() || resultTy->is<AnyMetatypeType>())
+    emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
+
   emitDiagnosticAt(member, diag::decl_declared_here, member->getName());
   return true;
 }
