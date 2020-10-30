@@ -1,6 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/linear/* %t
 
+// No reason to run these tests on the simulator hosts rdar://70772320
+// UNSUPPORTED: CPU=x86_64 && OS=ios
+// UNSUPPORTED: CPU=x86_64 && OS=tvos
+// UNSUPPORTED: CPU=x86_64 && OS=watchos
+// UNSUPPORTED: CPU=i386 && OS=watchos
+
 //
 // This test establishes a "linear" chain of modules that import one another
 // and ensures that a cross-module incremental build does not needlessly
