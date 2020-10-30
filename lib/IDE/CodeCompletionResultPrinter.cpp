@@ -343,7 +343,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
 void swift::ide::printCodeCompletionResultSourceText(
     const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
   auto Chunks = Result.getCompletionString()->getChunks();
-  for (size_t i = 0; i < Chunks.size(); ++i) {
+  for (size_t i = 0, e = Chunks.size(); i < e; ++i) {
     auto &C = Chunks[i];
     if (C.is(ChunkKind::BraceStmtWithCursor)) {
       OS << " {\n" << getCodePlaceholder() << "\n}";

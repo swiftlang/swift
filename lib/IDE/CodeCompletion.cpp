@@ -1047,7 +1047,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   --CurrentNestingLevel;
 }
 
-void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
+void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
+                                                    const PrintOptions &PO,
                                                     StringRef suffix) {
   T = T->getReferenceStorageReferent();
 
@@ -1410,7 +1411,6 @@ CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
 
 void CodeCompletionString::getName(raw_ostream &OS) const {
   auto FirstTextChunk = getFirstTextChunkIndex();
-  int TextSize = 0;
   if (FirstTextChunk.hasValue()) {
     auto chunks = getChunks().slice(*FirstTextChunk);
 
@@ -1440,7 +1440,6 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       }
 
       if (i->hasText() && shouldPrint) {
-        TextSize += i->getText().size();
         OS << i->getText();
       }
     }
@@ -2248,7 +2247,7 @@ public:
       GenericSignature genericSig = GenericSignature(),
       bool dynamicOrOptional = false) {
 
-    std::string suffix;
+    const char *suffix = "";
     // FIXME: This retains previous behavior, but in reality the type of dynamic
     // lookups is IUO, not Optional as it is for the @optional attribute.
     if (dynamicOrOptional) {
@@ -3301,7 +3300,7 @@ public:
     addLeadingDot(Builder);
     addValueBaseName(Builder, EED->getBaseIdentifier());
 
-    // Enum element is of function type; (Self.type) -> Self or
+    // Enum element is of function type; (Self.Type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
     Type EnumType = getTypeOfMember(EED, dynamicLookupInfo);
     if (EnumType->is<AnyFunctionType>())

@@ -214,11 +214,6 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
   }
 
-  void addAnnotatedTextChunk(StringRef Text) {
-    addTextChunk(Text);
-    getLastChunk().setIsAnnotation();
-  }
-
   void addAnnotatedThrows() {
     addThrows();
     getLastChunk().setIsAnnotation();
@@ -430,7 +425,7 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-  void addTypeAnnotation(Type T, PrintOptions PO, StringRef suffix = "");
+  void addTypeAnnotation(Type T, const PrintOptions &PO, StringRef suffix = "");
 
   void addBraceStmtWithCursor(StringRef Description = "") {
     addChunkWithText(
