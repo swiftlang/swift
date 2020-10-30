@@ -452,12 +452,9 @@ public:
 };
 
 class ForeignAsyncInitializationPlan final : public ResultPlan {
-  SILGenFunction &SGF;
   SILLocation loc;
 public:
-  ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc)
-    : SGF(SGF), loc(loc) {
-  }
+  ForeignAsyncInitializationPlan(SILLocation loc) : loc(loc) {}
   
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
@@ -575,7 +572,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     // Create a result plan that gets the result schema from the completion
     // handler callback's arguments.
     // completion handler.
-    return ResultPlanPtr(new ForeignAsyncInitializationPlan(SGF, loc));
+    return ResultPlanPtr(new ForeignAsyncInitializationPlan(loc));
     
   } else if (auto foreignError = calleeTypeInfo.foreign.error) {
     // Handle the foreign error first.
