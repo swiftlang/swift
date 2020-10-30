@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1626,14 +1626,6 @@ namespace decls_block {
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
     TypeIDField // the conforming type
-  >;
-
-  using BuiltinProtocolConformanceLayout = BCRecordLayout<
-    BUILTIN_PROTOCOL_CONFORMANCE,
-    TypeIDField, // the conforming type
-    DeclIDField, // the protocol
-    BCVBR<5> // the number of element conformances
-    // the (optional) element conformances follow
   >;
 
   // Refers to a normal protocol conformance in the given module via its id.
