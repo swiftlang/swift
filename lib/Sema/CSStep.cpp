@@ -640,18 +640,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
 
-  // Extra checks for binding of operators
-  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      currentChoice->getOverloadChoice().getDecl()->isOperator() &&
-      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      lastSuccessfulChoice->getOverloadChoice().getDecl()->isOperator()) {
-
-    // If we have a SIMD operator, and the prior choice was not a SIMD
-    // Operator, we're done.
-    if (isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
-        !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()))
-      return true;
-  }
   return false;
 }
 
