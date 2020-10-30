@@ -7,7 +7,7 @@ import ObjCConcurrency
 
 // Conform via async method
 class C1: ConcurrentProtocol {
-  func askUser(toSolvePuzzle puzzle: String) async throws -> String? { nil }
+  func askUser(toSolvePuzzle puzzle: String) async throws -> String { "" }
 
   func askUser(toJumpThroughHoop hoop: String) async -> String { "hello" }
 }
@@ -26,7 +26,7 @@ class C2: ConcurrentProtocol {
 // Conform via both; this is an error
 class C3: ConcurrentProtocol {
   // expected-note@+1{{method 'askUser(toSolvePuzzle:)' declared here}}
-  func askUser(toSolvePuzzle puzzle: String) async throws -> String? { nil }
+  func askUser(toSolvePuzzle puzzle: String) async throws -> String { "" }
 
   // expected-error@+1{{'askUser(toSolvePuzzle:completionHandler:)' with Objective-C selector 'askUserToSolvePuzzle:completionHandler:' conflicts with method 'askUser(toSolvePuzzle:)' with the same Objective-C selector}}
   func askUser(toSolvePuzzle puzzle: String, completionHandler: ((String?, Error?) -> Void)?) {
