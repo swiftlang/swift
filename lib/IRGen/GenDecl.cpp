@@ -2858,12 +2858,18 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // the insert-before point.
   llvm::Constant *clangAddr = nullptr;
   if (auto clangDecl = f->getClangDecl()) {
-    auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
-    clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
+    // If we have an Objective-C Clang declaration, it must be a direct
+    // method and we want to generate the IR declaration ourselves.
+    if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      assert(objcDecl->isDirectMethod());
+    } else {
+      auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
+      clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
 
-    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
-      clangAddr =
-          emitCXXConstructorThunkIfNeeded(*this, f, ctor, entity, clangAddr);
+      if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+        clangAddr =
+            emitCXXConstructorThunkIfNeeded(*this, f, ctor, entity, clangAddr);
+      }
     }
   }
 

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "clang/AST/DeclObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -313,6 +314,17 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // If the declaration is not @objc, it cannot be called dynamically.
       if (!D->isObjC())
         return;
+
+      // If the declaration is objc_direct, it cannot be called dynamically.
+      if (auto clangDecl = D->getClangDecl()) {
+        if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          if (objCMethod->isDirectMethod())
+            return;
+        } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+          if (objCProperty->isDirectProperty())
+            return;
+        }
+      }
 
       if (D->isRecursiveValidation())
         return;
