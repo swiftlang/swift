@@ -1,6 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/external-cascade/* %t
 
+// No reason to run these tests on the simulator hosts rdar://70772320
+// UNSUPPORTED: CPU=x86_64 && OS=ios
+// UNSUPPORTED: CPU=x86_64 && OS=tvos
+// UNSUPPORTED: CPU=x86_64 && OS=watchos
+// UNSUPPORTED: CPU=i386 && OS=watchos
+
 //
 // This test establishes a chain of modules that all depend on a set of
 // bridging headers. This test ensures that changes to external dependencies -
