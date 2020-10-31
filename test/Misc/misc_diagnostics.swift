@@ -186,14 +186,14 @@ func test_implicit_cgfloat_conversion() {
   test_to(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'CGFloat'}}
   test_to(d + d) // Ok (Double -> CGFloat for both arguments)
   test_to(d + cgf) // Ok
-  test_to(d + cgf - d) // expected-error {{ambiguous use of operator '+'}} (Both Double and CGFloat are equaly viable here)
+  test_to(d + cgf - d) // Ok (prefer CGFloat -> Double for `cgf`), it's a better solution than trying to convert `d`s to `CGFloat`
   test_to(d + cgf - cgf) // Ok (only one choice here to conver `d` to CGFloat)
 
   test_from(cgf) // Ok (CGFloat -> Double)
   test_from(f) // expected-error {{cannot convert value of type 'Float' to expected argument type 'Double'}}
   test_from(cgf + cgf) // Ok (CGFloat -> Double for both arguments)
   test_from(d + cgf) // Ok
-  test_from(cgf + d - cgf) // expected-error {{ambiguous use of operator '+'}} (Both Double and CGFloat are equaly viable here)
+  test_from(cgf + d - cgf) // (prefer Double -> CGFloat for `d`), it's a better solution than trying to convert `cgf`s to `Double`
   test_from(cgf + d - d) // Ok (only one choice here to conver `cgf` to Double)
 
   func test_returns_double(_: CGFloat) -> Double {

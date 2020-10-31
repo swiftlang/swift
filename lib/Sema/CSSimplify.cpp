@@ -10527,7 +10527,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   case ConversionRestrictionKind::DoubleToCGFloat:
   case ConversionRestrictionKind::CGFloatToDouble: {
-    increaseScore(SK_ImplicitValueConversion);
+    // Prefer CGFloat -> Double over other way araund.
+    auto defaultImpact =
+        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 2;
+
+    auto numConversions = CurrentScore.Data[SK_ImplicitValueConversion];
+    increaseScore(SK_ImplicitValueConversion,
+                  defaultImpact * (numConversions + 1));
+
     if (worseThanBestSolution())
       return SolutionKind::Error;
 

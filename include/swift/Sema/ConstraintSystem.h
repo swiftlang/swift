@@ -790,10 +790,6 @@ enum ScoreKind {
   SK_DisfavoredOverload,
   /// A member for an \c UnresolvedMemberExpr found via unwrapped optional base.
   SK_UnresolvedMemberViaOptional,
-  /// An implicit conversion from a value of one type (lhs)
-  /// to another type (rhs) via implicit initialization of
-  /// `rhs` type which an argument of `lhs` value.
-  SK_ImplicitValueConversion,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -814,8 +810,12 @@ enum ScoreKind {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// An implicit conversion from a value of one type (lhs)
+  /// to another type (rhs) via implicit initialization of
+  /// `rhs` type which an argument of `lhs` value.
+  SK_ImplicitValueConversion,
 
-  SK_LastScoreKind = SK_FunctionToAutoClosureConversion,
+  SK_LastScoreKind = SK_ImplicitValueConversion,
 };
 
 /// The number of score kinds.

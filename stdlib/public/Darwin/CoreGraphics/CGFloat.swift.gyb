@@ -470,6 +470,11 @@ extension CGFloat {
     lhs /= rhs
     return lhs
   }
+
+  @_transparent
+  public static prefix func -(x: CGFloat) -> CGFloat {
+    return 0 - x
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -596,7 +601,8 @@ public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
            "use CGFloat(nan: CGFloat.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> CGFloat {
-  return CGFloat(nan(tag) as CGFloat.NativeType)
+  let NaN: Float = nan(tag)
+  return CGFloat(CGFloat.NativeType(NaN))
 }
 
 @_transparent

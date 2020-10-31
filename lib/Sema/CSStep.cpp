@@ -710,7 +710,6 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto *lastChoice = LastSolvedChoice->first;
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
-  bool hasImplicitConversions = delta.Data[SK_ImplicitValueConversion] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
   bool hasAsyncMismatch = delta.Data[SK_AsyncInSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
@@ -720,9 +719,7 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   //   1. selecting unavailable overloads
   //   2. result in fixes being applied to reach a solution
   //   3. selecting an overload that results in an async/sync mismatch
-  //   4. implicit value conversions
   return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
-         !hasImplicitConversions &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
