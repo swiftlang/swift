@@ -2230,38 +2230,29 @@ public:
       Builder.addLeadingDot();
   }
 
-  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,
-                         GenericSignature genericSig = GenericSignature()) {
-    PrintOptions PO;
-    PO.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-      PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
-    Builder.setExpectedTypeRelation(
-        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
+    addTypeAnnotation(Builder, T, /*GenericSig=*/nullptr);
   }
 
-  void addTypeAnnotationForImplicitlyUnwrappedOptional(
-      CodeCompletionResultBuilder &Builder, Type T,
-      GenericSignature genericSig = GenericSignature(),
-      bool dynamicOrOptional = false) {
-
-    const char *suffix = "";
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder,
+                         Type T, GenericSignature GenericSig,
+                         bool PrintOptionalAsImplicitlyUnwrapped = false,
+                         bool DynamicOrOptional = false) {
+    const char *Suffix = "";
     // FIXME: This retains previous behavior, but in reality the type of dynamic
     // lookups is IUO, not Optional as it is for the @optional attribute.
-    if (dynamicOrOptional) {
+    if (PrintOptionalAsImplicitlyUnwrapped && DynamicOrOptional) {
       T = T->getOptionalObjectType();
-      suffix = "?";
+      Suffix = "?";
     }
 
     PrintOptions PO;
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    PO.PrintOptionalAsImplicitlyUnwrapped = PrintOptionalAsImplicitlyUnwrapped;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-      PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
+    if (auto *TypeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(TypeContext->getDeclaredTypeInContext());
+    Builder.addTypeAnnotation(eraseArchetypes(T, GenericSig), PO, Suffix);
     Builder.setExpectedTypeRelation(
         calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
   }
@@ -2512,11 +2503,9 @@ public:
 
     auto genericSig =
         VD->getInnermostDeclContext()->getGenericSignatureOfContext();
-    if (VD->isImplicitlyUnwrappedOptional())
-      addTypeAnnotationForImplicitlyUnwrappedOptional(
-          Builder, VarType, genericSig, DynamicOrOptional);
-    else
-      addTypeAnnotation(Builder, VarType, genericSig);
+    addTypeAnnotation(Builder, VarType, genericSig,
+                      VD->isImplicitlyUnwrappedOptional(),
+                      DynamicOrOptional);
 
     if (isUnresolvedMemberIdealType(VarType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -2752,12 +2741,9 @@ public:
       Builder.addRightBracket();
     else
       Builder.addAnnotatedRightBracket();
-    if (SD && SD->isImplicitlyUnwrappedOptional())
-      addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                      AFT->getResult(),
-                                                      genericSig);
-    else
-      addTypeAnnotation(Builder, AFT->getResult(), genericSig);
+
+    addTypeAnnotation(Builder, AFT->getResult(), genericSig,
+                      SD && SD->isImplicitlyUnwrappedOptional());
   }
 
   void addFunctionCallPattern(
@@ -2798,13 +2784,8 @@ public:
 
       addThrows(Builder, AFT, AFD);
 
-      if (AFD &&
-          AFD->isImplicitlyUnwrappedOptional())
-        addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                        AFT->getResult(),
-                                                        genericSig);
-      else
-        addTypeAnnotation(Builder, AFT->getResult(), genericSig);
+      addTypeAnnotation(Builder, AFT->getResult(), genericSig,
+                        AFD && AFD->isImplicitlyUnwrappedOptional());
     };
 
     if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -3095,12 +3076,8 @@ public:
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
-      if (CD->isImplicitlyUnwrappedOptional()) {
-        addTypeAnnotationForImplicitlyUnwrappedOptional(
-            Builder, *Result, CD->getGenericSignatureOfContext());
-      } else {
-        addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
-      }
+      addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext(),
+                        CD->isImplicitlyUnwrappedOptional());
     };
 
     if (ConstructorType && hasInterestingDefaultValues(CD))
