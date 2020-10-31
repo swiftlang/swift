@@ -2013,8 +2013,13 @@ static Constraint *tryOptimizeGenericDisjunction(
   llvm_unreachable("covered switch");
 }
 
-// Performance hack: favor operator overloads with decl or type we're already
-// binding elsewhere in this expression.
+/// Populates the \c found vector with the indices of the given constraints
+/// that have a matching type to an existing operator binding elsewhere in
+/// the expression.
+///
+/// Operator bindings that have a matching type to an existing binding
+/// are attempted first by the solver because it's very common to chain
+/// operators of the same type together.
 static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
                                                    ArrayRef<Constraint *> constraints,
                                                    SmallVectorImpl<unsigned> &found) {
@@ -2056,7 +2061,6 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
-
   // Apply a special-case rule for favoring one generic function over
   // another.
   if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
