@@ -182,10 +182,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     return makeParserCodeCompletionResult<TypeRepr>(
         new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
   case tok::l_square: {
-    auto Result = parseTypeCollection();
-    if (Result.hasSyntax())
-      SyntaxContext->addSyntax(Result.getSyntax());
-    ty = Result.getASTResult();
+    ty = parseTypeCollection();
     break;
   }
   case tok::kw_protocol:
@@ -211,20 +208,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     return nullptr;
   }
 
-  auto makeMetatypeTypeSyntax = [&]() {
-    if (!SyntaxContext->isEnabled())
-      return;
-    ParsedMetatypeTypeSyntaxBuilder Builder(*SyntaxContext);
-    auto TypeOrProtocol = SyntaxContext->popToken();
-    auto Period = SyntaxContext->popToken();
-    auto BaseType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-    Builder
-      .useTypeOrProtocol(std::move(TypeOrProtocol))
-      .usePeriod(std::move(Period))
-      .useBaseType(std::move(BaseType));
-    SyntaxContext->addSyntax(Builder.build());
-  };
-  
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
@@ -233,7 +216,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
         SourceLoc metatypeLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
-        makeMetatypeTypeSyntax();
+        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
         continue;
       }
       if (peekToken().isContextualKeyword("Protocol")) {
@@ -241,24 +224,18 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
         SourceLoc protocolLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
-        makeMetatypeTypeSyntax();
+        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
         continue;
       }
     }
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        auto Result = parseTypeOptional(ty.get());
-        if (Result.hasSyntax())
-          SyntaxContext->addSyntax(Result.getSyntax());
-        ty = Result.getASTResult();
+        ty = parseTypeOptional(ty.get());
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        auto Result = parseTypeImplicitlyUnwrappedOptional(ty.get());
-        if (Result.hasSyntax())
-          SyntaxContext->addSyntax(Result.getSyntax());
-        ty = Result.getASTResult();
+        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
         continue;
       }
       // Parse legacy array types for migration.
@@ -1291,7 +1268,8 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   return makeParserResult(ATR);
 }
 
-SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
+ParserResult<TypeRepr> Parser::parseTypeCollection() {
+  SyntaxParsingContext CollectionCtx(SyntaxContext, SyntaxContextKind::Type);
   ParserStatus Status;
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
@@ -1337,38 +1315,14 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     // Form the dictionary type.
     TyR = new (Context)
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
-    if (SyntaxContext->isEnabled()) {
-      ParsedDictionaryTypeSyntaxBuilder Builder(*SyntaxContext);
-      auto RightSquareBracket = SyntaxContext->popToken();
-      auto ValueType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      auto Colon = SyntaxContext->popToken();
-      auto KeyType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      auto LeftSquareBracket = SyntaxContext->popToken();
-      Builder
-        .useRightSquareBracket(std::move(RightSquareBracket))
-        .useValueType(std::move(ValueType))
-        .useColon(std::move(Colon))
-        .useKeyType(std::move(KeyType))
-        .useLeftSquareBracket(std::move(LeftSquareBracket));
-      SyntaxNode.emplace(Builder.build());
-    }
+    SyntaxContext->setCreateSyntax(SyntaxKind::DictionaryType);
   } else {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
-    if (SyntaxContext->isEnabled()) {
-      ParsedArrayTypeSyntaxBuilder Builder(*SyntaxContext);
-      auto RightSquareBracket = SyntaxContext->popToken();
-      auto ElementType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      auto LeftSquareBracket = SyntaxContext->popToken();
-      Builder
-        .useRightSquareBracket(std::move(RightSquareBracket))
-        .useElementType(std::move(ElementType))
-        .useLeftSquareBracket(std::move(LeftSquareBracket));
-      SyntaxNode.emplace(Builder.build());
-    }
+    SyntaxContext->setCreateSyntax(SyntaxKind::ArrayType);
   }
     
-  return makeSyntaxResult(Status, std::move(SyntaxNode), TyR);
+  return makeParserResult(Status, TyR);
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -1413,45 +1367,23 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
-SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
+ParserResult<TypeRepr>
 Parser::parseTypeOptional(TypeRepr *base) {
   SourceLoc questionLoc = consumeOptionalToken();
   auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
-  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
-  if (SyntaxContext->isEnabled()) {
-    auto QuestionMark = SyntaxContext->popToken();
-    if (auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
-      ParsedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
-      Builder
-        .useQuestionMark(std::move(QuestionMark))
-        .useWrappedType(std::move(*WrappedType));
-      SyntaxNode.emplace(Builder.build());
-    } else {
-      // Undo the popping of the question mark
-      SyntaxContext->addSyntax(std::move(QuestionMark));
-    }
-  }
-  return makeSyntaxResult(std::move(SyntaxNode), TyR);
+  SyntaxContext->createNodeInPlace(SyntaxKind::OptionalType);
+  return makeParserResult(TyR);
 }
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
 /// are looking at the exclamation mark.
-SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
+ParserResult<TypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   auto TyR =
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
-  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
-  if (SyntaxContext->isEnabled()) {
-    ParsedImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
-    auto ExclamationMark = SyntaxContext->popToken();
-    auto WrappedType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-    Builder
-      .useExclamationMark(std::move(ExclamationMark))
-      .useWrappedType(std::move(WrappedType));
-    SyntaxNode.emplace(Builder.build());
-  }
-  return makeSyntaxResult(std::move(SyntaxNode), TyR);
+  SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitlyUnwrappedOptionalType);
+  return makeParserResult(TyR);
 }
 
 //===----------------------------------------------------------------------===//

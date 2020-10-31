@@ -32,7 +32,6 @@
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/References.h"
 #include "swift/Config.h"
@@ -1219,13 +1218,11 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr> parseTypeCollection();
+  ParserResult<TypeRepr> parseTypeCollection();
 
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
-  parseTypeOptional(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeOptional(TypeRepr *Base);
 
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
-  parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
