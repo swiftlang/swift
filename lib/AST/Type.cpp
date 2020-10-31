@@ -822,7 +822,11 @@ bool TypeBase::isCGFloatType() {
     return false;
 
   auto *module = DC->getParentModule();
-  return module->getName().is("CoreGraphics") && NTD->getName().is("CGFloat");
+  // on macOS `CGFloat` is part of a `CoreGraphics` module,
+  // but on Linux it could be found in `Foundation`.
+  return (module->getName().is("CoreGraphics") ||
+          module->getName().is("Foundation")) &&
+         NTD->getName().is("CGFloat");
 }
 
 bool TypeBase::isKnownStdlibCollectionType() {
