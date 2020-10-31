@@ -373,8 +373,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_concurrency);
+  Opts.EnableExperimentalConcurrency = true;
 
   Opts.EnableSubstSILFunctionTypesForFunctionValues |=
     Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
