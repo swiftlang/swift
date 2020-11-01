@@ -238,6 +238,34 @@ static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 // MARK: - Module Trace
 
 namespace {
+
+/// An entry providing dependency information about a Swift module in a trace.
+///
+/// - Name: The name of the module, such as `SwiftUI` or `Foundation`.
+/// - Path: A filepath for the module which a build system can use to track
+///   changes to the dependency.
+/// - IsImportedDirectly: Whether the module currently being compiled has a
+///   `import DepName` in its source. If this condition is false, it implies
+///   that some transitive dependency must have `import DepName` in its source.
+/// - SupportsLibraryEvolution: Does the dependency have library evolution
+///   enabled?
+///
+/// The IsImportedDirectly and SupportsLibraryEvolution fields enable a
+/// build system to potentially optimize builds in the presence of a stable ABI.
+/// 
+/// For the sake of example, consider a module M. It has both direct and
+/// indirect clients, i.e. modules which depend on M with
+/// `IsImportedDirectly = true` and `IsImportedDirectly = false` respectively.
+/// 
+/// - If M has library evolution enabled and M is known to not have any ABI
+///   changes between consecutive builds:
+///   - Both indirect and direct clients need not be rebuilt.
+/// - If M has library evolution enabled and M is known to have made an ABI
+///   change between consecutive builds:
+///   - Direct clients need to be rebuilt.
+///   - Indirect clients need not be rebuilt (optimization).
+/// - If M has library evolution disabled:
+///   - Both direct and indirect clients need to be rebuilt.
 struct SwiftModuleTraceInfo {
   Identifier Name;
   std::string Path;
