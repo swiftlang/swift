@@ -4135,6 +4135,9 @@ ERROR(asynchandler_async,none,
 ERROR(asynchandler_inout_parameter,none,
       "'inout' parameter is not allowed in '@asyncHandler' function",
       ())
+ERROR(asynchandler_noescape_closure_parameter,none,
+      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
+      ())
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())

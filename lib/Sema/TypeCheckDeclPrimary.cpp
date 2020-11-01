@@ -1322,6 +1322,19 @@ void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
   }
 
   // For source compatibilty, allow duplicate internal parameter names
