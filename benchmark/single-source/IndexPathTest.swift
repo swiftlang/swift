@@ -1,4 +1,4 @@
-//===--- IndexPathTest.swift -------------------------------------------===//
+//===--- IndexPathTest.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -46,15 +46,13 @@ public let IndexPathTest = [
 ]
 
 @inline(__always)
-func indexPath(_ size: Int, 
-  reversed: Bool = false) -> IndexPath {
+func indexPath(_ size: Int, reversed: Bool = false) -> IndexPath {
     let indexes = Array(0..<size)
     return IndexPath(indexes: reversed ? indexes.reversed() : indexes)
 }
 
 @inline(__always)
-func indexPath(_ size: Int, 
-  middle: Int) -> IndexPath {
+func indexPath(_ size: Int, middle: Int) -> IndexPath {
     var indexes = Array(0..<size)
     indexes.insert(middle, at: (indexes.count - 1) / 2)
     return IndexPath(indexes: indexes)
@@ -79,18 +77,14 @@ func subscriptMutation(n: Int,
 
 @inline(never)
 public func run_IndexPathSubscriptMutation(_ n: Int, _ count: Int) {
-  subscriptMutation(n: n, 
-  mutations: count, 
-  mutate: { ip, i in
+  subscriptMutation(n: n,  mutations: count, mutate: { ip, i in
 		ip[i % 4] += 1
 	})
 }
 
 @inline(never)
 public func run_IndexPathSubscriptRangeMutation(_ n: Int, _ count: Int) {
-  subscriptMutation(n: count, 
-  mutations: count, 
-  mutate: { ip, i in
+  subscriptMutation(n: count, mutations: count, mutate: { ip, i in
 		ip[0..<i] += [i]
 	})
 }
