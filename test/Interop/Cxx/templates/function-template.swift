@@ -22,6 +22,12 @@ FunctionTemplateTestSuite.test("add<T, U> where T, U == Int") {
   expectEqual(65, result)
 }
 
+FunctionTemplateTestSuite.test("lvalueReference<T> where T == Int") {
+  var value = 0
+  lvalueReference(&value)
+  expectEqual(value, 42)
+}
+
 // TODO: currently "Any" is imported as an Objective-C "id".
 // This doesn't work without the Objective-C runtime. 
 #if _runtime(_ObjC)
