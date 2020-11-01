@@ -2001,6 +2001,9 @@ NodePointer Demangler::demangleMetatype() {
                              popNode(isEntity));
     case 'X':
       return demanglePrivateContextDescriptor();
+    case 'z':
+      return createWithPoppedType(
+          Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken);
     default:
       return nullptr;
   }

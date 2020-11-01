@@ -2191,6 +2191,12 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node
   Buffer << "MJ";
 }
 
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(NodePointer node) {
   if (!node) return "";

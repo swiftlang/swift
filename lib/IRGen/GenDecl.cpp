@@ -3907,6 +3907,24 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
 }
 
 llvm::Constant *
+IRGenModule::getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+    NominalTypeDecl *decl) {
+  assert(decl->isGenericContext());
+  LinkEntity entity =
+      LinkEntity::forCanonicalPrespecializedGenericTypeCachingOnceToken(decl);
+  if (auto &entry = GlobalVars[entity]) {
+    return entry;
+  }
+  auto variable = getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::ConstantInt::get(OnceTy, 0));
+
+  return variable;
+}
+
+llvm::Constant *
 IRGenModule::getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forNoncanonicalSpecializedGenericTypeMetadataCacheVariable(type);

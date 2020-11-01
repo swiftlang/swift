@@ -175,6 +175,7 @@ Globals
 
   global ::= global 'MJ'                 // noncanonical specialized generic type metadata instantiation cache associated with global
   global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
+  global ::= global 'Mz'                 // canonical specialized generic type metadata caching token
 
   #if SWIFT_RUNTIME_VERSION >= 5.4
     global ::= context (decl-name '_')+ 'WZ' // global variable one-time initialization function
