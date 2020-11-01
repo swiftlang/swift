@@ -63,18 +63,18 @@ func indexPath(_ size: Int,
 // Subscript Mutations
 
 @inline(__always)
-func subscriptMutation(n: Int,  
-	mutations: Int,
-	mutate: (inout IndexPath, Int) -> ()) {
+func subscriptMutation(n: Int,
+  mutations: Int,
+  mutate: (inout IndexPath, Int) -> ()) {
     for _ in 0..<n {
-		  var ip = indexPath(size)
+      var ip = indexPath(size)
 
-		  for i in 0..<mutations {
-			  mutate(&ip, i)
-		  }
-		
+      for i in 0..<mutations {
+        mutate(&ip, i)
+      }
+
       blackHole(ip)
-	}
+    }
 }
 
 @inline(never)
