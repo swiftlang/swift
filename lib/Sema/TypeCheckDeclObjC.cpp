@@ -1946,8 +1946,10 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   }
 
   // Fix the argument names that need fixing.
-  assert(name.getArgumentNames().size()
-          == targetName.getArgumentNames().size());
+  if (name.getArgumentNames().size()
+          != targetName.getArgumentNames().size())
+    return false;
+  
   auto params = func->getParameters();
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];

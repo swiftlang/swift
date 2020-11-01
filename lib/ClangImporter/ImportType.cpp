@@ -2065,7 +2065,13 @@ static Type decomposeCompletionHandlerType(
         paramIdx == *info.completionHandlerErrorParamIndex())
       continue;
 
-    resultTypeElts.push_back(param.getPlainType());
+    // If there is an error parameter, remove nullability.
+    Type paramType = param.getPlainType();
+    // TODO: Clang should gain a nullability form that overrides this.
+    if (info.completionHandlerErrorParamIndex())
+      paramType = paramType->lookThroughAllOptionalTypes();
+
+    resultTypeElts.push_back(paramType);
   }
 
   switch (resultTypeElts.size()) {
