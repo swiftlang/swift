@@ -3121,8 +3121,6 @@ ERROR(differentiable_attr_layout_req_unsupported,none,
       ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
      "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
      "(in protocol %3); explicit attribute is necessary because candidate is "
