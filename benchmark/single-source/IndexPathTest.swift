@@ -61,7 +61,8 @@ func indexPath(_ size: Int, middle: Int) -> IndexPath {
 // Subscript Mutations
 
 @inline(__always)
-func subscriptMutation(n: Int,
+func subscriptMutation(
+  n: Int,
   mutations: Int,
   mutate: (inout IndexPath, Int) -> ()) {
     for _ in 0..<n {
@@ -79,20 +80,21 @@ func subscriptMutation(n: Int,
 public func run_IndexPathSubscriptMutation(_ n: Int, _ count: Int) {
   subscriptMutation(n: n,  mutations: count, mutate: { ip, i in
 		ip[i % 4] += 1
-	})
+  })
 }
 
 @inline(never)
 public func run_IndexPathSubscriptRangeMutation(_ n: Int, _ count: Int) {
   subscriptMutation(n: count, mutations: count, mutate: { ip, i in
 		ip[0..<i] += [i]
-	})
+  })
 }
 
 // Max, Min
 
 @inline(__always)
-func maxMin(n: Int, 
+func maxMin(
+  n: Int, 
   creator: () -> IndexPath, 
   maxMinFunc: (inout IndexPath) -> Int?) {
     for _ in 0..<n {
