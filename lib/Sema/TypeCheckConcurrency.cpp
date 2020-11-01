@@ -87,6 +87,16 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 
       return true;
     }
+
+    if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+      if (fnType->isNoEscape()) {
+        if (diagnose) {
+          param->diagnose(diag::asynchandler_noescape_closure_parameter);
+        }
+
+        return true;
+      }
+    }
   }
 
   if (func->isMutating()) {
