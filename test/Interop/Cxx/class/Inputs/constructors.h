@@ -43,3 +43,9 @@ struct EmptyStruct {};
 struct IntWrapper {
   int x;
 };
+
+// TODO: we should be able to import this constructor correctly. Until we can,
+// make sure not to crash.
+struct UsingBaseConstructor : ConstructorWithParam {
+  using ConstructorWithParam::ConstructorWithParam;
+};
