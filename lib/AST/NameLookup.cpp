@@ -138,8 +138,6 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(
     ValueDecl *D, DeclVisibilityKind reason,
     DynamicLookupInfo dynamicLookupInfo) {
-  if (D->hasInterfaceType() && D->isInvalid())
-    return;
   if (!D->isAccessibleFrom(DC))
     return;
 
