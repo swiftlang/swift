@@ -8,8 +8,8 @@ import ObjCConcurrency
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
   let _: Bool = await slowServer.checkAvailability()
-  let _: String = try await slowServer.findAnswer() ?? "nope"
-  let _: String = await try slowServer.findAnswerFailingly() ?? "nope"
+  let _: String = try await slowServer.findAnswer()
+  let _: String = await try slowServer.findAnswerFailingly()
   let _: Void = await slowServer.doSomethingFun("jump")
   let _: (Int) -> Void = slowServer.completionHandler
 
