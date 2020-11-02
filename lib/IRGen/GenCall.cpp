@@ -2248,8 +2248,16 @@ public:
     // Set caller info into the context.
     { // caller context
       Explosion explosion;
-      explosion.add(IGF.getAsyncContext());
       auto fieldLayout = layout.getParentLayout();
+      auto *context = IGF.getAsyncContext();
+      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+        Address fieldAddr =
+            fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
+        context = emitPointerAuthSign(IGF, context, authInfo);
+      }
+      explosion.add(context);
       saveValue(fieldLayout, explosion, isOutlined);
     }
     { // caller executor
