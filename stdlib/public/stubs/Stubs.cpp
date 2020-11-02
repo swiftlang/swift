@@ -379,27 +379,27 @@ T _swift_strto(const char *nptr, char **endptr) {
 }
 
 #if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
-#define need_swift_strtod_l
+#define NEED_SWIFT_STRTOD_L
 #define strtod_l swift_strtod_l
-#define need_swift_strtof_l
+#define NEED_SWIFT_STRTOF_L
 #define strtof_l swift_strtof_l
-#define need_swift_strtold_l
+#define NEED_SWIFT_STRTOLD_L
 #define strtold_l swift_strtold_l
 #elif defined(__ANDROID__)
 #if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-#define need_swift_strtold_l
+#define NEED_SWIFT_STRTOLD_L
 #define strtold_l swift_strtold_l
 #endif
 
 #if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-#define need_swift_strtod_l
+#define NEED_SWIFT_STRTOD_L
 #define strtod_l swift_strtod_l
-#define need_swift_strtof_l
+#define NEED_SWIFT_STRTOF_L
 #define strtof_l swift_strtof_l
 #endif
 #endif
 
-#if defined(need_swift_strtod_l)
+#if defined(NEED_SWIFT_STRTOD_L)
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtod_l(nptr, endptr, getCLocale());
@@ -411,7 +411,7 @@ static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 }
 #endif
 
-#if defined(need_swift_strtof_l)
+#if defined(NEED_SWIFT_STRTOF_L)
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtof_l(nptr, endptr, getCLocale());
@@ -423,7 +423,7 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 }
 #endif
 
-#if defined(need_swift_strtold_l)
+#if defined(NEED_SWIFT_STRTOLD_L)
 static long double swift_strtold_l(const char *nptr, char **endptr,
                                    locale_t loc) {
 #if defined(_WIN32)
