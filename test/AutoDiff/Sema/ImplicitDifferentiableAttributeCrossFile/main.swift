@@ -23,6 +23,8 @@
 // RUN: %target-swift-frontend -c %s -primary-file %S/Inputs/other_file.swift
 // RUN: not %target-build-swift %s %S/Inputs/other_file.swift
 
+import _Differentiation
+
 // Error: conformance is in different file than witnesses.
 // expected-error @+1 {{type 'ConformingStruct' does not conform to protocol 'Protocol1'}}
 extension ConformingStruct: Protocol1 {}
@@ -32,4 +34,17 @@ extension ConformingStruct: Protocol2 {
   func internalMethod4(_ x: Float) -> Float {
     x
   }
+}
+
+public final class ConformingStructWithSupersetAttr: Protocol2 {}
+
+// rdar://70348904: Witness mismatch failure when a matching witness with a *superset* `@differentiable`
+// attribute is specified.
+// 
+// Note that public witnesses are required to explicitly specify `@differentiable` attributes except
+// those w.r.t. parameters that have already been covered by an existing `@differentiable` attribute.
+extension ConformingStructWithSupersetAttr {
+  // @differentiable(wrt: self) // Omitting this is okay.
+  @differentiable
+  public func internalMethod4(_ x: Float) -> Float { x }
 }
