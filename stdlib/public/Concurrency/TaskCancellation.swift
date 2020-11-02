@@ -171,7 +171,7 @@ extension Task {
     }
 
     public static var distantFuture: Self {
-      .init(time: .max)
+      .init(at: .max)
     }
 
     public static func `in`(_ interval: _TimeInterval) -> Self {

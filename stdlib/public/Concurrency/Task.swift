@@ -212,6 +212,31 @@ extension Task {
   }
 }
 
+// ==== Voluntary Suspension -----------------------------------------------------
+extension Task {
+
+  /// Suspend until a given point in time.
+  ///
+  /// ### Cancellation
+  /// Does not check for cancellation and suspends the current context until the
+  /// given deadline.
+  ///
+  /// - Parameter until: point in time until which to suspend.
+  public static func sleep(until: Deadline) async {
+    fatalError("\(#function) not implemented yet.")
+  }
+
+  /// Explicitly suspend the current task, potentially giving up execution actor
+  /// of current actor/task, allowing other tasks to execute.
+  ///
+  /// This is not a perfect cure for starvation;
+  /// if the task is the highest-priority task in the system, it might go
+  /// immediately back to executing.
+  public static func yield() async {
+    fatalError("\(#function) not implemented yet.")
+  }
+}
+
 // ==== UnsafeContinuation -----------------------------------------------------
 
 extension Task {
