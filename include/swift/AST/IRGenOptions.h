@@ -137,6 +137,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Resilient class stub initializer callbacks.
   PointerAuthSchema ResilientClassStubInitCallbacks;
+
+  /// The parent async context stored within a child async context.
+  PointerAuthSchema AsyncContextParent;
 };
 
 enum class JITDebugArtifact : unsigned {
