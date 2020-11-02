@@ -1222,6 +1222,9 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
 
+  if (fnTy->isAsync())
+    emitHopToCurrentExecutor(loc);
+
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
   if (suppressErrorPath) {
