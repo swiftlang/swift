@@ -14,43 +14,71 @@ import Foundation
 import TestsUtils
 
 let size = 200
+let increasingIndexPath = indexPath(size)
+let decreasingIndexPath = indexPath(size, reversed: true)
+let increasingMaxMiddleIndexPath = indexPath(size, middle: size + 1)
+let increasingMinMiddleIndexPath = indexPath(size, middle: -1)
 let tags: [BenchmarkCategory] = [.validation, .api, .IndexPath]
 
 public let IndexPathTest = [
   BenchmarkInfo(
     name: "IndexPath.Subscript.Mutation",
-    runFunction: { n in run_IndexPathSubscriptMutation(n * 60, size) },
-    tags: tags),
+    runFunction: { n in
+      run_IndexPathSubscriptMutation(n * 10, size, increasingIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingIndexPath) }),
   BenchmarkInfo(
     name: "IndexPath.Subscript.Range.Mutation",
-    runFunction: { n in run_IndexPathSubscriptRangeMutation(n * 60, size) },
-    tags: tags),
+    runFunction: { n in
+      run_IndexPathSubscriptRangeMutation(n, size, increasingIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingIndexPath) }),
 
   BenchmarkInfo(
     name: "IndexPath.Max.Beginning",
-    runFunction: { n in run_IndexPathMaxBeginning(n * 60) },
-    tags: tags),
+    runFunction: { n in 
+      run_IndexPathMaxBeginning(n * 25, decreasingIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(decreasingIndexPath) }),
   BenchmarkInfo(
     name: "IndexPath.Max.Middle",
-    runFunction: { n in run_IndexPathMaxMiddle(n * 60) },
-    tags: tags),
+    runFunction: { n in
+      run_IndexPathMaxMiddle(n * 25, increasingMaxMiddleIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingMaxMiddleIndexPath) }),
   BenchmarkInfo(
     name: "IndexPath.Max.End",
-    runFunction: { n in run_IndexPathMaxEnd(n * 60) },
-    tags: tags),
+    runFunction: { n in 
+      run_IndexPathMaxEnd(n * 25, increasingIndexPath) 
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingIndexPath) }),
 
   BenchmarkInfo(
     name: "IndexPath.Min.Beginning",
-    runFunction: { n in run_IndexPathMinBeginning(n * 60) },
-    tags: tags),
+    runFunction: { n in 
+      run_IndexPathMinBeginning(n * 25, increasingIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingIndexPath) }),
   BenchmarkInfo(
     name: "IndexPath.Min.Middle",
-    runFunction: { n in run_IndexPathMinMiddle(n * 60) },
-    tags: tags),
+    runFunction: { n in
+      run_IndexPathMinMiddle(n * 25, increasingMinMiddleIndexPath)
+    },
+    tags: tags,
+    setUpFunction: { blackHole(increasingMinMiddleIndexPath) }),
   BenchmarkInfo(
     name: "IndexPath.Min.End",
-    runFunction: { n in run_IndexPathMinEnd(n * 60) },
-    tags: tags),
+    runFunction: { n in 
+      run_IndexPathMinEnd(n * 25, decreasingIndexPath) 
+    },
+    tags: tags,
+    setUpFunction: { blackHole(decreasingIndexPath) }),
 ]
 
 @inline(__always)
@@ -72,30 +100,34 @@ func indexPath(_ size: Int, middle: Int) -> IndexPath {
 func subscriptMutation(
   n: Int,
   mutations: Int,
+  indexPath: IndexPath,
   mutate: (inout IndexPath, Int) -> Void
 ) {
   for _ in 0..<n {
-    var ip = indexPath(size)
     for i in 0..<mutations {
+      var ip = indexPath
       mutate(&ip, i)
     }
-    blackHole(ip)
   }
 }
 
 @inline(never)
-public func run_IndexPathSubscriptMutation(_ n: Int, _ count: Int) {
+public func run_IndexPathSubscriptMutation(
+  _ n: Int, _ count: Int, _ indexPath: IndexPath
+) {
   subscriptMutation(
-    n: n, mutations: count,
+    n: n, mutations: count, indexPath: indexPath,
     mutate: { ip, i in
       ip[i % 4] += 1
     })
 }
 
 @inline(never)
-public func run_IndexPathSubscriptRangeMutation(_ n: Int, _ count: Int) {
+public func run_IndexPathSubscriptRangeMutation(
+  _ n: Int, _ count: Int, _ indexPath: IndexPath
+) {
   subscriptMutation(
-    n: n, mutations: count,
+    n: n, mutations: count, indexPath: indexPath,
     mutate: { ip, i in
       ip[0..<i] += [i]
     })
@@ -106,11 +138,11 @@ public func run_IndexPathSubscriptRangeMutation(_ n: Int, _ count: Int) {
 @inline(__always)
 func maxMin(
   n: Int,
-  creator: () -> IndexPath,
+  indexPath: IndexPath,
   maxMinFunc: (inout IndexPath) -> Int?
 ) {
   for _ in 0..<n {
-    var ip = creator()
+    var ip = indexPath
     let found = maxMinFunc(&ip) != nil
     blackHole(found)
   }
@@ -119,36 +151,30 @@ func maxMin(
 // Max
 
 @inline(never)
-public func run_IndexPathMaxBeginning(_ n: Int) {
+public func run_IndexPathMaxBeginning(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size, reversed: true)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.max()
     })
 }
 
 @inline(never)
-public func run_IndexPathMaxMiddle(_ n: Int) {
+public func run_IndexPathMaxMiddle(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size, middle: size + 1)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.max()
     })
 }
 
 @inline(never)
-public func run_IndexPathMaxEnd(_ n: Int) {
+public func run_IndexPathMaxEnd(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.max()
     })
@@ -157,36 +183,30 @@ public func run_IndexPathMaxEnd(_ n: Int) {
 // Min
 
 @inline(never)
-public func run_IndexPathMinBeginning(_ n: Int) {
+public func run_IndexPathMinBeginning(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.min()
     })
 }
 
 @inline(never)
-public func run_IndexPathMinMiddle(_ n: Int) {
+public func run_IndexPathMinMiddle(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size, middle: -1)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.min()
     })
 }
 
 @inline(never)
-public func run_IndexPathMinEnd(_ n: Int) {
+public func run_IndexPathMinEnd(_ n: Int, _ indexPath: IndexPath) {
   maxMin(
     n: n,
-    creator: {
-      indexPath(size, reversed: true)
-    },
+    indexPath: indexPath,
     maxMinFunc: { ip in
       ip.min()
     })
