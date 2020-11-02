@@ -438,9 +438,9 @@ static long double swift_strtold_l(const char *nptr, char **endptr,
 }
 #endif
 
-#undef need_swift_strtod_l
-#undef need_swift_strtof_l
-#undef need_swift_strtold_l
+#undef NEED_SWIFT_STRTOD_L
+#undef NEED_SWIFT_STRTOF_L
+#undef NEED_SWIFT_STRTOLD_L
 
 static inline void _swift_set_errno(int to) {
 #if defined(_WIN32)
