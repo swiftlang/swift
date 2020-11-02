@@ -151,8 +151,7 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-simple '!'
 ///     type-collection
 ///     type-array
-ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
-                                               bool HandleCodeCompletion) {
+ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
 
   if (Tok.is(tok::kw_inout) ||
@@ -175,8 +174,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     ty = parseTypeTupleBody();
     break;
   case tok::code_complete:
-    if (!HandleCodeCompletion)
-      break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
     return makeParserCodeCompletionResult<TypeRepr>(
@@ -358,7 +355,6 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     type-composition 'async'? 'throws'? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
-                                         bool HandleCodeCompletion,
                                          bool IsSILFuncDecl) {
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
@@ -404,8 +400,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     return parseSILBoxType(generics, attrs, GenericsScope);
   }
 
-  ParserResult<TypeRepr> ty =
-    parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
+  ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
   if (ty.isNull())
     return ty;
   auto tyR = ty.get();
@@ -834,8 +829,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     'some'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
-Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
-                                     bool HandleCodeCompletion) {
+Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
   SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
@@ -859,8 +853,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   
   SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
-  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
-                                                     HandleCodeCompletion);
+  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID);
   if (FirstType.isNull())
     return FirstType;
   if (!Tok.isContextualPunctuator("&")) {
@@ -918,7 +911,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 
     // Parse next type.
     ParserResult<TypeRepr> ty =
-      parseTypeSimple(diag::expected_identifier_for_type, HandleCodeCompletion);
+      parseTypeSimple(diag::expected_identifier_for_type);
     if (ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     Status |= ty;
