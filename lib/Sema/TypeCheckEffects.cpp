@@ -399,7 +399,7 @@ public:
   DeclContext *RethrowsDC = nullptr;
   bool inRethrowsContext() const { return RethrowsDC != nullptr; }
 
-  /// Check to see if the given function application throws.
+  /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
@@ -461,7 +461,8 @@ public:
       if (!type) return Classification::forInvalidCode();
 
       // Use the most significant result from the arguments.
-      Classification result;
+      Classification result = isAsync ? Classification::forAsync() 
+                                      : Classification();
       for (auto arg : llvm::reverse(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
