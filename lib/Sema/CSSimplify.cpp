@@ -2920,6 +2920,54 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
       return nullptr;
   }
 
+  // If the requirement involves a generic parameter that is already involved in
+  // another argument fix. e.g.
+  //    func f<E: Equatable>(_ e1: E, _ e2: E) {}
+  //
+  //    struct A {}
+  //    struct B {}
+  //
+  //    f(A(), B())
+  //
+  // In that case, let's just increase the score and look over the fact that
+  // there are requirements on the generic parameter.
+  auto reqParameterLocator = cs.getConstraintLocator(anchor, path.drop_back());
+  auto genericElt =
+      reqParameterLocator->findLast<LocatorPathElt::OpenedGeneric>();
+  if (genericElt) {
+    if (!cs.getFixes().empty() &&
+        llvm::all_of(cs.getFixes(), [&](ConstraintFix *fix) {
+          auto fixLocator = fix->getLocator();
+          if (!fixLocator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+            return false;
+
+          // Retriving opened generic parameters from the callee locator.
+          auto *calleeLocator = cs.getCalleeLocator(fixLocator);
+          auto openedCalleeTypes =
+              llvm::find_if(cs.getOpenedTypes(), [&](const auto entry) {
+                return entry.first == calleeLocator;
+              });
+
+          if (openedCalleeTypes == cs.getOpenedTypes().end())
+            return false;
+
+          // Matching to check if there is generic paramenters of requirement
+          // locator that are involved in the fix.
+          auto reqGenericParams =
+              genericElt->getSignature()->getGenericParams();
+          return llvm::any_of(reqGenericParams, [&](const GenericTypeParamType
+                                                        *GPT) {
+            return llvm::any_of(openedCalleeTypes->second, [&](const auto GP) {
+              return GP.second->getImpl().getLocator()->getGenericParameter() ==
+                     GPT;
+            });
+          });
+        })) {
+      cs.increaseScore(SK_Fix);
+      return nullptr;
+    }
+  }
+
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   switch (req.getRequirementKind()) {

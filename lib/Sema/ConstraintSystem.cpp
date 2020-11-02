@@ -3169,34 +3169,12 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   if (!allGenericMismatch) {
     allMismatches =
         llvm::all_of(solutions, [](const Solution &solution) -> bool {
-          // Special casing situations where a type mismatch maybe followed by a
-          // conformance requirement fix on each solution e.g.
-          //    func f<E: Equatable>(_ e1: E, _ e2: E) {}
-          //
-          //    struct A {}
-          //    struct B {}
-          //
-          //    f(A(), B())
-          //
-          // We also have to make sure that we diagnose the generic argument
-          // mismatch in those situations.
-          bool allConformance = llvm::all_of(
+          return llvm::all_of(
               solution.Fixes, [](const ConstraintFix *fix) -> bool {
-                return fix->getKind() == FixKind::AddConformance;
+                return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
+                       fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
+                       fix->getKind() == FixKind::AllowTupleTypeMismatch;
               });
-          // Ensure to not attempt diagnose it when we only have conformance
-          // fixes.
-          return !allConformance &&
-                 llvm::all_of(
-                     solution.Fixes, [](const ConstraintFix *fix) -> bool {
-                       return fix->getKind() ==
-                                  FixKind::AllowArgumentTypeMismatch ||
-                              fix->getKind() ==
-                                  FixKind::AllowFunctionTypeMismatch ||
-                              fix->getKind() ==
-                                  FixKind::AllowTupleTypeMismatch ||
-                              fix->getKind() == FixKind::AddConformance;
-                     });
         });
   }
 
