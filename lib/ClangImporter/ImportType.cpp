@@ -1274,13 +1274,11 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
         impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
     return Type();
 
-  ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
-  if (!foundationModule ||
-      foundationModule->getName()
-        != elementClass->getModuleContext()->getName())
+  if (!impl.canImportFoundationModule() ||
+      !elementClass->getModuleContext()->isFoundationModule())
     return Type();
 
-
+  ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
   if (resugarNSErrorPointer)
     return impl.getNamedSwiftType(
       foundationModule,
@@ -1386,7 +1384,7 @@ static ImportedType adjustTypeForConcreteImport(
       // id and Any can be bridged without Foundation. There would be
       // bootstrapping issues with the ObjectiveC module otherwise.
       if (hint.BridgedType->isAny()
-          || impl.tryLoadFoundationModule()
+          || impl.canImportFoundationModule()
           || impl.ImportForwardDeclarations) {
 
         // Set the bridged type if it wasn't done already.
@@ -2515,6 +2513,10 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
 ModuleDecl *ClangImporter::Implementation::tryLoadFoundationModule() {
   return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
                        ImportForwardDeclarations, checkedModules);
+}
+
+bool ClangImporter::Implementation::canImportFoundationModule() {
+  return SwiftContext.canImportModule({SwiftContext.Id_Foundation, SourceLoc()});
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,

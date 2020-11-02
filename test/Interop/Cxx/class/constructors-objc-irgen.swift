@@ -2,7 +2,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
-
+import Foundation
 import ConstructorsObjC
 
 public func createConstructorWithNSArrayParam() -> ConstructorWithNSArrayParam {
