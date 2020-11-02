@@ -2166,6 +2166,9 @@ void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
 void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node) {
+  unreachable("unsupported");
+}
 void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
   unreachable("unsupported");
 }

@@ -171,7 +171,8 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
   Mangle::ASTMangler Mangler;
   auto name = Mangler.mangleObjCAsyncCompletionHandlerImpl(blockType,
-                                                           resumeType);
+                                                           resumeType,
+                                                           /*predefined*/ false);
   
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,

@@ -2263,10 +2263,13 @@ NodePointer Demangler::popProtocolConformance() {
       NodePointer type = popNode(Node::Kind::Type);
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
     }
-    case 'z': {
+    case 'z':
+    case 'Z': {
       NodePointer resultType = popNode(Node::Kind::Type);
       NodePointer implType = popNode(Node::Kind::Type);
-      return createWithChildren(Node::Kind::ObjCAsyncCompletionHandlerImpl,
+      return createWithChildren(c == 'z'
+                                  ? Node::Kind::ObjCAsyncCompletionHandlerImpl
+                                  : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
                                 implType, resultType);
     }
     case 'V': {

@@ -396,11 +396,12 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
                                                    CanSILFunctionType BlockType,
-                                                   CanType ResultType) {
+                                                   CanType ResultType,
+                                                   bool predefined) {
   beginMangling();
   appendType(BlockType);
   appendType(ResultType);
-  appendOperator("Tz");
+  appendOperator(predefined ? "TZ" : "Tz");
   return finalize();
 }
 
