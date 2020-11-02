@@ -16,7 +16,8 @@ protocol Protocol1: Differentiable {
   func internalMethod3(_ x: Float) -> Float
 }
 
-protocol Protocol2: Differentiable {
+public protocol Protocol2: Differentiable {
+  @differentiable(wrt: self)
   @differentiable(wrt: (self, x))
   func internalMethod4(_ x: Float) -> Float
 }
