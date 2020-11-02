@@ -18,38 +18,38 @@ let tags: [BenchmarkCategory] = [.validation, .api, .IndexPath]
 
 public let IndexPathTest = [
   BenchmarkInfo(
-    name: "IndexPathSubscriptMutation",
-    runFunction: { n in run_IndexPathSubscriptMutation(n * 1000, size) },
+    name: "IndexPath.Subscript.Mutation",
+    runFunction: { n in run_IndexPathSubscriptMutation(n * 60, size) },
     tags: tags),
   BenchmarkInfo(
-    name: "IndexPathSubscriptRangeMutation",
-    runFunction: { n in run_IndexPathSubscriptRangeMutation(n * 1000, size) },
-    tags: tags),
-
-  BenchmarkInfo(
-    name: "IndexPathMaxBeginning",
-    runFunction: { n in run_IndexPathMaxBeginning(n * 1000) },
-    tags: tags),
-  BenchmarkInfo(
-    name: "IndexPathMaxMiddle",
-    runFunction: { n in run_IndexPathMaxMiddle(n * 1000) },
-    tags: tags),
-  BenchmarkInfo(
-    name: "IndexPathMaxEnd",
-    runFunction: { n in run_IndexPathMaxEnd(n * 1000) },
+    name: "IndexPath.Subscript.Range.Mutation",
+    runFunction: { n in run_IndexPathSubscriptRangeMutation(n * 60, size) },
     tags: tags),
 
   BenchmarkInfo(
-    name: "IndexPathMinBeginning",
-    runFunction: { n in run_IndexPathMinBeginning(n * 1000) },
+    name: "IndexPath.Max.Beginning",
+    runFunction: { n in run_IndexPathMaxBeginning(n * 60) },
     tags: tags),
   BenchmarkInfo(
-    name: "IndexPathMinMiddle",
-    runFunction: { n in run_IndexPathMinMiddle(n * 1000) },
+    name: "IndexPath.Max.Middle",
+    runFunction: { n in run_IndexPathMaxMiddle(n * 60) },
     tags: tags),
   BenchmarkInfo(
-    name: "IndexPathMinEnd",
-    runFunction: { n in run_IndexPathMinEnd(n * 1000) },
+    name: "IndexPath.Max.End",
+    runFunction: { n in run_IndexPathMaxEnd(n * 60) },
+    tags: tags),
+
+  BenchmarkInfo(
+    name: "IndexPath.Min.Beginning",
+    runFunction: { n in run_IndexPathMinBeginning(n * 60) },
+    tags: tags),
+  BenchmarkInfo(
+    name: "IndexPath.Min.Middle",
+    runFunction: { n in run_IndexPathMinMiddle(n * 60) },
+    tags: tags),
+  BenchmarkInfo(
+    name: "IndexPath.Min.End",
+    runFunction: { n in run_IndexPathMinEnd(n * 60) },
     tags: tags),
 ]
 
@@ -95,7 +95,7 @@ public func run_IndexPathSubscriptMutation(_ n: Int, _ count: Int) {
 @inline(never)
 public func run_IndexPathSubscriptRangeMutation(_ n: Int, _ count: Int) {
   subscriptMutation(
-    n: count, mutations: count,
+    n: n, mutations: count,
     mutate: { ip, i in
       ip[0..<i] += [i]
     })
