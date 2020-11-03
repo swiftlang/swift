@@ -2034,7 +2034,14 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   if (!decl->isOperator())
     return;
 
-  SmallSet<CanType, 8> typesFound;
+  // For concrete operators, consider overloads that have the same type as
+  // an existing binding, because it's very common to write mixed operator
+  // expressions where all operands have the same type, e.g. `(x + 10) / 2`.
+  // For generic operators, only favor an exact overload that has already
+  // been bound, because mixed operator expressions are far less common, and
+  // computing generic canonical types is expensive.
+  SmallSet<CanType, 4> concreteTypesFound;
+  SmallSet<ValueDecl *, 4> genericDeclsFound;
   for (auto overload : CS.getResolvedOverloads()) {
     auto resolved = overload.second;
     if (!resolved.choice.isDecl())
@@ -2044,7 +2051,12 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
     if (!representativeDecl->isOperator())
       continue;
 
-    typesFound.insert(representativeDecl->getInterfaceType()->getCanonicalType());
+    auto interfaceType = representativeDecl->getInterfaceType();
+    if (interfaceType->is<GenericFunctionType>()) {
+      genericDeclsFound.insert(representativeDecl);
+    } else {
+      concreteTypesFound.insert(interfaceType->getCanonicalType());
+    }
   }
 
   for (auto index : indices(constraints)) {
@@ -2053,7 +2065,10 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
       continue;
 
     auto *decl = constraint->getOverloadChoice().getDecl();
-    if (typesFound.count(decl->getInterfaceType()->getCanonicalType()))
+    auto interfaceType = decl->getInterfaceType();
+    bool isGeneric = interfaceType->is<GenericFunctionType>();
+    if ((isGeneric && genericDeclsFound.count(decl)) ||
+        (!isGeneric && concreteTypesFound.count(interfaceType->getCanonicalType())))
       found.push_back(index);
   }
 }
