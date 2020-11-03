@@ -75,8 +75,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_1 | %FileCheck %s -check-prefix=IN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_2 | %FileCheck %s -check-prefix=IN_TUPLE_2
 
-// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
-// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_3 | %FileCheck %s -check-prefix=OWN_INIT_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_4 | %FileCheck %s -check-prefix=OWN_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5
@@ -85,6 +85,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_8 | %FileCheck %s -check-prefix=OWN_INIT_8
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_9 | %FileCheck %s -check-prefix=OWN_INIT_9
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_10 | %FileCheck %s -check-prefix=OWN_INIT_10
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_11 | %FileCheck %s -check-prefix=OWN_INIT_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_12 | %FileCheck %s -check-prefix=OWN_INIT_12
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_1 | %FileCheck %s -check-prefix=OWN_ACCESSOR_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_2 | %FileCheck %s -check-prefix=OWN_ACCESSOR_2
@@ -611,6 +613,14 @@ func ownInitTesting() {
   var ownInit10: String = "\(#^OWN_INIT_10^#)"
   // OWN_INIT_10: Begin completions
   // OWN_INIT_10-NOT: ownInit10
+}
+func ownInitTestingParam(ownInit11: Int = #^OWN_INIT_11^#) {
+  // OWN_INIT_11: Begin completions
+  // OWN_INIT_11-NOT: Decl[LocalVar]{{.*}}ownInit11
+}
+func ownInitTestingParamInterp(ownInit12: String = "\(#^OWN_INIT_12^#)") {
+  // OWN_INIT_12: Begin completions
+  // OWN_INIT_12-NOT: Decl[LocalVar]{{.*}}ownInit12
 }
 func ownInitTestingShadow(ownInit7: Int) {
   var ownInit7: Int = #^OWN_INIT_7^#

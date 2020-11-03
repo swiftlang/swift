@@ -149,9 +149,14 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
     DeclVisibilityKind reason, DynamicLookupInfo dynamicLookupInfo) {
   // Skip when Loc is within the decl's own initializer
   if (auto *VD = dyn_cast<VarDecl>(D)) {
+    Expr *init = VD->getParentInitializer();
+    if (auto *PD = dyn_cast<ParamDecl>(D)) {
+      init = PD->getStructuralDefaultExpr();
+    }
+
     // Only check if the VarDecl has the same (or parent) context to avoid
-    // grabbing the end location for every decl
-    if (auto *init = VD->getParentInitializer()) {
+    // grabbing the end location for every decl with an initializer
+    if (init != nullptr) {
       auto *varContext = VD->getDeclContext();
       if (DC == varContext || DC->isChildContextOf(varContext)) {
         auto initRange = Lexer::getCharSourceRangeFromSourceRange(
