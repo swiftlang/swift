@@ -272,6 +272,17 @@ public:
     CallRethrowsWithDefaultThrowingArgument,
   };
 
+  static StringRef kindToString(Kind k) {
+    switch (k) {
+      case Kind::Throw: return "Throw";
+      case Kind::CallThrows: return "CallThrows";
+      case Kind::CallRethrowsWithExplicitThrowingArgument: 
+        return "CallRethrowsWithExplicitThrowingArgument";
+      case Kind::CallRethrowsWithDefaultThrowingArgument: 
+        return "CallRethrowsWithDefaultThrowingArgument";
+    }
+  }
+
 private:
   Expr *TheExpression;
   Kind TheKind;
@@ -328,6 +339,26 @@ class Classification {
   bool IsAsync = false;
   ThrowingKind Result = ThrowingKind::None;
   Optional<PotentialThrowReason> Reason;
+  
+  void print(raw_ostream &out) const {
+    out << "{ IsInvalid = " << IsInvalid
+        << ", IsAsync = " << IsAsync
+        << ", Result = ThrowingKind::";
+    
+    switch(Result) {
+      case ThrowingKind::None:            out << "None"; break;
+      case ThrowingKind::RethrowingOnly:  out << "RethrowingOnly"; break;
+      case ThrowingKind::Throws:          out << "Throws"; break;
+    }
+         
+    out << ", Reason = ";
+    if (!Reason)
+      out << "nil";
+    else
+      out << PotentialThrowReason::kindToString(Reason.getValue().getKind());
+
+    out << " }";
+  }
   
 public:
   Classification() : Result(ThrowingKind::None) {}
@@ -386,6 +417,10 @@ public:
   }
   
   bool isAsync() const { return IsAsync; }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::errs()); }
+#endif
 };
 
 
