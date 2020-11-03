@@ -301,8 +301,8 @@ class C4 {
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
@@ -314,8 +314,8 @@ class C4 {
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U) -> U?#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U?) -> U?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U) -> U?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1??>#})[#(into: inout Hasher) -> Void#];
@@ -338,8 +338,8 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Somewhere#})[#Optional<Somewhere>#];
 // UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<Somewhere>#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:

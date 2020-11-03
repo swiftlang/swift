@@ -50,7 +50,7 @@ func testMembersPostfix1(r: Lens<Rectangle>) {
 }
 
 // testMembersPostfix1: Begin completions
-// testMembersPostfix1-DAG: Decl[Subscript]/CurrNominal:        [{#dynamicMember: WritableKeyPath<Rectangle, U>#}][#Lens<U>#];
+// testMembersPostfix1-DAG: Decl[Subscript]/CurrNominal:        {#<U>#}[{#dynamicMember: WritableKeyPath<Rectangle, U>#}][#Lens<U>#];
 
 // testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Lens<Point>#];
 // testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Lens<Point>#];

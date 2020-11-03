@@ -130,9 +130,9 @@ public:
     Equal,
     Whitespace,
 
-    /// The first chunk of a substring that describes the parameter for a
-    /// generic type.
-    GenericParameterBegin,
+    /// The first chunk of a substring that describes the generic parameter list
+    /// of a declaration.
+    GenericParameterListBegin,
     /// Generic type parameter name.
     GenericParameterName,
 
@@ -211,7 +211,7 @@ public:
 
   static bool chunkStartsNestedGroup(ChunkKind Kind) {
     return Kind == ChunkKind::CallParameterBegin ||
-           Kind == ChunkKind::GenericParameterBegin ||
+           Kind == ChunkKind::GenericParameterListBegin ||
            Kind == ChunkKind::OptionalBegin ||
            Kind == ChunkKind::CallParameterTypeBegin ||
            Kind == ChunkKind::TypeAnnotationBegin;

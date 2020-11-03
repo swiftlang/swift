@@ -399,12 +399,9 @@ public:
                      /*isLabeledTrailingClosure=*/false);
   }
 
-  void addGenericParameter(StringRef Name) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin,
-               [&] {
-      addChunkWithText(
+  void addGenericParameterName(StringRef Name) {
+    addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::GenericParameterName, Name);
-    });
   }
 
   void addDynamicLookupMethodCallTail() {

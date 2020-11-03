@@ -38,7 +38,7 @@ func testStructMembers<X>(value: GenericStruct<X>) {
 // MEMBERS_PROTO_EXT:      key.kind: source.lang.swift.decl.function.method.instance,
 // MEMBERS_PROTO_EXT-NEXT: key.name: "genericMethod()",
 // MEMBERS_PROTO_EXT-NEXT: key.sourcetext: "genericMethod(<#T##Self#>, <#T##Self.Assoc#>, <#T##U#>)",
-// MEMBERS_PROTO_EXT-NEXT: key.description: "genericMethod(Self, Self.Assoc, U)",
+// MEMBERS_PROTO_EXT-NEXT: key.description: "genericMethod<U>(Self, Self.Assoc, U)",
 // MEMBERS_PROTO_EXT-NEXT: key.typename: "Void where U : Class",
 
 // FIXME: Call argument patterns need auxiliary requirements.
@@ -58,23 +58,23 @@ func testStructMembers<X>(value: GenericStruct<X>) {
 // MEMBERS_STRUCT:      key.kind: source.lang.swift.decl.function.subscript,
 // MEMBERS_STRUCT-NEXT: key.name: "[]",
 // MEMBERS_STRUCT-NEXT: key.sourcetext: "[<#T##U#>]",
-// MEMBERS_STRUCT-NEXT: key.description: "[U]",
+// MEMBERS_STRUCT-NEXT: key.description: "<U>[U]",
 // MEMBERS_STRUCT-NEXT: key.typename: "X where U : Proto",
 // MEMBERS_STRUCT:      {
 // MEMBERS_STRUCT-NEXT: key.kind: source.lang.swift.decl.function.method.instance,
 // MEMBERS_STRUCT-NEXT: key.name: "genericMethod1(u1:u2:u3:)",
 // MEMBERS_STRUCT-NEXT: key.sourcetext: ".genericMethod1(u1: <#T##U#>, u2: <#T##U#>, u3: <#T##U#>)",
-// MEMBERS_STRUCT-NEXT: key.description: "genericMethod1(u1: U, u2: U, u3: U)",
+// MEMBERS_STRUCT-NEXT: key.description: "genericMethod1<U>(u1: U, u2: U, u3: U)",
 // MEMBERS_STRUCT-NEXT: key.typename: "Void where U : Proto",
 // MEMBERS_STRUCT:      {
 // MEMBERS_STRUCT-NEXT: key.kind: source.lang.swift.decl.function.method.instance,
 // MEMBERS_STRUCT-NEXT: key.name: "genericMethod2()",
 // MEMBERS_STRUCT-NEXT: key.sourcetext: ".genericMethod2(<#T##U.Bssoc#>, <#T##U#>, <#T##U.Assoc#>, <#T##U#>, <#T##X#>)",
-// MEMBERS_STRUCT-NEXT: key.description: "genericMethod2(U.Bssoc, U, U.Assoc, U, X)",
+// MEMBERS_STRUCT-NEXT: key.description: "genericMethod2<U>(U.Bssoc, U, U.Assoc, U, X)",
 // MEMBERS_STRUCT-NEXT: key.typename: "Void where U : Proto, U.Assoc : Class & Proto, U.Bssoc : Proto",
 
 // MEMBERS_STRUCT_ANNOTATED:      key.kind: source.lang.swift.decl.function.method.instance,
 // MEMBERS_STRUCT_ANNOTATED:      key.name: "genericMethod2()",
 // MEMBERS_STRUCT_ANNOTATED-NEXT: key.sourcetext: ".genericMethod2(<#T##U.Bssoc#>, <#T##U#>, <#T##U.Assoc#>, <#T##U#>, <#T##X#>)",
-// MEMBERS_STRUCT_ANNOTATED-NEXT: key.description: "<name>genericMethod2</name>(<callarg><callarg.type><typeid.user>U</typeid.user>.<typeid.user>Bssoc</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user>.<typeid.user>Assoc</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>X</typeid.user></callarg.type></callarg>)",
+// MEMBERS_STRUCT_ANNOTATED-NEXT: key.description: "<name>genericMethod2</name>&lt;U&gt;(<callarg><callarg.type><typeid.user>U</typeid.user>.<typeid.user>Bssoc</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user>.<typeid.user>Assoc</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.type><typeid.user>X</typeid.user></callarg.type></callarg>)",
 // MEMBERS_STRUCT_ANNOTATED-NEXT: key.typename: "<typeid.sys>Void</typeid.sys> <keyword>where</keyword> <typeid.user>U</typeid.user> : <typeid.user>Proto</typeid.user>, <typeid.user>U</typeid.user>.<typeid.user>Assoc</typeid.user> : <typeid.user>Class</typeid.user> &amp; <typeid.user>Proto</typeid.user>, <typeid.user>U</typeid.user>.<typeid.user>Bssoc</typeid.user> : <typeid.user>Proto</typeid.user>",

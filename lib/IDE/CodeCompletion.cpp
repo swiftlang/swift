@@ -18,6 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -437,7 +438,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::OptionalBegin:
     case ChunkKind::CallParameterBegin:
     case ChunkKind::CallParameterTypeBegin:
-    case ChunkKind::GenericParameterBegin:
+    case ChunkKind::GenericParameterListBegin:
       OS << "{#";
       break;
     case ChunkKind::DynamicLookupMethodCallTail:
@@ -1351,6 +1352,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::GenericParameterName:
     case ChunkKind::LeftParen:
     case ChunkKind::LeftBracket:
+    case ChunkKind::LeftAngle:
     case ChunkKind::Equal:
     case ChunkKind::DeclAttrParamKeyword:
     case ChunkKind::DeclAttrKeyword:
@@ -1360,6 +1362,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::TypeIdSystem:
     case ChunkKind::TypeIdUser:
     case ChunkKind::CallParameterBegin:
+    case ChunkKind::GenericParameterListBegin:
       return i;
     case ChunkKind::Dot:
     case ChunkKind::ExclamationMark:
@@ -1369,7 +1372,6 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
       continue;
     case ChunkKind::RightParen:
     case ChunkKind::RightBracket:
-    case ChunkKind::LeftAngle:
     case ChunkKind::RightAngle:
     case ChunkKind::Ellipsis:
     case ChunkKind::Comma:
@@ -1387,7 +1389,6 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::CallParameterClosureType:
     case ChunkKind::CallParameterClosureExpr:
     case ChunkKind::OptionalBegin:
-    case ChunkKind::GenericParameterBegin:
     case ChunkKind::DynamicLookupMethodCallTail:
     case ChunkKind::OptionalMethodCallTail:
     case ChunkKind::TypeAnnotation:
@@ -2599,6 +2600,26 @@ public:
     return false;
   }
 
+  static void addGenericParamList(CodeCompletionResultBuilder &Builder,
+                                  const GenericContext *GC) {
+    auto *const GPList = GC->getParsedGenericParams();
+    if (!GPList) {
+      return;
+    }
+
+    Builder.withNestedGroup(
+        CodeCompletionString::Chunk::ChunkKind::GenericParameterListBegin, [&] {
+      Builder.addLeftAngle();
+      llvm::interleave(
+          GPList->getParams(),
+          [&](const auto *Param) {
+            Builder.addGenericParameterName(Param->getName().str());
+          },
+          [&] { Builder.addComma(); });
+      Builder.addRightAngle();
+    });
+  }
+
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match
   /// with \p typeParams.
@@ -2976,6 +2997,8 @@ public:
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
       addValueBaseName(Builder, Name);
+      addGenericParamList(Builder, FD);
+
       if (IsDynamicLookup)
         Builder.addDynamicLookupMethodCallTail();
       else if (FD->getAttrs().hasAttribute<OptionalAttr>())
@@ -3119,6 +3142,7 @@ public:
         assert(addName.empty());
         addLeadingDot(Builder);
         Builder.addBaseName("init");
+        addGenericParamList(Builder, CD);
       } else if (!addName.empty()) {
         Builder.addBaseName(addName.str());
       }
@@ -3215,6 +3239,7 @@ public:
       Builder.addQuestionMark();
     }
 
+    addGenericParamList(Builder, SD);
     Builder.addLeftBracket();
     addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(),
                             SD->getGenericSignatureOfContext(), true);

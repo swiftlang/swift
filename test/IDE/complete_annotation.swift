@@ -51,7 +51,7 @@ func testGlobal() {
 // GLOBAL_EXPR-DAG: Keyword[#function]/None:            <name>#function</name>; typename=<typeid.sys>String</typeid.sys>;
 // GLOBAL_EXPR-DAG: Decl[Module]/None/IsSystem:         <name>Swift</name>; typename=Module;
 // GLOBAL_EXPR-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: <name>Int</name>; typename=<typeid.sys>Int</typeid.sys>;
-// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]/IsSystem: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>Target</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys> <keyword>where</keyword> <typeid.sys>Target</typeid.sys> : <typeid.sys>TextOutputStream</typeid.sys>; name=print(items: Any..., to: &Target)
+// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]/IsSystem: <name>print</name>&lt;Target&gt;(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>Target</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys> <keyword>where</keyword> <typeid.sys>Target</typeid.sys> : <typeid.sys>TextOutputStream</typeid.sys>; name=print<Target>(items: Any..., to: &Target)
 // GLOBAL_EXPR: End completions
 
 
@@ -125,8 +125,8 @@ func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
 }
 // GENERIC: Begin completions, 3 items
 // GENERIC-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>TestArchetypeAnnotations</typeid.user>&lt;<typeid.user>T</typeid.user>&gt;; name=self
-// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u: U, t: T)
-// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.user>S</typeid.user></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.user>S</typeid.user>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys> <keyword>where</keyword> <typeid.user>S</typeid.user> : <typeid.sys>Sequence</typeid.sys>; name=foo2(s: S, elt: S.Element)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>&lt;U&gt;(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1<U>(u: U, t: T)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>&lt;S&gt;(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.user>S</typeid.user></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.user>S</typeid.user>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys> <keyword>where</keyword> <typeid.user>S</typeid.user> : <typeid.sys>Sequence</typeid.sys>; name=foo2<S>(s: S, elt: S.Element)
 // GENERIC: End completions
 
 struct TestGenericParamAnnotations<T> {

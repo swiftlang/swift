@@ -109,6 +109,9 @@ class AnnotatingResultPrinter {
     case ChunkKind::Attribute:
       printWithTag("attribute", C.getText());
       break;
+    // FIXME: GenericParameterName corresponds to a type declaration
+    // and must be annotated respectively.
+    // case ChunkKind::GenericParameterName:
     case ChunkKind::BaseName:
       printWithTag("name", C.getText());
       break;
@@ -359,8 +362,9 @@ void swift::ide::printCodeCompletionResultSourceText(
       --i;
       continue;
     }
-    if (C.is(ChunkKind::TypeAnnotationBegin)) {
-      // Skip type annotation structure.
+    if (C.is(ChunkKind::TypeAnnotationBegin) ||
+        C.is(ChunkKind::GenericParameterListBegin)) {
+      // Skip generic parameter list and type annotation structures.
       auto level = C.getNestingLevel();
       do {
         ++i;
@@ -415,9 +419,11 @@ void swift::ide::printCodeCompletionResultFilterName(
       case ChunkKind::Ampersand:
       case ChunkKind::OptionalMethodCallTail:
         continue;
+      case ChunkKind::GenericParameterListBegin:
       case ChunkKind::CallParameterTypeBegin:
       case ChunkKind::TypeAnnotationBegin: {
-        // Skip call parameter type or type annotation structure.
+        // Skip generic parameter list, call parameter type, and type
+        // annotation structures.
         auto nestingLevel = C.getNestingLevel();
         do {
           ++i;
