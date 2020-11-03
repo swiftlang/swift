@@ -60,6 +60,9 @@ STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
 static unsigned MaxIterationsOfDominatorBasedSimplify = 10;
 
 namespace {
+
+struct ThreadInfo;
+
 class SimplifyCFG {
   SILOptFunctionBuilder FuncBuilder;
   SILFunction &Fn;
@@ -174,6 +177,7 @@ private:
   bool simplifyThreadedTerminators();
   bool dominatorBasedSimplifications(SILFunction &Fn, DominanceInfo *DT);
   bool dominatorBasedSimplify(DominanceAnalysis *DA);
+  bool threadEdge(const ThreadInfo &ti);
 
   /// Remove the basic block if it has no predecessors. Returns true
   /// If the block was removed.
@@ -245,6 +249,7 @@ static bool isThreadableBlock(SILBasicBlock *BB,
   return true;
 }
 
+namespace {
 
 /// A description of an edge leading to a conditionally branching (or switching)
 /// block and the successor block to thread to.
@@ -260,13 +265,12 @@ static bool isThreadableBlock(SILBasicBlock *BB,
 ///        /  \
 ///       ...  v
 ///            EnumCase/ThreadedSuccessorIdx
-class ThreadInfo {
+struct ThreadInfo {
   SILBasicBlock *Src;
   SILBasicBlock *Dest;
   EnumElementDecl *EnumCase;
   unsigned ThreadedSuccessorIdx;
 
-public:
   ThreadInfo(SILBasicBlock *Src, SILBasicBlock *Dest,
              unsigned ThreadedBlockSuccessorIdx)
       : Src(Src), Dest(Dest), EnumCase(nullptr),
@@ -276,69 +280,71 @@ public:
       : Src(Src), Dest(Dest), EnumCase(EnumCase), ThreadedSuccessorIdx(0) {}
 
   ThreadInfo() = default;
-
-  bool threadEdge() {
-    LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << Src->getDebugID()
-                            << " to bb" << Dest->getDebugID() << '\n');
-    auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
-
-    BasicBlockCloner Cloner(SrcTerm->getDestBB());
-    if (!Cloner.canCloneBlock())
-      return false;
-
-    Cloner.cloneBranchTarget(SrcTerm);
-
-    // We have copied the threaded block into the edge.
-    Src = Cloner.getNewBB();
-
-    // Rewrite the cloned branch to eliminate the non-taken path.
-    if (auto *CondTerm = dyn_cast<CondBranchInst>(Src->getTerminator())) {
-      // We know the direction this conditional branch is going to take thread
-      // it.
-      assert(Src->getSuccessors().size() > ThreadedSuccessorIdx &&
-             "Threaded terminator does not have enough successors");
-
-      auto *ThreadedSuccessorBlock =
-          Src->getSuccessors()[ThreadedSuccessorIdx].getBB();
-      auto Args = ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
-                                            : CondTerm->getFalseArgs();
-
-      SILBuilderWithScope(CondTerm)
-        .createBranch(CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
-
-      CondTerm->eraseFromParent();
-    } else {
-      // Get the enum element and the destination block of the block we jump
-      // thread.
-      auto *SEI = cast<SwitchEnumInst>(Src->getTerminator());
-      auto *ThreadedSuccessorBlock = SEI->getCaseDestination(EnumCase);
-
-      // Instantiate the payload if necessary.
-      SILBuilderWithScope Builder(SEI);
-      if (!ThreadedSuccessorBlock->args_empty()) {
-        auto EnumVal = SEI->getOperand();
-        auto EnumTy = EnumVal->getType();
-        auto Loc = SEI->getLoc();
-        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule(),
-                                            Builder.getTypeExpansionContext());
-        SILValue UED(
-            Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
-        assert(UED->getType() ==
-                   (*ThreadedSuccessorBlock->args_begin())->getType() &&
-               "Argument types must match");
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
-      } else
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
-                             ArrayRef<SILValue>());
-      SEI->eraseFromParent();
-    }
-    // After rewriting the cloned branch, split the critical edge.
-    // This does not currently update DominanceInfo.
-    Cloner.splitCriticalEdges(nullptr, nullptr);
-    Cloner.updateSSAAfterCloning();
-    return true;
-  }
 };
+
+} // end anonymous namespace
+
+bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
+  LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << ti.Src->getDebugID()
+             << " to bb" << ti.Dest->getDebugID() << '\n');
+  auto *SrcTerm = cast<BranchInst>(ti.Src->getTerminator());
+
+  BasicBlockCloner Cloner(SrcTerm->getDestBB());
+  if (!Cloner.canCloneBlock())
+    return false;
+
+  Cloner.cloneBranchTarget(SrcTerm);
+
+  // We have copied the threaded block into the edge.
+  auto *clonedSrc = Cloner.getNewBB();
+
+  // Rewrite the cloned branch to eliminate the non-taken path.
+  if (auto *CondTerm = dyn_cast<CondBranchInst>(clonedSrc->getTerminator())) {
+    // We know the direction this conditional branch is going to take thread
+    // it.
+    assert(clonedSrc->getSuccessors().size() > ti.ThreadedSuccessorIdx &&
+           "Threaded terminator does not have enough successors");
+
+    auto *ThreadedSuccessorBlock =
+      clonedSrc->getSuccessors()[ti.ThreadedSuccessorIdx].getBB();
+    auto Args = ti.ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
+      : CondTerm->getFalseArgs();
+
+    SILBuilderWithScope(CondTerm)
+      .createBranch(CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
+
+    CondTerm->eraseFromParent();
+  } else {
+    // Get the enum element and the destination block of the block we jump
+    // thread.
+    auto *SEI = cast<SwitchEnumInst>(clonedSrc->getTerminator());
+    auto *ThreadedSuccessorBlock = SEI->getCaseDestination(ti.EnumCase);
+
+    // Instantiate the payload if necessary.
+    SILBuilderWithScope Builder(SEI);
+    if (!ThreadedSuccessorBlock->args_empty()) {
+      auto EnumVal = SEI->getOperand();
+      auto EnumTy = EnumVal->getType();
+      auto Loc = SEI->getLoc();
+      auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
+                                          Builder.getTypeExpansionContext());
+      SILValue UED(
+        Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
+      assert(UED->getType() ==
+             (*ThreadedSuccessorBlock->args_begin())->getType() &&
+             "Argument types must match");
+      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+    } else
+      Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
+                           ArrayRef<SILValue>());
+    SEI->eraseFromParent();
+  }
+  // After rewriting the cloned branch, split the critical edge.
+  // This does not currently update DominanceInfo.
+  Cloner.splitCriticalEdges(nullptr, nullptr);
+  Cloner.updateSSAAfterCloning();
+  return true;
+}
 
 /// Give a cond_br or switch_enum instruction and one successor block return
 /// true if we can infer the value of the condition/enum along the edge to this
@@ -558,7 +564,7 @@ bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
     return Changed;
 
   for (auto &ThreadInfo : JumpThreadableEdges) {
-    if (ThreadInfo.threadEdge())
+    if (threadEdge(ThreadInfo))
       Changed = true;
   }
 
