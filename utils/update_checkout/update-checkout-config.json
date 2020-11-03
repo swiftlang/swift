@@ -47,9 +47,6 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-        "tensorflow-swift-apis": {
-            "remote": { "id": "tensorflow/swift-apis" }
-        },
        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
