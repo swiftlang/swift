@@ -1,0 +1,67 @@
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 -o /dev/null %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+sil @guaranteed_yield_coroutine : $@yield_once @convention(thin) () -> @yields @guaranteed Klass
+sil @owned_yield_coroutine : $@yield_once @convention(thin) () -> @yields @owned Klass
+
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'guaranteed_coroutine_caller'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: (**%3**, %4) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields @guaranteed Klass // user: %6
+// CHECK: Consuming User:   end_apply %4                                    // id: %5
+// CHECK: Non Consuming User:   %6 = apply %2(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'guaranteed_coroutine_caller'
+
+// CHECK-LABEL: Error#: 1. Begin Error in Function: 'guaranteed_coroutine_caller'
+// CHECK: Owned yield without life ending uses!
+// CHECK: Value: (**%7**, %8) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass // user: %10
+// CHECK: Error#: 1. End Error in Function: 'guaranteed_coroutine_caller'
+
+// CHECK-LABEL: Error#: 2. Begin Error in Function: 'guaranteed_coroutine_caller'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: (**%11**, %12) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass // users: %15, %13
+// CHECK: Consuming User:   destroy_value %11 : $Klass                      // id: %13
+// CHECK: Non Consuming User:   %15 = apply %2(%11) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Block: bb0
+// CHECK: Error#: 2. End Error in Function: 'guaranteed_coroutine_caller'
+
+// CHECK-LABEL: Error#: 3. Begin Error in Function: 'guaranteed_coroutine_caller'
+// CHECK: Owned yield without life ending uses!
+// CHECK: Value: (**%16**, %17) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass // user: %18
+// CHECK: Error#: 3. End Error in Function: 'guaranteed_coroutine_caller'
+
+sil [ossa] @guaranteed_coroutine_caller : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @guaranteed_yield_coroutine : $@yield_once @convention(thin) () -> @yields @guaranteed Klass
+  %1 = function_ref @owned_yield_coroutine : $@yield_once @convention(thin) () -> @yields @owned Klass
+
+  %user_func = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+  (%0a, %0b) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields @guaranteed Klass
+  end_apply %0b
+  apply %user_func(%0a) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  (%val1, %tok1) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass
+  end_apply %tok1
+  apply %user_func(%val1) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  (%val2, %tok2) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass
+  destroy_value %val2 : $Klass
+  end_apply %tok2
+  apply %user_func(%val2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  (%val3, %tok3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @owned Klass
+  apply %user_func(%val3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_apply %tok3
+
+  %9999 = tuple()
+  return %9999 : $()
+}

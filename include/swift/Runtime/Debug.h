@@ -18,7 +18,7 @@
 #define SWIFT_RUNTIME_DEBUG_HELPERS_H
 
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include <atomic>
 #include <cstdarg>
 #include <functional>
@@ -79,7 +79,7 @@ static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
 
   SWIFT_RUNTIME_BUILTIN_TRAP;
-  swift_runtime_unreachable("Expected compiler to crash.");
+  swift_unreachable("Expected compiler to crash.");
 }
 
 // swift::fatalError() halts with a crash log message, 

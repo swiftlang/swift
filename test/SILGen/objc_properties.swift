@@ -285,19 +285,28 @@ public struct SomeWrapper {
 
 class SomeWrapperTests {
   @objc @SomeWrapper dynamic var someWrapper: Int = 0
-// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC14testAssignmentyyF
+  @W @objc dynamic var s: String? = nil
+
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsCyACSScfc : $@convention(method) (@owned String, @owned SomeWrapperTests) -> @owned SomeWrapperTests {
 // CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
 // CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
 // CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
+// CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
+// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+  init(_ s: String) {
+    someWrapper = 1000
+    self.s = s
+  }
+
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC14testAssignmentyyF
+// CHECK: objc_method %0 : $SomeWrapperTests, #SomeWrapperTests.someWrapper!setter.foreign : (SomeWrapperTests) -> (Int) -> (), $@convention(objc_method) (Int, SomeWrapperTests) -> ()
   func testAssignment() {
     someWrapper = 1000
   }
 
-  @W @objc dynamic var s: String? = nil
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC16testBridgedValueyySSF
-// CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
-// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+// CHECK:  objc_method %1 : $SomeWrapperTests, #SomeWrapperTests.s!setter.foreign : (SomeWrapperTests) -> (String?) -> (), $@convention(objc_method) (Optional<NSString>, SomeWrapperTests) -> ()
   // Let's not crash.
   func testBridgedValue(_ s: String) {
     self.s = s

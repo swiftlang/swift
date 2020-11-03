@@ -336,6 +336,7 @@ private:
     case AdjointValueKind::Concrete:
       return val.getConcreteValue();
     }
+    llvm_unreachable("unhandled adjoint value kind!");
   }
 
   /// Materializes an adjoint value indirectly to a SIL buffer.
@@ -1350,7 +1351,7 @@ public:
         if (!getTangentSpace(
                 tupleTy->getElement(i).getType()->getCanonicalType()))
           continue;
-        if (tei->getFieldNo() == i)
+        if (tei->getFieldIndex() == i)
           elements.push_back(av);
         else
           elements.push_back(makeZeroAdjointValue(
@@ -2718,7 +2719,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
       return adjSource;
     auto origTupleTy = source->getType().castTo<TupleType>();
     unsigned adjIndex = 0;
-    for (unsigned i : range(teai->getFieldNo())) {
+    for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
               origTupleTy->getElement(i).getType()->getCanonicalType()))
         ++adjIndex;

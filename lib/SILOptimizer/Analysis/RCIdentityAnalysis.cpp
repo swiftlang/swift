@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -42,20 +43,26 @@ static bool isNoPayloadEnum(SILValue V) {
 /// necessarily preserve RC identity because it may cast from a
 /// reference-counted type to a non-reference counted type, or from a larger to
 /// a smaller struct with fewer references.
-static bool isRCIdentityPreservingCast(ValueKind Kind) {
-  switch (Kind) {
+static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
+  switch (V->getKind()) {
   case ValueKind::UpcastInst:
   case ValueKind::UncheckedRefCastInst:
-  case ValueKind::UnconditionalCheckedCastInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::ConvertFunctionInst:
-    return true;
-  default:
-    return false;
+    return cast<SingleValueInstruction>(V)->getOperand(0);
+  case ValueKind::UnconditionalCheckedCastInst: {
+    auto *castInst = cast<UnconditionalCheckedCastInst>(V);
+    if (SILDynamicCastInst(castInst).isRCIdentityPreserving())
+      return castInst->getOperand();
+    break;
   }
+  default:
+    break;
+  }
+  return SILValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -64,8 +71,8 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 
 static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // First strip off RC identity preserving casts.
-  if (isRCIdentityPreservingCast(V->getKind()))
-    return cast<SingleValueInstruction>(V)->getOperand(0);
+  if (SILValue castOp = getRCIdentityPreservingCastOperand(V))
+    return castOp;
 
   // Then if we have a struct_extract that is extracting a non-trivial member
   // from a struct with no other non-trivial members, a ref count operation on
@@ -116,9 +123,16 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // since we will only visit it twice if we go around a back edge due to a
   // different SILArgument that is actually being used for its phi node like
   // purposes.
-  if (auto *A = dyn_cast<SILPhiArgument>(V))
-    if (SILValue Result = A->getSingleTerminatorOperand())
+  if (auto *A = dyn_cast<SILPhiArgument>(V)) {
+    if (SILValue Result = A->getSingleTerminatorOperand()) {
+      // In case the terminator is a conditional cast, Result is the source of
+      // the cast.
+      auto dynCast = SILDynamicCastInst::getAs(A->getSingleTerminator());
+      if (dynCast && !dynCast.isRCIdentityPreserving())
+        return SILValue();
       return Result;
+    }
+  }
 
   return SILValue();
 }
@@ -321,9 +335,15 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
   }
 
   unsigned IVListSize = IncomingValues.size();
-
-  assert(IVListSize != 1 && "Should have been handled in "
-         "stripRCIdentityPreservingInsts");
+  if (IVListSize == 1) {
+#ifndef NDEBUG
+      auto dynCast = SILDynamicCastInst::getAs(A->getSingleTerminator());
+      assert((dynCast && !dynCast.isRCIdentityPreserving())
+             && "Should have been handled in stripRCIdentityPreservingInsts");
+#endif
+      return SILValue();
+    
+  }
 
   // Ok, we have multiple predecessors. See if all of them are the same
   // value. If so, just return that value.

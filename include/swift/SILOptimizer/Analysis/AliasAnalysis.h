@@ -47,7 +47,6 @@ namespace {
   struct MemBehaviorKeyTy {
     // The SILValue pair:
     size_t V1, V2;
-    RetainObserveKind InspectionMode; 
   };
 }
 
@@ -201,24 +200,16 @@ public:
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
-  ///
-  /// TODO: When ref count behavior is separated from generic memory behavior,
-  /// the InspectionMode flag will be unnecessary.
-  MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                       RetainObserveKind);
+  MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V);
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
-  ///
-  /// TODO: When ref count behavior is separated from generic memory behavior,
-  /// the InspectionMode flag will be unnecessary.
-  MemoryBehavior computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
-                                            RetainObserveKind);
+  MemoryBehavior computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V);
 
   /// Returns true if \p Inst may read from memory in a manner that
   /// affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
-    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayRead ||
            B == MemoryBehavior::MayReadWrite ||
            B == MemoryBehavior::MayHaveSideEffects;
@@ -227,7 +218,7 @@ public:
   /// Returns true if \p Inst may write to memory in a manner that
   /// affects V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
-    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayWrite ||
            B == MemoryBehavior::MayReadWrite ||
            B == MemoryBehavior::MayHaveSideEffects;
@@ -236,24 +227,8 @@ public:
   /// Returns true if \p Inst may read or write to memory in a manner that
   /// affects V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
-    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    auto B = computeMemoryBehavior(Inst, V);
     return MemoryBehavior::None != B;
-  }
-
-  /// Returns true if Inst may have side effects in a manner that affects V.
-  bool mayHaveSideEffects(SILInstruction *Inst, SILValue V) {
-    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
-    return B == MemoryBehavior::MayWrite ||
-           B == MemoryBehavior::MayReadWrite ||
-           B == MemoryBehavior::MayHaveSideEffects;
-  }
-
-  /// Returns true if Inst may have side effects in a manner that affects
-  /// V. This is independent of whether or not Inst may write to V and is meant
-  /// to encode notions such as ref count modifications.
-  bool mayHavePureSideEffects(SILInstruction *Inst, SILValue V) {
-    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
-    return MemoryBehavior::MayHaveSideEffects == B;
   }
 
   /// Returns true if \p Ptr may be released in the function call \p FAS.
@@ -268,8 +243,7 @@ public:
   AliasKeyTy toAliasKey(SILValue V1, SILValue V2, SILType Type1, SILType Type2);
 
   /// Encodes the memory behavior query as a MemBehaviorKeyTy.
-  MemBehaviorKeyTy toMemoryBehaviorKey(SILInstruction *V1, SILValue V2,
-                                       RetainObserveKind K);
+  MemBehaviorKeyTy toMemoryBehaviorKey(SILInstruction *V1, SILValue V2);
 
   virtual void invalidate() override {
     AliasCache.clear();
@@ -330,24 +304,21 @@ namespace llvm {
   template <> struct DenseMapInfo<MemBehaviorKeyTy> {
     static inline MemBehaviorKeyTy getEmptyKey() {
       auto Allone = std::numeric_limits<size_t>::max();
-      return {0, Allone, RetainObserveKind::RetainObserveKindEnd};
+      return {0, Allone};
     }
     static inline MemBehaviorKeyTy getTombstoneKey() {
       auto Allone = std::numeric_limits<size_t>::max();
-      return {Allone, 0, RetainObserveKind::RetainObserveKindEnd};
+      return {Allone, 0};
     }
     static unsigned getHashValue(const MemBehaviorKeyTy V) {
       unsigned H = 0;
       H ^= DenseMapInfo<size_t>::getHashValue(V.V1);
       H ^= DenseMapInfo<size_t>::getHashValue(V.V2);
-      H ^= DenseMapInfo<int>::getHashValue(static_cast<int>(V.InspectionMode));
       return H;
     }
     static bool isEqual(const MemBehaviorKeyTy LHS,
                         const MemBehaviorKeyTy RHS) {
-      return LHS.V1 == RHS.V1 &&
-             LHS.V2 == RHS.V2 &&
-             LHS.InspectionMode == RHS.InspectionMode; 
+      return LHS.V1 == RHS.V1 && LHS.V2 == RHS.V2;
     }
   };
 }

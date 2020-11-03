@@ -1,5 +1,5 @@
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
-// REQUIRES: optimized_stdlib
+// REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 // XFAIL: OS=linux-androideabi && CPU=armv7
 

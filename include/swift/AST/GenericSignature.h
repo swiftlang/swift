@@ -20,6 +20,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"

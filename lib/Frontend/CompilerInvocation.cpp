@@ -425,7 +425,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
+  Opts.DisableParserLookup |= Args.hasFlag(OPT_disable_parser_lookup,
+                                           OPT_enable_parser_lookup,
+                                           /*default*/ true);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -438,16 +440,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
-  Opts.EnableTypeFingerprints =
-      Args.hasFlag(options::OPT_enable_type_fingerprints,
-                   options::OPT_disable_type_fingerprints,
-                   LangOptions().EnableTypeFingerprints);
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
-
-  if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
-    Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
 
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
@@ -502,6 +496,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
       Opts.RequireExplicitAvailabilityTarget = A->getValue();
     }
+  }
+
+  for (const Arg *A : Args.filtered(OPT_define_availability)) {
+    Opts.AvailabilityMacros.push_back(A->getValue());
   }
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
@@ -744,8 +742,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
 
@@ -1602,6 +1598,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
       } else if (version.equals("5.1")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
+      } else if (version.equals("5.3")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 3);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);

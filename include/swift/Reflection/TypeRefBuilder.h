@@ -443,6 +443,8 @@ public:
       break;
     }
 
+    funcFlags = funcFlags.withAsync(flags.isAsync());
+
     auto result = createTupleType({}, "");
     return FunctionTypeRef::create(*this, {}, result, funcFlags);
   }

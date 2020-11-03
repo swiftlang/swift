@@ -672,7 +672,7 @@ static SILValue getArrayUninitializedInitResult(ArraySemanticsCall arrayCall,
     auto *tupleElt = dyn_cast<TupleExtractInst>(op->getUser());
     if (!tupleElt)
       return SILValue();
-    if (tupleElt->getFieldNo() != tupleElementIndex)
+    if (tupleElt->getFieldIndex() != tupleElementIndex)
       continue;
     tupleExtractInst = tupleElt;
     break;

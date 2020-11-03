@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -116,9 +116,14 @@ func f0(_ a: Any) -> Int { return 1 }
 assert(f0(1) == 1)
 
 
-var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
+var selfRef = { selfRef() }
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
+// expected-error@-3 {{unable to infer closure type in the current context}}
+
 var nestedSelfRef = {
-  var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
+  var recursive = { nestedSelfRef() }
+  // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
   recursive()
 }
 
@@ -319,7 +324,7 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [weak v1] in v1!.foo() }
   // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
-             weak v1] in v1!.foo() }  // expected-error {{definition conflicts with previous value}}
+             weak v1] in v1!.foo() }  // expected-error {{invalid redeclaration of 'v1'}}
   doStuff { [unowned v2] in v2.foo() }
   doStuff { [unowned(unsafe) v2] in v2.foo() }
   doStuff { [unowned(safe) v2] in v2.foo() }

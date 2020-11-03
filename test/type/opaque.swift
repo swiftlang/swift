@@ -73,7 +73,7 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'some' types are only implemented}}
+let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
 // Invalid positions
 
@@ -383,7 +383,7 @@ protocol P_51641323 {
 func rdar_51641323() {
   struct Foo: P_51641323 {
     var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
-      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only concrete types such as structs, enums and classes can conform to protocols}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
     }
   }
 }

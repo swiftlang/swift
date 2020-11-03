@@ -198,6 +198,10 @@ forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
     if (callback(dep))
       return true;
   }
+  for (auto &dep : CI.getDependencyTracker()->getIncrementalDependencies()) {
+    if (callback(dep))
+      return true;
+  }
 
   return false;
 }
@@ -272,6 +276,51 @@ static bool areAnyDependentFilesInvalidated(
       });
 }
 
+/// Get interface hash of \p SF including the type members in the file.
+///
+/// See if the inteface of the function and types visible from a function body
+/// has changed since the last completion. If they haven't changed, completion
+/// can reuse the existing AST of the source file. \c SF->getInterfaceHash() is
+/// not enough because it doesn't take the interface of the type members into
+/// account. For example:
+///
+///   struct S {
+///     func foo() {}
+///   }
+///   func main(val: S) {
+///     val.<HERE>
+///   }
+///
+/// In this case, we need to ensure that the interface of \c S hasn't changed.
+/// Note that we don't care about local types (i.e. type declarations inside
+/// function bodies, closures, or top level statement bodies) because they are
+/// not visible from other functions where the completion is happening.
+void getInterfaceHashIncludingTypeMembers(SourceFile *SF,
+                                          llvm::SmallString<32> &str) {
+  /// FIXME: Gross. Hashing multiple "hash" values.
+  llvm::MD5 hash;
+  SF->getInterfaceHash(str);
+  hash.update(str);
+
+  std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
+      [&](IterableDeclContext *IDC) {
+        if (auto fp = IDC->getBodyFingerprint())
+          hash.update(*fp);
+        for (auto *member : IDC->getParsedMembers())
+          if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
+            hashTypeBodyFingerprints(childIDC);
+      };
+
+  for (auto *D : SF->getTopLevelDecls()) {
+    if (auto IDC = dyn_cast<IterableDeclContext>(D))
+      hashTypeBodyFingerprints(IDC);
+  }
+
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+  str = result.digest();
+}
+
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
@@ -318,8 +367,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
-  // Ensure all non-function-body tokens are hashed into the interface hash
-  langOpts.EnableTypeFingerprints = false;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
@@ -353,8 +400,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // If the interface has changed, AST must be refreshed.
     llvm::SmallString<32> oldInterfaceHash{};
     llvm::SmallString<32> newInterfaceHash{};
-    oldSF->getInterfaceHash(oldInterfaceHash);
-    tmpSF->getInterfaceHash(newInterfaceHash);
+    getInterfaceHashIncludingTypeMembers(oldSF, oldInterfaceHash);
+    getInterfaceHashIncludingTypeMembers(tmpSF, newInterfaceHash);
     if (oldInterfaceHash != newInterfaceHash)
       return false;
 
@@ -404,6 +451,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
     Scope Top(SI, ScopeKind::TopLevel);
     Scope Body(SI, ScopeKind::FunctionBody);
 
+    assert(oldInfo.Kind == CodeCompletionDelayedDeclKind::FunctionBody &&
+           "If the interface hash is the same as old one, the previous kind "
+           "must be FunctionBody too. Otherwise, hashing is too weak");
+    oldInfo.Kind = CodeCompletionDelayedDeclKind::FunctionBody;
     oldInfo.ParentContext = DC;
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;
@@ -594,10 +645,6 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
-
-  // Since caching uses the interface hash, and since per type fingerprints
-  // weaken that hash, disable them here:
-  Invocation.getLangOptions().EnableTypeFingerprints = false;
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;

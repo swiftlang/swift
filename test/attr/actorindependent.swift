@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 
-// expected-error@+1{{'@actorIsolated' can only be applied to actor members and global/static variables}}
+// REQUIRES: concurrency
+
+// expected-error@+1{{'@actorIndependent' can only be applied to actor members and global/static variables}}
 @actorIndependent func globalFunction() { }
 
 @actorIndependent var globalComputedProperty1: Int { 17 }
@@ -10,7 +12,7 @@
   set { }
 }
 
-// expected-error@+1{{'@actorIsolated' can not be applied to stored properties}}
+// expected-error@+1{{'@actorIndependent' can not be applied to stored properties}}
 @actorIndependent var globalStoredProperty: Int = 17
 
 struct X {
@@ -25,13 +27,13 @@ struct X {
     set { }
   }
 
-  // expected-error@+1{{'@actorIsolated' can not be applied to stored properties}}
+  // expected-error@+1{{'@actorIndependent' can not be applied to stored properties}}
   @actorIndependent
   static var storedStaticProperty: Int = 17
 }
 
 class C {
-  // expected-error@+1{{'@actorIsolated' can only be applied to actor members and global/static variables}}
+  // expected-error@+1{{'@actorIndependent' can only be applied to actor members and global/static variables}}
   @actorIndependent
   var property3: Int { 5 }
 }
@@ -39,7 +41,7 @@ class C {
 actor class A {
   var property: Int = 5
 
-  // expected-error@+1{{'@actorIsolated' can not be applied to stored properties}}
+  // expected-error@+1{{'@actorIndependent' can not be applied to stored properties}}
   @actorIndependent
   var property2: Int = 5
 
@@ -72,6 +74,25 @@ actor class A {
   @actorIndependent
   subscript(index: Int) -> String { "\(index)" }
 
-  // expected-error@+1{{'@actorIsolated' can only be applied to instance members of actors}}
+  // expected-error@+1{{'@actorIndependent' can only be applied to instance members of actors}}
   @actorIndependent static func staticFunc() { }
+}
+
+actor class FromProperty {
+  // expected-note@+3{{mutable state is only available within the actor instance}}
+  // expected-note@+2{{mutable state is only available within the actor instance}}
+  // expected-note@+1{{mutable state is only available within the actor instance}}
+  var counter : Int = 0
+
+  // expected-error@+2{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+  @actorIndependent
+  var halfCounter : Int { counter / 2 }
+
+  @actorIndependent
+  var ticks : Int {
+    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    get { counter }
+    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    set { counter = newValue }
+  }
 }

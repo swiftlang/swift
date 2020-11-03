@@ -26,10 +26,9 @@
 using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
-SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
-				                               SILFunction *Orig,
-                                       const ReabstractionInfo &ReInfo,
-                                       StringRef NewName) {
+SILFunction *GenericCloner::createDeclaration(
+    SILOptFunctionBuilder &FunctionBuilder, SILFunction *Orig,
+    const ReabstractionInfo &ReInfo, StringRef NewName) {
   assert((!ReInfo.isSerialized() || Orig->isSerialized())
          && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())

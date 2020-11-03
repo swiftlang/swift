@@ -201,6 +201,7 @@ cmake^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
     -S "%source_root%\llvm-project\llvm" %exitOnError%
 
 cmake --build "%build_root%\llvm" %exitOnError%

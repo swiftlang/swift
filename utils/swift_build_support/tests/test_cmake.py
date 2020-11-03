@@ -33,6 +33,15 @@ class CMakeTestCase(unittest.TestCase):
             executable = 'mock-distcc'
         return os.path.join(os.path.dirname(__file__), executable)
 
+    def mock_sccache_path(self):
+        """Return a path string of a mock sccache executable
+        """
+        if platform.system() == 'Windows':
+            executable = 'sccache.cmd'
+        else:
+            executable = 'sccache'
+        return os.path.join(os.path.dirname(__file__), executable)
+
     def default_args(self):
         """Return new args object with default values
         """
@@ -46,6 +55,7 @@ class CMakeTestCase(unittest.TestCase):
                          enable_sanitize_coverage=False,
                          export_compile_commands=False,
                          distcc=False,
+                         sccache=False,
                          cmake_generator="Ninja",
                          cmake_c_launcher=None,
                          cmake_cxx_launcher=None,
@@ -73,6 +83,8 @@ class CMakeTestCase(unittest.TestCase):
         toolchain.libtool = args.host_libtool
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
+        if args.sccache:
+            toolchain.sccache = self.mock_sccache_path()
         toolchain.ninja = self.which_ninja(args)
         return CMake(args=args, toolchain=toolchain)
 
@@ -217,6 +229,20 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
              "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_sccache(self):
+        args = self.default_args()
+        args.sccache = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_sccache_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_sccache_path(),
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",

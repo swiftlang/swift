@@ -21,8 +21,9 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/AST/ImportCache.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -35,8 +36,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/ClangImporter/ClangModule.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
@@ -1651,11 +1650,12 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
   LangOpts->CurrentModule = LangOpts->ModuleName;
 
   auto language = getLanguageFromOptions(LangOpts);
-  auto inputFile = clang::FrontendInputFile(
-      moduleMapPath, clang::InputKind(
-          language, clang::InputKind::ModuleMap, false));
 
   auto &FrontendOpts = invocation.getFrontendOpts();
+  auto inputFile = clang::FrontendInputFile(
+      moduleMapPath, clang::InputKind(
+          language, clang::InputKind::ModuleMap, false),
+      FrontendOpts.IsSystemModule);
   FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OriginalModuleMap = moduleMapPath.str();
   FrontendOpts.OutputFile = outputPath.str();
@@ -3461,7 +3461,7 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
 }
 
 void ClangModuleUnit::getImportedModules(
-    SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+    SmallVectorImpl<ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
   // Bail out if we /only/ want ImplementationOnly imports; Clang modules never
   // have any of these.
@@ -3532,7 +3532,7 @@ void ClangModuleUnit::getImportedModules(
 }
 
 void ClangModuleUnit::getImportedModulesForLookup(
-    SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
+    SmallVectorImpl<ImportedModule> &imports) const {
 
   // Reuse our cached list of imports if we have one.
   if (importedModulesForLookup.hasValue()) {
@@ -3557,7 +3557,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
   }
 
   if (imported.empty()) {
-    importedModulesForLookup = ArrayRef<ModuleDecl::ImportedModule>();
+    importedModulesForLookup = ArrayRef<ImportedModule>();
     return;
   }
 
@@ -3616,7 +3616,13 @@ void ClangImporter::getMangledName(raw_ostream &os,
   if (!Impl.Mangler)
     Impl.Mangler.reset(Impl.getClangASTContext().createMangleContext());
 
-  Impl.Mangler->mangleName(clangDecl, os);
+  if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+    auto ctorGlobalDecl =
+        clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
+    Impl.Mangler->mangleCXXName(ctorGlobalDecl, os);
+  } else {
+    Impl.Mangler->mangleName(clangDecl, os);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -3728,48 +3734,46 @@ void ClangImporter::Implementation::lookupValue(
 
     // If we have a declaration and nothing matched so far, try the names used
     // in other versions of Swift.
-    if (!anyMatching) {
-      if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-        const clang::NamedDecl *recentClangDecl =
-            clangDecl->getMostRecentDecl();
+    if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+      const clang::NamedDecl *recentClangDecl =
+          clangDecl->getMostRecentDecl();
 
-        CurrentVersion.forEachOtherImportNameVersion(
-            SwiftContext.LangOpts.EnableExperimentalConcurrency,
-            [&](ImportNameVersion nameVersion) {
-          if (anyMatching)
-            return;
+      CurrentVersion.forEachOtherImportNameVersion(
+          SwiftContext.LangOpts.EnableExperimentalConcurrency,
+          [&](ImportNameVersion nameVersion) {
+        if (anyMatching)
+          return;
 
-          // Check to see if the name and context match what we expect.
-          ImportedName newName = importFullName(recentClangDecl, nameVersion);
-          if (!newName.getDeclName().matchesRef(name))
-            return;
+        // Check to see if the name and context match what we expect.
+        ImportedName newName = importFullName(recentClangDecl, nameVersion);
+        if (!newName.getDeclName().matchesRef(name))
+          return;
 
-          // If we asked for an async import and didn't find one, skip this.
-          // This filters out duplicates.
-          if (nameVersion.supportsConcurrency() &&
-              !newName.getAsyncInfo())
-            return;
+        // If we asked for an async import and didn't find one, skip this.
+        // This filters out duplicates.
+        if (nameVersion.supportsConcurrency() &&
+            !newName.getAsyncInfo())
+          return;
 
-          const clang::DeclContext *clangDC =
-              newName.getEffectiveContext().getAsDeclContext();
-          if (!clangDC || !clangDC->isFileContext())
-            return;
+        const clang::DeclContext *clangDC =
+            newName.getEffectiveContext().getAsDeclContext();
+        if (!clangDC || !clangDC->isFileContext())
+          return;
 
-          // Then try to import the decl under the alternate name.
-          auto alternateNamedDecl =
-              cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
-                                                     nameVersion));
-          if (!alternateNamedDecl || alternateNamedDecl == decl)
-            return;
-          assert(alternateNamedDecl->getName().matchesRef(name) &&
-                 "importFullName behaved differently from importDecl");
-          if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
-            consumer.foundDecl(alternateNamedDecl,
-                               DeclVisibilityKind::VisibleAtTopLevel);
-            anyMatching = true;
-          }
-        });
-      }
+        // Then try to import the decl under the alternate name.
+        auto alternateNamedDecl =
+            cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
+                                                   nameVersion));
+        if (!alternateNamedDecl || alternateNamedDecl == decl)
+          return;
+        assert(alternateNamedDecl->getName().matchesRef(name) &&
+               "importFullName behaved differently from importDecl");
+        if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
+          consumer.foundDecl(alternateNamedDecl,
+                             DeclVisibilityKind::VisibleAtTopLevel);
+          anyMatching = true;
+        }
+      });
     }
   }
 }
@@ -4104,3 +4108,32 @@ swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
 }
 
+clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
+    ASTContext &ctx, clang::FunctionTemplateDecl *func, SubstitutionMap subst) {
+  SmallVector<clang::TemplateArgument, 4> templateSubst;
+  std::unique_ptr<TemplateInstantiationError> error =
+      ctx.getClangTemplateArguments(func->getTemplateParameters(),
+                                    subst.getReplacementTypes(), templateSubst);
+  if (error) {
+    std::string failedTypesStr;
+    llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
+    llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+    // TODO: Use the location of the apply here.
+    // TODO: This error message should not reference implementation details.
+    // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
+    ctx.Diags.diagnose(SourceLoc(),
+                       diag::unable_to_convert_generic_swift_types.ID,
+                       {func->getName(), StringRef(failedTypesStr)});
+    // Return a valid FunctionDecl but, we'll never use it.
+    return func->getAsFunction();
+  }
+
+  // Instanciate a specialization of this template using the substitution map.
+  auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
+      func->getASTContext(), templateSubst);
+  auto &sema = getClangInstance().getSema();
+  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
+                                                   clang::SourceLocation());
+  sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
+  return spec;
+}

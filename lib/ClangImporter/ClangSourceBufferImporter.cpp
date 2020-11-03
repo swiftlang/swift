@@ -67,11 +67,17 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
 
   StringRef presumedFile = presumedLoc.getFilename();
   SourceLoc startOfLine = loc.getAdvancedLoc(-presumedLoc.getColumn() + 1);
-  bool isNewVirtualFile = swiftSourceManager.openVirtualFile(
-      startOfLine, presumedFile, presumedLoc.getLine() - bufferLineNumber);
-  if (isNewVirtualFile) {
-    SourceLoc endOfLine = findEndOfLine(swiftSourceManager, loc, mirrorID);
-    swiftSourceManager.closeVirtualFile(endOfLine);
+
+  // FIXME: Virtual files can't actually model the EOF position correctly, so
+  // if this virtual file would start at EOF, just hope the physical location
+  // will do.
+  if (startOfLine != swiftSourceManager.getRangeForBuffer(mirrorID).getEnd()) {
+    bool isNewVirtualFile = swiftSourceManager.openVirtualFile(
+        startOfLine, presumedFile, presumedLoc.getLine() - bufferLineNumber);
+    if (isNewVirtualFile) {
+      SourceLoc endOfLine = findEndOfLine(swiftSourceManager, loc, mirrorID);
+      swiftSourceManager.closeVirtualFile(endOfLine);
+    }
   }
 
   using SourceManagerRef = llvm::IntrusiveRefCntPtr<const clang::SourceManager>;

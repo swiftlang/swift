@@ -357,6 +357,11 @@ void getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                  SmallVectorImpl<Operand *> &argOperands,
                                  bool includeTrivialAddrArgs);
 
+/// Emit destroy operation for \p operand, and call appropriate functions from
+/// \p callbacks for newly created instructions and deleted instructions.
+void emitDestroyOperation(SILBuilder &builder, SILLocation loc,
+                          SILValue operand, InstModCallbacks callbacks);
+
 /// Collect all (transitive) users of \p inst which just copy or destroy \p
 /// inst.
 ///
@@ -366,6 +371,7 @@ void getConsumedPartialApplyArgs(PartialApplyInst *pai,
 /// destroys, i.e. if \p inst can be considered as "dead".
 bool collectDestroys(SingleValueInstruction *inst,
                      SmallVectorImpl<SILInstruction *> &destroys);
+
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///

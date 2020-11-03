@@ -123,12 +123,12 @@
 /// ===----------------------------------------------------------------------===
 
 #define DEBUG_TYPE "copy-propagation"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
@@ -146,199 +146,11 @@ STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
 STATISTIC(NumUnknownUsers, "number of functions with unknown users");
 
 //===----------------------------------------------------------------------===//
-// Ownership Abstraction.
-//
-// FIXME: These helpers are only defined in this pass for prototyping.  After
-// bootstrapping, they should be moved to a central ownership API (shared by
-// SILOwnershipVerifier, etc.).
-//
-// Categories of owned value users. (U1-U2 apply to any value, O3-O5 only apply
-// to owned values).
-//
-// U1. Use the value instantaneously (copy_value, @guaranteed).
-//
-// U2. Escape the nontrivial contents of the value (ref_to_unowned,
-// unchecked_trivial_bitcast).
-//
-// O3. Propagate the value without consuming it (mark_dependence, begin_borrow).
-//
-// O4. Consume the value immediately (store, destroy, @owned, destructure).
-//
-// O5. Consume the value indirectly via a move (tuple, struct).
-// ===---------------------------------------------------------------------===//
-
-// TODO: Figure out how to handle these cases if possible.
-static bool isUnknownUse(Operand *use) {
-  switch (use->getUser()->getKind()) {
-  default:
-    return false;
-  // FIXME: (Category O3) mark_dependence requires recursion to find all
-  // uses. It should be replaced by begin/end dependence.
-  case SILInstructionKind::MarkDependenceInst: // Dependent
-  // FIXME: (Category O3) ref_tail_addr should require a borrow because it
-  // doesn't rely on fix_lifetime like other escaping instructions.
-  case SILInstructionKind::RefTailAddrInst:
-  // FIXME: (Category O3) dynamic_method_br seems to capture self, presumably
-  // propagating lifetime. This should probably borrow self, then be treated
-  // like mark_dependence.
-  case SILInstructionKind::DynamicMethodBranchInst:
-  // FIXME: (Category O3) The ownership verifier says project_box can accept an
-  // owned value as a normal use, but it projects the address. That's either an
-  // ownership bug or a special case.
-  case SILInstructionKind::ProjectBoxInst:
-  case SILInstructionKind::ProjectExistentialBoxInst:
-  // FIXME: (Category O3) The ownership verifier says open_existential_box can
-  // accept an owned value as a normal use, but it projects an address.
-  case SILInstructionKind::OpenExistentialBoxInst:
-  // Unmanaged operations hopefully don't apply to the same value as CopyValue?
-  case SILInstructionKind::UnmanagedRetainValueInst:
-  case SILInstructionKind::UnmanagedReleaseValueInst:
-  case SILInstructionKind::UnmanagedAutoreleaseValueInst:
-    return true;
-  }
-}
-
-/// Return true if the given owned operand is consumed by the given call.
-static bool isAppliedArgConsumed(ApplySite apply, Operand *oper) {
-  ParameterConvention paramConv;
-  if (oper->get() == apply.getCallee()) {
-    assert(oper->getOperandNumber() == 0
-           && "function can't be passed to itself");
-    paramConv = apply.getSubstCalleeType()->getCalleeConvention();
-  } else {
-    unsigned argIndex = apply.getCalleeArgIndex(*oper);
-    paramConv = apply.getSubstCalleeConv()
-                    .getParamInfoForSILArg(argIndex)
-                    .getConvention();
-  }
-  return isConsumedParameter(paramConv);
-}
-
-/// Return true if the given builtin consumes its operand.
-static bool isBuiltinArgConsumed(BuiltinInst *BI) {
-  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
-  switch (Builtin.ID) {
-  default:
-    llvm_unreachable("Unexpected Builtin with owned value operand.");
-  // Extend lifetime without consuming.
-  case BuiltinValueKind::ErrorInMain:
-  case BuiltinValueKind::UnexpectedError:
-  case BuiltinValueKind::WillThrow:
-    return false;
-  // UnsafeGuaranteed moves the value, which will later be destroyed.
-  case BuiltinValueKind::UnsafeGuaranteed:
-    return true;
-  }
-}
-
-/// Return true if the given operand is consumed by its user.
-///
-/// TODO: Review the semantics of operations that extend the lifetime *without*
-/// propagating the value. Ideally, that never happens without borrowing first.
-static bool isConsuming(Operand *use) {
-  auto *user = use->getUser();
-  if (isa<ApplySite>(user))
-    return isAppliedArgConsumed(ApplySite(user), use);
-
-  if (auto *BI = dyn_cast<BuiltinInst>(user))
-    return isBuiltinArgConsumed(BI);
-
-  switch (user->getKind()) {
-  default:
-    llvm::dbgs() << *user;
-    llvm_unreachable("Unexpected use of a loadable owned value.");
-
-  // Consume the value.
-  case SILInstructionKind::AutoreleaseValueInst:
-  case SILInstructionKind::DeallocBoxInst:
-  case SILInstructionKind::DeallocExistentialBoxInst:
-  case SILInstructionKind::DeallocRefInst:
-  case SILInstructionKind::DeinitExistentialValueInst:
-  case SILInstructionKind::DestroyValueInst:
-  case SILInstructionKind::EndLifetimeInst:
-  case SILInstructionKind::InitExistentialRefInst:
-  case SILInstructionKind::InitExistentialValueInst:
-  case SILInstructionKind::KeyPathInst:
-  case SILInstructionKind::ReleaseValueInst:
-  case SILInstructionKind::ReleaseValueAddrInst:
-  case SILInstructionKind::StoreInst:
-  case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::UnownedReleaseInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
-    return true;
-
-  // Terminators must consume their owned values.
-  case SILInstructionKind::BranchInst:
-  case SILInstructionKind::CheckedCastBranchInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
-  case SILInstructionKind::CondBranchInst:
-  case SILInstructionKind::ReturnInst:
-  case SILInstructionKind::ThrowInst:
-    return true;
-
-  case SILInstructionKind::DeallocPartialRefInst:
-    return cast<DeallocPartialRefInst>(user)->getInstance() == use->get();
-
-  // Move the value.
-  case SILInstructionKind::TupleInst:
-  case SILInstructionKind::StructInst:
-  case SILInstructionKind::ObjectInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::UpcastInst:
-  case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::RefToBridgeObjectInst:
-  case SILInstructionKind::BridgeObjectToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::DestructureTupleInst:
-    return true;
-
-  // BeginBorrow should already be skipped.
-  // EndBorrow extends the lifetime like a normal use.
-  case SILInstructionKind::EndBorrowInst:
-    return false;
-
-  // Extend the lifetime without borrowing, propagating, or destroying it.
-  case SILInstructionKind::BridgeObjectToWordInst:
-  case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::CopyBlockInst:
-  case SILInstructionKind::CopyValueInst:
-  case SILInstructionKind::DebugValueInst:
-  case SILInstructionKind::ExistentialMetatypeInst:
-  case SILInstructionKind::FixLifetimeInst:
-  case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SetDeallocatingInst:
-  case SILInstructionKind::StoreWeakInst:
-  case SILInstructionKind::ValueMetatypeInst:
-    return false;
-
-  // Escape the value. The lifetime must already be enforced via something like
-  // fix_lifetime.
-  case SILInstructionKind::RefToRawPointerInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::RefToUnownedInst:
-  case SILInstructionKind::UncheckedBitwiseCastInst:
-  case SILInstructionKind::UncheckedTrivialBitCastInst:
-    return false;
-
-  // Dynamic dispatch without capturing self.
-  case SILInstructionKind::ObjCMethodInst:
-  case SILInstructionKind::ObjCSuperMethodInst:
-  case SILInstructionKind::SuperMethodInst:
-  case SILInstructionKind::WitnessMethodInst:
-    return false;
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // CopyPropagationState: shared state for the pass's analysis and transforms.
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 /// LiveWithin blocks have at least one use and/or def within the block, but are
 /// not LiveOut.
 ///
@@ -357,9 +169,10 @@ class LivenessInfo {
   // used value is consumed. (Non-consuming uses within a block that is already
   // known to be live are uninteresting.)
   DenseMap<SILInstruction *, bool> users;
+
   // Original points in the CFG where the current value was consumed or
   // destroyed.
-  typedef SmallSetVector<SILBasicBlock *, 8> BlockSetVec;
+  using BlockSetVec = SmallSetVector<SILBasicBlock *, 8>;
   BlockSetVec originalDestroyBlocks;
 
 public:
@@ -409,7 +222,7 @@ public:
   //
   // This call cannot be allowed to destroy %val.
   void recordUser(Operand *use) {
-    bool consume = isConsuming(use);
+    bool consume = use->isConsumingUse();
     auto iterAndSuccess = users.try_emplace(use->getUser(), consume);
     if (!iterAndSuccess.second)
       iterAndSuccess.first->second &= consume;
@@ -468,7 +281,7 @@ public:
 
 /// This pass' shared state.
 struct CopyPropagationState {
-  SILFunction *F;
+  SILFunction *func;
 
   // Per-function invalidation state.
   unsigned invalidation;
@@ -483,7 +296,7 @@ struct CopyPropagationState {
   DestroyInfo destroys;
 
   CopyPropagationState(SILFunction *F)
-      : F(F), invalidation(SILAnalysis::InvalidationKind::Nothing) {}
+      : func(F), invalidation(SILAnalysis::InvalidationKind::Nothing) {}
 
   bool isValueOwned() const {
     return currDef.getOwnershipKind() == ValueOwnershipKind::Owned;
@@ -600,27 +413,23 @@ static bool computeLiveness(CopyPropagationState &pass) {
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
 
-      // Bailout if we cannot yet determine the ownership of a use.
-      if (isUnknownUse(use)) {
-        LLVM_DEBUG(llvm::dbgs() << "Unknown owned value user: "; user->dump());
-        ++NumUnknownUsers;
-        return false;
-      }
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
         defUseWorkList.insert(copy);
         continue;
       }
+
       // An entire borrow scope is considered a single use that occurs at the
       // point of the end_borrow.
-      if (auto *BBI = dyn_cast<BeginBorrowInst>(user)) {
-        for (Operand *use : BBI->getUses()) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+        for (Operand *use : bbi->getUses()) {
           if (isa<EndBorrowInst>(use->getUser()))
             computeUseLiveness(use, pass);
         }
         continue;
       }
-      if (isConsuming(use)) {
+
+      if (use->isConsumingUse()) {
         pass.liveness.recordOriginalDestroy(use);
         // Destroying a values does not force liveness.
         if (isa<DestroyValueInst>(user))
@@ -649,13 +458,14 @@ static void insertDestroyOnCFGEdge(SILBasicBlock *predBB, SILBasicBlock *succBB,
   if (destroyBB != succBB)
     pass.markInvalid(SILAnalysis::InvalidationKind::Branches);
 
-  SILBuilderWithScope B(destroyBB->begin());
-  auto *DI = B.createDestroyValue(succBB->begin()->getLoc(), pass.currDef);
+  SILBuilderWithScope builder(destroyBB->begin());
+  auto *di =
+      builder.createDestroyValue(succBB->begin()->getLoc(), pass.currDef);
 
-  pass.destroys.recordFinalDestroy(DI);
+  pass.destroys.recordFinalDestroy(di);
 
   ++NumDestroysGenerated;
-  LLVM_DEBUG(llvm::dbgs() << "  Destroy on edge "; DI->dump());
+  LLVM_DEBUG(llvm::dbgs() << "  Destroy on edge "; di->dump());
 
   pass.markInvalid(SILAnalysis::InvalidationKind::Instructions);
 }
@@ -665,11 +475,11 @@ static void insertDestroyOnCFGEdge(SILBasicBlock *predBB, SILBasicBlock *succBB,
 /// Create a final destroy, immediately after `pos`.
 static void insertDestroyAtInst(SILBasicBlock::iterator pos,
                                 CopyPropagationState &pass) {
-  SILBuilderWithScope B(pos);
-  auto *DI = B.createDestroyValue((*pos).getLoc(), pass.currDef);
-  pass.destroys.recordFinalDestroy(DI);
+  SILBuilderWithScope builder(pos);
+  auto *di = builder.createDestroyValue((*pos).getLoc(), pass.currDef);
+  pass.destroys.recordFinalDestroy(di);
   ++NumDestroysGenerated;
-  LLVM_DEBUG(llvm::dbgs() << "  Destroy at last use "; DI->dump());
+  LLVM_DEBUG(llvm::dbgs() << "  Destroy at last use "; di->dump());
   pass.markInvalid(SILAnalysis::InvalidationKind::Instructions);
 }
 
@@ -679,9 +489,9 @@ static void insertDestroyAtInst(SILBasicBlock::iterator pos,
 static void findOrInsertDestroyInBlock(SILBasicBlock *bb,
                                        CopyPropagationState &pass) {
   auto *defInst = pass.currDef->getDefiningInstruction();
-  auto I = bb->getTerminator()->getIterator();
+  auto instIter = bb->getTerminator()->getIterator();
   while (true) {
-    auto *inst = &*I;
+    auto *inst = &*instIter;
     Optional<bool> isConsumingResult = pass.liveness.isConsumingUser(inst);
     if (isConsumingResult.hasValue()) {
       if (isConsumingResult.getValue()) {
@@ -691,20 +501,20 @@ static void findOrInsertDestroyInBlock(SILBasicBlock *bb,
       }
       // Insert a destroy after this non-consuming use.
       assert(inst != bb->getTerminator() && "Terminator must consume operand.");
-      insertDestroyAtInst(std::next(I), pass);
+      insertDestroyAtInst(std::next(instIter), pass);
       break;
     }
     // This is not a potential last user. Keep scanning.
     // If the original destroy is reached, this is a dead live range. Insert a
     // destroy immediately after the def.
-    if (I == bb->begin()) {
+    if (instIter == bb->begin()) {
       assert(cast<SILArgument>(pass.currDef)->getParent() == bb);
-      insertDestroyAtInst(I, pass);
+      insertDestroyAtInst(instIter, pass);
       break;
     }
-    --I;
-    if (&*I == defInst) {
-      insertDestroyAtInst(std::next(I), pass);
+    --instIter;
+    if (&*instIter == defInst) {
+      insertDestroyAtInst(std::next(instIter), pass);
       break;
     }
   }
@@ -799,6 +609,7 @@ static void rewriteCopies(CopyPropagationState &pass) {
       defUseWorklist.insert(copy);
       return;
     }
+
     if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
       // If this destroy was marked as a final destroy, ignore it; otherwise,
       // delete it.
@@ -809,8 +620,9 @@ static void rewriteCopies(CopyPropagationState &pass) {
       }
       return;
     }
+
     // Nonconsuming uses do not need copies and cannot be marked as destroys.
-    if (!isConsuming(use))
+    if (!use->isConsumingUse())
       return;
 
     // If this use was marked as a final destroy *and* this is the first
@@ -862,6 +674,7 @@ static SILValue stripCopies(SILValue v) {
       v = srcCopy->getOperand();
       continue;
     }
+
     return v;
   }
 }
@@ -885,12 +698,13 @@ void CopyPropagation::run() {
   // Step 1. Find all copied defs.
   CopyPropagationState pass(getFunction());
   SmallSetVector<SILValue, 16> copiedDefs;
-  for (auto &BB : *pass.F) {
-    for (auto &I : BB) {
-      if (auto *copy = dyn_cast<CopyValueInst>(&I))
+  for (auto &bb : *pass.func) {
+    for (auto &i : bb) {
+      if (auto *copy = dyn_cast<CopyValueInst>(&i))
         copiedDefs.insert(stripCopies(copy));
     }
   }
+
   for (auto &def : copiedDefs) {
     pass.resetDef(def);
     // Step 2: computeLiveness

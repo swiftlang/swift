@@ -95,10 +95,11 @@ struct SS: PPP {
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
 // CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}") PPP>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
-// CHECK: [[O:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O]] : $*@opened("{{.*}}") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-// CHECK: apply [[W]]<@opened("{{.*}}") PPP>(%{{.*}}, [[O]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
+// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O1]] : $*@opened("{{.*}}") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: apply [[W]]<@opened("{{.*}}") PPP>(%{{.*}}, [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF'
 public func testWitnessReturnOptionalIndirectSelf() {
   let p: PPP = S()

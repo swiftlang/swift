@@ -59,12 +59,12 @@ inline static StringRef getName(TopLevelKey Key) {
 inline static StringRef
 getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
   switch (Status) {
-  case CompileJobAction::InputInfo::UpToDate:
+  case CompileJobAction::InputInfo::Status::UpToDate:
     return "";
-  case CompileJobAction::InputInfo::NewlyAdded:
-  case CompileJobAction::InputInfo::NeedsCascadingBuild:
+  case CompileJobAction::InputInfo::Status::NewlyAdded:
+  case CompileJobAction::InputInfo::Status::NeedsCascadingBuild:
     return "!dirty";
-  case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+  case CompileJobAction::InputInfo::Status::NeedsNonCascadingBuild:
     return "!private";
   }
 
@@ -76,11 +76,11 @@ getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
 /// compilation record file (.swiftdeps file).
 inline static Optional<CompileJobAction::InputInfo::Status>
 getInfoStatusForIdentifier(StringRef Identifier) {
-  return llvm::StringSwitch<Optional<
-      CompileJobAction::InputInfo::Status>>(Identifier)
-    .Case("", CompileJobAction::InputInfo::UpToDate)
-    .Case("!dirty", CompileJobAction::InputInfo::NeedsCascadingBuild)
-    .Case("!private", CompileJobAction::InputInfo::NeedsNonCascadingBuild)
+  using InputStatus = CompileJobAction::InputInfo::Status;
+  return llvm::StringSwitch<Optional<InputStatus>>(Identifier)
+    .Case("", InputStatus::UpToDate)
+    .Case("!dirty", InputStatus::NeedsCascadingBuild)
+    .Case("!private", InputStatus::NeedsNonCascadingBuild)
     .Default(None);
 }
 

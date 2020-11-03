@@ -9,6 +9,22 @@
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
 // CHECK-HELPER-NOT: HelperSPI
 // CHECK-HELPER-NOT: @_spi
+// CHECK-HELPER-NOT: @_specialize
+
+// Test the spi parameter of the _specialize attribute in the private interface.
+// RUN: %FileCheck -check-prefix=CHECK-HELPER-PRIVATE %s < %t/SPIHelper.private.swiftinterface
+// CHECK-HELPER-PRIVATE: @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT: public func genericFunc<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc2<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc3<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc4<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:   @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func prespecializedMethod<T>(_ t: T)
+
+
 // RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -swift-version 5 -module-name SPIHelper -enable-library-evolution
 
 /// Test the textual interfaces generated from this test.

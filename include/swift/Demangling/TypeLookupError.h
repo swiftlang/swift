@@ -150,6 +150,7 @@ public:
         delete castContext;
         return nullptr;
       }
+      llvm_unreachable("unhandled command!");
     };
   }
 

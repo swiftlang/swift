@@ -19,4 +19,8 @@ add_dependencies(diagnostic-database swift-def-to-yaml-converter)
 swift_install_in_component(
   DIRECTORY ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   DESTINATION "share/swift/diagnostics"
-  COMPONENT compiler)
+  COMPONENT compiler
+  FILES_MATCHING
+  PATTERN "*.db"
+  PATTERN "*.yaml"
+)

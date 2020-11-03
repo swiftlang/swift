@@ -16,9 +16,7 @@
 #ifndef SWIFT_SEMA_CSDIAGNOSTICS_H
 #define SWIFT_SEMA_CSDIAGNOSTICS_H
 
-#include "Constraint.h"
-#include "ConstraintSystem.h"
-#include "OverloadChoice.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
@@ -28,6 +26,8 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
 
@@ -1271,13 +1271,11 @@ public:
 };
 
 class MissingArgumentsFailure final : public FailureDiagnostic {
-  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
-
-  SmallVector<SynthesizedParam, 4> SynthesizedArgs;
+  SmallVector<SynthesizedArg, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(const Solution &solution,
-                          ArrayRef<SynthesizedParam> synthesizedArgs,
+                          ArrayRef<SynthesizedArg> synthesizedArgs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
@@ -1698,8 +1696,6 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
-
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
 public:
@@ -1722,13 +1718,13 @@ public:
 
   bool diagnoseAsError() override;
 
-  bool diagnoseForAnchor(Anchor anchor,
+  bool diagnoseForAnchor(ASTNode anchor,
                          ArrayRef<GenericTypeParamType *> params) const;
 
-  bool diagnoseParameter(Anchor anchor, GenericTypeParamType *GP) const;
+  bool diagnoseParameter(ASTNode anchor, GenericTypeParamType *GP) const;
 
 private:
-  void emitGenericSignatureNote(Anchor anchor) const;
+  void emitGenericSignatureNote(ASTNode anchor) const;
 
   /// Retrieve representative locations for associated generic prameters.
   ///
@@ -1737,7 +1733,7 @@ private:
       llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
-class SkipUnhandledConstructInFunctionBuilderFailure final
+class SkipUnhandledConstructInResultBuilderFailure final
     : public FailureDiagnostic {
 public:
   using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
@@ -1748,7 +1744,7 @@ public:
   void diagnosePrimary(bool asNote);
 
 public:
-  SkipUnhandledConstructInFunctionBuilderFailure(const Solution &solution,
+  SkipUnhandledConstructInResultBuilderFailure(const Solution &solution,
                                                  UnhandledNode unhandled,
                                                  NominalTypeDecl *builder,
                                                  ConstraintLocator *locator)
@@ -2263,6 +2259,23 @@ class InvalidEmptyKeyPathFailure final : public FailureDiagnostic {
 public:
   InvalidEmptyKeyPathFailure(const Solution &solution,
                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where there is no context to determine a
+/// type of `nil` literal e.g.
+///
+/// \code
+/// let _ = nil
+/// let _ = try nil
+/// let _ = nil!
+/// \endcode
+class MissingContextualTypeForNil final : public FailureDiagnostic {
+public:
+  MissingContextualTypeForNil(const Solution &solution,
+                              ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

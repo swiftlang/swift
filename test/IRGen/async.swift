@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-concurrency | %FileCheck %s
 
+// REQUIRES: concurrency
+
 // CHECK: "$s5async1fyyYF"
 public func f() async { }
 

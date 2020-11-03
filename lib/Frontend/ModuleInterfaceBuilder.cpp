@@ -153,6 +153,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
   auto outerPrettyStackState = llvm::SavePrettyStackState();
 
   bool SubError = false;
+  static const size_t ThreadStackSize = 8 << 20; // 8 MB.
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
     // Pretend we're on the original thread for pretty-stack-trace purposes.
     auto savedInnerPrettyStackState = llvm::SavePrettyStackState();
@@ -169,10 +170,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
     // Try building forwarding module first. If succeed, return.
-    if (static_cast<ModuleInterfaceLoader*>(SubInstance.getASTContext()
-        .getModuleInterfaceLoader())->tryEmitForwardingModule(moduleName,
-                                                              interfacePath,
-                                                  CompiledCandidates, OutPath)) {
+    if (SubInstance.getASTContext().getModuleInterfaceChecker()
+          ->tryEmitForwardingModule(moduleName, interfacePath,
+                                    CompiledCandidates, OutPath)) {
       return std::error_code();
     }
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
@@ -265,7 +265,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     return std::error_code();
     });
-  });
+  }, ThreadStackSize);
   return !RunSuccess || SubError;
 }
 
@@ -297,7 +297,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     // necessary for performance. Fallback to building the module in case of any lock
     // related errors.
     if (RemarkRebuild) {
-      diagnose(diag::interface_file_lock_failure, interfacePath);
+      diagnose(diag::interface_file_lock_failure);
     }
     // Clear out any potential leftover.
     Locked.unsafeRemoveLockFile();

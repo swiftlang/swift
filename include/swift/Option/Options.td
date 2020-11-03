@@ -139,14 +139,6 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_type_fingerprints :
-Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable per-nominal and extension body fingerprints">;
-
-def disable_type_fingerprints :
-Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Disable per-nominal and extension body fingerprints">;
-
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Enables incremental build optimization that only produces one dependencies file">;
@@ -189,11 +181,6 @@ def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
 HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps file.">;
-
-def fine_grained_dependency_include_intrafile :
-Flag<["-"], "fine-grained-dependency-include-intrafile">,
-Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Include within-file dependencies.">;
 
 def emit_fine_grained_dependency_sourcefile_dot_files :
 Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
@@ -414,6 +401,11 @@ def require_explicit_availability_target : Separate<["-"], "require-explicit-ava
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
   MetaVarName<"<target>">;
 
+def define_availability : Separate<["-"], "define-availability">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
+  MetaVarName<"<macro>">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
@@ -584,6 +576,12 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def enable_experimental_cross_module_incremental_build :
+  Flag<["-"], "enable-experimental-cross-module-incremental-build">,
+  Flags<[FrontendOption]>,
+  HelpText<"(experimental) Enable cross-module incremental build metadata and "
+           "driver scheduling">;
+
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -674,7 +672,7 @@ def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
 def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Add directory to library link search path">;
-def L_EQ : Joined<["-"], "L=">,
+def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<L>;
 
@@ -763,10 +761,10 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   HelpText<"Emit full DWARF type info.">;
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
-    HelpText<"Remap source paths in debug info">;
+    HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
-  HelpText<"Remap source paths in coverage info">;
+  HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
@@ -1110,7 +1108,11 @@ def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
 
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
-  HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+  HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;
+
+def enable_parser_lookup : Flag<["-"], "enable-parser-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable parser lookup">;
 
 def enable_request_based_incremental_dependencies : Flag<["-"],
   "enable-request-based-incremental-dependencies">,

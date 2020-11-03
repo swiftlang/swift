@@ -66,50 +66,6 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
 }
 
 //==============================================================================
-// MARK: Privacy queries
-//==============================================================================
-
-/// Return true if \ref ED does not contain a member that can affect other
-/// files.
-static bool allMembersArePrivate(const ExtensionDecl *ED) {
-  return std::all_of(
-      ED->getMembers().begin(), ED->getMembers().end(),
-      [](const Decl *d) { return d->isPrivateToEnclosingFile(); });
-}
-
-/// \ref inheritedType, an inherited protocol, return true if this inheritance
-/// cannot affect other files.
-static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
-  auto type = inheritedType.getType();
-  if (!type)
-    return true;
-
-  if (!type->isExistentialType()) {
-    // Be conservative. We don't know how to deal with other extended types.
-    return false;
-  }
-
-  auto layout = type->getExistentialLayout();
-  assert(!layout.explicitSuperclass &&
-         "Should not have a subclass existential "
-         "in the inheritance clause of an extension");
-  for (auto protoTy : layout.getProtocols()) {
-    if (!protoTy->getDecl()->isPrivateToEnclosingFile())
-      return false;
-  }
-
-  return true;
-}
-
-/// Return true if \ref ED does not inherit a protocol that can affect other
-/// files. Was called "justMembers" in ReferenceDependencies.cpp
-/// \ref ED might be null.
-static bool allInheritedProtocolsArePrivate(const ExtensionDecl *ED) {
-  return std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
-                     extendedTypeIsPrivate);
-}
-
-//==============================================================================
 // MARK: DependencyKey - creation for Decls
 //==============================================================================
 
@@ -236,30 +192,22 @@ std::string DependencyKey::computeNameForProvidedEntity<
 // MARK: Entry point into frontend graph construction
 //==============================================================================
 
-bool fine_grained_dependencies::emitReferenceDependencies(
-    DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker,
-    StringRef outputPath,
-    const bool alsoEmitDotFile) {
-
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
-                             SF, outputPath, depTracker, alsoEmitDotFile)
-                              .construct();
-
-  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
-
-  // If path is stdout, cannot read it back, so check for "-"
-  assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
-
-  if (alsoEmitDotFile)
-    g.emitDotFile(outputPath, diags);
-
-  return hadError;
+bool fine_grained_dependencies::withReferenceDependencies(
+    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    bool alsoEmitDotFile,
+    llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
+  if (auto *MD = MSF.dyn_cast<ModuleDecl *>()) {
+    SourceFileDepGraph g =
+        ModuleDepGraphFactory(MD, alsoEmitDotFile).construct();
+    return cont(std::move(g));
+  } else {
+    auto *SF = MSF.get<SourceFile *>();
+    SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
+                               SF, outputPath, depTracker, alsoEmitDotFile)
+                               .construct();
+    return cont(std::move(g));
+  }
 }
 
 //==============================================================================
@@ -270,28 +218,22 @@ FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
     SourceFile *SF, StringRef outputPath, const DependencyTracker &depTracker,
     const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
-          computeIncludePrivateDeps(SF), SF->getASTContext().hadError(),
+          SF->getASTContext().hadError(),
           outputPath, getInterfaceHash(SF), alsoEmitDotFile,
           SF->getASTContext().Diags),
       SF(SF), depTracker(depTracker) {}
-
-bool FrontendSourceFileDepGraphFactory::computeIncludePrivateDeps(
-    SourceFile *SF) {
-  // Since, when fingerprints are enabled,
-  // the parser diverts token hashing into per-body fingerprints
-  // before it can know if a difference is in a private type,
-  // in order to be able to test the changed  fingerprints
-  // we force the inclusion of private declarations when fingerprints
-  // are enabled.
-  return SF->getASTContext()
-             .LangOpts.FineGrainedDependenciesIncludeIntrafileOnes ||
-         SF->getASTContext().LangOpts.EnableTypeFingerprints;
-}
 
 /// Centralize the invariant that the fingerprint of the whole file is the
 /// interface hash
 std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
   return getInterfaceHash(SF);
+}
+
+std::string
+FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  return interfaceHash.str().str();
 }
 
 //==============================================================================
@@ -305,10 +247,6 @@ namespace {
 /// Takes all the Decls in a SourceFile, and collects them into buckets by
 /// groups of DeclKinds. Also casts them to more specific types
 struct DeclFinder {
-  /// Existing system excludes private decls in some cases.
-  /// In the future, we might not want to do this, so use bool to decide.
-  const bool includePrivateDecls;
-
   // The extracted Decls:
   ConstPtrVec<ExtensionDecl> extensions;
   ConstPtrVec<OperatorDecl> operators;
@@ -327,19 +265,17 @@ public:
   /// Construct me and separates the Decls.
   // clang-format off
     DeclFinder(ArrayRef<Decl *> topLevelDecls,
-               const bool includePrivateDecls,
-               LookupClassMember lookupClassMember)
-    : includePrivateDecls(includePrivateDecls) {
+               LookupClassMember lookupClassMember) {
       for (const Decl *const D : topLevelDecls) {
-        select<ExtensionDecl, DeclKind::Extension>(D, extensions, false) ||
+        select<ExtensionDecl, DeclKind::Extension>(D, extensions) ||
         select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
-        DeclKind::PostfixOperator>(D, operators, false) ||
+        DeclKind::PostfixOperator>(D, operators) ||
         select<PrecedenceGroupDecl, DeclKind::PrecedenceGroup>(
-                                                               D, precedenceGroups, false) ||
+                                                               D, precedenceGroups) ||
         select<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
-        DeclKind::Class, DeclKind::Protocol>(D, topNominals, true) ||
+        DeclKind::Class, DeclKind::Protocol>(D, topNominals) ||
         select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
-        DeclKind::Accessor>(D, topValues, true);
+        DeclKind::Accessor>(D, topValues);
       }
     // clang-format on
     // The order is important because some of these use instance variables
@@ -368,18 +304,7 @@ private:
   /// (indirectly recursive)
   void findNominalsAndOperatorsIn(const NominalTypeDecl *const NTD,
                                   const ExtensionDecl *ED = nullptr) {
-    if (excludeIfPrivate(NTD))
-      return;
-    const bool exposedProtocolIsExtended =
-        ED && !allInheritedProtocolsArePrivate(ED);
-    if (ED && !includePrivateDecls && !exposedProtocolIsExtended &&
-        std::all_of(
-            ED->getMembers().begin(), ED->getMembers().end(),
-            [&](const Decl *D) { return D->isPrivateToEnclosingFile(); })) {
-      return;
-    }
-    if (includePrivateDecls || !ED || exposedProtocolIsExtended)
-      allNominals.push_back(NTD);
+    allNominals.push_back(NTD);
     potentialMemberHolders.push_back(NTD);
     findNominalsAndOperatorsInMembers(ED ? ED->getMembers()
                                          : NTD->getMembers());
@@ -391,7 +316,7 @@ private:
   void findNominalsAndOperatorsInMembers(const DeclRange members) {
     for (const Decl *const D : members) {
       auto *VD = dyn_cast<ValueDecl>(D);
-      if (!VD || excludeIfPrivate(VD))
+      if (!VD)
         continue;
       if (VD->getName().isOperator())
         memberOperatorDecls.push_back(cast<FuncDecl>(D));
@@ -404,19 +329,20 @@ private:
   void findValuesInExtensions() {
     for (const auto *ED : extensions) {
       const auto *const NTD = ED->getExtendedNominal();
-      if (!NTD || excludeIfPrivate(NTD))
+      if (!NTD) {
         continue;
-      if (!includePrivateDecls &&
-          (!allInheritedProtocolsArePrivate(ED) || allMembersArePrivate(ED)))
-        continue;
-      for (const auto *member : ED->getMembers())
-        if (const auto *VD = dyn_cast<ValueDecl>(member))
-          if (VD->hasName() &&
-              (includePrivateDecls || !VD->isPrivateToEnclosingFile())) {
-            const auto *const NTD = ED->getExtendedNominal();
-            if (NTD)
-              valuesInExtensions.push_back(std::make_pair(NTD, VD));
-          }
+      }
+
+      for (const auto *member : ED->getMembers()) {
+        const auto *VD = dyn_cast<ValueDecl>(member);
+        if (!VD || !VD->hasName()) {
+          continue;
+        }
+
+        if (const auto *const NTD = ED->getExtendedNominal()) {
+          valuesInExtensions.push_back(std::make_pair(NTD, VD));
+        }
+      }
     }
   }
 
@@ -439,29 +365,18 @@ private:
   /// \returns true if successful.
   template <typename DesiredDeclType, DeclKind firstKind,
             DeclKind... restOfKinds>
-  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls,
-              const bool canExcludePrivateDecls) {
+  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
     if (D->getKind() == firstKind) {
-      auto *dd = cast<DesiredDeclType>(D);
-      const bool exclude = canExcludePrivateDecls && excludeIfPrivate(dd);
-      if (!exclude)
-        foundDecls.push_back(cast<DesiredDeclType>(D));
+      foundDecls.push_back(cast<DesiredDeclType>(D));
       return true;
     }
-    return select<DesiredDeclType, restOfKinds...>(D, foundDecls,
-                                                   canExcludePrivateDecls);
+    return select<DesiredDeclType, restOfKinds...>(D, foundDecls);
   }
 
   /// Terminate the template recursion.
   template <typename DesiredDeclType>
-  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls,
-              bool) {
+  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
     return false;
-  }
-
-  /// Return true if \param D should be excluded on privacy grounds.
-  bool excludeIfPrivate(const Decl *const D) {
-    return !includePrivateDecls && D->isPrivateToEnclosingFile();
   }
 };
 } // namespace
@@ -472,7 +387,7 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  DeclFinder declFinder(SF->getTopLevelDecls(), includePrivateDeps,
+  DeclFinder declFinder(SF->getTopLevelDecls(),
                         [this](VisibleDeclConsumer &consumer) {
     SF->lookupClassMembers({}, consumer);
   });
@@ -499,7 +414,8 @@ template <NodeKind kind, typename ContentsT>
 void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
     std::vector<ContentsT> &contentsVec) {
   for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp = getFingerprintIfAny(declOrPair);
+    Optional<std::string> fp =
+        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
     addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
         fp ? StringRef(fp.getValue()) : Optional<StringRef>());
@@ -521,14 +437,11 @@ class UsedDeclEnumerator {
   const DependencyKey sourceFileInterface;
   const DependencyKey sourceFileImplementation;
 
-  const bool includeIntrafileDeps;
-
   function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
 
 public:
   UsedDeclEnumerator(
       SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
-      bool includeIntrafileDeps,
       function_ref<void(const DependencyKey &, const DependencyKey &)>
           createDefUse)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
@@ -536,7 +449,7 @@ public:
             DeclAspect::interface, swiftDeps)),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
             DeclAspect::implementation, swiftDeps)),
-        includeIntrafileDeps(includeIntrafileDeps), createDefUse(createDefUse) {
+        createDefUse(createDefUse) {
   }
 
 public:
@@ -589,11 +502,6 @@ private:
         return;
       }
 
-      bool isPrivate = subject->isPrivateToEnclosingFile();
-      if (isPrivate && !includeIntrafileDeps) {
-        return;
-      }
-
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
@@ -602,6 +510,9 @@ private:
   }
 
   void enumerateExternalUses() {
+    for (StringRef s : depTracker.getIncrementalDependencies())
+      enumerateUse<NodeKind::incrementalExternalDepend>("", s);
+
     for (StringRef s : depTracker.getDependencies())
       enumerateUse<NodeKind::externalDepend>("", s);
   }
@@ -609,7 +520,7 @@ private:
 } // end namespace
 
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps, includePrivateDeps,
+  UsedDeclEnumerator(SF, depTracker, swiftDeps,
                      [&](const DependencyKey &def, const DependencyKey &use) {
                        addAUsedDecl(def, use);
                      })
@@ -617,28 +528,54 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 }
 
 //==============================================================================
-// MARK: FrontendSourceFileDepGraphFactory - adding individual defined Decls
+// MARK: ModuleDepGraphFactory
 //==============================================================================
 
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
+ModuleDepGraphFactory::ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot)
+    : AbstractSourceFileDepGraphFactory(
+          Mod->getASTContext().hadError(),
+          Mod->getNameStr(), "0xBADBEEF", emitDot, Mod->getASTContext().Diags),
+      Mod(Mod) {}
+
+void ModuleDepGraphFactory::addAllDefinedDecls() {
+  // TODO: express the multiple provides and depends streams with variadic
+  // templates
+
+  // Many kinds of Decls become top-level depends.
+
+  SmallVector<Decl *, 32> TopLevelDecls;
+  Mod->getTopLevelDecls(TopLevelDecls);
+  DeclFinder declFinder(TopLevelDecls,
+                        [this](VisibleDeclConsumer &consumer) {
+                          return Mod->lookupClassMembers({}, consumer);
+                        });
+
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.precedenceGroups);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(
+      declFinder.memberOperatorDecls);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.operators);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topValues);
+  addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.allNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::potentialMember>(
+      declFinder.potentialMemberHolders);
+  addAllDefinedDeclsOfAGivenType<NodeKind::member>(
+      declFinder.valuesInExtensions);
+  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
+      declFinder.classMembers);
 }
 
-/// At present, only \c NominalTypeDecls have (body) fingerprints
-Optional<std::string> FrontendSourceFileDepGraphFactory::getFingerprintIfAny(
-    std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-  return None;
-}
-Optional<std::string>
-FrontendSourceFileDepGraphFactory::getFingerprintIfAny(const Decl *d) {
-  if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
-    auto result = idc->getBodyFingerprint();
-    assert((!result || !result->empty()) &&
-           "Fingerprint should never be empty");
-    return result;
+/// Given an array of Decls or pairs of them in \p declsOrPairs
+/// create node pairs for context and name
+template <NodeKind kind, typename ContentsT>
+void ModuleDepGraphFactory::addAllDefinedDeclsOfAGivenType(
+    std::vector<ContentsT> &contentsVec) {
+  for (const auto &declOrPair : contentsVec) {
+    Optional<std::string> fp =
+        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
+    addADefinedDecl(
+        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
+        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
   }
-  return None;
 }

@@ -358,7 +358,7 @@ static void replaceLoadsFromGlobal(SILValue addr,
     if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
       auto *ti = cast<TupleInst>(initVal);
       auto *member = cast<SingleValueInstruction>(
-                          ti->getElement(teai->getFieldNo()));
+                          ti->getElement(teai->getFieldIndex()));
       replaceLoadsFromGlobal(teai, member, cloner);
       continue;
     }

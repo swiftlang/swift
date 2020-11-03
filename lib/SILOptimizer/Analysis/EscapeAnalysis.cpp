@@ -1871,11 +1871,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   // uses must be mapped to ConnectionGraph nodes by the client of this API.
   for (Operand *use : getNonDebugUses(ai)) {
     if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser())) {
-      if (tei->getFieldNo() == 0 && !call.arrayStruct) {
+      if (tei->getFieldIndex() == 0 && !call.arrayStruct) {
         call.arrayStruct = tei;
         continue;
       }
-      if (tei->getFieldNo() == 1 && !call.arrayElementPtr) {
+      if (tei->getFieldIndex() == 1 && !call.arrayElementPtr) {
         call.arrayElementPtr = tei;
         continue;
       }

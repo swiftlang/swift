@@ -14,6 +14,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
@@ -45,6 +46,19 @@ SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
 //----------------------------------------------------------------------------//
 // Superclass declaration computation.
 //----------------------------------------------------------------------------//
+void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto nominalDecl = std::get<0>(getStorage());
+  diags.diagnose(nominalDecl, diag::circular_class_inheritance,
+                 nominalDecl->getName());
+}
+
+void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
 Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
@@ -300,16 +314,15 @@ void DirectLookupRequest::writeDependencySink(
 
 void LookupInModuleRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
-  auto *module = std::get<0>(getStorage());
+  auto *DC = std::get<0>(getStorage());
   auto member = std::get<1>(getStorage());
-  auto *DC = std::get<4>(getStorage());
 
-  // Decline to record lookups outside our module.
-  if (!DC->getParentSourceFile() ||
-      module->getParentModule() != DC->getParentModule()) {
-    return;
+  // Decline to record lookups if the module in question has no incremental
+  // dependency information available.
+  auto *module = DC->getParentModule();
+  if (module->isMainModule() || module->hasIncrementalInfo()) {
+    reqTracker.addTopLevelName(member.getBaseName());
   }
-  reqTracker.addTopLevelName(member.getBaseName());
 }
 
 //----------------------------------------------------------------------------//
@@ -343,16 +356,14 @@ swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
 
 void ModuleQualifiedLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
-  auto *DC = std::get<0>(getStorage());
   auto *module = std::get<1>(getStorage());
   auto member = std::get<2>(getStorage());
 
-  // Decline to record lookups outside our module.
-  if (!DC->getParentSourceFile() ||
-      module != DC->getModuleScopeContext()->getParentModule()) {
-    return;
+  // Decline to record lookups if the module in question has no incremental
+  // dependency information available.
+  if (module->isMainModule() || module->hasIncrementalInfo()) {
+    reqTracker.addTopLevelName(member.getBaseName());
   }
-  reqTracker.addTopLevelName(member.getBaseName());
 }
 
 //----------------------------------------------------------------------------//
@@ -370,16 +381,13 @@ void LookupConformanceInModuleRequest::writeDependencySink(
   if (!Adoptee)
     return;
 
-  auto source = reqTracker.getRecorder().getActiveDependencySourceOrNull();
-  if (source.isNull())
-    return;
-
-  // Decline to record conformances defined outside of the active module.
+  // Decline to record lookups if the module in question has no incremental
+  // dependency information available.
   auto *conformance = lookupResult.getConcrete();
-  if (source.get()->getParentModule() !=
-      conformance->getDeclContext()->getParentModule())
-    return;
-  reqTracker.addPotentialMember(Adoptee);
+  auto *module = conformance->getDeclContext()->getParentModule();
+  if (module->isMainModule() || module->hasIncrementalInfo()) {
+    reqTracker.addPotentialMember(Adoptee);
+  }
 }
 
 //----------------------------------------------------------------------------//

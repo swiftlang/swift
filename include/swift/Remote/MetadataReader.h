@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,7 +28,7 @@
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -923,7 +923,7 @@ public:
     }
     }
 
-    swift_runtime_unreachable("Unhandled MetadataKind in switch");
+    swift_unreachable("Unhandled MetadataKind in switch");
   }
 
   TypeLookupErrorOr<typename BuilderType::BuiltType>
@@ -1295,7 +1295,7 @@ public:
     }
     }
 
-    swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
+    swift_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
   /// Read the offset of the generic parameters of a class from the nominal
@@ -1413,6 +1413,9 @@ public:
         return None;
 
       return metadataFn(metadata);
+    }
+    case TypeReferenceKind::MetadataKind: {
+      return None;
     }
     }
 

@@ -229,6 +229,9 @@ TEST(ConcurrentReadableHashMapTest, SingleThreaded) {
   check(1000000);
   map.clear();
   check(0);
+
+  ASSERT_FALSE(map.hasActiveReaders());
+  map.clear();
 }
 
 struct MultiThreadedKey {
@@ -328,6 +331,9 @@ TEST(ConcurrentReadableHashMapTest, MultiThreaded) {
     else
       reader();
   });
+
+  ASSERT_FALSE(map.hasActiveReaders());
+  map.clear();
 }
 
 // Test readers and writers while also constantly clearing the map.
@@ -389,6 +395,9 @@ TEST(ConcurrentReadableHashMapTest, MultiThreaded2) {
     else
       clear();
   });
+
+  ASSERT_FALSE(map.hasActiveReaders());
+  map.clear();
 }
 
 // Test readers and writers, with readers taking lots of snapshots.
@@ -443,6 +452,9 @@ TEST(ConcurrentReadableHashMapTest, MultiThreaded3) {
     else
       reader();
   });
+
+  ASSERT_FALSE(map.hasActiveReaders());
+  map.clear();
 }
 
 // Test readers and writers, with readers taking lots of snapshots, and
@@ -498,4 +510,6 @@ TEST(ConcurrentReadableHashMapTest, MultiThreaded4) {
     else
       clear();
   });
+  ASSERT_FALSE(map.hasActiveReaders());
+  map.clear();
 }

@@ -393,7 +393,7 @@ ERROR(error_creating_remark_serializer,none,
       "error while creating remark serializer: '%0'", (StringRef))
 
 REMARK(interface_file_lock_failure,none,
-      "could not acquire lock file for module interface '%0'", (StringRef))
+      "building module interface without lock file", ())
 
 REMARK(interface_file_lock_timed_out,none,
       "timed out waiting to acquire lock file for module interface '%0'", (StringRef))

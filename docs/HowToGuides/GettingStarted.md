@@ -97,7 +97,7 @@ toolchain as a one-off, there are a couple of differences:
    or a specific snapshot. You can update the branch/tag for all repositories
    as follows:
    ```sh
-   utils/update-checkout --branch mybranchname
+   utils/update-checkout --scheme mybranchname
    # OR
    utils/update-checkout --tag mytagname
    ```
@@ -126,7 +126,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 ### macOS
 
-1. Install [Xcode 12 beta 3][Xcode] or newer:
+1. Install [Xcode 12.2 beta 3][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
    Check this document or the host information on <https://ci.swift.org> for the
    current required version.
@@ -246,15 +246,13 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --cmake-c-launcher="$(which sccache)" --cmake-cxx-launcher="$(which sccache)" \
-       --release-debuginfo --test
+       --sccache --release-debuginfo --test
      ```
    - Via Xcode:
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
-       --cmake-c-launcher="$(which sccache)" --cmake-cxx-launcher="$(which sccache)" \
-       --release-debuginfo --test \
+       --sccache --release-debuginfo --test \
        --xcode
      ```
    This will create a directory

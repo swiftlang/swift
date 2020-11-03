@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TestContext.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/Strings.h"

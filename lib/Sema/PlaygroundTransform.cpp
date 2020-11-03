@@ -204,8 +204,8 @@ public:
   }
 
   GuardStmt *transformGuardStmt(GuardStmt *GS) {
-    if (Stmt *BS = GS->getBody())
-      GS->setBody(transformStmt(BS));
+    if (BraceStmt *BS = GS->getBody())
+      GS->setBody(transformBraceStmt(BS));
     return GS;
   }
 

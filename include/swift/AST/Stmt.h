@@ -632,17 +632,17 @@ public:
 ///
 class GuardStmt : public LabeledConditionalStmt {
   SourceLoc GuardLoc;
-  Stmt *Body;
+  BraceStmt *Body;
   
 public:
   GuardStmt(SourceLoc GuardLoc, StmtCondition Cond,
-            Stmt *Body, Optional<bool> implicit = None)
+            BraceStmt *Body, Optional<bool> implicit = None)
   : LabeledConditionalStmt(StmtKind::Guard,
                            getDefaultImplicitFlag(implicit, GuardLoc),
                            LabeledStmtInfo(), Cond),
     GuardLoc(GuardLoc), Body(Body) {}
   
-  GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
+  GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
             Optional<bool> implicit, ASTContext &Ctx);
   
   SourceLoc getGuardLoc() const { return GuardLoc; }
@@ -654,8 +654,8 @@ public:
     return Body->getEndLoc();
   }
   
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *s) { Body = s; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
@@ -945,13 +945,13 @@ class CaseStmt final
   SourceLoc ItemTerminatorLoc;
   CaseParentKind ParentKind;
 
-  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
+  llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-           SourceLoc ItemTerminatorLoc, Stmt *Body,
+           SourceLoc ItemTerminatorLoc, BraceStmt *Body,
            Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
            Optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
@@ -960,7 +960,7 @@ public:
   static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-         SourceLoc ItemTerminatorLoc, Stmt *Body,
+         SourceLoc ItemTerminatorLoc, BraceStmt *Body,
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
@@ -997,8 +997,8 @@ public:
 
   bool hasFallthroughDest() const { return BodyAndHasFallthrough.getInt(); }
 
-  Stmt *getBody() const { return BodyAndHasFallthrough.getPointer(); }
-  void setBody(Stmt *body) { BodyAndHasFallthrough.setPointer(body); }
+  BraceStmt *getBody() const { return BodyAndHasFallthrough.getPointer(); }
+  void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
   bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }

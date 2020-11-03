@@ -349,6 +349,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
     break;
   }
+  case TermKind::AwaitAsyncContinuationInst:
   case TermKind::TryApplyInst: {
     assert(ArgIndex == 0 && "Expect a single argument!");
     break;
@@ -412,6 +413,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     markValueLive(I->getOperand(0));
     return;
 
+  case TermKind::AwaitAsyncContinuationInst:
   case TermKind::CheckedCastBranchInst:
   case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:

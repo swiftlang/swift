@@ -105,6 +105,10 @@ import SubE
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "clang"
+// CHECK:      "-fsystem-module",
+// CHECK-NEXT: "-emit-pcm",
+// CHECK-NEXT: "-module-name",
+// CHECK-NEXT: "C"
 
 /// --------Swift module E
 // CHECK: "swift": "E"

@@ -387,6 +387,9 @@ def create_argument_parser():
     option('--distcc', toggle_true,
            default=os.environ.get('USE_DISTCC') == '1',
            help='use distcc in pump mode')
+    option('--sccache', toggle_true,
+           default=os.environ.get('SWIFT_USE_SCCACHE') == '1',
+           help='use sccache')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
     option('--enable-ubsan', toggle_true,

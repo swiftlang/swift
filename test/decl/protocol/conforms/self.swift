@@ -7,6 +7,8 @@ protocol P {
   func returnsSelf() -> Self
   func hasDefaultTakesT(_: T)
   func returnsSelfTakesT(_: T) -> Self
+
+  subscript(_: T) -> Self { get }
 }
 
 extension P {
@@ -21,19 +23,29 @@ extension P {
   func returnsSelfTakesT(_: T) -> Self { // expected-note {{'returnsSelfTakesT' declared here}}
     return self
   }
+
+  subscript(_: T) -> Self { self } // expected-note {{'subscript(_:)' declared here}}
 }
 
 // This fails
-class Class : P {} // expected-error {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns 'Self' and has associated type requirements}}
+class Class : P {}
+// expected-error@-1 {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns 'Self' and has associated type requirements}}
+// expected-error@-2 {{subscript 'subscript(_:)' in non-final class 'Class' cannot be implemented in a protocol extension because it returns 'Self' and has associated type requirements}}
 
 // This succeeds, because the class is final
 final class FinalClass : P {}
 
-// This succeeds, because we're not using the default implementation
+// This succeeds, because we're not using the default implementations
 class NonFinalClass : P {
+  // FIXME: An explicit type witness is necessary to avoid an unrelated
+  // associated type inference bug.
+  typealias T = Never
+
   func returnsSelfTakesT(_: T) -> Self {
     return self
   }
+
+  subscript(_: T) -> Self { self }
 }
 
 // Test for default implementation that comes from a constrained extension

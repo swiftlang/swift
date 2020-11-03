@@ -1,9 +1,12 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=true %s | %target-sil-opt -enable-sil-verify-all=true | %FileCheck %s
+// REQUIRES: concurrency
 
 import Builtin
+import Swift
+import _Concurrency
 
 // CHECK: sil @not_async_test : $@convention(thin) () -> () {
-sil @not_async_test : $() -> () {
+sil @not_async_test : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -29,3 +32,105 @@ bb0(%fn : $@async () -> ()):
   %0 = tuple ()
   return %0 : $()
 }
+
+// CHECK: sil @async_continuation : $@convention(thin) @async () -> () {
+sil @async_continuation : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation $Builtin.Int32
+  %c = get_async_continuation $Builtin.Int32
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: function_ref
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply
+  apply %f() : $@convention(thin) () -> ()
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
+bb1(%r : $Builtin.Int32):
+  return undef : $()
+}
+
+// CHECK: sil @async_continuation_throws : $@convention(thin) @async () -> () {
+sil @async_continuation_throws : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation [throws] $Builtin.Int32
+  %c = get_async_continuation [throws] $Builtin.Int32
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: function_ref
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply
+  apply %f() : $@convention(thin) () -> ()
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]([[RVALUE:%.*]] : $Builtin.Int32):
+bb1(%r : $Builtin.Int32):
+  // CHECK-NEXT: br
+  br bb3
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+bb2(%e : $Error):
+  // CHECK-NEXT: br
+  br bb3
+
+bb3: 
+  return undef : $()
+}
+
+// CHECK: sil @async_continuation_addr : $@convention(thin) @async () -> () {
+sil @async_continuation_addr : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK: [[SLOT:%.*]] = alloc_stack
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: function_ref
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply
+  apply %f() : $@convention(thin) () -> ()
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK: sil @async_continuation_throws_addr : $@convention(thin) @async () -> () {
+sil @async_continuation_throws_addr : $@async () -> () {
+// CHECK-NEXT: bb
+entry:
+  // CHECK: [[SLOT:%.*]] = alloc_stack
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: [[CONT:%.*]] = get_async_continuation_addr [throws] $Builtin.Int32, [[SLOT]] : $*Builtin.Int32
+  %c = get_async_continuation_addr [throws] $Builtin.Int32, %a : $*Builtin.Int32
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: function_ref
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply
+  apply %f() : $@convention(thin) () -> ()
+  // CHECK-NEXT: await_async_continuation [[CONT]] : $UnsafeThrowingContinuation<Builtin.Int32>, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  // CHECK-NEXT: dealloc_stack
+  dealloc_stack %a : $*Builtin.Int32
+  // CHECK-NEXT: br
+  br bb3
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  return undef : $()
+}
+

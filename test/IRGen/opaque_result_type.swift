@@ -195,7 +195,19 @@ struct X<T: R, U: R>: R {
 
 var globalOProp: some O = 0
 
-struct OpaqueProps {
+public struct OpaqueProps {
   static var staticOProp: some O = 0
   var instanceOProp: some O = 0
+}
+
+// Make sure we don't recurse indefinitely on recursive enums.
+public enum RecursiveEnum {
+  case a(Int)
+  case b(String)
+  indirect case c(RecursiveEnum)
+}
+
+public enum EnumWithTupleWithOpaqueField {
+  case a(Int)
+  case b((OpaqueProps, String))
 }

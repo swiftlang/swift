@@ -16,24 +16,31 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
-#include "CodeSynthesis.h"
 #include "CSDiagnostics.h"
+#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
-#include "SolutionResult.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/SolutionResult.h"
+#include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Mangle.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Sema/Sema.h"
+#include "clang/Sema/Template.h"
+#include "clang/Sema/TemplateDeduction.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -99,6 +106,45 @@ Solution::computeSubstitutions(GenericSignature sig,
                               lookupConformanceFn);
 }
 
+static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
+    ASTContext &ctx, FuncDecl *oldDecl, SubstitutionMap subst,
+    clang::FunctionDecl *specialized) {
+  // Create a new ParameterList with the substituted type.
+  auto oldFnType =
+      cast<GenericFunctionType>(oldDecl->getInterfaceType().getPointer());
+  auto newFnType = oldFnType->substGenericArgs(subst);
+  SmallVector<ParamDecl *, 4> newParams;
+  unsigned i = 0;
+  for (auto paramTy : newFnType->getParams()) {
+    auto *oldParamDecl = oldDecl->getParameters()->get(i);
+    auto *newParamDecl =
+        ParamDecl::cloneWithoutType(oldDecl->getASTContext(), oldParamDecl);
+    newParamDecl->setInterfaceType(paramTy.getParameterType());
+    newParams.push_back(newParamDecl);
+    (void)++i;
+  }
+  auto *newParamList =
+      ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  // Generate a name for the specialized function.
+  std::string newNameStr;
+  llvm::raw_string_ostream buffer(newNameStr);
+  clang::MangleContext *mangler =
+      specialized->getASTContext().createMangleContext();
+  mangler->mangleName(specialized, buffer);
+  buffer.flush();
+  // Add all parameters as empty parameters.
+  auto newName = DeclName(
+      ctx, DeclName(ctx.getIdentifier(newNameStr)).getBaseName(), newParamList);
+
+  auto newFnDecl = FuncDecl::createImported(
+      ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
+      /*Async*/ false, oldDecl->hasThrows(), newParamList,
+      newFnType->getResult(), /*GenericParams*/ nullptr,
+      oldDecl->getDeclContext(), specialized);
+  return ConcreteDeclRef(newFnDecl);
+}
+
 ConcreteDeclRef
 Solution::resolveConcreteDeclRef(ValueDecl *decl,
                                  ConstraintLocator *locator) const {
@@ -107,7 +153,25 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
   // Get the generic signatue of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
+  auto subst = computeSubstitutions(sig, locator);
+
+  // If this is a C++ function template, get it's specialization for the given
+  // substitution map and update the decl accordingly.
+  if (decl->getClangDecl() &&
+      isa<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
+    auto *newFn =
+        decl->getASTContext()
+            .getClangModuleLoader()
+            ->instantiateCXXFunctionTemplate(
+                decl->getASTContext(),
+                const_cast<clang::FunctionTemplateDecl *>(
+                    cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
+                subst);
+    return generateDeclRefForSpecializedCXXFunctionTemplate(
+        decl->getASTContext(), cast<FuncDecl>(decl), subst, newFn);
+  }
+
+  return ConcreteDeclRef(decl, subst);
 }
 
 ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
@@ -482,8 +546,7 @@ namespace {
   public:
     /// Build a reference to the given declaration.
     Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
-                       ConstraintLocatorBuilder locator, bool implicit,
-                       AccessSemantics semantics) {
+                       ConstraintLocatorBuilder locator, bool implicit) {
       auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *decl = choice.getDecl();
@@ -492,6 +555,9 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
       
+      auto semantics = decl->getAccessSemanticsFromContext(cs.DC,
+                                                           /*isAccessOnSelf*/false);
+
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
@@ -632,7 +698,6 @@ namespace {
       if (!ref)
         ref = solution.resolveConcreteDeclRef(decl, loc);
 
-      assert(ref.getDecl() == decl);
       return ref;
     }
 
@@ -1057,7 +1122,6 @@ namespace {
                          AccessSemantics semantics) {
       auto choice = overload.choice;
       auto openedType = overload.openedType;
-      auto openedFullType = overload.openedFullType;
 
       ValueDecl *member = choice.getDecl();
 
@@ -1093,13 +1157,15 @@ namespace {
         return result;
       }
 
+      auto refTy = simplifyType(overload.openedFullType);
+
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
-        cs.setType(ref, simplifyType(openedFullType));
+        cs.setType(ref, refTy);
         ref->setFunctionRefKind(choice.getFunctionRefKind());
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
@@ -1109,8 +1175,6 @@ namespace {
       bool isUnboundInstanceMember =
         (!baseIsInstance && member->isInstanceMember());
       bool isPartialApplication = shouldBuildCurryThunk(choice, baseIsInstance);
-
-      auto refTy = simplifyType(openedFullType);
 
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());
@@ -1174,8 +1238,8 @@ namespace {
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
 
-        base = coerceObjectArgumentToType(
-                 base, selfParamTy, member, semantics,
+        base = coerceSelfArgumentToType(
+                 base, selfParamTy, member,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         if (!isExistentialMetatype || openedExistential) {
@@ -1257,7 +1321,7 @@ namespace {
       }
 
       // For properties, build member references.
-      if (isa<VarDecl>(member)) {
+      if (auto *varDecl = dyn_cast<VarDecl>(member)) {
         if (isUnboundInstanceMember) {
           assert(memberLocator.getBaseLocator() &&
                  cs.UnevaluatedRootExprs.count(
@@ -1270,17 +1334,22 @@ namespace {
           base->setImplicit();
         }
 
+        auto hasDynamicSelf =
+          varDecl->getValueInterfaceType()->hasDynamicSelfType();
+
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit, semantics);
         memberRefExpr->setIsSuper(isSuper);
 
-        cs.setType(memberRefExpr, simplifyType(openedType));
+        if (hasDynamicSelf)
+          refTy = refTy->replaceCovariantResultType(containerTy, 1);
+        cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
+
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
 
-        if (cast<VarDecl>(member)->getValueInterfaceType()
-                                 ->hasDynamicSelfType()) {
+        if (hasDynamicSelf) {
           if (!baseTy->isEqual(containerTy)) {
             result = new (context) CovariantReturnConversionExpr(
                 result, simplifyType(openedType));
@@ -1512,10 +1581,8 @@ namespace {
     /// protocol is broken.
     ///
     /// \returns the converted literal expression.
-    Expr *convertLiteralInPlace(Expr *literal,
-                                Type type,
-                                ProtocolDecl *protocol,
-                                Identifier literalType,
+    Expr *convertLiteralInPlace(LiteralExpr *literal, Type type,
+                                ProtocolDecl *protocol, Identifier literalType,
                                 DeclName literalFuncName,
                                 ProtocolDecl *builtinProtocol,
                                 DeclName builtinLiteralFuncName,
@@ -1588,7 +1655,7 @@ namespace {
                         ArrayRef<Identifier> argLabels,
                         ConstraintLocatorBuilder locator);
 
-    /// Coerce the given object argument (e.g., for the base of a
+    /// Coerce the given 'self' argument (e.g., for the base of a
     /// member expression) to the given type.
     ///
     /// \param expr The expression to coerce.
@@ -1597,13 +1664,10 @@ namespace {
     ///
     /// \param member The member being accessed.
     ///
-    /// \param semantics The kind of access we've been asked to perform.
-    ///
     /// \param locator Locator used to describe where in this expression we are.
-    Expr *coerceObjectArgumentToType(Expr *expr,
-                                     Type baseTy, ValueDecl *member,
-                                     AccessSemantics semantics,
-                                     ConstraintLocatorBuilder locator);
+    Expr *coerceSelfArgumentToType(Expr *expr,
+                                   Type baseTy, ValueDecl *member,
+                                   ConstraintLocatorBuilder locator);
 
   private:
     /// Build a new subscript.
@@ -1807,8 +1871,7 @@ namespace {
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
-        base = coerceObjectArgumentToType(base, baseTy, subscript,
-                                          AccessSemantics::Ordinary, locator);
+        base = coerceSelfArgumentToType(base, baseTy, subscript, locator);
         if (!base)
           return nullptr;
 
@@ -1832,8 +1895,8 @@ namespace {
       auto containerTy = solution.simplifyType(openedBaseType);
       
       if (baseIsInstance) {
-        base = coerceObjectArgumentToType(
-          base, containerTy, subscript, AccessSemantics::Ordinary,
+        base = coerceSelfArgumentToType(
+          base, containerTy, subscript,
           locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         base = coerceToType(base,
@@ -2535,7 +2598,7 @@ namespace {
           KnownProtocolKind::ExpressibleByStringInterpolation, type,
           {ctx.Id_stringInterpolation});
       if (!resultInit) return nullptr;
-      expr->setResultInit(resultInit);
+      expr->setInitializer(resultInit);
 
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
@@ -2687,7 +2750,7 @@ namespace {
       // Find the overload choice used for this declaration reference.
       auto selected = solution.getOverloadChoice(locator);
       return buildDeclRef(selected, expr->getNameLoc(), locator,
-                          expr->isImplicit(), expr->getAccessSemantics());
+                          expr->isImplicit());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2717,7 +2780,7 @@ namespace {
       auto selected = solution.getOverloadChoice(locator);
 
       return buildDeclRef(selected, expr->getNameLoc(), locator,
-                          expr->isImplicit(), AccessSemantics::Ordinary);
+                          expr->isImplicit());
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -3037,8 +3100,7 @@ namespace {
         diagnoseDeprecatedConditionalConformanceOuterAccess(
             UDE, selected.choice.getDecl());
 
-        return buildDeclRef(selected, nameLoc, memberLocator, implicit,
-                            AccessSemantics::Ordinary);
+        return buildDeclRef(selected, nameLoc, memberLocator, implicit);
       }
 
       switch (selected.choice.getKind()) {
@@ -4310,7 +4372,7 @@ namespace {
                                                 { Identifier() });
 
       auto resultTy = TypeChecker::typeCheckExpression(
-          callExpr, cs.DC, valueType, CTP_CannotFail);
+          callExpr, cs.DC, /*contextualInfo=*/{valueType, CTP_CannotFail});
       assert(resultTy && "Conversion cannot fail!");
       (void)resultTy;
 
@@ -6880,9 +6942,14 @@ static bool isNonMutatingSetterPWAssignInsideInit(Expr *baseExpr,
 /// the given member.
 static Type adjustSelfTypeForMember(Expr *baseExpr,
                                     Type baseTy, ValueDecl *member,
-                                    AccessSemantics semantics,
                                     DeclContext *UseDC) {
-  auto baseObjectTy = baseTy->getWithoutSpecifierType();
+  assert(!baseTy->is<LValueType>());
+
+  auto inOutTy = baseTy->getAs<InOutType>();
+  if (!inOutTy)
+    return baseTy;
+
+  auto baseObjectTy = inOutTy->getObjectType();
 
   if (isa<ConstructorDecl>(member))
     return baseObjectTy;
@@ -6891,7 +6958,7 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     if (func->isMutating())
-      return InOutType::get(baseObjectTy);
+      return baseTy;
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;
@@ -6914,34 +6981,17 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
       !isNonMutatingSetterPWAssignInsideInit(baseExpr, member, UseDC))
     return baseObjectTy;
 
-  // If we're calling an accessor, keep the base as an inout type, because the
-  // getter may be mutating.
-  auto strategy = SD->getAccessStrategy(semantics,
-                                        isSettableFromHere
-                                          ? AccessKind::ReadWrite
-                                          : AccessKind::Read,
-                                        UseDC->getParentModule(),
-                                        UseDC->getResilienceExpansion());
-  if (baseTy->is<InOutType>() && strategy.getKind() != AccessStrategy::Storage)
-    return InOutType::get(baseObjectTy);
+  if (isa<SubscriptDecl>(member))
+    return baseTy;
 
-  // Accesses to non-function members in value types are done through an @lvalue
-  // type.
-  if (baseTy->is<InOutType>())
-    return LValueType::get(baseObjectTy);
-  
-  // Accesses to members in values of reference type (classes, metatypes) are
-  // always done through a the reference to self.  Accesses to value types with
-  // a non-mutable self are also done through the base type.
-  return baseTy;
+  return LValueType::get(baseObjectTy);
 }
 
 Expr *
-ExprRewriter::coerceObjectArgumentToType(Expr *expr,
-                                         Type baseTy, ValueDecl *member,
-                                         AccessSemantics semantics,
-                                         ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(expr, baseTy, member, semantics, dc);
+ExprRewriter::coerceSelfArgumentToType(Expr *expr,
+                                       Type baseTy, ValueDecl *member,
+                                       ConstraintLocatorBuilder locator) {
+  Type toType = adjustSelfTypeForMember(expr, baseTy, member, dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = cs.getType(expr);
@@ -6964,15 +7014,11 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                           /*isImplicit*/ true));
 }
 
-Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
-                                          Type type,
-                                          ProtocolDecl *protocol,
-                                          Identifier literalType,
-                                          DeclName literalFuncName,
-                                          ProtocolDecl *builtinProtocol,
-                                          DeclName builtinLiteralFuncName,
-                                          Diag<> brokenProtocolDiag,
-                                          Diag<> brokenBuiltinProtocolDiag) {
+Expr *ExprRewriter::convertLiteralInPlace(
+    LiteralExpr *literal, Type type, ProtocolDecl *protocol,
+    Identifier literalType, DeclName literalFuncName,
+    ProtocolDecl *builtinProtocol, DeclName builtinLiteralFuncName,
+    Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
@@ -6996,16 +7042,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       // Form a reference to the builtin conversion function.
 
       // Set the builtin initializer.
-      if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-        stringLiteral->setBuiltinInitializer(witness);
-      else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
-        booleanLiteral->setBuiltinInitializer(witness);
-      else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
-        numberLiteral->setBuiltinInitializer(witness);
-      else {
-        cast<MagicIdentifierLiteralExpr>(literal)->setBuiltinInitializer(
-            witness);
-      }
+      dyn_cast<BuiltinLiteralExpr>(literal)->setBuiltinInitializer(witness);
 
       // The literal expression has this type.
       cs.setType(literal, type);
@@ -7042,16 +7079,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     return nullptr;
 
   // Set the initializer.
-  if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal))
-    nilLiteral->setInitializer(witness);
-  else if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-    stringLiteral->setInitializer(witness);
-  else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
-    booleanLiteral->setInitializer(witness);
-  else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
-    numberLiteral->setInitializer(witness);
-  else
-    cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
+  literal->setInitializer(witness);
 
   // The literal expression has this type.
   cs.setType(literal, type);
@@ -8052,8 +8080,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
     Expr *convertElementExpr = elementExpr;
     if (TypeChecker::typeCheckExpression(
             convertElementExpr, dc,
-            optPatternType,
-            CTP_CoerceOperand).isNull()) {
+            /*contextualInfo=*/{optPatternType, CTP_CoerceOperand})
+            .isNull()) {
       return None;
     }
     elementExpr->setIsPlaceholder(false);

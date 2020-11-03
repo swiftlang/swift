@@ -24,7 +24,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Runtime/Portability.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <vector>
@@ -642,6 +642,12 @@ public:
       }
 
       unsigned firstChildIdx = 0;
+      if (Node->getChild(firstChildIdx)->getKind() == NodeKind::ClangType) {
+        // [TODO: synthesize-Clang-type-from-mangled-name] Use the first child
+        // to create a ClangTypeInfo.
+        ++firstChildIdx;
+      }
+
       bool isThrow = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::ThrowsAnnotation) {
@@ -706,17 +712,29 @@ public:
           } else if (child->getText() == "@callee_guaranteed") {
             calleeConvention = ImplParameterConvention::Direct_Guaranteed;
           }
+        } else if (child->getKind() == NodeKind::ImplFunctionConvention) {
+          if (child->getNumChildren() == 0)
+            return MAKE_NODE_TYPE_ERROR0(child, "expected grandchildren");
+          if ((child->getFirstChild()->getKind() !=
+               NodeKind::ImplFunctionConventionName) ||
+              !child->getFirstChild()->hasText())
+            return MAKE_NODE_TYPE_ERROR0(child, "expected convention name");
+
+          // [TODO: synthesize-Clang-type-from-mangled-name] If there are two
+          // grand-children, the second is going to be the mangled Clang type.
+          StringRef text = child->getFirstChild()->getText();
+          if (text == "c") {
+            flags =
+              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
+          } else if (text == "block") {
+            flags =
+              flags.withRepresentation(ImplFunctionRepresentation::Block);
+          }
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
-
-          StringRef text = child->getText();
-          if (text == "@convention(c)") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
-          } else if (text == "@convention(block)") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::Block);
+          if (child->getText() == "@async") {
+            flags = flags.withAsync();
           }
         } else if (child->getKind() == NodeKind::ImplDifferentiable) {
           flags = flags.withDifferentiabilityKind(

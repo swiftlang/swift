@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 5 %s -verify
 
 func testPopFirst() {
-  var str = "abc"
-  var charView: String.CharacterView // expected-error{{'CharacterView' is unavailable: Please use String directly}}
+  let str = "abc"
+  let charView: String.CharacterView // expected-error{{'CharacterView' is unavailable: Please use String directly}}
   _ = str.characters // expected-error{{'characters' is unavailable: Please use String directly}}
   dump(charView)
 
@@ -11,7 +11,7 @@ func testPopFirst() {
   _ = substr.characters.popFirst() // expected-error{{'characters' is unavailable: Please use Substring directly}}
   _ = substr.unicodeScalars.popFirst() // ok
 
-  var charSubView: Substring.CharacterView // expected-error{{'CharacterView' is unavailable: Please use Substring directly}}
+  let charSubView: Substring.CharacterView // expected-error{{'CharacterView' is unavailable: Please use Substring directly}}
   _ = substr.characters // expected-error{{'characters' is unavailable: Please use Substring directly}}
   dump(charSubView)
 }

@@ -21,10 +21,6 @@ func testSimpleInterpolation() {
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
 
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
-
     // CHECK: [[ENABLED]]:
     //
     // Header bytes.
@@ -51,6 +47,10 @@ func testSimpleInterpolation() {
     // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([27 x i8], [27 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
+  
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testInterpolationWithMultipleArguments
@@ -135,18 +135,15 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
 
-    // CHECK: [[EXIT]]:
-    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
-
     // CHECK: [[ENABLED]]:
     //
     // Header bytes.
     //
     // CHECK-64: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i64 12
     // CHECK-32: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i32 8
-    // CHECK-NEXT: store i8 2, i8* [[BUFFER]], align 1
+    // CHECK-64: [[OBJ_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i64 8
+    // CHECK-32: [[OBJ_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i32 4
+    // CHECK: store i8 2, i8* [[BUFFER]], align 1
     // CHECK-NEXT: [[OFFSET1:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 1
     // CHECK-NEXT: store i8 1, i8* [[OFFSET1]], align 1
     //
@@ -157,18 +154,29 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
-    // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-NEXT: bitcast %swift.refcounted* %{{.*}} to %swift.opaque*
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
     // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
     // CHECK-NEXT: store %TSo7NSArrayC*  [[BITCASTED_SRC]], %TSo7NSArrayC** [[BITCASTED_DEST]], align 1
+    // CHECK-NEXT: [[BITCASTED_DEST2:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %TSo7NSArrayC**
+    // CHECK-NEXT: [[BITCASTED_SRC2:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
+    // CHECK-64-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 8
+    // CHECK-32-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 4
 
     // CHECK-64-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK-NEXT: [[BITCASTED_OBJ_STORAGE:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %swift.opaque*
+    // CHECK-NEXT: tail call void @swift_arrayDestroy(%swift.opaque* [[BITCASTED_OBJ_STORAGE]]
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[OBJ_STORAGE]]
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: br label %[[EXIT]]
+  
+    // CHECK: [[EXIT]]:
+    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testFloatInterpolation
@@ -177,10 +185,6 @@ func testFloatInterpolation(doubleValue: Double) {
     // CHECK: entry:
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
-
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:
     //
@@ -204,6 +208,10 @@ func testFloatInterpolation(doubleValue: Double) {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([17 x i8], [17 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 }
 
 // This test checks that the precision and alignment are optimally "stored" into the
@@ -235,7 +243,7 @@ func testDynamicPrecisionAndAlignment() {
     // First argument bytes.
     //
     // CHECK-NEXT: [[OFFSET2:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 2
-    // CHECK-NEXT: store i8 16, i8* [[OFFSET2]], align 1
+    // CHECK-NEXT: store i8 0, i8* [[OFFSET2]], align 1
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-NEXT: store i8 4, i8* [[OFFSET3]], align 1
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
@@ -269,5 +277,110 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
 }
 
-// TODO: add test for String. It is more complicated due to more complex logic
-// in string serialization.
+// CHECK-LABEL: define hidden swiftcc void @"${{.*}}testStringInterpolation
+func testStringInterpolation(stringValue: String) {
+  _osLogTestHelper("String value: \(stringValue)")
+    // CHECK: entry:
+    // CHECK-64: call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %1
+    // CHECK-32: tail call void @"$ss13_StringObjectV7VariantOWOy"(i32 %1
+    // CHECK-32-NEXT: tail call void @"$ss13_StringObjectV7VariantOWOy"(i32 %1
+    // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
+    // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-64: call void @swift_bridgeObjectRelease_n(%swift.bridge* %1
+    // CHECK-32: tail call void @"$ss13_StringObjectV7VariantOWOe"(i32 %1
+    // CHECK-32-NEXT: tail call void @"$ss13_StringObjectV7VariantOWOe"(i32 %1
+    // CHECK: br label %[[EXIT:[0-9]+]]
+
+    // CHECK: [[ENABLED]]:
+    //
+    // Header bytes.
+    //
+    // CHECK-64: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 12
+    // CHECK-32: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 8
+    // CHECK-64-NEXT: [[STR_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 32
+    // CHECK-32-NEXT: [[STR_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 16
+    // CHECK: call void @llvm.lifetime.start{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR:%.*]]
+    // CHECK: store i8 2, i8* [[BUFFER]], align 1
+    // CHECK-NEXT: [[OFFSET1:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 1
+    // CHECK-NEXT: store i8 1, i8* [[OFFSET1]], align 1
+
+    // Argument bytes.
+    //
+    // CHECK-NEXT: [[OFFSET2:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 2
+    // CHECK-NEXT: store i8 32, i8* [[OFFSET2]], align 1
+    // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
+    // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
+    // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
+    
+    // CHECK: [[STR_POINTER:%.*]] = call swiftcc i8* @"${{.*}}getNullTerminatedUTF8Pointer{{.*}}"(i{{.*}} %0, {{.*}} %1
+
+    // CHECK: [[OFFSET_BUFFER:%.*]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
+    // CHECK-NEXT: [[OFFSET_BUFFER_PTR:%.*]] = bitcast i8* [[OFFSET_BUFFER]] to i8**
+    // CHECK-NEXT: store i8* [[STR_POINTER]], i8** [[OFFSET_BUFFER_PTR]]
+
+    // os_log_impl call.
+    // CHECK-64-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([17 x i8], [17 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
+    // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([17 x i8], [17 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK-NEXT: [[BITCASTED_STR_STORAGE:%.*]] = bitcast i8* [[STR_STORAGE]] to %swift.opaque*
+    // CHECK-NEXT: tail call void @swift_arrayDestroy(%swift.opaque* [[BITCASTED_STR_STORAGE]]
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[STR_STORAGE]]
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
+    // CHECK: call void @llvm.lifetime.end{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR]]
+    // CHECK-NEXT: br label %[[EXIT]]
+  
+    // CHECK: [[EXIT]]:
+    // CHECK-NEXT: ret void
+}
+
+// CHECK-LABEL: define hidden swiftcc void @"${{.*}}testMetatypeInterpolation
+func testMetatypeInterpolation<T>(of type: T.Type) {
+    _osLogTestHelper("Metatype value: \(type)")
+    // CHECK: entry:
+    // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
+    // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: call void @swift_release
+    // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
+
+    // CHECK: [[ENABLED]]:
+    //
+    // Header bytes.
+    //
+    // CHECK-64: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 12
+    // CHECK-32: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 8
+    // CHECK-64-NEXT: [[STR_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 32
+    // CHECK-32-NEXT: [[STR_STORAGE:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 16
+    // CHECK: call void @llvm.lifetime.start{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR:%.*]]
+    // CHECK: store i8 2, i8* [[BUFFER]], align 1
+    // CHECK-NEXT: [[OFFSET1:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 1
+    // CHECK-NEXT: store i8 1, i8* [[OFFSET1]], align 1
+
+    // Argument bytes.
+    //
+    // CHECK-NEXT: [[OFFSET2:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 2
+    // CHECK-NEXT: store i8 32, i8* [[OFFSET2]], align 1
+    // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
+    // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
+    // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
+    // CHECK-NEXT: [[TYPENAME:%.+]] = tail call swiftcc { i{{.*}}, {{.*}} } @"${{.*}}_typeName{{.*}}"({{.*}} %0
+    // CHECK-NEXT: [[TYPENAME_0:%.+]] = extractvalue { i{{.*}}, {{.*}} } [[TYPENAME]], 0
+    // CHECK-NEXT: [[TYPENAME_1:%.+]] = extractvalue { i{{.*}}, {{.*}} } [[TYPENAME]], 1
+    
+    // CHECK: [[STR_POINTER:%.*]] = call swiftcc i8* @"${{.*}}getNullTerminatedUTF8Pointer{{.*}}"(i{{.*}} [[TYPENAME_0]], {{.*}} [[TYPENAME_1]]
+
+    // os_log_impl call.
+    // CHECK-64: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([19 x i8], [19 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
+    // CHECK-32: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([19 x i8], [19 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK-NEXT: [[BITCASTED_STR_STORAGE:%.*]] = bitcast i8* [[STR_STORAGE]] to %swift.opaque*
+    // CHECK-NEXT: tail call void @swift_arrayDestroy(%swift.opaque* [[BITCASTED_STR_STORAGE]]
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[STR_STORAGE]]
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
+    // CHECK: call void @llvm.lifetime.end{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR]]
+    // CHECK-NEXT: br label %[[EXIT]]
+  
+    // CHECK: [[EXIT]]:
+    // CHECK-NEXT: ret void
+}

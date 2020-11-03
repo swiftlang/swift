@@ -453,6 +453,10 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
     return false;
   
   EnumElementDecl *element = nullptr;
+  unsigned numInits =0;
+  unsigned numTakes = 0;
+  SILBasicBlock *initBlock = nullptr;
+  SILBasicBlock *takeBlock = nullptr;
   SILType payloadType;
   
   // First step: check if the stack location is only used to hold one specific
@@ -463,6 +467,8 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
       case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::InjectEnumAddrInst:
+        // We'll check init_enum_addr below.
         break;
       case SILInstructionKind::InitEnumDataAddrInst: {
         auto *ieda = cast<InitEnumDataAddrInst>(user);
@@ -472,13 +478,8 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         element = el;
         assert(!payloadType || payloadType == ieda->getType());
         payloadType = ieda->getType();
-        break;
-      }
-      case SILInstructionKind::InjectEnumAddrInst: {
-        auto *el = cast<InjectEnumAddrInst>(user)->getElement();
-        if (element && el != element)
-          return false;
-        element = el;
+        numInits++;
+        initBlock = user->getParent();
         break;
       }
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
@@ -486,6 +487,8 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         if (element && el != element)
           return false;
         element = el;
+        numTakes++;
+        takeBlock = user->getParent();
         break;
       }
       default:
@@ -494,6 +497,24 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   }
   if (!element || !payloadType)
     return false;
+
+  // If the enum has a single init-take pair in a single block, we know that
+  // the enum cannot contain any valid payload outside that init-take pair.
+  //
+  // This also means that we can ignore any inject_enum_addr of another enum
+  // case, because this can only inject a case without a payload.
+  bool singleInitTakePair =
+    (numInits == 1 && numTakes == 1 && initBlock == takeBlock);
+  if (!singleInitTakePair) {
+    // No single init-take pair: We cannot ignore inject_enum_addrs with a
+    // mismatching case.
+    for (auto *use : AS->getUses()) {
+      if (auto *inject = dyn_cast<InjectEnumAddrInst>(use->getUser())) {
+        if (inject->getElement() != element)
+          return false;
+      }
+    }
+  }
 
   // Second step: replace the enum alloc_stack with a payload alloc_stack.
   auto *newAlloc = Builder.createAllocStack(
@@ -508,6 +529,22 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         eraseInstFromFunction(*user);
         break;
       case SILInstructionKind::DestroyAddrInst:
+        if (singleInitTakePair) {
+          // It's not possible that the enum has a payload at the destroy_addr,
+          // because it must have already been taken by the take of the
+          // single init-take pair.
+          // We _have_ to remove the destroy_addr, because we also remove all
+          // inject_enum_addrs which might inject a payload-less case before
+          // the destroy_addr.
+          eraseInstFromFunction(*user);
+        } else {
+          // The enum payload can still be valid at the destroy_addr, so we have
+          // to keep the destroy_addr. Just replace the enum with the payload
+          // (and because it's not a singleInitTakePair, we can be sure that the
+          // enum cannot have any other case than the payload case).
+          use->set(newAlloc);
+        }
+        break;
       case SILInstructionKind::DeallocStackInst:
         use->set(newAlloc);
         break;
@@ -803,7 +840,7 @@ static SingleValueInstruction *getValueFromStaticLet(SILValue v) {
     if (!tupleVal)
       return nullptr;
     return cast<SingleValueInstruction>(
-      cast<TupleInst>(tupleVal)->getElement(teai->getFieldNo()));
+      cast<TupleInst>(tupleVal)->getElement(teai->getFieldIndex()));
   }
   return nullptr;
 }
@@ -1111,9 +1148,9 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
         kind = tuple;
       }
       if (kind == tuple) {
-        if (elems[telem->getFieldNo()])
+        if (elems[telem->getFieldIndex()])
           return SILValue();
-        elems[telem->getFieldNo()] = createValueFromAddr(telem, builder, loc);
+        elems[telem->getFieldIndex()] = createValueFromAddr(telem, builder, loc);
         continue;
       }
     }
@@ -1802,7 +1839,7 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
 
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
-  if (TEI->getFieldNo() != 1)
+  if (TEI->getFieldIndex() != 1)
     return nullptr;
 
   Builder.setCurrentDebugScope(TEI->getDebugScope());

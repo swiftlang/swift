@@ -23,6 +23,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace swift {
   template<typename T>
@@ -93,7 +94,17 @@ namespace swift {
                       const std::tuple<Types...> &value) {
     simple_display_tuple<0>(out, value);
   }
-  
+
+  template<typename T1, typename T2>
+  void simple_display(llvm::raw_ostream &out,
+                      const std::pair<T1, T2> &value) {
+    out << "(";
+    simple_display(out, value.first);
+    out << ", ";
+    simple_display(out, value.second);
+    out << ")";
+  }
+
   template<typename T>
   void simple_display(llvm::raw_ostream &out,
                       const llvm::TinyPtrVector<T> &vector) {

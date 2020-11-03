@@ -250,6 +250,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MultipleTrailingClosureElementList': 245,
     'MultipleTrailingClosureElement': 246,
     'PoundFileIDExpr': 247,
+    'TargetFunctionEntry': 248,
 }
 
 

@@ -13,9 +13,8 @@
 // This file implements constraint generation for the type checker.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintGraph.h"
-#include "ConstraintSystem.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
@@ -24,6 +23,8 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -588,6 +589,13 @@ namespace {
       
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value, Type type) -> bool {
+        // We want to consider all options for calls that might contain the code
+        // completion location, as missing arguments after the completion
+        // location are valid (since it might be that they just haven't been
+        // written yet).
+        if (CS.isForCodeCompletion())
+          return false;
+
         if (!type->is<AnyFunctionType>())
           return false;
 
@@ -990,7 +998,7 @@ namespace {
         : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
       // Although constraint system is initialized in `constraint
       // generation` phase, we have to set it here manually because e.g.
-      // function builders could generate constraints for its body
+      // result builders could generate constraints for its body
       // in the middle of the solving.
       CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
     }
@@ -1002,8 +1010,21 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      // FIXME: Can we do anything with error expressions at this point?
-      return nullptr;
+      if (!CS.isForCodeCompletion())
+        return nullptr;
+
+      // For code completion, treat error expressions that don't contain
+      // the completion location itself as holes. If an ErrorExpr contains the
+      // code completion location, a fallback typecheck is called on the
+      // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
+      // independent of the wider expression containing the ErrorExpr, so
+      // there's no point attempting to produce a solution for it.
+      SourceRange range = E->getSourceRange();
+      if (range.isInvalid() ||
+          CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
+        return nullptr;
+
+      return HoleType::get(CS.getASTContext(), E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1015,80 +1036,13 @@ namespace {
     }
 
     Type visitNilLiteralExpr(NilLiteralExpr *expr) {
-      auto &DE = CS.getASTContext().Diags;
-      // If this is a standalone `nil` literal expression e.g.
-      // `_ = nil`, let's diagnose it here because solver can't
-      // attempt any types for it.
-      auto *parentExpr = CS.getParentExpr(expr);
-      bool hasContextualType = bool(CS.getContextualType(expr));
+      auto literalTy = visitLiteralExpr(expr);
+      // Allow `nil` to be a hole so we can diagnose it via a fix
+      // if it turns out that there is no contextual information.
+      if (auto *typeVar = literalTy->getAs<TypeVariableType>())
+        CS.recordPotentialHole(typeVar);
 
-      while (parentExpr) {
-        if (!isa<IdentityExpr>(parentExpr))
-          break;
-
-        // If there is a parent, use it, otherwise we need
-        // to check whether the last parent node in the chain
-        // had a contextual type associated with it because
-        // in situations like:
-        //
-        // \code
-        // func foo() -> Int? {
-        //   return (nil)
-        // }
-        // \endcode
-        //
-        // parentheses around `nil` are significant.
-        if (auto *nextParent = CS.getParentExpr(parentExpr)) {
-          parentExpr = nextParent;
-        } else {
-          hasContextualType |= bool(CS.getContextualType(parentExpr));
-          // Since current expression is an identity expr
-          // and there are no more parents, let's pretend
-          // that `nil`  don't have a parent since parens
-          // are not semantically significant for further checks.
-          parentExpr = nullptr;
-        }
-      }
-
-      // In cases like `_ = nil?` AST would have `nil`
-      // wrapped in `BindOptionalExpr`.
-      if (parentExpr && isa<BindOptionalExpr>(parentExpr))
-        parentExpr = CS.getParentExpr(parentExpr);
-
-      if (parentExpr) {
-        // `_ = nil as? ...`
-        if (isa<ConditionalCheckedCastExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::conditional_cast_from_nil);
-          return Type();
-        }
-
-        // `_ = nil!`
-        if (isa<ForceValueExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
-          return Type();
-        }
-
-        // `_ = nil?`
-        if (isa<OptionalEvaluationExpr>(parentExpr)) {
-          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-          return Type();
-        }
-
-        // `_ = nil`
-        if (auto *assignment = dyn_cast<AssignExpr>(parentExpr)) {
-          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-            return Type();
-          }
-        }
-      }
-
-      if (!parentExpr && !hasContextualType) {
-        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-        return Type();
-      }
-
-      return visitLiteralExpr(expr);
+      return literalTy;
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
@@ -1363,7 +1317,7 @@ namespace {
         type = CS.openUnboundGenericTypes(type, locator);
       } else if (CS.hasType(E)) {
         // If there's a type already set into the constraint system, honor it.
-        // FIXME: This supports the function builder transform, which sneakily
+        // FIXME: This supports the result builder transform, which sneakily
         // stashes a type in the constraint system through a TypeExpr in order
         // to pass it down to the rest of CSGen. This is a terribly
         // unprincipled thing to do.
@@ -1492,9 +1446,6 @@ namespace {
 
       // The result of the last element of the chain must be convertible to the
       // whole chain, and the type of the whole chain must be equal to the base.
-      CS.addConstraint(
-          ConstraintKind::Conversion, memberTy, chainBaseTy,
-          CS.getConstraintLocator(tail, ConstraintLocator::RValueAdjustment));
       CS.addConstraint(ConstraintKind::Conversion, memberTy, chainResultTy,
                        locator);
       CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
@@ -2552,6 +2503,24 @@ namespace {
             }
           }
 
+          // FIXME: We can see UnresolvedDeclRefExprs here because we have
+          // not yet run preCheckExpression() on the entire closure body
+          // yet.
+          //
+          // We could consider pre-checking more eagerly.
+          if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+            auto name = declRef->getName();
+            auto loc = declRef->getLoc();
+            if (name.isSimpleName() && loc.isValid()) {
+              auto *varDecl = dyn_cast_or_null<VarDecl>(
+                ASTScope::lookupSingleLocalDecl(cs.DC->getParentSourceFile(),
+                                                name.getFullName(), loc));
+              if (varDecl)
+                if (auto varType = cs.getTypeIfAvailable(varDecl))
+                  varType->getTypeVariables(varRefs);
+            }
+          }
+
           return { true, expr };
         }
       } collectVarRefs(CS);
@@ -2622,9 +2591,9 @@ namespace {
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);
-      CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
-                       CS.getType(expr->getBase()),
-           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
+      CS.addConstraint(
+          ConstraintKind::DynamicTypeOf, tv, CS.getType(expr->getBase()),
+          CS.getConstraintLocator(expr, ConstraintLocator::DynamicType));
       return tv;
     }
 
@@ -3031,11 +3000,19 @@ namespace {
                                             TVO_PrefersSubtypeBinding |
                                             TVO_CanBindToLValue |
                                             TVO_CanBindToNoEscape);
-      
+
+      auto *valueExpr = expr->getSubExpr();
+      // It's invalid to force unwrap `nil` literal e.g. `_ = nil!` or
+      // `_ = (try nil)!` and similar constructs.
+      if (auto *nilLiteral = dyn_cast<NilLiteralExpr>(
+              valueExpr->getSemanticsProvidingExpr())) {
+        CS.recordFix(SpecifyContextualTypeForNil::create(
+            CS, CS.getConstraintLocator(nilLiteral)));
+      }
+
       // The result is the object type of the optional subexpression.
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       CS.getType(expr->getSubExpr()), objectTy,
-                       locator);
+      CS.addConstraint(ConstraintKind::OptionalObject, CS.getType(valueExpr),
+                       objectTy, locator);
       return objectTy;
     }
 
@@ -3488,6 +3465,8 @@ namespace {
 
       // Generate constraints for each of the entries in the capture list.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        TypeChecker::diagnoseDuplicateCaptureVars(captureList);
+
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
           SolutionApplicationTarget target(capture.Init);
@@ -3825,9 +3804,8 @@ bool ConstraintSystem::generateConstraints(
 
       // Substitute type variables in for unresolved types.
       if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
-        auto *convertTypeLocator = getConstraintLocator(
-            expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
+        auto *convertTypeLocator =
+            getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
         convertType = convertType.transform([&](Type type) -> Type {
           if (type->is<UnresolvedType>()) {

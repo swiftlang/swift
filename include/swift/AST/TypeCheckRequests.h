@@ -19,6 +19,7 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
@@ -125,10 +126,9 @@ public:
 };
 
 /// Request the raw type of the given enum.
-class EnumRawTypeRequest :
-    public SimpleRequest<EnumRawTypeRequest,
-                         Type(EnumDecl *, TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+class EnumRawTypeRequest
+    : public SimpleRequest<EnumRawTypeRequest, Type(EnumDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -136,18 +136,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type
-  evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
-           TypeResolutionStage stage) const;
+  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 
-  // Separate caching.
-  bool isCached() const;
-  Optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
+  bool isCached() const { return true; }
 };
 
 /// Request to determine the set of declarations that were are overridden
@@ -210,6 +206,29 @@ private:
   // Evaluation.
   CtorInitializerKind
   evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
+// Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyInitKind initKind);
+void simple_display(llvm::raw_ostream &out, BodyInitKindAndExpr initKindAndExpr);
+
+/// Computes the kind of initializer call (self.init or super.init) performed
+/// in the body of a \c ConstructorDecl
+class BodyInitKindRequest :
+    public SimpleRequest<BodyInitKindRequest,
+                         BodyInitKindAndExpr(ConstructorDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BodyInitKindAndExpr evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
 
 public:
   // Caching.
@@ -716,10 +735,10 @@ void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
-/// Request the custom attribute which attaches a function builder to the
+/// Request the custom attribute which attaches a result builder to the
 /// given declaration.
-class AttachedFunctionBuilderRequest :
-    public SimpleRequest<AttachedFunctionBuilderRequest,
+class AttachedResultBuilderRequest :
+    public SimpleRequest<AttachedResultBuilderRequest,
                          CustomAttr *(ValueDecl *),
                          RequestFlags::Cached> {
 public:
@@ -737,10 +756,10 @@ public:
   bool isCached() const;
 };
 
-/// Request the function builder type attached to the given declaration,
+/// Request the result builder type attached to the given declaration,
 /// if any.
-class FunctionBuilderTypeRequest :
-    public SimpleRequest<FunctionBuilderTypeRequest,
+class ResultBuilderTypeRequest :
+    public SimpleRequest<ResultBuilderTypeRequest,
                          Type(ValueDecl *),
                          RequestFlags::Cached> {
 public:
@@ -797,6 +816,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given function can be an @asyncHandler, without
+/// producing any diagnostics.
+class CanBeAsyncHandlerRequest :
+    public SimpleRequest<CanBeAsyncHandlerRequest,
+                         bool(FuncDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given class is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
@@ -809,6 +847,55 @@ private:
   friend SimpleRequest;
 
   bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the static "shared" property within a global actor that provides
+/// the actor instance representing the global actor.
+///
+/// Global actors can be applied to a declaration to indicate that the
+/// declaration operations on state that is protected by the global actor.
+class GlobalActorInstanceRequest :
+    public SimpleRequest<GlobalActorInstanceRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
+
+/// Request the custom attribute which denotes the global actor for the given
+/// declaration.
+///
+/// This is the "raw" global actor attribute as written directly on the
+/// declaration, with any inference rules applied.
+class GlobalActorAttributeRequest :
+    public SimpleRequest<
+        GlobalActorAttributeRequest,
+        Optional<CustomAttrNominalPair>(Decl *),
+        RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   // Caching
@@ -1873,7 +1960,7 @@ public:
   void cacheResult(Witness value) const;
 };
 
-struct PreCheckFunctionBuilderDescriptor {
+struct PreCheckResultBuilderDescriptor {
   AnyFunctionRef Fn;
   bool SuppressDiagnostics;
 
@@ -1885,35 +1972,35 @@ private:
   BraceStmt *Body;
 
 public:
-  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
+  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
       : Fn(Fn), SuppressDiagnostics(suppressDiagnostics), Body(Fn.getBody()) {}
 
   friend llvm::hash_code
-  hash_value(const PreCheckFunctionBuilderDescriptor &owner) {
+  hash_value(const PreCheckResultBuilderDescriptor &owner) {
     return llvm::hash_combine(owner.Fn, owner.Body);
   }
 
-  friend bool operator==(const PreCheckFunctionBuilderDescriptor &lhs,
-                         const PreCheckFunctionBuilderDescriptor &rhs) {
+  friend bool operator==(const PreCheckResultBuilderDescriptor &lhs,
+                         const PreCheckResultBuilderDescriptor &rhs) {
     return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
   }
 
-  friend bool operator!=(const PreCheckFunctionBuilderDescriptor &lhs,
-                         const PreCheckFunctionBuilderDescriptor &rhs) {
+  friend bool operator!=(const PreCheckResultBuilderDescriptor &lhs,
+                         const PreCheckResultBuilderDescriptor &rhs) {
     return !(lhs == rhs);
   }
 
-  friend SourceLoc extractNearestSourceLoc(PreCheckFunctionBuilderDescriptor d) {
+  friend SourceLoc extractNearestSourceLoc(PreCheckResultBuilderDescriptor d) {
     return extractNearestSourceLoc(d.Fn);
   }
 
   friend void simple_display(llvm::raw_ostream &out,
-                             const PreCheckFunctionBuilderDescriptor &d) {
+                             const PreCheckResultBuilderDescriptor &d) {
     simple_display(out, d.Fn);
   }
 };
 
-enum class FunctionBuilderBodyPreCheck : uint8_t {
+enum class ResultBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
 
@@ -1924,10 +2011,10 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
   HasReturnStmt,
 };
 
-class PreCheckFunctionBuilderRequest
-    : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(
-                               PreCheckFunctionBuilderDescriptor),
+class PreCheckResultBuilderRequest
+    : public SimpleRequest<PreCheckResultBuilderRequest,
+                           ResultBuilderBodyPreCheck(
+                               PreCheckResultBuilderDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1936,34 +2023,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const;
+  ResultBuilderBodyPreCheck
+  evaluate(Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const;
 
 public:
   // Separate caching.
-  bool isCached() const { return true; }
-};
-
-/// Computes whether a class has a circular reference in its inheritance
-/// hierarchy.
-class HasCircularInheritanceRequest
-    : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, ClassDecl *decl) const;
-
-public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
-  // Cached.
   bool isCached() const { return true; }
 };
 
@@ -2107,6 +2171,25 @@ private:
 
   // Evaluation.
   ValueDecl * evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class SpecializeAttrTargetDeclRequest
+    : public SimpleRequest<SpecializeAttrTargetDeclRequest,
+                           ValueDecl *(const ValueDecl *, SpecializeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *vd,
+                      SpecializeAttr *attr) const;
 
 public:
   // Caching.
@@ -2474,30 +2557,11 @@ public:
   }
 };
 
-/// A module which has been implicitly imported.
-struct ImplicitImport {
-  using ImportOptions = SourceFile::ImportOptions;
-
-  ModuleDecl *Module;
-  ImportOptions Options;
-
-  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
-      : Module(module), Options(opts) {}
-
-  friend bool operator==(const ImplicitImport &lhs,
-                         const ImplicitImport &rhs) {
-    return lhs.Module == rhs.Module &&
-           lhs.Options.toRaw() == rhs.Options.toRaw();
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
-
 /// Computes the loaded modules that should be implicitly imported by each file
 /// of a given module.
 class ModuleImplicitImportsRequest
     : public SimpleRequest<ModuleImplicitImportsRequest,
-                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           ImplicitImportList(ModuleDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2505,8 +2569,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<ImplicitImport>
-  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+  ImplicitImportList evaluate(Evaluator &evaluator, ModuleDecl *module) const;
 
 public:
   // Cached.
@@ -2624,9 +2687,13 @@ enum class CustomAttrTypeKind {
   /// any contextual type parameters.
   NonGeneric,
 
-  /// Property delegates have some funky rules, like allowing
+  /// Property wrappers have some funky rules, like allowing
   /// unbound generic types.
-  PropertyDelegate,
+  PropertyWrapper,
+
+  /// Global actors are represented as custom type attributes. They don't
+  /// have any particularly interesting semantics.
+  GlobalActor,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
@@ -2692,7 +2759,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
-void simple_display(llvm::raw_ostream &out, FunctionBuilderBodyPreCheck pck);
+void simple_display(llvm::raw_ostream &out, ResultBuilderBodyPreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

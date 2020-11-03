@@ -327,15 +327,12 @@ void ValueLifetimeAnalysis::dump() const {
 
 void swift::endLifetimeAtFrontier(
     SILValue valueOrStackLoc, const ValueLifetimeAnalysis::Frontier &frontier,
-    SILBuilderContext &builderCtxt) {
+    SILBuilderContext &builderCtxt, InstModCallbacks callbacks) {
   for (SILInstruction *endPoint : frontier) {
     SILBuilderWithScope builder(endPoint, builderCtxt);
     SILLocation loc = RegularLocation(endPoint->getLoc().getSourceLoc());
-    if (valueOrStackLoc->getType().isObject()) {
-      builder.emitDestroyValueOperation(loc, valueOrStackLoc);
-    } else {
-      assert(isa<AllocStackInst>(valueOrStackLoc));
-      builder.createDestroyAddr(loc, valueOrStackLoc);
+    emitDestroyOperation(builder, loc, valueOrStackLoc, callbacks);
+    if (isa<AllocStackInst>(valueOrStackLoc)) {
       builder.createDeallocStack(loc, valueOrStackLoc);
     }
   }

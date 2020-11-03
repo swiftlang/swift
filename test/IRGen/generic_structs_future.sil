@@ -247,9 +247,6 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s22generic_structs_future26GenericLayoutWithAssocTypeVMr"(
 
-// CHECK: [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, %swift.type* %T)
-// CHECK: [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-
 // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
 // CHECK: [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
 // CHECK: [[T1:%.*]] = bitcast i8* [[T0]] to i8**

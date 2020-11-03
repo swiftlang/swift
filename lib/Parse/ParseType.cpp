@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -840,7 +841,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
   SourceLoc opaqueLoc;
-  if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
+  if (Tok.isContextualKeyword("some")) {
     // Treat some as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     opaqueLoc = consumeToken();
@@ -904,7 +905,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     }
     
     // Diagnose invalid `some` after an ampersand.
-    if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
+    if (Tok.isContextualKeyword("some")) {
       auto badLoc = consumeToken();
 
       diagnose(badLoc, diag::opaque_mid_composition)
@@ -1093,7 +1094,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // If the label is "some", this could end up being an opaque type
     // description if there's `some <identifier>` without a following colon,
     // so we may need to backtrack as well.
-    if (Tok.getText().equals("some")) {
+    if (Tok.isContextualKeyword("some")) {
       Backtracking.emplace(*this);
     }
 
@@ -1194,8 +1195,10 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
-  bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
-                                  tok::kw_rethrows);
+  bool isFunctionType =
+      Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
+      (shouldParseExperimentalConcurrency() &&
+       Tok.isContextualKeyword("async"));
 
   // If there were any labels, figure out which labels should go into the type
   // representation.
@@ -1527,6 +1530,9 @@ bool Parser::canParseGenericArguments() {
 bool Parser::canParseType() {
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
+
+  if (Tok.isContextualKeyword("some"))
+    consumeToken();
 
   switch (Tok.getKind()) {
   case tok::kw_Self:

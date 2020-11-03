@@ -59,10 +59,13 @@ namespace swift {
 class DependencyTracker;
 class DiagnosticEngine;
 class FrontendOptions;
+class ModuleDecl;
 class SourceFile;
 
 /// Use a new namespace to help keep the experimental code from clashing.
 namespace fine_grained_dependencies {
+
+class SourceFileDepGraph;
 
 using StringVec = std::vector<std::string>;
 
@@ -343,11 +346,15 @@ private:
 // MARK: Start of fine-grained-dependency-specific code
 //==============================================================================
 
-/// The entry point into this system from the frontend:
-/// Write out the .swiftdeps file for a frontend compilation of a primary file.
-bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
-                               const DependencyTracker &depTracker,
-                               StringRef outputPath, bool alsoEmitDotFile);
+/// Uses the provided module or source file to construct a dependency graph,
+/// which is provided back to the caller in the continuation callback.
+///
+/// \Note The returned graph should not be escaped from the callback.
+bool withReferenceDependencies(
+    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    const DependencyTracker &depTracker, StringRef outputPath,
+    bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
+
 //==============================================================================
 // MARK: Enums
 //==============================================================================
@@ -844,6 +851,8 @@ public:
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
   Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
+  Optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
+      llvm::MemoryBuffer &);
 
   void verifySame(const SourceFileDepGraph &other) const;
 

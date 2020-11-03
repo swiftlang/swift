@@ -680,7 +680,8 @@ struct WithTuples {
 class TestResilientDI {
   @MyPublished var data: Int? = nil
 
-	// CHECK: assign_by_wrapper {{%.*}} : $Optional<Int> to {{%.*}} : $*MyPublished<Optional<Int>>, init {{%.*}} : $@callee_guaranteed (Optional<Int>) -> @out MyPublished<Optional<Int>>, set {{%.*}} : $@callee_guaranteed (Optional<Int>) -> ()
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers15TestResilientDIC11doSomethingyyF : $@convention(method) (@guaranteed TestResilientDI) -> () {
+  // CHECK: class_method %0 : $TestResilientDI, #TestResilientDI.data!setter : (TestResilientDI) -> (Int?) -> (), $@convention(method) (Optional<Int>, @guaranteed TestResilientDI) -> ()
 
   func doSomething() {
     self.data = Int()

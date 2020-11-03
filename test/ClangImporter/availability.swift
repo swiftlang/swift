@@ -137,6 +137,7 @@ func test_swift_unavailable() {
   NSSwiftNewUnavailableFunctionPremium() // expected-error {{'NSSwiftNewUnavailableFunctionPremium()' is unavailable in Swift: You didn't want to use it anyway.}}
 
   let x: NSSwiftUnavailableStruct? = nil // expected-error {{'NSSwiftUnavailableStruct' is unavailable in Swift}}
+  _ = x
 }
 
 func test_CFReleaseRetainAutorelease(_ x: CFTypeRef, color: CGColor) {
@@ -152,9 +153,9 @@ func testRedeclarations() {
   unavail2() // expected-error {{is unavailable: middle}}
   unavail3() // expected-error {{is unavailable: last}}
 
-  UnavailClass1.self // expected-error {{is unavailable: first}}
-  UnavailClass2.self // expected-error {{is unavailable: middle}}
-  UnavailClass3.self // expected-error {{is unavailable: last}}
+  _ = UnavailClass1.self // expected-error {{is unavailable: first}}
+  _ = UnavailClass2.self // expected-error {{is unavailable: middle}}
+  _ = UnavailClass3.self // expected-error {{is unavailable: last}}
 
   let _: UnavailStruct1 // expected-error {{is unavailable: first}}
   let _: UnavailStruct2 // expected-error {{is unavailable: first}}
@@ -186,7 +187,9 @@ func test_DistributedObjects(_ o: NSObject,
                              i: NSPortCoder) {          // expected-error {{'NSPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 
   let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable in Swift: Use NSXPCConnection instead}}
+  _ = ca
   let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable in Swift: Use NSXPCConnection instead}}
+  _ = cc
   _ = o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 

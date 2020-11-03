@@ -883,7 +883,7 @@ protocol ProtocolAvailableOn10_51 {
 }
 
 @available(OSX, introduced: 10.9)
-protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 {
+protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_51 : ProtocolAvailableOn10_51 { // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
 }
 
 @available(OSX, introduced: 10.51)
@@ -926,6 +926,14 @@ func GenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 { // expect
 
 func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
+}
+
+struct GenericType<T> { // expected-note {{add @available attribute to enclosing generic struct}}
+  func nonGenericWhereClause() where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 {{add @available attribute to enclosing instance method}}
+
+  struct NestedType where T : ProtocolAvailableOn10_51 {} // expected-error {{'ProtocolAvailableOn10_51' is only available in macOS 10.51 or newer}}
+  // expected-note@-1 2{{add @available attribute to enclosing struct}}
 }
 
 // Extensions

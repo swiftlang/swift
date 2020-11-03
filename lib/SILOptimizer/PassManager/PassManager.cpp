@@ -393,12 +393,26 @@ static void logS4TFPassEvent(long long Delta, llvm::sys::TimePoint<> StartTime,
   llvm::dbgs() << "S4TF," << Delta << "," << strTime << "," << passName << ","
                << (isFunctionPass ? "F" : "M") << "," << funcName << "\n";
 }
+// SWIFT_ENABLE_TENSORFLOW END
+
+bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
+  return isMandatory || sft->getPassKind() ==
+             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
+         sft->getPassKind() == PassKind::OwnershipModelEliminator ||
+         sft->getPassKind() ==
+             PassKind::NonStdlibNonTransparentFunctionOwnershipModelEliminator;
+}
 
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   auto *SFT = cast<SILFunctionTransform>(Transformations[TransIdx]);
+
+  if (!F->shouldOptimize() && !isMandatoryFunctionPass(SFT)) {
+    return;
+  }
+
   SFT->injectPassManager(this);
   SFT->injectFunction(F);
 
@@ -406,9 +420,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   DebugPrintEnabler DebugPrint(NumPassesRun);
 
   // If nothing changed since the last run of this pass, we can skip this
-  // pass.
+  // pass if it is not mandatory
   CompletedPasses &completedPasses = CompletedPassesMap[F];
-  if (completedPasses.test((size_t)SFT->getPassKind()) &&
+  if (!isMandatoryFunctionPass(SFT) &&
+      completedPasses.test((size_t)SFT->getPassKind()) &&
       !SILDisableSkippingPasses) {
     if (SILPrintPassName)
       dumpPassInfo("(Skip)", TransIdx, F);
@@ -518,9 +533,11 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
     return;
 
   BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
+  // SWIFT_ENABLE_TENSORFLOW
   BottomUpFunctionOrder BottomUpOrder(BCA);
   BottomUpOrder.computeBottomUpOrder(Mod);
   auto BottomUpFunctions = BottomUpOrder.getBottomUpOrder();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   assert(FunctionWorklist.empty() && "Expected empty function worklist!");
 
@@ -531,7 +548,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
 
     // Only include functions that are definitions, and which have not
     // been intentionally excluded from optimization.
-    if (F.isDefinition() && (isMandatory || F.shouldOptimize()))
+    if (F.isDefinition())
       FunctionWorklist.push_back(*I);
   }
 
@@ -574,6 +591,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
     }
     clearRestartPipeline();
 
+    // SWIFT_ENABLE_TENSORFLOW
     if (TailIdx == (FunctionWorklist.size() - 1))  {
       // No new functions to process
       continue;
@@ -614,6 +632,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
       }
       FunctionWorklist.push_back((*Entry).second);
     }
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 }
 

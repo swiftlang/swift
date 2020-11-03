@@ -878,6 +878,13 @@ private:
       HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) { }
 
 public:
+  bool shouldDiagnoseErrorOnTry() const {
+    return DiagnoseErrorOnTry;
+  }
+  void setDiagnoseErrorOnTry(bool b) {
+    DiagnoseErrorOnTry = b;
+  }
+
   /// Whether this is a function that rethrows.
   bool isRethrows() const {
     if (!HandlesErrors)
@@ -1375,6 +1382,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     DeclContext *OldRethrowsDC;
     ContextFlags OldFlags;
     ThrowingKind OldMaxThrowingKind;
+
   public:
     ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
@@ -1468,7 +1476,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
 
     ~ContextScope() {
+      // The "DiagnoseErrorOnTry" flag is a bit of mutable state
+      // in the Context itself, used to postpone diagnostic emission
+      // to a parent "try" expression. If something was diagnosed
+      // during this ContextScope, the flag may have been set, and
+      // we need to preseve its value when restoring the old Context.
+      bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
       Self.CurContext = OldContext;
+      Self.CurContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
+
       Self.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;

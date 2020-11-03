@@ -36,7 +36,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
-  mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
+  mutable Optional<ArrayRef<ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ASTSourceDescriptor ASTSourceDescriptor;
 
@@ -92,11 +92,11 @@ public:
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+  getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
   virtual void getImportedModulesForLookup(
-      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const override;
+      SmallVectorImpl<ImportedModule> &imports) const override;
 
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;

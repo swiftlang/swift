@@ -115,6 +115,9 @@ namespace swift {
     /// when using RequireExplicitAvailability.
     std::string RequireExplicitAvailabilityTarget;
 
+    // Availability macros definitions to be expanded at parsing.
+    SmallVector<StringRef, 4> AvailabilityMacros;
+
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
@@ -336,20 +339,9 @@ namespace swift {
     /// of active clauses aren't hoisted into the enclosing scope.
     bool DisablePoundIfEvaluation = false;
 
-    /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
-    /// the interface hash, hash them into per-iterable-decl-context
-    /// fingerprints. Fine-grained dependency types won't dirty every provides
-    /// in a file when the user adds a member to, e.g., a struct.
-    bool EnableTypeFingerprints = true;
-
     /// When using fine-grained dependencies, emit dot files for every swiftdeps
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;
-
-    /// To mimic existing system, set to false.
-    /// To experiment with including file-private and private dependency info,
-    /// set to true.
-    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
@@ -554,10 +546,6 @@ namespace swift {
     
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
-
-    /// Enable constraint solver support for experimental
-    ///        operator protocol designator feature.
-    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// Enable experimental support for one-way constraints for the
     /// parameters of closures.

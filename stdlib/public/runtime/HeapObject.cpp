@@ -229,8 +229,10 @@ public:
     return reinterpret_cast<intptr_t>(Data.BoxedType);
   }
 
-  int compareWithKey(const Metadata *type) const {
-    return comparePointers(type, Data.BoxedType);
+  bool matchesKey(const Metadata *type) const { return type == Data.BoxedType; }
+
+  friend llvm::hash_code hash_value(const BoxCacheEntry &value) {
+    return llvm::hash_value(value.Data.BoxedType);
   }
 
   static size_t getExtraAllocationSize(const Metadata *key) {

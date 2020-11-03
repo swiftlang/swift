@@ -30,10 +30,15 @@ using namespace swift;
 /// Returns whether the type represented by the given ClassDecl inherits from a
 /// type which conforms to the given protocol.
 static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
-  if (!target || !target->getSuperclass() || target->hasCircularInheritance()) {
+  if (!target) {
     return false;
   }
-  return !target->getSuperclassDecl()
+
+  auto superclass = target->getSuperclassDecl();
+  if (!superclass)
+    return false;
+
+  return !superclass
               ->getModuleContext()
               ->lookupConformance(target->getSuperclass(),
                                   target->getASTContext().getProtocol(kpk))
@@ -229,7 +234,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  MutableArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
@@ -794,8 +799,10 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
               diag::decodable_property_init_or_codingkeys_explicit,
               varDecl->getName());
         }
-        varDecl->diagnose(diag::decodable_make_property_mutable)
-            .fixItReplace(varDecl->getAttributeInsertionLoc(true), "var");
+        if (auto *PBD = varDecl->getParentPatternBinding()) {
+          varDecl->diagnose(diag::decodable_make_property_mutable)
+              .fixItReplace(PBD->getLoc(), "var");
+        }
 
         continue;
       }

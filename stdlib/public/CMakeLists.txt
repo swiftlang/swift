@@ -15,7 +15,11 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
-list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
+list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
+
+if(SWIFT_STDLIB_SIL_DEBUGGING)
+  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-gsil")
+endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
@@ -100,7 +104,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(SwiftRemoteMirror)
 endif()
 
-if(SWIFT_BUILD_SDK_OVERLAY)
+if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
   add_subdirectory(Platform)
 endif()
 

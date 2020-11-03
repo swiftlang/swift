@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_TYPELOWERING_H
 #define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -147,16 +147,23 @@ enum IsResilient_t : bool {
   IsResilient = true
 };
 
+/// Does this type contain an opaque result type that affects type lowering?
+enum IsTypeExpansionSensitive_t : bool {
+  IsNotTypeExpansionSensitive = false,
+  IsTypeExpansionSensitive = true
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
   class RecursiveProperties {
     // These are chosen so that bitwise-or merges the flags properly.
     enum : unsigned {
-      NonTrivialFlag     = 1 << 0,
-      NonFixedABIFlag    = 1 << 1,
-      AddressOnlyFlag    = 1 << 2,
-      ResilientFlag      = 1 << 3,
+      NonTrivialFlag             = 1 << 0,
+      NonFixedABIFlag            = 1 << 1,
+      AddressOnlyFlag            = 1 << 2,
+      ResilientFlag              = 1 << 3,
+      TypeExpansionSensitiveFlag = 1 << 4,
     };
 
     uint8_t Flags;
@@ -165,15 +172,17 @@ public:
     /// a trivial, loadable, fixed-layout type.
     constexpr RecursiveProperties() : Flags(0) {}
 
-    constexpr RecursiveProperties(IsTrivial_t isTrivial,
-                                  IsFixedABI_t isFixedABI,
-                                  IsAddressOnly_t isAddressOnly,
-                                  IsResilient_t isResilient)
-      : Flags((isTrivial ? 0U : NonTrivialFlag) | 
-              (isFixedABI ? 0U : NonFixedABIFlag) |
-              (isAddressOnly ? AddressOnlyFlag : 0U) |
-              (isResilient ? ResilientFlag : 0U)) {}
-    
+    constexpr RecursiveProperties(
+        IsTrivial_t isTrivial, IsFixedABI_t isFixedABI,
+        IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
+        IsTypeExpansionSensitive_t isTypeExpansionSensitive =
+            IsNotTypeExpansionSensitive)
+        : Flags((isTrivial ? 0U : NonTrivialFlag) |
+                (isFixedABI ? 0U : NonFixedABIFlag) |
+                (isAddressOnly ? AddressOnlyFlag : 0U) |
+                (isResilient ? ResilientFlag : 0U) |
+                (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U)) {}
+
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
     }
@@ -183,7 +192,7 @@ public:
     }
 
     static constexpr RecursiveProperties forReference() {
-      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient };
+      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
     }
 
     static constexpr RecursiveProperties forOpaque() {
@@ -193,6 +202,7 @@ public:
     static constexpr RecursiveProperties forResilient() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
     }
+
 
     void addSubobject(RecursiveProperties other) {
       Flags |= other.Flags;
@@ -210,10 +220,19 @@ public:
     IsResilient_t isResilient() const {
       return IsResilient_t((Flags & ResilientFlag) != 0);
     }
+    IsTypeExpansionSensitive_t isTypeExpansionSensitive() const {
+      return IsTypeExpansionSensitive_t(
+          (Flags & TypeExpansionSensitiveFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
     void setAddressOnly() { Flags |= AddressOnlyFlag; }
+    void setTypeExpansionSensitive(
+        IsTypeExpansionSensitive_t isTypeExpansionSensitive) {
+      Flags = (Flags & ~TypeExpansionSensitiveFlag) |
+              (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
+    }
   };
 
 private:
@@ -303,6 +322,12 @@ public:
 
   bool isResilient() const {
     return Properties.isResilient();
+  }
+
+  /// Does this type contain an opaque result type that could influence how the
+  /// type is lowered if we could look through to the underlying type.
+  bool isTypeExpansionSensitive() const {
+    return Properties.isTypeExpansionSensitive();
   }
 
   ResilienceExpansion getResilienceExpansion() const {
@@ -705,8 +730,6 @@ class TypeConverter {
 
   llvm::DenseMap<SILDeclRef, CaptureInfo> LoweredCaptures;
 
-  llvm::DenseMap<CanType, bool> opaqueArchetypeFields;
-
   /// Cache of loadable SILType to number of (estimated) fields
   ///
   /// Second element is a ResilienceExpansion.
@@ -719,17 +742,15 @@ class TypeConverter {
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
-  const TypeLowering &
-  getTypeLoweringForLoweredType(AbstractionPattern origType,
-                                CanType loweredType,
-                                TypeExpansionContext forExpansion,
-                                bool origHadOpaqueTypeArchetype);
+  const TypeLowering &getTypeLoweringForLoweredType(
+      AbstractionPattern origType, CanType loweredType,
+      TypeExpansionContext forExpansion,
+      IsTypeExpansionSensitive_t isTypeExpansionSensitive);
 
-  const TypeLowering *
-  getTypeLoweringForExpansion(TypeKey key,
-                              TypeExpansionContext forExpansion,
-                              const TypeLowering *lowering,
-                              bool origHadOpaqueTypeArchetype);
+  const TypeLowering *getTypeLoweringForExpansion(
+      TypeKey key, TypeExpansionContext forExpansion,
+      const TypeLowering *minimalExpansionLowering,
+      IsTypeExpansionSensitive_t isOrigTypeExpansionSensitive);
 
 public:
   ModuleDecl &M;
@@ -792,8 +813,7 @@ public:
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
-    return ProtocolDescriptorFlags::needsWitnessTable
-             (getProtocolDispatchStrategy(P));
+    return swift::protocolRequiresWitnessTable(getProtocolDispatchStrategy(P));
   }
   
   /// True if a type is passed indirectly at +0 when used as the "self"
@@ -884,8 +904,6 @@ public:
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
   CanType getLoweredTypeOfGlobal(VarDecl *var);
-
-  bool hasOpaqueArchetypeOrPropertiesOrCases(CanType ty);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.

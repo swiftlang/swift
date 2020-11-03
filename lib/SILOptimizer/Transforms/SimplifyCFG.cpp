@@ -802,10 +802,12 @@ static int getThreadingCost(SILInstruction *I) {
   return 0;
 }
 
+static int maxBranchRecursionDepth = 6;
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
-static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
+static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
+                                   int recursionDepth = 0) {
   SILBasicBlock *BB = BBArg->getParent();
   int BudgetForBranch = 100;
 
@@ -833,6 +835,9 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
     }
 
     if (auto *BI = dyn_cast<BranchInst>(User)) {
+      if (recursionDepth >= maxBranchRecursionDepth) {
+        return false;
+      }
       if (BudgetForBranch > Budget) {
         BudgetForBranch = Budget;
         for (SILInstruction &I : *BB) {
@@ -844,7 +849,8 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
       if (BudgetForBranch > 0) {
         SILBasicBlock *DestBB = BI->getDestBB();
         unsigned OpIdx = UI->getOperandNumber();
-        if (couldSimplifyEnumUsers(DestBB->getArgument(OpIdx), BudgetForBranch))
+        if (couldSimplifyEnumUsers(DestBB->getArgument(OpIdx), BudgetForBranch,
+                                   recursionDepth + 1))
           return true;
       }
     }
@@ -916,16 +922,57 @@ static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
   return IsReleaseOfDest;
 }
 
+/// Returns true if any instruction in \p block may write memory.
+static bool blockMayWriteMemory(SILBasicBlock *block) {
+  for (auto instAndIdx : llvm::enumerate(*block)) {
+    if (instAndIdx.value().mayWriteToMemory())
+      return true;
+    // Only look at the first 20 instructions to avoid compile time problems for
+    // corner cases of very large blocks without memory writes.
+    // 20 instructions is more than enough.
+    if (instAndIdx.index() > 50)
+      return true;
+  }
+  return false;
+}
+
+// Returns true if \p block contains an injected an enum case into \p enumAddr
+// which is valid at the end of the block.
+static bool hasInjectedEnumAtEndOfBlock(SILBasicBlock *block, SILValue enumAddr) {
+  for (auto instAndIdx : llvm::enumerate(llvm::reverse(*block))) {
+    SILInstruction &inst = instAndIdx.value();
+    if (auto *injectInst = dyn_cast<InjectEnumAddrInst>(&inst)) {
+      return injectInst->getOperand() == enumAddr;
+    }
+    if (inst.mayWriteToMemory())
+      return false;
+    // Only look at the first 20 instructions to avoid compile time problems for
+    // corner cases of very large blocks without memory writes.
+    // 20 instructions is more than enough.
+    if (instAndIdx.index() > 50)
+      return false;
+  }
+  return false;
+}
+
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
+  TermInst *destTerminator = DestBB->getTerminator();
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
-  if (DestBB->getTerminator()->isFunctionExiting())
+  if (destTerminator->isFunctionExiting())
     return false;
 
+  // Jump threading only makes sense if there is an argument on the branch
+  // (which is reacted on in the DestBB), or if this goes through a memory
+  // location (switch_enum_addr is the only adress-instruction which we
+  // currently handle).
+  if (BI->getArgs().empty() && !isa<SwitchEnumAddrInst>(destTerminator))
+    return false;
+      
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
   // leave that to LLVM).  However, doing limited code duplication can lead to
@@ -956,11 +1003,29 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     }
   }
 
-  if (ThreadingBudget == 0 && isa<CondBranchInst>(DestBB->getTerminator())) {
-    for (auto V : BI->getArgs()) {
-      if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+  if (ThreadingBudget == 0) {
+    if (isa<CondBranchInst>(destTerminator)) {
+      for (auto V : BI->getArgs()) {
+        if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+          ThreadingBudget = 4;
+          break;
+        }
+      }
+    } else if (auto *SEA = dyn_cast<SwitchEnumAddrInst>(destTerminator)) {
+      // If the branch-block injects a certain enum case and the destination
+      // switches on that enum, it's worth jump threading. E.g.
+      //
+      //   inject_enum_addr %enum : $*Optional<T>, #Optional.some
+      //   ... // no memory writes here
+      //   br DestBB
+      // DestBB:
+      //   ... // no memory writes here
+      //   switch_enum_addr %enum : $*Optional<T>, case #Optional.some ...
+      //
+      SILValue enumAddr = SEA->getOperand();
+      if (!blockMayWriteMemory(DestBB) &&
+          hasInjectedEnumAtEndOfBlock(SrcBB, enumAddr)) {
         ThreadingBudget = 4;
-        break;
       }
     }
   }
@@ -976,7 +1041,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // control flow. Still, we make an exception for switch_enum.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
   if (DestIsLoopHeader) {
-    if (!isa<SwitchEnumInst>(DestBB->getTerminator()))
+    if (!isa<SwitchEnumInst>(destTerminator))
       return false;
   }
 
@@ -1189,21 +1254,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     LLVM_DEBUG(llvm::dbgs() << "merge bb" << BB->getDebugID() << " with bb"
                             << DestBB->getDebugID() << '\n');
 
-    // If there are any BB arguments in the destination, replace them with the
-    // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-      if (DestBB->getArgument(i) != BI->getArg(i)) {
-        SILValue Val = BI->getArg(i);
-        DestBB->getArgument(i)->replaceAllUsesWith(Val);
-        if (!isVeryLargeFunction) {
-          if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
-            // Replacing operands may trigger constant folding which then could
-            // trigger other simplify-CFG optimizations.
-            ConstFolder.addToWorklist(I);
-            ConstFolder.processWorkList();
-          }
-        }
-      } else {
+      if (DestBB->getArgument(i) == BI->getArg(i)) {
         // We must be processing an unreachable part of the cfg with a cycle.
         // bb1(arg1): // preds: bb3
         //   br bb2
@@ -1214,6 +1266,23 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
         // bb3: // preds: bb2
         //   br bb1(arg1)
         assert(!isReachable(BB) && "Should only occur in unreachable block");
+        return Simplified;
+      }
+    }
+    
+    // If there are any BB arguments in the destination, replace them with the
+    // branch operands, since they must dominate the dest block.
+    for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+      assert(DestBB->getArgument(i) != BI->getArg(i));
+      SILValue Val = BI->getArg(i);
+      DestBB->getArgument(i)->replaceAllUsesWith(Val);
+      if (!isVeryLargeFunction) {
+        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+          // Replacing operands may trigger constant folding which then could
+          // trigger other simplify-CFG optimizations.
+          ConstFolder.addToWorklist(I);
+          ConstFolder.processWorkList();
+        }
       }
     }
 
@@ -1286,8 +1355,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
-  if (!isVeryLargeFunction && !BI->getArgs().empty() &&
-      tryJumpThreading(BI))
+  if (!isVeryLargeFunction && tryJumpThreading(BI))
     return true;
 
   return Simplified;
@@ -1503,17 +1571,29 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  if (TrueArgs == FalseArgs && (TrueSide == FalseTrampolineDest ||
-                                FalseSide == TrueTrampolineDest)) {
-    LLVM_DEBUG(llvm::dbgs() << "replace cond_br with same dests with br: "
-                            << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
-                      TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
+  auto condBrToBr = [&](OperandValueArrayRef branchArgs,
+                        SILBasicBlock *newDest) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "replace cond_br with same dests with br: " << *BI);
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
-    addToWorklist(TrueSide);
     ++NumConstantFolded;
-    return true;
+  };
+  if (TrueArgs == FalseArgs) {
+    if (TrueTrampolineDest) {
+      if (TrueTrampolineDest == FalseSide
+          || TrueTrampolineDest == FalseTrampolineDest) {
+        condBrToBr(TrueArgs, TrueTrampolineDest);
+        removeIfDead(TrueSide);
+        removeIfDead(FalseSide);
+        return true;
+      }
+    } else if (FalseTrampolineDest == TrueSide) {
+      condBrToBr(TrueArgs, FalseTrampolineDest);
+      removeIfDead(FalseSide);
+      return true;
+    }
   }
 
   auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);
@@ -2630,6 +2710,9 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;
+    case TermKind::AwaitAsyncContinuationInst:
+      // TODO(async): Simplify AwaitAsyncContinuationInst
+      break;
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);
@@ -3144,7 +3227,7 @@ static SILValue getInsertedValue(SILInstruction *Aggregate,
   }
   auto *Tuple = cast<TupleInst>(Aggregate);
   auto *TEI = cast<TupleExtractInst>(Extract);
-  return Tuple->getElement(TEI->getFieldNo());
+  return Tuple->getElement(TEI->getFieldIndex());
 }
 
 /// Find a parent SwitchEnumInst of the block \p BB. The block \p BB is a

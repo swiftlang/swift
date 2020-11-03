@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
@@ -259,12 +260,25 @@ private:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
+  /// A trie of integer indices that gives pointer identity to a path of
+  /// projections, shared between all functions in the module.
+  std::unique_ptr<IndexTrieNode> indexTrieRoot;
+
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
+
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in non transparent functions.
+  /// This gets set in NonTransparent OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in transparent functions.
+  /// This gets set in OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForAllFuncOME;
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
@@ -302,6 +316,19 @@ public:
   void removeDeserializationNotificationHandler(
       DeserializationNotificationHandler *handler) {
     deserializationNotificationHandlers.erase(handler);
+  }
+
+  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  }
+  bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    return regDeserializationNotificationHandlerForAllFuncOME;
+  }
+  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
+  }
+  void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
   /// Add a delete notification handler \p Handler to the module context.
@@ -635,6 +662,8 @@ public:
   void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
     PGOReader = std::move(IPR);
   }
+
+  IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
 
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?

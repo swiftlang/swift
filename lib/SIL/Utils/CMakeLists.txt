@@ -3,6 +3,7 @@ target_sources(swiftSIL PRIVATE
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
+  GenericSpecializationMangler.cpp
   InstructionUtils.cpp
   LoopInfo.cpp
   MemAccessUtils.cpp

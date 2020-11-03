@@ -41,6 +41,6 @@ public class FooOverlayClassDerived : FooOverlayClassBase {
 
 // PASS_NO_INTERNAL-NOT: overlay_func_internal
 
-// PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
 // PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
 // PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>FooHelper</ref></decl>

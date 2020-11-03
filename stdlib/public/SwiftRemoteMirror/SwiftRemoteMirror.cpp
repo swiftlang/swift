@@ -23,7 +23,7 @@ unsigned long long swift_reflection_classIsSwiftMask = 2;
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
-#include "swift/Runtime/Unreachable.h"
+#include "swift/Basic/Unreachable.h"
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
@@ -406,7 +406,7 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
   }
 
-  swift_runtime_unreachable("Unhandled TypeInfoKind in switch");
+  swift_unreachable("Unhandled TypeInfoKind in switch");
 }
 
 static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {

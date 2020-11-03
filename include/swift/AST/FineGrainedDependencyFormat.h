@@ -48,6 +48,7 @@ using NodeKindField = BCFixed<3>;
 using DeclAspectField = BCFixed<1>;
 
 const unsigned RECORD_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID;
+const unsigned INCREMENTAL_INFORMATION_BLOCK_ID = 196;
 
 /// The swiftdeps file format consists of a METADATA record, followed by zero or more
 /// IDENTIFIER_NODE records.
@@ -113,9 +114,15 @@ namespace record_block {
 }
 
 /// Tries to read the dependency graph from the given buffer.
-/// Returns true if there was an error.
+/// Returns \c true if there was an error.
 bool readFineGrainedDependencyGraph(llvm::MemoryBuffer &buffer,
                                     SourceFileDepGraph &g);
+
+/// Tries to read the dependency graph from the given buffer, assuming that it
+/// is in the format of a swiftmodule file.
+/// Returns \c true if there was an error.
+bool readFineGrainedDependencyGraphFromSwiftModule(llvm::MemoryBuffer &buffer,
+                                                   SourceFileDepGraph &g);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
@@ -124,8 +131,36 @@ bool readFineGrainedDependencyGraph(llvm::StringRef path,
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
-bool writeFineGrainedDependencyGraph(DiagnosticEngine &diags, llvm::StringRef path,
-                                     const SourceFileDepGraph &g);
+bool writeFineGrainedDependencyGraphToPath(DiagnosticEngine &diags,
+                                           llvm::StringRef path,
+                                           const SourceFileDepGraph &g);
+
+/// Enumerates the supported set of purposes for writing out or reading in
+/// swift dependency information into a file. These can be used to influence
+/// the structure of the resulting data that is produced by the serialization
+/// machinery defined here.
+enum class Purpose : bool {
+  /// Write out fine grained dependency metadata suitable for embedding in
+  /// \c .swiftmodule file.
+  ///
+  /// The resulting metadata does not contain the usual block descriptor header
+  /// nor does it contain a leading magic signature, which would otherwise
+  /// disrupt clients and tools that do not expect them to be present such as
+  /// llvm-bcanalyzer.
+  ForSwiftModule = false,
+  /// Write out fine grained dependency metadata suitable for a standalone
+  /// \c .swiftdeps file.
+  ///
+  /// The resulting metadata will contain a leading magic signature and block
+  /// descriptor header.
+  ForSwiftDeps = true,
+};
+
+/// Tries to write out the given dependency graph with the given
+/// bitstream writer.
+void writeFineGrainedDependencyGraph(llvm::BitstreamWriter &Out,
+                                     const SourceFileDepGraph &g,
+                                     Purpose purpose);
 
 } // namespace fine_grained_dependencies
 } // namespace swift

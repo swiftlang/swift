@@ -83,7 +83,7 @@ public:
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
-  ~IRGenFunction();
+  virtual ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
@@ -100,15 +100,18 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
-  /// Return the error result slot, given an error type.  There's
-  /// always only one error type.
-  Address getErrorResultSlot(SILType errorType);
+  /// Return the error result slot to be passed to the callee, given an error
+  /// type.  There's always only one error type.
+  ///
+  /// For async functions, this is different from the caller result slot because
+  /// that is a gep into the %swift.context.
+  Address getCalleeErrorResultSlot(SILType errorType);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
 
-  /// Set the error result slot.
-  void setErrorResultSlot(llvm::Value *address);
+  /// Set the error result slot for the current function.
+  void setCallerErrorResultSlot(llvm::Value *address);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -124,15 +127,21 @@ public:
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
   }
-  
+
+  virtual llvm::Value *getAsyncTask();
+  virtual llvm::Value *getAsyncExecutor();
+  virtual llvm::Value *getAsyncContext();
+
 private:
   void emitPrologue();
   void emitEpilogue();
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  llvm::Value *ErrorResultSlot = nullptr;
+  llvm::Value *CalleeErrorResultSlot = nullptr;
+  llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
+  bool IsAsync = false;
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -145,6 +154,9 @@ public:
   bool optimizeForSize() const {
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
+
+  bool isAsync() const { return IsAsync; }
+  void setAsync(bool async = true) { IsAsync = async; }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");
@@ -635,8 +647,8 @@ public:
     ~ConditionalDominanceScope();
   };
 
-  /// The kind of value LocalSelf is.
-  enum LocalSelfKind {
+  /// The kind of value DynamicSelf is.
+  enum DynamicSelfKind {
     /// An object reference.
     ObjectReference,
     /// A Swift metatype.
@@ -645,9 +657,9 @@ public:
     ObjCMetatype,
   };
 
-  llvm::Value *getLocalSelfMetadata();
-  void setLocalSelfMetadata(CanType selfBaseTy, bool selfIsExact,
-                            llvm::Value *value, LocalSelfKind kind);
+  llvm::Value *getDynamicSelfMetadata();
+  void setDynamicSelfMetadata(CanType selfBaseTy, bool selfIsExact,
+                              llvm::Value *value, DynamicSelfKind kind);
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
@@ -661,12 +673,12 @@ private:
   DominancePoint ActiveDominancePoint = DominancePoint::universal();
   ConditionalDominanceScope *ConditionalDominance = nullptr;
   
-  /// The value that satisfies metadata lookups for dynamic Self.
-  llvm::Value *LocalSelf = nullptr;
+  /// The value that satisfies metadata lookups for DynamicSelfType.
+  llvm::Value *SelfValue = nullptr;
   /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
-  CanType LocalSelfType;
-  bool LocalSelfIsExact = false;
-  LocalSelfKind SelfKind;
+  CanType SelfType;
+  bool SelfTypeIsExact = false;
+  DynamicSelfKind SelfKind;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

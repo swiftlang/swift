@@ -4,7 +4,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_4 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_5 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_6 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_7 | %FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_7 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_1 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_2 | %FileCheck %s -check-prefix=FOO_STRUCT_COMMON
@@ -91,10 +91,6 @@ func testTypecheckVar6() {
 }
 
 func testTypecheckVar7() {
-  // FIXME: We don't display any useful completions here, although we could --
-  // it is obvious that the expression could only have type 'FooStruct'.
-  //
-  // In any case, ensure that we don't crash.
   var localInt = 42
   FooStruct(localInt).builderFunc2(unknown_var).#^TC_VAR_7^#
 }

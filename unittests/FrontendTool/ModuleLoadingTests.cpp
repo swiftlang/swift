@@ -103,8 +103,13 @@ protected:
         ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
                         sourceMgr, diags);
 
+    ctx->addModuleInterfaceChecker(
+      std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
+        prebuiltCacheDir, ModuleInterfaceLoaderOptions()));
+
     auto loader = ModuleInterfaceLoader::create(
-        *ctx, cacheDir, prebuiltCacheDir,
+        *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(
+          ctx->getModuleInterfaceChecker()),
         /*dependencyTracker*/nullptr,
         ModuleLoadingMode::PreferSerialized);
 

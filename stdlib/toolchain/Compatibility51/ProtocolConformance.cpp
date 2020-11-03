@@ -229,9 +229,12 @@ override_getCanonicalTypeMetadata(const ProtocolConformanceDescriptor *conf) {
 
     return nullptr;
   }
+  case TypeReferenceKind::MetadataKind: {
+    return nullptr;
+  }
   }
 
-  swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
+  swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
   class ConformanceCandidate {

@@ -202,7 +202,7 @@ func f2() {
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
-// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   VoidGen()[#Void#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   VoidGen()[#Void#]
 // ASSIGN_11-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f12() {

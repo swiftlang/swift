@@ -13,44 +13,155 @@
 // This file implements selection of bindings for type variables.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintGraph.h"
-#include "ConstraintSystem.h"
+#include "TypeChecker.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
 #include <tuple>
 
 using namespace swift;
 using namespace constraints;
 
+void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
+    const ConstraintSystem &cs,
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+        &inferredBindings) {
+  if (TransitiveProtocols)
+    return;
+
+  llvm::SmallVector<std::pair<TypeVariableType *, TypeVariableType *>, 4>
+      workList;
+  llvm::SmallPtrSet<TypeVariableType *, 4> visitedRelations;
+
+  llvm::SmallDenseMap<TypeVariableType *, SmallPtrSet<Constraint *, 4>, 4>
+      protocols;
+
+  auto addToWorkList = [&](TypeVariableType *parent,
+                           TypeVariableType *typeVar) {
+    if (visitedRelations.insert(typeVar).second)
+      workList.push_back({parent, typeVar});
+  };
+
+  auto propagateProtocolsTo =
+      [&protocols](TypeVariableType *dstVar,
+                   const SmallVectorImpl<Constraint *> &direct,
+                   const SmallPtrSetImpl<Constraint *> &transitive) {
+        auto &destination = protocols[dstVar];
+
+        for (auto *protocol : direct)
+          destination.insert(protocol);
+
+        for (auto *protocol : transitive)
+          destination.insert(protocol);
+      };
+
+  addToWorkList(nullptr, TypeVar);
+
+  do {
+    auto *currentVar = workList.back().second;
+
+    auto cachedBindings = inferredBindings.find(currentVar);
+    if (cachedBindings == inferredBindings.end()) {
+      workList.pop_back();
+      continue;
+    }
+
+    auto &bindings = cachedBindings->getSecond();
+
+    // If current variable already has transitive protocol
+    // conformances inferred, there is no need to look deeper
+    // into subtype/equivalence chain.
+    if (bindings.TransitiveProtocols) {
+      TypeVariableType *parent = nullptr;
+      std::tie(parent, currentVar) = workList.pop_back_val();
+      assert(parent);
+      propagateProtocolsTo(parent, bindings.Protocols,
+                           *bindings.TransitiveProtocols);
+      continue;
+    }
+
+    for (const auto &entry : bindings.SubtypeOf)
+      addToWorkList(currentVar, entry.first);
+
+    // If current type variable is part of an equivalence
+    // class, make it a "representative" and let's it infer
+    // supertypes and direct protocol requirements from
+    // other members.
+    for (const auto &entry : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(entry.first);
+      if (eqBindings != inferredBindings.end()) {
+        const auto &bindings = eqBindings->getSecond();
+
+        llvm::SmallPtrSet<Constraint *, 2> placeholder;
+        // Add any direct protocols from members of the
+        // equivalence class, so they could be propagated
+        // to all of the members.
+        propagateProtocolsTo(currentVar, bindings.Protocols, placeholder);
+
+        // Since type variables are equal, current type variable
+        // becomes a subtype to any supertype found in the current
+        // equivalence  class.
+        for (const auto &eqEntry : bindings.SubtypeOf)
+          addToWorkList(currentVar, eqEntry.first);
+      }
+    }
+
+    // More subtype/equivalences relations have been added.
+    if (workList.back().second != currentVar)
+      continue;
+
+    TypeVariableType *parent = nullptr;
+    std::tie(parent, currentVar) = workList.pop_back_val();
+
+    // At all of the protocols associated with current type variable
+    // are transitive to its parent, propogate them down the subtype/equivalence
+    // chain.
+    if (parent) {
+      propagateProtocolsTo(parent, bindings.Protocols, protocols[currentVar]);
+    }
+
+    auto inferredProtocols = std::move(protocols[currentVar]);
+
+    llvm::SmallPtrSet<Constraint *, 4> protocolsForEquivalence;
+
+    // Equivalence class should contain both:
+    // - direct protocol requirements of the current type
+    //   variable;
+    // - all of the transitive protocols inferred through
+    //   the members of the equivalence class.
+    {
+      protocolsForEquivalence.insert(bindings.Protocols.begin(),
+                                     bindings.Protocols.end());
+
+      protocolsForEquivalence.insert(inferredProtocols.begin(),
+                                     inferredProtocols.end());
+    }
+
+    // Propogate inferred protocols to all of the members of the
+    // equivalence class.
+    for (const auto &equivalence : bindings.EquivalentTo) {
+      auto eqBindings = inferredBindings.find(equivalence.first);
+      if (eqBindings != inferredBindings.end()) {
+        auto &bindings = eqBindings->getSecond();
+        bindings.TransitiveProtocols.emplace(protocolsForEquivalence);
+      }
+    }
+
+    // Update the bindings associated with current type variable,
+    // to avoid repeating this inference process.
+    bindings.TransitiveProtocols.emplace(std::move(inferredProtocols));
+  } while (!workList.empty());
+}
+
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
 
-  llvm::SmallVector<Constraint *, 4> conversions;
-  // First, let's collect all of the conversions associated
-  // with this type variable.
-  llvm::copy_if(
-      Sources, std::back_inserter(conversions),
-      [&](const Constraint *constraint) -> bool {
-        if (constraint->getKind() != ConstraintKind::Subtype &&
-            constraint->getKind() != ConstraintKind::Conversion &&
-            constraint->getKind() != ConstraintKind::ArgumentConversion &&
-            constraint->getKind() != ConstraintKind::OperatorArgumentConversion)
-          return false;
-
-        auto rhs = cs.simplifyType(constraint->getSecondType());
-        return rhs->getAs<TypeVariableType>() == TypeVar;
-      });
-
-  for (auto *constraint : conversions) {
-    auto *tv =
-        cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
-    if (!tv || tv == TypeVar)
-      continue;
-
-    auto relatedBindings = inferredBindings.find(tv);
+  for (const auto &entry : SupertypeOf) {
+    auto relatedBindings = inferredBindings.find(entry.first);
     if (relatedBindings == inferredBindings.end())
       continue;
 
@@ -88,7 +199,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
 
     // TODO: We shouldn't need this in the future.
-    if (constraint->getKind() != ConstraintKind::Subtype)
+    if (entry.second->getKind() != ConstraintKind::Subtype)
       continue;
 
     for (auto &binding : bindings.Bindings) {
@@ -144,7 +255,7 @@ isUnviableDefaultType(Type defaultType,
 }
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
   auto isDirectRequirement = [&](Constraint *constraint) -> bool {
     if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
       auto *repr = cs.getRepresentative(typeVar);
@@ -300,9 +411,8 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
-    const ConstraintSystem &cs,
-    const llvm::SmallDenseMap<TypeVariableType *,
-                              ConstraintSystem::PotentialBindings>
+    ConstraintSystem &cs,
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
   // We need to make sure that there are no duplicate bindings in the
   // set, otherwise solver would produce multiple identical solutions.
@@ -310,8 +420,8 @@ void ConstraintSystem::PotentialBindings::finalize(
   for (const auto &binding : Bindings)
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
+  inferTransitiveProtocolRequirements(cs, inferredBindings);
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
-
   inferDefaultTypes(cs, existingTypes);
 
   // Adjust optionality of existing bindings based on presence of
@@ -366,6 +476,24 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (locator->directlyAt<CodeCompletionExpr>()) {
       FullyBound = true;
       PotentiallyIncomplete = true;
+    }
+
+    // Delay resolution of the `nil` literal to a hole until
+    // the very end to give it a change to be bound to some
+    // other type, just like code completion expression which
+    // relies solely on contextual information.
+    if (locator->directlyAt<NilLiteralExpr>()) {
+      FullyBound = true;
+      PotentiallyIncomplete = true;
+    }
+
+    // If this type variable is associated with a code completion token
+    // and it failed to infer any bindings let's adjust hole's locator
+    // to point to a code completion token to avoid attempting to "fix"
+    // this problem since its rooted in the fact that constraint system
+    // is under-constrained.
+    if (AssociatedCodeCompletionToken) {
+      locator = cs.getConstraintLocator(AssociatedCodeCompletionToken);
     }
 
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
@@ -611,8 +739,7 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
 }
 
 ConstraintSystem::PotentialBindings
-ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
-                                   bool finalize) const {
+ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
@@ -651,10 +778,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
          "only relational constraints handled here");
 
   auto *typeVar = result.TypeVar;
-
-  // Record constraint which contributes to the
-  // finding of potential bindings.
-  result.Sources.insert(constraint);
 
   auto first = simplifyType(constraint->getFirstType());
   auto second = simplifyType(constraint->getSecondType());
@@ -760,9 +883,41 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
     result.InvolvesTypeVariables = true;
 
-    if (constraint->getKind() == ConstraintKind::Subtype &&
-        kind == AllowedBindingKind::Subtypes) {
-      result.SubtypeOf.insert(bindingTypeVar);
+    // If current type variable is associated with a code completion token
+    // it's possible that it doesn't have enough contextual information
+    // to be resolved to anything, so let's note that fact in the potential
+    // bindings and use it when forming a hole if there are no other bindings
+    // available.
+    if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
+      if (locator->directlyAt<CodeCompletionExpr>()) {
+        result.AssociatedCodeCompletionToken = locator->getAnchor();
+        result.PotentiallyIncomplete = true;
+      }
+    }
+
+    switch (constraint->getKind()) {
+    case ConstraintKind::Subtype:
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::OperatorArgumentConversion: {
+      if (kind == AllowedBindingKind::Subtypes) {
+        result.SubtypeOf.insert({bindingTypeVar, constraint});
+      } else {
+        assert(kind == AllowedBindingKind::Supertypes);
+        result.SupertypeOf.insert({bindingTypeVar, constraint});
+      }
+      break;
+    }
+
+    case ConstraintKind::Bind:
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Equal: {
+      result.EquivalentTo.insert({bindingTypeVar, constraint});
+      break;
+    }
+
+    default:
+      break;
     }
 
     return None;
@@ -820,7 +975,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 bool ConstraintSystem::PotentialBindings::infer(
-    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
     Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -956,8 +1111,13 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-    return false;
+  case ConstraintKind::SelfObjectOfProtocol: {
+    auto protocolTy = constraint->getSecondType();
+    if (!protocolTy->is<ProtocolType>())
+      return false;
+
+    LLVM_FALLTHROUGH;
+  }
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
@@ -1208,6 +1368,92 @@ bool TypeVarBindingProducer::computeNext() {
   return true;
 }
 
+Optional<std::pair<ConstraintFix *, unsigned>>
+TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
+  auto *dstLocator = TypeVar->getImpl().getLocator();
+  auto *srcLocator = Binding.getLocator();
+
+  // FIXME: This check could be turned into an assert once
+  // all code completion kinds are ported to use
+  // `TypeChecker::typeCheckForCodeCompletion` API.
+  if (cs.isForCodeCompletion()) {
+    // If the hole is originated from code completion expression
+    // let's not try to fix this, anything connected to a
+    // code completion is allowed to be a hole because presence
+    // of a code completion token makes constraint system
+    // under-constrained due to e.g. lack of expressions on the
+    // right-hand side of the token, which are required for a
+    // regular type-check.
+    if (dstLocator->directlyAt<CodeCompletionExpr>())
+      return None;
+  }
+
+  unsigned defaultImpact = 1;
+
+  if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+    // If it is represetative for a key path root, let's emit a more
+    // specific diagnostic.
+    auto *keyPathRoot =
+        cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
+    if (keyPathRoot) {
+      ConstraintFix *fix = SpecifyKeyPathRootType::create(
+          cs, keyPathRoot->getImpl().getLocator());
+      return std::make_pair(fix, defaultImpact);
+    } else {
+      auto path = dstLocator->getPath();
+      // Drop `generic parameter` locator element so that all missing
+      // generic parameters related to the same path can be coalesced later.
+      ConstraintFix *fix = DefaultGenericArgument::create(
+          cs, GP,
+          cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
+      return std::make_pair(fix, defaultImpact);
+    }
+  }
+
+  if (TypeVar->getImpl().isClosureParameterType()) {
+    ConstraintFix *fix = SpecifyClosureParameterType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (TypeVar->getImpl().isClosureResultType()) {
+    auto *closure = castToExpr<ClosureExpr>(dstLocator->getAnchor());
+    // If the whole body is being ignored due to a pre-check failure,
+    // let's not record a fix about result type since there is
+    // just not enough context to infer it without a body.
+    if (cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
+                     FixKind::IgnoreInvalidResultBuilderBody))
+      return None;
+
+    ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
+    ConstraintFix *fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (srcLocator->isKeyPathRoot()) {
+    // If we recorded an invalid key path fix, let's skip this specify root
+    // type fix because it wouldn't produce a useful diagnostic.
+    auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
+    if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+      return None;
+
+    ConstraintFix *fix = SpecifyKeyPathRootType::create(cs, dstLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
+  if (dstLocator->directlyAt<NilLiteralExpr>()) {
+    // This is a dramatic event, it means that there is absolutely
+    // no contextual information to resolve type of `nil`.
+    ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
+    return std::make_pair(fix, /*impact=*/(unsigned)10);
+  }
+
+  return None;
+}
+
 bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
   auto *srcLocator = Binding.getLocator();
@@ -1229,49 +1475,10 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);
 
-      ConstraintFix *fix = nullptr;
-      if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-        // If it is represetative for a key path root, let's emit a more
-        // specific diagnostic.
-        auto *keyPathRoot =
-            cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
-        if (keyPathRoot) {
-          fix = SpecifyKeyPathRootType::create(
-              cs, keyPathRoot->getImpl().getLocator());
-        } else {
-          auto path = dstLocator->getPath();
-          // Drop `generic parameter` locator element so that all missing
-          // generic parameters related to the same path can be coalesced later.
-          fix = DefaultGenericArgument::create(
-              cs, GP,
-              cs.getConstraintLocator(dstLocator->getAnchor(),
-                                      path.drop_back()));
-        }
-      } else if (TypeVar->getImpl().isClosureParameterType()) {
-        fix = SpecifyClosureParameterType::create(cs, dstLocator);
-      } else if (TypeVar->getImpl().isClosureResultType()) {
-        auto *locator = TypeVar->getImpl().getLocator();
-        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-        // If the whole body is being ignored due to a pre-check failure,
-        // let's not record a fix about result type since there is
-        // just not enough context to infer it without a body.
-        if (!cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
-                          FixKind::IgnoreInvalidFunctionBuilderBody))
-          fix = SpecifyClosureReturnType::create(cs, dstLocator);
-      } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
-        fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
-      } else if (srcLocator->isKeyPathRoot()) {
-        // If we recorded an invalid key path fix, let's skip this specify root
-        // type fix because it wouldn't produce a useful diagnostic.
-        auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
-        if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+      if (auto fix = fixForHole(cs)) {
+        if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
           return true;
-        
-        fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       }
-
-      if (fix && cs.recordFix(fix))
-        return true;
     }
   }
 

@@ -1427,6 +1427,17 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       break;
     }
 
+    case INCREMENTAL_INFORMATION_BLOCK_ID: {
+      HasIncrementalInfo = true;
+      // Skip incremental info if present. The Frontend currently doesn't do
+      // anything with this.
+      if (cursor.SkipBlock()) {
+        info.status = error(Status::Malformed);
+        return;
+      }
+      break;
+    }
+
     default:
       // Unknown top-level block, possibly for use by a future version of the
       // module format.

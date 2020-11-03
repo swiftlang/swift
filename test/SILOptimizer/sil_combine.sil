@@ -8,6 +8,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class Klass {}
 class RawBuffer {}
 class HeapBufferStorage<T, U> : RawBuffer {}
 
@@ -4115,4 +4116,17 @@ bb0:
   %0 = global_addr @initialized_var_global : $*Int64
   %1 = load %0 : $*Int64
   return %1 : $Int64
+}
+
+// Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
+// This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
+// CHECK-LABEL: sil [ossa] @refcast :
+// CHECK: unchecked_bitwise_cast
+// CHECK-LABEL: } // end sil function 'refcast'
+sil [ossa] @refcast : $@convention(thin) (@owned Klass) -> @owned Optional<Klass> {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $Optional<Klass>
+  %2 = copy_value %1 : $Optional<Klass>
+  destroy_value %0 : $Klass
+  return %2 : $Optional<Klass>
 }

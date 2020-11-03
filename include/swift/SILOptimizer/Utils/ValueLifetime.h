@@ -17,8 +17,9 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CFG_H
 #define SWIFT_SILOPTIMIZER_UTILS_CFG_H
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {
 
@@ -159,7 +160,8 @@ private:
 /// destroy_value at each instruction of the \p frontier.
 void endLifetimeAtFrontier(SILValue valueOrStackLoc,
                            const ValueLifetimeAnalysis::Frontier &frontier,
-                           SILBuilderContext &builderCtxt);
+                           SILBuilderContext &builderCtxt,
+                           InstModCallbacks callbacks);
 
 } // end namespace swift
 

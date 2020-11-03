@@ -124,8 +124,14 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext()) ==
-         constantInfo.SILFnType);
+#ifndef NDEBUG
+  auto constantFnTypeInContext =
+    SGM.Types.getLoweredType(constantInfo.SILFnType,
+                             B.getTypeExpansionContext())
+             .castTo<SILFunctionType>();
+  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext())
+          == constantFnTypeInContext);
+#endif
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
   else
@@ -169,7 +175,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
 
 SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
-  auto *derivativeId = derivativeFnDeclRef.derivativeFunctionIdentifier;
+  auto *derivativeId = derivativeFnDeclRef.getDerivativeFunctionIdentifier();
   assert(derivativeId);
   auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 

@@ -1241,19 +1241,6 @@ static bool diagnoseZeroWidthMatchAndAdvance(char Target, const char *&CurPtr,
   return *CurPtr == Target && CurPtr++;
 }
 
-/// advanceIfMultilineDelimiter - Centralized check for multiline delimiter.
-static bool advanceIfMultilineDelimiter(const char *&CurPtr,
-                                        DiagnosticEngine *Diags) {
-  const char *TmpPtr = CurPtr;
-  if (*(TmpPtr - 1) == '"' &&
-      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags) &&
-      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags)) {
-    CurPtr = TmpPtr;
-    return true;
-  }
-  return false;
-}
-
 /// advanceIfCustomDelimiter - Extracts/detects any custom delimiter on
 /// opening a string literal, advances CurPtr if a delimiter is found and
 /// returns a non-zero delimiter length. CurPtr[-1] must be '#' when called.
@@ -1300,6 +1287,37 @@ static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
   return true;
 }
 
+/// advanceIfMultilineDelimiter - Centralized check for multiline delimiter.
+static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
+                                        const char *&CurPtr,
+                                        DiagnosticEngine *Diags,
+                                        bool IsOpening = false) {
+
+  // Test for single-line string literals that resemble multiline delimiter.
+  const char *TmpPtr = CurPtr + 1;
+  if (IsOpening && CustomDelimiterLen) {
+    while (*TmpPtr != '\r' && *TmpPtr != '\n') {
+      if (*TmpPtr == '"') {
+        if (delimiterMatches(CustomDelimiterLen, ++TmpPtr, nullptr)) {
+          return false;
+        }
+        continue;
+      }
+      ++TmpPtr;
+    }
+  }
+
+  TmpPtr = CurPtr;
+  if (*(TmpPtr - 1) == '"' &&
+      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags) &&
+      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags)) {
+    CurPtr = TmpPtr;
+    return true;
+  }
+
+  return false;
+}
+
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence (i.e. the character is equal to
 /// 'StopQuote'), this returns ~0U and advances 'CurPtr' pointing to the end of
@@ -1342,7 +1360,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 
       DiagnosticEngine *D = EmitDiagnostics ? Diags : nullptr;
       auto TmpPtr = CurPtr;
-      if (IsMultilineString && !advanceIfMultilineDelimiter(TmpPtr, D))
+      if (IsMultilineString &&
+          !advanceIfMultilineDelimiter(CustomDelimiterLen, TmpPtr, D))
         return '"';
       if (CustomDelimiterLen &&
           !delimiterMatches(CustomDelimiterLen, TmpPtr, D, /*IsClosing=*/true))
@@ -1478,7 +1497,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       if (!inStringLiteral()) {
         // Open string literal.
         OpenDelimiters.push_back(CurPtr[-1]);
-        AllowNewline.push_back(advanceIfMultilineDelimiter(CurPtr, nullptr));
+        AllowNewline.push_back(advanceIfMultilineDelimiter(CustomDelimiterLen,
+                                                           CurPtr, nullptr,
+                                                           true));
         CustomDelimiter.push_back(CustomDelimiterLen);
         continue;
       }
@@ -1490,7 +1511,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         continue;
 
       // Multi-line string can only be closed by '"""'.
-      if (AllowNewline.back() && !advanceIfMultilineDelimiter(CurPtr, nullptr))
+      if (AllowNewline.back() &&
+          !advanceIfMultilineDelimiter(CustomDelimiterLen, CurPtr, nullptr))
         continue;
 
       // Check whether we have equivalent number of '#'s.
@@ -1827,7 +1849,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   // diagnostics about changing them to double quotes.
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
-  bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
+  bool IsMultilineString = advanceIfMultilineDelimiter(CustomDelimiterLen,
+                                                       CurPtr, Diags, true);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
     diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");

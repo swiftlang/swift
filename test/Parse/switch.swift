@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -246,7 +246,7 @@ case (1, _):
 func patternVarUsedInAnotherPattern(x: Int) {
   switch x {
   case let a, // expected-error {{'a' must be bound in every pattern}}
-       a:
+       a: // expected-error {{cannot find 'a' in scope}}
     break
   }
 }

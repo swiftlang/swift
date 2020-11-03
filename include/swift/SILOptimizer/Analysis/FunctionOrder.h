@@ -43,6 +43,7 @@ private:
   llvm::SmallSetVector<SILFunction *, 4> DFSStack;
 
 public:
+  // SWIFT_ENABLE_TENSORFLOW
   BottomUpFunctionOrder(BasicCalleeAnalysis *BCA)
       : BCA(BCA), NextDFSNum(0) {}
 
@@ -56,14 +57,17 @@ public:
     for (auto &F : *M)
       DFS(&F);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Get the SCCs in bottom-up order.
   ArrayRef<SCC> getSCCs() {
     return TheSCCs;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// Get a flattened view of all functions in all the SCCs in bottom-up order
   ArrayRef<SILFunction *> getBottomUpOrder() {
+  // SWIFT_ENABLE_TENSORFLOW END
     if (!TheFunctions.empty())
       return TheFunctions;
     for (auto SCC : getSCCs())

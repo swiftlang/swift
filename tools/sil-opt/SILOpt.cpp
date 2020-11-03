@@ -344,6 +344,7 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getClangImporterOptions().ExtraArgs = ExtraClangArgs;
   Invocation.setParseStdlib();
+  Invocation.getLangOptions().DisableParserLookup = true;
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;

@@ -15,10 +15,10 @@
 // constraint that must be solved.
 //
 //===----------------------------------------------------------------------===//
-#include "Constraint.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Sema/Constraint.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>

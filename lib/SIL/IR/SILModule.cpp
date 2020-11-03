@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -95,7 +95,10 @@ class SILModule::SerializationCallback final
 
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options)
-    : Stage(SILStage::Raw), Options(Options), serialized(false),
+    : Stage(SILStage::Raw), indexTrieRoot(new IndexTrieNode()),
+      Options(Options), serialized(false),
+      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
+      regDeserializationNotificationHandlerForAllFuncOME(false),
       SerializeSILAction(), Types(TC) {
   assert(!context.isNull());
   if (auto *file = context.dyn_cast<FileUnit *>()) {
@@ -132,6 +135,7 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
+    F.clearSpecializeAttrs();
   }
 }
 
@@ -217,6 +221,11 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   SILWitnessTable *wtable;
 
   auto rootC = C->getRootConformance();
+
+  // Builtin conformances don't have witness tables in SIL.
+  if (isa<BuiltinProtocolConformance>(rootC))
+    return nullptr;
+
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(rootC);
   if (found == WitnessTableMap.end()) {
@@ -515,6 +524,8 @@ void SILModule::eraseFunction(SILFunction *F) {
   F->dropAllReferences();
   F->dropDynamicallyReplacedFunction();
   F->getBlocks().clear();
+  // Drop references for any _specialize(target:) functions.
+  F->clearSpecializeAttrs();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {

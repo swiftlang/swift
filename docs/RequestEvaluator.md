@@ -80,4 +80,4 @@ The request-evaluator is relatively new to the Swift compiler, having been intro
 * Port higher-level queries (e.g., those that come from SourceKit) over to the request-evaluator, so we can see the dependencies of a given SourceKit request for testing and performance tuning.
 
 ## Prior art
-Rust's compiler went through a similar transformation to support [demand-driven compilation](https://rust-lang-nursery.github.io/rustc-guide/query.html). We should learn from their experience!
+Rust's compiler went through a similar transformation to support [demand-driven compilation](https://rustc-dev-guide.rust-lang.org/query.html). We should learn from their experience!

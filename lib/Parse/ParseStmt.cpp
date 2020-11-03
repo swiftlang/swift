@@ -1183,8 +1183,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
 /// Validate availability spec list, emitting diagnostics if necessary and removing
 /// specs for unrecognized platforms.
-static void validateAvailabilitySpecList(Parser &P,
-    SmallVectorImpl<AvailabilitySpec *> &Specs) {
+static void
+validateAvailabilitySpecList(Parser &P,
+                             SmallVectorImpl<AvailabilitySpec *> &Specs,
+                             bool ParsingMacroDefinition) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   bool HasOtherPlatformSpec = false;
 
@@ -1232,8 +1234,13 @@ static void validateAvailabilitySpecList(Parser &P,
     }
   }
 
-  if (!HasOtherPlatformSpec) {
-    SourceLoc InsertWildcardLoc = Specs.back()->getSourceRange().End;
+  if (ParsingMacroDefinition) {
+    if (HasOtherPlatformSpec) {
+      SourceLoc InsertWildcardLoc = P.PreviousLoc;
+      P.diagnose(InsertWildcardLoc, diag::attr_availability_wildcard_in_macro);
+    }
+  } else if (!HasOtherPlatformSpec) {
+    SourceLoc InsertWildcardLoc = P.PreviousLoc;
     P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
   }
@@ -1285,7 +1292,40 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 }
 
 ParserStatus
-Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
+Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
+
+  // Prime the lexer.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  if (!Tok.isIdentifierOrUnderscore()) {
+    diagnose(Tok, diag::attr_availability_missing_macro_name);
+    return makeParserError();
+  }
+
+  Result.Name = Tok.getText();
+  consumeToken();
+
+  if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    SourceRange VersionRange;
+    if (parseVersionTuple(Result.Version, VersionRange,
+                          diag::avail_query_expected_version_number)) {
+      return makeParserError();
+    }
+  }
+
+  if (!consumeIf(tok::colon)) {
+    diagnose(Tok, diag::attr_availability_expected_colon_macro, Result.Name);
+    return makeParserError();
+  }
+
+  return parseAvailabilitySpecList(Result.Specs,
+                                   /*ParsingMacroDefinition=*/true);
+}
+
+ParserStatus
+Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
+                                  bool ParsingMacroDefinition) {
   SyntaxParsingContext AvailabilitySpecContext(
       SyntaxContext, SyntaxKind::AvailabilitySpecList);
   ParserStatus Status = makeParserSuccess();
@@ -1295,14 +1335,34 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   while (1) {
     SyntaxParsingContext AvailabilityEntryContext(
         SyntaxContext, SyntaxKind::AvailabilityArgument);
-    auto SpecResult = parseAvailabilitySpec();
-    if (auto *Spec = SpecResult.getPtrOrNull()) {
-      Specs.push_back(Spec);
-    } else {
-      if (SpecResult.hasCodeCompletion()) {
-        return makeParserCodeCompletionStatus();
+
+    // First look for a macro as we need Specs for the expansion.
+    bool MatchedAMacro = false;
+    if (!ParsingMacroDefinition && Tok.is(tok::identifier)) {
+      SmallVector<AvailabilitySpec *, 4> MacroSpecs;
+      ParserStatus MacroStatus = parseAvailabilityMacro(MacroSpecs);
+
+      if (MacroStatus.isError()) {
+        // There's a parsing error if the platform name matches a macro
+        // but something goes wrong after.
+        Status.setIsParseError();
+        MatchedAMacro = true;
+      } else {
+        MatchedAMacro = !MacroSpecs.empty();
+        Specs.append(MacroSpecs.begin(), MacroSpecs.end());
       }
-      Status.setIsParseError();
+    }
+
+    if (!MatchedAMacro) {
+      auto SpecResult = parseAvailabilitySpec();
+      if (auto *Spec = SpecResult.getPtrOrNull()) {
+        Specs.push_back(Spec);
+      } else {
+        if (SpecResult.hasCodeCompletion()) {
+          return makeParserCodeCompletionStatus();
+        }
+        Status.setIsParseError();
+      }
     }
 
     // We don't allow binary operators to combine specs.
@@ -1362,7 +1422,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   }
 
   if (Status.isSuccess() && !Status.hasCodeCompletion())
-    validateAvailabilitySpecList(*this, Specs);
+    validateAvailabilitySpecList(*this, Specs, ParsingMacroDefinition);
 
   return Status;
 }
@@ -1876,9 +1936,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
-    SourceLoc lbraceLoc = Tok.getLoc();
     diagnose(whileLoc, diag::missing_condition_after_while);
-    condition = makeParserErrorResult(new (Context) ErrorExpr(lbraceLoc));
+    condition = makeParserErrorResult(new (Context) ErrorExpr(whileLoc));
   } else {
     condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;

@@ -78,7 +78,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
   StringRef implicitHeaderPath = opts.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, mainModule)) {
-      SmallVector<ModuleDecl::ImportedModule, 16> imported;
+      SmallVector<ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(
           imported, {ModuleDecl::ImportFilterKind::Exported,
                      ModuleDecl::ImportFilterKind::Default,

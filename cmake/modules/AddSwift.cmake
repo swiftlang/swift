@@ -291,6 +291,16 @@ function(_add_host_variant_c_compile_flags target)
       target_compile_options(${target} PRIVATE -march=core2)
     endif()
   endif()
+
+  # The LLVM backend is built with these defines on most 32-bit platforms,
+  # llvm/llvm-project@66395c9, which can cause incompatibilities with the Swift
+  # frontend if not built the same way.
+  if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686" AND
+     NOT (SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID AND SWIFT_ANDROID_API_LEVEL LESS 24))
+    target_compile_definitions(${target} PRIVATE
+      _LARGEFILE_SOURCE
+      _FILE_OFFSET_BITS=64)
+  endif()
 endfunction()
 
 function(_add_host_variant_link_flags target)
@@ -461,7 +471,7 @@ function(add_swift_host_library name)
       INSTALL_NAME_DIR "@rpath")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     set_target_properties(${name} PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
     set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
@@ -629,4 +639,10 @@ endfunction()
 macro(add_swift_tool_symlink name dest component)
   add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
   llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+endmacro()
+
+# Declare that files in this library are built with LLVM's support
+# libraries available.
+macro(set_swift_llvm_is_available)
+  add_compile_options(-DSWIFT_LLVM_SUPPORT_IS_AVAILABLE)
 endmacro()

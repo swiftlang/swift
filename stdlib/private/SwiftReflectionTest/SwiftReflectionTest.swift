@@ -216,7 +216,7 @@ internal struct ReflectionInfo : Sequence {
 }
 
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
-  var source = address
+  var source = UnsafeRawPointer(address)
   var bytesLeft = count
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   while bytesLeft > 0 {

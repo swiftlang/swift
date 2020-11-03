@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3845,6 +3845,8 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
+      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+        Printer << "error_expr";
       } else {
         visit(originator.get<DependentMemberType *>());
       }
@@ -4054,7 +4056,9 @@ public:
     visit(staticSelfT);
   }
 
-  void printFunctionExtInfo(ASTContext &Ctx, AnyFunctionType::ExtInfo info) {
+  void printFunctionExtInfo(AnyFunctionType *fnType) {
+    auto &ctx = fnType->getASTContext();
+    auto info = fnType->getExtInfo();
     if (Options.SkipAttributes)
       return;
 
@@ -4091,13 +4095,13 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
-        if (printClangType && !info.getClangTypeInfo().empty())
-          printCType(Ctx, Printer, info);
+        if (printClangType && fnType->hasNonDerivableClangType())
+          printCType(ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        if (printClangType && !info.getClangTypeInfo().empty())
-          printCType(Ctx, Printer, info);
+        if (printClangType && fnType->hasNonDerivableClangType())
+          printCType(ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4118,9 +4122,12 @@ public:
     }
   }
 
-  void printFunctionExtInfo(ASTContext &Ctx,
-                            SILFunctionType::ExtInfo info,
-                            ProtocolConformanceRef witnessMethodConformance) {
+  void printFunctionExtInfo(SILFunctionType *fnType) {
+    auto &Ctx = fnType->getASTContext();
+    auto info = fnType->getExtInfo();
+    auto witnessMethodConformance =
+        fnType->getWitnessMethodConformanceOrInvalid();
+
     if (Options.SkipAttributes)
       return;
 
@@ -4157,12 +4164,12 @@ public:
         break;
       case SILFunctionType::Representation::Block:
         Printer << "block";
-        if (printClangType)
+        if (printClangType && fnType->hasNonDerivableClangType())
           printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
-        if (printClangType)
+        if (printClangType && fnType->hasNonDerivableClangType())
           printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
@@ -4237,7 +4244,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
+    printFunctionExtInfo(T);
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
@@ -4277,7 +4284,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo());
+    printFunctionExtInfo(T);
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::PrintRequirements);
@@ -4339,8 +4346,7 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
-                         T->getWitnessMethodConformanceOrInvalid());
+    printFunctionExtInfo(T);
     printCalleeConvention(T->getCalleeConvention());
 
     if (auto sig = T->getInvocationGenericSignature()) {
@@ -4550,7 +4556,8 @@ public:
     visit(T->getOpenedExistentialType());
   }
   
-  void printArchetypeCommon(ArchetypeType *T) {
+  void printArchetypeCommon(ArchetypeType *T,
+                            const AbstractTypeParamDecl *Decl) {
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
       if (found != Options.AlternativeTypeNames->end()) {
@@ -4559,24 +4566,23 @@ public:
       }
     }
 
-    auto Name = T->getName();
-    if (Name.empty())
+    const auto Name = T->getName();
+    if (Name.empty()) {
       Printer << "<anonymous>";
-    else {
-      PrintNameContext context = PrintNameContext::Normal;
-      if (Name == T->getASTContext().Id_Self)
-        context = PrintNameContext::GenericParameter;
-      Printer.printName(Name, context);
+    } else if (Decl) {
+      Printer.printTypeRef(T, Decl, Name);
+    } else {
+      Printer.printName(Name);
     }
   }
-  
+
   void visitNestedArchetypeType(NestedArchetypeType *T) {
     visitParentType(T->getParent());
-    printArchetypeCommon(T);
+    printArchetypeCommon(T, T->getAssocType());
   }
   
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T);
+    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
   }
   
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
@@ -4643,26 +4649,23 @@ public:
         T = Options.GenericSig->getSugaredType(T);
     }
 
-    auto Name = T->getName();
-    if (Name.empty())
+    const auto Name = T->getName();
+    if (Name.empty()) {
       Printer << "<anonymous>";
-    else {
-      if (T->getDecl() &&
-          T->getDecl()->getDeclContext()->getSelfProtocolDecl()) {
-        Printer.printTypeRef(T, T->getDecl(), Name);
-        return;
-      }
-
-      PrintNameContext context = PrintNameContext::Normal;
-      if (Name == T->getASTContext().Id_Self)
-        context = PrintNameContext::GenericParameter;
-      Printer.printName(Name, context);
+    } else if (auto *Decl = T->getDecl()) {
+      Printer.printTypeRef(T, Decl, Name);
+    } else {
+      Printer.printName(Name);
     }
   }
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    Printer.printName(T->getName());
+    if (auto *const Assoc = T->getAssocType()) {
+      Printer.printTypeRef(T, Assoc, T->getName());
+    } else {
+      Printer.printName(T->getName());
+    }
   }
 
 #define REF_STORAGE(Name, name, ...) \
@@ -5044,6 +5047,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     os << "inherit (";
     inherited->getInheritedConformance()->printName(os, PO);
     os << ")";
+    break;
+  }
+  case ProtocolConformanceKind::Builtin: {
+    auto builtin = cast<BuiltinProtocolConformance>(this);
+    os << builtin->getProtocol()->getName()
+       << " type " << builtin->getType();
     break;
   }
   }

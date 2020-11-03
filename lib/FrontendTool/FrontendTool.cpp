@@ -30,6 +30,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -208,6 +209,12 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     dependencyString.push_back(' ');
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
+  auto incrementalDependencyPaths =
+      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
+  for (auto const &path : incrementalDependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+  }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
@@ -311,10 +318,10 @@ static void getImmediateImports(
       ModuleDecl::ImportFilterKind::SPIAccessControl,
       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay
     }) {
-  SmallVector<ModuleDecl::ImportedModule, 8> importList;
+  SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 
-  for (ModuleDecl::ImportedModule &import : importList)
+  for (ImportedModule &import : importList)
     imports.insert(import.importedModule);
 }
 
@@ -1175,6 +1182,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
+    C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -1370,6 +1378,35 @@ static bool dumpAST(CompilerInstance &Instance) {
   return Instance.getASTContext().hadError();
 }
 
+static bool emitReferenceDependencies(CompilerInstance &Instance,
+                                      SourceFile *const SF,
+                                      StringRef outputPath) {
+  const auto alsoEmitDotFile = Instance.getInvocation()
+                                   .getLangOptions()
+                                   .EmitFineGrainedDependencySourcefileDotFiles;
+
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
+
+  using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+  return fine_grained_dependencies::withReferenceDependencies(
+      SF, *Instance.getDependencyTracker(), outputPath, alsoEmitDotFile,
+      [&](SourceFileDepGraph &&g) -> bool {
+        const bool hadError =
+            fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
+                Instance.getDiags(), outputPath, g);
+
+        // If path is stdout, cannot read it back, so check for "-"
+        assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
+
+        if (alsoEmitDotFile)
+          g.emitDotFile(outputPath, Instance.getDiags());
+        return hadError;
+      });
+}
+
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -1384,13 +1421,11 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
-    if (!referenceDependenciesFilePath.empty()) {
-      const auto LangOpts = Invocation.getLangOptions();
-      (void)fine_grained_dependencies::emitReferenceDependencies(
-          Instance.getDiags(), SF, *Instance.getDependencyTracker(),
-          referenceDependenciesFilePath,
-          LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
+    if (referenceDependenciesFilePath.empty()) {
+      continue;
     }
+
+    emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
   }
 }
 static void
@@ -2257,7 +2292,23 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
-    serialize(MSF, serializationOpts, SM.get());
+    if (serializationOpts.ExperimentalCrossModuleIncrementalInfo) {
+      const auto alsoEmitDotFile =
+          Instance.getInvocation()
+              .getLangOptions()
+              .EmitFineGrainedDependencySourcefileDotFiles;
+
+      using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+      auto *Mod = MSF.get<ModuleDecl *>();
+      fine_grained_dependencies::withReferenceDependencies(
+          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
+            serialize(MSF, serializationOpts, SM.get(), &g);
+            return false;
+          });
+    } else {
+      serialize(MSF, serializationOpts, SM.get());
+    }
   };
 
   // Set the serialization action, so that the SIL module

@@ -14,11 +14,12 @@
 // constraint-based type checker.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
+#include "TypeChecker.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 

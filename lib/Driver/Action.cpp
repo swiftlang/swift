@@ -43,6 +43,8 @@ void InputAction::anchor() {}
 
 void JobAction::anchor() {}
 
+void IncrementalJobAction::anchor() {}
+
 void CompileJobAction::anchor() {}
 
 void InterpretJobAction::anchor() {}

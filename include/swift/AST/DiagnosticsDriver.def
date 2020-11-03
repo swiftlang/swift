@@ -190,6 +190,8 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
 
+REMARK(remark_forwarding_to_new_driver, none, "new Swift driver will be used", ())
+
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(error_tensorflow_toolchain_repl_not_supported, none,
       "The Swift for TensorFlow toolchain does not support the Swift REPL. Colab "

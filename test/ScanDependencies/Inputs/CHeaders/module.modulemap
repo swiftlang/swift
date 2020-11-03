@@ -8,7 +8,7 @@ module B {
   export *
 }
 
-module C {
+module C [system] {
   header "C.h"
   export *
 }

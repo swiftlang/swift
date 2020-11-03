@@ -113,14 +113,14 @@ documentation, please create a thread on the Swift forums under the
     Describes how the "Omit Needless Words" algorithm works,
     making imported names more idiomatic.
 - Type-checking and inference:
-  - [TypeChecker.rst](/docs/TypeChecker.rst):
+  - [TypeChecker.md](/docs/TypeChecker.md):
     Provides an overview of how type-checking and inference work.
   - [RequestEvaluator.md](/docs/RequestEvaluator.md):
     Describes the request evaluator architecture, which is used for
     lazy type-checking and efficient caching.
   - [Literals.md](/docs/Literals.md):
     Describes type-checking and inference specifically for literals.
-- [Serialization.rst](/docs/Serialization.rst):
+- [Serialization.md](/docs/Serialization.md):
   Gives an overview of the LLVM bitcode format used for swiftmodules.
   - [StableBitcode.md](/docs/StableBitcode.md):
     Describes how to maintain compatibility when changing the serialization

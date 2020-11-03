@@ -73,4 +73,3 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
     TheSCCs.push_back(CurrentSCC);
   }
 }
-

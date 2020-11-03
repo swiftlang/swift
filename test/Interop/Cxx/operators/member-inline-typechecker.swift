@@ -2,7 +2,7 @@
 
 import MemberInline
 
-var lhs = IntBox(value: 42)
-let rhs = IntBox(value: 23)
+var lhs = LoadableIntWrapper(value: 42)
+let rhs = LoadableIntWrapper(value: 23)
 
 let resultPlus = lhs - rhs

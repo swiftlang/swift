@@ -34,6 +34,10 @@ bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs) {
   return false;
 }
 
+bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs) {
+  return !(lhs == rhs);
+}
+
 ClangTypeInfo ClangTypeInfo::getCanonical() const {
   if (!type)
     return ClangTypeInfo();
@@ -92,6 +96,10 @@ Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
 }
 
 void UnexpectedClangTypeError::dump() {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
+
   auto &e = llvm::errs();
   using Kind = UnexpectedClangTypeError::Kind;
   switch (errorKind) {

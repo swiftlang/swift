@@ -2809,11 +2809,6 @@ static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
 
 static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   SwiftDeclCollector Collector(Ctx);
-  // If the baseline path has been given, honor that.
-  if (!options::BaselineFilePath.empty()) {
-    Collector.deSerialize(options::BaselineFilePath);
-    return Collector.getSDKRoot();
-  }
   CompilerInvocation Invok;
   llvm::StringSet<> Modules;
   // We need to call prepareForDump to parse target triple.
@@ -2823,7 +2818,10 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   assert(Modules.size() == 1 &&
          "Cannot find builtin baseline for more than one module");
   std::string Path;
-  if (!options::BaselineDirPath.empty()) {
+  // If the baseline path has been given, honor that.
+  if (!options::BaselineFilePath.empty()) {
+    Path = options::BaselineFilePath;
+  } else if (!options::BaselineDirPath.empty()) {
     Path = getCustomBaselinePath(Invok.getLangOptions().Target,
                                  Ctx.checkingABI());
   } else if (options::UseEmptyBaseline) {

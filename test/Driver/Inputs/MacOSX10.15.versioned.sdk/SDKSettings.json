@@ -9,5 +9,7 @@
           "13.1" : "10.15",
           "13.2" : "10.15.1"
       }
-  }
+  },
+  "DefaultDeploymentTarget" : "10.15",
+  "MaximumDeploymentTarget" : "10.15.99"
 }

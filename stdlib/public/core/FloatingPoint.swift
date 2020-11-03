@@ -1950,9 +1950,30 @@ extension BinaryFloatingPoint {
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
   public init?<Source: BinaryFloatingPoint>(exactly value: Source) {
-    let (value_, exact) = Self._convert(from: value)
-    guard exact else { return nil }
-    self = value_
+    // We define exactness by equality after roundtripping; since NaN is never
+    // equal to itself, it can never be converted exactly.
+    if value.isNaN { return nil }
+    
+    if (Source.exponentBitCount > Self.exponentBitCount
+        || Source.significandBitCount > Self.significandBitCount)
+      && value.isFinite && !value.isZero {
+      let exponent = value.exponent
+      if exponent < Self.leastNormalMagnitude.exponent {
+        if exponent < Self.leastNonzeroMagnitude.exponent { return nil }
+        if value.significandWidth >
+          Int(Self.Exponent(exponent) - Self.leastNonzeroMagnitude.exponent) {
+          return nil
+        }
+      } else {
+        if exponent > Self.greatestFiniteMagnitude.exponent { return nil }
+        if value.significandWidth >
+          Self.greatestFiniteMagnitude.significandWidth {
+          return nil
+        }
+      }
+    }
+    
+    self = Self(value)
   }
   
   @inlinable

@@ -85,7 +85,7 @@ BuiltinInst *SILGlobalVariable::getOffsetSubtract(const TupleExtractInst *TE,
   // Match the pattern:
   // tuple_extract(usub_with_overflow(x, integer_literal, integer_literal 0), 0)
 
-  if (TE->getFieldNo() != 0)
+  if (TE->getFieldIndex() != 0)
     return nullptr;
 
   auto *BI = dyn_cast<BuiltinInst>(TE->getOperand());

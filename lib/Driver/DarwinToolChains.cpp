@@ -364,6 +364,7 @@ bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
   case BackDeployLibFilter::all:
     return true;
   }
+  llvm_unreachable("unhandled back deploy lib filter!");
 }
 
 }
@@ -377,19 +378,18 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   // have an older Swift runtime.
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
-  Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  Optional<llvm::VersionTuple> runtimeCompatibilityVersion 
+      = llvm::VersionTuple();
   
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
     auto value = context.Args.getLastArgValue(
                                     options::OPT_runtime_compatibility_version);
-    if (value.equals("5.0")) {
-      runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
-    } else if (value.equals("5.1")) {
-      runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
-    } else if (value.equals("none")) {
-      runtimeCompatibilityVersion = None;
-    } else {
-      // TODO: diagnose unknown runtime compatibility version?
+    if (runtimeCompatibilityVersion->tryParse(value)) {
+      if (value.equals("none")) {
+        runtimeCompatibilityVersion = None;
+      } else {
+        // TODO: diagnose unknown runtime compatibility version?
+      }
     }
   } else if (job.getKind() == LinkKind::Executable) {
     runtimeCompatibilityVersion

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -591,6 +591,21 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  SwiftContextTy = createStructType(*this, "swift.context", {});
+  SwiftTaskTy = createStructType(*this, "swift.task", {});
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
+  SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
+  SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+
+  // using TaskContinuationFunction =
+  //   SWIFT_CC(swift)
+  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  TaskContinuationFunctionTy = llvm::FunctionType::get(
+      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
+      /*isVarArg*/ false);
+  TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
@@ -680,6 +695,14 @@ namespace RuntimeConstants {
   GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
+    auto featureAvailability = context.getConcurrencyAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -969,6 +992,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // its own shared copy of it.
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
+
+  // If we happen to see a builtin witness table here, we can't emit those.
+  // The runtime has those for us.
+  if (isa<BuiltinProtocolConformance>(wt->getConformance()))
+    return false;
 
   NominalTypeDecl *ConformingTy =
     wt->getConformingType()->getNominalOrBoundGenericNominal();

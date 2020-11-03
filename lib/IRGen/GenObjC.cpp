@@ -833,11 +833,13 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   // Prepare the call to the underlying method.
-  CallEmission emission(subIGF,
-                        getObjCMethodCallee(subIGF, method, self,
+  auto emission = getCallEmission(
+      subIGF, self,
+      getObjCMethodCallee(subIGF, method, self,
                           CalleeInfo(origMethodType, origMethodType, {})));
+  emission->begin();
 
-  emission.setArgs(translatedParams, false);
+  emission->setArgs(translatedParams, false, /*witnessMetadata*/ nullptr);
 
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{
@@ -855,14 +857,16 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   if (indirectedDirectResult) {
     Address addr =
       indirectedResultTI->getAddressForPointer(indirectedDirectResult);
-    emission.emitToMemory(addr, *indirectedResultTI, false);
+    emission->emitToMemory(addr, *indirectedResultTI, false);
+    emission->end();
     cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
     Explosion result;
-    emission.emitToExplosion(result, false);
+    emission->emitToExplosion(result, false);
+    emission->end();
     cleanup();
-    auto &callee = emission.getCallee();
+    auto &callee = emission->getCallee();
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
         IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     subIGF.emitScalarReturn(resultType, resultType, result,

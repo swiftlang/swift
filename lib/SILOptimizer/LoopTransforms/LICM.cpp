@@ -700,18 +700,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                InstSet &SideEffectInsts,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  const AccessedStorage &storage = findAccessedStorage(BI->getSource());
+  auto storage = AccessedStorage::compute(BI->getSource());
   if (!storage) {
     return false;
   }
 
-  auto BIAccessedStorageNonNested = findAccessedStorage(BI);
+  auto BIAccessedStorageNonNested = AccessedStorage::compute(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
     if (BI == OtherBI) {
       return true;
     }
     return BIAccessedStorageNonNested.isDistinctFrom(
-        findAccessedStorage(OtherBI));
+        AccessedStorage::compute(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))
@@ -940,7 +940,7 @@ static SILValue projectLoadValue(SILValue addr, SILValue rootAddr,
     SILValue val = projectLoadValue(TEI->getOperand(), rootAddr, rootVal,
                                     beforeInst);
     SILBuilder B(beforeInst);
-    return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldNo(),
+    return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldIndex(),
                                 TEI->getType().getObjectType());
   }
   llvm_unreachable("unknown projection");

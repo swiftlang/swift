@@ -1216,7 +1216,7 @@ TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Alignment align,
                                                 Alignment pointerAlignment) {
   SpareBitVector spareBits = IGM.TargetInfo.PointerSpareBits;
-  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
+  for (unsigned bit = 0; Alignment(1ull << bit) != pointerAlignment; ++bit) {
     spareBits.setBit(bit);
   }
 
@@ -1451,6 +1451,48 @@ const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
+}
+
+const TypeInfo &IRGenModule::getSwiftContextPtrTypeInfo() {
+  return Types.getSwiftContextPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getSwiftContextPtrTypeInfo() {
+  if (SwiftContextPtrTI) return *SwiftContextPtrTI;
+  SwiftContextPtrTI = createUnmanagedStorageType(IGM.SwiftContextPtrTy,
+                                                 ReferenceCounting::Unknown,
+                                                 /*isOptional*/false);
+  SwiftContextPtrTI->NextConverted = FirstType;
+  FirstType = SwiftContextPtrTI;
+  return *SwiftContextPtrTI;
+}
+
+const TypeInfo &IRGenModule::getTaskContinuationFunctionPtrTypeInfo() {
+  return Types.getTaskContinuationFunctionPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
+  if (TaskContinuationFunctionPtrTI) return *TaskContinuationFunctionPtrTI;
+  TaskContinuationFunctionPtrTI = createUnmanagedStorageType(
+      IGM.TaskContinuationFunctionPtrTy, ReferenceCounting::Unknown,
+      /*isOptional*/ false);
+  TaskContinuationFunctionPtrTI->NextConverted = FirstType;
+  FirstType = TaskContinuationFunctionPtrTI;
+  return *TaskContinuationFunctionPtrTI;
+}
+
+const TypeInfo &IRGenModule::getSwiftExecutorPtrTypeInfo() {
+  return Types.getSwiftExecutorPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getSwiftExecutorPtrTypeInfo() {
+  if (SwiftExecutorPtrTI) return *SwiftExecutorPtrTI;
+  SwiftExecutorPtrTI = createUnmanagedStorageType(IGM.SwiftExecutorPtrTy,
+                                                  ReferenceCounting::Unknown,
+                                                  /*isOptional*/ false);
+  SwiftExecutorPtrTI->NextConverted = FirstType;
+  FirstType = SwiftExecutorPtrTI;
+  return *SwiftExecutorPtrTI;
 }
 
 const LoadableTypeInfo &
@@ -1872,7 +1914,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
       = convertPrimitiveBuiltin(IGM,
                                 vecTy->getElementType()->getCanonicalType());
 
-    auto llvmVecTy = llvm::VectorType::get(elementTy, vecTy->getNumElements());
+    auto llvmVecTy = llvm::FixedVectorType::get(elementTy, vecTy->getNumElements());
     unsigned bitSize = size.getValue() * vecTy->getNumElements() * 8;
     if (!llvm::isPowerOf2_32(bitSize))
       bitSize = llvm::NextPowerOf2(bitSize);
@@ -2381,16 +2423,16 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-void IRGenFunction::setLocalSelfMetadata(CanType selfClass,
-                                         bool isExactSelfClass,
-                                         llvm::Value *value,
-                                         IRGenFunction::LocalSelfKind kind) {
-  assert(!LocalSelf && "already have local self metadata");
-  LocalSelf = value;
+void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
+                                           bool isExactSelfClass,
+                                           llvm::Value *value,
+                                           IRGenFunction::DynamicSelfKind kind) {
+  assert(!SelfValue && "already have local self metadata");
+  SelfValue = value;
   assert(selfClass->getClassOrBoundGenericClass()
          && "self type not a class?");
-  LocalSelfIsExact = isExactSelfClass;
-  LocalSelfType = selfClass;
+  SelfTypeIsExact = isExactSelfClass;
+  SelfType = selfClass;
   SelfKind = kind;
 }
 

@@ -6,6 +6,7 @@ add_swift_unittest(SwiftASTTests
   TestContext.cpp
   TypeMatchTests.cpp
   VersionRangeLattice.cpp
+  ImportTests.cpp
 )
 
 target_link_libraries(SwiftASTTests

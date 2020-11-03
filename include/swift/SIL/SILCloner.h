@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1542,6 +1542,13 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitUncheckedValueCastInst(
     UncheckedValueCastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    recordClonedInstruction(Inst, getBuilder().createUncheckedBitwiseCast(
+                                      getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+    return;
+  }
   recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
@@ -1946,7 +1953,7 @@ SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleExtract(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -1956,7 +1963,7 @@ SILCloner<ImplClass>::visitTupleElementAddrInst(TupleElementAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleElementAddr(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldNo(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -2086,7 +2093,8 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   if (conformance.isConcrete()) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
-    if (Ty != newLookupType) {
+    if (Ty != newLookupType &&
+        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
       assert(
           (Ty->isExactSuperclassOf(newLookupType) ||
            getBuilder().getModule().Types.getLoweredRValueType(
@@ -2919,6 +2927,41 @@ void SILCloner<ImplClass>::visitDifferentiabilityWitnessFunctionInst(
                           getBuilder().createDifferentiabilityWitnessFunction(
                               getOpLocation(Inst->getLoc()),
                               Inst->getWitnessKind(), Inst->getWitness()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitGetAsyncContinuationInst(GetAsyncContinuationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createGetAsyncContinuation(
+                            getOpLocation(Inst->getLoc()),
+                            getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createGetAsyncContinuationAddr(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getOperand()),
+                            getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createAwaitAsyncContinuation(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getOperand()),
+                            getOpBasicBlock(Inst->getResumeBB()),
+                            Inst->getErrorBB()
+                              ? getOpBasicBlock(Inst->getErrorBB())
+                              : nullptr));
 }
 
 } // end namespace swift
