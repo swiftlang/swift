@@ -31,7 +31,6 @@ public:
   typedef TinyPtrVector<SILFunction *> SCC;
 
 private:
-  SILModule &M;
   llvm::SmallVector<SCC, 32> TheSCCs;
   llvm::SmallVector<SILFunction *, 32> TheFunctions;
 
@@ -44,24 +43,33 @@ private:
   llvm::SmallSetVector<SILFunction *, 4> DFSStack;
 
 public:
-  BottomUpFunctionOrder(SILModule &M, BasicCalleeAnalysis *BCA)
-      : M(M), BCA(BCA), NextDFSNum(0) {}
+  // SWIFT_ENABLE_TENSORFLOW
+  BottomUpFunctionOrder(BasicCalleeAnalysis *BCA)
+      : BCA(BCA), NextDFSNum(0) {}
+
+  /// DFS on 'F' to compute bottom up order
+  void computeBottomUpOrder(SILFunction *F) {
+     DFS(F);
+  }
+
+  /// DFS on all functions in the module to compute bottom up order
+  void computeBottomUpOrder(SILModule *M) {
+    for (auto &F : *M)
+      DFS(&F);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Get the SCCs in bottom-up order.
   ArrayRef<SCC> getSCCs() {
-    if (!TheSCCs.empty())
-      return TheSCCs;
-
-    FindSCCs(M);
     return TheSCCs;
   }
 
-  /// Get a flattened view of all functions in all the SCCs in
-  /// bottom-up order
-  ArrayRef<SILFunction *> getFunctions() {
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get a flattened view of all functions in all the SCCs in bottom-up order
+  ArrayRef<SILFunction *> getBottomUpOrder() {
+  // SWIFT_ENABLE_TENSORFLOW END
     if (!TheFunctions.empty())
       return TheFunctions;
-
     for (auto SCC : getSCCs())
       for (auto *F : SCC)
         TheFunctions.push_back(F);
@@ -71,7 +79,6 @@ public:
 
 private:
   void DFS(SILFunction *F);
-  void FindSCCs(SILModule &M);
 };
 
 } // end namespace swift
