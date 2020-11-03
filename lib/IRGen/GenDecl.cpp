@@ -897,6 +897,11 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
     ObjCNonLazyClasses.push_back(classPtr);
 }
 
+/// Add the given global value to the Objective-C resilient class stub list.
+void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
+  ObjCClassStubs.push_back(classPtr);
+}
+
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
   RuntimeResolvableTypes.push_back(type);
@@ -992,6 +997,12 @@ void IRGenModule::emitGlobalLists() {
     // name but a magic section.
     emitGlobalList(*this, ObjCClasses, "objc_classes",
                    GetObjCSectionName("__objc_classlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
+    // So do resilient class stubs.
+    emitGlobalList(*this, ObjCClassStubs, "objc_class_stubs",
+                   GetObjCSectionName("__objc_stublist",
                                       "regular,no_dead_strip"),
                    llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 

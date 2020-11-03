@@ -102,6 +102,12 @@ import resilient_objc_class
 
 // NEGATIVE-NOT: @objc_classes =
 
+// -- ... but they do appear in the stub list
+
+// CHECK-LABEL: @objc_class_stubs = internal global
+// CHECK-SAME: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
+// CHECK-SAME: , section "__DATA,__objc_stublist,regular,no_dead_strip"
+
 // -- The category list
 
 // CHECK-LABEL: @objc_categories = internal global
