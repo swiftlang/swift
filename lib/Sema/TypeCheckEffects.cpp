@@ -1504,6 +1504,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
+    void preserveCoverageFromOptionalOrForcedTryOperand() {
+      OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
+    }
+
     void preserveCoverageFromInterpolatedString() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
@@ -1848,6 +1852,8 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
+
+    scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
 
@@ -1862,6 +1868,8 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
+
+    scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
 };
