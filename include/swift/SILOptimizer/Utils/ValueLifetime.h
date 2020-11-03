@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CFG_H
 #define SWIFT_SILOPTIMIZER_UTILS_CFG_H
 
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -59,19 +60,62 @@ public:
   /// We templatize over the RangeTy so that we can initialize
   /// ValueLifetimeAnalysis with misc iterators including transform
   /// iterators.
-  template <typename RangeTy>
-  ValueLifetimeAnalysis(decltype(defValue) def, const RangeTy &userRange)
-      : defValue(def), userSet(userRange.begin(), userRange.end()) {
+  template <typename RangeTy,
+            typename std::enable_if<
+              std::is_same<
+                swift::Operand,
+                typename remove_cpr<decltype(std::begin<RangeTy>())>::type
+              >::value
+            >::type * = nullptr>
+  ValueLifetimeAnalysis(SILArgument *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
     propagateLiveness();
   }
 
-  /// Constructor for the value \p def considering all the value's uses.
-  ValueLifetimeAnalysis(SILInstruction *def) : defValue(def) {
-    for (auto result : def->getResults()) {
-      for (Operand *op : result->getUses()) {
-        userSet.insert(op->getUser());
-      }
-    }
+  template <typename RangeTy,
+            typename std::enable_if<
+              std::is_base_of<
+                swift::SILInstruction,
+                typename remove_cpr<decltype(std::begin<RangeTy>())>::type
+              >::value
+            >::type * = nullptr>
+  ValueLifetimeAnalysis(
+      SILArgument *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use);
+    propagateLiveness();
+  }
+
+  template <typename RangeTy,
+            typename std::enable_if<
+              std::is_same<
+                swift::Operand,
+                typename remove_cpr<decltype(std::begin<RangeTy>())>::type
+              >::value
+            >::type * = nullptr>
+  ValueLifetimeAnalysis(
+      SILInstruction *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
+  template <typename RangeTy,
+            typename std::enable_if<
+              std::is_base_of<
+                swift::SILInstruction,
+                typename remove_cpr<decltype(std::begin<RangeTy>())>::type
+              >::value
+            >::type * = nullptr>
+  ValueLifetimeAnalysis(
+      SILInstruction *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use);
     propagateLiveness();
   }
 

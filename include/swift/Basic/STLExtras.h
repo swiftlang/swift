@@ -752,6 +752,17 @@ using all_true =
 template <class... Ts>
 using are_all_compound = all_true<std::is_compound<Ts>::value...>;
 
+/// Removes reference, pointer, const from T.
+template <typename T>
+struct remove_cpr {
+  using type =
+    typename std::remove_const<
+      typename std::remove_pointer<
+        typename std::remove_reference<T>
+      >
+    >::type;
+};
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H
