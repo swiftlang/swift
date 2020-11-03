@@ -3794,6 +3794,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
               classDecl, NotForDefinition,
               TypeMetadataAddress::AddressPoint);
           emitObjCClassSymbol(IGM, classDecl, stub);
+
+          IGM.addObjCClassStub(stub);
         }
       }
       break;
