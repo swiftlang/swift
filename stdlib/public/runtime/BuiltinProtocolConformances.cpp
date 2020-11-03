@@ -33,6 +33,11 @@ using StaticInfixWitness = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
 #define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL "@GOTPCREL + 1"
 #endif
 
+#if defined(__wasm__)
+// Wasm doesn't support pc relative relocation, so use absolute ptr
+#define INDIRECT_RELREF_GOTPCREL(SYMBOL) SYMBOL
+#endif
+
 // MachO indirect symbol references.
 #if defined(__MACH__)
 
@@ -105,6 +110,16 @@ __asm(
   "  .lcomm __swift_tupleEquatable_private, 128, 16\n"
   "  .section .rdata, \"dr\"\n"
   #pragma comment(linker, "/EXPORT:_swift_tupleEquatable_conf,DATA")
+  #elif defined(__wasm__)
+  "  .section .rodata,\"\",@\n"
+  "__swift_tupleEquatable_private:\n"
+  "  .type __swift_tupleEquatable_private, @object\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .size __swift_tupleEquatable_private, 128\n"
+  "  .type " TUPLE_EQUATABLE_CONF ", @object\n"
   #endif
   "  .globl " TUPLE_EQUATABLE_CONF "\n"
   "  .p2align 2\n"
@@ -128,7 +143,11 @@ __asm(
   // Equatable == method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(EQUATABLE_EE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the equals witness defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_EQUATABLE_EQUALS ")\n"
+  #else
   "  .long (" TUPLE_EQUATABLE_EQUALS ") - .\n"
+  #endif
   // The witness table size in words.
   "  .short 0\n"
   // The witness table private size in words & requires instantiation.
@@ -137,8 +156,12 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
+  #if defined(__wasm__)
+  "  .long __swift_tupleEquatable_private\n"
+  #else
   "  .long __swift_tupleEquatable_private - .\n"
-  #if defined(__ELF__)
+  #endif
+  #if defined(__ELF__) || defined(__wasm__)
   "  .size " TUPLE_EQUATABLE_CONF ", 40\n"
   #endif
 );
@@ -236,6 +259,8 @@ __asm(
   #elif defined(_WIN32)
   "  .section .sw5tyrf$B, \"dr\", discard, \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
   "  .globl \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\"\n"
+  #elif defined(__wasm__)
+  "  .section .rodata.__swift5_typeref,\"\",@\n"
   #endif
   "  .p2align 1\n"
   "\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\":\n"
@@ -243,10 +268,14 @@ __asm(
   "  .byte 7\n"
   // This is a direct relative reference to the base accessor for Equatable
   // defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_COMPARABLE_BASEACCESSOREQUATABLE ")\n"
+  #else
   "  .long (" TUPLE_COMPARABLE_BASEACCESSOREQUATABLE ") - .\n"
+  #endif
   // This 0 is our null terminator.
   "  .byte 0\n"
-  #if defined (__ELF__)
+  #if defined (__ELF__) || defined(__wasm__)
   "  .size \"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\", 7\n"
   #endif
 );
@@ -268,6 +297,16 @@ __asm(
   "  .lcomm __swift_tupleComparable_private, 128, 16\n"
   "  .section .rdata, \"dr\"\n"
   #pragma comment(linker, "/EXPORT:_swift_tupleComparable_conf,DATA")
+  #elif defined(__wasm__)
+  "  .section .rodata,\"\",@\n"
+  "__swift_tupleComparable_private:\n"
+  "  .type __swift_tupleComparable_private, @object\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .size __swift_tupleComparable_private, 128\n"
+  "  .type " TUPLE_COMPARABLE_CONF ", @object\n"
   #endif
   "  .globl " TUPLE_COMPARABLE_CONF "\n"
   "  .p2align 2\n"
@@ -293,30 +332,50 @@ __asm(
   // This is a direct relative reference to the associated conformance for
   // Equatable defined above in assembly. NOTE: We + 1 here because the
   // associated conformance structure is 1 aligned.
+  #if defined(__wasm__)
+  "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") + 1\n"
+  #else
   "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - . + 1\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Comparable.< method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_LT_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the less than witness defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_COMPARABLE_LESSTHAN ")\n"
+  #else
   "  .long (" TUPLE_COMPARABLE_LESSTHAN ") - .\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Comparable.<= method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(COMPARBALE_LTE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the less than or equal witness
   // defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_COMPARABLE_LESSTHANOREQUAL ")\n"
+  #else
   "  .long (" TUPLE_COMPARABLE_LESSTHANOREQUAL ") - .\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Comparable.>= method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_GTE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the greater than or equal witness
   // defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_COMPARABLE_GREATERTHANOREQUAL ")\n"
+  #else
   "  .long (" TUPLE_COMPARABLE_GREATERTHANOREQUAL ") - .\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Comparable.> method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(COMPARABLE_GT_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the greater than witness defined
   // below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_COMPARABLE_GREATERTHAN ")\n"
+  #else
   "  .long (" TUPLE_COMPARABLE_GREATERTHAN ") - .\n"
+  #endif
   // The witness table size in words.
   "  .short 0\n"
   // The witness table private size in words & requires instantiation.
@@ -325,8 +384,12 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
+  #if defined(__wasm__)
+  "  .long __swift_tupleComparable_private\n"
+  #else
   "  .long __swift_tupleComparable_private - .\n"
-  #if defined(__ELF__)
+  #endif
+  #if defined(__ELF__) || defined(__wasm__)
   "  .size " TUPLE_COMPARABLE_CONF ", 72\n"
   #endif
 );
@@ -634,6 +697,16 @@ __asm(
   "  .lcomm __swift_tupleHashable_private, 128, 16\n"
   "  .section .rdata, \"dr\"\n"
   #pragma comment(linker, "/EXPORT:_swift_tupleHashable_conf,DATA")
+  #elif defined(__wasm__)
+  "  .section .rodata,\"\",@\n"
+  "__swift_tupleHashable_private:\n"
+  "  .type __swift_tupleHashable_private, @object\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .8byte 0\n  .8byte 0\n  .8byte 0\n  .8byte 0\n"
+  "  .size __swift_tupleHashable_private, 128\n"
+  "  .type " TUPLE_HASHABLE_CONF ", @object\n"
   #endif
   "  .globl " TUPLE_HASHABLE_CONF "\n"
   "  .p2align 2\n"
@@ -663,17 +736,29 @@ __asm(
   // from its elements whose witness table is located in the same place for both
   // protocols. NOTE: We + 1 here because the associated conformance
   // structure is 1 aligned.
+  #if defined(__wasm__)
+  "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") + 1\n"
+  #else
   "  .long (\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - . + 1\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Hashable.hashValue method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_HASHVALUE_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the hashValue witness defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_HASHABLE_HASHVALUE ")\n"
+  #else
   "  .long (" TUPLE_HASHABLE_HASHVALUE ") - .\n"
+  #endif
   // This is an indirectable relative reference to the GOT entry for the
   // Hashable.hash(into:) method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_HASH_METHOD_DESCRIPTOR) "\n"
   // This is a direct relative reference to the hash(into:) witness defined below.
+  #if defined(__wasm__)
+  "  .long (" TUPLE_HASHABLE_HASH ")\n"
+  #else
   "  .long (" TUPLE_HASHABLE_HASH ") - .\n"
+  #endif
   // This is an indirectable relative reference to the GOT equivalent for the
   // Hashable._rawHashValue method descriptor.
   "  .long " INDIRECT_RELREF_GOTPCREL(HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR) "\n"
@@ -688,8 +773,12 @@ __asm(
   "  .long 0\n"
   // This is a direct relative reference to the private data for the
   // conformance.
+  #if defined(__wasm__)
+  "  .long __swift_tupleHashable_private\n"
+  #else
   "  .long __swift_tupleHashable_private - .\n"
-  #if defined(__ELF__)
+  #endif
+  #if defined(__ELF__) || defined(__wasm__)
   "  .size " TUPLE_HASHABLE_CONF ", 64\n"
   #endif
 );
