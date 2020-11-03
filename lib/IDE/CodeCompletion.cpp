@@ -2381,58 +2381,6 @@ public:
     }
   }
 
-  /// For printing in code completion results, replace archetypes with
-  /// protocol compositions.
-  ///
-  /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature genericSig) {
-    if (!genericSig)
-      return type;
-
-    auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
-      SmallVector<Type, 2> types;
-      for (auto proto : protos)
-        types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(Ctx, types,
-                                          /*HasExplicitAnyObject=*/false);
-    };
-
-    if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
-      SmallVector<AnyFunctionType::Param, 8> erasedParams;
-      for (const auto &param : genericFuncType->getParams()) {
-        auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-        erasedParams.emplace_back(erasedTy, param.getLabel(),
-                                  param.getParameterFlags());
-      }
-      return GenericFunctionType::get(genericSig,
-          erasedParams,
-          eraseArchetypes(genericFuncType->getResult(), genericSig),
-          genericFuncType->getExtInfo());
-    }
-
-    return type.transform([&](Type t) -> Type {
-      // FIXME: Code completion should only deal with one or the other,
-      // and not both.
-      if (auto *archetypeType = t->getAs<ArchetypeType>()) {
-        // Don't erase opaque archetype.
-        if (isa<OpaqueTypeArchetypeType>(archetypeType))
-          return t;
-
-        auto protos = archetypeType->getConformsTo();
-        if (!protos.empty())
-          return buildProtocolComposition(protos);
-      }
-
-      if (t->isTypeParameter()) {
-        const auto protos = genericSig->getRequiredProtocols(t);
-        if (!protos.empty())
-          return buildProtocolComposition(protos);
-      }
-
-      return t;
-    });
-  }
-
   Type getTypeOfMember(const ValueDecl *VD,
                        DynamicLookupInfo dynamicLookupInfo) {
     switch (dynamicLookupInfo.getKind()) {
