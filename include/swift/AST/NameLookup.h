@@ -414,6 +414,22 @@ public:
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
+/// Filters out decls that are not usable based on their source location, eg.
+/// a decl inside its own initializer or a non-type decl before its definition.
+class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
+  const SourceManager &SM;
+  SourceLoc Loc;
+  VisibleDeclConsumer &ChainedConsumer;
+
+public:
+  UsableFilteringDeclConsumer(const SourceManager &SM, SourceLoc loc,
+                              VisibleDeclConsumer &consumer)
+      : SM(SM), Loc(loc), ChainedConsumer(consumer) {}
+
+  void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
+                 DynamicLookupInfo dynamicLookupInfo) override;
+};
+
 /// Remove any declarations in the given set that were overridden by
 /// other declarations in that set.
 ///

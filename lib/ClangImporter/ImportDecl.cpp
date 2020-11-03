@@ -5696,8 +5696,7 @@ namespace {
 }
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
-                                               const ProtocolDecl *proto,
-                                               ModuleDecl *foundationModule) {
+                                               const ProtocolDecl *proto) {
   auto &ctx = nominal->getASTContext();
 
   if (inheritanceListContainsProtocol(nominal, proto))
@@ -5720,7 +5719,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   for (ExtensionDecl *extension : nominal->getExtensions()) {
     ModuleDecl *extensionModule = extension->getParentModule();
     if (extensionModule != originalModule && extensionModule != overlayModule &&
-        extensionModule != foundationModule) {
+        !extensionModule->isFoundationModule()) {
       continue;
     }
     if (inheritanceListContainsProtocol(extension, proto))
@@ -5815,8 +5814,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
-    if (conformsToProtocolInOriginalModule(computedNominal, proto,
-                                           Impl.tryLoadFoundationModule())) {
+    if (conformsToProtocolInOriginalModule(computedNominal, proto)) {
       synthesizedProtocols.push_back(kind);
       return true;
     }

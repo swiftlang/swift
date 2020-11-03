@@ -326,6 +326,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           // Ignore all other implicit expressions.
           continue;
         }
+      } else if (auto D = ESD.dyn_cast<Decl*>()) {
+        // Local type declarations are not unreachable because they can appear
+        // after the declared type has already been used.
+        if (isa<TypeDecl>(D))
+          continue;
       }
       
       if (StmtType != UnknownStmtType) {
