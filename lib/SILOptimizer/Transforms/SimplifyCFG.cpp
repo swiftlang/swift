@@ -284,9 +284,14 @@ struct ThreadInfo {
 
 } // end anonymous namespace
 
+// FIXME: It would be far more efficient to clone the jump-threaded region using
+// a single invocation of the RegionCloner (see ArrayPropertyOpt) instead of a
+// BasicBlockCloner. Cloning a single block at a time forces the cloner to
+// create four extra blocks that immediately become dead after the conditional
+// branch and its clone is converted to an unconditional branch.
 bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
   LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << ti.Src->getDebugID()
-             << " to bb" << ti.Dest->getDebugID() << '\n');
+                          << " to bb" << ti.Dest->getDebugID() << '\n');
   auto *SrcTerm = cast<BranchInst>(ti.Src->getTerminator());
 
   BasicBlockCloner Cloner(SrcTerm->getDestBB());
@@ -297,28 +302,33 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
 
   // We have copied the threaded block into the edge.
   auto *clonedSrc = Cloner.getNewBB();
+  SmallVector<SILBasicBlock *, 4> clonedSuccessors(
+      clonedSrc->getSuccessorBlocks().begin(),
+      clonedSrc->getSuccessorBlocks().end());
+  SILBasicBlock *ThreadedSuccessorBlock = nullptr;
 
   // Rewrite the cloned branch to eliminate the non-taken path.
   if (auto *CondTerm = dyn_cast<CondBranchInst>(clonedSrc->getTerminator())) {
     // We know the direction this conditional branch is going to take thread
     // it.
-    assert(clonedSrc->getSuccessors().size() > ti.ThreadedSuccessorIdx &&
-           "Threaded terminator does not have enough successors");
+    assert(clonedSrc->getSuccessors().size() > ti.ThreadedSuccessorIdx
+           && "Threaded terminator does not have enough successors");
 
-    auto *ThreadedSuccessorBlock =
-      clonedSrc->getSuccessors()[ti.ThreadedSuccessorIdx].getBB();
+    ThreadedSuccessorBlock =
+        clonedSrc->getSuccessors()[ti.ThreadedSuccessorIdx].getBB();
     auto Args = ti.ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
-      : CondTerm->getFalseArgs();
+                                             : CondTerm->getFalseArgs();
 
-    SILBuilderWithScope(CondTerm)
-      .createBranch(CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
+    SILBuilderWithScope(CondTerm).createBranch(CondTerm->getLoc(),
+                                               ThreadedSuccessorBlock, Args);
 
     CondTerm->eraseFromParent();
+
   } else {
     // Get the enum element and the destination block of the block we jump
     // thread.
     auto *SEI = cast<SwitchEnumInst>(clonedSrc->getTerminator());
-    auto *ThreadedSuccessorBlock = SEI->getCaseDestination(ti.EnumCase);
+    ThreadedSuccessorBlock = SEI->getCaseDestination(ti.EnumCase);
 
     // Instantiate the payload if necessary.
     SILBuilderWithScope Builder(SEI);
@@ -329,19 +339,29 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
       auto Ty = EnumTy.getEnumElementType(ti.EnumCase, SEI->getModule(),
                                           Builder.getTypeExpansionContext());
       SILValue UED(
-        Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
-      assert(UED->getType() ==
-             (*ThreadedSuccessorBlock->args_begin())->getType() &&
-             "Argument types must match");
+          Builder.createUncheckedEnumData(Loc, EnumVal, ti.EnumCase, Ty));
+      assert(UED->getType()
+                 == (*ThreadedSuccessorBlock->args_begin())->getType()
+             && "Argument types must match");
       Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
-    } else
+
+    } else {
       Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
                            ArrayRef<SILValue>());
+    }
     SEI->eraseFromParent();
   }
-  // After rewriting the cloned branch, split the critical edge.
-  // This does not currently update DominanceInfo.
-  Cloner.splitCriticalEdges(nullptr, nullptr);
+  // If the jump-threading target "Dest" had multiple predecessors, then the
+  // cloner will have created unconditional branch predecessors, which can
+  // now be removed or folded after converting the source block "Src" to an
+  // unconditional branch.
+  for (auto *succBB : clonedSuccessors) {
+    removeIfDead(succBB);
+  }
+  if (auto *branchInst =
+          dyn_cast<BranchInst>(ThreadedSuccessorBlock->getTerminator())) {
+    simplifyBranchBlock(branchInst);
+  }
   Cloner.updateSSAAfterCloning();
   return true;
 }
@@ -564,8 +584,9 @@ bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
     return Changed;
 
   for (auto &ThreadInfo : JumpThreadableEdges) {
-    if (threadEdge(ThreadInfo))
+    if (threadEdge(ThreadInfo)) {
       Changed = true;
+    }
   }
 
   return Changed;
@@ -1269,6 +1290,10 @@ static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
 
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
+///
+/// Performs trivial trampoline removal. May be called as a utility to cleanup
+/// successors after removing conditional branches or predecessors after
+/// deleting unreachable blocks.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If we are asked to not simplify unconditional branches (for testing
   // purposes), exit early.
@@ -1385,13 +1410,6 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
     return true;
   }
-
-  // If this unconditional branch has BBArgs, check to see if duplicating the
-  // destination would allow it to be simplified.  This is a simple form of jump
-  // threading.
-  if (!isVeryLargeFunction && tryJumpThreading(BI))
-    return true;
-
   return Simplified;
 }
 
@@ -2649,6 +2667,13 @@ bool SimplifyCFG::simplifyBlocks() {
     switch (TI->getTermKind()) {
     case TermKind::BranchInst:
       if (simplifyBranchBlock(cast<BranchInst>(TI))) {
+        Changed = true;
+        continue;
+      }
+      // If this unconditional branch has BBArgs, check to see if duplicating
+      // the destination would allow it to be simplified.  This is a simple form
+      // of jump threading.
+      if (!isVeryLargeFunction && tryJumpThreading(cast<BranchInst>(TI))) {
         Changed = true;
         continue;
       }
