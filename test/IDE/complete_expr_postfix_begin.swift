@@ -82,6 +82,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_6 | %FileCheck %s -check-prefix=OWN_INIT_6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_7 | %FileCheck %s -check-prefix=OWN_INIT_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_8 | %FileCheck %s -check-prefix=OWN_INIT_8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_9 | %FileCheck %s -check-prefix=OWN_INIT_9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_10 | %FileCheck %s -check-prefix=OWN_INIT_10
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_1 | %FileCheck %s -check-prefix=OWN_ACCESSOR_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_ACCESSOR_2 | %FileCheck %s -check-prefix=OWN_ACCESSOR_2
@@ -584,6 +587,9 @@ func sync() {}
 var ownInit2: () -> Void = { #^OWN_INIT_2^# }
 // OWN_INIT_2: Begin completions
 // OWN_INIT_2-NOT: ownInit2
+var ownInit8: Int = "\(#^OWN_INIT_8^#)"
+// OWN_INIT_8: Begin completions
+// OWN_INIT_8-NOT: ownInit8
 struct OwnInitTester {
   var ownInit3: Int = #^OWN_INIT_3^#
   // OWN_INIT_3: Begin completions
@@ -591,6 +597,9 @@ struct OwnInitTester {
   var ownInit4: () -> Void = { #^OWN_INIT_4^# }
   // OWN_INIT_4: Begin completions
   // OWN_INIT_4-NOT: ownInit4
+  var ownInit9: String = "\(#^OWN_INIT_9^#)"
+  // OWN_INIT_9: Begin completions
+  // OWN_INIT_9-NOT: ownInit9
 }
 func ownInitTesting() {
   var ownInit5: Int = #^OWN_INIT_5^#
@@ -599,6 +608,9 @@ func ownInitTesting() {
   var ownInit6: () -> Void = { #^OWN_INIT_6^# }
   // OWN_INIT_6: Begin completions
   // OWN_INIT_6-NOT: ownInit6
+  var ownInit10: String = "\(#^OWN_INIT_10^#)"
+  // OWN_INIT_10: Begin completions
+  // OWN_INIT_10-NOT: ownInit10
 }
 func ownInitTestingShadow(ownInit7: Int) {
   var ownInit7: Int = #^OWN_INIT_7^#

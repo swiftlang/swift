@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
@@ -31,9 +30,11 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -148,10 +149,16 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
     DeclVisibilityKind reason, DynamicLookupInfo dynamicLookupInfo) {
   // Skip when Loc is within the decl's own initializer
   if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Only check if the VarDecl has the same (or parent) context to avoid
+    // grabbing the end location for every decl
     if (auto *init = VD->getParentInitializer()) {
-      auto initRange = init->getSourceRange();
-      if (initRange.isValid() && SM.rangeContainsTokenLoc(initRange, Loc))
-        return;
+      auto *varContext = VD->getDeclContext();
+      if (DC == varContext || DC->isChildContextOf(varContext)) {
+        auto initRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, init->getSourceRange());
+        if (initRange.isValid() && initRange.contains(Loc))
+          return;
+      }
     }
   }
 
