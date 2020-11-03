@@ -26,7 +26,7 @@ struct InternalConforming : DifferentiableRequirement {
 
 // expected-error @+1 {{type 'PublicConforming' does not conform to protocol 'DifferentiableRequirement'}}
 public struct PublicConforming : DifferentiableRequirement {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: float)'}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(wrt: float)' attribute to satisfy requirement 'foo(float:empty:)' (in protocol 'DifferentiableRequirement')}}
   public func foo(float: Float, empty: Empty) -> Float {
     return float
   }
