@@ -1563,13 +1563,6 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
     const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
-  // We only emit diagnostics for API unavailability, not for explicitly
-  // weak-linked symbols.
-  if (Reason.getReasonKind() !=
-      UnavailabilityReason::Kind::RequiresOSVersionRange) {
-    return;
-  }
-
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
@@ -1592,13 +1585,6 @@ void TypeChecker::diagnosePotentialUnavailability(
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
-
-  // We only emit diagnostics for API unavailability, not for explicitly
-  // weak-linked symbols.
-  if (Reason.getReasonKind() !=
-      UnavailabilityReason::Kind::RequiresOSVersionRange) {
-    return;
-  }
 
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
