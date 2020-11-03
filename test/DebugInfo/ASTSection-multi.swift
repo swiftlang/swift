@@ -1,4 +1,3 @@
-// REQUIRES: OS=linux-gnu
 // REQUIRES: executable_test
 // REQUIRES: swift_tools_extra
 
@@ -46,4 +45,3 @@
 // CHECK: Importing a1... ok!
 // CHECK: Importing a2... ok!
 // CHECK: Importing a3... ok!
-
