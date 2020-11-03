@@ -2834,9 +2834,6 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
       continue;
 
     Cloner.cloneBranchTarget(Branch);
-
-    // Does not currently update DominanceInfo.
-    Cloner.splitCriticalEdges(nullptr, nullptr);
     Cloner.updateSSAAfterCloning();
 
     Changed = true;
