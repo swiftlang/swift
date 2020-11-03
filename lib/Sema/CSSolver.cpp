@@ -2191,6 +2191,10 @@ Constraint *ConstraintSystem::selectDisjunction() {
         unsigned firstFavored = first->countFavoredNestedConstraints();
         unsigned secondFavored = second->countFavoredNestedConstraints();
 
+        if (!isOperatorBindOverload(first->getNestedConstraints().front()) ||
+            !isOperatorBindOverload(second->getNestedConstraints().front()))
+          return first->countActiveNestedConstraints() < second->countActiveNestedConstraints();
+
         if (firstFavored == secondFavored) {
           // Look for additional choices to favor
           SmallVector<unsigned, 4> firstExisting;
@@ -2202,11 +2206,11 @@ Constraint *ConstraintSystem::selectDisjunction() {
           secondFavored = secondExisting.size() ? secondExisting.size() : second->countActiveNestedConstraints();
 
           return firstFavored < secondFavored;
-        } else {
-          firstFavored = firstFavored ? firstFavored : first->countActiveNestedConstraints();
-          secondFavored = secondFavored ? secondFavored : second->countActiveNestedConstraints();
-          return firstFavored < secondFavored;
         }
+
+        firstFavored = firstFavored ? firstFavored : first->countActiveNestedConstraints();
+        secondFavored = secondFavored ? secondFavored : second->countActiveNestedConstraints();
+        return firstFavored < secondFavored;
       });
 
   if (minDisjunction != disjunctions.end())
