@@ -677,7 +677,7 @@ func receiveHasStatic<T: HasStatic>(x: T)  {}
 func testingGenericParam1<T: HasStatic>(x: inout T, fn: (T) -> Void) -> T {
   x = .#^GENERICPARAM_1^#
 // GENERICPARAM_1: Begin completions, 1 items
-// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#HasStatic#]; name=instance
+// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#{{[A-Z]}}#]
 // GENERICPARAM_1: End completions
 
   /* Parser sync. */;
@@ -785,7 +785,7 @@ func receiveMyStructOfMyProtocol<T: MyProtocol>(value: MyStruct<T>) {}
 func testTypeParamInContextType() {
   receiveMyStructOfMyProtocol(value: .#^TYPEPARAM_IN_CONTEXTTYPE_1^#)
 // TYPEPARAM_IN_CONTEXTTYPE_1: Begin completions, 3 items
-// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:      init()[#MyStruct<MyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:      init()[#MyStruct<T>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal:        otherProtocolOption[#MyStruct<ConcreteOtherProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions

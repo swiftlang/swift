@@ -101,7 +101,7 @@ func testQualified1() {
   L.#^L_QUALIFIED_0^#
 }
 // L_QUALIFIED_0: Begin completions
-// L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
+// L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#L<X>.Y#]{{; name=.+}}
 // L_QUALIFIED_0: End completions
 // NEGATIVE_L_QUALIFIED_0-NOT: X({#x: A#})
 
@@ -121,7 +121,7 @@ extension L {
   }
 }
 // INSIDE_L_0: Begin completions
-// INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
+// INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#Y#]{{; name=.+}}
 
 // FIXME: <rdar://problem/20530021> Code complete generic parameters in extensions
 // INSIDE_L_0-DAG: Decl[GenericTypeParam]/Local:     X[#X#]; name=X
@@ -136,7 +136,7 @@ struct M<X: G> {
   }
 }
 // INSIDE_M_0: Begin completions
-// INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
+// INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#Y#]{{; name=.+}}
 // INSIDE_M_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
 // INSIDE_M_0: End completions
 

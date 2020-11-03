@@ -191,15 +191,15 @@ func postfixExpr() {
   let _ = value#^POSTFIX_TestProtocol_NODOT^#
 }
 // POSTFIX_TestProtocol_DOT: Begin completions, 3 items
-// POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
-// POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
+// POSTFIX_TestProtocol_DOT-DAG:                                     foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (TestProtocol.Assoc2) -> TestProtocol.Assoc1##(TestProtocol.Assoc2) -> TestProtocol.Assoc1#})[#TestProtocol.Assoc2#]; name={{.*$}}
+// POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#(TestProtocol.Assoc1, TestProtocol.Assoc2)#]; name={{.*$}}
 // POSTFIX_TestProtocol_DOT-DAG: Keyword[self]/CurrNominal:          self[#TestProtocol#]; name={{.*$}}
 // POSTFIX_TestProtocol_DOT: End completions
 
 // POSTFIX_TestProtocol_NODOT: Begin completions, 5 items
-// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
-// POSTFIX_TestProtocol_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): TestProtocol.Assoc1#}, {#(idx2): Comparable#}][#TestProtocol#]; name={{.*$}}
-// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (TestProtocol.Assoc2) -> TestProtocol.Assoc1##(TestProtocol.Assoc2) -> TestProtocol.Assoc1#})[#TestProtocol.Assoc2#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): TestProtocol.Assoc1#}, {#(idx2): TestProtocol.Assoc2#}][#TestProtocol#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .value[#(TestProtocol.Assoc1, TestProtocol.Assoc2)#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: BuiltinOperator/None:                = {#TestProtocol#}[#Void#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#TestProtocol#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: End completions

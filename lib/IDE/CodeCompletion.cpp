@@ -2230,19 +2230,139 @@ public:
       Builder.addLeadingDot();
   }
 
+  /// Stands for a subtype requirement 'T : P' representing the bounds of
+  /// an archetype that appears in the type signature of a completion result.
+  /// Auxiliary requirements are currently appended to the corresponding type
+  /// annotation in the form of a generic \c where clause.
+  struct AuxiliaryRequirement {
+    Type FirstTy;
+    Type SecondTy;
+  };
+
+  llvm::SmallVector<AuxiliaryRequirement, 2>
+  computeAuxiliaryRequirements(Type Ty, GenericSignature GenericSig) {
+    using AuxiliaryRequirements = llvm::SmallVector<AuxiliaryRequirement, 2>;
+
+    class RequirementCollector : public TypeWalker {
+      const ASTContext &Ctx;
+      GenericSignature GenericSig;
+      AuxiliaryRequirements &Reqs;
+      llvm::SmallDenseSet<Type, 2> Visited;
+
+    public:
+      explicit RequirementCollector(const ASTContext &Ctx,
+                                    GenericSignature GenericSig,
+                                    AuxiliaryRequirements &Reqs)
+          : Ctx(Ctx), GenericSig(GenericSig), Reqs(Reqs) {}
+
+      Action walkToTypePre(Type Ty) override {
+        if (!Ty->isTypeParameter()) {
+          return Action::Continue;
+        }
+
+        if (!Visited.insert(Ty).second) {
+          return Action::SkipChildren;
+        }
+
+        llvm::SmallVector<Type, 2> Bounds;
+        for (auto *const Proto : GenericSig->getRequiredProtocols(Ty)) {
+          Bounds.push_back(Proto->getDeclaredInterfaceType());
+        }
+        if (const auto SuperclassTy = GenericSig->getSuperclassBound(Ty)) {
+          Bounds.push_back(SuperclassTy);
+        }
+
+        if (Bounds.empty()) {
+          return Action::SkipChildren;
+        }
+
+        Reqs.push_back(AuxiliaryRequirement{
+            Ty, ProtocolCompositionType::get(Ctx, Bounds,
+                                             /*HasExplicitAnyObject=*/false)});
+
+        return Action::SkipChildren;
+      }
+    };
+
+    // Don't visit generic signatures.
+    if (auto *const GFT = Ty->getAs<GenericFunctionType>()) {
+      return computeAuxiliaryRequirements(FunctionType::get(GFT->getParams(),
+                                                            GFT->getResult(),
+                                                            GFT->getExtInfo()),
+                                          GenericSig);
+    }
+
+    // We are only interested in type parameters –
+    AuxiliaryRequirements Result;
+    if (!Ty->hasTypeParameter()) {
+      return Result;
+    }
+
+    Ty.walk(RequirementCollector(Ctx, GenericSig, Result));
+
+    // Use the canonical ordering for dependent types to sort the requirements.
+    llvm::array_pod_sort(Result.begin(), Result.end(),
+                         [](const AuxiliaryRequirement *Req1,
+                            const AuxiliaryRequirement *Req2) {
+      return swift::compareDependentTypes(Req1->FirstTy, Req2->FirstTy);
+    });
+
+    return Result;
+  }
+
+  void addAuxiliaryRequirements(CodeCompletionResultBuilder &Builder, Type T,
+                                GenericSignature Sig, const PrintOptions &PO) {
+    const auto Reqs = computeAuxiliaryRequirements(T, Sig);
+    if (Reqs.empty()) {
+      return;
+    }
+
+    if (Builder.shouldAnnotateResults()) {
+      Builder.withNestedGroup(
+          CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
+        Builder.addKeyword(" where ");
+        llvm::interleave(
+            Reqs,
+            [&](const AuxiliaryRequirement &Req) {
+              AnnotatedTypePrinter Printer(Builder);
+              Req.FirstTy.print(Printer, PO);
+              Printer.printText(" : ");
+              Req.SecondTy.print(Printer, PO);
+            },
+            [&] { Builder.addComma(); });
+      });
+    } else {
+      llvm::SmallString<32> Buffer;
+      llvm::raw_svector_ostream OS(Buffer);
+
+      OS << " where ";
+      llvm::interleave(
+          Reqs,
+          [&](const AuxiliaryRequirement &Req) {
+            Req.FirstTy.print(OS, PO);
+            OS << " : ";
+            Req.SecondTy.print(OS, PO);
+          },
+          [&] { OS << ", "; });
+
+      Builder.addTypeAnnotation(Buffer);
+    }
+  }
+
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
-    addTypeAnnotation(Builder, T, /*GenericSig=*/nullptr);
+    addTypeAnnotation(Builder, T, /*TargetTy=*/nullptr, /*GenericSig=*/nullptr);
   }
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder,
-                         Type T, GenericSignature GenericSig,
+                         Type AnnotationTy, Type TargetTy,
+                         GenericSignature GenericSig,
                          bool PrintOptionalAsImplicitlyUnwrapped = false,
                          bool DynamicOrOptional = false) {
     const char *Suffix = "";
     // FIXME: This retains previous behavior, but in reality the type of dynamic
     // lookups is IUO, not Optional as it is for the @optional attribute.
     if (PrintOptionalAsImplicitlyUnwrapped && DynamicOrOptional) {
-      T = T->getOptionalObjectType();
+      AnnotationTy = AnnotationTy->getOptionalObjectType();
       Suffix = "?";
     }
 
@@ -2252,9 +2372,13 @@ public:
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     if (auto *TypeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(TypeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(eraseArchetypes(T, GenericSig), PO, Suffix);
-    Builder.setExpectedTypeRelation(
-        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
+    Builder.addTypeAnnotation(AnnotationTy, PO, Suffix);
+    Builder.setExpectedTypeRelation(calculateMaxTypeRelation(
+        AnnotationTy, expectedTypeContext, CurrDeclContext));
+
+    if (TargetTy) {
+      addAuxiliaryRequirements(Builder, TargetTy, GenericSig, PO);
+    }
   }
 
   /// For printing in code completion results, replace archetypes with
@@ -2501,11 +2625,11 @@ public:
       VarType = OptionalType::get(VarType);
     }
 
-    auto genericSig =
-        VD->getInnermostDeclContext()->getGenericSignatureOfContext();
-    addTypeAnnotation(Builder, VarType, genericSig,
-                      VD->isImplicitlyUnwrappedOptional(),
-                      DynamicOrOptional);
+    addTypeAnnotation(Builder, VarType,
+                      // Variables cannot be generic and do not need auxiliary
+                      // requirements.
+                      /*TargetTy=*/Type(), /*GenericSig=*/nullptr,
+                      VD->isImplicitlyUnwrappedOptional(), DynamicOrOptional);
 
     if (isUnresolvedMemberIdealType(VarType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -2599,8 +2723,7 @@ public:
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName,
-                               eraseArchetypes(paramTy, genericSig), contextTy,
+      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
                                isVariadic, isInOut, isIUO, isAutoclosure,
                                /*useUnderscoreLabel=*/false,
                                /*isLabeledTrailingClosure=*/false);
@@ -2711,7 +2834,7 @@ public:
   }
 
   void addSubscriptCallPattern(
-      const AnyFunctionType *AFT, const SubscriptDecl *SD,
+      AnyFunctionType *AFT, const SubscriptDecl *SD,
       const Optional<SemanticContextKind> SemanticContext = None) {
     foundFunction(AFT);
     GenericSignature genericSig;
@@ -2742,12 +2865,12 @@ public:
     else
       Builder.addAnnotatedRightBracket();
 
-    addTypeAnnotation(Builder, AFT->getResult(), genericSig,
+    addTypeAnnotation(Builder, AFT->getResult(), AFT, genericSig,
                       SD && SD->isImplicitlyUnwrappedOptional());
   }
 
   void addFunctionCallPattern(
-      const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
+      AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
       const Optional<SemanticContextKind> SemanticContext = None) {
     GenericSignature genericSig;
     if (AFD)
@@ -2784,7 +2907,7 @@ public:
 
       addThrows(Builder, AFT, AFD);
 
-      addTypeAnnotation(Builder, AFT->getResult(), genericSig,
+      addTypeAnnotation(Builder, AFT->getResult(), AFT, genericSig,
                         AFD && AFD->isImplicitlyUnwrappedOptional());
     };
 
@@ -2911,8 +3034,7 @@ public:
         Builder.addOptionalMethodCallTail();
 
       if (!AFT) {
-        addTypeAnnotation(Builder, FunctionType,
-                          FD->getGenericSignatureOfContext());
+        addTypeAnnotation(Builder, FunctionType);
         return;
       }
       if (IsImplicitlyCurriedInstanceMethod) {
@@ -2949,8 +3071,7 @@ public:
       PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         PO.setBaseType(typeContext->getDeclaredTypeInContext());
-      Type AnnotationTy =
-          eraseArchetypes(ResultType, FD->getGenericSignatureOfContext());
+      Type AnnotationTy = ResultType;
       if (Builder.shouldAnnotateResults()) {
         Builder.withNestedGroup(
             CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
@@ -2984,6 +3105,9 @@ public:
         AnnotationTy.print(OS, PO);
         Builder.addTypeAnnotation(TypeStr);
       }
+
+      addAuxiliaryRequirements(Builder, AFT, FD->getGenericSignatureOfContext(),
+                               PO);
 
       Builder.setExpectedTypeRelation(calculateMaxTypeRelation(
           ResultType, expectedTypeContext, CurrDeclContext));
@@ -3052,8 +3176,7 @@ public:
       }
 
       if (!ConstructorType) {
-        addTypeAnnotation(Builder, MemberType,
-                          CD->getGenericSignatureOfContext());
+        addTypeAnnotation(Builder, MemberType);
         return;
       }
 
@@ -3076,7 +3199,9 @@ public:
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
-      addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext(),
+
+      addTypeAnnotation(Builder, *Result, MemberType,
+                        CD->getGenericSignatureOfContext(),
                         CD->isImplicitlyUnwrappedOptional());
     };
 
@@ -3154,7 +3279,9 @@ public:
       // Optional<T> type.
       resultTy = OptionalType::get(resultTy);
     }
-    addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
+
+    addTypeAnnotation(Builder, resultTy, subscriptType,
+                      SD->getGenericSignatureOfContext());
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
@@ -3283,6 +3410,7 @@ public:
     if (EnumType->is<AnyFunctionType>())
       EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
+    Type AnnotationTy = EnumType;
     if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
       addCallArgumentPatterns(Builder, EnumType->castTo<FunctionType>(),
@@ -3291,12 +3419,13 @@ public:
       Builder.addRightParen();
 
       // Extract result as the enum type.
-      EnumType = EnumType->castTo<FunctionType>()->getResult();
+      AnnotationTy = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    addTypeAnnotation(Builder, EnumType, EED->getGenericSignatureOfContext());
+    addTypeAnnotation(Builder, AnnotationTy, EnumType,
+                      EED->getGenericSignatureOfContext());
 
-    if (isUnresolvedMemberIdealType(EnumType))
+    if (isUnresolvedMemberIdealType(AnnotationTy))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
   }
 
@@ -3405,8 +3534,10 @@ public:
       Builder.addRightParen();
     }
 
-    if (funcTy)
-      addTypeAnnotation(Builder, funcTy, AFD->getGenericSignatureOfContext());
+    if (funcTy) {
+      addTypeAnnotation(Builder, funcTy, funcTy,
+                        AFD->getGenericSignatureOfContext());
+    }
 
     return true;
   }

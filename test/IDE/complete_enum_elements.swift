@@ -134,12 +134,12 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: FooEnum)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#arrayLiteral: FooEnum...#})[#Array<FooEnum>#]; name=AllCases(arrayLiteral: FooEnum...)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases()[#Array<FooEnum>#]; name=AllCases()
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(s): Sequence#})[#Array<FooEnum>#]; name=AllCases(s: Sequence)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(s): S#})[#Array<FooEnum>#][# where S : Sequence#]; name=AllCases(s: S)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#Array<FooEnum>#]; name=AllCases(repeating: FooEnum, count: Int)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#unsafeUninitializedCapacity: Int#}, {#initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void##(inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void#})[' rethrows'][#Array<FooEnum>#]; name=AllCases(unsafeUninitializedCapacity: Int, initializingWith: (inout UnsafeMutableBufferPointer<FooEnum>, inout Int) throws -> Void) rethrows
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#from: Decoder#})[' throws'][#Array<FooEnum>#]; name=AllCases(from: Decoder) throws
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#repeating: FooEnum#}, {#count: Int#})[#FooEnum.AllCases#]; name=AllCases(repeating: FooEnum, count: Int)
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(elements): Sequence#})[#FooEnum.AllCases#]; name=AllCases(elements: Sequence)
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[Constructor]/CurrNominal/IsSystem: AllCases({#(elements): S#})[#FooEnum.AllCases#][# where S : Sequence#]; name=AllCases(elements: S)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal:        allCases[#[FooEnum]#]; name=allCases
 // FOO_ENUM_DOT_ELEMENTS-NEXT: End completions
 

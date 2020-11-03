@@ -11,9 +11,9 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
-// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
-// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: T##T#>)",
+// CHECK-NEXT:   key.description: "abs(x: T)",
+// CHECK-NEXT:   key.typename: "T where T : Comparable & SignedNumeric",
 // CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
