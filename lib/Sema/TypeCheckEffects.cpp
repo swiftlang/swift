@@ -404,9 +404,12 @@ public:
   }
 
   void merge(Classification other) {
+    bool oldAsync = IsAsync;
+    
     if (other.getResult() > getResult())
       *this = other;
-    IsAsync |= other.IsAsync;
+
+    IsAsync = oldAsync | other.IsAsync;
   }
 
   bool isInvalid() const { return IsInvalid; }
