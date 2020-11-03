@@ -395,10 +395,11 @@ public:
     return result;
   }
 
-  static Classification forRethrowingOnly(PotentialThrowReason reason) {
+  static Classification forRethrowingOnly(PotentialThrowReason reason, bool isAsync) {
     Classification result;
     result.Result = ThrowingKind::RethrowingOnly;
     result.Reason = reason;
+    result.IsAsync = isAsync;
     return result;
   }
 
@@ -563,7 +564,7 @@ private:
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
     if (param->getDeclContext() == RethrowsDC)
-      return Classification::forRethrowingOnly(reason);
+      return Classification::forRethrowingOnly(reason, /*async*/false);
 
     // Otherwise, it throws unconditionally.
     return Classification::forThrow(reason, /*async*/false);
