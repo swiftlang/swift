@@ -1,0 +1,267 @@
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+struct Pair { var lhs: AnyObject; var rhs: AnyObject }
+
+struct WrapperStruct {
+  var cls : Klass
+}
+
+struct SmallCodesizeStruct {
+  var cls1 : Klass
+  var cls2 : Klass
+}
+
+sil shared [noinline] @blackhole_spl1 : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : $WrapperStruct):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl1a : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : $Optional<WrapperStruct>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl2a : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl2b : $@convention(thin) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : $Optional<Klass>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl3 : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl3a : $@convention(thin) (@guaranteed Pair) -> () {
+bb0(%0 : $Pair):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared [noinline] @blackhole_spl3b : $@convention(thin) (AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// Borrow of forwarding casts are just like borrow of owned values
+// Borrow of the cast dest can be verified like any other owned value
+// Borrow of the cast src is only valid if its lifetime ends with end_borrow before the cast and can be verified like any other owned value
+// CHECK-NOT: Function: 'forwarding_value_cast_correct'
+sil [ossa] @forwarding_value_cast_correct : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : @guaranteed $Optional<WrapperStruct>):
+  %1 = copy_value %0 : $Optional<WrapperStruct>
+  %cast = unchecked_value_cast %1 : $Optional<WrapperStruct> to $WrapperStruct
+  %2 = begin_borrow %cast : $WrapperStruct
+  %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  end_borrow %2 : $WrapperStruct
+  destroy_value %cast : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'forwarding_value_cast_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = copy_value %0 : $Optional<WrapperStruct>   // users: %3, %2
+// CHECK: Consuming User:   %3 = unchecked_value_cast %1 : $Optional<WrapperStruct> to $WrapperStruct // user: %7
+// CHECK: Non Consuming User:   end_borrow %2 : $Optional<WrapperStruct>        // id: %6
+// CHECK: Block: bb0
+// CHECK-LABEL: Error#: 0. End Error in Function: 'forwarding_value_cast_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'forwarding_value_cast_incorrect'
+sil [ossa] @forwarding_value_cast_incorrect : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : @guaranteed $Optional<WrapperStruct>):
+  %1 = copy_value %0 : $Optional<WrapperStruct>
+  %2 = begin_borrow %1 : $Optional<WrapperStruct>
+  %cast = unchecked_value_cast %1 : $Optional<WrapperStruct> to $WrapperStruct
+  %func = function_ref @blackhole_spl1a : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> ()
+  end_borrow %2 : $Optional<WrapperStruct>
+  destroy_value %cast : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'forwarding_ref_cast_correct'
+sil [ossa] @forwarding_ref_cast_correct : $@convention(thin) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %cast = unchecked_ref_cast %1 : $Optional<Klass> to $Klass
+  %2 = begin_borrow %cast : $Klass
+  %func = function_ref @blackhole_spl2a : $@convention(thin) (@guaranteed Klass) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_value %cast : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'forwarding_ref_cast_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = copy_value %0 : $Optional<Klass>           // users: %3, %2
+// CHECK: Consuming User:   %3 = unchecked_ref_cast %1 : $Optional<Klass> to $Klass // user: %7
+// CHECK: Non Consuming User:   end_borrow %2 : $Optional<Klass>                // id: %6
+// CHECK: Block: bb0
+// CHECK-LABEL: Error#: 0. End Error in Function: 'forwarding_ref_cast_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'forwarding_ref_cast_incorrect'
+sil [ossa] @forwarding_ref_cast_incorrect : $@convention(thin) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %2 = begin_borrow %1 : $Optional<Klass>
+  %cast = unchecked_ref_cast %1 : $Optional<Klass> to $Klass
+  %func = function_ref @blackhole_spl2b : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
+  end_borrow %2 : $Optional<Klass>
+  destroy_value %cast : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'bitwise_cast_borrow_dest'
+sil [ossa] @bitwise_cast_borrow_dest : $@convention(thin) (@guaranteed Pair) -> () {
+bb0(%0 : @guaranteed $Pair):
+  %1 = copy_value %0 : $Pair
+  %cast = unchecked_bitwise_cast %1 : $Pair to $AnyObject
+  %2 = begin_borrow %cast : $AnyObject
+  %func = function_ref @blackhole_spl3 : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  end_borrow %2 : $AnyObject
+  destroy_value %1 : $Pair
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'bitwise_cast_borrow_src'
+sil [ossa] @bitwise_cast_borrow_src : $@convention(thin) (@guaranteed Pair) -> () {
+bb0(%0 : @guaranteed $Pair):
+  %1 = copy_value %0 : $Pair
+  %2 = begin_borrow %1 : $Pair
+  %cast = unchecked_bitwise_cast %1 : $Pair to $AnyObject
+  %func = function_ref @blackhole_spl3a : $@convention(thin) (@guaranteed Pair) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed Pair) -> ()
+  end_borrow %2 : $Pair
+  destroy_value %1 : $Pair
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'bitwise_cast_of_borrowed_val'
+sil [ossa] @bitwise_cast_of_borrowed_val : $@convention(thin) (@guaranteed Pair) -> () {
+bb0(%0 : @guaranteed $Pair):
+  %1 = copy_value %0 : $Pair
+  %2 = begin_borrow %1 : $Pair
+  %cast = unchecked_bitwise_cast %2 : $Pair to $AnyObject
+  %func = function_ref @blackhole_spl3a : $@convention(thin) (@guaranteed Pair) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed Pair) -> ()
+  end_borrow %2 : $Pair
+  destroy_value %1 : $Pair
+  %res = tuple ()
+  return %res : $()
+}
+
+// Gap in verification. Verify unchecked_bitwise_cast correctly rdar://70558176
+// CHECK-NOT: Function: 'bitwise_cast_use_after_free'
+sil [ossa] @bitwise_cast_use_after_free : $@convention(thin) (@guaranteed Pair) -> () {
+bb0(%0 : @guaranteed $Pair):
+  %1 = copy_value %0 : $Pair
+  %cast = unchecked_bitwise_cast %1 : $Pair to $AnyObject
+  %func = function_ref @blackhole_spl3b : $@convention(thin) (AnyObject) -> ()
+  destroy_value %1 : $Pair
+  %call1 = apply %func(%cast) : $@convention(thin) (AnyObject) -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_cast_not_dominate_correct'
+sil [ossa] @borrowed_cast_not_dominate_correct : $@convention(thin) (@guaranteed Optional<WrapperStruct>, @guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : @guaranteed $Optional<WrapperStruct>, %1 : @guaranteed $Optional<WrapperStruct>):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $Optional<WrapperStruct>
+  %cast0 = unchecked_value_cast %copy0 : $Optional<WrapperStruct> to $WrapperStruct
+  %borrow0 = begin_borrow %cast0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %cast0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %1 : $Optional<WrapperStruct>
+  %cast1 = unchecked_value_cast %copy1 : $Optional<WrapperStruct> to $WrapperStruct
+  %borrow1 = begin_borrow %cast1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %cast1 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_cast_dominates_one_path'
+sil [ossa] @borrowed_cast_dominates_one_path : $@convention(thin) (@guaranteed Optional<WrapperStruct>, @guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : @guaranteed $Optional<WrapperStruct>, %1 : @guaranteed $Optional<WrapperStruct>):
+  %copy1 = copy_value %1 : $Optional<WrapperStruct>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $Optional<WrapperStruct>
+  %cast0 = unchecked_value_cast %copy0 : $Optional<WrapperStruct> to $WrapperStruct
+  %borrow0 = begin_borrow %cast0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %cast0 : $WrapperStruct)
+
+bb2:
+  %copy2 = copy_value %1 : $Optional<WrapperStruct>
+  %cast2 = unchecked_value_cast %copy2 : $Optional<WrapperStruct> to $WrapperStruct
+  %borrow1 = begin_borrow %cast2 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %cast2 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  destroy_value %copy1 : $Optional<WrapperStruct>
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_cast_dominates_one_path_loop'
+sil [ossa] @borrowed_cast_dominates_one_path_loop : $@convention(thin) (@guaranteed Optional<WrapperStruct>) -> () {
+bb0(%0 : @guaranteed $Optional<WrapperStruct>):
+  %1b = copy_value %0 : $Optional<WrapperStruct>
+  %cast0 = unchecked_value_cast %1b : $Optional<WrapperStruct> to $WrapperStruct
+  %1a = begin_borrow %cast0 : $WrapperStruct
+  br bb1(%1a : $WrapperStruct, %cast0 : $WrapperStruct)
+
+bb1(%2a : @guaranteed $WrapperStruct, %2b : @owned $WrapperStruct):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = copy_value %2a : $WrapperStruct
+  %3a = begin_borrow %3 : $WrapperStruct
+  end_borrow %2a : $WrapperStruct
+  destroy_value %2b : $WrapperStruct
+  br bb1(%3a : $WrapperStruct, %3 : $WrapperStruct)
+
+bb3:
+  end_borrow %2a : $WrapperStruct
+  destroy_value %2b : $WrapperStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+

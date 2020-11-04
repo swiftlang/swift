@@ -609,17 +609,15 @@ bb2:
 
 // HOIST-LABEL: sil @hoist_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST: br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -671,17 +669,15 @@ bb3:
 
 // HOIST-LABEL: sil @hoist_rangechecked_ref_tail_addr
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST: br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -818,17 +814,15 @@ bb2:
 
 // HOIST-LABEL: sil @hoist_rangechecked_addr_proj_store
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -882,17 +876,15 @@ bb3:
 
 // HOIST-LABEL: hoist_inclusive_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4:
 // HOIST:  br bb3
 // HOIST: bb5:
@@ -944,16 +936,15 @@ bb3:
 /// Don't hoist arrays that are variant.
 // HOIST-LABEL: dont_hoist_variant_array
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
+// HOIST-NEXT:  br bb3
 // HOIST: bb2:
-// HOIST-NOT:   function_ref @checkbounds
-// HOIST:   br bb3{{.*}}
+// HOIST-NEXT:  br bb6
 // HOIST: bb3{{.*}}:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:  apply [[CB]]
-// HOIST:  cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:  cond_br {{.*}}, bb5, bb4
 // HOIST: bb4:
 // HOIST:  br bb3
 // HOIST: bb5:

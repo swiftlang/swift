@@ -144,8 +144,9 @@ public:
                   SILFunction &From,
                   SubstitutionMap ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
+                  DominanceInfo *DT = nullptr,
                   bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
+    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, DT, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ApplySubs),
       Original(From),

@@ -40,9 +40,6 @@ void addAsyncNotes(FuncDecl *func);
 /// Check actor isolation rules.
 void checkActorIsolation(const Expr *expr, const DeclContext *dc);
 
-/// Determine how the given value declaration is isolated.
-ActorIsolation getActorIsolation(ValueDecl *value);
-
 /// The isolation restriction in effect for a given declaration that is
 /// referenced from source.
 class ActorIsolationRestriction {
