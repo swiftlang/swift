@@ -56,6 +56,11 @@ TEST(StaticUnsafeMutexTest, BasicLockableThreaded) {
   basicLockableThreaded(mutex);
 }
 
+TEST(SmallMutex, BasicLockableThreaded) {
+  SmallMutex mutex;
+  basicLockableThreaded(mutex);
+}
+
 template <typename M> void lockableThreaded(M &mutex) {
   mutex.lock();
   threadedExecute(5, [&](int) { ASSERT_FALSE(mutex.try_lock()); });
@@ -94,6 +99,11 @@ TEST(StaticMutexTest, LockableThreaded) {
   lockableThreaded(Mutex);
 }
 
+TEST(SmallMutexTest, LockableThreaded) {
+  SmallMutex Mutex;
+  lockableThreaded(Mutex);
+}
+
 template <typename SL, typename M> void scopedLockThreaded(M &mutex) {
   int count1 = 0;
   int count2 = 0;
@@ -119,6 +129,11 @@ TEST(MutexTest, ScopedLockThreaded) {
 TEST(StaticMutexTest, ScopedLockThreaded) {
   static StaticMutex Mutex;
   scopedLockThreaded<StaticScopedLock>(Mutex);
+}
+
+TEST(SmallMutexTest, ScopedLockThreaded) {
+  SmallMutex mutex(/* checked = */ true);
+  scopedLockThreaded<ScopedLockT<SmallMutex, false>>(mutex);
 }
 
 template <typename SL, typename SU, typename M>
@@ -153,6 +168,12 @@ TEST(StaticMutexTest, ScopedUnlockUnderScopedLockThreaded) {
   static StaticMutex Mutex;
   scopedUnlockUnderScopedLockThreaded<StaticScopedLock, StaticScopedUnlock>(
       Mutex);
+}
+
+TEST(SmallMutexTest, ScopedUnlockUnderScopedLockThreaded) {
+  SmallMutex mutex(/* checked = */ true);
+  scopedUnlockUnderScopedLockThreaded<ScopedLockT<SmallMutex, false>,
+                                      ScopedLockT<SmallMutex, true>>(mutex);
 }
 
 template <typename M> void criticalSectionThreaded(M &mutex) {
