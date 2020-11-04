@@ -83,3 +83,6 @@ struct S {
 }
 
 let _ = S().$café // Okay
+
+infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
+infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
