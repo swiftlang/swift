@@ -1615,3 +1615,14 @@ SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
 }
+
+bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  return false;
+}
+
+AllowRefToInvalidDecl *
+AllowRefToInvalidDecl::create(ConstraintSystem &cs,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowRefToInvalidDecl(cs, locator);
+}

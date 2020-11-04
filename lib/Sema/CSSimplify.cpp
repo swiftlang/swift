@@ -10144,7 +10144,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
   case FixKind::IgnoreInvalidResultBuilderBody:
-  case FixKind::SpecifyContextualTypeForNil: {
+  case FixKind::SpecifyContextualTypeForNil:
+  case FixKind::AllowRefToInvalidDecl: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
