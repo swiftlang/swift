@@ -144,3 +144,32 @@ func invalidAsyncFunction() async {
 func validAsyncFunction() async throws {
   _ = try await throwingAndAsync()
 }
+
+// Async let checking
+func mightThrow() throws { }
+
+extension Error {
+  var number: Int { 0 }
+}
+
+func testAsyncLet() async throws {
+  async let x = await getInt()
+  print(x) // expected-error{{reference to async let 'x' is not marked with 'await'}}
+  print(await x)
+
+  do {
+    try mightThrow()
+  } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
+  } catch {
+  }
+}
+
+// expected-note@+2 2{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}
+// expected-note@+1 2{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}}
+func testAsyncLetOutOfAsync() {
+  async let x = 1 // ERROR?
+
+  _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
+  _ = x // expected-error{{'async let' in a function that does not support concurrency}}
+}
+

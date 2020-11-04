@@ -4727,6 +4727,9 @@ public:
   /// getSpecifier() == Specifier::Default.
   bool isLet() const { return getIntroducer() == Introducer::Let; }
 
+  /// Is this an "async let" property?
+  bool isAsyncLet() const;
+
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
   }

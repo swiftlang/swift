@@ -59,7 +59,7 @@ func getIntSomeday() async -> Int { 5 }
 
 func testAsyncLet() async {
   async let x = await getIntSomeday()
-  _ = x
+  _ = await x
 }
 
 async func asyncIncorrectly() { } // expected-error{{'async' must be written after the parameter list of a function}}{{1-7=}}{{30-30= async}}

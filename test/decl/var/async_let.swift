@@ -16,11 +16,11 @@ func testAsyncFunc() async {
   async var x = 17 // expected-error{{'async' can only be used with 'let' declarations}}{{9-12=let}}
   async let (_, _) = (1, 2), y2 = 7 // expected-error{{'async let' requires at least one named variable}}
   async let y: Int // expected-error{{'async let' binding requires an initializer expression}}
-  _ = x
+  _ = await x
   _ = y
-  _ = z1
-  _ = z2
-  _ = x2
-  x = 1
+  _ = await z1
+  _ = await z2
+  _ = await x2
+  await x = 1
   _ = y2
 }

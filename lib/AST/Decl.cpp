@@ -5740,6 +5740,10 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
+bool VarDecl::isAsyncLet() const {
+  return getAttrs().hasAttribute<AsyncAttr>();
+}
+
 void ParamDecl::setSpecifier(Specifier specifier) {
   // FIXME: Revisit this; in particular shouldn't __owned parameters be
   // ::Let also?

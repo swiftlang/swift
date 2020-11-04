@@ -219,6 +219,8 @@ public:
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
+      recurse = asImpl().checkDeclRef(declRef);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
@@ -655,6 +657,9 @@ private:
       IsInvalid |= classification.isInvalid();
       Result = std::max(Result, classification.getResult());
       return ShouldRecurse;
+    }
+    ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
+      return ShouldNotRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
       Result = ThrowingKind::Throws;
@@ -1271,6 +1276,18 @@ public:
     SourceRange highlight;
 
     // Generate more specific messages in some cases.
+
+    // Reference to an 'async let' missing an 'await'.
+    if (auto declRef = dyn_cast_or_null<DeclRefExpr>(node.dyn_cast<Expr *>())) {
+      if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
+        if (var->isAsyncLet()) {
+          ctx.Diags.diagnose(
+              declRef->getLoc(), diag::async_let_without_await, var->getName());
+          return;
+        }
+      }
+    }
+
     if (auto apply = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>()))
       highlight = apply->getSourceRange();
 
@@ -1293,6 +1310,17 @@ public:
                        static_cast<unsigned>(getKind()));
         return;
       }
+
+      if (auto declRef = dyn_cast<DeclRefExpr>(e)) {
+        if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
+          if (var->isAsyncLet()) {
+            Diags.diagnose(
+                e->getLoc(), diag::async_let_in_illegal_context,
+                var->getName(), static_cast<unsigned>(getKind()));
+            return;
+          }
+        }
+      }
     }
 
     Diags.diagnose(node.getStartLoc(), diag::await_in_illegal_context,
@@ -1312,11 +1340,17 @@ public:
 
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
     switch (getKind()) {
-    case Kind::PotentiallyHandled:
+    case Kind::PotentiallyHandled: {
+      unsigned kind = 0;
+      if (node.isExpr(ExprKind::Await))
+        kind = 1;
+      else if (node.isExpr(ExprKind::DeclRef))
+        kind = 2;
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
-                     node.isExpr(ExprKind::Await), isAutoClosure());
+                     kind, isAutoClosure());
       maybeAddAsyncNote(Diags);
       return;
+    }
 
     case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
@@ -1692,6 +1726,21 @@ private:
     // incorrect.
     auto type = E->getType();
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
+    if (auto decl = E->getDecl()) {
+      if (auto var = dyn_cast<VarDecl>(decl)) {
+        // "Async let" declarations are treated as an asynchronous call
+        // (to the underlying task's "get").
+        if (var->isAsyncLet()) {
+          checkThrowAsyncSite(
+              E, /*requiresTry=*/false, Classification::forAsync());
+        }
+      }
+    }
+
+    return ShouldNotRecurse;
   }
 
   ShouldRecurse_t
