@@ -664,6 +664,12 @@ function(_compile_swift_files
       math(EXPR old_interface_file_index "${interface_file_index} + 1")
       list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
     endif()
+
+    # We still need to change the main swift flags
+    # so we can use the correct modules
+    # when building for macOS
+    list(APPEND swift_flags
+      "-I" "${SWIFTLIB_DIR}/${library_subdir}")
   elseif(maccatalyst_build_flavor STREQUAL "ios-like")
     compute_library_subdir(maccatalyst_library_subdir
       "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")

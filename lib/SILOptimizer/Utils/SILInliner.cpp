@@ -374,7 +374,7 @@ SILInlineCloner::SILInlineCloner(
     SILOpenedArchetypesTracker &openedArchetypesTracker,
     SILInliner::DeletionFuncTy deletionCallback)
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
-              openedArchetypesTracker, /*Inlining=*/true),
+              openedArchetypesTracker, /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
       DeletionCallback(deletionCallback) {
 

@@ -466,6 +466,12 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
+  /// If set, the current function is an async function which is isolated to
+  /// this actor.
+  /// If set, hop_to_executor instructions must be inserted at the begin of the
+  /// function and after all suspension points.
+  SILValue actor;
+
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
   bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
@@ -750,6 +756,10 @@ public:
                        CanAnyFunctionType inputSubstType,
                        CanAnyFunctionType outputSubstType,
                        bool baseLessVisibleThanDerived);
+  
+  /// If the current function is actor isolated, insert a hop_to_executor
+  /// instruction.
+  void emitHopToCurrentExecutor(SILLocation loc);
   
   //===--------------------------------------------------------------------===//
   // Control flow

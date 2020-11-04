@@ -74,7 +74,8 @@ void LoopCloner::cloneLoop() {
   Loop->getExitBlocks(ExitBlocks);
 
   // Clone the entire loop.
-  cloneReachableBlocks(Loop->getHeader(), ExitBlocks);
+  cloneReachableBlocks(Loop->getHeader(), ExitBlocks,
+                       /*insertAfter*/Loop->getLoopLatch());
 }
 
 /// Determine the number of iterations the loop is at most executed. The loop
@@ -93,7 +94,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (!Loop->isLoopExiting(Latch))
     return None;
 
-  // Get the loop exit condition.
+ // Get the loop exit condition.
   auto *CondBr = dyn_cast<CondBranchInst>(Latch->getTerminator());
   if (!CondBr)
     return None;

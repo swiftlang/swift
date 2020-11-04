@@ -12,3 +12,5 @@
 // CHECK: func setConstStaticIntRvalueRef(_: UnsafePointer<Int32>)
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
+
+// CHECK-NOT: dontImportAtomicRef

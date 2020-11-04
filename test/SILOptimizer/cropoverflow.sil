@@ -40,9 +40,12 @@ bb1:                                              // Preds: bb0
   %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
   %20 = apply %10() : $@convention(thin) () -> ()
-  br bb2                                          // id: %21
+  br bb3                                          // id: %21
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:
   %22 = tuple ()                                  // user: %23
 // CHECK: return
   return %22 : $()                                // id: %23
@@ -75,9 +78,12 @@ bb1:                                              // Preds: bb0
   %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
   cond_fail %13 : $Builtin.Int1                   // id: %19
   %20 = apply %10() : $@convention(thin) () -> ()
-  br bb2                                          // id: %21
+  br bb3                                          // id: %21
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:
   %22 = tuple ()                                  // user: %23
   return %22 : $()                                // id: %23
 }
@@ -109,9 +115,12 @@ bb1:                                              // Preds: bb0
   %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
   cond_fail %13 : $Builtin.Int1                   // id: %19
   %20 = apply %10() : $@convention(thin) () -> ()
-  br bb2                                          // id: %21
+  br bb3                                          // id: %21
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:                                              // Preds: bb0 bb1
   %22 = tuple ()                                  // user: %23
   return %22 : $()                                // id: %23
 }
@@ -143,9 +152,12 @@ bb1:                                              // Preds: bb0
   %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
   cond_fail %13 : $Builtin.Int1                   // id: %19
   %20 = apply %10() : $@convention(thin) () -> ()
-  br bb2                                          // id: %21
+  br bb3                                          // id: %21
 
 bb2:                                              // Preds: bb0 bb1
+  br bb3
+
+bb3:
   %22 = tuple ()                                  // user: %23
   return %22 : $()                                // id: %23
 }
@@ -341,9 +353,12 @@ bb1:                                              // Preds: bb0
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
   cond_fail %9 : $Builtin.Int1                   // id: %16
   %17 = apply %11() : $@convention(thin) () -> ()
-  br bb2                                          // id: %18
+  br bb3                                          // id: %18
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
 }
@@ -371,9 +386,12 @@ bb1:                                              // Preds: bb0
   %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
   cond_fail %9 : $Builtin.Int1                   // id: %16
   %17 = apply %11() : $@convention(thin) () -> ()
-  br bb2                                          // id: %18
+  br bb3                                          // id: %18
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
 }

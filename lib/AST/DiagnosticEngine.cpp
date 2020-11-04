@@ -93,19 +93,13 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
               "array size mismatch");
 
 static constexpr const char * const diagnosticStrings[] = {
-#define ERROR(ID, Options, Text, Signature) Text,
-#define WARNING(ID, Options, Text, Signature) Text,
-#define NOTE(ID, Options, Text, Signature) Text,
-#define REMARK(ID, Options, Text, Signature) Text,
+#define DIAG(KIND, ID, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
 
 static constexpr const char *const debugDiagnosticStrings[] = {
-#define ERROR(ID, Options, Text, Signature) Text " [" #ID "]",
-#define WARNING(ID, Options, Text, Signature) Text " [" #ID "]",
-#define NOTE(ID, Options, Text, Signature) Text " [" #ID "]",
-#define REMARK(ID, Options, Text, Signature) Text " [" #ID "]",
+#define DIAG(KIND, ID, Options, Text, Signature) Text " [" #ID "]",
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };

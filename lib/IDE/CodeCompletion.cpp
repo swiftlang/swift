@@ -2468,9 +2468,7 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo) {
-    if (!VD->hasName() ||
-        !VD->isAccessibleFrom(CurrDeclContext) ||
-        VD->shouldHideFromEditor())
+    if (!VD->hasName())
       return;
 
     const Identifier Name = VD->getName();
@@ -4288,8 +4286,12 @@ public:
     ExprType = Type();
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    FilteredDeclConsumer Consumer(*this, Filter);
-    lookupVisibleDecls(Consumer, CurrDeclContext,
+
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, *this);
+    FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
+
+    lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
     RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults()
                                          .withModuleQualifier(ModuleQualifier));
@@ -4633,7 +4635,10 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc,
                                        bool ModuleQualifier = true) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext,
+
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, *this);
+    lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults.push_back(
@@ -4646,14 +4651,23 @@ public:
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
-    CurrModule->lookupVisibleDecls({}, FilteringConsumer,
+
+    UsableFilteringDeclConsumer UsableFilteringConsumer(
+        Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
+        *this);
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, UsableFilteringConsumer);
+
+    CurrModule->lookupVisibleDecls({}, AccessFilteringConsumer,
                                    NLKind::UnqualifiedLookup);
   }
 
-  void getVisibleDeclsOfModule(const ModuleDecl *TheModule,
-                               ArrayRef<std::string> AccessPath,
-                               bool ResultsHaveLeadingDot) {
+  void lookupExternalModuleDecls(const ModuleDecl *TheModule,
+                                 ArrayRef<std::string> AccessPath,
+                                 bool ResultsHaveLeadingDot) {
+    assert(CurrModule != TheModule &&
+           "requested module should be external");
+
     Kind = LookupKind::ImportFromModule;
     NeedLeadingDot = ResultsHaveLeadingDot;
 
@@ -4661,6 +4675,7 @@ public:
     for (auto Piece : AccessPath) {
       builder.push_back(Ctx.getIdentifier(Piece));
     }
+
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     TheModule->lookupVisibleDecls(builder.get(), FilteringConsumer,
                                   NLKind::UnqualifiedLookup);
@@ -6758,7 +6773,7 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
   CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
-  Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
+  Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
 void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,

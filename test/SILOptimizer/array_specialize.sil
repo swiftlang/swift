@@ -33,16 +33,22 @@ bb1:
   %4 = load %1 : $*MyBool
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb5, case #MyBool.True!enumelt: bb2
 
 bb2:
  %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb1, bb4
+ cond_br %6, bb3, bb4
 
 bb3:
- br bb4
+  br bb1
 
 bb4:
+ br bb6
+
+bb5:
+ br bb6
+
+bb6:
   return %4 : $MyBool
 }
 
@@ -60,16 +66,22 @@ bb1:
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
   %11 = open_existential_ref %10 : $AProtocol to $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
-  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb5, case #MyBool.True!enumelt: bb2
 
 bb2:
  %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb1, bb4
+ cond_br %6, bb3, bb4
 
 bb3:
- br bb4
+  br bb1
 
 bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
   release_value %11 : $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
   return %4 : $MyBool
 }
@@ -94,19 +106,19 @@ bb1:
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
   %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
-  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb5
+  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb6
 
 bb2(%8 : $MyBool):
  %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb1, bb4
+ cond_br %6, bb3, bb5
 
 bb3:
- br bb4
+  br bb1
 
-bb4:
+bb5:
   return %4 : $MyBool
 
-bb5(%9 : $Error):
+bb6(%9 : $Error):
   throw %9 : $Error
 }
 
@@ -120,25 +132,34 @@ bb1:
   %4 = load %1 : $*Builtin.Int1
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  cond_br %4, bb2, bb4
+  cond_br %4, bb2, bb7
 
 bb2:
- cond_br undef, bb3, bb5
+  cond_br undef, bb3, bb6
 
 bb3:
- %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb1, bb7
+  %6 = integer_literal $Builtin.Int1, -1
+  cond_br %6, bb4, bb5
 
-bb4: // Exit block; b1 dom b4
- cond_br undef, bb5, bb6
+bb4:
+  br bb1
 
-bb5: // Exit Block; b1 dom b4
- br bb6
+bb5:
+  br bb10
 
-bb6: // Non-exit Dominated by bb1
- br bb7
+bb6: // Exit block; b1 dom b4
+  br bb10
 
-bb7:
+bb7: // Exit block; b1 dom b4
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb10
+
+bb9:
+  br bb10
+
+bb10:
   return %4 : $Builtin.Int1
 }
 
@@ -152,27 +173,36 @@ bb1:
   %4 = load %1 : $*Builtin.Int1
   retain_value %3 : $MyArray<MyClass>
   %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
-  cond_br %4, bb2, bb4
+  cond_br %4, bb2, bb5
 
 bb2:
- cond_br undef, bb3, bb5
+ cond_br undef, bb3, bb9
 
 bb3:
  %6 = integer_literal $Builtin.Int1, -1
- cond_br %6, bb1, bb7
+ cond_br %6, bb4, bb10
 
-bb4: // Exit block; b1 dom b4
- cond_br undef, bb5, bb6
+bb4:
+  br bb1
 
-bb5: // Exit Block; b1 dom b4
- br bb6
+bb5: // Exit block; b1 dom b4
+ cond_br undef, bb6, bb7
 
-bb6: // Non-exit Dominated by bb1
+bb6: // Exit Block; b1 dom b4
  br bb8
 
-bb7: // Exit dominated by bb3
- br bb8
+bb7:
+  br bb8
 
-bb8: // Non-exit dominated by bb1
+bb8: // Non-exit Dominated by bb1
+ br bb11
+
+bb9: // Exit dominated by bb3
+ br bb11
+
+bb10: // Exit dominated by bb3
+ br bb11
+
+bb11: // Non-exit dominated by bb1
   return %4 : $Builtin.Int1
 }
