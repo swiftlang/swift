@@ -180,6 +180,7 @@ public:
   ASTNode getLastElement() const { return getElements().back(); }
 
   void setFirstElement(ASTNode node) { getElements().front() = node; }
+  void setLastElement(ASTNode node) { getElements().back() = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {

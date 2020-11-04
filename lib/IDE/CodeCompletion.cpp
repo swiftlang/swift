@@ -6107,7 +6107,7 @@ static void undoSingleExpressionReturn(DeclContext *DC) {
     if (!RS || !RS->isImplicit())
       return false;
 
-    BS->getElements().back() = RS->getResult();
+    BS->setLastElement(RS->getResult());
     return true;
   };
 

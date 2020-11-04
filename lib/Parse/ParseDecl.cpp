@@ -6683,7 +6683,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       }
       if (isa<FuncDecl>(AFD)) {
         auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-        BS->getElements().back() = RS;
+        BS->setLastElement(RS);
         AFD->setHasSingleExpressionBody();
         AFD->setSingleExpressionBody(E);
       } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
@@ -6691,7 +6691,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
           // If it's a nil literal, just insert return.  This is the only
           // legal thing to return.
           auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
-          BS->getElements().back() = RS;
+          BS->setLastElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
         }
