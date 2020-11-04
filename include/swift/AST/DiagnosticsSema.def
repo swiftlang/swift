@@ -3726,6 +3726,9 @@ ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
 
+ERROR(reference_to_invalid_decl,none,
+      "cannot reference invalid declaration %0", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------

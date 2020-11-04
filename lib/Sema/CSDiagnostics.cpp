@@ -7002,3 +7002,21 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
   emitDiagnostic(diag::unresolved_nil_literal);
   return true;
 }
+
+bool ReferenceToInvalidDeclaration::diagnoseAsError() {
+  auto *decl = castToExpr<DeclRefExpr>(getAnchor())->getDecl();
+  assert(decl);
+
+  auto &DE = getASTContext().Diags;
+  // This problem should have been already diagnosed during
+  // validation of the declaration.
+  if (DE.hadAnyError())
+    return true;
+
+  // If no errors have been emitted yet, let's emit one
+  // about reference to an invalid declaration.
+
+  emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
+  emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
+  return true;
+}

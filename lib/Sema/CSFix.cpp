@@ -1618,7 +1618,8 @@ SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
 
 bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
                                      bool asNote) const {
-  return false;
+  ReferenceToInvalidDeclaration failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowRefToInvalidDecl *
