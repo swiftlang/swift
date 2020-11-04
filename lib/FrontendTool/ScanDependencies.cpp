@@ -161,7 +161,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
   auto isSwift = knownDependencies.isSwiftTextualModule();
 
   // Find the dependencies of every module this module directly depends on.
-  std::set<ModuleDependencyID> result;
+  std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
     // Figure out what kind of module we need.
     bool onlyClangModule = !isSwift || module.first == dependsOn;
@@ -169,7 +169,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     // Retrieve the dependencies for this module.
     if (auto found = ctx.getModuleDependencies(
             dependsOn, onlyClangModule, cache, ASTDelegate)) {
-      result.insert({dependsOn, found->getKind()});
+      result.push_back({dependsOn, found->getKind()});
     }
   }
 
@@ -215,15 +215,13 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
         // This Clang module may have the same name as the Swift module we are resolving, so we
         // need to make sure we don't add a dependency from a Swift module to itself.
         if ((found->getKind() == ModuleDependenciesKind::SwiftTextual ||
-             found->getKind() == ModuleDependenciesKind::SwiftBinary ||
-             found->getKind() == ModuleDependenciesKind::SwiftPlaceholder) &&
-            clangDep != module.first) {
-          result.insert({clangDep, found->getKind()});
-        }
+             found->getKind() == ModuleDependenciesKind::SwiftBinary) &&
+            clangDep != module.first)
+          result.push_back({clangDep, found->getKind()});
       }
     }
   }
-  return std::vector<ModuleDependencyID>(result.begin(), result.end());
+  return result;
 }
 
 static void discoverCrosssImportOverlayDependencies(

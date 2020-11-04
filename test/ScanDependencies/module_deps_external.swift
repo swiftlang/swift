@@ -40,9 +40,6 @@ import SomeExternalModule
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "swift": "F"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
 // CHECK-NEXT: "swiftPlaceholder": "SomeExternalModule"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
@@ -50,6 +47,9 @@ import SomeExternalModule
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "SwiftOnoneSupport"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "F"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 
