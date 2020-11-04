@@ -1185,6 +1185,29 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
                                                Segments.front().Length));
 }
 
+bool Parser::shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body) {
+  // If the body consists of an #if declaration with a single
+  // expression active clause, find a single expression.
+  if (Body.size() == 2) {
+    if (auto *D = Body.front().dyn_cast<Decl *>()) {
+      // Step into nested active clause.
+      while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+        auto ACE = ICD->getActiveClauseElements();
+        if (ACE.size() == 1) {
+          return true;
+        } else if (ACE.size() == 2) {
+          if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
+            D = ND;
+            continue;
+          }
+        }
+        break;
+      }
+    }
+  }
+  return Body.size() == 1;
+}
+
 struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;

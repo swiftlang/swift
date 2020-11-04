@@ -1974,10 +1974,10 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElements().back();
+  auto body = getBody()->getLastElement();
   if (auto stmt = body.dyn_cast<Stmt *>()) {
     if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      return braceStmt->getElements().back().get<Expr *>();
+      return braceStmt->getLastElement().get<Expr *>();
 
     return cast<ReturnStmt>(stmt)->getResult();
   }
@@ -2003,7 +2003,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getElements().back().get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {

@@ -6657,75 +6657,44 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   BraceStmt *BS = Body.get();
   AFD->setBodyParsed(BS);
   
-  if (BS->getNumElements() == 0)
-    return BS;
-  
-  auto Element = BS->getFirstElement();
-  
-  // If the body consists of an #if declaration with a single
-  // expression active clause, turn it into a return statement.
-  bool ReturnsLastElement = false;
-  if (BS->getNumElements() == 2) {
-    if (auto *D = Element.dyn_cast<Decl *>()) {
-      // Step into nested active clause.
-      while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        auto ACE = ICD->getActiveClauseElements();
-        if (ACE.size() == 1) {
-          Element = BS->getLastElement();
-          ReturnsLastElement = true;
-          break;
-        } else if (ACE.size() == 2) {
-          if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
-            D = ND;
-            continue;
+  if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
+    auto Element = BS->getLastElement();
+    if (auto *stmt = Element.dyn_cast<Stmt *>()) {
+      if (isa<FuncDecl>(AFD)) {
+        if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
+          if (!returnStmt->hasResult()) {
+            auto returnExpr = TupleExpr::createEmpty(Context,
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     /*implicit*/true);
+            returnStmt->setResult(returnExpr);
+            AFD->setHasSingleExpressionBody();
+            AFD->setSingleExpressionBody(returnExpr);
           }
         }
-        break;
       }
-    }
-  }
-
-  // If the body consists of a single expression, turn it into a return
-  // statement.
-  if (BS->getNumElements() != 1 &&
-      !ReturnsLastElement)
-    return BS;
-
-  if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-    if (isa<FuncDecl>(AFD)) {
-      if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-        if (!returnStmt->hasResult()) {
-          auto returnExpr = TupleExpr::createEmpty(Context,
-                                                   SourceLoc(),
-                                                   SourceLoc(),
-                                                   /*implicit*/true);
-          returnStmt->setResult(returnExpr);
-          AFD->setHasSingleExpressionBody();
-          AFD->setSingleExpressionBody(returnExpr);
+    } else if (auto *E = Element.dyn_cast<Expr *>()) {
+      if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
+        if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
+          // This is an assignment.  We don't want to implicitly return
+          // it.
+          return BS;
         }
       }
-    }
-  } else if (auto *E = Element.dyn_cast<Expr *>()) {
-    if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
-      if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
-        // This is an assignment.  We don't want to implicitly return
-        // it.
-        return BS;
-      }
-    }
-    if (isa<FuncDecl>(AFD)) {
-      auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-      BS->getElements().back() = RS;
-      AFD->setHasSingleExpressionBody();
-      AFD->setSingleExpressionBody(E);
-    } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-      if (F->isFailable() && isa<NilLiteralExpr>(E)) {
-        // If it's a nil literal, just insert return.  This is the only
-        // legal thing to return.
-        auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+      if (isa<FuncDecl>(AFD)) {
+        auto RS = new (Context) ReturnStmt(SourceLoc(), E);
         BS->getElements().back() = RS;
         AFD->setHasSingleExpressionBody();
         AFD->setSingleExpressionBody(E);
+      } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
+        if (F->isFailable() && isa<NilLiteralExpr>(E)) {
+          // If it's a nil literal, just insert return.  This is the only
+          // legal thing to return.
+          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+          BS->getElements().back() = RS;
+          AFD->setHasSingleExpressionBody();
+          AFD->setSingleExpressionBody(E);
+        }
       }
     }
   }

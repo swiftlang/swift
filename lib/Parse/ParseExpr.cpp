@@ -2843,56 +2843,26 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // If the body consists of a single expression, turn it into a return
   // statement.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace && bodyElements.size()) {
-    auto Element = bodyElements.front();
+  if (!missingRBrace &&
+      Parser::shouldReturnSingleExpressionElement(bodyElements)) {
+    auto Element = bodyElements.back();
     
-    // If the body consists of an #if declaration with a single
-    // expression active clause, turn it into a return statement.
-    bool ReturnsLastElement = false;
-    if (bodyElements.size() == 2) {
-      if (auto *D = Element.dyn_cast<Decl *>()) {
-        // Step into nested active clause.
-        while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          auto ACE = ICD->getActiveClauseElements();
-          if (ACE.size() == 1) {
-            ReturnsLastElement = true;
-            Element = bodyElements.back();
-            break;
-          } else if (ACE.size() == 2) {
-            if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
-              D = ND;
-              continue;
-            }
-          }
-          break;
-        }
-      }
-    }
-    
-    if (ReturnsLastElement || bodyElements.size() == 1) {
-      // If the closure's only body element is a single return statement,
-      // use that instead of creating a new wrapping return expression.
-      Expr *returnExpr = nullptr;
-      
-      if (Element.is<Stmt *>()) {
-        if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
-          if (!returnStmt->hasResult()) {
-            returnExpr = TupleExpr::createEmpty(Context,
-                                                SourceLoc(),
-                                                SourceLoc(),
-                                                /*implicit*/true);
-            returnStmt->setResult(returnExpr);
-          }
-          hasSingleExpressionBody = true;
-        }
-      }
-      
-      // Otherwise, create the wrapping return.
-      if (Element.is<Expr *>()) {
+    if (Element.is<Stmt *>()) {
+      if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
         hasSingleExpressionBody = true;
-        returnExpr = Element.get<Expr*>();
-        bodyElements.back() = new (Context) ReturnStmt(SourceLoc(), returnExpr);
+        if (!returnStmt->hasResult()) {
+          auto returnExpr = TupleExpr::createEmpty(Context,
+                                                   SourceLoc(),
+                                                   SourceLoc(),
+                                                   /*implicit*/true);
+          returnStmt->setResult(returnExpr);
+        }
       }
+    } else if (Element.is<Expr *>()) {
+      // Create the wrapping return.
+      hasSingleExpressionBody = true;
+      auto returnExpr = Element.get<Expr*>();
+      bodyElements.back() = new (Context) ReturnStmt(SourceLoc(), returnExpr);
     }
   }
 

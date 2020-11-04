@@ -1114,13 +1114,22 @@ class ExprContextAnalyzer {
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
     if (body->getNumElements() == 2) {
       if (auto *D = body->getFirstElement().dyn_cast<Decl *>()) {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+        // Step into nested active clause.
+        while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
           auto ACE = ICD->getActiveClauseElements();
-          return ACE.size() == 1;
+          if (ACE.size() == 1) {
+            return body->getLastElement().is<Expr *>();
+          } else if (ACE.size() == 2) {
+            if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
+              D = ND;
+              continue;
+            }
+          }
+          break;
         }
       }
     }
-    return body->getNumElements() == 1 && body->getElements().back().is<Expr *>();
+    return body->getNumElements() == 1 && body->getLastElement().is<Expr *>();
   }
 
 public:
