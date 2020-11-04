@@ -845,7 +845,6 @@ namespace {
     MAYBE_SUGAR_TYPE(TemplateSpecialization)
     MAYBE_SUGAR_TYPE(Auto)
     MAYBE_SUGAR_TYPE(DeducedTemplateSpecialization)
-    MAYBE_SUGAR_TYPE(PackExpansion)
 
     // These types are ALWAYS sugared.
 #define SUGAR_TYPE(KIND)                                                       \
