@@ -36,6 +36,13 @@ decltype(auto) testAuto(T arg) {
   return arg;
 }
 
-// TODO: Add tests for Decltype, UnaryTransform, and TemplateSpecialization with a dependent type once those are supported.
+// TODO: Add tests for Decltype, UnaryTransform, and TemplateSpecialization with
+// a dependent type once those are supported.
 
 // TODO: Add test for DeducedTemplateSpecializationType once we support class templates.
+
+// TODO(SR-13809): We don't yet support dependent types but we still shouldn't
+// crash when importing one.
+template <class T> struct Dep { using TT = T; };
+
+template <class T> void useDependentType(typename Dep<T>::TT) {}
