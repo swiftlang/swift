@@ -1227,9 +1227,11 @@ namespace {
         if (knownType) {
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
+            auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+            (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
             if (!CS.hasType(E))
-              CS.setType(E, knownType);
-            return nullptr;
+              CS.setType(E, hole);
+            return hole;
           }
 
           if (!knownType->hasHole()) {
@@ -1258,14 +1260,13 @@ namespace {
         }
       }
 
-      // If we're referring to an invalid declaration, don't type-check.
-      //
-      // FIXME: If the decl is in error, we get no information from this.
-      // We may, alternatively, want to use a type variable in that case,
-      // and possibly infer the type of the variable that way.
+      // If declaration is invalid, let's turn it into a potential hole
+      // and keep generating constraints.
       if (!knownType && E->getDecl()->isInvalid()) {
-        CS.setType(E, E->getDecl()->getInterfaceType());
-        return nullptr;
+        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
+        CS.setType(E, hole);
+        return hole;
       }
 
       // Create an overload choice referencing this declaration and immediately
