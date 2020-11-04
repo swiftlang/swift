@@ -418,13 +418,14 @@ public:
 /// a decl inside its own initializer or a non-type decl before its definition.
 class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
   const SourceManager &SM;
+  const DeclContext *DC;
   SourceLoc Loc;
   VisibleDeclConsumer &ChainedConsumer;
 
 public:
-  UsableFilteringDeclConsumer(const SourceManager &SM, SourceLoc loc,
-                              VisibleDeclConsumer &consumer)
-      : SM(SM), Loc(loc), ChainedConsumer(consumer) {}
+  UsableFilteringDeclConsumer(const SourceManager &SM, const DeclContext *DC,
+                              SourceLoc loc, VisibleDeclConsumer &consumer)
+      : SM(SM), DC(DC), Loc(loc), ChainedConsumer(consumer) {}
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
                  DynamicLookupInfo dynamicLookupInfo) override;
