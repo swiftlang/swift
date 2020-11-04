@@ -505,6 +505,8 @@ namespace {
       Type pointeeType =
           Impl.importTypeIgnoreIUO(pointeeQualType, ImportTypeKind::Value,
                                    AllowNSUIntegerAsInt, Bridgeability::None);
+      if (!pointeeType)
+        return Type();
 
       if (pointeeQualType->isFunctionType()) {
         return importFunctionPointerLikeType(*type, pointeeType);
