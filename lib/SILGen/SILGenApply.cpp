@@ -4366,6 +4366,9 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     return rawDirectResults[0];
   }();
 
+  if (substFnType->isAsync())
+    emitHopToCurrentExecutor(loc);
+
   // Pop the argument scope.
   argScope.pop();
 
