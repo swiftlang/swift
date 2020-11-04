@@ -326,14 +326,6 @@ TypeChecker::typeCheckExpression(
                                   "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
-  // First let's check whether given expression has a code completion
-  // token which requires special handling.
-  if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
-        Context.CompletionCallback->sawSolution(S);
-      }))
-    return None;
-
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
@@ -342,6 +334,15 @@ TypeChecker::typeCheckExpression(
     return None;
   }
   target.setExpr(expr);
+
+  // Check whether given expression has a code completion token which requires
+  // special handling.
+  if (Context.CompletionCallback &&
+      typeCheckForCodeCompletion(target, /*needsPrecheck*/false,
+                                 [&](const constraints::Solution &S) {
+        Context.CompletionCallback->sawSolution(S);
+      }))
+    return None;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;

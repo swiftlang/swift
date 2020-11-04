@@ -430,11 +430,13 @@ namespace {
 /// in a set of basic blocks. Updates the dominator tree with the cloned blocks.
 /// However, the client needs to update the dominator of the exit blocks.
 ///
-/// FIXME: SILCloner is used to cloned CFG regions by multiple clients. All
-/// functionality for generating valid SIL (including the DomTree) should be
-/// handled by the common SILCloner.
+/// FIXME: All functionality for generating valid SIL (including the DomTree)
+/// should be handled by the common SILCloner. Currently, SILCloner only updates
+/// the DomTree for original (non-cloned) blocks when splitting edges. The
+/// cloned blocks won't be mapped to dominator nodes until fixDomTree()
+/// runs. However, since SILCloner always handles single-entry regions,
+/// fixDomTree() could be part of SILCloner itself.
 class RegionCloner : public SILCloner<RegionCloner> {
-  DominanceInfo &DomTree;
   SILBasicBlock *StartBB;
 
   friend class SILInstructionVisitor<RegionCloner>;
@@ -442,25 +444,10 @@ class RegionCloner : public SILCloner<RegionCloner> {
 
 public:
   RegionCloner(SILBasicBlock *EntryBB, DominanceInfo &DT)
-      : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
-        StartBB(EntryBB) {}
+      : SILCloner<RegionCloner>(*EntryBB->getParent(), &DT), StartBB(EntryBB) {}
 
   SILBasicBlock *cloneRegion(ArrayRef<SILBasicBlock *> exitBBs) {
-    assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
-    // We need to split any edge from a non cond_br basic block leading to a
-    // exit block. After cloning this edge will become critical if it came from
-    // inside the cloned region. The SSAUpdater can't handle critical non
-    // cond_br edges.
-    //
-    // FIXME: remove this in the next commit. The SILCloner will always do it.
-    for (auto *BB : exitBBs) {
-      SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
-      for (auto *Pred : Preds)
-        if (!isa<CondBranchInst>(Pred->getTerminator()) &&
-            !isa<BranchInst>(Pred->getTerminator()))
-          splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
-    }
+    assert(DomTree->getNode(StartBB) != nullptr && "Can't cloned dead code");
 
     cloneReachableBlocks(StartBB, exitBBs);
 
@@ -477,25 +464,25 @@ protected:
   void fixDomTree() {
     for (auto *BB : originalPreorderBlocks()) {
       auto *ClonedBB = getOpBasicBlock(BB);
-      auto *OrigDomBB = DomTree.getNode(BB)->getIDom()->getBlock();
+      auto *OrigDomBB = DomTree->getNode(BB)->getIDom()->getBlock();
       if (BB == StartBB) {
         // The cloned start node shares the same dominator as the original node.
-        auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDomBB);
+        auto *ClonedNode = DomTree->addNewBlock(ClonedBB, OrigDomBB);
         (void)ClonedNode;
         assert(ClonedNode);
         continue;
       }
       // Otherwise, map the dominator structure using the mapped block.
-      DomTree.addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
+      DomTree->addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
     }
   }
 
   SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
-      if (!DomTree.dominates(StartBB, BB)) {
+      if (!DomTree->dominates(StartBB, BB)) {
         // Must be a value that dominates the start basic block.
-        assert(DomTree.dominates(BB, StartBB) &&
-               "Must dominated the start of the cloned region");
+        assert(DomTree->dominates(BB, StartBB)
+               && "Must dominated the start of the cloned region");
         return V;
       }
     }

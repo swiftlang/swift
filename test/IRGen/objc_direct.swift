@@ -40,13 +40,13 @@ markUsed(Bar.directClassMethod())
 // NOTE: The class must be realized before calling objc_direct class methods, even if
 //       Swift avoids explicit class realization before calling regular class methods.
 // CHECK: [[R0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_Bar"
-// CHECK: [[R1:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[R0]])
+// CHECK: [[R1:%.*]] = call %objc_class*  @{{(swift_getInitializedObjCClass|objc_opt_self)}}(%objc_class* [[R0]])
 // CHECK: [[R2:%.*]] = bitcast %objc_class* [[R1]] to i8*
 // CHECK: call {{.*}} @"\01+[Bar directClassMethod]"(i8* [[R2]], i8* undef)
 
 markUsed(Bar.directClassMethod2())
 // CHECK: [[R3:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_Bar"
-// CHECK: [[R4:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[R3]])
+// CHECK: [[R4:%.*]] = call %objc_class* @{{(swift_getInitializedObjCClass|objc_opt_self)}}(%objc_class* [[R3]])
 // CHECK: [[R5:%.*]] = bitcast %objc_class* [[R4]] to i8*
 // CHECK: call {{.*}} @"\01+[Bar directClassMethod2]"(i8* [[R5]], i8* undef)
 

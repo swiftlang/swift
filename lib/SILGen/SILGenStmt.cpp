@@ -326,6 +326,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           // Ignore all other implicit expressions.
           continue;
         }
+      } else if (auto D = ESD.dyn_cast<Decl*>()) {
+        // Local type declarations are not unreachable because they can appear
+        // after the declared type has already been used.
+        if (isa<TypeDecl>(D))
+          continue;
       }
       
       if (StmtType != UnknownStmtType) {
@@ -1216,6 +1221,9 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+
+  if (fnTy->isAsync())
+    emitHopToCurrentExecutor(loc);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.

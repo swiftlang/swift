@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs -enable-cxx-interop -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
-
+import Foundation
 import ConstructorsObjC
 
 // CHECK: [[VAR:%[0-9]+]] = alloc_stack $ConstructorWithNSArrayParam

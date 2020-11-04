@@ -1238,6 +1238,7 @@ public:
     if (isAutoClosure())
       diag = diag::async_call_without_await_in_autoclosure;
     ctx.Diags.diagnose(node.getStartLoc(), diag)
+        .fixItInsert(node.getStartLoc(), "await ")
         .highlight(highlight);
   }
 

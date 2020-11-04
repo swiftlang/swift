@@ -305,10 +305,14 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // must be instructions in the given block. Make sure that the non consuming
   // user is strictly before the consuming user.
   for (auto *nonConsumingUse : nonConsumingUsesInBlock) {
-    if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
-                     [&nonConsumingUse](const SILInstruction &i) -> bool {
-                       return nonConsumingUse->getUser() == &i;
-                     }) == userBlock->end()) {
+    if (nonConsumingUse->getUser() != consumingUse->getUser()) {
+      if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
+                       [&nonConsumingUse](const SILInstruction &i) -> bool {
+                         return nonConsumingUse->getUser() == &i;
+                       }) == userBlock->end()) {
+        continue;
+      }
+    } else if (isReborrowInstruction(consumingUse->getUser())) {
       continue;
     }
 

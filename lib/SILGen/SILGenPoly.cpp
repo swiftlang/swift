@@ -4481,6 +4481,15 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 }
 
 //===----------------------------------------------------------------------===//
+// Concurrency
+//===----------------------------------------------------------------------===//
+
+void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
+  if (actor)
+    B.createHopToExecutor(loc, actor);
+}
+
+//===----------------------------------------------------------------------===//
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 

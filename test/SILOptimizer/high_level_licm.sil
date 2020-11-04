@@ -28,9 +28,12 @@ bb1:
   %f2 = function_ref @user : $@convention(thin) (Int) -> ()
   %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
   %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %r1 = tuple ()
   return %r1 : $()
 }
@@ -56,9 +59,12 @@ bb1:
   %f2 = function_ref @user : $@convention(thin) (Int) -> ()
   %c1 = apply %f1(%a1) : $@convention(method) (@guaranteed Array<Int>) -> Int
   %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   %r1 = tuple ()
   return %r1 : $()
 }

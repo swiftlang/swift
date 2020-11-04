@@ -125,6 +125,15 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
   return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
 }
 
+bool swift::isReborrowInstruction(const SILInstruction *i) {
+  switch (i->getKind()) {
+  case SILInstructionKind::BranchInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                           Borrowing Operand
 //===----------------------------------------------------------------------===//
@@ -163,7 +172,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowingOperand::visitEndScopeInstructions(
+void BorrowingOperand::visitLocalEndScopeInstructions(
     function_ref<void(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
@@ -181,18 +190,8 @@ void BorrowingOperand::visitEndScopeInstructions(
     return;
   }
   case BorrowingOperandKind::Branch:
-    for (auto *succBlock :
-         cast<BranchInst>(op->getUser())->getSuccessorBlocks()) {
-      auto *arg = succBlock->getArgument(op->getOperandNumber());
-      for (auto *use : arg->getUses()) {
-        if (use->isConsumingUse()) {
-          func(use);
-        }
-      }
-    }
     return;
   }
-  llvm_unreachable("Covered switch isn't covered");
 }
 
 void BorrowingOperand::visitBorrowIntroducingUserResults(
@@ -267,46 +266,10 @@ void BorrowingOperand::visitUserResultConsumingUses(
   }
 }
 
-bool BorrowingOperand::getImplicitUses(
+void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  if (!areAnyUserResultsBorrowIntroducers()) {
-    visitEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
-    return false;
-  }
-
-  // Ok, we have an instruction that introduces a new borrow scope and its
-  // result is that borrow scope. In such a case, we need to not just add the
-  // end scope instructions of this scoped operand, but also look through any
-  // guaranteed phis and add their end_borrow to this list as well.
-  SmallVector<BorrowingOperand, 8> worklist;
-  SmallPtrSet<Operand *, 8> visitedValue;
-  worklist.push_back(*this);
-  visitedValue.insert(op);
-  bool foundError = false;
-  while (!worklist.empty()) {
-    auto scopedOperand = worklist.pop_back_val();
-    scopedOperand.visitConsumingUsesOfBorrowIntroducingUserResults(
-        [&](Operand *op) {
-          if (auto subSub = BorrowingOperand::get(op)) {
-            if (!visitedValue.insert(op).second) {
-              if (errorFunction) {
-                (*errorFunction)(op);
-              }
-              foundError = true;
-              return;
-            }
-
-            worklist.push_back(*subSub);
-            visitedValue.insert(subSub->op);
-            return;
-          }
-
-          foundUses.push_back(op);
-        });
-  }
-
-  return foundError;
+  visitLocalEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
 }
 
 //===----------------------------------------------------------------------===//
