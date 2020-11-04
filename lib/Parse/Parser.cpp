@@ -1194,6 +1194,8 @@ bool Parser::shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body) {
       while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
         auto ACE = ICD->getActiveClauseElements();
         if (ACE.size() == 1) {
+          assert(Body.back() == ACE.back() &&
+                 "active clause not found in body");
           return true;
         } else if (ACE.size() == 2) {
           if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
