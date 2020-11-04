@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -swift-version 5 -emit-module-interface-path - -enable-library-evolution %s -experimental-print-full-convention | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -swift-version 5 -emit-module-interface-path - -enable-library-evolution %s -experimental-print-full-convention -use-clang-function-types | %FileCheck %s
 
 import ctypes
 

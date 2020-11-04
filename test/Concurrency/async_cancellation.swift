@@ -53,14 +53,13 @@ func test_cancellation_loop() async -> Int {
 func int() async -> Int { 42 }
 
 func test_cancellation_withDeadline_in() async throws -> Int {
-  /* missing await */ Task.withDeadline(in: .seconds(5), operation: { // FIXME: rdar://70751405 async rethrows functions are not detected as async
+  await Task.withDeadline(in: .seconds(5), operation: {
     await int()
   })
 }
 
 func test_cancellation_withDeadline(specificDeadline: Task.Deadline) async -> Int {
-  /* missing `await` */
-  Task.withDeadline(specificDeadline) { // FIXME: rdar://70751405 async rethrows functions are not detected as async
+  await Task.withDeadline(specificDeadline) {
     await int()
   }
 }
