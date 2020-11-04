@@ -105,10 +105,8 @@ func asyncTest() async {
   let _ = await invokeAuto(await try! throwingTask())
   let _ = await invokeAuto(await try? throwingTask())
 
-  // FIXME: we currently emit a less-helpful error message here.
-  // it would be better if we said "call is 'async' in an autoclosure argument that is not marked with 'await'"
-  let _ = await invokeAuto(try! throwingTask()) // expected-error{{call is 'async' but is not marked with 'await'}}
-  let _ = await invokeAuto(try? throwingTask()) // expected-error{{call is 'async' but is not marked with 'await'}}
+  let _ = await invokeAuto(try! throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  let _ = await invokeAuto(try? throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
 
   let _ = await invokeAuto(await try! throwingTask())
   let _ = await invokeAuto(await try? throwingTask())

@@ -1275,8 +1275,12 @@ public:
       highlight = apply->getSourceRange();
 
     auto diag = diag::async_call_without_await;
-    if (isAutoClosure())
+    // To produce a better error message, check if it is an autoclosure.
+    // We do not use 'Context::isAutoClosure' b/c it gives conservative answers.
+    if (Function && llvm::isa_and_nonnull<AutoClosureExpr>(
+                                            Function->getAbstractClosureExpr()))
       diag = diag::async_call_without_await_in_autoclosure;
+
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
         .highlight(highlight);
