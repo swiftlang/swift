@@ -4118,6 +4118,15 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
+ERROR(async_not_let,none,
+      "'async' can only be used with 'let' declarations", ())
+ERROR(async_let_not_local,none,
+      "'async let' can only be used on local declarations", ())
+ERROR(async_let_not_initialized,none,
+      "'async let' binding requires an initializer expression", ())
+ERROR(async_let_no_variables,none,
+      "'async let' requires at least one named variable", ())
+
 ERROR(asynchandler_non_func,none,
       "'@asyncHandler' can only be applied to functions",
       ())
