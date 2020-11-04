@@ -194,10 +194,14 @@ public:
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
-    if (auto ic = dyn_cast<IfConfigDecl>(D))
+    if (auto ic = dyn_cast<IfConfigDecl>(D)) {
       recurse = asImpl().checkIfConfig(ic);
-    else if (!isa<PatternBindingDecl>(D))
+    } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
+      if (patternBinding->isAsyncLet())
+        recurse = asImpl().checkAsyncLet(patternBinding);
+    } else {
       recurse = ShouldNotRecurse;
+    }
     return bool(recurse);
   }
 
@@ -660,6 +664,9 @@ private:
     }
     ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
       return ShouldNotRecurse;
+    }
+    ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
       Result = ThrowingKind::Throws;
@@ -1321,6 +1328,15 @@ public:
           }
         }
       }
+    } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
+                   node.dyn_cast<Decl *>())) {
+      if (patternBinding->isAsyncLet()) {
+        auto var = patternBinding->getAnchoringVarDecl(0);
+        Diags.diagnose(
+            e->getLoc(), diag::async_let_in_illegal_context,
+            var->getName(), static_cast<unsigned>(getKind()));
+        return;
+      }
     }
 
     Diags.diagnose(node.getStartLoc(), diag::await_in_illegal_context,
@@ -1344,7 +1360,8 @@ public:
       unsigned kind = 0;
       if (node.isExpr(ExprKind::Await))
         kind = 1;
-      else if (node.isExpr(ExprKind::DeclRef))
+      else if (node.isExpr(ExprKind::DeclRef) ||
+               node.isDecl(DeclKind::PatternBinding))
         kind = 2;
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
                      kind, isAutoClosure());
@@ -1741,6 +1758,14 @@ private:
     }
 
     return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
+      // Diagnose async calls in a context that doesn't handle async.
+      if (!CurContext.handlesAsync()) {
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
+      }
+    return ShouldRecurse;
   }
 
   ShouldRecurse_t
