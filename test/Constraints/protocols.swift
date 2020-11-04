@@ -422,3 +422,13 @@ func test_sr_11609() {
   let _: String = foo()
   // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
 }
+
+// rdar://70814576 -- failed to produce a diagnostic when implicit value-to-optional conversion is involved.
+func rdar70814576() {
+  struct S {}
+
+  func test(_: Fooable?) {
+  }
+
+  test(S()) // expected-error {{argument type 'S' does not conform to expected type 'Fooable'}}
+}
