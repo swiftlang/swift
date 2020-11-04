@@ -1309,7 +1309,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     return;
   }
   UsableFilteringDeclConsumer FilteringConsumer(DC->getASTContext().SourceMgr,
-                                                Loc, Consumer);
+                                                DC, Loc, Consumer);
   lookupVisibleDeclsImpl(FilteringConsumer, DC, IncludeTopLevel, Loc);
 }
 

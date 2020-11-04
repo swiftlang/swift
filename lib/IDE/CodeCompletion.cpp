@@ -4658,8 +4658,9 @@ public:
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
 
-    UsableFilteringDeclConsumer UsableFilteringConsumer(Ctx.SourceMgr,
-        Ctx.SourceMgr.getCodeCompletionLoc(), *this);
+    UsableFilteringDeclConsumer UsableFilteringConsumer(
+        Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
+        *this);
     AccessFilteringDeclConsumer AccessFilteringConsumer(
         CurrDeclContext, UsableFilteringConsumer);
 
