@@ -52,11 +52,14 @@ bb4:                                              // Preds: bb3 bb2
   cond_fail %33 : $Builtin.Int1                   // id: %35
   %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
   dealloc_stack %8 : $*Int64     // id: %37
-  br bb5                                          // id: %38
+  br bb6                                          // id: %38
+
+bb5:
+  br bb6
 
 // We don't need a PHI node here because the value is dead!
-// CHECK: bb5:
-bb5:                                              // Preds: bb4 bb0
+// CHECK: bb6:
+bb6:
   dealloc_stack %1 : $*Int64     // id: %39
   %40 = tuple ()                                  // user: %41
 // CHECK: return
