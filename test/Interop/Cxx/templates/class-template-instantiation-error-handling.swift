@@ -5,9 +5,9 @@ import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-// CHECK: class-template-instantiation-error-handling.swift:10:21: error: could not generate C++ types from the generic Swift types provided. The following Swift type(s) provided to 'MagicWrapper' were unable to be converted: String.
+// CHECK: class-template-instantiation-error-handling.swift:10:21: error: could not generate C++ types from the generic Swift types provided. The following Swift type(s) provided to 'MagicWrapper' were unable to be converted: Optional<_>.
 TemplatesTestSuite.test("swift-template-arg-not-supported") {
-  var magicString = MagicWrapper<String>(t: "asdf")
+  var magicString = MagicWrapper<Optional>(t: "asdf")
 }
 
 // CHECK: class-template-instantiation-errors.h:18:7: error: no member named 'doesNotExist' in 'IntWrapper'
