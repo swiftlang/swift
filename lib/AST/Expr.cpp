@@ -2031,6 +2031,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
 
   switch (getThunkKind()) {
   case AutoClosureExpr::Kind::None:
+  case AutoClosureExpr::Kind::AsyncLet:
     break;
 
   case AutoClosureExpr::Kind::SingleCurryThunk: {
