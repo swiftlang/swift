@@ -3255,6 +3255,10 @@ namespace {
         return nullptr;
       }
 
+      // TODO(SR-13809): fix this once we support dependent types.
+      if (decl->getTypeForDecl()->isDependentType())
+        return nullptr;
+
       // Don't import nominal types that are over-aligned.
       if (Impl.isOverAligned(decl))
         return nullptr;
