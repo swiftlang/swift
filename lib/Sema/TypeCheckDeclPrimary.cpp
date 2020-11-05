@@ -2332,6 +2332,13 @@ public:
     if (!AFD->getBodySourceRange().isValid())
       return false;
 
+    // didSet runs typechecking to determine whether to keep its parameter,
+    // so never try to skip.
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      if (AD->getAccessorKind() == AccessorKind::DidSet)
+        return false;
+    }
+
     // If we're gonna serialize the body, we can't skip it.
     if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)
       return false;
