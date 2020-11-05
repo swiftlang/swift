@@ -36,11 +36,11 @@ bb0:
 }
 
 // CHECK-LABEL: Begin Error in function nonasync_apply_caller
-// CHECK: SIL verification failed: cannot call an async function from a non-async function: !fnType->isAsync() || FRI->getFunction()->isAsync()
+// CHECK: SIL verification failed: cannot call an async function from a non async function: !calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync()
 // CHECK: Verifying instruction:
-// CHECK: ->   // function_ref asynccallee1
+// CHECK:      // function_ref asynccallee1
 // CHECK:   %0 = function_ref @asynccallee1 : $@convention(thin) @async () -> () // user: %1
-// CHECK:      %1 = apply %0() : $@convention(thin) @async () -> ()
+// CHECK: ->  %1 = apply %0() : $@convention(thin) @async () -> ()
 // CHECK-LABEL: End Error in function nonasync_apply_caller
 sil [ossa] @nonasync_apply_caller : $@convention(thin) () -> () {
 bb0:
@@ -62,11 +62,11 @@ bb2(%result_error : $Error):
 }
 
 // CHECK-LABEL: Begin Error in function nonasync_try_apply_caller
-// CHECK: SIL verification failed: cannot call an async function from a non-async function: !fnType->isAsync() || FRI->getFunction()->isAsync()
+// CHECK: SIL verification failed: cannot call an async function from a non async function: !calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync()
 // CHECK: Verifying instruction:
-// CHECK: ->   // function_ref asynccallee2
+// CHECK:      // function_ref asynccallee2
 // CHECK:   %0 = function_ref @asynccallee2 : $@convention(thin) @async () -> ((), @error Error) // user: %1
-// CHECK:      try_apply %0() : $@convention(thin) @async () -> ((), @error Error), normal bb1, error bb2 // id: %1
+// CHECK: ->  try_apply %0() : $@convention(thin) @async () -> ((), @error Error), normal bb1, error bb2 // id: %1
 // CHECK-LABEL: End Error in function nonasync_try_apply_caller
 sil [ossa] @nonasync_try_apply_caller : $@convention(thin) () -> () {
 bb0:
@@ -86,13 +86,7 @@ bb0:
   return %2 : $@async @callee_owned () -> ()
 }
 
-// CHECK-LABEL: Begin Error in function nonasync_partial_apply_caller
-// CHECK: SIL verification failed: cannot call an async function from a non-async function: !fnType->isAsync() || FRI->getFunction()->isAsync()
-// CHECK: Verifying instruction:
-// CHECK: ->   // function_ref asynccallee1
-// CHECK:   %0 = function_ref @asynccallee1 : $@convention(thin) @async () -> () // user: %1
-// CHECK:      %1 = partial_apply %0() : $@convention(thin) @async () -> () // user: %2
-// CHECK-LABEL: End Error in function nonasync_partial_apply_caller
+// CHECK-NOT: Function: 'nonasync_partial_apply_caller'
 sil [ossa] @nonasync_partial_apply_caller : $@convention(thin) () -> @owned @async @callee_owned () -> () {
 bb0:
   %1 = function_ref @asynccallee1 : $@async @convention(thin) () -> ()
@@ -113,10 +107,10 @@ bb0(%t : $*T):
 }
 
 // CHECK-LABEL: Begin Error in function nonasync_witness_method_caller
-// CHECK: SIL verification failed: cannot call an async function from a non-async function: !methodType->isAsync() || AMI->getFunction()->isAsync()
+// CHECK: SIL verification failed: cannot call an async function from a non async function: !calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync()
 // CHECK: Verifying instruction:
-// CHECK: ->   %1 = witness_method $T, #P.printMe : <Self where Self : P> (Self) -> () async -> Int64 : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // user: %2
-// CHECK:      %2 = apply %1<T>(%0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // user: %3
+// CHECK:      %1 = witness_method $T, #P.printMe : <Self where Self : P> (Self) -> () async -> Int64 : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // user: %2
+// CHECK: ->   %2 = apply %1<T>(%0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64 // user: %3
 // CHECK-LABEL: End Error in function nonasync_witness_method_caller
 sil hidden @nonasync_witness_method_caller : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64 {
 bb0(%t : $*T):
@@ -141,11 +135,11 @@ bb0(%int : $Int64, %instance : $S):
 }
 
 // CHECK-LABEL: Begin Error in function nonasync_class_method_caller
-// CHECK: SIL verification failed: cannot call an async function from a non-async function: !methodType->isAsync() || CMI->getFunction()->isAsync()
+// CHECK: SIL verification failed: cannot call an async function from a non async function: !calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync()
 // CHECK: Verifying instruction:
 // CHECK:    %1 = argument of bb0 : $S                      // users: %3, %2
-// CHECK: ->   %2 = class_method %1 : $S, #S.method : (S) -> (Int64) async -> (), $@convention(method) @async (Int64, @guaranteed S) -> () // user: %3
-// CHECK:      %3 = apply %2(%0, %1) : $@convention(method) @async (Int64, @guaranteed S) -> ()
+// CHECK:      %2 = class_method %1 : $S, #S.method : (S) -> (Int64) async -> (), $@convention(method) @async (Int64, @guaranteed S) -> () // user: %3
+// CHECK: ->   %3 = apply %2(%0, %1) : $@convention(method) @async (Int64, @guaranteed S) -> ()
 // CHECK-LABEL: End Error in function nonasync_class_method_caller
 sil hidden @nonasync_class_method_caller : $@convention(thin) (Int64, S) -> () {
 bb0(%int : $Int64, %instance : $S):
