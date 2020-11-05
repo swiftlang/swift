@@ -22,39 +22,46 @@ set(sources
   Visibility.h
   _SwiftConcurrency.h
 
-  CoreMediaOverlayShims.h
   DispatchOverlayShims.h
-  NetworkOverlayShims.h
-  OSOverlayShims.h
-  ObjectiveCOverlayShims.h
-  SafariServicesOverlayShims.h
-  AppKitOverlayShims.h
-  UIKitOverlayShims.h
-  XCTestOverlayShims.h
-  XPCOverlayShims.h
-
-  CoreFoundationOverlayShims.h
-  CFCharacterSetShims.h
-  CFHashingShims.h
-
-  FoundationOverlayShims.h
-  FoundationShimSupport.h
-  NSCalendarShims.h
-  NSCharacterSetShims.h
-  NSCoderShims.h
-  NSDataShims.h
-  NSDictionaryShims.h
-  NSErrorShims.h
-  NSFileManagerShims.h
-  NSIndexPathShims.h
-  NSIndexSetShims.h
-  NSKeyedArchiverShims.h
-  NSLocaleShims.h
-  NSTimeZoneShims.h
-  NSUndoManagerShims.h
-
-  ClockKitOverlayShims.h
   )
+
+list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+if(building_darwin_sdks)
+  list(APPEND sources
+      CoreMediaOverlayShims.h
+      NetworkOverlayShims.h
+      OSOverlayShims.h
+      ObjectiveCOverlayShims.h
+      SafariServicesOverlayShims.h
+      AppKitOverlayShims.h
+      UIKitOverlayShims.h
+      XCTestOverlayShims.h
+      XPCOverlayShims.h
+
+      CoreFoundationOverlayShims.h
+      CFCharacterSetShims.h
+      CFHashingShims.h
+
+      FoundationOverlayShims.h
+      FoundationShimSupport.h
+      NSCalendarShims.h
+      NSCharacterSetShims.h
+      NSCoderShims.h
+      NSDataShims.h
+      NSDictionaryShims.h
+      NSErrorShims.h
+      NSFileManagerShims.h
+      NSIndexPathShims.h
+      NSIndexSetShims.h
+      NSKeyedArchiverShims.h
+      NSLocaleShims.h
+      NSTimeZoneShims.h
+      NSUndoManagerShims.h
+
+      ClockKitOverlayShims.h
+      )
+endif()
+
 set(output_dir "${SWIFTLIB_DIR}/shims")
 set(output_dir_static "${SWIFTSTATICLIB_DIR}/shims")
 
@@ -97,7 +104,6 @@ foreach(input ${sources})
   endif()
 endforeach()
 
-list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
 handle_gyb_source_single(shims_modulemap_target
     SOURCE "${shims_modulemap_source}"
     OUTPUT "${shims_modulemap_out}"
