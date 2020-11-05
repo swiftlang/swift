@@ -1306,11 +1306,27 @@ public:
       highlight = apply->getSourceRange();
 
     auto diag = diag::async_call_without_await;
+
     // To produce a better error message, check if it is an autoclosure.
     // We do not use 'Context::isAutoClosure' b/c it gives conservative answers.
-    if (Function && llvm::isa_and_nonnull<AutoClosureExpr>(
-                                            Function->getAbstractClosureExpr()))
-      diag = diag::async_call_without_await_in_autoclosure;
+    if (Function) {
+      if (auto autoclosure = dyn_cast_or_null<AutoClosureExpr>(
+              Function->getAbstractClosureExpr())) {
+        switch (autoclosure->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+          diag = diag::async_call_without_await_in_autoclosure;
+          break;
+
+        case AutoClosureExpr::Kind::AsyncLet:
+          diag = diag::async_call_without_await_in_async_let;
+          break;
+
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+          break;
+        }
+      }
+    }
 
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
@@ -1636,24 +1652,32 @@ private:
   ShouldRecurse_t checkAutoClosure(AutoClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
-    scope.resetCoverageForAutoclosureBody();
 
+    bool shouldPreserveCoverage = true;
     switch (E->getThunkKind()) {
     case AutoClosureExpr::Kind::DoubleCurryThunk:
     case AutoClosureExpr::Kind::SingleCurryThunk:
       // Curry thunks aren't actually a call to the asynchronous function.
       // Assume that async is covered in such contexts.
+      scope.resetCoverageForAutoclosureBody();
       Flags.set(ContextFlags::IsAsyncCovered);
       break;
 
     case AutoClosureExpr::Kind::None:
+      scope.resetCoverageForAutoclosureBody();
+      break;
+
     case AutoClosureExpr::Kind::AsyncLet:
+      scope.resetCoverage();
+      shouldPreserveCoverage = false;
       break;
     }
 
     E->getBody()->walk(*this);
 
-    scope.preserveCoverageFromAutoclosureBody();
+    if (shouldPreserveCoverage)
+      scope.preserveCoverageFromAutoclosureBody();
+
     return ShouldNotRecurse;
   }
 

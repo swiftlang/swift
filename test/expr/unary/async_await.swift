@@ -148,6 +148,9 @@ func validAsyncFunction() async throws {
 // Async let checking
 func mightThrow() throws { }
 
+func getIntUnsafely() throws -> Int { 0 }
+func getIntUnsafelyAsync() async throws -> Int { 0 }
+
 extension Error {
   var number: Int { 0 }
 }
@@ -162,6 +165,16 @@ func testAsyncLet() async throws {
   } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
   } catch {
   }
+
+  async let x1 = getIntUnsafely() // expected-error{{call can throw but is not marked with 'try'}}
+  // expected-note@-1{{did you mean to use 'try'}}
+  // expected-note@-2{{did you mean to handle error as optional value?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+
+  async let x2 = getInt() // expected-error{{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
+
+  _ = await x1
+  _ = await x2
 }
 
 // expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}

@@ -4087,6 +4087,9 @@ ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
 ERROR(async_call_without_await_in_autoclosure,none,
       "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
+ERROR(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer that is not marked "
+      "with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
