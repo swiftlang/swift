@@ -91,9 +91,10 @@ AsyncContextLayout irgen::getAsyncContextLayout(IRGenModule &IGM,
   return layout;
 }
 
-AsyncContextLayout irgen::getAsyncContextLayout(
-    IRGenModule &IGM, CanSILFunctionType originalType,
-    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap) {
+AsyncContextLayout
+irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
+                             CanSILFunctionType substitutedType,
+                             SubstitutionMap substitutionMap) {
   SmallVector<const TypeInfo *, 4> typeInfos;
   SmallVector<SILType, 4> valTypes;
   SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
@@ -158,8 +159,8 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   //   IndirectResultTypes *indirectResults...;
   auto indirectResults = fnConv.getIndirectSILResults();
   for (auto indirectResult : indirectResults) {
-    auto ty = fnConv.getSILType(indirectResult,
-                                IGM.getMaximalTypeExpansionContext());
+    auto ty =
+        fnConv.getSILType(indirectResult, IGM.getMaximalTypeExpansionContext());
     auto retLoweringTy = CanInOutType::get(ty.getASTType());
     auto &ti = IGM.getTypeInfoForLowered(retLoweringTy);
     valTypes.push_back(ty);
@@ -177,8 +178,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     addExecutor();
     // YieldTypes yieldValues...
     for (auto yield : fnConv.getYields()) {
-      auto ty =
-          fnConv.getSILType(yield, IGM.getMaximalTypeExpansionContext());
+      auto ty = fnConv.getSILType(yield, IGM.getMaximalTypeExpansionContext());
       auto &ti = IGM.getTypeInfoForLowered(ty.getASTType());
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
@@ -187,8 +187,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   } else {
     //     ResultTypes directResults...;
     for (auto result : fnConv.getDirectSILResults()) {
-      auto ty =
-          fnConv.getSILType(result, IGM.getMaximalTypeExpansionContext());
+      auto ty = fnConv.getSILType(result, IGM.getMaximalTypeExpansionContext());
       auto &ti = IGM.getTypeInfoForLowered(ty.getASTType());
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
@@ -208,8 +207,8 @@ AsyncContextLayout irgen::getAsyncContextLayout(
 
   //   ArgTypes formalArguments...;
   for (auto parameter : parameters) {
-    SILType ty = IGM.silConv.getSILType(
-        parameter, substitutedType, IGM.getMaximalTypeExpansionContext());
+    SILType ty = IGM.silConv.getSILType(parameter, substitutedType,
+                                        IGM.getMaximalTypeExpansionContext());
 
     auto argumentLoweringType =
         getArgumentLoweringType(ty.getASTType(), parameter,
@@ -225,8 +224,8 @@ AsyncContextLayout irgen::getAsyncContextLayout(
       IGM, originalType, substitutionMap);
   if (!bindings.empty()) {
     auto bindingsSize = bindings.getBufferSize(IGM);
-    auto &bindingsTI = IGM.getOpaqueStorageTypeInfo(
-        bindingsSize, IGM.getPointerAlignment());
+    auto &bindingsTI =
+        IGM.getOpaqueStorageTypeInfo(bindingsSize, IGM.getPointerAlignment());
     valTypes.push_back(SILType());
     typeInfos.push_back(&bindingsTI);
   }
@@ -236,7 +235,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     if (hasLocalContextParameter) {
       SILType ty =
           IGM.silConv.getSILType(localContextParameter, substitutedType,
-                                     IGM.getMaximalTypeExpansionContext());
+                                 IGM.getMaximalTypeExpansionContext());
       auto argumentLoweringType =
           getArgumentLoweringType(ty.getASTType(), localContextParameter,
                                   /*isNoEscape*/ true);
@@ -278,19 +277,19 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     trailingWitnessInfo = AsyncContextLayout::TrailingWitnessInfo();
   }
 
-  return AsyncContextLayout(
-      IGM, LayoutStrategy::Optimal, valTypes, typeInfos, originalType,
-      substitutedType, substitutionMap, std::move(bindings),
-      trailingWitnessInfo, errorType, canHaveValidError, paramInfos,
-      isCoroutine, yieldInfos, indirectReturnInfos, directReturnInfos,
-      localContextInfo);
+  return AsyncContextLayout(IGM, LayoutStrategy::Optimal, valTypes, typeInfos,
+                            originalType, substitutedType, substitutionMap,
+                            std::move(bindings), trailingWitnessInfo, errorType,
+                            canHaveValidError, paramInfos, isCoroutine,
+                            yieldInfos, indirectReturnInfos, directReturnInfos,
+                            localContextInfo);
 }
 
 AsyncContextLayout::AsyncContextLayout(
     IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
-    ArrayRef<const TypeInfo *> fieldTypeInfos,
-    CanSILFunctionType originalType, CanSILFunctionType substitutedType,
-    SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
+    ArrayRef<const TypeInfo *> fieldTypeInfos, CanSILFunctionType originalType,
+    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap,
+    NecessaryBindings &&bindings,
     Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
     bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
     bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,

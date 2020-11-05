@@ -255,8 +255,8 @@ namespace irgen {
     // AsyncContextLayout.
     SILType getParameterType(unsigned index) {
       SILFunctionConventions origConv(substitutedType, IGM.getSILModule());
-      return origConv.getSILArgumentType(
-          index, IGM.getMaximalTypeExpansionContext());
+      return origConv.getSILArgumentType(index,
+                                         IGM.getMaximalTypeExpansionContext());
     }
     unsigned getArgumentCount() { return argumentInfos.size(); }
     bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
