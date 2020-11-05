@@ -1330,6 +1330,7 @@ namespace {
     void maybeAddCanonicalMetadataPrespecializations() {
       if (Type->isGenericContext() && hasCanonicalMetadataPrespecializations()) {
         asImpl().addCanonicalMetadataPrespecializations();
+        asImpl().addCanonicalMetadataPrespecializationCachingOnceToken();
       }
     }
 
@@ -1347,6 +1348,12 @@ namespace {
         auto *metadata = IGM.getAddrOfTypeMetadata(specialization);
         B.addRelativeAddress(metadata);
       }
+    }
+
+    void addCanonicalMetadataPrespecializationCachingOnceToken() {
+      auto *cachingOnceToken =
+          IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(Type);
+      B.addRelativeAddress(cachingOnceToken);
     }
 
     // Subclasses should provide:

@@ -1189,6 +1189,13 @@ static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
     NominalTypeDecl &decl) {
+  // The accessor depends on the existence of canonical metadata records
+  // because their presence determine which runtime function is called.
+  auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(
+      decl.getDeclaredType()->getCanonicalType(), NotForDefinition);
+  accessor->deleteBody();
+  IGM.IRGen.noteUseOfMetadataAccessor(&decl);
+
   IGM.IRGen.noteLazyReemissionOfNominalTypeDescriptor(&decl);
   // The type context descriptor depends on canonical metadata records because
   // pointers to them are attached as trailing objects to it.
@@ -1231,8 +1238,9 @@ void IRGenerator::emitLazyDefinitions() {
       auto &IGM = *IGMPtr.get();
       // A new canonical prespecialized metadata changes both the type
       // descriptor (adding a new entry to the trailing list of metadata) and
-      // the metadata accessor (adding a new list of generic arguments against
-      // which to compare the arguments to the function).  Consequently, it is
+      // the metadata accessor (calling the appropriate getGenericMetadata
+      // variant depending on whether there are any canonical prespecialized
+      // metadata records to add to the metadata cache).  Consequently, it is
       // necessary to force these to be reemitted.
       if (canonicality == TypeMetadataCanonicality::Canonical) {
         deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
@@ -3928,6 +3936,24 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
   // Zero-initialize if we're asking for a definition.
   cast<llvm::GlobalVariable>(variable)->setInitializer(
     llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
+
+  return variable;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+    NominalTypeDecl *decl) {
+  assert(decl->isGenericContext());
+  LinkEntity entity =
+      LinkEntity::forCanonicalPrespecializedGenericTypeCachingOnceToken(decl);
+  if (auto &entry = GlobalVars[entity]) {
+    return entry;
+  }
+  auto variable = getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::ConstantInt::get(OnceTy, 0));
 
   return variable;
 }
