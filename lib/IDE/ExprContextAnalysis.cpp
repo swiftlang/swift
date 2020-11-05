@@ -795,8 +795,8 @@ class ExprContextAnalyzer {
       bool MayNeedName = !HasName && !E->isImplicit() &&
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
                           isa<UnresolvedMemberExpr>(E));
-      SmallPtrSet<TypeBase *, 4> seenTypes;
-      llvm::SmallSet<std::pair<Identifier, TypeBase *>, 4> seenArgs;
+      SmallPtrSet<CanType, 4> seenTypes;
+      llvm::SmallSet<std::pair<Identifier, CanType>, 4> seenArgs;
       for (auto &typeAndDecl : Candidates) {
         DeclContext *memberDC = nullptr;
         if (typeAndDecl.Decl)
@@ -820,7 +820,8 @@ class ExprContextAnalyzer {
                             paramList->get(Pos)->isVariadic());
 
           if (paramType.hasLabel() && MayNeedName) {
-            if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
+            if (seenArgs.insert({paramType.getLabel(), ty->getCanonicalType()})
+                    .second)
               recordPossibleParam(&paramType, !canSkip);
           } else {
             auto argTy = ty;
@@ -828,7 +829,7 @@ class ExprContextAnalyzer {
               argTy = InOutType::get(argTy);
             else if (paramType.isAutoClosure() && argTy->is<AnyFunctionType>())
               argTy = argTy->castTo<AnyFunctionType>()->getResult();
-            if (seenTypes.insert(argTy.getPointer()).second)
+            if (seenTypes.insert(argTy->getCanonicalType()).second)
               recordPossibleType(argTy);
           }
           if (!canSkip)
@@ -837,7 +838,7 @@ class ExprContextAnalyzer {
         // If the argument position is out of expeceted number, indicate that
         // with optional nullptr param.
         if (Position >= Params.size()) {
-          if (seenArgs.insert({Identifier(), nullptr}).second)
+          if (seenArgs.insert({Identifier(), CanType()}).second)
             recordPossibleParam(nullptr, /*isRequired=*/false);
         }
       }
