@@ -302,6 +302,7 @@ NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
 NODE(GlobalVariableOnceFunction)
 NODE(GlobalVariableOnceToken)
 NODE(GlobalVariableOnceDeclList)
+NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
 
 #undef CONTEXT_NODE
 #undef NODE

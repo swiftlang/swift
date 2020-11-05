@@ -561,6 +561,7 @@ private:
     case Node::Kind::GlobalVariableOnceDeclList:
     case Node::Kind::GlobalVariableOnceFunction:
     case Node::Kind::GlobalVariableOnceToken:
+    case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2535,6 +2536,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ObjCAsyncCompletionHandlerImpl:
     Printer << "@objc completion handler block implementation for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+    Printer << "flag for loading of canonical specialized generic type "
+               "metadata for ";
     print(Node->getChild(0));
     return nullptr;
   }

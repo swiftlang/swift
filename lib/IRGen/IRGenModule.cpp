@@ -701,6 +701,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  GetCanonicalPrespecializedGenericMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getPrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
