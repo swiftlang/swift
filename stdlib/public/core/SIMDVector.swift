@@ -843,8 +843,8 @@ extension SIMD where Scalar: FloatingPoint {
   
   /// Returns the sum of the scalars in the vector.
   // SWIFT_ENABLE_TENSORFLOW: We have changed `@_alwaysEmitIntoClient` to `@inlinable`, to work
-  // around TF-1103.
-  // TODO(TF-1103): Change `@inlinable` back to `@_alwaysEmitIntoClient`.
+  // around SR-13689.
+  // TODO(SR-13689): Change `@inlinable` back to `@_alwaysEmitIntoClient`.
   @inlinable
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
