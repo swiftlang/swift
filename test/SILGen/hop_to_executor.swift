@@ -47,6 +47,13 @@ actor class MyActor {
     await callee(p)
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC13dontInsertHTESiyF : $@convention(method) (@guaranteed MyActor) -> Int {
+  // CHECK-NOT:   hop_to_executor
+  // CHECK:     } // end sil function '$s4test7MyActorC13dontInsertHTESiyF'
+  func dontInsertHTE() -> Int {
+    return p
+  }
+
   init() {
     p = 27
   }
@@ -57,7 +64,7 @@ struct GlobalActor {
   static var shared: MyActor = MyActor()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test0A11GlobalActoryyYF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A11GlobalActoryyYF : $@convention(thin) @async () -> () {
 // CHECK:   [[F:%[0-9]+]] = function_ref @$s4test11GlobalActorV6sharedAA02MyC0Cvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[P:%[0-9]+]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[A:%[0-9]+]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*MyActor
@@ -75,7 +82,7 @@ struct GenericGlobalActorWithGetter<T> {
   static var shared: MyActor { return MyActor() }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test0A28GenericGlobalActorWithGetteryyYF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A28GenericGlobalActorWithGetteryyYF : $@convention(thin) @async () -> () {
 // CHECK:     [[MT:%[0-9]+]] = metatype $@thin GenericGlobalActorWithGetter<Int>.Type
 // CHECK:     [[F:%[0-9]+]] = function_ref @$s4test28GenericGlobalActorWithGetterV6sharedAA02MyD0CvgZ : $@convention(method) <τ_0_0> (@thin GenericGlobalActorWithGetter<τ_0_0>.Type) -> @owned MyActor
 // CHECK:     [[A:%[0-9]+]] = apply [[F]]<Int>([[MT]]) : $@convention(method) <τ_0_0> (@thin GenericGlobalActorWithGetter<τ_0_0>.Type) -> @owned MyActor
