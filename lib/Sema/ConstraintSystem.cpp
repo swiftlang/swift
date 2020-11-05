@@ -4680,7 +4680,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
-                                             bool isDefaultWrappedValue) {
+                                             bool isDefaultWrappedValue,
+                                             bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4701,6 +4702,9 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
       expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
+
+  if (isAsyncLetWrapper)
+    closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
 

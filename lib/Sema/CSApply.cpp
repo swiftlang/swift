@@ -7891,6 +7891,51 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// For the initializer of an `async let`, wrap it in an autoclosure and then
+/// a call to that autoclosure, so that the code for the child task is captured
+/// entirely within the autoclosure. This captures the semantics of the
+/// operation but not the timing, e.g., the call itself will actually occur
+/// when one of the variables in the async let is referenced.
+static Expr *wrapAsyncLetInitializer(
+      ConstraintSystem &cs, Expr *initializer, DeclContext *dc) {
+  // Form the autoclosure type. It is always 'async', and will be 'throws'.
+  Type initializerType = initializer->getType();
+  bool throws = TypeChecker::canThrow(initializer);
+  auto extInfo = ASTExtInfoBuilder()
+    .withAsync()
+    .withThrows(throws)
+    .build();
+
+  // Form the autoclosure expression. The actual closure here encapsulates the
+  // child task.
+  auto closureType = FunctionType::get({ }, initializerType, extInfo);
+  ASTContext &ctx = dc->getASTContext();
+  Expr *autoclosureExpr = cs.buildAutoClosureExpr(
+      initializer, closureType, /*isDefaultWrappedValue=*/false,
+      /*isAsyncLetWrapper=*/true);
+
+  // Call the autoclosure so that the AST types line up. SILGen will ignore the
+  // actual calls and translate them into a different mechanism.
+  auto autoclosureCall = CallExpr::createImplicit(
+      ctx, autoclosureExpr, { }, { });
+  autoclosureCall->setType(initializerType);
+  autoclosureCall->setThrows(throws);
+
+  // For a throwing expression, wrap the call in a 'try'.
+  Expr *resultInit = autoclosureCall;
+  if (throws) {
+    resultInit = new (ctx) TryExpr(
+        SourceLoc(), resultInit, initializerType, /*implicit=*/true);
+  }
+
+  // Wrap the call in an 'await'.
+  resultInit = new (ctx) AwaitExpr(
+      SourceLoc(), resultInit, initializerType, /*implicit=*/true);
+
+  cs.cacheExprTypes(resultInit);
+  return resultInit;
+}
+
 /// Apply the given solution to the initialization target.
 ///
 /// \returns the resulting initialization expression.
@@ -7963,6 +8008,16 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
     resultTarget.setPattern(coercedPattern);
   } else {
     return None;
+  }
+
+  // For an async let, wrap the initializer appropriately to make it a child
+  // task.
+  if (auto patternBinding = target.getInitializationPatternBindingDecl()) {
+    if (patternBinding->isAsyncLet()) {
+      resultTarget.setExpr(
+          wrapAsyncLetInitializer(
+            cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
+    }
   }
 
   return resultTarget;

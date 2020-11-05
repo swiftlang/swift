@@ -588,11 +588,17 @@ SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   105)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
+  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  106)
+
 // SWIFT_ENABLE_TENSORFLOW
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   OnAccessor | OnFunc | OnConstructor | OnSubscript |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
-  NotSerialized, 106)
+  NotSerialized, 107)
 // SWIFT_ENABLE_TENSORFLOW END
 
 #undef TYPE_ATTR

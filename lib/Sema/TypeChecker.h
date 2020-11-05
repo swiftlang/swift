@@ -1063,6 +1063,9 @@ void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 
+/// Whether the given expression can throw.
+bool canThrow(Expr *expr);
+
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.
 /// Otherwise, return nil.
