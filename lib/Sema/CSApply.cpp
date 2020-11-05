@@ -7900,7 +7900,9 @@ static Expr *wrapAsyncLetInitializer(
   // child task.
   auto closureType = FunctionType::get({ }, initializerType, extInfo);
   ASTContext &ctx = dc->getASTContext();
-  Expr *autoclosureExpr = cs.buildAutoClosureExpr(initializer, closureType);
+  Expr *autoclosureExpr = cs.buildAutoClosureExpr(
+      initializer, closureType, /*isDefaultWrappedValue=*/false,
+      /*isAsyncLetWrapper=*/true);
 
   // Call the autoclosure so that the AST types line up. SILGen will ignore the
   // actual calls and translate them into a different mechanism.

@@ -1638,15 +1638,16 @@ private:
     scope.enterSubFunction();
     scope.resetCoverageForAutoclosureBody();
 
-    // Curry thunks aren't actually a call to the asynchronous function.
-    // Assume that async is covered in such contexts.
     switch (E->getThunkKind()) {
     case AutoClosureExpr::Kind::DoubleCurryThunk:
     case AutoClosureExpr::Kind::SingleCurryThunk:
+      // Curry thunks aren't actually a call to the asynchronous function.
+      // Assume that async is covered in such contexts.
       Flags.set(ContextFlags::IsAsyncCovered);
       break;
 
     case AutoClosureExpr::Kind::None:
+    case AutoClosureExpr::Kind::AsyncLet:
       break;
     }
 

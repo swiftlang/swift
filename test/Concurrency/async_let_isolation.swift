@@ -16,8 +16,6 @@ actor class MyActor {
 
     async let z = synchronous()
     // expected-error @-1{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
-    // FIXME: expected-error @-2{{call to method 'synchronous' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    // FIXME: expected-note @-3{{reference 'self.' explicitly}}
 
     var localText = text // expected-note{{var declared here}}
     async let w = localText.removeLast()

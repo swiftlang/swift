@@ -3903,7 +3903,10 @@ public:
 
     // An autoclosure with type (Self) -> (Args...) -> Result. Formed from type
     // checking a partial application.
-    DoubleCurryThunk = 2
+    DoubleCurryThunk = 2,
+
+    // An autoclosure with type () -> Result that was formed for an async let.
+    AsyncLet = 3,
   };
 
   AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
