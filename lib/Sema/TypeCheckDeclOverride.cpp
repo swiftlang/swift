@@ -1516,6 +1516,7 @@ namespace  {
     UNINTERESTING_ATTR(Actor)
     UNINTERESTING_ATTR(ActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
+    UNINTERESTING_ATTR(Async)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

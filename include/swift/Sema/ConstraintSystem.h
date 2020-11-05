@@ -4373,7 +4373,8 @@ public:
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
-                             bool isDefaultWrappedValue = false);
+                             bool isDefaultWrappedValue = false,
+                             bool isAsyncLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
