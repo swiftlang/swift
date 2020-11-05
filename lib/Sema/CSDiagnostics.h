@@ -2281,6 +2281,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnostic situations where AST node references an invalid declaration.
+///
+/// \code
+/// let foo = doesntExist // or something invalid
+/// foo(42)
+/// \endcode
+class ReferenceToInvalidDeclaration final : public FailureDiagnostic {
+public:
+  ReferenceToInvalidDeclaration(const Solution &solution,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
