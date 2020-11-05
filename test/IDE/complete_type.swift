@@ -407,7 +407,7 @@ func testTypeInTupleType6() {
 }
 
 func testTypeInTupleType7() {
-  var localVar: (a: b: #^TYPE_IN_TUPLE_TYPE_7?skip=FIXME^#
+  var localVar: (a: b: #^TYPE_IN_TUPLE_TYPE_7?xfail=FIXME^#
 }
 
 //===---
