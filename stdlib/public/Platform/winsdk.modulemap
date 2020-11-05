@@ -340,6 +340,13 @@ module WinSDK [system] {
     export *
   }
 
+  module WIC {
+    header "wincodec.h"
+    export *
+
+    link "windowscodecs.lib"
+  }
+
   module WinBase {
     header "winbase.h"
     export *
