@@ -636,7 +636,7 @@ extension ArraySlice: RangeReplaceableCollection {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }
@@ -726,6 +726,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   /// Construct a ArraySlice of `count` uninitialized elements.
   @inlinable
+  @_semantics("array.init")
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ArraySlice with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra

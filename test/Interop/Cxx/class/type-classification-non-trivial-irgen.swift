@@ -29,7 +29,7 @@ public func testStructWithCopyConstructorAndValue() -> Bool {
 // CHECK: [[OBJ:%.*]] = alloca %TSo42StructWithSubobjectCopyConstructorAndValueV
 // CHECK: alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[TMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
-// CHECK: [[MEMBER_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* %member to %struct.StructWithCopyConstructorAndValue*
+// CHECK: [[MEMBER_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)Ei|"\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z"}}(%struct.StructWithCopyConstructorAndValue* {{(noalias )?}}[[MEMBER_STRUCT]], i32 42)
 // CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, %TSo33StructWithCopyConstructorAndValueV* [[TMP]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER_VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[TEMP_MEMBER]], i32 0, i32 0
@@ -47,7 +47,7 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // CHECK: [[OBJ:%.*]] = alloca %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV
 // CHECK: [[TEMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[TEMP2:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
-// CHECK: [[MEMBER_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* %member to %struct.StructWithCopyConstructorAndValue*
+// CHECK: [[MEMBER_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)Ei|"\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z"}}(%struct.StructWithCopyConstructorAndValue* {{(noalias )?}}[[MEMBER_STRUCT]], i32 42)
 // CHECK: [[TEMP_AS_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TEMP]] to %struct.StructWithCopyConstructorAndValue*
 // CHECK: [[OBJ_AS_STRUCT:%.*]] = bitcast %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV* [[OBJ]] to %struct.StructWithCopyConstructorAndSubobjectCopyConstructorAndValue*

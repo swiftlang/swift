@@ -272,6 +272,17 @@ public:
     CallRethrowsWithDefaultThrowingArgument,
   };
 
+  static StringRef kindToString(Kind k) {
+    switch (k) {
+      case Kind::Throw: return "Throw";
+      case Kind::CallThrows: return "CallThrows";
+      case Kind::CallRethrowsWithExplicitThrowingArgument: 
+        return "CallRethrowsWithExplicitThrowingArgument";
+      case Kind::CallRethrowsWithDefaultThrowingArgument: 
+        return "CallRethrowsWithDefaultThrowingArgument";
+    }
+  }
+
 private:
   Expr *TheExpression;
   Kind TheKind;
@@ -329,6 +340,26 @@ class Classification {
   ThrowingKind Result = ThrowingKind::None;
   Optional<PotentialThrowReason> Reason;
   
+  void print(raw_ostream &out) const {
+    out << "{ IsInvalid = " << IsInvalid
+        << ", IsAsync = " << IsAsync
+        << ", Result = ThrowingKind::";
+    
+    switch(Result) {
+      case ThrowingKind::None:            out << "None"; break;
+      case ThrowingKind::RethrowingOnly:  out << "RethrowingOnly"; break;
+      case ThrowingKind::Throws:          out << "Throws"; break;
+    }
+         
+    out << ", Reason = ";
+    if (!Reason)
+      out << "nil";
+    else
+      out << PotentialThrowReason::kindToString(Reason.getValue().getKind());
+
+    out << " }";
+  }
+  
 public:
   Classification() : Result(ThrowingKind::None) {}
   explicit Classification(ThrowingKind result, PotentialThrowReason reason,
@@ -364,17 +395,21 @@ public:
     return result;
   }
 
-  static Classification forRethrowingOnly(PotentialThrowReason reason) {
+  static Classification forRethrowingOnly(PotentialThrowReason reason, bool isAsync) {
     Classification result;
     result.Result = ThrowingKind::RethrowingOnly;
     result.Reason = reason;
+    result.IsAsync = isAsync;
     return result;
   }
 
   void merge(Classification other) {
+    bool oldAsync = IsAsync;
+    
     if (other.getResult() > getResult())
       *this = other;
-    IsAsync |= other.IsAsync;
+
+    IsAsync = oldAsync | other.IsAsync;
   }
 
   bool isInvalid() const { return IsInvalid; }
@@ -386,6 +421,10 @@ public:
   }
   
   bool isAsync() const { return IsAsync; }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::errs()); }
+#endif
 };
 
 
@@ -399,7 +438,7 @@ public:
   DeclContext *RethrowsDC = nullptr;
   bool inRethrowsContext() const { return RethrowsDC != nullptr; }
 
-  /// Check to see if the given function application throws.
+  /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
@@ -461,7 +500,8 @@ public:
       if (!type) return Classification::forInvalidCode();
 
       // Use the most significant result from the arguments.
-      Classification result;
+      Classification result = isAsync ? Classification::forAsync() 
+                                      : Classification();
       for (auto arg : llvm::reverse(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
@@ -527,7 +567,7 @@ private:
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
     if (param->getDeclContext() == RethrowsDC)
-      return Classification::forRethrowingOnly(reason);
+      return Classification::forRethrowingOnly(reason, /*async*/false);
 
     // Otherwise, it throws unconditionally.
     return Classification::forThrow(reason, /*async*/false);
@@ -1235,9 +1275,14 @@ public:
       highlight = apply->getSourceRange();
 
     auto diag = diag::async_call_without_await;
-    if (isAutoClosure())
+    // To produce a better error message, check if it is an autoclosure.
+    // We do not use 'Context::isAutoClosure' b/c it gives conservative answers.
+    if (Function && llvm::isa_and_nonnull<AutoClosureExpr>(
+                                            Function->getAbstractClosureExpr()))
       diag = diag::async_call_without_await_in_autoclosure;
+
     ctx.Diags.diagnose(node.getStartLoc(), diag)
+        .fixItInsert(node.getStartLoc(), "await ")
         .highlight(highlight);
   }
 
@@ -1461,6 +1506,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+
+    void preserveCoverageFromOptionalOrForcedTryOperand() {
+      OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
     }
 
     void preserveCoverageFromInterpolatedString() {
@@ -1807,6 +1856,8 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
+
+    scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
 
@@ -1821,6 +1872,8 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
+
+    scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
 };

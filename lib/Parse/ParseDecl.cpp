@@ -624,7 +624,6 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel);
       }
       if (ParamLabel == "exported") {
-        auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
@@ -7720,11 +7719,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
-    if (Tk.is(tok::identifier) &&
-        DeclAttribute::getAttrKindFromString(Tk.getText()) ==
-          DeclAttrKind::DAK_Count) {
-      diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
-      return true;
+    if (Tk.is(tok::identifier)) {
+      if (Tk.getText().equals("$") ||
+          DeclAttribute::getAttrKindFromString(Tk.getText()) ==
+              DeclAttrKind::DAK_Count) {
+        diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
+        return true;
+      }
     } else if (Tk.isNot(tok::colon, tok::l_brace, tok::semi) &&
                Tk.isPunctuation()) {
       diagnose(Tk, diag::operator_name_invalid_char,

@@ -66,6 +66,9 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
+/// Returns true if the instruction is a 'reborrow'.
+bool isReborrowInstruction(const SILInstruction *inst);
+
 class BorrowingOperandKind {
 public:
   enum Kind : uint8_t {
@@ -134,7 +137,7 @@ struct BorrowingOperand {
     return BorrowingOperand(*kind, op);
   }
 
-  void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
@@ -204,7 +207,7 @@ struct BorrowingOperand {
   /// \p errorFunction a callback that if non-null is passed an operand that
   /// triggers a mal-formed SIL error. This is just needed for the ownership
   /// verifier to emit good output.
-  bool getImplicitUses(
+  void getImplicitUses(
       SmallVectorImpl<Operand *> &foundUses,
       std::function<void(Operand *)> *errorFunction = nullptr) const;
 

@@ -2671,6 +2671,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   PrintingDiagnosticConsumer PDC;
@@ -2694,8 +2695,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     DiagnosticInfo errorInfo(
         DiagID(0), SourceLoc(), DiagnosticKind::Error,
-        "fatal error encountered during compilation; please file a bug report "
-        "with your project and the crash log",
+        "fatal error encountered during compilation; " SWIFT_BUG_REPORT_MESSAGE,
         {}, SourceLoc(), {}, {}, {}, false);
     DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
                             reason, {}, SourceLoc(), {}, {}, {}, false);

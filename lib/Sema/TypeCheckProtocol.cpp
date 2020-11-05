@@ -383,20 +383,27 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
               reqDiffAttr->getParameterIndices()))
         supersetConfig = witnessConfig;
     }
-    if (!foundExactConfig) {
-      // If no exact witness derivative configuration was found, check
-      // conditions for creating an implicit witness `@differentiable` attribute
-      // with the exact derivative configuration.
 
-      // If witness is declared in a different file or type context than the
-      // conformance, we should not create an implicit `@differentiable`
-      // attribute on the witness. Produce an error.
-      auto sameTypeContext =
-          dc->getInnermostTypeContext() ==
+    // If no exact witness derivative configuration was found, check conditions
+    // for creating an implicit witness `@differentiable` attribute with the
+    // exact derivative configuration.
+    if (!foundExactConfig) {
+      auto witnessInDifferentFile =
+          dc->getParentSourceFile() !=
+          witness->getDeclContext()->getParentSourceFile();
+      auto witnessInDifferentTypeContext =
+          dc->getInnermostTypeContext() !=
           witness->getDeclContext()->getInnermostTypeContext();
-      auto sameModule = dc->getModuleScopeContext() ==
-                        witness->getDeclContext()->getModuleScopeContext();
-      if (!sameTypeContext || !sameModule) {
+      // Produce an error instead of creating an implicit `@differentiable`
+      // attribute if any of the following conditions are met:
+      // - The witness is in a different file than the conformance
+      //   declaration.
+      // - The witness is in a different type context (i.e. extension) than
+      //   the conformance declaration, and there is no existing
+      //   `@differentiable` attribute that covers the required differentiation
+      //   parameters.
+      if (witnessInDifferentFile ||
+          (witnessInDifferentTypeContext && !supersetConfig)) {
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
@@ -2492,30 +2499,14 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause);
     os.flush();
-    // If the witness is declared in a different file or type context than the
-    // conformance, emit a specialized diagnostic.
-    auto sameModule = conformance->getDeclContext()->getModuleScopeContext() !=
-                      witness->getDeclContext()->getModuleScopeContext();
-    auto sameTypeContext =
-        conformance->getDeclContext()->getInnermostTypeContext() !=
-        witness->getDeclContext()->getInnermostTypeContext();
-    if (sameModule || sameTypeContext) {
-      diags
-          .diagnose(
-              witness,
-              diag::
-                  protocol_witness_missing_differentiable_attr_invalid_context,
-              reqDiffAttrString, req->getName(), conformance->getType(),
-              conformance->getProtocol()->getDeclaredInterfaceType())
-          .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
-    }
-    // Otherwise, emit a general "missing attribute" diagnostic.
-    else {
-      diags
-          .diagnose(witness, diag::protocol_witness_missing_differentiable_attr,
-                    reqDiffAttrString)
-          .fixItInsert(witness->getStartLoc(), reqDiffAttrString + ' ');
-    }
+    diags
+        .diagnose(
+            witness,
+            diag::
+                protocol_witness_missing_differentiable_attr_invalid_context,
+            reqDiffAttrString, req->getName(), conformance->getType(),
+            conformance->getProtocol()->getDeclaredInterfaceType())
+        .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
     break;
   }
   case MatchKind::EnumCaseWithAssociatedValues:
@@ -4735,6 +4726,8 @@ void swift::diagnoseConformanceFailure(Type T,
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
                      T, T->isEqual(Proto->getDeclaredInterfaceType()), 
                      Proto->getDeclaredInterfaceType());
+      diags.diagnose(ComplainLoc,
+                     diag::only_concrete_types_conform_to_protocols);
       return;
     }
 

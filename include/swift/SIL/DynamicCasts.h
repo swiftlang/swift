@@ -433,6 +433,9 @@ public:
     return TargetIsBridgeable != SourceIsBridgeable;
   }
 
+  /// Returns true if this dynamic cast can release its source operand.
+  bool isRCIdentityPreserving() const;
+
   /// If getSourceType() is a Swift type that can bridge to an ObjC type, return
   /// the ObjC type it bridges to. If the source type is an objc type, an empty
   /// CanType() is returned.

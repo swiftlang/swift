@@ -766,7 +766,7 @@ ERROR(serialization_target_too_new_repl,none,
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
-      "please file a bug report with your project and the crash log",
+      SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
 NOTE(serialization_misc_version,none,
      "module '%0' full misc version is '%1'",
@@ -1842,9 +1842,11 @@ ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 ERROR(type_cannot_conform, none,
       "%select{type %1|protocol %1 as a type}0 cannot conform to "
-      "%select{%3|the protocol itself}2; "
-      "only concrete types such as structs, enums and classes can conform to protocols",
+      "%select{%3|the protocol itself}2",
       (bool, Type, bool, Type))
+NOTE(only_concrete_types_conform_to_protocols,none,
+     "only concrete types such as structs, enums and classes can conform to protocols",
+     ())
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
@@ -2732,6 +2734,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
@@ -2740,12 +2743,14 @@ ERROR(decl_from_hidden_module,none,
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "as result builder in SPI|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
@@ -3120,8 +3125,6 @@ ERROR(differentiable_attr_layout_req_unsupported,none,
       ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
      "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
      "(in protocol %3); explicit attribute is necessary because candidate is "
@@ -3445,7 +3448,7 @@ ERROR(type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report", ())
+      SWIFT_BUG_REPORT_MESSAGE, ())
 
 
 ERROR(missing_protocol,none,
@@ -4134,6 +4137,9 @@ ERROR(asynchandler_async,none,
 ERROR(asynchandler_inout_parameter,none,
       "'inout' parameter is not allowed in '@asyncHandler' function",
       ())
+ERROR(asynchandler_noescape_closure_parameter,none,
+      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
+      ())
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
@@ -4266,6 +4272,8 @@ ERROR(global_actor_on_actor_class,none,
       "actor class %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
+ERROR(global_actor_on_struct_property,none,
+      "stored property %0 of a struct cannot have a global actor", (DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",

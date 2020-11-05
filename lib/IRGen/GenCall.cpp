@@ -97,11 +97,56 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   SmallVector<const TypeInfo *, 4> typeInfos;
   SmallVector<SILType, 4> valTypes;
   SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
+  bool isCoroutine = originalType->isCoroutine();
+  SmallVector<SILYieldInfo, 4> yieldInfos;
   SmallVector<SILResultInfo, 4> indirectReturnInfos;
   SmallVector<SILResultInfo, 4> directReturnInfos;
 
   auto parameters = substitutedType->getParameters();
   SILFunctionConventions fnConv(substitutedType, IGF.getSILModule());
+
+  auto addTaskContinuationFunction = [&]() {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getTaskContinuationFunctionPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  };
+  auto addExecutor = [&]() {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftExecutorPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  };
+
+  // AsyncContext * __ptrauth_swift_async_context_parent Parent;
+  {
+    auto ty = SILType();
+    auto &ti = IGF.IGM.getSwiftContextPtrTypeInfo();
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
+  // TaskContinuationFunction * __ptrauth_swift_async_context_resume
+  //     ResumeParent;
+  addTaskContinuationFunction();
+
+  // ExecutorRef ResumeParentExecutor;
+  addExecutor();
+
+  // AsyncContextFlags Flags;
+  {
+    auto ty = SILType::getPrimitiveObjectType(
+        BuiltinIntegerType::get(32, IGF.IGM.IRGen.SIL.getASTContext())
+            ->getCanonicalType());
+    const auto &ti = IGF.IGM.getTypeInfo(ty);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+  }
+
+  if (isCoroutine) {
+    // SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
+    addTaskContinuationFunction();
+  }
 
   //   SwiftError *errorResult;
   auto errorCanType = IGF.IGM.Context.getExceptionType();
@@ -122,15 +167,33 @@ AsyncContextLayout irgen::getAsyncContextLayout(
     indirectReturnInfos.push_back(indirectResult);
   }
 
-  //     ResultTypes directResults...;
-  auto directResults = fnConv.getDirectSILResults();
-  for (auto result : directResults) {
-    auto ty =
-        fnConv.getSILType(result, IGF.IGM.getMaximalTypeExpansionContext());
-    auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-    directReturnInfos.push_back(result);
+  // union {
+  if (isCoroutine) {
+    // SwiftPartialFunction * __ptrauth(...) resumeFromYield?
+    addTaskContinuationFunction();
+    // SwiftPartialFunction * __ptrauth(...) abortFromYield?
+    addTaskContinuationFunction();
+    // SwiftActor * __ptrauth(...) calleeActorDuringYield?
+    addExecutor();
+    // YieldTypes yieldValues...
+    for (auto yield : fnConv.getYields()) {
+      auto ty =
+          fnConv.getSILType(yield, IGF.IGM.getMaximalTypeExpansionContext());
+      auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      yieldInfos.push_back(yield);
+    }
+  } else {
+    //     ResultTypes directResults...;
+    for (auto result : fnConv.getDirectSILResults()) {
+      auto ty =
+          fnConv.getSILType(result, IGF.IGM.getMaximalTypeExpansionContext());
+      auto &ti = IGF.getTypeInfoForLowered(ty.getASTType());
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      directReturnInfos.push_back(result);
+    }
   }
 
   //   SelfType self?;
@@ -219,7 +282,8 @@ AsyncContextLayout irgen::getAsyncContextLayout(
       IGF.IGM, LayoutStrategy::Optimal, valTypes, typeInfos, IGF, originalType,
       substitutedType, substitutionMap, std::move(bindings),
       trailingWitnessInfo, errorType, canHaveValidError, paramInfos,
-      indirectReturnInfos, directReturnInfos, localContextInfo);
+      isCoroutine, yieldInfos, indirectReturnInfos, directReturnInfos,
+      localContextInfo);
 }
 
 AsyncContextLayout::AsyncContextLayout(
@@ -229,6 +293,7 @@ AsyncContextLayout::AsyncContextLayout(
     SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
     Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
     bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
+    bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,
     ArrayRef<SILResultInfo> indirectReturnInfos,
     ArrayRef<SILResultInfo> directReturnInfos,
     Optional<AsyncContextLayout::ArgumentInfo> localContextInfo)
@@ -236,7 +301,8 @@ AsyncContextLayout::AsyncContextLayout(
                    fieldTypeInfos, /*typeToFill*/ nullptr),
       IGF(IGF), originalType(originalType), substitutedType(substitutedType),
       substitutionMap(substitutionMap), errorType(errorType),
-      canHaveValidError(canHaveValidError),
+      canHaveValidError(canHaveValidError), isCoroutine(isCoroutine),
+      yieldInfos(yieldInfos.begin(), yieldInfos.end()),
       directReturnInfos(directReturnInfos.begin(), directReturnInfos.end()),
       indirectReturnInfos(indirectReturnInfos.begin(),
                           indirectReturnInfos.end()),
@@ -246,6 +312,11 @@ AsyncContextLayout::AsyncContextLayout(
 #ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
+  if (isCoroutine) {
+    assert(directReturnInfos.empty());
+  } else {
+    assert(yieldInfos.empty());
+  }
   if (!bindings.empty()) {
     assert(fieldTypeInfos.size() >= 2 && "no field for bindings");
     auto fixedBindingsField =
@@ -266,11 +337,6 @@ static Size getAsyncContextSize(AsyncContextLayout layout) {
 
 static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
-}
-
-static llvm::Value *getAsyncTask(IRGenFunction &IGF) {
-  // TODO: Return the appropriate task.
-  return llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy);
 }
 
 llvm::Value *IRGenFunction::getAsyncTask() {
@@ -2165,9 +2231,8 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(llvm::Constant::getNullValue(IGF.IGM.SwiftTaskPtrTy));
-    asyncExplosion.add(
-        llvm::Constant::getNullValue(IGF.IGM.SwiftExecutorPtrTy));
+    asyncExplosion.add(IGF.getAsyncTask());
+    asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
     if (getCallee().getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {
@@ -2176,9 +2241,30 @@ public:
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
-
-    // Move all the arguments into the context.
     auto layout = getAsyncContextLayout();
+
+    // Set caller info into the context.
+    { // caller context
+      Explosion explosion;
+      auto fieldLayout = layout.getParentLayout();
+      auto *context = IGF.getAsyncContext();
+      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+        Address fieldAddr =
+            fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
+        context = emitPointerAuthSign(IGF, context, authInfo);
+      }
+      explosion.add(context);
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    { // caller executor
+      Explosion explosion;
+      explosion.add(IGF.getAsyncExecutor());
+      auto fieldLayout = layout.getResumeParentExecutorLayout();
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    // Move all the arguments into the context.
     for (unsigned index = 0, count = layout.getIndirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getIndirectReturnLayout(index);
@@ -3354,7 +3440,7 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
 Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                              Alignment alignment) {
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
-                                      {getAsyncTask(IGF), size});
+                                      {IGF.getAsyncTask(), size});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -3366,7 +3452,7 @@ Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
 void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
                             llvm::Value *size) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskDeallocFn(), {getAsyncTask(IGF), address.getAddress()});
+      IGF.IGM.getTaskDeallocFn(), {IGF.getAsyncTask(), address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->addAttribute(llvm::AttributeList::FunctionIndex,

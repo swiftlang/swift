@@ -23,7 +23,7 @@
 
 namespace llvm {
   class Triple;
-  class FileCollector;
+  class FileCollectorBase;
   template<typename Fn> class function_ref;
 }
 
@@ -172,9 +172,9 @@ public:
 
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
-  static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector(IntermoduleDepTrackingMode Mode,
-                            std::shared_ptr<llvm::FileCollector> FileCollector);
+  static std::shared_ptr<clang::DependencyCollector> createDependencyCollector(
+      IntermoduleDepTrackingMode Mode,
+      std::shared_ptr<llvm::FileCollectorBase> FileCollector);
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.

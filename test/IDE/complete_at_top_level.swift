@@ -1,3 +1,5 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_3 | %FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_3_NEGATIVE
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_1 | %FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_2 | %FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_3 | %FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_3
@@ -152,6 +154,9 @@
 //
 // This test is not meant to test that we can correctly form all kinds of
 // completion results in general; that should be tested elsewhere.
+
+var topLevelVar3 = #^TOP_LEVEL_VAR_INIT_3^#
+// TOP_LEVEL_VAR_INIT_3_NEGATIVE-NOT: topLevelVar3
 
 struct FooStruct {
   var instanceVar = 0

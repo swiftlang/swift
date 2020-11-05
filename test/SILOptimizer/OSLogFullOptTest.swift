@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir -swift-version 5 -O -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 //
 // REQUIRES: VENDOR=apple
+// REQUIRES: swift_stdlib_no_asserts
 
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate
@@ -8,6 +9,13 @@
 // fails, it implies that some expected optimizations fail to get triggered on
 // os log APIs. TODO: eventually these optimization should also happen in Onone
 // mode.
+
+// With stdlib asserts, this test exhibits the same problem as
+// dead_array_elim.swift. The problem can be overcome by handling
+// non-trivial stores in OSSA, as described here:
+//   [OSSA] Improve DeadObjectElimination to handle array copies
+//   https://bugs.swift.org/browse/SR-13782
+// Once that bug is fixed, remove the requirement: swift_stdlib_no_asserts.
 
 import OSLogTestHelper
 import Foundation

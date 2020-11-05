@@ -90,6 +90,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
+  P.addNestedSemanticFunctionCheck();
   P.addCapturePromotion();
 
   // Select access kind after capture promotion and before stack promotion.

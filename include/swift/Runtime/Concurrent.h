@@ -584,7 +584,8 @@ using llvm::hash_value;
 /// process. It has no destructor, to avoid generating useless global destructor
 /// calls. The memory it allocates can be freed by calling clear() with no
 /// outstanding readers, but this won't destroy the static mutex it uses.
-template <class ElemTy> struct ConcurrentReadableHashMap {
+template <class ElemTy, class MutexTy = StaticMutex>
+struct ConcurrentReadableHashMap {
   // We use memcpy and don't call destructors. Make sure the elements will put
   // up with this.
   static_assert(std::is_trivially_copyable<ElemTy>::value,
@@ -593,6 +594,9 @@ template <class ElemTy> struct ConcurrentReadableHashMap {
                 "Elements must not have destructors (they won't be called).");
 
 private:
+  // A scoped lock type to use on MutexTy.
+  using ScopedLockTy = ScopedLockT<MutexTy, false>;
+
   /// The reciprocal of the load factor at which we expand the table. A value of
   /// 4 means that we resize at 1/4 = 75% load factor.
   static const size_t ResizeProportion = 4;
@@ -601,7 +605,7 @@ private:
   /// rounds up to the next allocation quantum by calling `malloc_good_size`.
   /// Otherwise, just return the passed-in size, which is always valid even if
   /// not necessarily optimal.
-  size_t goodSize(size_t size) {
+  static size_t goodSize(size_t size) {
 #if defined(__APPLE__) && defined(__MACH__)
     return malloc_good_size(size);
 #else
@@ -693,6 +697,29 @@ private:
     }
   };
 
+  /// The struct used for element storage. The `Elem` member is considered to be
+  /// the first element of a variable-length array, whose size is determined by
+  /// the allocation.
+  struct ElementStorage {
+    uint32_t Capacity;
+    ElemTy Elem;
+
+    static ElementStorage *allocate(size_t capacity) {
+      auto headerSize = offsetof(ElementStorage, Elem);
+      auto size = goodSize(headerSize + capacity * sizeof(ElemTy));
+
+      auto *ptr = reinterpret_cast<ElementStorage *>(malloc(size));
+      if (!ptr)
+        swift::crash("Could not allocate memory.");
+
+      ptr->Capacity = (size - headerSize) / sizeof(ElemTy);
+
+      return ptr;
+    }
+
+    ElemTy *data() { return &Elem; }
+  };
+
   /// A simple linked list representing pointers that need to be freed.
   struct FreeListNode {
     FreeListNode *Next;
@@ -723,16 +750,13 @@ private:
   std::atomic<uint32_t> ElementCount{0};
 
   /// The array of elements.
-  std::atomic<ElemTy *> Elements{nullptr};
+  std::atomic<ElementStorage *> Elements{nullptr};
 
   /// The array of indices.
   std::atomic<IndexStorage *> Indices{nullptr};
 
   /// The writer lock, which must be taken before any mutation of the table.
-  StaticMutex WriterLock;
-
-  /// The maximum number of elements that the current elements array can hold.
-  uint32_t ElementCapacity{0};
+  MutexTy WriterLock;
 
   /// The list of pointers to be freed once no readers are active.
   FreeListNode *FreeList{nullptr};
@@ -754,22 +778,18 @@ private:
 
   /// Grow the elements array, adding the old array to the free list and
   /// returning the new array with all existing elements copied into it.
-  ElemTy *resize(ElemTy *elements, size_t elementCount) {
+  ElementStorage *resize(ElementStorage *elements, size_t elementCount) {
     // Grow capacity by 25%, making sure we grow by at least 1.
     size_t newCapacity =
         std::max(elementCount + (elementCount >> 2), elementCount + 1);
-    size_t newSize = newCapacity * sizeof(ElemTy);
+    auto *newElements = ElementStorage::allocate(newCapacity);
 
-    newSize = goodSize(newSize);
-    newCapacity = newSize / sizeof(ElemTy);
-
-    ElemTy *newElements = static_cast<ElemTy *>(malloc(newSize));
     if (elements) {
-      memcpy(newElements, elements, elementCount * sizeof(ElemTy));
+      memcpy(newElements->data(), elements->data(),
+             elementCount * sizeof(ElemTy));
       FreeListNode::add(&FreeList, elements);
     }
 
-    ElementCapacity = newCapacity;
     Elements.store(newElements, std::memory_order_release);
     return newElements;
   }
@@ -919,8 +939,8 @@ public:
     // should not happen often.
     IndexStorage *indices;
     size_t elementCount;
-    ElemTy *elements;
-    ElemTy *elements2;
+    ElementStorage *elements;
+    ElementStorage *elements2;
     do {
       elements = Elements.load(std::memory_order_acquire);
       indices = Indices.load(std::memory_order_acquire);
@@ -928,7 +948,8 @@ public:
       elements2 = Elements.load(std::memory_order_acquire);
     } while (elements != elements2);
 
-    return Snapshot(this, indices, elements, elementCount);
+    ElemTy *elementsPtr = elements ? elements->data() : nullptr;
+    return Snapshot(this, indices, elementsPtr, elementCount);
   }
 
   /// Get an element by key, or insert a new element for that key if one is not
@@ -949,7 +970,7 @@ public:
   /// The return value is ignored when `created` is `false`.
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
-    StaticScopedLock guard(WriterLock);
+    ScopedLockTy guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     if (!indices)
@@ -958,8 +979,9 @@ public:
     auto indicesCapacityLog2 = indices->CapacityLog2;
     auto elementCount = ElementCount.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
+    auto *elementsPtr = elements ? elements->data() : nullptr;
 
-    auto found = this->find(key, indices, elementCount, elements);
+    auto found = this->find(key, indices, elementCount, elementsPtr);
     if (found.first) {
       call(found.first, false);
       deallocateFreeListIfSafe();
@@ -973,15 +995,15 @@ public:
     auto emptyCount = indicesCapacity - (elementCount + 1);
     auto proportion = indicesCapacity / emptyCount;
     if (proportion >= ResizeProportion) {
-      indices = resize(indices, indicesCapacityLog2, elements);
-      found = find(key, indices, elementCount, elements);
+      indices = resize(indices, indicesCapacityLog2, elementsPtr);
+      found = find(key, indices, elementCount, elementsPtr);
       assert(!found.first && "Shouldn't suddenly find the key after rehashing");
     }
 
-    if (elementCount >= ElementCapacity) {
+    if (!elements || elementCount >= elements->Capacity) {
       elements = resize(elements, elementCount);
     }
-    auto *element = &elements[elementCount];
+    auto *element = &elements->data()[elementCount];
 
     // Order matters: fill out the element, then update the count,
     // then update the index.
@@ -1000,7 +1022,7 @@ public:
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
   void clear() {
-    StaticScopedLock guard(WriterLock);
+    ScopedLockTy guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
@@ -1010,7 +1032,6 @@ public:
     Indices.store(nullptr, std::memory_order_relaxed);
     ElementCount.store(0, std::memory_order_relaxed);
     Elements.store(nullptr, std::memory_order_relaxed);
-    ElementCapacity = 0;
 
     FreeListNode::add(&FreeList, indices);
     FreeListNode::add(&FreeList, elements);
@@ -1037,11 +1058,13 @@ template <class ElemTy> struct HashMapElementWrapper {
 /// by allocating them separately and storing pointers to them. The elements of
 /// the hash table are instances of HashMapElementWrapper. A new getOrInsert
 /// method is provided that directly returns the stable element pointer.
-template <class ElemTy, class Allocator>
+template <class ElemTy, class Allocator, class MutexTy = StaticMutex>
 struct StableAddressConcurrentReadableHashMap
-    : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>> {
+    : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy> {
   // Implicitly trivial destructor.
   ~StableAddressConcurrentReadableHashMap() = default;
+
+  std::atomic<ElemTy *> LastFound{nullptr};
 
   /// Get or insert an element for the given key and arguments. Returns the
   /// pointer to the existing or new element, and a bool indicating whether the
@@ -1049,16 +1072,24 @@ struct StableAddressConcurrentReadableHashMap
   /// call.
   template <class KeyTy, class... ArgTys>
   std::pair<ElemTy *, bool> getOrInsert(KeyTy key, ArgTys &&...args) {
+    // See if this is a repeat of the previous search.
+    if (auto lastFound = LastFound.load(std::memory_order_acquire))
+      if (lastFound->matchesKey(key))
+        return {lastFound, false};
+
     // Optimize for the case where the value already exists.
-    if (auto wrapper = this->snapshot().find(key))
+    if (auto wrapper = this->snapshot().find(key)) {
+      LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
       return {wrapper->Ptr, false};
+    }
 
     // No such element. Insert if needed. Note: another thread may have inserted
     // it in the meantime, so we still have to handle both cases!
     ElemTy *ptr = nullptr;
     bool outerCreated = false;
-    ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>>::getOrInsert(
-        key, [&](HashMapElementWrapper<ElemTy> *wrapper, bool created) {
+    ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy>::
+        getOrInsert(key, [&](HashMapElementWrapper<ElemTy> *wrapper,
+                             bool created) {
           if (created) {
             // Created the indirect entry. Allocate the actual storage.
             size_t allocSize =
@@ -1071,7 +1102,15 @@ struct StableAddressConcurrentReadableHashMap
           outerCreated = created;
           return true; // Keep the new entry.
         });
+    LastFound.store(ptr, std::memory_order_relaxed);
     return {ptr, outerCreated};
+  }
+
+  template <class KeyTy> ElemTy *find(const KeyTy &key) {
+    auto result = this->snapshot().find(key);
+    if (!result)
+      return nullptr;
+    return result->Ptr;
   }
 
 private:

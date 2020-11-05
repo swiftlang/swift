@@ -58,12 +58,19 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
+                                             llvm::cl::init(false));
+
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
                               llvm::cl::init(true));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
+
+// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
+static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
+                                              llvm::cl::init(true));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -678,9 +685,18 @@ public:
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
 
-    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    StringRef funcName;
+    if (CurInstruction)
+      funcName = CurInstruction->getFunction()->getName();
+    else if (CurArgument)
+      funcName = CurArgument->getFunction()->getName();
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+    }
 
-    if (extraContext) extraContext();
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    if (extraContext)
+      extraContext();
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
@@ -689,6 +705,11 @@ public:
       llvm::dbgs() << "Verifying argument:\n";
       CurArgument->printInContext(llvm::dbgs());
     }
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "End Error in function " << funcName << "\n";
+      return;
+    }
+
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
     llvm::dbgs() << "In module:\n";
@@ -1456,6 +1477,8 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
@@ -1473,6 +1496,9 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
+
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -1518,6 +1544,8 @@ public:
 
     require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
             "must call yield_once coroutine with begin_apply");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
   }
 
   void checkAbortApplyInst(AbortApplyInst *AI) {
@@ -1567,6 +1595,8 @@ public:
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+    require(!resultInfo->isAsync() || PAI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     checkApplyTypeDependentArguments(PAI);
 
@@ -1649,7 +1679,7 @@ public:
                 "function");
       }
     }
-    
+
     // TODO: Impose additional constraints when partial_apply when the
     // -disable-sil-partial-apply flag is enabled. We want to reduce
     // partial_apply to being only a means of associating a closure invocation
@@ -1715,6 +1745,8 @@ public:
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
             "function_ref should have a context-free function result");
+    require(!fnType->isAsync() || FRI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
 
     // Note: in SingleFunction mode, we relax some of these checks because
     // we may not have linked everything yet.
@@ -2889,6 +2921,8 @@ public:
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
                                         "result of witness_method");
+    require(!methodType->isAsync() || AMI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
 
     auto *protocol
       = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
@@ -3044,6 +3078,9 @@ public:
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
+    require(!methodType->isAsync() || CMI->getFunction()->isAsync(),
+            "cannot call an async function from a non-async function");
+
     SILType operandType = CMI->getOperand()->getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
@@ -5025,8 +5062,11 @@ public:
           SILValue op = i.getOperand(0);
           require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
-          require(op == state.Stack.back(),
-                  "stack dealloc does not match most recent stack alloc");
+          if (op != state.Stack.back()) {
+            llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
+            require(op == state.Stack.back(),
+                    "stack dealloc does not match most recent stack alloc");
+          }
           state.Stack.pop_back();
 
         } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
@@ -5147,7 +5187,7 @@ public:
   }
 
   void verifyBranches(const SILFunction *F) {
-    // Verify that there is no non_condbr critical edge.
+    // Verify no critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
@@ -5170,10 +5210,11 @@ public:
       const TermInst *TI = BB.getTerminator();
       CurInstruction = TI;
 
-      // Check for non-cond_br critical edges.
-      if (isa<CondBranchInst>(TI)) {
+      // FIXME: In OSSA, critical edges will never be allowed.
+      // In Lowered SIL, they are allowed on unconditional branches only.
+      //   if (!(isSILOwnershipEnabled() && F->hasOwnership()))
+      if (AllowCriticalEdges && isa<CondBranchInst>(TI))
         continue;
-      }
 
       for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
         require(!isCriticalEdgePred(TI, Idx),

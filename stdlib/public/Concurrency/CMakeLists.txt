@@ -14,6 +14,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Actor.swift
   PartialAsyncTask.swift
   Task.cpp
+  Task.swift
+  TaskCancellation.swift
+  _TimeTypes.swift
   TaskAlloc.cpp
   TaskStatus.cpp
   Mutex.cpp
@@ -36,6 +39,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
+    -Xfrontend -enable-experimental-concurrency
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

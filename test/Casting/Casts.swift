@@ -522,12 +522,7 @@ class ClassInt: Equatable, Hashable {
   static func == (lhs: ClassInt, rhs: ClassInt) -> Bool {return true}
   func hash(into hasher: inout Hasher) {}
 }
-CastsTests.test("AnyHashable(Class) -> Obj-C -> Class")
-.skip(.custom({
-      !_isDebugAssertConfiguration()
-    },
-    reason: "Cast optimizer breaks this test"))
-.code {
+CastsTests.test("AnyHashable(Class) -> Obj-C -> Class") {
   let a = ClassInt()
   let b = runtimeCast(a, to: AnyHashable.self)!
   let c = _bridgeAnythingToObjectiveC(b)
@@ -760,5 +755,44 @@ CastsTests.test("Async function types") {
   expectFalse(fnType is (() async -> Void).Type)
   expectFalse(asyncFnType is (() -> Void).Type)
 }
+
+// `Optional<Int>` is Hashable, so it must cast to AnyHashable,
+// even if it contains a nil.  (This was broken in 5.3 and earlier,
+// but was fixed by the new dynamic cast runtime.)
+CastsTests.test("Optional nil -> AnyHashable") {
+  let a : Int? = nil
+  expectNotNil(a as? AnyHashable)
+}
+
+#if _runtime(_ObjC)
+// See below for notes about missing Linux functionality
+// that prevents us from running this test there.
+CastsTests.test("AnyObject.Type -> AnyObject") {
+  class C {}
+  let a = C.self
+  let b = a as? AnyObject.Type
+  expectNotNil(b)
+  // Note: On macOS, the following cast generates a call to
+  // `swift_dynamicCastMetatypeToObjectConditional` That function is currently
+  // unimplemented on Linux, so this cast always fails on Linux.
+  let c = b as? AnyObject
+  expectNotNil(c)
+  // Note: The following cast currently succeeds on Linux only by stuffing the
+  // source into a `__SwiftValue` container, which breaks the checks below.
+  let d = runtimeCast(b, to: AnyObject.self)
+  expectNotNil(d)
+  let e = c as? C.Type
+  expectNotNil(e)
+  let f = runtimeCast(d, to: C.Type.self)
+  expectNotNil(f)
+  // Verify that the round-trip casts yield exactly the same pointer.  In
+  // particular, none of the casts above should fall back on stuffing the source
+  // into a `__SwiftValue` container.
+  expectTrue(c! === a)
+  expectTrue(d! === a)
+  expectTrue(e! === a)
+  expectTrue(f! === a)
+}
+#endif
 
 runAllTests()

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,9 +18,11 @@
 #define SWIFT_SIL_SILCLONER_H
 
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {
@@ -44,6 +46,7 @@ protected:
   /// MARK: Context shared with CRTP extensions.
 
   SILBuilder Builder;
+  DominanceInfo *DomTree = nullptr;
   TypeSubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
@@ -75,12 +78,15 @@ public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
   explicit SILCloner(SILFunction &F,
-                     SILOpenedArchetypesTracker &OpenedArchetypesTracker)
-      : Builder(F), OpenedArchetypesTracker(OpenedArchetypesTracker) {
+                     SILOpenedArchetypesTracker &OpenedArchetypesTracker,
+                     DominanceInfo *DT = nullptr)
+      : Builder(F), DomTree(DT),
+        OpenedArchetypesTracker(OpenedArchetypesTracker) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
-  explicit SILCloner(SILFunction &F) : Builder(F), OpenedArchetypesTracker(&F) {
+  explicit SILCloner(SILFunction &F, DominanceInfo *DT = nullptr)
+      : Builder(F), DomTree(DT), OpenedArchetypesTracker(&F) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
@@ -442,8 +448,9 @@ class SILClonerWithScopes : public SILCloner<ImplClass> {
 public:
   SILClonerWithScopes(SILFunction &To,
                       SILOpenedArchetypesTracker &OpenedArchetypesTracker,
+                      DominanceInfo *DT = nullptr,
                       bool Disable = false)
-      : SILCloner<ImplClass>(To, OpenedArchetypesTracker) {
+      : SILCloner<ImplClass>(To, OpenedArchetypesTracker, DT) {
 
     // We only want to do this when we generate cloned functions, not
     // when we inline.
@@ -694,17 +701,36 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
     asImpl().visitInstructionsInBlock(BB);
 
     unsigned dfsSuccStartIdx = dfsWorklist.size();
-    for (auto &succ : BB->getSuccessors()) {
+
+    // splitEdge may rewrite BB's successors during this loop.
+    for (unsigned succIdx = 0, numSucc = BB->getSuccessors().size();
+         succIdx != numSucc; ++succIdx) {
+
       // Only visit a successor that has not already been visited and was not
       // premapped by the client.
-      if (BBMap.count(succ))
-        continue;
-
+      if (BBMap.count(BB->getSuccessors()[succIdx])) {
+        // After cloning BB, this successor may be a new CFG merge. If it is
+        // valid to branch directly from the BB to its clone do nothing; if not,
+        // split the edge from BB->succ and clone the new block.
+        //
+        // A CFG merge may require new block arguments, so check for both a
+        // critical edge and the ability to add branch arguments (BranchInst).
+        if (BB->getSingleSuccessorBlock()
+            && isa<BranchInst>(BB->getTerminator())) {
+          continue;
+        }
+        // This predecessor has multiple successors, so cloning it without
+        // cloning its successors would create a critical edge.
+        splitEdge(BB->getTerminator(), succIdx, DomTree);
+        assert(!BBMap.count(BB->getSuccessors()[succIdx]));
+      }
       // Map the successor to a new BB. Layout the cloned blocks in the order
       // they are visited and cloned.
       lastClonedBB =
           getBuilder().getFunction().createBasicBlockAfter(lastClonedBB);
 
+      // After splitting, BB has stable successors.
+      auto &succ = BB->getSuccessors()[succIdx];
       BBMap.insert(std::make_pair(succ.getBB(), lastClonedBB));
 
       dfsWorklist.push_back(succ);
@@ -2093,8 +2119,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   if (conformance.isConcrete()) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
-    if (Ty != newLookupType &&
-        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
+    if (Ty != newLookupType) {
       assert(
           (Ty->isExactSuperclassOf(newLookupType) ||
            getBuilder().getModule().Types.getLoweredRValueType(
@@ -2963,6 +2988,17 @@ void SILCloner<ImplClass>
                               ? getOpBasicBlock(Inst->getErrorBB())
                               : nullptr));
 }
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitHopToExecutorInst(HopToExecutorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createHopToExecutor(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getActor())));
+}
+
 
 } // end namespace swift
 

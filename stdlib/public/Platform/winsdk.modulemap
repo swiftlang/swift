@@ -255,6 +255,13 @@ module WinSDK [system] {
     export *
   }
 
+  module AppNotify {
+    header "appnotify.h"
+    export *
+
+    link "appnotify.lib"
+  }
+
   module ShellAPI {
     header "shellapi.h"
     header "Shlwapi.h"

@@ -609,17 +609,15 @@ bb2:
 
 // HOIST-LABEL: sil @hoist_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST: br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -671,17 +669,15 @@ bb3:
 
 // HOIST-LABEL: sil @hoist_rangechecked_ref_tail_addr
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST: br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -818,17 +814,15 @@ bb2:
 
 // HOIST-LABEL: sil @hoist_rangechecked_addr_proj_store
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4
 // HOIST:   br bb3
 // HOIST: bb5
@@ -882,17 +876,15 @@ bb3:
 
 // HOIST-LABEL: hoist_inclusive_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
-// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
 // HOIST:   br bb3{{.*}}
 // HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:   cond_br {{.*}}, bb5, bb4
 // HOIST: bb4:
 // HOIST:  br bb3
 // HOIST: bb5:
@@ -944,16 +936,15 @@ bb3:
 /// Don't hoist arrays that are variant.
 // HOIST-LABEL: dont_hoist_variant_array
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST:  cond_br {{.*}}, bb2, bb1
 // HOIST: bb1:
-// HOIST:  br bb6
+// HOIST-NEXT:  br bb3
 // HOIST: bb2:
-// HOIST-NOT:   function_ref @checkbounds
-// HOIST:   br bb3{{.*}}
+// HOIST-NEXT:  br bb6
 // HOIST: bb3{{.*}}:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:  apply [[CB]]
-// HOIST:  cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST:  cond_br {{.*}}, bb5, bb4
 // HOIST: bb4:
 // HOIST:  br bb3
 // HOIST: bb5:
@@ -1148,19 +1139,21 @@ sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (I
 
 // CHECK-LABEL: sil @rangeCheck
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb2, bb1
+// CHECK:   cond_br {{.*}}, bb1, bb2
 // CHECK: bb1
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   br bb3
 // CHECK: bb2
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:   br bb4
+// CHECK: bb3
 // CHECK:   return
-// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb2, bb4
-// CHECK: bb4:
-// CHECK:   br bb3
+// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb4
 // CHECK: }
 sil @rangeCheck : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
@@ -1197,21 +1190,23 @@ bb3(%15 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @rangeCheck2
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb2, bb1
+// CHECK:   cond_br {{.*}}, bb1, bb2
 // CHECK: bb1
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:   br bb3
 // CHECK: bb2
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:   br bb4
+// CHECK: bb3
 // CHECK:   return
-// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "or_Int1"([[FALSE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb2, bb4
-// CHECK: bb4:
-// CHECK:   br bb3
+// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb4
 // CHECK: }
 sil @rangeCheck2 : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):

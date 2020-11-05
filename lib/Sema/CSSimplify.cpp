@@ -2616,11 +2616,22 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         if (!shouldAttemptFixes())
           return getTypeMatchFailure(locator);
 
+        SmallVector<LocatorPathElt, 4> path;
+        auto anchor = locator.getLocatorParts(path);
+
+        // If the path ends at `optional payload` it means that this
+        // check is part of an implicit value-to-optional conversion,
+        // and it could be safely dropped.
+        if (!path.empty() && path.back().is<LocatorPathElt::OptionalPayload>())
+          path.pop_back();
+
         // Determine whether this conformance mismatch is
-        // associate with argument to a call, and if so
+        // associated with argument to a call, and if so
         // produce a tailored fix.
-        if (auto last = locator.last()) {
-          if (last->is<LocatorPathElt::ApplyArgToParam>()) {
+        if (!path.empty()) {
+          auto last = path.back();
+
+          if (last.is<LocatorPathElt::ApplyArgToParam>()) {
             auto *fix = AllowArgumentMismatch::create(
                 *this, type1, proto, getConstraintLocator(locator));
 
@@ -2643,21 +2654,19 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           //
           // Once either reacher locators or better diagnostic presentation for
           // nested type failures is available this check could be removed.
-          if (last->is<LocatorPathElt::FunctionResult>())
+          if (last.is<LocatorPathElt::FunctionResult>())
             return getTypeMatchFailure(locator);
 
           // If instance types didn't line up correctly, let's produce a
           // diagnostic which mentions them together with their metatypes.
-          if (last->is<LocatorPathElt::InstanceType>())
+          if (last.is<LocatorPathElt::InstanceType>())
             return getTypeMatchFailure(locator);
 
         } else { // There are no elements in the path
-          auto anchor = locator.getAnchor();
           if (!(isExpr<AssignExpr>(anchor) || isExpr<CoerceExpr>(anchor)))
             return getTypeMatchFailure(locator);
         }
 
-        auto anchor = locator.getAnchor();
         if (isExpr<CoerceExpr>(anchor)) {
           auto *fix = ContextualMismatch::create(
               *this, type1, type2, getConstraintLocator(locator));
@@ -5625,8 +5634,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
-    if (conformance.isConcrete() &&
-        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
+    if (conformance.isConcrete()) {
       unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
         addConstraint(req,

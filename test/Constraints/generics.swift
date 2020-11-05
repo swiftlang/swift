@@ -188,7 +188,7 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{protocol 'Any' as a type cannot conform to 'Hashable'; only concrete types such as structs, enums and classes can conform to protocols}}
+_ = [] as Set  // expected-error {{protocol 'Any' as a type cannot conform to 'Hashable'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 // expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 

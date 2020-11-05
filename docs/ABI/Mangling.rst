@@ -175,6 +175,7 @@ Globals
 
   global ::= global 'MJ'                 // noncanonical specialized generic type metadata instantiation cache associated with global
   global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
+  global ::= global 'Mz'                 // canonical specialized generic type metadata caching token
 
   #if SWIFT_RUNTIME_VERSION >= 5.4
     global ::= context (decl-name '_')+ 'WZ' // global variable one-time initialization function
@@ -218,6 +219,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
+  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
+  global ::= impl-function-type 'Tz'     // objc-to-swift-async completion handler block implementation
   global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter

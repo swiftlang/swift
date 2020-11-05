@@ -374,7 +374,7 @@ SILInlineCloner::SILInlineCloner(
     SILOpenedArchetypesTracker &openedArchetypesTracker,
     SILInliner::DeletionFuncTy deletionCallback)
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
-              openedArchetypesTracker, /*Inlining=*/true),
+              openedArchetypesTracker, /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
       DeletionCallback(deletionCallback) {
 
@@ -895,6 +895,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::HopToExecutorInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

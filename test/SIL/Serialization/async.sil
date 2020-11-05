@@ -8,7 +8,7 @@ import Builtin
 import Swift
 import _Concurrency
 
-sil [serialized] @aaa : $@convention(thin) () -> () {
+sil [serialized] @aaa : $@async @convention(thin) () -> () {
 entry:
   %a = function_ref @async_continuation : $@convention(thin) @async () -> ()
   %b = function_ref @async_continuation_throws : $@convention(thin) @async () -> ()

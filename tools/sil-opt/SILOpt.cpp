@@ -100,6 +100,10 @@ DisableObjCInterop("disable-objc-interop",
                    llvm::cl::desc("Disable Objective-C interoperability."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalConcurrency("enable-experimental-concurrency",
+                   llvm::cl::desc("Enable experimental concurrency model."));
+
+static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
@@ -299,6 +303,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE  "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
@@ -341,6 +346,10 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  
+  Invocation.getLangOptions().EnableExperimentalConcurrency =
+    EnableExperimentalConcurrency;
+
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();

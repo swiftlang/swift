@@ -50,6 +50,7 @@ public:
   class ErrorBuilder;
 
 private:
+  friend class ReborrowVerifier;
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
 

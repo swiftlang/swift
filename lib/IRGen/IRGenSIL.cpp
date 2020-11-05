@@ -1136,6 +1136,10 @@ public:
     llvm_unreachable("not implemented");
   }
 
+  void visitHopToExecutorInst(HopToExecutorInst *i) {
+    //TODO(async)
+  }
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
@@ -2569,6 +2573,10 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
   switch (kind) {
   case Kind::FunctionPointer: {
     auto &fn = getFunctionPointer();
+    if (calleeInfo.OrigFnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::ObjCMethod) {
+      return getObjCDirectMethodCallee(std::move(calleeInfo), fn, selfValue);
+    }
     return Callee(std::move(calleeInfo), fn, selfValue);
   }
 

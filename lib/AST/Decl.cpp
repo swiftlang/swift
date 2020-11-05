@@ -4727,6 +4727,10 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 static SelfReferenceInfo
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
                            SelfReferencePosition position) {
+  // If there are no type parameters, we're done.
+  if (!type->hasTypeParameter())
+    return SelfReferenceInfo();
+
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
     auto info = SelfReferenceInfo();
@@ -4794,6 +4798,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
     return info;
   }
+
+  // Opaque result types of protocol extension members contain an invariant
+  // reference to 'Self'.
+  if (type->is<OpaqueTypeArchetypeType>())
+    return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
 
   // A direct reference to 'Self'.
   if (proto->getSelfInterfaceType()->isEqual(type))

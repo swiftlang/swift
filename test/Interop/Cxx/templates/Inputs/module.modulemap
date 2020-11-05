@@ -61,3 +61,7 @@ module ClassTemplateNonTypeParameter {
 module ClassTemplateTemplateParameter {
   header "class-template-template-parameter.h"
 }
+
+module ClassTemplateWithTypedef {
+  header "class-template-with-typedef.h"
+}

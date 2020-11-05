@@ -2166,6 +2166,9 @@ void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
 void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
   Buffer << "MM";
@@ -2186,6 +2189,12 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
 void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MJ";
+}
+
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
 }
 
 /// The top-level interface to the remangler.

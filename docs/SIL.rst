@@ -2885,6 +2885,27 @@ initialized with the resume value, and that value is then owned by the current
 function. If ``await_async_continuation`` instead resumes to its ``error``
 successor, then the memory remains uninitialized.
 
+hop_to_executor
+```````````````
+
+::
+
+  sil-instruction ::= 'hop_to_executor' sil-operand
+
+  hop_to_executor %0 : $T
+
+  // $T must conform to the Actor protocol
+
+Ensures that all instructions, which need to run on the actor's executor
+actually run on that executor.
+This instruction can only be used inside an ``@async`` function.
+
+Checks if the current executor is the one which is bound to the operand actor.
+If not, begins a suspension point and enqueues the continuation to the executor
+which is bound to the operand actor.
+
+The operand is a guaranteed operand, i.e. not consumed.
+
 dealloc_stack
 `````````````
 ::
