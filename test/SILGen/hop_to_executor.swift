@@ -47,6 +47,13 @@ actor class MyActor {
     await callee(p)
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC13dontInsertHTESiyF : $@convention(method) (@guaranteed MyActor) -> Int {
+  // CHECK-NOT:   hop_to_executor
+  // CHECK:     } // end sil function '$s4test7MyActorC13dontInsertHTESiyF'
+  func dontInsertHTE() -> Int {
+    return p
+  }
+
   init() {
     p = 27
   }
