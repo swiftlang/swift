@@ -269,6 +269,9 @@ public:
     /// The function calls an unconditionally throwing function.
     CallThrows,
 
+    /// The initializer of an 'async let' unconditionally throws.
+    AsyncLetThrows,
+
     /// The function is 'rethrows', and it was passed an explicit
     /// argument that was not rethrowing-only in this context.
     CallRethrowsWithExplicitThrowingArgument,
@@ -282,7 +285,8 @@ public:
     switch (k) {
       case Kind::Throw: return "Throw";
       case Kind::CallThrows: return "CallThrows";
-      case Kind::CallRethrowsWithExplicitThrowingArgument: 
+      case Kind::AsyncLetThrows: return "AsyncLetThrows";
+      case Kind::CallRethrowsWithExplicitThrowingArgument:
         return "CallRethrowsWithExplicitThrowingArgument";
       case Kind::CallRethrowsWithDefaultThrowingArgument: 
         return "CallRethrowsWithDefaultThrowingArgument";
@@ -308,6 +312,9 @@ public:
   }
   static PotentialThrowReason forThrow() {
     return PotentialThrowReason(Kind::Throw);
+  }
+  static PotentialThrowReason forThrowingAsyncLet() {
+    return PotentialThrowReason(Kind::AsyncLetThrows);
   }
 
   Kind getKind() const { return TheKind; }
@@ -1124,6 +1131,7 @@ public:
     case PotentialThrowReason::Kind::Throw:
       llvm_unreachable("should already have been covered");
     case PotentialThrowReason::Kind::CallThrows:
+    case PotentialThrowReason::Kind::AsyncLetThrows:
       // Already fully diagnosed.
       return;
     case PotentialThrowReason::Kind::CallRethrowsWithExplicitThrowingArgument:
@@ -1141,6 +1149,9 @@ public:
                                   const PotentialThrowReason &reason) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
+    if (reason.getKind() == PotentialThrowReason::Kind::AsyncLetThrows)
+      message = diag::throwing_async_let_without_try;
+
     auto loc = E.getStartLoc();
     SourceLoc insertLoc;
     SourceRange highlight;
@@ -1781,10 +1792,25 @@ private:
     if (auto decl = E->getDecl()) {
       if (auto var = dyn_cast<VarDecl>(decl)) {
         // "Async let" declarations are treated as an asynchronous call
-        // (to the underlying task's "get").
+        // (to the underlying task's "get"). If the initializer was throwing,
+        // then the access is also treated as throwing.
         if (var->isAsyncLet()) {
-          checkThrowAsyncSite(
-              E, /*requiresTry=*/false, Classification::forAsync());
+          // If the initializer could throw, we will have a 'try' in the
+          // application of its autoclosure.
+          bool throws = false;
+          if (auto init = var->getParentInitializer()) {
+            if (auto await = dyn_cast<AwaitExpr>(init))
+              init = await->getSubExpr();
+            if (isa<TryExpr>(init))
+              throws = true;
+          }
+
+          auto classification =
+            throws ? Classification::forThrow(
+                       PotentialThrowReason::forThrowingAsyncLet(),
+                       /*isAsync=*/true)
+                     : Classification::forAsync();
+          checkThrowAsyncSite(E, /*requiresTry=*/throws, classification);
         }
       }
     }

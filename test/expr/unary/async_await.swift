@@ -173,8 +173,15 @@ func testAsyncLet() async throws {
 
   async let x2 = getInt() // expected-error{{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
 
-  _ = await x1
+  async let x3 = try getIntUnsafely()
+  async let x4 = try! getIntUnsafely()
+  async let x5 = try? getIntUnsafely()
+
+  _ = await x1 // expected-error{{reading 'async let' can throw but is not marked with 'try'}}
   _ = await x2
+  _ = await try x3
+  _ = await x4
+  _ = await x5
 }
 
 // expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}
