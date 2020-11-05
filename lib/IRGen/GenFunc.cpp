@@ -1090,7 +1090,7 @@ public:
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
-        layout(getAsyncContextLayout(subIGF, origType, substType, subs)),
+        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs)),
         currentArgumentIndex(outType->getNumParameters()) {
     task = origParams.claimNext();
     executor = origParams.claimNext();
