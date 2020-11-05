@@ -105,7 +105,7 @@ namespace irgen {
       ResumeParentExecutor = 1,
       Error = 1,
     };
-    IRGenFunction &IGF;
+    IRGenModule &IGM;
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
@@ -254,9 +254,9 @@ namespace irgen {
     // indexing of the function parameters, *not* the indexing of
     // AsyncContextLayout.
     SILType getParameterType(unsigned index) {
-      SILFunctionConventions origConv(substitutedType, IGF.getSILModule());
+      SILFunctionConventions origConv(substitutedType, IGM.getSILModule());
       return origConv.getSILArgumentType(
-          index, IGF.IGM.getMaximalTypeExpansionContext());
+          index, IGM.getMaximalTypeExpansionContext());
     }
     unsigned getArgumentCount() { return argumentInfos.size(); }
     bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
@@ -283,7 +283,7 @@ namespace irgen {
 
     AsyncContextLayout(
         IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
-        ArrayRef<const TypeInfo *> fieldTypeInfos, IRGenFunction &IGF,
+        ArrayRef<const TypeInfo *> fieldTypeInfos,
         CanSILFunctionType originalType, CanSILFunctionType substitutedType,
         SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
         Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
@@ -294,18 +294,18 @@ namespace irgen {
         Optional<ArgumentInfo> localContextInfo);
   };
 
-  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
-                                          AsyncContextLayout layout,
-                                          CanSILFunctionType functionType,
-                                          llvm::Value *thickContext);
-  AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
+  AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            SILFunction *function);
 
-  AsyncContextLayout getAsyncContextLayout(IRGenFunction &IGF,
+  AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap);
 
+  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
+                                          AsyncContextLayout layout,
+                                          CanSILFunctionType functionType,
+                                          llvm::Value *thickContext);
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
 
