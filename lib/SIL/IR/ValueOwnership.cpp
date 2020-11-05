@@ -541,6 +541,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, GetCurrentAsyncTask)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -570,12 +571,6 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
-  if (auto kind = BI->getBuiltinKind()) {
-    // The current async task is kept alive by the caller.
-    if (*kind == BuiltinValueKind::GetCurrentAsyncTask)
-      return ValueOwnershipKind::Unowned;
-  }
-
   // For now, just conservatively say builtins are None. We need to use a
   // builtin in here to guarantee correctness.
   return ValueOwnershipKindBuiltinVisitor().visit(BI);

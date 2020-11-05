@@ -2000,7 +2000,10 @@ public:
   
   /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
-  
+
+  /// Enter cleanup to emit an EndLifetime operation for the given value.
+  CleanupHandle enterEndLifetimeCleanup(SILValue value);
+
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
   CleanupHandle enterDeinitExistentialCleanup(CleanupState state,

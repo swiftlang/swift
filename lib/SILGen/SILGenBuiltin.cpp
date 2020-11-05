@@ -1402,6 +1402,7 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentAsyncTask)),
       SGF.getLoweredType(ctx.TheNativeObjectType), SubstitutionMap(), { });
+  SGF.enterEndLifetimeCleanup(apply);
   return ManagedValue::forUnmanaged(apply);
 }
 

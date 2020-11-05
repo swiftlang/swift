@@ -492,12 +492,6 @@ BUILTIN_SIL_OPERATION(ConvertStrongToUnownedUnsafe, "convertStrongToUnownedUnsaf
 /// now.
 BUILTIN_SIL_OPERATION(ConvertUnownedUnsafeToGuaranteed, "convertUnownedUnsafeToGuaranteed", Special)
 
-// getCurrentAsyncTask: () -> Builtin.NativeObject
-//
-// Retrieve the pointer to the task in which the current asynchronous
-// function is executing.
-BUILTIN_SIL_OPERATION(GetCurrentAsyncTask, "getCurrentAsyncTask", Special)
-
 /// applyDerivative
 BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 
@@ -722,6 +716,12 @@ BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Spe
 #define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
+
+// getCurrentAsyncTask: () -> Builtin.NativeObject
+//
+// Retrieve the pointer to the task in which the current asynchronous
+// function is executing.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

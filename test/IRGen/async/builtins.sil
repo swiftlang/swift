@@ -14,5 +14,6 @@ bb0:
   %0 = builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
   // CHECK-NEXT: [[TASK_COPY:%.*]] = call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TASK]])
   %1 = copy_value %0 : $Builtin.NativeObject
+  end_lifetime %0 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }

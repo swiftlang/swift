@@ -1327,6 +1327,32 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 }
 
 namespace {
+class EndLifetimeCleanup : public Cleanup {
+  SILValue v;
+public:
+  EndLifetimeCleanup(SILValue v) : v(v) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createEndLifetime(l, v);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndLifetimeCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterEndLifetimeCleanup(SILValue value) {
+  Cleanups.pushCleanup<EndLifetimeCleanup>(value);
+  return Cleanups.getTopCleanup();
+}
+
+namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
   class DeinitExistentialCleanup: public Cleanup {
