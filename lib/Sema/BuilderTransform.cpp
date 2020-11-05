@@ -1244,8 +1244,9 @@ public:
         if (!nominal)
           return false;
 
+        ExportContext where = ExportContext::forFunctionBody(dc, loc);
         if (auto reason = TypeChecker::checkDeclarationAvailability(
-                              nominal, loc, dc)) {
+                              nominal, where)) {
           ctx.Diags.diagnose(
               loc, diag::result_builder_missing_limited_availability,
               builderTransform.builderType);

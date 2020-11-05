@@ -451,9 +451,10 @@ bb0(%0 : $*PPP):
 // CHECK: bb0:
 // CHECK:  [[ALLOC:%.*]] = alloc_stack $PPP, var, name "magic6"
 // CHECK:  alloc_ref $KKK
-// CHECK:  [[F:%.*]] = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32
 // CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*PPP to $*@opened("{{.*}}") PPP
-// CHECK:  apply [[F]]<@opened("{{.*}}") PPP>([[ADR]]) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32
+// CHECK:  [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
+// CHECK:  [[F:%.*]] = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5 : $@convention(thin) (@inout KKK) -> Int32
+// CHECK:  apply [[F]]([[CAST]])
 // CHECK:  dealloc_stack %0 : $*PPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
@@ -500,9 +501,10 @@ bb0(%0 : $*PPPP):
 // CHECK: bb0:
 // CHECK:   [[ALLOC:%.*]] = alloc_stack $PPPP, var, name "magic7"      
 // CHECK:   struct $SSSS ()                            
-// CHECK:   [[F:%.*]] = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
-// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("{{.*}}") PPPP 
-// CHECK:   apply [[F]]<@opened("{{.*}}") PPPP>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
+// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("{{.*}}") PPPP
+// CHECK:   [[CAST:%.*]] = unchecked_addr_cast [[ADR]]
+// CHECK:   [[F:%.*]] = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5 : $@convention(thin) (@inout SSSS) -> Int32
+// CHECK:  apply [[F]]([[CAST]])
 // CHECK:   dealloc_stack [[ALLOC]] : $*PPPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {

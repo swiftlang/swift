@@ -16,17 +16,14 @@
 // Autolinks because compatibility library was explicitly asked for
 // RUN: %target-swift-frontend -runtime-compatibility-version 5.0 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -runtime-compatibility-version 5.1 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
-// RUN: %target-swift-frontend -runtime-compatibility-version 5.3 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-53 %s
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.0 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.1 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-51 %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.24 -runtime-compatibility-version 5.3 -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=FORCE-LOAD-53 %s
 
 public func foo() {}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility50"}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility51"}
-// NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility53"}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibilityDynamicReplacements"}
 
 // FORCE-LOAD: declare {{.*}} @"_swift_FORCE_LOAD_$_swiftCompatibility50"
@@ -45,16 +42,3 @@ public func foo() {}
 // FORCE-LOAD-51-DAG: !llvm.linker.options = !{{{.*}}[[AUTOLINK_SWIFT_COMPAT]]{{[,}]}}
 // FORCE-LOAD-51-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-51-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
-
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
-// FORCE-LOAD-53: declare {{.*}} @"_swift_FORCE_LOAD_$_swiftCompatibility53"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
-// FORCE-LOAD-53-DAG: [[AUTOLINK_SWIFT_COMPAT:![0-9]+]] = !{!"-lswiftCompatibility53"}
-// FORCE-LOAD-53-DAG: !llvm.linker.options = !{{{.*}}[[AUTOLINK_SWIFT_COMPAT]]{{[,}]}}
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
-// FORCE-LOAD-53-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"

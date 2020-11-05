@@ -24,7 +24,6 @@ static constexpr int staticConstexpr = makeStaticConstexpr();
 
 class NonTrivial {
 public:
-  explicit NonTrivial() : val(-1) {}
   explicit NonTrivial(int val) : val(val) {}
   constexpr NonTrivial(int val, int val2) : val(val + val2) {}
   int val;

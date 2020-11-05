@@ -157,6 +157,18 @@ public struct Struct {
     }
   }
 
+  public var willSetVar: Int = 1 {
+    willSet {
+      _blackHole("willSet body") // CHECK-NOT: "willSet body"
+    }
+  }
+
+  public var didSetVar: Int = 1 {
+    didSet {
+      _blackHole("didSet body") // CHECK-NOT: "didSet body"
+    }
+  }
+
   @_transparent
   public func transparentFunc() {
     _blackHole("@_transparent method body") // CHECK: "@_transparent method body"

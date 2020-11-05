@@ -1322,6 +1322,19 @@ void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
   }
 
   // For source compatibilty, allow duplicate internal parameter names
@@ -2318,6 +2331,13 @@ public:
     // Make sure there even _is_ a body that we can skip.
     if (!AFD->getBodySourceRange().isValid())
       return false;
+
+    // didSet runs typechecking to determine whether to keep its parameter,
+    // so never try to skip.
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      if (AD->getAccessorKind() == AccessorKind::DidSet)
+        return false;
+    }
 
     // If we're gonna serialize the body, we can't skip it.
     if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)

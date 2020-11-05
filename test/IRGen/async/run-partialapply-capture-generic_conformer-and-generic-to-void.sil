@@ -14,6 +14,7 @@
 import Builtin
 import Swift
 import PrintShims
+import _Concurrency
 
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
@@ -55,7 +56,7 @@ sil_witness_table ObserverImpl : Observer module main {
 }
 
 // CHECK-LL: define internal swiftcc void @"$sTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
-sil hidden @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> () {
+sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> () {
 bb0(%0 : $*S):
   %1 = witness_method $S, #Observable.subscribe : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
   %2 = partial_apply %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
@@ -70,8 +71,8 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   strong_retain %observableImpl : $ObservableImpl
   %observableImpl_addr = alloc_stack $ObservableImpl
   store %observableImpl to %observableImpl_addr : $*ObservableImpl
-  %witness_method = function_ref @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
-  %partiallyApplied = apply %witness_method<ObservableImpl, ObserverImpl>(%observableImpl_addr) : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
+  %witness_method = function_ref @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
+  %partiallyApplied = apply %witness_method<ObservableImpl, ObserverImpl>(%observableImpl_addr) : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
   %observerImpl = alloc_ref $ObserverImpl
   %observerImpl_addr = alloc_stack $ObserverImpl
   store %observerImpl to %observerImpl_addr : $*ObserverImpl

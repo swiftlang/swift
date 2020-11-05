@@ -14,6 +14,7 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "Scope.h"
+#include "ArgumentSource.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -449,6 +450,51 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       }
     }
   }
+  
+  if (!F.isAsync())
+    return;
+
+  if (auto *funcDecl =
+        dyn_cast_or_null<AbstractFunctionDecl>(FunctionDC->getAsDecl())) {
+    auto actorIsolation = getActorIsolation(funcDecl);
+    switch (actorIsolation.getKind()) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+        break;
+      case ActorIsolation::ActorInstance: {
+        assert(selfParam && "no self parameter for ActorInstance isolation");
+        ManagedValue selfArg = ManagedValue::forUnmanaged(F.getSelfArgument());
+        ManagedValue borrowedSelf = selfArg.borrow(*this, F.getLocation());
+        actor = borrowedSelf.getValue();
+        break;
+      }
+      case ActorIsolation::GlobalActor: {
+        CanType actorType = CanType(actorIsolation.getGlobalActor());
+        NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
+        VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
+        assert(sharedInstanceDecl && "no shared actor field in global actor");
+        SubstitutionMap subs =
+          actorType->getContextSubstitutionMap(SGM.SwiftModule, nominal);
+        SILLocation loc = F.getLocation();
+        Type instanceType =
+          actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
+
+        ManagedValue actorMetaType =
+          ManagedValue::forUnmanaged(B.createMetatype(loc,
+            SILType::getPrimitiveObjectType(
+              CanMetatypeType::get(actorType, MetatypeRepresentation::Thin))));
+
+        RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
+          actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
+          subs, AccessSemantics::Ordinary, instanceType, SGFContext());
+        ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
+        actor = actorInstance.borrow(*this, loc).getValue();
+        break;
+      }
+    }
+  }
+  emitHopToCurrentExecutor(F.getLocation());
 }
 
 static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,

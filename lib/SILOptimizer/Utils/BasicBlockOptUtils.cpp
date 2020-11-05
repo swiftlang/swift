@@ -134,28 +134,6 @@ void BasicBlockCloner::updateSSAAfterCloning() {
   }
 }
 
-// FIXME: Remove this. SILCloner should not create critical edges.
-bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
-                                          SILLoopInfo *loopInfo) {
-  bool changed = false;
-  // Remove any critical edges that the EdgeThreadingCloner may have
-  // accidentally created.
-  for (unsigned succIdx = 0, succEnd = origBB->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    if (nullptr
-        != splitCriticalEdge(origBB->getTerminator(), succIdx, domInfo,
-                             loopInfo))
-      changed |= true;
-  }
-  for (unsigned succIdx = 0, succEnd = getNewBB()->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    auto *newBB = splitCriticalEdge(getNewBB()->getTerminator(), succIdx,
-                                    domInfo, loopInfo);
-    changed |= (newBB != nullptr);
-  }
-  return changed;
-}
-
 void BasicBlockCloner::sinkAddressProjections() {
   // Because the address projections chains will be disjoint (an instruction
   // in one chain cannot use the result of an instruction in another chain),

@@ -3194,6 +3194,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
                                        AbstractionPattern(boolTy), boolTy,
                                        None,
+                                       None,
                                        ImportAsMemberStatus());
       
       Scope branchScope(subSGF, loc);

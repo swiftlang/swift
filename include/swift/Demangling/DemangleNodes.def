@@ -159,6 +159,7 @@ CONTEXT_NODE(NativePinningMutableAddressor)
 NODE(NominalTypeDescriptor)
 NODE(NonObjCAttribute)
 NODE(Number)
+NODE(ObjCAsyncCompletionHandlerImpl)
 NODE(ObjCAttribute)
 NODE(ObjCBlock)
 NODE(EscapingObjCBlock)
@@ -301,6 +302,7 @@ NODE(NoncanonicalSpecializedGenericTypeMetadataCache)
 NODE(GlobalVariableOnceFunction)
 NODE(GlobalVariableOnceToken)
 NODE(GlobalVariableOnceDeclList)
+NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
 
 #undef CONTEXT_NODE
 #undef NODE

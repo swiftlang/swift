@@ -89,4 +89,18 @@
 #define SWIFT_ATTRIBUTE_NORETURN
 #endif
 
+#ifndef SWIFT_BUG_REPORT_URL
+#define SWIFT_BUG_REPORT_URL "https://swift.org/contributing/#reporting-bugs"
+#endif
+
+#define SWIFT_BUG_REPORT_MESSAGE_BASE \
+  "submit a bug report (" SWIFT_BUG_REPORT_URL \
+  ") and include the project"
+
+#define SWIFT_BUG_REPORT_MESSAGE \
+  "please " SWIFT_BUG_REPORT_MESSAGE_BASE
+
+#define SWIFT_CRASH_BUG_REPORT_MESSAGE \
+  "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and the crash backtrace."
+
 #endif // SWIFT_BASIC_COMPILER_H

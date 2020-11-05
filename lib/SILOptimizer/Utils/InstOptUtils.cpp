@@ -69,6 +69,16 @@ const std::function<void(SingleValueInstruction *, SILValue)>
           i->eraseFromParent();
         };
 
+Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
+  if (isa<SingleValueInstruction>(val)) {
+    return std::next(cast<SingleValueInstruction>(val)->getIterator());
+  }
+  if (isa<SILArgument>(val)) {
+    return cast<SILArgument>(val)->getParentBlock()->begin();
+  }
+  return None;
+}
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.

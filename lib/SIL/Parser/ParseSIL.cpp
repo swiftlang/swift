@@ -1259,7 +1259,6 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
-                                           /*handleCodeCompletion*/ true,
                                            /*isSILFuncDecl*/ IsFuncDecl);
 
   if (TyR.isNull())
@@ -2951,6 +2950,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
+    UNARY_INSTRUCTION(HopToExecutor)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
     REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)

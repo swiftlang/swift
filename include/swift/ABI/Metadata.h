@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,6 +30,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "swift/Strings.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Once.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/ABI/TrailingObjects.h"
@@ -2295,28 +2296,37 @@ private:
   union {
     /// A direct reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       IndirectNominalTypeDescriptor;
+
+    // We only allow a subset of the TypeReferenceKinds here.
+    // Should we just acknowledge that this is a different enum?
   };
 
 public:
-  TypeMetadataRecordKind getTypeKind() const {
+  TypeReferenceKind getTypeKind() const {
     return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetContextDescriptor<Runtime> *
   getContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeMetadataRecordKind::DirectTypeDescriptor:
+    case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeMetadataRecordKind::IndirectTypeDescriptor:
+    case TypeReferenceKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
+
+    // These types (and any others we might add to TypeReferenceKind
+    // in the future) are just never used in these lists.
+    case TypeReferenceKind::DirectObjCClassName:
+    case TypeReferenceKind::IndirectObjCClass:
+      return nullptr;
     }
     
     return nullptr;
@@ -2406,9 +2416,6 @@ struct TargetTypeReference {
     /// A direct reference to an Objective-C class name.
     RelativeDirectPointer<const char>
       DirectObjCClassName;
-
-    /// A "reference" to some metadata kind, e.g. tuple.
-    MetadataKind MetadataKind;
   };
 
   const TargetContextDescriptor<Runtime> *
@@ -2422,16 +2429,10 @@ struct TargetTypeReference {
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
-    case TypeReferenceKind::MetadataKind:
       return nullptr;
     }
 
     return nullptr;
-  }
-
-  enum MetadataKind getMetadataKind(TypeReferenceKind kind) const {
-    assert(kind == TypeReferenceKind::MetadataKind);
-    return MetadataKind;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -2519,10 +2520,6 @@ public:
     return Flags.getTypeReferenceKind();
   }
 
-  enum MetadataKind getMetadataKind() const {
-    return TypeRef.getMetadataKind(getTypeKind());
-  }
-
   const char *getDirectObjCClassName() const {
     return TypeRef.getDirectObjCClassName(getTypeKind());
   }
@@ -2548,11 +2545,6 @@ public:
 
     return this->template getTrailingObjects<
         TargetRelativeContextPointer<Runtime>>();
-  }
-
-  /// Whether this conformance is builtin by the compiler + runtime.
-  bool isBuiltin() const {
-    return getTypeKind() == TypeReferenceKind::MetadataKind;
   }
 
   /// Whether this conformance is non-unique because it has been synthesized
@@ -3797,6 +3789,11 @@ struct TargetCanonicalSpecializedMetadataAccessorsListEntry {
 };
 
 template <typename Runtime>
+struct TargetCanonicalSpecializedMetadatasCachingOnceToken {
+  TargetRelativeDirectPointer<Runtime, swift_once_t, /*Nullable*/ false> token;
+};
+
+template <typename Runtime>
 class TargetTypeContextDescriptor
     : public TargetContextDescriptor<Runtime> {
 public:
@@ -3882,7 +3879,9 @@ public:
   }
 
   const llvm::ArrayRef<TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>>
-  getCanonicicalMetadataPrespecializations() const; 
+  getCanonicicalMetadataPrespecializations() const;
+
+  swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const;
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() >= ContextDescriptorKind::Type_First
@@ -4024,7 +4023,8 @@ class TargetClassDescriptor final
                               TargetObjCResilientClassStubInfo<Runtime>,
                               TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                               TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>> {
+                              TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+                              TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -4039,7 +4039,8 @@ private:
                                          TargetObjCResilientClassStubInfo<Runtime>,
                                          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                                          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>>;
+                                         TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
+                                         TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4067,6 +4068,8 @@ public:
     TargetRelativeDirectPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
+  using MetadataCachingOnceToken =
+      TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4202,6 +4205,10 @@ private:
     return this->hasCanonicicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
+    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4367,6 +4374,14 @@ public:
         );
   }
 
+  swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
+    if (!this->hasCanonicicalMetadataPrespecializations()) {
+      return nullptr;
+    }
+    auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
+    return box->token.get();
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Class;
   }
@@ -4394,7 +4409,8 @@ class TargetStructDescriptor final
                             TargetForeignMetadataInitialization<Runtime>,
                             TargetSingletonMetadataInitialization<Runtime>,
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>> {
+                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4406,6 +4422,8 @@ public:
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
   using MetadataListEntry =
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
+  using MetadataCachingOnceToken =
+      TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4414,7 +4432,8 @@ private:
                                            ForeignMetadataInitialization,
                                            SingletonMetadataInitialization,
                                            MetadataListCount,
-                                           MetadataListEntry>;
+                                           MetadataListEntry,
+                                           MetadataCachingOnceToken>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4442,6 +4461,10 @@ private:
     return this->hasCanonicicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
+    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4489,6 +4512,14 @@ public:
         );
   }
 
+  swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
+    if (!this->hasCanonicicalMetadataPrespecializations()) {
+      return nullptr;
+    }
+    auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
+    return box->token.get();
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct;
   }
@@ -4505,7 +4536,8 @@ class TargetEnumDescriptor final
                             TargetForeignMetadataInitialization<Runtime>,
                             TargetSingletonMetadataInitialization<Runtime>,
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
-                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>> {
+                            TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
+                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4517,6 +4549,8 @@ public:
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
   using MetadataListEntry =
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
+  using MetadataCachingOnceToken =
+      TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4525,7 +4559,8 @@ private:
                                         ForeignMetadataInitialization,
                                         SingletonMetadataInitialization,
                                         MetadataListCount,
-                                        MetadataListEntry>;
+                                        MetadataListEntry, 
+                                        MetadataCachingOnceToken>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4553,6 +4588,10 @@ private:
     return this->hasCanonicicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
+    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4612,6 +4651,14 @@ public:
         reinterpret_cast<const Metadata *>(list),
         listCount->count
         );
+  }
+
+  swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
+    if (!this->hasCanonicicalMetadataPrespecializations()) {
+      return nullptr;
+    }
+    auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
+    return box->token.get();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4761,6 +4808,24 @@ TargetTypeContextDescriptor<Runtime>::getCanonicicalMetadataPrespecializations()
   case ContextDescriptorKind::Class:
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getCanonicicalMetadataPrespecializations();
+  default:
+    swift_unreachable("Not a type context descriptor.");
+  }
+}
+
+template <typename Runtime>
+inline swift_once_t *TargetTypeContextDescriptor<
+    Runtime>::getCanonicalMetadataPrespecializationCachingOnceToken() const {
+  switch (this->getKind()) {
+  case ContextDescriptorKind::Enum:
+    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+        ->getCanonicalMetadataPrespecializationCachingOnceToken();
+  case ContextDescriptorKind::Struct:
+    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+        ->getCanonicalMetadataPrespecializationCachingOnceToken();
+  case ContextDescriptorKind::Class:
+    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+        ->getCanonicalMetadataPrespecializationCachingOnceToken();
   default:
     swift_unreachable("Not a type context descriptor.");
   }

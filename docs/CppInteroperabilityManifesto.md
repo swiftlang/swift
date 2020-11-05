@@ -307,7 +307,7 @@ provide the following guarantees:
 
 - `inout` are backed by initialized memory on function entry and function exit
   (an implication of the copy-in/copy-out semantics). Destroying the object in
-  `inout` requires using unsafe construts. Therefore, in safe Swift `inout`
+  `inout` requires using unsafe constructs. Therefore, in safe Swift `inout`
   parameters are backed by initialized memory throughout function execution.
 
 - `inout` parameters don't alias each other or any other values that program is
@@ -1033,7 +1033,7 @@ in all Swift code, but it is feasible for local variables of concrete types.
 An example where it is not possible to maintain precise destruction semantics
 for C++ classes is in a generic Swift function that is called with a C++ class
 as a type parameter. In this case, we must be able to compile one definition of
-a Swift function, which must work regradless of the nature of the type (be it a
+a Swift function, which must work regardless of the nature of the type (be it a
 Swift type or a C++ class). This limitation does not seem too bad, because RAII
 types are not often passed as type parameters to templates in C++, which creates
 a reason to believe it will not be common in Swift either.
