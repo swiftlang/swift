@@ -2633,6 +2633,12 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node
   Buffer << "MJ";
 }
 
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
+}
+
 void Remangler::mangleGlobalVariableOnceToken(Node *node) {
   mangleChildNodes(node);
   Buffer << "Wz";

@@ -682,24 +682,13 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
-MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
-    MetadataRequest request, const Metadata *candidate,
-    const Metadata **cacheMetadataPtr) {
-  assert(candidate->isStaticallySpecializedGenericMetadata() &&
-         !candidate->isCanonicalStaticallySpecializedGenericMetadata());
-  auto *description = candidate->getDescription();
-  assert(description);
-
-  using CachedMetadata = std::atomic<const Metadata *>;
-  auto cachedMetadataAddr = ((CachedMetadata *)cacheMetadataPtr);
-  auto *cachedMetadata = cachedMetadataAddr->load(SWIFT_MEMORY_ORDER_CONSUME);
-  if (SWIFT_LIKELY(cachedMetadata != nullptr)) {
-    // Cached metadata pointers are always complete.
-    return MetadataResponse{(const Metadata *)cachedMetadata,
-                            MetadataState::Complete};
-  }
-
+// Look into the canonical prespecialized metadata attached to the type
+// descriptor and add them to the metadata cache.
+static void
+_cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
   auto &cache = getCache(*description);
+  auto request =
+      MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
          cache.NumKeyParameters + cache.NumWitnessTables);
   if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
@@ -729,8 +718,47 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
       assert(result.second.Value == canonicalMetadata);
     }
   }
+}
+
+static void
+cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
+                                  swift_once_t *token) {
+  swift_once(
+      token,
+      [](void *uncastDescription) {
+        auto *description = (const TypeContextDescriptor *)uncastDescription;
+        _cacheCanonicalSpecializedMetadata(description);
+      },
+      (void *)description);
+}
+
+MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
+    MetadataRequest request, const Metadata *candidate,
+    const Metadata **cacheMetadataPtr) {
+  assert(candidate->isStaticallySpecializedGenericMetadata() &&
+         !candidate->isCanonicalStaticallySpecializedGenericMetadata());
+  auto *description = candidate->getDescription();
+  assert(description);
+
+  using CachedMetadata = std::atomic<const Metadata *>;
+  auto cachedMetadataAddr = ((CachedMetadata *)cacheMetadataPtr);
+  auto *cachedMetadata = cachedMetadataAddr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (SWIFT_LIKELY(cachedMetadata != nullptr)) {
+    // Cached metadata pointers are always complete.
+    return MetadataResponse{(const Metadata *)cachedMetadata,
+                            MetadataState::Complete};
+  }
+
+  if (auto *token =
+          description
+              ->getCanonicalMetadataPrespecializationCachingOnceToken()) {
+    cacheCanonicalSpecializedMetadata(description, token);
+    // NOTE: If there is no token, then there are no canonical prespecialized
+    //       metadata records, either.
+  }
   const void *const *arguments =
       reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+  auto &cache = getCache(*description);
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, candidate);
@@ -740,53 +768,10 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
   return result.second;
 }
 
-// Look into the canonical prespecialized metadata attached to the type
-// descriptor and return matching records, if any.
-static Metadata *
-findCanonicalSpecializedMetadata(MetadataRequest request,
-                                 const void *const *arguments,
-                                 const TypeContextDescriptor *description) {
-  auto &cache = getCache(*description);
-  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                              arguments);
-  auto prespecializedMetadatas =
-      description->getCanonicicalMetadataPrespecializations();
-  int index = 0;
-  for (auto &prespecializedMetadataPtr : prespecializedMetadatas) {
-    Metadata *prespecializationMetadata = prespecializedMetadataPtr.get();
-    const void *const *prespecializationArguments =
-        reinterpret_cast<const void *const *>(
-            prespecializationMetadata->getGenericArgs());
-    auto prespecializationKey =
-        MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                         prespecializationArguments);
-    if (key == prespecializationKey) {
-      if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
-        auto canonicalMetadataAccessors =
-            classDescription->getCanonicalMetadataPrespecializationAccessors();
-        auto &canonicalMetadataAccessorPtr = canonicalMetadataAccessors[index];
-        auto *canonicalMetadataAccessor = canonicalMetadataAccessorPtr.get();
-        auto response = canonicalMetadataAccessor(request);
-        return const_cast<Metadata *>(response.Value);
-      } else {
-        return prespecializationMetadata;
-      }
-    }
-    ++index;
-  }
-  return nullptr;
-}
-
-/// The primary entrypoint.
-MetadataResponse
-swift::swift_getGenericMetadata(MetadataRequest request,
-                                const void * const *arguments,
-                                const TypeContextDescriptor *description) {
-  description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
-  if (auto *prespecialization =
-          findCanonicalSpecializedMetadata(request, arguments, description)) {
-    return {prespecialization, MetadataState::Complete};
-  }
+SWIFT_CC(swift)
+static MetadataResponse
+_swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
+                          const TypeContextDescriptor *description) {
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
          cache.NumKeyParameters + cache.NumWitnessTables);
@@ -794,10 +779,27 @@ swift::swift_getGenericMetadata(MetadataRequest request,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
 
-  assert(
-      !result.second.Value->isCanonicalStaticallySpecializedGenericMetadata());
-
   return result.second;
+}
+
+/// The primary entrypoint.
+MetadataResponse
+swift::swift_getGenericMetadata(MetadataRequest request,
+                                const void *const *arguments,
+                                const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  return _swift_getGenericMetadata(request, arguments, description);
+}
+
+MetadataResponse swift::swift_getCanonicalPrespecializedGenericMetadata(
+    MetadataRequest request, const void *const *arguments,
+    const TypeContextDescriptor *description, swift_once_t *token) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  cacheCanonicalSpecializedMetadata(description, token);
+
+  return _swift_getGenericMetadata(request, arguments, description);
 }
 
 /***************************************************************************/
