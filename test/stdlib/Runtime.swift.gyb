@@ -593,7 +593,7 @@ Runtime.test("Struct layout with reference storage types") {
   print(malkovich)
 }
 
-#if !(canImport(Darwin) && !_runtime(_ObjC))
+#if !(canImport(Darwin) && !_runtime(_ObjC)) && !os(WASI)
 Runtime.test("SwiftError layout constants for LLDB") {
   let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
   let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
