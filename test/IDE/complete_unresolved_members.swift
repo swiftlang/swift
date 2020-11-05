@@ -856,7 +856,7 @@ func testSameType() {
 
   testSugarType(.#^SUGAR_TYPE^#
 // Ensure results aren't duplicated.
-// SUGAR_TYPE: Begin completions, 9 items
+// SUGAR_TYPE: Begin completions, 21 items
 // SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#];
 // SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#];
 // SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
