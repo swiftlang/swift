@@ -1784,7 +1784,7 @@ public:
   /// Is the pattern binding entry for this variable  currently being computed?
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
 
-  /// Is this an "async let" declaration.
+  /// Is this an "async let" declaration?
   bool isAsyncLet() const;
 
   /// Gets the text of the initializer expression for the pattern entry at the
