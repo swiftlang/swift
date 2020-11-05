@@ -164,10 +164,11 @@ func testAsyncLet() async throws {
   }
 }
 
-// expected-note@+2 3{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}
-// expected-note@+1 3{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}}
+// expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}
+// expected-note@+1 4{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}}
 func testAsyncLetOutOfAsync() {
   async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
+  // FIXME: expected-error@-1{{'async' in a function that does not support concurrency}}
 
   _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
   _ = x // expected-error{{'async let' in a function that does not support concurrency}}

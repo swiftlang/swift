@@ -533,6 +533,13 @@ public:
     return result;
   }
 
+  /// Classify a single expression without considering its enclosing context.
+  ThrowingKind classifyExpr(Expr *expr) {
+    FunctionBodyClassifier classifier(*this);
+    expr->walk(classifier);
+    return classifier.Result;
+  }
+
 private:
   /// Classify a throwing function according to our local knowledge of
   /// its implementation.
@@ -2014,4 +2021,8 @@ void TypeChecker::checkPropertyWrapperEffects(
   auto &ctx = binding->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
+}
+
+bool TypeChecker::canThrow(Expr *expr) {
+  return ApplyClassifier().classifyExpr(expr) == ThrowingKind::Throws;
 }
