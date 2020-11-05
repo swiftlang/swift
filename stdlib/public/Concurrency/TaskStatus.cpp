@@ -28,7 +28,7 @@ using namespace swift;
 
 /// A lock used to protect management of task-specific status
 /// record locks.
-static StaticMutex StatusRecordLockLock;
+static StaticConditionMutex StatusRecordLockLock;
 
 namespace {
 
@@ -91,13 +91,13 @@ public:
   }
 
   /// Wait on the queue until there's an unlock.
-  void waitForUnlock(StaticScopedLock &globalLock) {
+  void waitForUnlock(StaticConditionScopedLock &globalLock) {
     assert(Locked);
 
     // Flag that we're waiting, then drop the global lock.
     NumUnlockWaiters++;
     {
-      StaticScopedLock globalUnlock(StatusRecordLockLock);
+      StaticConditionScopedLock globalUnlock(StatusRecordLockLock);
 
       // Attempt to acquire the locking-thread lock, thereby
       // waiting until the locking thread unlocks the record.
@@ -121,7 +121,7 @@ public:
   /// Wake up any threads that were waiting for unlock.  Must be
   /// called by the locking thread.
   void unlock() {
-    StaticScopedLock globalLock(StatusRecordLockLock);
+    StaticConditionScopedLock globalLock(StatusRecordLockLock);
     assert(Locked);
     Locked = false;
 
@@ -158,7 +158,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
   assert(oldStatus.isLocked());
 
   // Acquire the lock.
-  StaticScopedLock globalLock(StatusRecordLockLock);
+  StaticConditionScopedLock globalLock(StatusRecordLockLock);
 
   while (true) {
     // Check that oldStatus is still correct.

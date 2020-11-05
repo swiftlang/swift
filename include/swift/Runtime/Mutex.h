@@ -75,8 +75,8 @@ public:
 /// A ConditionVariable that works with Mutex to allow -- as an example --
 /// multi-threaded producers and consumers to signal each other in a safe way.
 class ConditionVariable {
-  friend class Mutex;
-  friend class StaticMutex;
+  friend class ConditionMutex;
+  friend class StaticConditionMutex;
 
   ConditionVariable(const ConditionVariable &) = delete;
   ConditionVariable &operator=(const ConditionVariable &) = delete;
@@ -137,21 +137,27 @@ private:
 };
 
 class Mutex;
+class ConditionMutex;
 class StaticMutex;
+class StaticConditionMutex;
 
 /// A stack based object that locks the supplied mutex on construction
 /// and unlocks it on destruction.
 ///
 /// Precondition: Mutex unlocked by this thread, undefined otherwise.
 typedef ScopedLockT<Mutex, false> ScopedLock;
+typedef ScopedLockT<ConditionMutex, false> ConditionScopedLock;
 typedef ScopedLockT<StaticMutex, false> StaticScopedLock;
+typedef ScopedLockT<StaticConditionMutex, false> StaticConditionScopedLock;
 
 /// A stack based object that unlocks the supplied mutex on construction
 /// and relocks it on destruction.
 ///
 /// Precondition: Mutex locked by this thread, undefined otherwise.
 typedef ScopedLockT<Mutex, true> ScopedUnlock;
+typedef ScopedLockT<ConditionMutex, true> ConditionScopedUnlock;
 typedef ScopedLockT<StaticMutex, true> StaticScopedUnlock;
+typedef ScopedLockT<StaticConditionMutex, true> StaticConditionScopedUnlock;
 
 /// A Mutex object that supports `BasicLockable` and `Lockable` C++ concepts.
 /// See http://en.cppreference.com/w/cpp/concept/BasicLockable
@@ -211,6 +217,85 @@ public:
   /// - Does not throw exceptions but will halt on error (fatalError).
   bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
 
+  /// Acquires lock before calling the supplied critical section and releases
+  /// lock on return from critical section.
+  ///
+  /// This call can block while waiting for the lock to become available.
+  ///
+  /// For example the following mutates value while holding the mutex lock.
+  ///
+  /// ```
+  ///   mutex.lock([&value] { value++; });
+  /// ```
+  ///
+  /// Precondition: Mutex not held by this thread, undefined otherwise.
+  template <typename CriticalSection>
+  auto withLock(CriticalSection criticalSection)
+      -> decltype(criticalSection()) {
+    ScopedLock guard(*this);
+    return criticalSection();
+  }
+
+private:
+  MutexHandle Handle;
+};
+
+/// A Mutex object that also supports ConditionVariables.
+///
+/// This is NOT a recursive mutex.
+class ConditionMutex {
+
+  ConditionMutex(const ConditionMutex &) = delete;
+  ConditionMutex &operator=(const ConditionMutex &) = delete;
+  ConditionMutex(ConditionMutex &&) = delete;
+  ConditionMutex &operator=(ConditionMutex &&) = delete;
+
+public:
+  /// Constructs a non-recursive mutex.
+  ///
+  /// If `checked` is true the mutex will attempt to check for misuse and
+  /// fatalError when detected. If `checked` is false (the default) the
+  /// mutex will make little to no effort to check for misuse (more efficient).
+  explicit ConditionMutex(bool checked = false) {
+    MutexPlatformHelper::init(Handle, checked);
+  }
+  ~ConditionMutex() { MutexPlatformHelper::destroy(Handle); }
+
+  /// The lock() method has the following properties:
+  /// - Behaves as an atomic operation.
+  /// - Blocks the calling thread until exclusive ownership of the mutex
+  ///   can be obtained.
+  /// - Prior m.unlock() operations on the same mutex synchronize-with
+  ///   this lock operation.
+  /// - The behavior is undefined if the calling thread already owns
+  ///   the mutex (likely a deadlock).
+  /// - Does not throw exceptions but will halt on error (fatalError).
+  void lock() { MutexPlatformHelper::lock(Handle); }
+
+  /// The unlock() method has the following properties:
+  /// - Behaves as an atomic operation.
+  /// - Releases the calling thread's ownership of the mutex and
+  ///   synchronizes-with the subsequent successful lock operations on
+  ///   the same object.
+  /// - The behavior is undefined if the calling thread does not own
+  ///   the mutex.
+  /// - Does not throw exceptions but will halt on error (fatalError).
+  void unlock() { MutexPlatformHelper::unlock(Handle); }
+
+  /// The try_lock() method has the following properties:
+  /// - Behaves as an atomic operation.
+  /// - Attempts to obtain exclusive ownership of the mutex for the calling
+  ///   thread without blocking. If ownership is not obtained, returns
+  ///   immediately. The function is allowed to spuriously fail and return
+  ///   even if the mutex is not currently owned by another thread.
+  /// - If try_lock() succeeds, prior unlock() operations on the same object
+  ///   synchronize-with this operation. lock() does not synchronize with a
+  ///   failed try_lock()
+  /// - The behavior is undefined if the calling thread already owns
+  ///   the mutex (likely a deadlock)?
+  /// - Does not throw exceptions but will halt on error (fatalError).
+  bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
+
   /// Releases lock, waits on supplied condition, and relocks before returning.
   ///
   /// Precondition: Mutex held by this thread, undefined otherwise.
@@ -232,7 +317,7 @@ public:
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
   auto withLock(CriticalSection criticalSection) -> decltype(criticalSection()){
-    ScopedLock guard(*this);
+    ConditionScopedLock guard(*this);
     return criticalSection();
   }
 
@@ -318,7 +403,7 @@ public:
   }
 
 private:
-  MutexHandle Handle;
+  ConditionMutexHandle Handle;
 };
 
 /// Compile time adjusted stack based object that locks/unlocks the supplied
@@ -557,7 +642,7 @@ private:
 ///
 /// Use ConditionVariable instead unless you need static allocation.
 class StaticConditionVariable {
-  friend class StaticMutex;
+  friend class StaticConditionMutex;
 
   StaticConditionVariable(const StaticConditionVariable &) = delete;
   StaticConditionVariable &operator=(const StaticConditionVariable &) = delete;
@@ -612,6 +697,45 @@ public:
   /// See Mutex::try_lock
   bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
 
+  /// See Mutex::lock
+  template <typename CriticalSection>
+  auto withLock(CriticalSection criticalSection)
+      -> decltype(criticalSection()) {
+    StaticScopedLock guard(*this);
+    return criticalSection();
+  }
+
+private:
+  MutexHandle Handle;
+};
+
+/// A static allocation variant of ConditionMutex.
+///
+/// Use ConditionMutex instead unless you need static allocation.
+class StaticConditionMutex {
+
+  StaticConditionMutex(const StaticMutex &) = delete;
+  StaticConditionMutex &operator=(const StaticMutex &) = delete;
+  StaticConditionMutex(StaticMutex &&) = delete;
+  StaticConditionMutex &operator=(StaticMutex &&) = delete;
+
+public:
+#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
+  constexpr
+#endif
+      StaticConditionMutex()
+      : Handle(MutexPlatformHelper::conditionStaticInit()) {
+  }
+
+  /// See Mutex::lock
+  void lock() { MutexPlatformHelper::lock(Handle); }
+
+  /// See Mutex::unlock
+  void unlock() { MutexPlatformHelper::unlock(Handle); }
+
+  /// See Mutex::try_lock
+  bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
+
   /// See Mutex::wait
   void wait(StaticConditionVariable &condition) {
     ConditionPlatformHelper::wait(condition.Handle, Handle);
@@ -623,7 +747,7 @@ public:
   /// See Mutex::lock
   template <typename CriticalSection>
   auto withLock(CriticalSection criticalSection) -> decltype(criticalSection()){
-    StaticScopedLock guard(*this);
+    StaticConditionScopedLock guard(*this);
     return criticalSection();
   }
 
@@ -661,7 +785,7 @@ public:
   }
 
 private:
-  MutexHandle Handle;
+  ConditionMutexHandle Handle;
 };
 
 /// A static allocation variant of ReadWriteLock.
@@ -772,21 +896,18 @@ private:
   MutexHandle Handle;
 };
 
-/// A "small" variant of a Mutex. This allocates the mutex on the heap, for
-/// places where having the mutex inline takes up too much space.
-///
-/// TODO: On OSes that provide a smaller mutex type (e.g. os_unfair_lock on
-/// Darwin), make SmallMutex use that and store it inline, or make Mutex use it
-/// and this can become a typedef there.
-class SmallMutex {
-  SmallMutex(const SmallMutex &) = delete;
-  SmallMutex &operator=(const SmallMutex &) = delete;
-  SmallMutex(SmallMutex &&) = delete;
-  SmallMutex &operator=(SmallMutex &&) = delete;
+/// An indirect variant of a Mutex. This allocates the mutex on the heap, for
+/// places where having the mutex inline takes up too much space. Used for
+/// SmallMutex on platforms where Mutex is large.
+class IndirectMutex {
+  IndirectMutex(const IndirectMutex &) = delete;
+  IndirectMutex &operator=(const IndirectMutex &) = delete;
+  IndirectMutex(IndirectMutex &&) = delete;
+  IndirectMutex &operator=(IndirectMutex &&) = delete;
 
 public:
-  explicit SmallMutex(bool checked = false) { Ptr = new Mutex(checked); }
-  ~SmallMutex() { delete Ptr; }
+  explicit IndirectMutex(bool checked = false) { Ptr = new Mutex(checked); }
+  ~IndirectMutex() { delete Ptr; }
 
   void lock() { Ptr->lock(); }
 
@@ -797,6 +918,12 @@ public:
 private:
   Mutex *Ptr;
 };
+
+/// A "small" mutex, which is pointer sized or smaller, for places where the
+/// mutex is stored inline with limited storage space. This uses a normal Mutex
+/// when that is small, and otherwise uses IndirectMutex.
+using SmallMutex =
+    std::conditional_t<sizeof(Mutex) <= sizeof(void *), Mutex, IndirectMutex>;
 
 // Enforce literal requirements for static variants.
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
