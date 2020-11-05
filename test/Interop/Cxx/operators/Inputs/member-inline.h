@@ -8,4 +8,8 @@ struct LoadableIntWrapper {
   }
 };
 
+struct HasDeletedOperator {
+  void operator!=(HasDeletedOperator) const = delete;
+};
+
 #endif
