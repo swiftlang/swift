@@ -1341,6 +1341,10 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   return builder.build(id);
 }
 
+static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -2466,6 +2470,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertUnownedUnsafeToGuaranteed:
     return getConvertUnownedUnsafeToGuaranteed(Context, Id);
+
+  case BuiltinValueKind::GetCurrentAsyncTask:
+    return getGetCurrentAsyncTask(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

@@ -140,6 +140,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::IntInstrprofIncrement:
+    case BuiltinValueKind::GetCurrentAsyncTask:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

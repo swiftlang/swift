@@ -1393,6 +1393,18 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
   return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
 }
 
+// Emit SIL for the named builtin: getCurrentAsyncTask.
+static ManagedValue emitBuiltinGetCurrentAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentAsyncTask)),
+      SGF.getLoweredType(ctx.TheNativeObjectType), SubstitutionMap(), { });
+  return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
