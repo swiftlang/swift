@@ -552,7 +552,8 @@ deriveHashable_hashInto(
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  hashDecl->copyFormalAccessFrom(derived.Nominal);
+  hashDecl->copyFormalAccessFrom(derived.Nominal,
+                                 /*sourceIsParentContext=*/true);
 
   derived.addMembersToConformanceContext({hashDecl});
 
