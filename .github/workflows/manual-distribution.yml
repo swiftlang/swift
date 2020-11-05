@@ -16,7 +16,7 @@ jobs:
   manual-distribution:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - name: Setup keychain
         run: |
           security create-keychain -p "$KEYCHAIN_PASSWORD" swiftwasm-ci

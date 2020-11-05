@@ -27,7 +27,7 @@ jobs:
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
         with:
           path: swift
       - name: Prepare sccache timestamp
@@ -73,7 +73,7 @@ jobs:
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
         with:
           path: swift
       - name: Prepare sccache timestamp
@@ -109,7 +109,7 @@ jobs:
     runs-on: macos-10.15
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
         with:
           path: swift
       - name: Prepare sccache timestamp
