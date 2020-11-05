@@ -25,3 +25,13 @@ func testAsyncFunc() async {
   await x = 1
   _ = y2
 }
+
+// Cooking example
+func chopVegetables() async throws -> [String] { [] }
+func marinateMeat() async -> String { "MEAT" }
+
+func cook() async throws {
+  async let veggies = await try chopVegetables(), meat = await marinateMeat()
+  _ = await try veggies
+  _ = await meat
+}
