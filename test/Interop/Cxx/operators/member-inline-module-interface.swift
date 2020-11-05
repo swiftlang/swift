@@ -3,3 +3,6 @@
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   static func - (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK: }
+
+// CHECK: struct HasDeletedOperator {
+// CHECK: }

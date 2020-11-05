@@ -1814,8 +1814,20 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Import the parameter type into Swift.
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
-    if (auto *templateParamType =
-            dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
+
+    auto referenceType = dyn_cast<clang::ReferenceType>(paramTy);
+    if (referenceType &&
+        isa<clang::TemplateTypeParmType>(referenceType->getPointeeType())) {
+      auto pointeeType = referenceType->getPointeeType();
+      auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
+      PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
+                                        ? PTK_UnsafePointer
+                                        : PTK_UnsafeMutablePointer;
+      auto genericType =
+          findGenericTypeInGenericDecls(templateParamType, genericParams);
+      swiftParamTy = genericType->wrapInPointer(pointerKind);
+    } else if (auto *templateParamType =
+                   dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
     } else {
