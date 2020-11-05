@@ -78,6 +78,7 @@ extension Task {
   /// if the current task has been cancelled.
   public struct CancellationError: Error {
     // no extra information, cancellation is intended to be light-weight
+    public init() {}
   }
 
 }
