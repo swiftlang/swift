@@ -1347,9 +1347,10 @@ public:
 };
 } // end anonymous namespace
 
-CleanupHandle SILGenFunction::enterEndLifetimeCleanup(SILValue value) {
+ManagedValue SILGenFunction::emitManagedRValueWithEndLifetimeCleanup(
+    SILValue value) {
   Cleanups.pushCleanup<EndLifetimeCleanup>(value);
-  return Cleanups.getTopCleanup();
+  return ManagedValue::forUnmanaged(value);
 }
 
 namespace {

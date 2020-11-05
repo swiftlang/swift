@@ -2001,8 +2001,19 @@ public:
   /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
 
-  /// Enter cleanup to emit an EndLifetime operation for the given value.
-  CleanupHandle enterEndLifetimeCleanup(SILValue value);
+  /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
+  ///
+  /// The end_lifetime cleanup is not placed into the ManagedValue itself and
+  /// thus can not be forwarded. This means that the ManagedValue is treated
+  /// as a +0 value. This means that the owned value will be copied by SILGen
+  /// if it is ever needed as a +1 value (meaning any time that the value
+  /// escapes).
+  ///
+  /// DISCUSSION: end_lifetime ends the lifetime of an owned value in OSSA
+  /// without resulting in a destroy being emitted. This cleanup should only
+  /// be used for owned values that do not need to be destroyed if they do not
+  /// escape the current call frame but need to be copied if they escape.
+  ManagedValue emitManagedRValueWithEndLifetimeCleanup(SILValue value);
 
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.

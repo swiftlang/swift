@@ -1033,8 +1033,15 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, GetCurrentAsyncTask)
 #undef CONSTANT_OWNERSHIP_BUILTIN
+
+#define SHOULD_NEVER_VISIT_BUILTIN(ID)                              \
+  OperandOwnershipKindMap OperandOwnershipKindBuiltinClassifier::visit##ID(    \
+      BuiltinInst *, StringRef) {                                              \
+    llvm_unreachable("Builtin should never be visited! E.x.: It may not have arguments"); \
+  }
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+#undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see
 // them.
