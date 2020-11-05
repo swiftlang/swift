@@ -388,6 +388,8 @@ namespace irgen {
   Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
+  void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
+
   /// Allocate task local storage for the specified layout but using the
   /// provided dynamic size.  Allowing the size to be specified dynamically is
   /// necessary for applies of thick functions the sizes of whose async contexts
