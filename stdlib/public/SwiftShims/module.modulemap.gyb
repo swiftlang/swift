@@ -32,11 +32,11 @@ module SwiftOverlayShims {
 // FIXME: These are only needed when building each overlay; they declare no
 // types and therefore would not strictly need to be present in an installed
 // Swift.
-// FIXME: These are not used at all on non-Apple platforms.
 module _SwiftDispatchOverlayShims {
   header "DispatchOverlayShims.h"
 }
 
+% if DARWIN_SDKS:
 module _SwiftObjectiveCOverlayShims {
   header "ObjectiveCOverlayShims.h"
 }
@@ -84,6 +84,7 @@ module _SwiftClockKitOverlayShims {
 module _SwiftCoreMediaOverlayShims {
   header "CoreMediaOverlayShims.h"
 }
+% end
 
 module _SwiftConcurrencyShims {
   header "_SwiftConcurrency.h"

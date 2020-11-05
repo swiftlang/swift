@@ -54,11 +54,13 @@ set(sources
   NSUndoManagerShims.h
 
   ClockKitOverlayShims.h
-
-  module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
 set(output_dir_static "${SWIFTSTATICLIB_DIR}/shims")
+
+set(shims_modulemap_source module.modulemap.gyb)
+set(shims_modulemap_out "${output_dir}/module.modulemap")
+set(shims_modulemap_out_static "${output_dir_static}/module.modulemap")
 
 add_custom_command(
     OUTPUT "${output_dir}"
@@ -94,6 +96,27 @@ foreach(input ${sources})
     list(APPEND outputs "${output_dir_static}/${input}")
   endif()
 endforeach()
+
+list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+handle_gyb_source_single(shims_modulemap_target
+    SOURCE "${shims_modulemap_source}"
+    OUTPUT "${shims_modulemap_out}"
+    FLAGS "-DDARWIN_SDKS=${building_darwin_sdks}")
+
+list(APPEND outputs "${shims_modulemap_out}")
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  add_custom_command_target(
+      copy_shims_modulemap_static
+      COMMAND
+      "${CMAKE_COMMAND}" "-E" "copy_if_different" ${shims_modulemap_out} ${shims_modulemap_out_static}
+      OUTPUT ${shims_modulemap_out_static}
+      DEPENDS "${shims_modulemap_target}"
+      COMMENT "Copying SwiftShims modulemap to ${output_dir_static}")
+
+  list(APPEND outputs ${copy_shims_modulemap_static})
+endif()
+
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
@@ -182,12 +205,12 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
-swift_install_in_component(FILES ${sources}
+swift_install_in_component(FILES ${sources} ${shims_modulemap_out}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)
 
 if(SWIFT_BUILD_STATIC_STDLIB)
-  swift_install_in_component(FILES ${sources}
+  swift_install_in_component(FILES ${sources} ${shims_modulemap_out_static}
                              DESTINATION "lib/swift_static/shims"
                              COMPONENT stdlib)
 endif()
