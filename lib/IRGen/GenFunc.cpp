@@ -1014,6 +1014,8 @@ class AsyncPartialApplicationForwarderEmission
     : public PartialApplicationForwarderEmission {
   using super = PartialApplicationForwarderEmission;
   AsyncContextLayout layout;
+  llvm::Value *task;
+  llvm::Value *executor;
   llvm::Value *contextBuffer;
   Size contextSize;
   Address context;
@@ -1067,6 +1069,8 @@ public:
             substType, outType, subs, layout, conventions),
         layout(getAsyncContextLayout(subIGF, origType, substType, subs)),
         currentArgumentIndex(outType->getNumParameters()) {
+    task = origParams.claimNext();
+    executor = origParams.claimNext();
     contextBuffer = origParams.claimNext();
     heapContextBuffer = origParams.claimNext();
   }
@@ -1223,6 +1227,9 @@ public:
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
     Explosion asyncExplosion;
+    asyncExplosion.add(llvm::Constant::getNullValue(subIGF.IGM.SwiftTaskPtrTy));
+    asyncExplosion.add(
+        llvm::Constant::getNullValue(subIGF.IGM.SwiftExecutorPtrTy));
     asyncExplosion.add(contextBuffer);
     if (dynamicFunction &&
         dynamicFunction->kind == DynamicFunction::Kind::PartialApply) {

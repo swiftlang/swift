@@ -54,7 +54,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ParentType:
   case ConstraintLocator::ExistentialSuperclassType:
   case ConstraintLocator::LValueConversion:
-  case ConstraintLocator::RValueAdjustment:
+  case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
   case ConstraintLocator::GenericParameter:
@@ -350,8 +350,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "@lvalue-to-inout conversion";
       break;
 
-    case RValueAdjustment:
-      out << "rvalue adjustment";
+    case DynamicType:
+      out << "`.dynamicType` reference";
       break;
 
     case SubscriptMember:

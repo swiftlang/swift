@@ -253,7 +253,9 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
+    # Keep in sync with stdlib/tools/CMakeLists.txt: swift-reflection-test is
+    # only used when testing dynamic stdlib.
+    if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT SWIFTWASM_DISABLE_REFLECTION_TEST)
       # NOTE create a stub BlocksRuntime library that can be used for the
       # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
