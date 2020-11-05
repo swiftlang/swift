@@ -6558,6 +6558,19 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // If there was an 'async' modifier, put it in the right place for a function.
+  bool isAsync = asyncLoc.isValid();
+  if (auto asyncAttr = Attributes.getAttribute<AsyncAttr>()) {
+    SourceLoc insertLoc = Lexer::getLocForEndOfToken(
+        SourceMgr, BodyParams->getRParenLoc());
+
+    diagnose(asyncAttr->getLocation(), diag::async_func_modifier)
+      .fixItRemove(asyncAttr->getRange())
+      .fixItInsert(insertLoc, " async");
+    asyncAttr->setInvalid();
+    isAsync = true;
+  }
+
   // Create the decl for the func and add it to the parent scope.
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,

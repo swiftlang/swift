@@ -1175,7 +1175,7 @@ public:
 } // end anonymous namespace
 
 static AsyncContextLayout getAsyncContextLayout(IRGenSILFunction &IGF) {
-  return getAsyncContextLayout(IGF, IGF.CurSILFn);
+  return getAsyncContextLayout(IGF.IGM, IGF.CurSILFn);
 }
 
 namespace {
@@ -3064,7 +3064,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
                                                 i->getSubstCalleeType());
     llvm::Value *innerContext = std::get<1>(result);
     auto layout =
-        getAsyncContextLayout(*this, i->getOrigCalleeType(),
+        getAsyncContextLayout(IGM, i->getOrigCalleeType(),
                               i->getSubstCalleeType(), i->getSubstitutionMap());
     auto size = getDynamicAsyncContextSize(
         *this, layout, i->getOrigCalleeType(), innerContext);

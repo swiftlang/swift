@@ -451,6 +451,9 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     }
   }
   
+  if (!F.isAsync())
+    return;
+
   if (auto *funcDecl =
         dyn_cast_or_null<AbstractFunctionDecl>(FunctionDC->getAsDecl())) {
     auto actorIsolation = getActorIsolation(funcDecl);

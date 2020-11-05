@@ -194,10 +194,14 @@ public:
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
-    if (auto ic = dyn_cast<IfConfigDecl>(D))
+    if (auto ic = dyn_cast<IfConfigDecl>(D)) {
       recurse = asImpl().checkIfConfig(ic);
-    else if (!isa<PatternBindingDecl>(D))
+    } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
+      if (patternBinding->isAsyncLet())
+        recurse = asImpl().checkAsyncLet(patternBinding);
+    } else {
       recurse = ShouldNotRecurse;
+    }
     return bool(recurse);
   }
 
@@ -219,6 +223,8 @@ public:
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
+      recurse = asImpl().checkDeclRef(declRef);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
@@ -263,6 +269,9 @@ public:
     /// The function calls an unconditionally throwing function.
     CallThrows,
 
+    /// The initializer of an 'async let' unconditionally throws.
+    AsyncLetThrows,
+
     /// The function is 'rethrows', and it was passed an explicit
     /// argument that was not rethrowing-only in this context.
     CallRethrowsWithExplicitThrowingArgument,
@@ -276,7 +285,8 @@ public:
     switch (k) {
       case Kind::Throw: return "Throw";
       case Kind::CallThrows: return "CallThrows";
-      case Kind::CallRethrowsWithExplicitThrowingArgument: 
+      case Kind::AsyncLetThrows: return "AsyncLetThrows";
+      case Kind::CallRethrowsWithExplicitThrowingArgument:
         return "CallRethrowsWithExplicitThrowingArgument";
       case Kind::CallRethrowsWithDefaultThrowingArgument: 
         return "CallRethrowsWithDefaultThrowingArgument";
@@ -302,6 +312,9 @@ public:
   }
   static PotentialThrowReason forThrow() {
     return PotentialThrowReason(Kind::Throw);
+  }
+  static PotentialThrowReason forThrowingAsyncLet() {
+    return PotentialThrowReason(Kind::AsyncLetThrows);
   }
 
   Kind getKind() const { return TheKind; }
@@ -527,6 +540,13 @@ public:
     return result;
   }
 
+  /// Classify a single expression without considering its enclosing context.
+  ThrowingKind classifyExpr(Expr *expr) {
+    FunctionBodyClassifier classifier(*this);
+    expr->walk(classifier);
+    return classifier.Result;
+  }
+
 private:
   /// Classify a throwing function according to our local knowledge of
   /// its implementation.
@@ -654,6 +674,12 @@ private:
       auto classification = Self.classifyApply(E);
       IsInvalid |= classification.isInvalid();
       Result = std::max(Result, classification.getResult());
+      return ShouldRecurse;
+    }
+    ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
+      return ShouldNotRecurse;
+    }
+    ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
       return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
@@ -1105,6 +1131,7 @@ public:
     case PotentialThrowReason::Kind::Throw:
       llvm_unreachable("should already have been covered");
     case PotentialThrowReason::Kind::CallThrows:
+    case PotentialThrowReason::Kind::AsyncLetThrows:
       // Already fully diagnosed.
       return;
     case PotentialThrowReason::Kind::CallRethrowsWithExplicitThrowingArgument:
@@ -1122,6 +1149,9 @@ public:
                                   const PotentialThrowReason &reason) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
+    if (reason.getKind() == PotentialThrowReason::Kind::AsyncLetThrows)
+      message = diag::throwing_async_let_without_try;
+
     auto loc = E.getStartLoc();
     SourceLoc insertLoc;
     SourceRange highlight;
@@ -1271,15 +1301,43 @@ public:
     SourceRange highlight;
 
     // Generate more specific messages in some cases.
+
+    // Reference to an 'async let' missing an 'await'.
+    if (auto declRef = dyn_cast_or_null<DeclRefExpr>(node.dyn_cast<Expr *>())) {
+      if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
+        if (var->isAsyncLet()) {
+          ctx.Diags.diagnose(
+              declRef->getLoc(), diag::async_let_without_await, var->getName());
+          return;
+        }
+      }
+    }
+
     if (auto apply = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>()))
       highlight = apply->getSourceRange();
 
     auto diag = diag::async_call_without_await;
+
     // To produce a better error message, check if it is an autoclosure.
     // We do not use 'Context::isAutoClosure' b/c it gives conservative answers.
-    if (Function && llvm::isa_and_nonnull<AutoClosureExpr>(
-                                            Function->getAbstractClosureExpr()))
-      diag = diag::async_call_without_await_in_autoclosure;
+    if (Function) {
+      if (auto autoclosure = dyn_cast_or_null<AutoClosureExpr>(
+              Function->getAbstractClosureExpr())) {
+        switch (autoclosure->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+          diag = diag::async_call_without_await_in_autoclosure;
+          break;
+
+        case AutoClosureExpr::Kind::AsyncLet:
+          diag = diag::async_call_without_await_in_async_let;
+          break;
+
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+          break;
+        }
+      }
+    }
 
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
@@ -1291,6 +1349,26 @@ public:
       if (isa<ApplyExpr>(e)) {
         Diags.diagnose(e->getLoc(), diag::async_call_in_illegal_context,
                        static_cast<unsigned>(getKind()));
+        return;
+      }
+
+      if (auto declRef = dyn_cast<DeclRefExpr>(e)) {
+        if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
+          if (var->isAsyncLet()) {
+            Diags.diagnose(
+                e->getLoc(), diag::async_let_in_illegal_context,
+                var->getName(), static_cast<unsigned>(getKind()));
+            return;
+          }
+        }
+      }
+    } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
+                   node.dyn_cast<Decl *>())) {
+      if (patternBinding->isAsyncLet()) {
+        auto var = patternBinding->getAnchoringVarDecl(0);
+        Diags.diagnose(
+            e->getLoc(), diag::async_let_in_illegal_context,
+            var->getName(), static_cast<unsigned>(getKind()));
         return;
       }
     }
@@ -1312,11 +1390,18 @@ public:
 
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
     switch (getKind()) {
-    case Kind::PotentiallyHandled:
+    case Kind::PotentiallyHandled: {
+      unsigned kind = 0;
+      if (node.isExpr(ExprKind::Await))
+        kind = 1;
+      else if (node.isExpr(ExprKind::DeclRef) ||
+               node.isDecl(DeclKind::PatternBinding))
+        kind = 2;
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
-                     node.isExpr(ExprKind::Await), isAutoClosure());
+                     kind, isAutoClosure());
       maybeAddAsyncNote(Diags);
       return;
+    }
 
     case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
@@ -1578,23 +1663,32 @@ private:
   ShouldRecurse_t checkAutoClosure(AutoClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
-    scope.resetCoverageForAutoclosureBody();
 
-    // Curry thunks aren't actually a call to the asynchronous function.
-    // Assume that async is covered in such contexts.
+    bool shouldPreserveCoverage = true;
     switch (E->getThunkKind()) {
     case AutoClosureExpr::Kind::DoubleCurryThunk:
     case AutoClosureExpr::Kind::SingleCurryThunk:
+      // Curry thunks aren't actually a call to the asynchronous function.
+      // Assume that async is covered in such contexts.
+      scope.resetCoverageForAutoclosureBody();
       Flags.set(ContextFlags::IsAsyncCovered);
       break;
 
     case AutoClosureExpr::Kind::None:
+      scope.resetCoverageForAutoclosureBody();
+      break;
+
+    case AutoClosureExpr::Kind::AsyncLet:
+      scope.resetCoverage();
+      shouldPreserveCoverage = false;
       break;
     }
 
     E->getBody()->walk(*this);
 
-    scope.preserveCoverageFromAutoclosureBody();
+    if (shouldPreserveCoverage)
+      scope.preserveCoverageFromAutoclosureBody();
+
     return ShouldNotRecurse;
   }
 
@@ -1692,6 +1786,44 @@ private:
     // incorrect.
     auto type = E->getType();
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
+    if (auto decl = E->getDecl()) {
+      if (auto var = dyn_cast<VarDecl>(decl)) {
+        // "Async let" declarations are treated as an asynchronous call
+        // (to the underlying task's "get"). If the initializer was throwing,
+        // then the access is also treated as throwing.
+        if (var->isAsyncLet()) {
+          // If the initializer could throw, we will have a 'try' in the
+          // application of its autoclosure.
+          bool throws = false;
+          if (auto init = var->getParentInitializer()) {
+            if (auto await = dyn_cast<AwaitExpr>(init))
+              init = await->getSubExpr();
+            if (isa<TryExpr>(init))
+              throws = true;
+          }
+
+          auto classification =
+            throws ? Classification::forThrow(
+                       PotentialThrowReason::forThrowingAsyncLet(),
+                       /*isAsync=*/true)
+                     : Classification::forAsync();
+          checkThrowAsyncSite(E, /*requiresTry=*/throws, classification);
+        }
+      }
+    }
+
+    return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
+      // Diagnose async calls in a context that doesn't handle async.
+      if (!CurContext.handlesAsync()) {
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
+      }
+    return ShouldRecurse;
   }
 
   ShouldRecurse_t
@@ -1940,4 +2072,8 @@ void TypeChecker::checkPropertyWrapperEffects(
   auto &ctx = binding->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
+}
+
+bool TypeChecker::canThrow(Expr *expr) {
+  return ApplyClassifier().classifyExpr(expr) == ThrowingKind::Throws;
 }

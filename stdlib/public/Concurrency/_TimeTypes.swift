@@ -38,7 +38,7 @@ extension Task {
     }
 
     public static func microseconds(_ us: UInt64) -> Self {
-      .init(nanoseconds: clampedInt64Product(us, 1000))
+      .init(nanoseconds: clampedInt64Product(us, 1_000))
     }
 
     public static func nanoseconds(_ ns: UInt64) -> Self {
