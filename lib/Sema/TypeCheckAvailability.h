@@ -30,6 +30,7 @@ namespace swift {
   class InFlightDiagnostic;
   class Decl;
   class ProtocolConformanceRef;
+  class RootProtocolConformance;
   class Stmt;
   class SubstitutionMap;
   class Type;
@@ -246,6 +247,14 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+bool diagnoseExplicitUnavailability(
+    SourceLoc loc,
+    const RootProtocolConformance *rootConf,
+    const ExtensionDecl *ext,
+    const ExportContext &where);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);

@@ -391,6 +391,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
+  if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
+                               OPT_disable_conformance_availability_errors)) {
+    Opts.EnableConformanceAvailabilityErrors
+      = A->getOption().matches(OPT_enable_conformance_availability_errors);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
