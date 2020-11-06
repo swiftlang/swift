@@ -687,7 +687,10 @@ public:
 
   /// Skip a braced block (e.g. function body). The current token must be '{'.
   /// Returns \c true if the parser hit the eof before finding matched '}'.
-  bool skipBracedBlock();
+  ///
+  /// Set \c HasNestedTypeDeclarations to true if a token for a type
+  /// declaration is detected in the skipped block.
+  bool skipBracedBlock(bool &HasNestedTypeDeclarations);
 
   /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
   void skipSILUntilSwiftDecl();

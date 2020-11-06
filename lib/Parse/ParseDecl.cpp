@@ -3519,10 +3519,12 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
                                         bool &HasOperatorDeclarations,
-                                        bool &HasNestedClassDeclarations) {
+                                        bool &HasNestedClassDeclarations,
+                                        bool &HasNestedTypeDeclarations) {
   HasPoundDirective = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
+  HasNestedTypeDeclarations = false;
 
   unsigned OpenBraces = 1;
 
@@ -3541,6 +3543,10 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
 
     HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
+
+    HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
+                                             tok::kw_enum);
+
     if (P.consumeIf(tok::l_brace)) {
       ++OpenBraces;
       continue;
@@ -4823,10 +4829,12 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   // we can't lazily parse.
   BacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
+  bool HasNestedTypeDeclarations;
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
                           HasOperatorDeclarations,
-                          HasNestedClassDeclarations);
+                          HasNestedClassDeclarations,
+                          HasNestedTypeDeclarations);
   if (!HasPoundDirective)
     BackTrack.cancelBacktrack();
   return !BackTrack.willBacktrack();
@@ -5514,7 +5522,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-bool Parser::skipBracedBlock() {
+bool Parser::skipBracedBlock(bool &HasNestedTypeDeclarations) {
   SyntaxParsingContext disabled(SyntaxContext);
   SyntaxContext->disable();
   consumeToken(tok::l_brace);
@@ -5528,7 +5536,8 @@ bool Parser::skipBracedBlock() {
   unsigned OpenBraces = skipUntilMatchingRBrace(*this,
                                                 HasPoundDirectives,
                                                 HasOperatorDeclarations,
-                                                HasNestedClassDeclarations);
+                                                HasNestedClassDeclarations,
+                                                HasNestedTypeDeclarations);
   if (consumeIf(tok::r_brace))
     --OpenBraces;
   return OpenBraces != 0;
@@ -6424,11 +6433,13 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   BodyRange.Start = Tok.getLoc();
 
   // Advance the parser to the end of the block; '{' ... '}'.
-  skipBracedBlock();
+  bool HasNestedTypeDeclarations;
+  skipBracedBlock(HasNestedTypeDeclarations);
 
   BodyRange.End = PreviousLoc;
 
   AFD->setBodyDelayed(BodyRange);
+  AFD->setHasNestedTypeDeclarations(HasNestedTypeDeclarations);
 
   if (isCodeCompletionFirstPass() &&
       SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {

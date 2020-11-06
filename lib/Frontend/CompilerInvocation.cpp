@@ -716,6 +716,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
 
+  // Check for SkipFunctionBodies arguments in order from skipping less to
+  // skipping more.
+  if (Args.hasArg(
+        OPT_experimental_skip_non_inlinable_function_bodies_without_types))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||

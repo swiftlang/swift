@@ -3,6 +3,8 @@
 // Check -emit-ir and -c are invalid when skipping function bodies
 // RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -c %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
+// RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-non-inlinable-function-bodies-without-types %s 2>&1 | %FileCheck %s --check-prefix ERROR
+// RUN: not %target-swift-frontend -c %s -experimental-skip-non-inlinable-function-bodies-without-types %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-all-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -c %s -experimental-skip-all-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // ERROR: -experimental-skip-*-function-bodies do not support emitting IR
@@ -14,8 +16,10 @@
 
 // Check skipped bodies are neither typechecked nor SILgen'd
 // RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s -o %t/Skip.noninlinable.sil
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix TYPESNOTYPECHECK %s -o %t/Skip.withouttypes.sil
 // RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-all-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix ALLNOTYPECHECK %s -o %t/Skip.all.sil
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-SIL < %t/Skip.noninlinable.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-WITHOUTTYPES-ONLY,CHECK-NONINLINE-SIL < %t/Skip.withouttypes.sil
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY < %t/Skip.all.sil
 
 // Emit the module interface and check it against the same set of strings.
@@ -176,6 +180,57 @@ public func inlinableNestedLocalTypeFunc() {
     takesLocalType(0)
   }
   nestedFunc()
+}
+
+public func funcWithEnum() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with enum body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with enum body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with enum body"
+  // CHECK-ALL-ONLY-NOT: "func with enum body"
+  enum E {}
+}
+
+public func funcWithClass() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with class body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with class body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with class body"
+  // CHECK-ALL-ONLY-NOT: "func with class body"
+  class C {}
+}
+
+public func funcWithStruct() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with struct body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with struct body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with struct body"
+  // CHECK-ALL-ONLY-NOT: "func with struct body"
+  struct S {}
+}
+
+public func funcWithNestedFuncs() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with nested funcs body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with nested funcs body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with nested funcs body"
+  // CHECK-ALL-ONLY-NOT: "func with nested funcs body"
+
+  func bar() {
+    _blackHole("nested func body")
+    // CHECK-WITHOUTTYPES-ONLY: "nested func body"
+    // FIXME: We could skip this nested function.
+  }
+
+  func foo() {
+    _blackHole("nested func with type body")
+    // CHECK-WITHOUTTYPES-ONLY: "nested func with type body"
+    struct S {}
+  }
 }
 
 public struct Struct {

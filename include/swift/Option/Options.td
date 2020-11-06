@@ -297,6 +297,10 @@ def experimental_skip_non_inlinable_function_bodies:
   Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
+def experimental_skip_non_inlinable_function_bodies_without_types:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies-without-types">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip work on non-inlinable function bodies that do not declare nested types">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
