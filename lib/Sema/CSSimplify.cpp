@@ -1672,20 +1672,6 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (!anchor)
     return impact;
 
-  // If this is a conditional requirement failure associated with a
-  // call, let's increase impact of the fix to show that such failure
-  // makes member/function unreachable in current context or with
-  // given arguments.
-  if (auto last = locator.last()) {
-    if (last->isConditionalRequirement()) {
-      if (auto *expr = getAsExpr(anchor)) {
-        auto *parent = cs.getParentExpr(expr);
-        if (parent && isa<ApplyExpr>(parent))
-          return 5;
-      }
-    }
-  }
-
   // If this requirement is associated with a member reference and it
   // was possible to check it before overload choice is bound, that means
   // types came from the context (most likely Self, or associated type(s))
