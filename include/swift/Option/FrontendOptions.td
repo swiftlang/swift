@@ -762,4 +762,9 @@ def use_static_resource_dir
 def disable_building_interface
   : Flag<["-"], "disable-building-interface">,
     HelpText<"Disallow building binary module from textual interface">;
+
+def experimental_skip_all_function_bodies:
+  Flag<["-"], "experimental-skip-all-function-bodies">,
+  HelpText<"Skip type-checking function bodies and all SIL generation">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

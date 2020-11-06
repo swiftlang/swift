@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1039,8 +1039,11 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   }
 
   if (forPrimary || isWholeModuleCompilation()) {
-    // Disable delayed body parsing for primaries and in WMO.
-    opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+    // Disable delayed body parsing for primaries and in WMO, unless
+    // forcefully skipping function bodies
+    auto typeOpts = getASTContext().TypeCheckerOpts;
+    if (typeOpts.SkipFunctionBodies == FunctionBodySkipping::None)
+      opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   } else {
     // Suppress parse warnings for non-primaries, as they'll get parsed multiple
     // times.

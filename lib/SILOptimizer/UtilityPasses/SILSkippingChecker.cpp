@@ -1,8 +1,8 @@
-//===------------- NonInlinableFunctionSkippingChecker.cpp ----------------===//
+//===---------------------- SILSkippingChecker.cpp ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -25,7 +25,8 @@ using namespace swift;
 /// appears in a SILModule. This only applies when
 /// \c -experimental-skip-non-inlinable-function-bodies is enabled.
 static bool shouldHaveSkippedFunction(const SILFunction &F) {
-  assert(F.getModule().getOptions().SkipNonInlinableFunctionBodies &&
+  assert(F.getModule().getOptions().SkipFunctionBodies ==
+             FunctionBodySkipping::NonInlinable &&
          "this check only makes sense if we're skipping function bodies");
 
   // First, we only care about functions that haven't been marked serialized.
@@ -80,35 +81,55 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
 namespace {
 
 /// This is a verification utility pass that's meant to be used with
-/// \c -experimental-skip-non-inlinable-function-bodies. It checks all the
-/// functions in a module and ensures that, if the function was written in
-/// source and not serialized, then it wasn't even SILGen'd.
-class NonInlinableFunctionSkippingChecker : public SILModuleTransform {
+/// \c -experimental-skip-non-inlinable-function-bodies or
+/// \c -experimental-skip-all-function-bodies. It checks that SIL is only
+/// generated for for what's actually serialized.all functions
+/// that aren't serialized also have no generated SIL.
+class SILSkippingChecker : public SILModuleTransform {
   void run() override {
-    // Skip this if we're not skipping function bodies
-    if (!getModule()->getOptions().SkipNonInlinableFunctionBodies)
-      return;
+    auto &M = *getModule();
 
     // Skip this verification for SwiftOnoneSupport
-    if (getModule()->getSwiftModule()->isOnoneSupportModule())
+    if (M.getSwiftModule()->isOnoneSupportModule())
       return;
 
-    for (auto &F : *getModule()) {
-      if (!shouldHaveSkippedFunction(F))
-        continue;
+    if (M.getOptions().SkipFunctionBodies == FunctionBodySkipping::All) {
+      // Should only have an empty SIL module
+      bool notEmpty = false;
+      if (!M.getFunctions().empty())
+        notEmpty = true;
+      if (!M.getVTables().empty())
+        notEmpty = true;
+      if (!M.getWitnessTables().empty())
+        notEmpty = true;
+      if (!M.getSILGlobals().empty())
+        notEmpty = true;
 
-      llvm::dbgs() << "Function serialized that should have been skipped!\n";
-      F.getLocation().dump(F.getModule().getSourceManager());
-      llvm::dbgs() << "\n";
-      F.dump();
-      abort();
+      if (notEmpty) {
+        llvm::dbgs() << "Non-empty SIL module when all function bodies should "
+                        "have been skipped!\n";
+        abort();
+      }
+    }
+
+    if (M.getOptions().SkipFunctionBodies ==
+        FunctionBodySkipping::NonInlinable) {
+      for (auto &F : *getModule()) {
+        if (!shouldHaveSkippedFunction(F))
+          continue;
+
+        llvm::dbgs() << "Function serialized that should have been skipped!\n";
+        F.getLocation().dump(F.getModule().getSourceManager());
+        llvm::dbgs() << "\n";
+        F.dump();
+        abort();
+      }
     }
   }
-
 };
 
 } // end anonymous namespace
 
-SILTransform *swift::createNonInlinableFunctionSkippingChecker() {
-  return new NonInlinableFunctionSkippingChecker();
+SILTransform *swift::createSILSkippingChecker() {
+  return new SILSkippingChecker();
 }

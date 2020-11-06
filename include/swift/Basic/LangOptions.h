@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,18 +18,19 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
-#include "swift/Config.h"
+#include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
+#include "swift/Config.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
 
 // SWIFT_ENABLE_TENSORFLOW
 #include "clang/Basic/InMemoryOutputFileSystem.h"
@@ -498,9 +499,8 @@ namespace swift {
     /// dumped to llvm::errs().
     bool DebugTimeExpressions = false;
 
-    /// Indicate that the type checker should skip type-checking non-inlinable
-    /// function bodies.
-    bool SkipNonInlinableFunctionBodies = false;
+    /// Controls the function bodies to skip during type-checking.
+    FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
     ///
     /// Flags for developers

@@ -9,7 +9,6 @@ target_sources(swiftSILOptimizer PRIVATE
   BugReducerTester.cpp
   CFGPrinter.cpp
   CallerAnalysisPrinter.cpp
-  NonInlinableFunctionSkippingChecker.cpp
   ComputeDominanceInfo.cpp
   ComputeLoopInfo.cpp
   ConstantEvaluatorTester.cpp
@@ -29,6 +28,7 @@ target_sources(swiftSILOptimizer PRIVATE
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
+  SILSkippingChecker.cpp
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
