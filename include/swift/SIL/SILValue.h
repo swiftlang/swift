@@ -692,12 +692,8 @@ public:
   /// potentially have to the UseLifetimeConstraint associated with that
   /// ownership kind
   ///
-  /// NOTE: This is implemented in OperandOwnershipKindMapClassifier.cpp.
-  ///
-  /// NOTE: The default argument isSubValue is a temporary staging flag that
-  /// will be removed once borrow scoping is checked by the normal verifier.
-  OperandOwnershipKindMap
-  getOwnershipKindMap(bool isForwardingSubValue = false) const;
+  /// NOTE: This is implemented in OperandOwnership.cpp.
+  OperandOwnershipKindMap getOwnershipKindMap() const;
 
   /// Returns true if this operand acts as a use that consumes its associated
   /// value.

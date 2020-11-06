@@ -35,7 +35,6 @@ private:
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
 
   const Operand &op;
-  bool checkingSubObject;
 
 public:
   /// Create a new OperandOwnershipKindClassifier.
@@ -45,13 +44,8 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipKindClassifier(
-      SILModule &mod, const Operand &op,
-      bool checkingSubObject)
-      : mod(mod), op(op),
-        checkingSubObject(checkingSubObject) {}
-
-  bool isCheckingSubObject() const { return checkingSubObject; }
+  OperandOwnershipKindClassifier(SILModule &mod, const Operand &op)
+      : mod(mod), op(op) {}
 
   SILValue getValue() const { return op.get(); }
 
@@ -553,15 +547,6 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *i) {
-  // If we are checking a subobject, make sure that we are from a guaranteed
-  // basic block argument.
-  if (isCheckingSubObject()) {
-    auto *phiArg = cast<SILPhiArgument>(op.get());
-    (void)phiArg;
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
-  }
-
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
   return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
@@ -1065,10 +1050,7 @@ OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-OperandOwnershipKindMap
-Operand::getOwnershipKindMap(bool isForwardingSubValue) const {
-  OperandOwnershipKindClassifier classifier(
-      getUser()->getModule(), *this,
-      isForwardingSubValue);
+OperandOwnershipKindMap Operand::getOwnershipKindMap() const {
+  OperandOwnershipKindClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }
