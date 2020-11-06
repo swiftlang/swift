@@ -3952,7 +3952,7 @@ public:
     auto extendedType = MF.getType(extendedTypeID);
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               std::move(extendedType));
-    auto nominal = dyn_cast<NominalTypeDecl>(MF.getDecl(extendedNominalID));
+    auto nominal = dyn_cast_or_null<NominalTypeDecl>(MF.getDecl(extendedNominalID));
     ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
                               std::move(nominal));
 
@@ -3969,7 +3969,9 @@ public:
       encodeLazyConformanceContextData(numConformances,
                                        MF.DeclTypeCursor.GetCurrentBitNo()));
 
-    nominal->addExtension(extension);
+    if (nominal) {
+      nominal->addExtension(extension);
+    }
 
 #ifndef NDEBUG
     if (outerParams) {
@@ -6176,7 +6178,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
-    if (conformanceCount != llvm::count_if(proto->getRequirementSignature(),
+    if (!isAllowModuleWithCompilerErrorsEnabled() &&
+        conformanceCount != llvm::count_if(proto->getRequirementSignature(),
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
           "serialized conformances do not match requirement signature",
