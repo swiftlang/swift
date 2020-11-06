@@ -14,6 +14,7 @@
 import Builtin
 import Swift
 import PrintShims
+import _Concurrency
 
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 

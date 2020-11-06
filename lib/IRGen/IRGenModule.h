@@ -1004,6 +1004,7 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
+  void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
 
   llvm::Constant *emitSwiftProtocols();
@@ -1121,6 +1122,8 @@ private:
   /// List of Objective-C classes that require nonlazy realization, bitcast to
   /// i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
+  /// List of Objective-C resilient class stubs, bitcast to i8*.
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCClassStubs;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of Objective-C categories on class stubs, bitcast to i8*.
@@ -1463,6 +1466,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+      NominalTypeDecl *decl);
   llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,

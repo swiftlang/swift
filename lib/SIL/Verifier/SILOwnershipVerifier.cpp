@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-ownership-verifier"
 
 #include "LinearLifetimeCheckerPrivate.h"
+#include "ReborrowVerifierPrivate.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -78,7 +79,6 @@ static llvm::cl::opt<bool>
 //===----------------------------------------------------------------------===//
 
 namespace swift {
-
 // TODO: This class uses a bunch of global state like variables. It should be
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
@@ -107,13 +107,17 @@ class SILValueOwnershipChecker {
   /// The set of blocks that we have visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
 
+  ReborrowVerifier &reborrowVerifier;
+
 public:
   SILValueOwnershipChecker(
       DeadEndBlocks &deadEndBlocks, SILValue value,
       LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks)
+      llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+      ReborrowVerifier &reborrowVerifier)
       : result(), deadEndBlocks(deadEndBlocks), value(value),
-        errorBuilder(errorBuilder), visitedBlocks(visitedBlocks) {
+        errorBuilder(errorBuilder), visitedBlocks(visitedBlocks),
+        reborrowVerifier(reborrowVerifier) {
     assert(value && "Can not initialize a checker with an empty SILValue");
   }
 
@@ -157,8 +161,9 @@ bool SILValueOwnershipChecker::check() {
 
   LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
   result = checkUses();
-  if (!result.getValue())
+  if (!result.getValue()) {
     return false;
+  }
 
   SmallVector<Operand *, 32> allLifetimeEndingUsers;
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
@@ -281,8 +286,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
                      << "Initial: " << *initialScopedOperand << "\n";
       });
     };
-    foundError |=
-        initialScopedOperand->getImplicitUses(nonLifetimeEndingUsers, &error);
+    initialScopedOperand->getImplicitUses(nonLifetimeEndingUsers, &error);
+    reborrowVerifier.verifyReborrows(initialScopedOperand.getValue(), value);
   }
 
   return foundError;
@@ -301,7 +306,7 @@ bool SILValueOwnershipChecker::gatherUsers(
                                      nonLifetimeEndingUsers);
   }
 
-  // Ok, we have a value with guarantee ownership. Before we continue, check if
+  // Ok, we have a value with guaranteed ownership. Before we continue, check if
   // this value forwards guaranteed ownership. In such a case, we are going to
   // validate it as part of the borrow introducer from which the forwarding
   // value originates. So we can just return true and continue.
@@ -310,8 +315,8 @@ bool SILValueOwnershipChecker::gatherUsers(
 
   // Ok, we have some sort of borrow introducer. We need to recursively validate
   // that all of its uses (including sub-scopes) are before any end_borrows that
-  // end the lifetime of the borrow introducer. With that in mind, gather up our
-  // initial list of users.
+  // may end the lifetime of the borrow introducer. With that in mind, gather up
+  // our initial list of users.
   SmallVector<Operand *, 8> users;
   llvm::copy(value->getUses(), std::back_inserter(users));
 
@@ -378,8 +383,9 @@ bool SILValueOwnershipChecker::gatherUsers(
                          << "Initial: " << *scopedOperand << "\n";
           });
         };
-        foundError |=
-            scopedOperand->getImplicitUses(nonLifetimeEndingUsers, &onError);
+
+        scopedOperand->getImplicitUses(nonLifetimeEndingUsers, &onError);
+        reborrowVerifier.verifyReborrows(scopedOperand.getValue(), value);
       }
 
       // Next see if our use is an interior pointer operand. If we have an
@@ -429,16 +435,13 @@ bool SILValueOwnershipChecker::gatherUsers(
                "Should have guaranteed ownership as well.");
         llvm::copy(result->getUses(), std::back_inserter(users));
       }
-
       continue;
     }
-
     assert(user->getResults().empty());
     auto *ti = dyn_cast<TermInst>(user);
     if (!ti) {
       continue;
     }
-
     // At this point, the only type of thing we could have is a transformation
     // terminator since all forwarding terminators are transformation
     // terminators.
@@ -774,7 +777,8 @@ void SILInstruction::verifyOperandOwnership() const {
 static void
 verifySILValueHelper(const SILFunction *f, SILValue value,
                      LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-                     DeadEndBlocks *deadEndBlocks) {
+                     DeadEndBlocks *deadEndBlocks,
+                     ReborrowVerifier &reborrowVerifier) {
   assert(!isa<SILUndef>(value) &&
          "We assume we are always passed arguments or instruction results");
 
@@ -785,11 +789,13 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
 
   SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
   if (deadEndBlocks) {
-    SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks,
+                             reborrowVerifier)
         .check();
   } else {
     DeadEndBlocks deadEndBlocks(f);
-    SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder, liveBlocks,
+                             reborrowVerifier)
         .check();
   }
 }
@@ -838,7 +844,8 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
       *f, BehaviorKind::PrintMessageAndAssert);
-  verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks);
+  ReborrowVerifier reborrowVerifier(f, *deadEndBlocks, errorBuilder);
+  verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks, reborrowVerifier);
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
@@ -873,16 +880,19 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }
 
+  ReborrowVerifier reborrowVerifier(this, *deadEndBlocks, *errorBuilder);
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {
       LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
-      verifySILValueHelper(this, arg, newBuilder, deadEndBlocks);
+      verifySILValueHelper(this, arg, newBuilder, deadEndBlocks,
+                           reborrowVerifier);
     }
 
     for (auto &inst : block) {
       for (auto result : inst.getResults()) {
         LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
-        verifySILValueHelper(this, result, newBuilder, deadEndBlocks);
+        verifySILValueHelper(this, result, newBuilder, deadEndBlocks,
+                             reborrowVerifier);
       }
     }
   }

@@ -193,8 +193,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
-  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)
-      && Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
+  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
+      (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+       Args.hasArg(OPT_experimental_skip_all_function_bodies))) {
     Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
     return true;
   }

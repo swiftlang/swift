@@ -694,6 +694,9 @@ public:
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
 
+  /// \returns true if this module is the "Foundation" module;
+  bool isFoundationModule() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 

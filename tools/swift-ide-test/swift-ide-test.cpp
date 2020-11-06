@@ -923,6 +923,7 @@ struct CompletionTestToken {
   StringRef Name;
   SmallVector<StringRef, 1> CheckPrefixes;
   StringRef Skip;
+  StringRef Xfail;
   Optional<bool> IncludeKeywords = None;
   Optional<bool> IncludeComments = None;
 
@@ -1001,6 +1002,10 @@ struct CompletionTestToken {
         }
         if (Key == "skip") {
           Result.Skip = Value;
+          continue;
+        }
+        if (Key == "xfail") {
+          Result.Xfail = Value;
           continue;
         }
         Error = "unknown option (" + Key.str() + ") for token";
@@ -1166,6 +1171,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
   // Process tokens.
   SmallVector<StringRef, 0> FailedTokens;
+  SmallVector<StringRef, 0> UPassTokens;
   for (const auto &Token : CCTokens) {
     if (!options::CodeCompletionToken.empty() &&
         options::CodeCompletionToken != Token.Name)
@@ -1183,6 +1189,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     if (!Token.Skip.empty()) {
       llvm::errs() << "Skipped: " << Token.Skip << "\n";
       continue;
+    }
+
+    bool failureExpected = !Token.Xfail.empty();
+    if (failureExpected) {
+      llvm::errs() << "Xfail: " << Token.Xfail << "\n";
     }
 
     auto IncludeKeywords = CodeCompletionKeywords;
@@ -1291,23 +1302,37 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
       }
     }
 
-    if (isFileCheckFailed) {
+    if (isFileCheckFailed == failureExpected) {
+      // Success. The result may be huge. Remove the result if it's succeeded.
+      llvm::sys::fs::remove(resultFilename);
+    } else if (isFileCheckFailed) {
+      // Unexpectedly failed.
       FailedTokens.push_back(Token.Name);
     } else {
-      // The result may be huge. Remove the result if it's succeeded.
-      llvm::sys::fs::remove(resultFilename);
+      // Unexpectedly passed.
+      UPassTokens.push_back(Token.Name);
     }
   }
 
+  if (FailedTokens.empty() && UPassTokens.empty())
+    return 0;
+
+  llvm::errs() << "----\n";
   if (!FailedTokens.empty()) {
-    llvm::errs() << "----\n";
     llvm::errs() << "Unexpected failures: ";
     llvm::interleave(
         FailedTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
   }
-
-  return !FailedTokens.empty();
+  if (!UPassTokens.empty()) {
+    llvm::errs() << "Unexpected passes: ";
+    llvm::interleave(
+        UPassTokens, [&](StringRef name) { llvm::errs() << name; },
+        [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
+  }
+  return 1;
 }
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,

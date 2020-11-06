@@ -653,6 +653,18 @@ FUNCTION(GetCanonicalSpecializedMetadata, swift_getCanonicalSpecializedMetadata,
          ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// MetadataResponse
+// swift_getCanonicalPrespecializedGenericMetadata(MetadataRequest request,
+//                          const void * const *arguments,
+//                          const TypeContextDescriptor *description,
+//                          swift_once_t *cachedFlag)
+FUNCTION(GetCanonicalPrespecializedGenericMetadata, 
+         swift_getCanonicalPrespecializedGenericMetadata,
+         SwiftCC, GetCanonicalPrespecializedGenericMetadataAvailability,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, Int8PtrTy, TypeContextDescriptorPtrTy, OnceTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadOnly))
+
 // MetadataResponse swift_getOpaqueTypeMetadata(MetadataRequest request,
 //                                     const void * const *arguments,
 //                                     const OpaqueTypeDescriptor *descriptor,
@@ -1475,6 +1487,14 @@ FUNCTION(TaskDealloc,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftTaskPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void swift_task_dealloc(AsyncTask *task, void *ptr);
+FUNCTION(TaskCancel,
+         swift_task_cancel, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

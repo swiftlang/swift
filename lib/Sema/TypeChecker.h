@@ -591,7 +591,7 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` othrewise.
 bool typeCheckForCodeCompletion(
-    constraints::SolutionApplicationTarget &target,
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -952,21 +952,21 @@ Expr *buildDefaultInitializer(Type type);
 /// \name Resilience diagnostics
 
 bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
-                                    ExportContext where);
+                                    const ExportContext &where);
 
 /// Given that a declaration is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if it cannot
 /// reasonably be shared.
 bool diagnoseDeclRefExportability(SourceLoc loc,
                                   const ValueDecl *D,
-                                  ExportContext where);
+                                  const ExportContext &where);
 
 /// Given that a conformance is used from a particular context which
 /// exposes it in the interface of the current module, diagnose if the
 /// conformance is SPI or visible via an implementation-only import.
 bool diagnoseConformanceExportability(SourceLoc loc,
                                       const RootProtocolConformance *rootConf,
-                                      ExportContext where);
+                                      const ExportContext &where);
 
 /// \name Availability checking
 ///
@@ -1010,8 +1010,7 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
 Optional<UnavailabilityReason>
-checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
-                             const DeclContext *referenceDC);
+checkDeclarationAvailability(const Decl *D, const ExportContext &where);
 
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 ///
@@ -1046,7 +1045,7 @@ const AvailableAttr *getDeprecated(const Decl *D);
 /// Callers can provide a lambda that adds additional information (such as a
 /// fixit hint) to the deprecation diagnostic, if it is emitted.
 void diagnoseIfDeprecated(SourceRange SourceRange,
-                          ExportContext Where,
+                          const ExportContext &Where,
                           const ValueDecl *DeprecatedDecl,
                           const ApplyExpr *Call);
 /// @}
@@ -1062,6 +1061,9 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
+
+/// Whether the given expression can throw.
+bool canThrow(Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

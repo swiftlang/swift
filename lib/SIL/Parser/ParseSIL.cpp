@@ -1259,7 +1259,6 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
-                                           /*handleCodeCompletion*/ true,
                                            /*isSILFuncDecl*/ IsFuncDecl);
 
   if (TyR.isNull())

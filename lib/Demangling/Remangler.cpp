@@ -805,6 +805,11 @@ void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
   Buffer << "TC";
 }
 
+void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tz";
+}
+
 void Remangler::mangleDeallocator(Node *node) {
   mangleChildNodes(node);
   Buffer << "fD";
@@ -2626,6 +2631,12 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
 void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MJ";
+}
+
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
 }
 
 void Remangler::mangleGlobalVariableOnceToken(Node *node) {

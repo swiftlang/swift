@@ -544,13 +544,16 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
   if (auto *var = patternBinding->getSingleVar())
     addChildrenForKnownAttributes(var, parentScope);
 
-  auto *insertionPoint = parentScope;
+  bool isLocalBinding = false;
   for (auto i : range(patternBinding->getNumPatternEntries())) {
-    bool isLocalBinding = false;
     if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
       isLocalBinding = varDecl->getDeclContext()->isLocalContext();
+      break;
     }
+  }
 
+  auto *insertionPoint = parentScope;
+  for (auto i : range(patternBinding->getNumPatternEntries())) {
     Optional<SourceLoc> endLocForBinding = None;
     if (isLocalBinding) {
       endLocForBinding = endLoc;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1322,6 +1322,19 @@ void TypeChecker::checkParameterList(ParameterList *params,
                                      DeclContext *owner) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
   }
 
   // For source compatibilty, allow duplicate internal parameter names
@@ -2311,19 +2324,29 @@ public:
 
 
   bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
-    // Make sure we're in the mode that's skipping function bodies.
-    if (!getASTContext().TypeCheckerOpts.SkipNonInlinableFunctionBodies)
+    // Make sure we're in a mode that's skipping function bodies.
+    if (getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
+        FunctionBodySkipping::None)
       return false;
 
     // Make sure there even _is_ a body that we can skip.
     if (!AFD->getBodySourceRange().isValid())
       return false;
 
-    // If we're gonna serialize the body, we can't skip it.
-    if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)
-      return false;
+    // didSet runs typechecking to determine whether to keep its parameter,
+    // so never try to skip.
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      if (AD->getAccessorKind() == AccessorKind::DidSet)
+        return false;
+    }
 
-    return true;
+    // Skipping all bodies won't serialize anything, so can skip regardless
+    if (getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
+        FunctionBodySkipping::All)
+      return true;
+
+    // Only skip functions where their body won't be serialized
+    return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;
   }
 
   void visitFuncDecl(FuncDecl *FD) {

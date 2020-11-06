@@ -148,7 +148,7 @@ sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
 // CHECK: apply %{{.*}}<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[FIELD:%.*]] = ref_element_addr %1 : $CC<R>, #CC.r
 // CHECK: debug_value_addr [[FIELD]] : $*R, let, name "u"
-// CHECK: apply %10<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply %{{.*}}<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'testDebugValue'
 sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
 bb0(%0 : $*S, %1 : $CC<R>, %2 : $Bool):

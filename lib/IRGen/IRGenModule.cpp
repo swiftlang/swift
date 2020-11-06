@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -697,6 +697,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  GetCanonicalPrespecializedGenericMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getPrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
@@ -981,11 +991,6 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // its own shared copy of it.
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
-
-  // If we happen to see a builtin witness table here, we can't emit those.
-  // The runtime has those for us.
-  if (isa<BuiltinProtocolConformance>(wt->getConformance()))
-    return false;
 
   NominalTypeDecl *ConformingTy =
     wt->getConformingType()->getNominalOrBoundGenericNominal();

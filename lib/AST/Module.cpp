@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1013,33 +1013,6 @@ LookupConformanceInModuleRequest::evaluate(
   if (type->is<UnresolvedType>())
     return ProtocolConformanceRef(protocol);
 
-  // Tuples have builtin conformances implemented within the runtime.
-  // These conformances so far consist of Equatable, Comparable, and Hashable.
-  if (auto tuple = type->getAs<TupleType>()) {
-    auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
-    auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
-    auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
-
-    if (protocol != equatable && protocol != comparable && protocol != hashable)
-      return ProtocolConformanceRef::forInvalid();
-
-    SmallVector<ProtocolConformanceRef, 4> elementConformances;
-
-    // Ensure that every element in this tuple conforms to said protocol.
-    for (auto eltTy : tuple->getElementTypes()) {
-      auto conformance = mod->lookupConformance(eltTy, protocol);
-
-      if (conformance.isInvalid())
-        return ProtocolConformanceRef::forInvalid();
-
-      elementConformances.push_back(conformance);
-    }
-
-    auto conformance = ctx.getBuiltinConformance(tuple, protocol,
-                                                 elementConformances);
-    return ProtocolConformanceRef(conformance);
-  }
-
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
@@ -1361,6 +1334,10 @@ bool ModuleDecl::isSwiftShimsModule() const {
 
 bool ModuleDecl::isOnoneSupportModule() const {
   return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
+}
+
+bool ModuleDecl::isFoundationModule() const {
+  return !getParent() && getName() == getASTContext().Id_Foundation;
 }
 
 bool ModuleDecl::isBuiltinModule() const {

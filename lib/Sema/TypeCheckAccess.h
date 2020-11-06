@@ -56,10 +56,10 @@ enum class DowngradeToWarning: bool {
 /// Returns the kind of origin, implementation-only import or SPI declaration,
 /// that restricts exporting \p decl from the given file and context.
 DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
-                                             ExportContext where);
+                                             const ExportContext &where);
 
 DisallowedOriginKind getDisallowedOriginKind(const Decl *decl,
-                                             ExportContext where,
+                                             const ExportContext &where,
                                              DowngradeToWarning &downgradeToWarning);
 
 } // end namespace swift

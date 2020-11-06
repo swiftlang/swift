@@ -16,6 +16,9 @@ import SubEWrapper
 // CHECK-NEXT:   "swift": "EWrapper"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "F"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
 // CHECK-NEXT:   "swift": "SubEWrapper"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
@@ -26,8 +29,5 @@ import SubEWrapper
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "swift": "_cross_import_E"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "F"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],

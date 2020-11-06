@@ -1696,9 +1696,10 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
+    auto loc = fromCtor->getLoc();
     diagnoseDeclAvailability(
-        ctor, fromCtor->getLoc(),
-        ExportContext::forFunctionBody(fromCtor));
+        ctor, loc, nullptr,
+        ExportContext::forFunctionBody(fromCtor, loc));
   }
 
 
@@ -1840,12 +1841,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
+        auto braceCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, brace->getSourceRange());
+        // Unless this brace contains the loc, there's nothing to do.
+        if (!braceCharRange.contains(Loc))
+          return {false, S};
+
+        // Reset the node found in a parent context.
+        if (!brace->isImplicit())
+          FoundNode = nullptr;
+
         for (ASTNode &node : brace->getElements()) {
           if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
             break;
 
           // NOTE: We need to check the character loc here because the target
-          // loc can be inside the last token of the node. i.e. interpolated string.
+          // loc can be inside the last token of the node. i.e. interpolated
+          // string.
           SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, node.getEndLoc());
           if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)
             continue;
@@ -1857,8 +1869,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
 
           // Walk into the node to narrow down.
           node.walk(*this);
-        }
 
+          break;
+        }
         // Already walked into.
         return {false, nullptr};
       }
@@ -1926,18 +1939,20 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter
        // what the type of the expression is.  Take the inserted return back out.
-      func->getBody()->setFirstElement(func->getSingleExpressionBody());
+      func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
 
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
   // the closure itself. So we need to try type checking the enclosing closure
-  // signature first.
+  // signature first unless it has already been type checked.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
-    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
-    if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
-      return false;
+    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+      swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
+        return false;
+    }
   }
 
   TypeChecker::typeCheckASTNode(finder.getRef(), DC,
@@ -1991,7 +2006,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
       // what the type of the expression is.  Take the inserted return back out.
-      body->setFirstElement(func->getSingleExpressionBody());
+      body->setLastElement(func->getSingleExpressionBody());
     }
   } else if (isa<ConstructorDecl>(AFD) &&
              (body->empty() ||
@@ -2025,12 +2040,12 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // that we have eagerly converted something like `{ fatalError() }`
   // into `{ return fatalError() }` that has to be corrected here.
   if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getFirstElement().dyn_cast<Stmt *>()) {
+    if (auto *stmt = body->getLastElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
         if (retStmt->isImplicit() && retStmt->hasResult()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
-            body->setFirstElement(retStmt->getResult());
+            body->setLastElement(retStmt->getResult());
         }
       }
     }

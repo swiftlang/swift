@@ -40,7 +40,8 @@ class SILInstruction;
 class SILLocation;
 class DeadEndBlocks;
 class ValueBaseUseIterator;
-class ValueUseIterator;
+class ConsumingUseIterator;
+class NonConsumingUseIterator;
 class SILValue;
 
 /// An enumeration which contains values for all the concrete ValueBase
@@ -263,9 +264,19 @@ public:
 
   using use_iterator = ValueBaseUseIterator;
   using use_range = iterator_range<use_iterator>;
+  using consuming_use_iterator = ConsumingUseIterator;
+  using consuming_use_range = iterator_range<consuming_use_iterator>;
+  using non_consuming_use_iterator = NonConsumingUseIterator;
+  using non_consuming_use_range = iterator_range<non_consuming_use_iterator>;
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
+
+  inline consuming_use_iterator consuming_use_begin() const;
+  inline consuming_use_iterator consuming_use_end() const;
+
+  inline non_consuming_use_iterator non_consuming_use_begin() const;
+  inline non_consuming_use_iterator non_consuming_use_end() const;
 
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
@@ -284,6 +295,12 @@ public:
   /// Returns .some(single user) if this value is non-trivial, we are in ossa,
   /// and it has a single consuming user. Returns .none otherwise.
   inline Operand *getSingleConsumingUse() const;
+
+  /// Returns a range of all consuming uses
+  inline consuming_use_range getConsumingUses() const;
+
+  /// Returns a range of all non consuming uses
+  inline non_consuming_use_range getNonConsumingUses() const;
 
   template <class T>
   inline T *getSingleUserOfType() const;
@@ -711,8 +728,10 @@ private:
     TheValue->FirstUse = this;
   }
 
+  friend class ValueBase;
   friend class ValueBaseUseIterator;
-  friend class ValueUseIterator;
+  friend class ConsumingUseIterator;
+  friend class NonConsumingUseIterator;
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
@@ -729,6 +748,7 @@ using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 /// An iterator over all uses of a ValueBase.
 class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
                                                   Operand*, ptrdiff_t> {
+protected:
   Operand *Cur;
 public:
   ValueBaseUseIterator() = default;
@@ -770,6 +790,74 @@ inline ValueBase::use_iterator ValueBase::use_end() const {
 inline iterator_range<ValueBase::use_iterator> ValueBase::getUses() const {
   return { use_begin(), use_end() };
 }
+
+class ConsumingUseIterator : public ValueBaseUseIterator {
+public:
+  explicit ConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  ConsumingUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    assert(Cur->isConsumingUse());
+    while ((Cur = Cur->NextUse)) {
+      if (Cur->isConsumingUse())
+        break;
+    }
+    return *this;
+  }
+
+  ConsumingUseIterator operator++(int unused) {
+    ConsumingUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::consuming_use_iterator
+ValueBase::consuming_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && !cur->isConsumingUse()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::consuming_use_iterator(cur);
+}
+
+inline ValueBase::consuming_use_iterator ValueBase::consuming_use_end() const {
+  return ValueBase::consuming_use_iterator(nullptr);
+}
+
+class NonConsumingUseIterator : public ValueBaseUseIterator {
+public:
+  explicit NonConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  NonConsumingUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    assert(!Cur->isConsumingUse());
+    while ((Cur = Cur->NextUse)) {
+      if (!Cur->isConsumingUse())
+        break;
+    }
+    return *this;
+  }
+
+  NonConsumingUseIterator operator++(int unused) {
+    NonConsumingUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::non_consuming_use_iterator
+ValueBase::non_consuming_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && cur->isConsumingUse()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::non_consuming_use_iterator(cur);
+}
+
+inline ValueBase::non_consuming_use_iterator
+ValueBase::non_consuming_use_end() const {
+  return ValueBase::non_consuming_use_iterator(nullptr);
+}
+
 inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
@@ -804,6 +892,15 @@ inline Operand *ValueBase::getSingleConsumingUse() const {
     }
   }
   return result;
+}
+
+inline ValueBase::consuming_use_range ValueBase::getConsumingUses() const {
+  return {consuming_use_begin(), consuming_use_end()};
+}
+
+inline ValueBase::non_consuming_use_range
+ValueBase::getNonConsumingUses() const {
+  return {non_consuming_use_begin(), non_consuming_use_end()};
 }
 
 inline bool ValueBase::hasTwoUses() const {

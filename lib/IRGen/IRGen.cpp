@@ -688,6 +688,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.ResilientClassStubInitCallbacks =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::ResilientClassStubInitCallback);
+
+  opts.AsyncContextParent =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators::AsyncContextParent);
 }
 
 std::unique_ptr<llvm::TargetMachine>

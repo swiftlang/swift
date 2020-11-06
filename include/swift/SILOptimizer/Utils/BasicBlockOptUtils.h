@@ -136,9 +136,9 @@ public:
 /// block's branch to jump to the newly cloned block, call cloneBranchTarget
 /// instead.
 ///
-/// After cloning, call splitCriticalEdges, then updateSSAAfterCloning. This is
-/// decoupled from cloning becaused some clients perform CFG edges updates after
-/// cloning but before splitting CFG edges.
+/// After cloning, call updateSSAAfterCloning. This is decoupled from cloning
+/// becaused some clients perform CFG edges updates after cloning but before
+/// splitting CFG edges.
 class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
   using SuperTy = SILCloner<BasicBlockCloner>;
   friend class SILCloner<BasicBlockCloner>;
@@ -225,12 +225,7 @@ public:
 
   bool wasCloned() { return isBlockCloned(origBB); }
 
-  /// Call this after processing all instructions to fix the control flow
-  /// graph. The branch cloner may have left critical edges.
-  bool splitCriticalEdges(DominanceInfo *domInfo, SILLoopInfo *loopInfo);
-
-  /// Helper function to perform SSA updates after calling both
-  /// cloneBranchTarget and splitCriticalEdges.
+  /// Helper function to perform SSA updates after calling cloneBranchTarget.
   void updateSSAAfterCloning();
 
 protected:

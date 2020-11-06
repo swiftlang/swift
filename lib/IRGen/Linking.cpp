@@ -185,6 +185,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     return mangler.mangleNoncanonicalTypeMetadata(getType());
 
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+    return mangler.mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+        cast<NominalTypeDecl>(getDecl()));
+
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return mangler.mangleNoncanonicalSpecializedGenericTypeMetadataCache(getType());
 
@@ -653,6 +657,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     return SILLinkage::Private;
 
   case Kind::DynamicallyReplaceableFunctionKey:
@@ -767,6 +772,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -874,6 +880,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     llvm_unreachable("invalid metadata address");
   case Kind::DifferentiabilityWitness:
     return IGM.DifferentiabilityWitnessTy;
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+    return IGM.OnceTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -926,6 +934,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return IGM.getPointerAlignment();
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::TypeMetadataDemanglingCacheVariable:
     return Alignment(8);
   case Kind::SILFunction:
@@ -1009,6 +1018,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     return false;
 
   // TODO: Revisit some of the below, for weak conformances.
@@ -1079,6 +1089,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
+  case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     return getDecl()->getDeclContext();
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:

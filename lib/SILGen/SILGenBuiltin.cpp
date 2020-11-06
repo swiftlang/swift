@@ -1393,6 +1393,32 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
   return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
 }
 
+// Emit SIL for the named builtin: getCurrentAsyncTask.
+static ManagedValue emitBuiltinGetCurrentAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentAsyncTask)),
+      SGF.getLoweredType(ctx.TheNativeObjectType), SubstitutionMap(), { });
+  return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
+}
+
+// Emit SIL for the named builtin: getCurrentAsyncTask.
+static ManagedValue emitBuiltinCancelAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto argument = args[0].borrow(SGF, loc).forward(SGF);
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
+      SGF.getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
+      { argument });
+  return ManagedValue::forUnmanaged(apply);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

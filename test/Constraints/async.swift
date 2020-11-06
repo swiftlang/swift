@@ -59,7 +59,7 @@ func testOverloadedAsync() async {
   let _: String? = await overloadedOptDifference() // no warning
 
   let _ = await overloaded()
-  let _ = overloaded() // expected-error{{call is 'async' but is not marked with 'await'}}
+  let _ = overloaded() // expected-error{{call is 'async' but is not marked with 'await'}}{{11-11=await }}
 
   let fn = {
     overloaded()

@@ -906,16 +906,6 @@ static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
-  // Some Builtin conformances are dependent.
-  if (auto builtin = dyn_cast<BuiltinProtocolConformance>(rootConformance)) {
-    // Tuples are conditionally conformed to any builtin conformance.
-    if (builtin->getType()->is<TupleType>())
-      return true;
-
-    // Otherwise, this builtin conformance is not dependant.
-    return false;
-  }
-
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
   if (!conformance)
@@ -981,10 +971,12 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
 static llvm::Value *
 emitConditionalConformancesBuffer(IRGenFunction &IGF,
                                   const ProtocolConformance *substConformance) {
-  auto rootConformance = substConformance->getRootConformance();
+  auto rootConformance =
+    dyn_cast<NormalProtocolConformance>(substConformance->getRootConformance());
 
-  if (!isa<NormalProtocolConformance>(rootConformance) &&
-      !isa<BuiltinProtocolConformance>(rootConformance))
+  // Not a normal conformance means no conditional requirements means no need
+  // for a buffer.
+  if (!rootConformance)
     return llvm::UndefValue::get(IGF.IGM.WitnessTablePtrPtrTy);
 
   // Pointers to the witness tables, in the right order, which will be included
@@ -994,18 +986,9 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
   auto subMap = substConformance->getSubstitutions(IGF.IGM.getSwiftModule());
 
   SILWitnessTable::enumerateWitnessTableConditionalConformances(
-      rootConformance, [&](unsigned i, CanType type, ProtocolDecl *proto) {
+      rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
         auto substType = type.subst(subMap)->getCanonicalType();
         auto reqConformance = subMap.lookupConformance(type, proto);
-
-        // Builtin conformances don't have a substitution list, so accomodate
-        // for that here.
-        if (auto builtin 
-              = dyn_cast<BuiltinProtocolConformance>(rootConformance)) {
-          substType = type->getCanonicalType();
-          reqConformance = builtin->getConformances()[i];
-        }
-
         assert(reqConformance && "conditional conformance must be valid");
 
         tables.push_back(emitWitnessTableRef(IGF, substType, reqConformance));
@@ -1154,10 +1137,8 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
-    // If the conformance is builtin, go ahead and emit an accessor call.
     if (Conformance->getType()->hasArchetype() ||
-        Conformance->getType()->hasDynamicSelfType() ||
-        isa<BuiltinProtocolConformance>(Conformance)) {
+        Conformance->getType()->hasDynamicSelfType()) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
                                           typeMetadataCache);
     }

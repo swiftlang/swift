@@ -624,7 +624,6 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel);
       }
       if (ParamLabel == "exported") {
-        auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
@@ -6559,6 +6558,19 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // If there was an 'async' modifier, put it in the right place for a function.
+  bool isAsync = asyncLoc.isValid();
+  if (auto asyncAttr = Attributes.getAttribute<AsyncAttr>()) {
+    SourceLoc insertLoc = Lexer::getLocForEndOfToken(
+        SourceMgr, BodyParams->getRParenLoc());
+
+    diagnose(asyncAttr->getLocation(), diag::async_func_modifier)
+      .fixItRemove(asyncAttr->getRange())
+      .fixItInsert(insertLoc, " async");
+    asyncAttr->setInvalid();
+    isAsync = true;
+  }
+
   // Create the decl for the func and add it to the parent scope.
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
@@ -6671,48 +6683,45 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
 
   BraceStmt *BS = Body.get();
   AFD->setBodyParsed(BS);
-
-  // If the body consists of a single expression, turn it into a return
-  // statement.
-  if (BS->getNumElements() != 1)
-    return BS;
-
-  auto Element = BS->getFirstElement();
-  if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-    if (isa<FuncDecl>(AFD)) {
-      if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-        if (!returnStmt->hasResult()) {
-          auto returnExpr = TupleExpr::createEmpty(Context,
-                                                   SourceLoc(),
-                                                   SourceLoc(),
-                                                   /*implicit*/true);
-          returnStmt->setResult(returnExpr);
-          AFD->setHasSingleExpressionBody();
-          AFD->setSingleExpressionBody(returnExpr);
+  
+  if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
+    auto Element = BS->getLastElement();
+    if (auto *stmt = Element.dyn_cast<Stmt *>()) {
+      if (isa<FuncDecl>(AFD)) {
+        if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
+          if (!returnStmt->hasResult()) {
+            auto returnExpr = TupleExpr::createEmpty(Context,
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     /*implicit*/true);
+            returnStmt->setResult(returnExpr);
+            AFD->setHasSingleExpressionBody();
+            AFD->setSingleExpressionBody(returnExpr);
+          }
         }
       }
-    }
-  } else if (auto *E = Element.dyn_cast<Expr *>()) {
-    if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
-      if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
-        // This is an assignment.  We don't want to implicitly return
-        // it.
-        return BS;
+    } else if (auto *E = Element.dyn_cast<Expr *>()) {
+      if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
+        if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
+          // This is an assignment.  We don't want to implicitly return
+          // it.
+          return BS;
+        }
       }
-    }
-    if (isa<FuncDecl>(AFD)) {
-      auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-      BS->setFirstElement(RS);
-      AFD->setHasSingleExpressionBody();
-      AFD->setSingleExpressionBody(E);
-    } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-      if (F->isFailable() && isa<NilLiteralExpr>(E)) {
-        // If it's a nil literal, just insert return.  This is the only
-        // legal thing to return.
-        auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
-        BS->setFirstElement(RS);
+      if (isa<FuncDecl>(AFD)) {
+        auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+        BS->setLastElement(RS);
         AFD->setHasSingleExpressionBody();
         AFD->setSingleExpressionBody(E);
+      } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
+        if (F->isFailable() && isa<NilLiteralExpr>(E)) {
+          // If it's a nil literal, just insert return.  This is the only
+          // legal thing to return.
+          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+          BS->setLastElement(RS);
+          AFD->setHasSingleExpressionBody();
+          AFD->setSingleExpressionBody(E);
+        }
       }
     }
   }
@@ -7720,11 +7729,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
-    if (Tk.is(tok::identifier) &&
-        DeclAttribute::getAttrKindFromString(Tk.getText()) ==
-          DeclAttrKind::DAK_Count) {
-      diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
-      return true;
+    if (Tk.is(tok::identifier)) {
+      if (Tk.getText().equals("$") ||
+          DeclAttribute::getAttrKindFromString(Tk.getText()) ==
+              DeclAttrKind::DAK_Count) {
+        diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
+        return true;
+      }
     } else if (Tk.isNot(tok::colon, tok::l_brace, tok::semi) &&
                Tk.isPunctuation()) {
       diagnose(Tk, diag::operator_name_invalid_char,
