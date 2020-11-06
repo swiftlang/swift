@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -715,22 +715,26 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
-  Opts.SkipNonInlinableFunctionBodies |=
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
 
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
-  Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+      Args.hasArg(OPT_tbd_is_installapi))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
 
-  if (Opts.SkipNonInlinableFunctionBodies &&
+  if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+
+  if (Opts.SkipFunctionBodies == FunctionBodySkipping::NonInlinable &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
     // Disable this optimization if we're compiling SwiftOnoneSupport, because
     // we _definitely_ need to look inside every declaration to figure out
     // what gets prespecialized.
-    Opts.SkipNonInlinableFunctionBodies = false;
-    Diags.diagnose(SourceLoc(),
-                   diag::module_incompatible_with_skip_function_bodies,
-                   SWIFT_ONONE_SUPPORT);
+    Opts.SkipFunctionBodies = FunctionBodySkipping::None;
+    Diags.diagnose(
+        SourceLoc(),
+        diag::module_incompatible_with_skip_non_inlinable_function_bodies,
+        SWIFT_ONONE_SUPPORT);
   }
 
   Opts.DisableConstraintSolverPerformanceHacks |=
@@ -1060,8 +1064,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.StopOptimizationAfterSerialization = true;
 
   // Propagate the typechecker's understanding of
-  // -experimental-skip-non-inlinable-function-bodies to SIL.
-  Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;
+  // -experimental-skip-*-function-bodies to SIL.
+  Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.

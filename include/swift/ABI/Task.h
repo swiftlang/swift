@@ -182,7 +182,7 @@ public:
   /// prevent it from being corrupted in flight.
   AsyncContext * __ptrauth_swift_task_resume_context ResumeContext;
 
-  /// The currntly-active information about cancellation.
+  /// The currently-active information about cancellation.
   std::atomic<ActiveTaskStatus> Status;
 
   /// Reserved for the use of the task-local stack allocator.

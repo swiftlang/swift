@@ -1489,6 +1489,14 @@ FUNCTION(TaskDealloc,
          ARGS(SwiftTaskPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// void swift_task_dealloc(AsyncTask *task, void *ptr);
+FUNCTION(TaskCancel,
+         swift_task_cancel, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

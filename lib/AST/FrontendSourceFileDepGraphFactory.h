@@ -39,11 +39,6 @@ private:
 
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override;
-
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create node pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
 };
 
 class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
@@ -57,11 +52,6 @@ public:
 private:
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override {}
-
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create node pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
 };
 
 } // namespace fine_grained_dependencies

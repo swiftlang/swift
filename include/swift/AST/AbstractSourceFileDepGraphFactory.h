@@ -66,6 +66,19 @@ private:
   virtual void addAllUsedDecls() = 0;
 
 protected:
+  /// Given an array of Decls or pairs of them in \p declsOrPairs
+  /// create node pairs for context and name
+  template <NodeKind kind, typename ContentsT>
+  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec) {
+    for (const auto &declOrPair : contentsVec) {
+      Optional<std::string> fp =
+          AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
+      addADefinedDecl(
+          DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
+          fp ? StringRef(fp.getValue()) : Optional<StringRef>());
+    }
+  }
+
   /// Add an pair of interface, implementation nodes to the graph, which
   /// represent some \c Decl defined in this source file. \param key the
   /// interface key of the pair

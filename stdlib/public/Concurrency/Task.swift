@@ -102,7 +102,10 @@ extension Task {
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
-  public final class Handle<Success> {
+  @_frozen
+  public struct Handle<Success> {
+    private let task: Builtin.NativeObject
+
     /// Wait for the task to complete, returning (or throwing) its result.
     ///
     /// ### Priority
@@ -130,7 +133,7 @@ extension Task {
     /// their "actual work", however this is not a requirement nor is it guaranteed
     /// how and when tasks check for cancellation in general.
     public func cancel() {
-      fatalError("\(#function) not implemented yet.")
+      Builtin.cancelAsyncTask(task)
     }
   }
 }

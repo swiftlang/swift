@@ -211,7 +211,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // getCurrentAsyncTask has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentAsyncTask) {
+    auto task = IGF.getAsyncTask();
+    out.add(IGF.Builder.CreateBitCast(task, IGF.IGM.RefCountedPtrTy));
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
+
+  if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
+    emitTaskCancel(IGF, args.claimNext());
+    return;
+  }
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);

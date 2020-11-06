@@ -1,0 +1,30 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
+sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
+bb0:
+  // CHECK: [[TASK:%.*]] = bitcast %swift.task* %0 to %swift.refcounted*
+  %0 = builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
+  // CHECK-NEXT: [[TASK_COPY:%.*]] = call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TASK]])
+  %1 = copy_value %0 : $Builtin.NativeObject
+  end_lifetime %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: define hidden swiftcc void @cancel_task(%swift.refcounted* %0)
+// CHECK: [[TASK:%.*]] = bitcast %swift.refcounted* %0 to %swift.task*
+// CHECK-NEXT:  call swiftcc void @swift_task_cancel(%swift.task* [[TASK]])
+
+sil hidden [ossa] @cancel_task : $@convention(method) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %4 = builtin "cancelAsyncTask"(%0 : $Builtin.NativeObject) : $()
+  %5 = tuple ()
+  return %5 : $()
+}
