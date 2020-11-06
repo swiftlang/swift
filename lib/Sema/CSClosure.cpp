@@ -173,7 +173,11 @@ private:
   }
 
   void visitDecl(Decl *decl) {
-    llvm_unreachable("Declarations not supported");
+    
+    if (isa<IfConfigDecl>(decl))
+      return;
+    
+    llvm_unreachable("Unimplemented case for closure body");
   }
 
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
