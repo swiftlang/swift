@@ -124,9 +124,8 @@ public:
 /// A status record which states that a task has one or
 /// more active child tasks.
 class ChildTaskStatusRecord : public TaskStatusRecord {
-  /// FIXME: should this be an array?  How are things like task
-  /// nurseries supposed to actually manage this?  Should it be
-  /// atomically moodifiable?
+  /// FIXME: should this be an array?  How are things like task groups supposed
+  /// to actually manage this?  Should it be atomically modifiable?
   AsyncTask *FirstChild;
 
 public:
