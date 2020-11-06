@@ -180,13 +180,8 @@ bool SILValueOwnershipChecker::check() {
 
 bool SILValueOwnershipChecker::isCompatibleDefUse(
     Operand *op, ValueOwnershipKind ownershipKind) {
-  bool isGuaranteedSubValue = false;
-  if (ownershipKind == ValueOwnershipKind::Guaranteed &&
-      isGuaranteedForwardingInst(op->getUser())) {
-    isGuaranteedSubValue = true;
-  }
   auto *user = op->getUser();
-  auto opOwnershipKindMap = op->getOwnershipKindMap(isGuaranteedSubValue);
+  auto opOwnershipKindMap = op->getOwnershipKindMap();
   // If our ownership kind doesn't match, track that we found an error, emit
   // an error message optionally and then continue.
   if (opOwnershipKindMap.canAcceptKind(ownershipKind)) {
