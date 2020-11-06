@@ -453,12 +453,10 @@ static bool computeLiveness(CopyPropagationState &pass) {
 /// (assuming no critical edges).
 static void insertDestroyOnCFGEdge(SILBasicBlock *predBB, SILBasicBlock *succBB,
                                    CopyPropagationState &pass) {
-  // FIXME: ban critical edges and avoid invalidating CFG analyses.
-  auto *destroyBB = splitIfCriticalEdge(predBB, succBB);
-  if (destroyBB != succBB)
-    pass.markInvalid(SILAnalysis::InvalidationKind::Branches);
+  assert(succBB->getSinglePredecessorBlock() == predBB &&
+         "value is live-out on another predBB successor: critical edge?");
 
-  SILBuilderWithScope builder(destroyBB->begin());
+  SILBuilderWithScope builder(succBB->begin());
   auto *di =
       builder.createDestroyValue(succBB->begin()->getLoc(), pass.currDef);
 
@@ -543,13 +541,8 @@ static void findOrInsertDestroys(CopyPropagationState &pass) {
     auto visitBB = [&](SILBasicBlock *bb, SILBasicBlock *succBB) {
       switch (pass.liveness.isBlockLive(bb)) {
       case LiveOut:
-        // If succBB is null, then the original destroy must be an inner
-        // nested destroy, so just skip it.
-        //
-        // Otherwise, this CFG edge is a liveness boundary, so insert a new
-        // destroy on the edge.
-        if (succBB)
-          insertDestroyOnCFGEdge(bb, succBB, pass);
+        assert(succBB && "value live-out of a block where it is consumed");
+        insertDestroyOnCFGEdge(bb, succBB, pass);
         break;
       case LiveWithin:
         // The liveness boundary is inside this block. Insert a final destroy
