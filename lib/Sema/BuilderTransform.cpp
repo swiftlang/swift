@@ -1158,6 +1158,12 @@ public:
             stmt,
             ResultBuilderTarget{ResultBuilderTarget::TemporaryVar,
                                   std::move(captured)});
+
+        // Re-write of statements that envolve type-checking
+        // could fail, such a failure terminates the walk.
+        if (!finalStmt)
+          return nullptr;
+
         newElements.push_back(finalStmt);
         continue;
       }
@@ -1512,7 +1518,7 @@ BraceStmt *swift::applyResultBuilderTransform(
           rewriteTarget) {
   BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
-  return cast<BraceStmt>(
+  return cast_or_null<BraceStmt>(
     rewriter.visitBraceStmt(
       body,
       ResultBuilderTarget::forReturn(applied.returnExpr),
