@@ -4340,21 +4340,19 @@ static void checkExportability(Type depTy, Type replacementTy,
   ASTContext &ctx = SF->getASTContext();
 
   Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
-  if (depTy->isEqual(selfTy)) {
-    ctx.Diags.diagnose(
-        conformanceBeingChecked->getLoc(),
-        diag::conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), 0, M->getName(),
-        static_cast<unsigned>(originKind));
-  } else {
+
+  ctx.Diags.diagnose(
+      conformanceBeingChecked->getLoc(),
+      diag::conformance_from_implementation_only_module,
+      rootConformance->getType(),
+      rootConformance->getProtocol()->getName(), 0, M->getName(),
+      static_cast<unsigned>(originKind));
+
+  if (!depTy->isEqual(selfTy)) {
     ctx.Diags.diagnose(
         conformanceBeingChecked->getLoc(),
         diag::assoc_conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), M->getName(),
-        depTy, replacementTy->getCanonicalType(),
-        static_cast<unsigned>(originKind));
+        depTy, replacementTy->getCanonicalType());
   }
 }
 
