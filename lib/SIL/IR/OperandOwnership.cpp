@@ -231,6 +231,7 @@ CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocValueBuffer)
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
@@ -1033,6 +1034,8 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, MustBeLive, CancelAsyncTask)
+
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                              \
