@@ -286,6 +286,10 @@ def disable_clangimporter_source_import : Flag<["-"],
   "disable-clangimporter-source-import">,
   HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
 
+def disable_implicit_concurrency_module_import : Flag<["-"],
+  "disable-implicit-concurrency-module-import">,
+  HelpText<"Disable the implicit import of the _Concurrency module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
