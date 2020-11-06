@@ -2077,6 +2077,10 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
   closure->setBodyState(ClosureExpr::BodyState::SeparatelyTypeChecked);
+  
+  if (!HadError)
+    performClosureBodyDiagnostics(closure);
+  
   return HadError;
 }
 
