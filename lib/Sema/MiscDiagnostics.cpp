@@ -3194,6 +3194,20 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   TLCD->walk(checker);
 }
 
+/// Perform diagnostics on closure body.
+void swift::performClosureBodyDiagnostics(ClosureExpr *closure) {
+  if (auto *ACE = dyn_cast<AbstractClosureExpr>(closure)) {
+    // Skip if we aleady checked variable usage.
+    if (isa<TopLevelCodeDecl>(ACE->getParent()) ||
+        isa<AbstractFunctionDecl>(ACE->getParent())) {
+      return;
+    }
+  }
+  auto &ctx = closure->getASTContext();
+  VarDeclUsageChecker checker(closure, ctx.Diags);
+  closure->walk(checker);
+}
+
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.

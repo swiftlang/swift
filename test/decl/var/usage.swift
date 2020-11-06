@@ -504,3 +504,92 @@ func testVariablesBoundInPatterns() {
     break
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Top Level Closures
+//===----------------------------------------------------------------------===//
+
+var closure_var_unused: () -> Int = {
+  var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+  return 12
+}
+
+var closure_let_unused: () -> Int = {
+  let unused = 42 // expected-warning {{initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+  return 12
+}
+
+var closure_var_never_mutated: () -> Int = {
+  var unmutated = 42 // expected-warning {{variable 'unmutated' was never mutated; consider changing to 'let' constant}}
+  return unmutated
+}
+
+func nested_closures() {
+  var _: () -> Int = {
+    var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }
+  
+  var _: () -> Int = {
+    let unused = 42 // expected-warning {{initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }
+  
+  var _: () -> Int = {
+    var unmutated = 42 // expected-warning {{variable 'unmutated' was never mutated; consider changing to 'let' constant}}
+    return unmutated
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Nested Scope Closures
+//===----------------------------------------------------------------------===//
+
+class A {
+  lazy var lazyvar_var_unused: Int = {
+    var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }()
+  
+  lazy var lazyvar_let_unused: Int = {
+    let unused = 42 // expected-warning {{initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }()
+  
+  lazy var lazyvar_var_never_mutated: Int = {
+    var unmutated = 42 // expected-warning {{variable 'unmutated' was never mutated; consider changing to 'let' constant}}
+    return unmutated
+  }()
+  
+  var closure_var_unused: () -> Int = {
+    var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }
+  
+  var closure_let_unused: () -> Int = {
+    let unused = 42 // expected-warning {{initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+    return 12
+  }
+  
+  var closure_var_never_mutated: () -> Int = {
+    var unmutated = 42 // expected-warning {{variable 'unmutated' was never mutated; consider changing to 'let' constant}}
+    return unmutated
+  }
+  
+  func nested_closures() {
+    var _: () -> Int = {
+      var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+      return 12
+    }
+    
+    var _: () -> Int = {
+      let unused = 42 // expected-warning {{initialization of immutable value 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+      return 12
+    }
+    
+    var _: () -> Int = {
+      var unmutated = 42 // expected-warning {{variable 'unmutated' was never mutated; consider changing to 'let' constant}}
+      return unmutated
+    }
+  }
+}
