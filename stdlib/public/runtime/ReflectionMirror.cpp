@@ -674,7 +674,8 @@ struct ClassImpl : ReflectionMirrorImpl {
       fieldOffset = Clas->getFieldOffsets()[i];
     } else {
   #if SWIFT_OBJC_INTEROP
-      Ivar *ivars = class_copyIvarList((Class)Clas, nullptr);
+      Ivar *ivars = class_copyIvarList(
+          reinterpret_cast<Class>(const_cast<ClassMetadata *>(Clas)), nullptr);
       fieldOffset = ivar_getOffset(ivars[i]);
       free(ivars);
   #else

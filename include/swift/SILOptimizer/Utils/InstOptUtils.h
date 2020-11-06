@@ -56,6 +56,9 @@ NullablePtr<SILInstruction> createIncrementBefore(SILValue ptr,
 NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
                                                   SILInstruction *insertpt);
 
+/// Get the insertion point after \p val.
+Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
+
 /// A utility for deleting one or more instructions belonging to a function, and
 /// cleaning up any dead code resulting from deleting those instructions. Use
 /// this utility instead of

@@ -1496,6 +1496,9 @@ tryCastUnwrappingExistentialSource(
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
   bool takeOnSuccess, bool mayDeferChecks)
 {
+  assert(srcType != destType);
+  assert(srcType->getKind() == MetadataKind::Existential);
+
   auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
 
   // Unpack the existential content
@@ -1527,6 +1530,29 @@ tryCastUnwrappingExistentialSource(
   }
   }
 
+  srcFailureType = srcInnerType;
+  return tryCast(destLocation, destType,
+                 srcInnerValue, srcInnerType,
+                 destFailureType, srcFailureType,
+                 takeOnSuccess & (srcInnerValue == srcValue),
+                 mayDeferChecks);
+}
+
+static DynamicCastResult
+tryCastUnwrappingExistentialMetatypeSource(
+  OpaqueValue *destLocation, const Metadata *destType,
+  OpaqueValue *srcValue, const Metadata *srcType,
+  const Metadata *&destFailureType, const Metadata *&srcFailureType,
+  bool takeOnSuccess, bool mayDeferChecks)
+{
+  assert(srcType != destType);
+  assert(srcType->getKind() == MetadataKind::ExistentialMetatype);
+
+  auto srcExistentialContainer = reinterpret_cast<ExistentialMetatypeContainer *>(srcValue);
+  auto srcInnerValue = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+  assert((const void *)srcInnerValue == (const void *)srcValue);
+  auto srcInnerValueAsType = srcExistentialContainer->Value;
+  const Metadata *srcInnerType = swift_getMetatypeMetadata(srcInnerValueAsType);
   srcFailureType = srcInnerType;
   return tryCast(destLocation, destType,
                  srcInnerValue, srcInnerType,
@@ -1591,8 +1617,7 @@ tryCastToMetatype(
   const MetatypeMetadata *destMetatypeType = cast<MetatypeMetadata>(destType);
   MetadataKind srcKind = srcType->getKind();
   switch (srcKind) {
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype: {
+  case MetadataKind::Metatype: {
     const Metadata *srcMetatype = *(const Metadata * const *) srcValue;
     if (auto result = swift_dynamicCastMetatype(
           srcMetatype, destMetatypeType->InstanceType)) {
@@ -1702,8 +1727,7 @@ tryCastToExistentialMetatype(
     = cast<ExistentialMetatypeMetadata>(destType);
   MetadataKind srcKind = srcType->getKind();
   switch (srcKind) {
-  case MetadataKind::Metatype: // Metatype => ExistentialMetatype
-  case MetadataKind::ExistentialMetatype: { // ExistentialMetatype => ExistentialMetatype
+  case MetadataKind::Metatype: { // Metatype => ExistentialMetatype
     const Metadata *srcMetatype = *(const Metadata * const *) srcValue;
     return _dynamicCastMetatypeToExistentialMetatype(
       destLocation,
@@ -1949,6 +1973,16 @@ tryCast(
 
   case MetadataKind::Existential: {
     auto subcastResult = tryCastUnwrappingExistentialSource(
+      destLocation, destType, srcValue, srcType,
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+    if (isSuccess(subcastResult)) {
+      return subcastResult;
+    }
+    break;
+  }
+
+  case MetadataKind::ExistentialMetatype: {
+    auto subcastResult = tryCastUnwrappingExistentialMetatypeSource(
       destLocation, destType, srcValue, srcType,
       destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
     if (isSuccess(subcastResult)) {

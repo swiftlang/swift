@@ -77,7 +77,7 @@ doit()
 // CHECK: entry:
 // CHECK:   [[ERASED_TYPE_1:%[0-9]+]] = bitcast %swift.type* [[TYPE_1]] to i8*
 // CHECK:   [[ERASED_TYPE_2:%[0-9]+]] = bitcast %swift.type* [[TYPE_2]] to i8*
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 
 // CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE_2]], 

@@ -1067,7 +1067,7 @@ public:
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
-        layout(getAsyncContextLayout(subIGF, origType, substType, subs)),
+        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs)),
         currentArgumentIndex(outType->getNumParameters()) {
     task = origParams.claimNext();
     executor = origParams.claimNext();
@@ -1227,9 +1227,8 @@ public:
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(llvm::Constant::getNullValue(subIGF.IGM.SwiftTaskPtrTy));
-    asyncExplosion.add(
-        llvm::Constant::getNullValue(subIGF.IGM.SwiftExecutorPtrTy));
+    asyncExplosion.add(subIGF.getAsyncTask());
+    asyncExplosion.add(subIGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer);
     if (dynamicFunction &&
         dynamicFunction->kind == DynamicFunction::Kind::PartialApply) {
@@ -1308,6 +1307,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
+  subIGF.setAsync(origType->isAsync());
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
 

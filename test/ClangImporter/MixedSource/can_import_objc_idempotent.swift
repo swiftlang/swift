@@ -30,6 +30,7 @@
   // expected-error@-1 {{cannot find 'CGRect' in scope}}
 
   let (r, s) = square.divided(atDistance: 50, from: .minXEdge)
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
 #endif
 
 #if canImport(MixedWithHeader)

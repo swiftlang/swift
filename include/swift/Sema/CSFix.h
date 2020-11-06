@@ -281,6 +281,10 @@ enum class FixKind : uint8_t {
 
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
+
+  /// Allow expressions to reference invalid declarations by turning
+  /// them into holes.
+  AllowRefToInvalidDecl,
 };
 
 class ConstraintFix {
@@ -2053,6 +2057,25 @@ public:
 
   static SpecifyContextualTypeForNil *create(ConstraintSystem & cs,
                                              ConstraintLocator * locator);
+};
+
+class AllowRefToInvalidDecl final : public ConstraintFix {
+  AllowRefToInvalidDecl(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowRefToInvalidDecl, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid declaration reference";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowRefToInvalidDecl *create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator);
 };
 
 } // end namespace constraints

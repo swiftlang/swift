@@ -83,7 +83,7 @@ public:
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
-  ~IRGenFunction();
+  virtual ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
@@ -127,7 +127,11 @@ public:
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
   }
-  
+
+  virtual llvm::Value *getAsyncTask();
+  virtual llvm::Value *getAsyncExecutor();
+  virtual llvm::Value *getAsyncContext();
+
 private:
   void emitPrologue();
   void emitEpilogue();

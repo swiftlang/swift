@@ -658,7 +658,9 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Key",
+    key.usr: "s:SD4KeysV5cake1AC2P1RzrlE3Keyxmfp",
     key.offset: 816,
     key.length: 3
   },
@@ -1107,7 +1109,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     ],
     key.offset: 784,
     key.length: 66,
-    key.fully_annotated_decl: "<decl.extension.struct>extension <decl.name><ref.struct usr=\"s:SD\">Dictionary</ref.struct>.<ref.struct usr=\"s:SD4KeysV\">Keys</ref.struct></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Key : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
+    key.fully_annotated_decl: "<decl.extension.struct>extension <decl.name><ref.struct usr=\"s:SD\">Dictionary</ref.struct>.<ref.struct usr=\"s:SD4KeysV\">Keys</ref.struct></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SD4KeysV5cake1AC2P1RzrlE3Keyxmfp\">Key</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "Keys",

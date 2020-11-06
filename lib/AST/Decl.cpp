@@ -1545,6 +1545,13 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+bool PatternBindingDecl::isAsyncLet() const {
+  if (auto var = getAnchoringVarDecl(0))
+    return var->isAsyncLet();
+
+  return false;
+}
+
 
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
@@ -4727,6 +4734,10 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 static SelfReferenceInfo
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
                            SelfReferencePosition position) {
+  // If there are no type parameters, we're done.
+  if (!type->hasTypeParameter())
+    return SelfReferenceInfo();
+
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
     auto info = SelfReferenceInfo();
@@ -4794,6 +4805,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
     return info;
   }
+
+  // Opaque result types of protocol extension members contain an invariant
+  // reference to 'Self'.
+  if (type->is<OpaqueTypeArchetypeType>())
+    return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
 
   // A direct reference to 'Self'.
   if (proto->getSelfInterfaceType()->isEqual(type))
@@ -5729,6 +5745,10 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
     return false;
 
   return true;
+}
+
+bool VarDecl::isAsyncLet() const {
+  return getAttrs().hasAttribute<AsyncAttr>();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {

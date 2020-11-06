@@ -286,6 +286,13 @@ class LinkEntity {
     /// The pointer is a AbstractStorageDecl*.
     DynamicallyReplaceableFunctionImpl,
 
+    /// The once token used by cacheCanonicalSpecializedMetadata, by way of
+    /// swift_getCanonicalSpecializedMetadata and
+    /// swift_getCanonicalPrespecializedGenericMetadata, to
+    /// ensure that canonical prespecialized generic records are only added to
+    /// the metadata cache once.
+    CanonicalPrespecializedGenericTypeCachingOnceToken,
+
     /// The pointer is a SILFunction*.
     DynamicallyReplaceableFunctionKey,
 
@@ -399,7 +406,7 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadata,
 
-    /// A cache variable for noncanonical specialized type metadata, to be 
+    /// A cache variable for noncanonical specialized type metadata, to be
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
@@ -411,7 +418,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::DynamicallyReplaceableFunctionImpl;
+    return k <= Kind::CanonicalPrespecializedGenericTypeCachingOnceToken;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -1036,6 +1043,14 @@ public:
     LinkEntity entity;
     entity.setForDecl(Kind::DynamicallyReplaceableFunctionImpl, decl);
     entity.SecondaryPointer = isAllocator ? decl : nullptr;
+    return entity;
+  }
+
+  static LinkEntity
+  forCanonicalPrespecializedGenericTypeCachingOnceToken(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::CanonicalPrespecializedGenericTypeCachingOnceToken,
+                      decl);
     return entity;
   }
 

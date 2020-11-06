@@ -1,0 +1,742 @@
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class SuperKlass {}
+class Klass : SuperKlass {}
+
+struct WrapperStruct {
+  var cls : Klass
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil shared [noinline] @blackhole_spl : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+
+bb0(%0 : $WrapperStruct):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// owned val dominates the end_borrow
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_owned_val_dominates_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = copy_value %0 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %1 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %4 : $WrapperStruct
+// CHECK: Block: bb1
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_owned_val_dominates_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_owned_val_dominates_incorrect'
+sil [ossa] @borrowed_owned_val_dominates_correct : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %1 = copy_value %0 : $WrapperStruct
+  %borrow = begin_borrow %1 : $WrapperStruct
+  br bb1(%borrow : $WrapperStruct)
+
+bb1(%2 : @guaranteed $WrapperStruct):
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  end_borrow %2 : $WrapperStruct
+  destroy_value %1 : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_owned_val_dominates_incorrect'
+sil [ossa] @borrowed_owned_val_dominates_incorrect : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %1 = copy_value %0 : $WrapperStruct
+  %borrow = begin_borrow %1 : $WrapperStruct
+  br bb1(%borrow : $WrapperStruct)
+
+bb1(%2 : @guaranteed $WrapperStruct):
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  destroy_value %1 : $WrapperStruct
+  end_borrow %2 : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_owned_val_dominates_and_is_phi_incorrect'
+// CHECK: Function: 'borrowed_owned_val_dominates_and_is_phi_incorrect'
+// CHECK: Found non consuming use outside of the lifetime being verified.
+// CHECK: Value:   %1 = copy_value %0 : $WrapperStruct
+// CHECK: User:   end_borrow %2 : $WrapperStruct
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_owned_val_dominates_and_is_phi_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_owned_val_dominates_and_is_phi_incorrect'
+sil [ossa] @borrowed_owned_val_dominates_and_is_phi_incorrect : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %1 = copy_value %0 : $WrapperStruct
+  %borrow = begin_borrow %1 : $WrapperStruct
+  br bb1(%1 : $WrapperStruct)
+
+bb1(%newowned : @owned $WrapperStruct):
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  %call1 = apply %func(%borrow) : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  end_borrow %borrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// borrowed operand dominates the end_borrow
+// CHECK-NOT: Function: 'borrowed_owned_val_dominates_diamond_correct'
+sil [ossa] @borrowed_owned_val_dominates_diamond_correct : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct)
+
+bb2:
+  %borrow1a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  end_borrow %borrow0 : $WrapperStruct
+  destroy_value %copy0 : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect1'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = copy_value %0 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %2 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %3 : $WrapperStruct
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect1'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect1'
+sil [ossa] @borrowed_owned_val_dominates_diamond_incorrect1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct)
+
+bb2:
+  %borrow1a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  destroy_value %copy0 : $WrapperStruct
+  end_borrow %borrow0 : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = copy_value %0 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %2 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %3 : $WrapperStruct
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect2'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_owned_val_dominates_diamond_incorrect2'
+sil [ossa] @borrowed_owned_val_dominates_diamond_incorrect2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct)
+
+bb2:
+  %borrow1a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct):
+  destroy_value %copy0 : $WrapperStruct
+  end_borrow %newborrowi : $WrapperStruct
+  end_borrow %borrow0 : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// guaranteed val borrowed
+// CHECK-NOT: Function: 'borrowed_guaranteed_val_dominates'
+sil [ossa] @borrowed_guaranteed_val_dominates : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %borrow = begin_borrow %0 : $WrapperStruct
+  br bb1(%borrow : $WrapperStruct)
+
+bb1(%2 : @guaranteed $WrapperStruct):
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  %call1 = apply %func(%2) : $@convention(thin) (@guaranteed WrapperStruct) -> ()
+  end_borrow %2 : $WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// owned val does not dominate the end_borrow
+// CHECK-NOT: Function: 'borrowed_owned_val_not_dominate_correct'
+sil [ossa] @borrowed_owned_val_not_dominate_correct : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_owned_val_not_dominate_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %10 = argument of bb3 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %10 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %9 : $WrapperStruct
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_owned_val_not_dominate_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_owned_val_not_dominate_incorrect'
+sil [ossa] @borrowed_owned_val_not_dominate_incorrect : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  destroy_value %newowned : $WrapperStruct
+  end_borrow %newborrow : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrow_lifetime_discrepency'
+sil [ossa] @borrow_lifetime_discrepency : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct, %borrow0 : $WrapperStruct)
+
+bb2:
+  %borrow1 = begin_borrow %copy0 : $WrapperStruct
+  %borrow1a = begin_borrow %borrow1 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct, %borrow1 : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  end_borrow %newborrowo : $WrapperStruct
+  destroy_value %copy0 : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrow_lifetime_discrepency_2'
+sil [ossa] @borrow_lifetime_discrepency_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct, %borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %0 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  %borrow1a = begin_borrow %borrow1 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct, %borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $WrapperStruct, %base : @owned $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  end_borrow %newborrowo : $WrapperStruct
+  destroy_value %base : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepency_incorrect_1'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %13 = argument of bb3 : $WrapperStruct            // user: %15
+// CHECK: Consuming User:   destroy_value %13 : $WrapperStruct              // id: %15
+// CHECK: Non Consuming User:   end_borrow %12 : $WrapperStruct                 // id: %16
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepency_incorrect_1'
+// CHECK-NOT: Error#: 1.
+sil [ossa] @borrow_lifetime_discrepency_incorrect_1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct, %borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %0 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  %borrow1a = begin_borrow %borrow1 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct, %borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $WrapperStruct, %base : @owned $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  destroy_value %base : $WrapperStruct
+  end_borrow %newborrowo : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepency_incorrect_2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %12 = argument of bb3 : $WrapperStruct            // user: %14
+// CHECK: Consuming User:   end_borrow %12 : $WrapperStruct                 // id: %14
+// CHECK: Non Consuming User:   end_borrow %11 : $WrapperStruct                 // id: %15
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepency_incorrect_2'
+// CHECK-NOT: Error#: 1.
+sil [ossa] @borrow_lifetime_discrepency_incorrect_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  %borrow0a = begin_borrow %borrow0 : $WrapperStruct
+  br bb3(%borrow0a : $WrapperStruct, %borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %0 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  %borrow1a = begin_borrow %borrow1 : $WrapperStruct
+  br bb3(%borrow1a : $WrapperStruct, %borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $WrapperStruct, %base : @owned $WrapperStruct):
+  end_borrow %newborrowo : $WrapperStruct
+  end_borrow %newborrowi : $WrapperStruct
+  destroy_value %base : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+
+// CHECK-NOT: Function: 'borrow_lifetime_nodiscrepency'
+sil [ossa] @borrow_lifetime_nodiscrepency : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow0 = begin_borrow %0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct)
+
+bb2:
+  %borrow1 = begin_borrow %1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_owned_val_dominates_one_path'
+sil [ossa] @borrowed_owned_val_dominates_one_path : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy1 = copy_value %1 : $WrapperStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy2 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy2 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  destroy_value %copy1 : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_owned_val_dominates_one_path_loop'
+sil [ossa] @borrowed_owned_val_dominates_one_path_loop : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1a = begin_borrow %0 : $Builtin.NativeObject
+  %1b = copy_value %0 : $Builtin.NativeObject
+  br bb1(%1a : $Builtin.NativeObject, %1b : $Builtin.NativeObject)
+
+bb1(%2a : @guaranteed $Builtin.NativeObject, %2b : @owned $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = copy_value %2a : $Builtin.NativeObject
+  %3a = begin_borrow %3 : $Builtin.NativeObject
+  end_borrow %2a : $Builtin.NativeObject
+  destroy_value %2b : $Builtin.NativeObject
+  br bb1(%3a : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+
+bb3:
+  end_borrow %2a : $Builtin.NativeObject
+  destroy_value %2b : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-NOT: Function: 'not_all_incoming_reborrows_have_owned_value'
+sil [ossa] @not_all_incoming_reborrows_have_owned_value : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy2 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %0 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy2 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// test to show we need to insert reborrow's of reborrows's into the worklist during validation of reborrows
+// CHECK-NOT: Function: 'chain_of_reborrows1'
+sil [ossa] @chain_of_reborrows1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy2 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %0 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy2 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  br bb4(%newborrow : $WrapperStruct, %newowned : $WrapperStruct)
+
+bb4(%newnewborrow : @guaranteed $WrapperStruct, %newnewowned : @owned $WrapperStruct):
+  end_borrow %newnewborrow : $WrapperStruct
+  destroy_value %newnewowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'chain_of_reborrows2'
+sil [ossa] @chain_of_reborrows2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy1 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %copy1 : $WrapperStruct
+  br bb3(%borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  cond_br undef, bb4, bb5
+
+bb4:
+  %borrow2 = begin_borrow %newborrow : $WrapperStruct
+  br bb6(%borrow2 : $WrapperStruct)
+
+bb5:
+  %borrow3 = begin_borrow %newborrow : $WrapperStruct
+  br bb6(%borrow3 : $WrapperStruct)
+
+bb6(%newnewborrow : @guaranteed $WrapperStruct):
+  end_borrow %newnewborrow : $WrapperStruct
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrowed_owned_val_not_a_phiarg'
+// test to show that we cannot assume the owned val is dominating if it is not passed an owned phi arg in a branch where the reborrow happens
+sil [ossa] @borrowed_owned_val_not_a_phiarg : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb2:
+  %copy2 = copy_value %1 : $WrapperStruct
+  %borrow1 = begin_borrow %0 : $WrapperStruct
+  br bb2a(%borrow1 : $WrapperStruct)
+
+bb2a(%borrow1a : @guaranteed $WrapperStruct):
+  br bb3(%borrow1a : $WrapperStruct, %copy2 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  end_borrow %newborrow : $WrapperStruct
+  destroy_value %newowned : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'infinite_loop'
+sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  cond_br undef, bb1, bb4
+
+bb1:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0 = begin_borrow %copy0 : $WrapperStruct
+  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  br bb3(%newborrow : $WrapperStruct, %newowned : $WrapperStruct)
+
+bb4:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'diamond_within_loop'
+sil [ossa] @diamond_within_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb5
+
+bb2:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0a = begin_borrow %copy0 : $WrapperStruct
+  br bb4(%borrow0a : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb3:
+  %copy1 = copy_value %1 : $WrapperStruct
+  %borrow1a = begin_borrow %copy1 : $WrapperStruct
+  br bb4(%borrow1a : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb4(%newborrowi : @guaranteed $WrapperStruct, %copy : @owned $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  br bb1
+
+bb5:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'chain_diamond_within_loop'
+sil [ossa] @chain_diamond_within_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bbret
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0a = begin_borrow %copy0 : $WrapperStruct
+  br bb5(%borrow0a : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb4:
+  %copy1 = copy_value %1 : $WrapperStruct
+  %borrow1a = begin_borrow %copy1 : $WrapperStruct
+  br bb5(%borrow1a : $WrapperStruct, %copy1 : $WrapperStruct)
+
+bb5(%newborrowo : @guaranteed $WrapperStruct, %copy : @owned $WrapperStruct):
+  cond_br undef, bb6, bb7
+
+bb6:
+  %borrowi1 = begin_borrow %newborrowo : $WrapperStruct
+  br bb8(%borrowi1 : $WrapperStruct)
+
+bb7:
+  %borrowi2 = begin_borrow %newborrowo : $WrapperStruct
+  br bb8(%borrowi2 : $WrapperStruct)
+
+bb8(%newborrowi : @guaranteed $WrapperStruct):
+  end_borrow %newborrowi : $WrapperStruct
+  end_borrow %newborrowo : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  br bb1
+
+bbret:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'reborrow_at_loop_head'
+sil [ossa] @reborrow_at_loop_head : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0a = begin_borrow %copy0 : $WrapperStruct
+  br bb1(%borrow0a : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb1(%borrow : @guaranteed $WrapperStruct, %copy : @owned $WrapperStruct):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %copyagain = copy_value %copy : $WrapperStruct
+  %borrowagain = begin_borrow %copyagain : $WrapperStruct
+  end_borrow %borrow : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  br bb1(%borrowagain : $WrapperStruct, %copyagain : $WrapperStruct)
+
+bb3:
+  end_borrow %borrow : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'reborrow_at_loop_head_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %6 = argument of bb1 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %6 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %5 : $WrapperStruct
+// CHECK: Block: bb2
+// CHECK-LABEL: Error#: 0. End Error in Function: 'reborrow_at_loop_head_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'reborrow_at_loop_head_incorrect'
+sil [ossa] @reborrow_at_loop_head_incorrect : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
+  %copy0 = copy_value %0 : $WrapperStruct
+  %borrow0a = begin_borrow %copy0 : $WrapperStruct
+  br bb1(%borrow0a : $WrapperStruct, %copy0 : $WrapperStruct)
+
+bb1(%borrow : @guaranteed $WrapperStruct, %copy : @owned $WrapperStruct):
+  cond_br undef, bb2, bb3
+
+bb2:
+  %copyagain = copy_value %copy : $WrapperStruct
+  %borrowagain = begin_borrow %copyagain : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  end_borrow %borrow : $WrapperStruct
+  br bb1(%borrowagain : $WrapperStruct, %copyagain : $WrapperStruct)
+
+bb3:
+  end_borrow %borrow : $WrapperStruct
+  destroy_value %copy : $WrapperStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-NOT: Function: 'borrow_unreachable_correct'
+sil [ossa] @borrow_unreachable_correct : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  unreachable
+}
+
+// CHECK-NOT: Function: 'test_borrow_checked_cast_switch_enum_control_flow'
+sil [ossa] @test_borrow_checked_cast_switch_enum_control_flow : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  checked_cast_br %0 : $Klass to SuperKlass, bb1, bb2
+
+bb1(%1 : @owned $SuperKlass):
+  destroy_value %1 : $SuperKlass
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %borrownone = begin_borrow %none : $FakeOptional<Klass>
+  br bb3(%borrownone : $FakeOptional<Klass>, %none : $FakeOptional<Klass>)
+
+bb2(%2 : @owned $Klass):
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2 : $Klass
+  %borrowsome = begin_borrow %some : $FakeOptional<Klass>
+  br bb3(%borrowsome : $FakeOptional<Klass>, %some : $FakeOptional<Klass>)
+
+bb3(%borrow : @guaranteed $FakeOptional<Klass>, %mKlass : @owned $FakeOptional<Klass>):
+  end_borrow %borrow : $FakeOptional<Klass>
+  destroy_value %mKlass : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_borrow_checked_cast_switch_enum_control_flow_incorrect'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %12 = argument of bb3 : $FakeOptional<Klass>
+// CHECK: Consuming User:   destroy_value %12 : $FakeOptional<Klass>
+// CHECK: Non Consuming User:   end_borrow %11 : $FakeOptional<Klass>
+// CHECK: Block: bb3
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_borrow_checked_cast_switch_enum_control_flow_incorrect'
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'test_borrow_checked_cast_switch_enum_control_flow_incorrect'
+sil [ossa] @test_borrow_checked_cast_switch_enum_control_flow_incorrect : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  checked_cast_br %0 : $Klass to SuperKlass, bb1, bb2
+
+bb1(%1 : @owned $SuperKlass):
+  destroy_value %1 : $SuperKlass
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %borrownone = begin_borrow %none : $FakeOptional<Klass>
+  br bb3(%borrownone : $FakeOptional<Klass>, %none : $FakeOptional<Klass>)
+
+bb2(%2 : @owned $Klass):
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2 : $Klass
+  %borrowsome = begin_borrow %some : $FakeOptional<Klass>
+  br bb3(%borrowsome : $FakeOptional<Klass>, %some : $FakeOptional<Klass>)
+
+bb3(%borrow : @guaranteed $FakeOptional<Klass>, %mKlass : @owned $FakeOptional<Klass>):
+  destroy_value %mKlass : $FakeOptional<Klass>
+  end_borrow %borrow : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}

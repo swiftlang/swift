@@ -2001,6 +2001,9 @@ NodePointer Demangler::demangleMetatype() {
                              popNode(isEntity));
     case 'X':
       return demanglePrivateContextDescriptor();
+    case 'z':
+      return createWithPoppedType(
+          Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken);
     default:
       return nullptr;
   }
@@ -2244,7 +2247,7 @@ NodePointer Demangler::popProtocolConformance() {
   return Conf;
 }
 
-NodePointer Demangler::demangleThunkOrSpecialization() {
+  NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
@@ -2262,6 +2265,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'C': {
       NodePointer type = popNode(Node::Kind::Type);
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
+    }
+    case 'z': {
+      NodePointer implType = popNode(Node::Kind::ImplFunctionType);
+      return createWithChild(Node::Kind::ObjCAsyncCompletionHandlerImpl, implType);
     }
     case 'V': {
       NodePointer Base = popNode(isEntity);

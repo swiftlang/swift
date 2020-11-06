@@ -255,6 +255,13 @@ module WinSDK [system] {
     export *
   }
 
+  module AppNotify {
+    header "appnotify.h"
+    export *
+
+    link "appnotify.lib"
+  }
+
   module ShellAPI {
     header "shellapi.h"
     header "Shlwapi.h"
@@ -331,6 +338,13 @@ module WinSDK [system] {
   module User {
     header "WinUser.h"
     export *
+  }
+
+  module WIC {
+    header "wincodec.h"
+    export *
+
+    link "windowscodecs.lib"
   }
 
   module WinBase {

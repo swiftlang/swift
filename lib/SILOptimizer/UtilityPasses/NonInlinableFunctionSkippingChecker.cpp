@@ -65,6 +65,12 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func))
     return false;
 
+  // See DeclChecker::shouldSkipBodyTypechecking. Can't skip didSet for now.
+  if (auto *AD = dyn_cast<AccessorDecl>(func)) {
+    if (AD->getAccessorKind() == AccessorKind::DidSet)
+      return false;
+  }
+
   // If none of those conditions trip, then this is something that _should_
   // be serialized in the module even when we're skipping non-inlinable
   // function bodies.

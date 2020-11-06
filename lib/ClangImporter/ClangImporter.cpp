@@ -326,13 +326,13 @@ class ClangImporterDependencyCollector : public clang::DependencyCollector
   llvm::StringSet<> ExcludedPaths;
   /// The FileCollector is used by LLDB to generate reproducers. It's not used
   /// by Swift to track dependencies.
-  std::shared_ptr<llvm::FileCollector> FileCollector;
+  std::shared_ptr<llvm::FileCollectorBase> FileCollector;
   const IntermoduleDepTrackingMode Mode;
 
 public:
   ClangImporterDependencyCollector(
       IntermoduleDepTrackingMode Mode,
-      std::shared_ptr<llvm::FileCollector> FileCollector)
+      std::shared_ptr<llvm::FileCollectorBase> FileCollector)
       : FileCollector(FileCollector), Mode(Mode) {}
 
   void excludePath(StringRef filename) {
@@ -378,7 +378,7 @@ public:
 std::shared_ptr<clang::DependencyCollector>
 ClangImporter::createDependencyCollector(
     IntermoduleDepTrackingMode Mode,
-    std::shared_ptr<llvm::FileCollector> FileCollector) {
+    std::shared_ptr<llvm::FileCollectorBase> FileCollector) {
   return std::make_shared<ClangImporterDependencyCollector>(Mode,
                                                             FileCollector);
 }

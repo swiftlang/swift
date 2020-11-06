@@ -87,7 +87,7 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, i8** %1) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK:   [[ERASED_BUFFER:%[0-9]+]] = bitcast i8** %1 to i8*
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @swift_getGenericMetadata(
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @swift_getCanonicalPrespecializedGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 
 // CHECK-SAME:     i8* [[ERASED_BUFFER]], 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (

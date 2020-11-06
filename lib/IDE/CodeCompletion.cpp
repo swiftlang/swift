@@ -1813,6 +1813,9 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
+  bool CheckForDuplicates = false;
+  llvm::DenseSet<std::pair<const Decl *, Type>> PreviouslySeen;
+
   bool IncludeInstanceMembers = false;
 
   /// True if we are code completing inside a static method.
@@ -1996,6 +1999,10 @@ public:
 
   void setIsKeyPathExpr() {
     IsKeyPathExpr = true;
+  }
+
+  void shouldCheckForDuplicates(bool value = true) {
+    CheckForDuplicates = value;
   }
 
   void setIsSwiftKeyPathExpr(bool onRoot) {
@@ -2461,9 +2468,7 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo) {
-    if (!VD->hasName() ||
-        !VD->isAccessibleFrom(CurrDeclContext) ||
-        VD->shouldHideFromEditor())
+    if (!VD->hasName())
       return;
 
     const Identifier Name = VD->getName();
@@ -2895,8 +2900,13 @@ public:
       IsImplicitlyCurriedInstanceMethod = isImplicitlyCurriedInstanceMethod(FD);
 
       // Strip off '(_ self: Self)' if needed.
-      if (AFT && !IsImplicitlyCurriedInstanceMethod)
+      if (AFT && !IsImplicitlyCurriedInstanceMethod) {
         AFT = AFT->getResult()->getAs<AnyFunctionType>();
+
+        // Check for duplicates with the adjusted type too.
+        if (isDuplicate(FD, AFT))
+          return;
+      }
     }
 
     bool trivialTrailingClosure = false;
@@ -3369,10 +3379,10 @@ public:
                                          DynamicLookupInfo dynamicLookupInfo) {
     auto funcTy =
         getTypeOfMember(AFD, dynamicLookupInfo)->getAs<AnyFunctionType>();
-    if (funcTy && AFD->getDeclContext()->isTypeContext() &&
-        !isImplicitlyCurriedInstanceMethod(AFD)) {
+    bool dropCurryLevel = funcTy && AFD->getDeclContext()->isTypeContext() &&
+        !isImplicitlyCurriedInstanceMethod(AFD);
+    if (dropCurryLevel)
       funcTy = funcTy->getResult()->getAs<AnyFunctionType>();
-    }
 
     bool useFunctionReference = PreferFunctionReferencesToCalls;
     if (!useFunctionReference && funcTy) {
@@ -3383,6 +3393,10 @@ public:
     }
     if (!useFunctionReference)
       return false;
+
+    // Check for duplicates with the adjusted type too.
+    if (dropCurryLevel && isDuplicate(AFD, funcTy))
+      return true;
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -3421,6 +3435,29 @@ public:
     return true;
   }
 
+private:
+
+  /// Returns true if duplicate checking is enabled (via
+  /// \c shouldCheckForDuplicates) and this decl + type combination has been
+  /// checked previously. Returns false otherwise.
+  bool isDuplicate(const ValueDecl *D, Type Ty) {
+    if (!CheckForDuplicates)
+      return false;
+    return !PreviouslySeen.insert({D, Ty}).second;
+  }
+
+  /// Returns true if duplicate checking is enabled (via
+  /// \c shouldCheckForDuplicates) and this decl has been checked previously
+  /// with the type according to \c getTypeOfMember. Returns false otherwise.
+  bool isDuplicate(const ValueDecl *D, DynamicLookupInfo dynamicLookupInfo) {
+    if (!CheckForDuplicates)
+      return false;
+    Type Ty = getTypeOfMember(D, dynamicLookupInfo);
+    return !PreviouslySeen.insert({D, Ty}).second;
+  }
+
+public:
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
@@ -3435,6 +3472,11 @@ public:
       return;
 
     if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
+      return;
+
+    // If we've seen this decl+type before (possible when multiple lookups are
+    // performed e.g. because of ambiguous base types), bail.
+    if (isDuplicate(D, dynamicLookupInfo))
       return;
     
     // FIXME(InterfaceTypeRequest): Remove this.
@@ -3526,6 +3568,11 @@ public:
           Type funcType = getTypeOfMember(FD, dynamicLookupInfo)
                               ->castTo<AnyFunctionType>()
                               ->getResult();
+
+          // Check for duplicates with the adjusted type too.
+          if (isDuplicate(FD, funcType))
+            return;
+
           addFunctionCallPattern(
               funcType->castTo<AnyFunctionType>(), FD,
               getSemanticContext(FD, Reason, dynamicLookupInfo));
@@ -4239,8 +4286,12 @@ public:
     ExprType = Type();
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    FilteredDeclConsumer Consumer(*this, Filter);
-    lookupVisibleDecls(Consumer, CurrDeclContext,
+
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, *this);
+    FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
+
+    lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
     RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults()
                                          .withModuleQualifier(ModuleQualifier));
@@ -4315,13 +4366,18 @@ public:
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
+
+    SmallPtrSet<CanType, 4> seenTypes;
     for (auto T : Types) {
-      if (!T)
+      if (!T || !seenTypes.insert(T->getCanonicalType()).second)
         continue;
+
       if (auto objT = T->getOptionalObjectType()) {
         // If this is optional type, perform completion for the object type.
         // i.e. 'let _: Enum??? = .enumMember' is legal.
-        getUnresolvedMemberCompletions(objT->lookThroughAllOptionalTypes());
+        objT = objT->lookThroughAllOptionalTypes();
+        if (seenTypes.insert(objT->getCanonicalType()).second)
+          getUnresolvedMemberCompletions(objT);
 
         // Add 'nil' keyword with erasing '.' instruction.
         unsigned bytesToErase = 0;
@@ -4584,7 +4640,10 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc,
                                        bool ModuleQualifier = true) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext,
+
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, *this);
+    lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults.push_back(
@@ -4597,14 +4656,23 @@ public:
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
-    CurrModule->lookupVisibleDecls({}, FilteringConsumer,
+
+    UsableFilteringDeclConsumer UsableFilteringConsumer(
+        Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getCodeCompletionLoc(),
+        *this);
+    AccessFilteringDeclConsumer AccessFilteringConsumer(
+        CurrDeclContext, UsableFilteringConsumer);
+
+    CurrModule->lookupVisibleDecls({}, AccessFilteringConsumer,
                                    NLKind::UnqualifiedLookup);
   }
 
-  void getVisibleDeclsOfModule(const ModuleDecl *TheModule,
-                               ArrayRef<std::string> AccessPath,
-                               bool ResultsHaveLeadingDot) {
+  void lookupExternalModuleDecls(const ModuleDecl *TheModule,
+                                 ArrayRef<std::string> AccessPath,
+                                 bool ResultsHaveLeadingDot) {
+    assert(CurrModule != TheModule &&
+           "requested module should be external");
+
     Kind = LookupKind::ImportFromModule;
     NeedLeadingDot = ResultsHaveLeadingDot;
 
@@ -4612,6 +4680,7 @@ public:
     for (auto Piece : AccessPath) {
       builder.push_back(Ctx.getIdentifier(Piece));
     }
+
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     TheModule->lookupVisibleDecls(builder.get(), FilteringConsumer,
                                   NLKind::UnqualifiedLookup);
@@ -6039,6 +6108,7 @@ void deliverDotExprResults(
     Lookup.setPreferFunctionReferencesToCalls();
   }
 
+  Lookup.shouldCheckForDuplicates(Results.size() > 1);
   for (auto &Result: Results) {
     Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
@@ -6708,7 +6778,7 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
   CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
-  Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
+  Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
 void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,

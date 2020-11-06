@@ -87,6 +87,16 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 
       return true;
     }
+
+    if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+      if (fnType->isNoEscape()) {
+        if (diagnose) {
+          param->diagnose(diag::asynchandler_noescape_closure_parameter);
+        }
+
+        return true;
+      }
+    }
   }
 
   if (func->isMutating()) {
@@ -406,6 +416,15 @@ GlobalActorAttributeRequest::evaluate(
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
       }
+
+      // Global actors don't make sense on a stored property of a struct.
+      if (var->hasStorage() && var->getDeclContext()->getSelfStructDecl() &&
+          var->isInstanceMember()) {
+        var->diagnose(diag::global_actor_on_struct_property, var->getName())
+          .highlight(globalActorAttr->getRangeWithAt());
+        return None;
+      }
+
     }
   } else if (isa<ExtensionDecl>(decl)) {
     // Extensions are okay.

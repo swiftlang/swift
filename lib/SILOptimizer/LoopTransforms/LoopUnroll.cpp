@@ -74,7 +74,8 @@ void LoopCloner::cloneLoop() {
   Loop->getExitBlocks(ExitBlocks);
 
   // Clone the entire loop.
-  cloneReachableBlocks(Loop->getHeader(), ExitBlocks);
+  cloneReachableBlocks(Loop->getHeader(), ExitBlocks,
+                       /*insertAfter*/Loop->getLoopLatch());
 }
 
 /// Determine the number of iterations the loop is at most executed. The loop
@@ -93,7 +94,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (!Loop->isLoopExiting(Latch))
     return None;
 
-  // Get the loop exit condition.
+ // Get the loop exit condition.
   auto *CondBr = dyn_cast<CondBranchInst>(Latch->getTerminator());
   if (!CondBr)
     return None;
@@ -194,7 +195,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
         auto Callee = AI.getCalleeFunction();
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
           // If callee is rather big and potentialy inlinable, it may be better
-          // not to unroll, so that the body of the calle can be inlined later.
+          // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
         }
       }

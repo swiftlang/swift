@@ -29,6 +29,9 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
 
+config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
+config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
+
 # --- Darwin Configuration ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 

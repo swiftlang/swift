@@ -2006,6 +2006,9 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
 
   auto request = params.claimNext();
 
+  bool checkPrespecialized =
+      IGM.IRGen.metadataPrespecializationsForType(nominal).size() > 0;
+
   auto numArguments = genericArgs.Types.size();
 
   llvm::Value *result;
@@ -2018,8 +2021,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
 
     // Make the call.
-    auto call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                         {request, arguments, descriptor});
+    llvm::CallInst *call;
+    if (checkPrespecialized) {
+      call = IGF.Builder.CreateCall(
+          IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+          {request, arguments, descriptor,
+           IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+               nominal)});
+    } else {
+      call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                    {request, arguments, descriptor});
+    }
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
     call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -2032,7 +2044,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // Factor out the buffer shuffling for metadata accessors that take their
     // arguments directly, so that the accessor function itself only needs to
     // materialize the nominal type descriptor and call this thunk.
-    auto generateThunkFn = [&IGM](IRGenFunction &subIGF) {
+    auto generateThunkFn = [&IGM,
+                            checkPrespecialized](IRGenFunction &subIGF) {
       subIGF.CurFn->setDoesNotAccessMemory();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
       IGM.setHasNoFramePointer(subIGF.CurFn);
@@ -2043,6 +2056,10 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       auto arg1 = params.claimNext();
       auto arg2 = params.claimNext();
       auto descriptor = params.claimNext();
+      llvm::Value *token = nullptr;
+      if (checkPrespecialized) {
+        token = params.claimNext();
+      }
 
       // Allocate a buffer with enough storage for the arguments.
       auto argsBufferTy =
@@ -2067,23 +2084,47 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       // Make the call.
       auto argsAddr = subIGF.Builder.CreateBitCast(argsBuffer.getAddress(),
                                                    IGM.Int8PtrTy);
-      auto result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                             {request, argsAddr, descriptor});
+
+      llvm::Value *result;
+      if (checkPrespecialized) {
+        result = subIGF.Builder.CreateCall(
+            IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+            {request, argsAddr, descriptor, token});
+      } else {
+        result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                           {request, argsAddr, descriptor});
+      }
       subIGF.Builder.CreateRet(result);
     };
-    auto thunkFn = IGM.getOrCreateHelperFunction(
-        "__swift_instantiateGenericMetadata",
-        IGM.TypeMetadataResponseTy,
-        {
-          IGM.SizeTy, // request
-          IGM.Int8PtrTy, // arg 0
-          IGM.Int8PtrTy, // arg 1
-          IGM.Int8PtrTy, // arg 2
-          IGM.TypeContextDescriptorPtrTy // type context descriptor
-        },
-        generateThunkFn,
-        /*noinline*/true);
-    
+    llvm::Constant *thunkFn;
+    if (checkPrespecialized) {
+      thunkFn = IGM.getOrCreateHelperFunction(
+          "__swift_instantiateCanonicalPrespecializedGenericMetadata",
+          IGM.TypeMetadataResponseTy,
+          {
+              IGM.SizeTy,                     // request
+              IGM.Int8PtrTy,                  // arg 0
+              IGM.Int8PtrTy,                  // arg 1
+              IGM.Int8PtrTy,                  // arg 2
+              IGM.TypeContextDescriptorPtrTy, // type context descriptor
+              IGM.OnceTy->getPointerTo()      // token pointer
+          },
+          generateThunkFn,
+          /*noinline*/ true);
+    } else {
+      thunkFn = IGM.getOrCreateHelperFunction(
+          "__swift_instantiateGenericMetadata", IGM.TypeMetadataResponseTy,
+          {
+              IGM.SizeTy,                    // request
+              IGM.Int8PtrTy,                 // arg 0
+              IGM.Int8PtrTy,                 // arg 1
+              IGM.Int8PtrTy,                 // arg 2
+              IGM.TypeContextDescriptorPtrTy // type context descriptor
+          },
+          generateThunkFn,
+          /*noinline*/ true);
+    }
+
     // Call out to the helper.
     auto arg0 = numArguments >= 1
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
@@ -2095,8 +2136,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
-    auto call = IGF.Builder.CreateCall(thunkFn,
-                                       {request, arg0, arg1, arg2, descriptor});
+    llvm::CallInst *call;
+    if (checkPrespecialized) {
+      auto *token =
+          IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+              nominal);
+      call = IGF.Builder.CreateCall(
+          thunkFn, {request, arg0, arg1, arg2, descriptor, token});
+    } else {
+      call = IGF.Builder.CreateCall(thunkFn,
+                                    {request, arg0, arg1, arg2, descriptor});
+    }
     call->setDoesNotAccessMemory();
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);

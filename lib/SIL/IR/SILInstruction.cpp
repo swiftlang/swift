@@ -22,6 +22,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
@@ -1059,6 +1060,13 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
+  // RC identity preserving it can release it's source (in some cases - we are
+  // conservative here).
+  auto dynCast = SILDynamicCastInst::getAs(const_cast<SILInstruction *>(this));
+  if (dynCast && !dynCast.isRCIdentityPreserving())
+    return true;
+
   if (getReleasingBehavior() ==
       SILInstruction::ReleasingBehavior::DoesNotRelease)
     return false;

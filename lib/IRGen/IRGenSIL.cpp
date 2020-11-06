@@ -852,7 +852,43 @@ public:
       }
     }
   }
-  
+
+  llvm::Value *getAsyncTask() override {
+    // FIXME: (1) Remove this override, (2) mark the IRGenFunction::getAsyncTask
+    //        declaration as non-virtual, and (3) mark IRGenFunction's
+    //        destructor non-virtual once Task.runDetached is available.
+    //        rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftTaskPtrTy);
+    }
+    return IRGenFunction::getAsyncTask();
+  }
+
+  llvm::Value *getAsyncExecutor() override {
+    // FIXME: (1) Remove this override, (2) mark the
+    //        IRGenFunction::getAsyncExecutor declaration as non-virtual, and
+    //        (3) mark IRGenFunction's destructor non-virtual once
+    //        Task.runDetached is available.  rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftExecutorPtrTy);
+    }
+    return IRGenFunction::getAsyncExecutor();
+  }
+
+  llvm::Value *getAsyncContext() override {
+    // FIXME: (1) Remove this override, (2) mark the
+    //        IRGenFunction::getAsyncContext declaration as non-virtual, and
+    //        (3) mark IRGenFunction's destructor non-virtual once
+    //        Task.runDetached is available.  rdar://problem/70597390*/
+    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
+        SILFunctionTypeRepresentation::CFunctionPointer) {
+      return llvm::Constant::getNullValue(IGM.SwiftContextPtrTy);
+    }
+    return IRGenFunction::getAsyncContext();
+  }
+
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -1100,6 +1136,10 @@ public:
     llvm_unreachable("not implemented");
   }
 
+  void visitHopToExecutorInst(HopToExecutorInst *i) {
+    //TODO(async)
+  }
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
@@ -1135,7 +1175,7 @@ public:
 } // end anonymous namespace
 
 static AsyncContextLayout getAsyncContextLayout(IRGenSILFunction &IGF) {
-  return getAsyncContextLayout(IGF, IGF.CurSILFn);
+  return getAsyncContextLayout(IGF.IGM, IGF.CurSILFn);
 }
 
 namespace {
@@ -2533,6 +2573,10 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
   switch (kind) {
   case Kind::FunctionPointer: {
     auto &fn = getFunctionPointer();
+    if (calleeInfo.OrigFnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::ObjCMethod) {
+      return getObjCDirectMethodCallee(std::move(calleeInfo), fn, selfValue);
+    }
     return Callee(std::move(calleeInfo), fn, selfValue);
   }
 
@@ -3020,7 +3064,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
                                                 i->getSubstCalleeType());
     llvm::Value *innerContext = std::get<1>(result);
     auto layout =
-        getAsyncContextLayout(*this, i->getOrigCalleeType(),
+        getAsyncContextLayout(IGM, i->getOrigCalleeType(),
                               i->getSubstCalleeType(), i->getSubstitutionMap());
     auto size = getDynamicAsyncContextSize(
         *this, layout, i->getOrigCalleeType(), innerContext);
@@ -3179,7 +3223,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.CurFn->getArg(2);
+    llvm::Value *context = IGF.getAsyncContext();
     auto layout = getAsyncContextLayout(IGF);
 
     Address dataAddr = layout.emitCastTo(IGF, context);

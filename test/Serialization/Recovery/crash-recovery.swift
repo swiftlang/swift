@@ -12,7 +12,7 @@ public class Sub: Base {
   public override func disappearingMethod() {}
 }
 
-// CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please file a bug report with your project and the crash log
+// CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please submit a bug report (https://swift.org/contributing/#reporting-bugs) and include the project
 // CHECK-CRASH: note: module 'Lib' full misc version is
 // CHECK-CRASH-4-NOT: note: compiling as
 // CHECK-CRASH-4_2: note: compiling as Swift 4.2, with 'Lib' built as Swift 4.1.50

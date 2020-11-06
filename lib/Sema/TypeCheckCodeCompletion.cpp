@@ -825,7 +825,7 @@ static bool isViableForReTypeCheck(const Solution &S) {
 }
 
 bool TypeChecker::typeCheckForCodeCompletion(
-    SolutionApplicationTarget &target,
+    SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
@@ -867,7 +867,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   // (that are type-checked together with enclosing context)
   // and regular closures which are type-checked separately.
 
-  {
+  if (needsPrecheck) {
     // First, pre-check the expression, validating any types that occur in the
     // expression and folding sequence expressions.
     auto failedPreCheck = ConstraintSystem::preCheckExpression(
@@ -953,18 +953,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
                                                fallback->DC, CTP_Unused,
                                                /*contextualType=*/Type(),
                                                /*isDiscarded=*/true);
-    if (fallback->SeparatePrecheck) {
-      typeCheckForCodeCompletion(completionTarget, callback);
-      return true;
-    }
-
-    switch (solveForCodeCompletion(completionTarget)) {
-    case CompletionResult::Ok:
-    case CompletionResult::Fallback:
-      break;
-    case CompletionResult::NotApplicable:
-      llvm_unreachable("fallback expr not applicable?");
-    }
+    typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
+                               callback);
   }
   return true;
 }
@@ -1084,7 +1074,8 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
                                              /*isDiscared=*/true);
 
   TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, [&](const Solution &S) { sawSolution(S); });
+      completionTarget, /*needsPrecheck*/true,
+      [&](const Solution &S) { sawSolution(S); });
 }
 
 void DotExprTypeCheckCompletionCallback::
