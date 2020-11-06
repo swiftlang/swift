@@ -422,6 +422,8 @@ namespace irgen {
                                                  AsyncContextLayout layout);
   void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);
 
+  void emitAsyncFunctionEntry(IRGenFunction &IGF, SILFunction *asyncFunc);
+
   /// Yield the given values from the current continuation.
   ///
   /// \return an i1 indicating whether the caller wants to unwind this
@@ -435,6 +437,9 @@ namespace irgen {
     Executor = 1,
     Context = 2,
   };
+
+  void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       CanSILFunctionType fnType);
 } // end namespace irgen
 } // end namespace swift
 

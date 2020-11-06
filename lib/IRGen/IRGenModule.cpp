@@ -591,7 +591,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                              {RelativeAddressTy, Int32Ty});
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
-                                            {RelativeAddressTy, Int32Ty});
+                                            {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});

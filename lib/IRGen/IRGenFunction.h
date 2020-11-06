@@ -132,6 +132,10 @@ public:
   virtual llvm::Value *getAsyncExecutor();
   virtual llvm::Value *getAsyncContext();
 
+  llvm::Function *getOrCreateResumePrjFn();
+  llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                        ArrayRef<llvm::Value *> args);
+
 private:
   void emitPrologue();
   void emitEpilogue();
