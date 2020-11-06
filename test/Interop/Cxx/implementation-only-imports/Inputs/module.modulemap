@@ -8,6 +8,11 @@ module UserB {
     export *
 }
 
+module UserC {
+    header "user-c.h"
+    export *
+}
+
 module DeclA {
     header "decl-a.h"
     export *

@@ -8,12 +8,12 @@
 // Swift should consider all sources for the decl and recognize that the
 // decl is not hidden behind @_implementationOnly in all modules.
 
-// This test, as well as `check-constructor-visibility-inversed.swift` checks
+// This test, as well as `check-constructor-visibility.swift` checks
 // that the constructor decl can be found when at least one of the
 // modules is not `@_implementationOnly`.
 
-import UserA
-@_implementationOnly import UserB
+@_implementationOnly import UserA
+import UserB
 
 @_inlineable
 public func createAWrapper() {
