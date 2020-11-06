@@ -408,20 +408,6 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
       declFinder.classMembers);
 }
 
-/// Given an array of Decls or pairs of them in \p declsOrPairs
-/// create node pairs for context and name
-template <NodeKind kind, typename ContentsT>
-void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
-    std::vector<ContentsT> &contentsVec) {
-  for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp =
-        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
-    addADefinedDecl(
-        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
-        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
-  }
-}
-
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of used Decls
 //==============================================================================
@@ -564,18 +550,4 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
       declFinder.valuesInExtensions);
   addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
       declFinder.classMembers);
-}
-
-/// Given an array of Decls or pairs of them in \p declsOrPairs
-/// create node pairs for context and name
-template <NodeKind kind, typename ContentsT>
-void ModuleDepGraphFactory::addAllDefinedDeclsOfAGivenType(
-    std::vector<ContentsT> &contentsVec) {
-  for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp =
-        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
-    addADefinedDecl(
-        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
-        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
-  }
 }

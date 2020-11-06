@@ -1345,6 +1345,11 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
 }
 
+static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -2479,6 +2484,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetCurrentAsyncTask:
     return getGetCurrentAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CancelAsyncTask:
+    return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

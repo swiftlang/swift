@@ -6177,13 +6177,13 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 // to work via TypeCheckCompletionCallback.
 static void undoSingleExpressionReturn(DeclContext *DC) {
   auto updateBody = [](BraceStmt *BS, ASTContext &Ctx) -> bool {
-    ASTNode FirstElem = BS->getFirstElement();
-    auto *RS = dyn_cast_or_null<ReturnStmt>(FirstElem.dyn_cast<Stmt*>());
+    ASTNode LastElem = BS->getLastElement();
+    auto *RS = dyn_cast_or_null<ReturnStmt>(LastElem.dyn_cast<Stmt*>());
 
     if (!RS || !RS->isImplicit())
       return false;
 
-    BS->setFirstElement(RS->getResult());
+    BS->setLastElement(RS->getResult());
     return true;
   };
 

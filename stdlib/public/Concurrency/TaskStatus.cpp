@@ -505,7 +505,7 @@ JobPriority
 swift::swift_task_escalate(AsyncTask *task, JobPriority newPriority) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
-  // Fast path: check that the task's priority is not already at laest
+  // Fast path: check that the task's priority is not already at least
   // as high as the target.  The task's priority can only be modified
   // under the status record lock; it's possible that the priority could
   // be getting simultaneously escalated, but it's okay for us to return
