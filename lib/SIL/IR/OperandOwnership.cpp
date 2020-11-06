@@ -557,6 +557,7 @@ OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *i) {
   if (isCheckingSubObject()) {
     auto *phiArg = cast<SILPhiArgument>(op.get());
     (void)phiArg;
+    llvm_unreachable("You hit it!");
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::MustBeLive);
   }
