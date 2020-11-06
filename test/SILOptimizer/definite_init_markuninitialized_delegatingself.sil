@@ -178,10 +178,13 @@ bb1:
 // CHECK-NEXT:  store [[NEW_SELF]] to [init] [[SELF_BOX]] : $*MyStruct3
 
 // CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
-  br bb2
+  br bb3
+
+bb2:
+  br bb3
 
 // CHECK: [[CHECK]]:
-bb2:
+bb3:
 
 // CHECK-NEXT:  [[BIT:%[0-9]+]] = load [trivial] [[CONTROL]] : $*Builtin.Int1
 // CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
@@ -241,10 +244,13 @@ bb1:
 // CHECK-NEXT:  store [[NEW_SELF]] to [init] [[SELF_BOX]] : $*MyClass3
 
 // CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
-  br bb2
+  br bb3
+
+bb2:
+  br bb3
 
 // CHECK: [[CHECK]]:
-bb2:
+bb3:
 
 // CHECK-NEXT:  [[BIT:%.*]] = load [trivial] [[CONTROL]]
 // CHECK-NEXT:  [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BIT]] : $Builtin.Int2) : $Builtin.Int1

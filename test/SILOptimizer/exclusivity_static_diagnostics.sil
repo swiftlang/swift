@@ -136,8 +136,10 @@ bb0(%0 : $Int, %1 : $Builtin.Int1):
   %4 = begin_access [modify] [unknown] %3 : $*Int
   br bb1
 bb1:
-  cond_br %1, bb1, bb2
+  cond_br %1, bb2, bb3
 bb2:
+  br bb1
+bb3:
   end_access %4: $*Int
   destroy_value %2 : ${ var Int }
   %5 = tuple ()
@@ -157,8 +159,10 @@ bb1:
   %5 = begin_access [modify] [unknown] %3 : $*Int // expected-note {{conflicting access is here}}
   end_access %5: $*Int
   end_access %4: $*Int
-  cond_br %1, bb1, bb2
+  cond_br %1, bb2, bb3
 bb2:
+  br bb1
+bb3:
   destroy_value %2 : ${ var Int }
   %6 = tuple ()
   return %6 : $()

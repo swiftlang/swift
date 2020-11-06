@@ -265,9 +265,12 @@ bb1:
   %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %6 = apply %f() : $@convention(thin) () -> @owned SomeClass
   assign %6 to %3 : $*SomeClass
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+
+bb3:
   destroy_addr %3 : $*SomeClass
   dealloc_stack %2 : $*SomeClass
   %14 = tuple ()
@@ -284,9 +287,12 @@ bb1:
   %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %12 = apply %2() : $@convention(thin) () -> @owned SomeClass
   assign %12 to %6 : $*SomeClass                // id: %13
-  br bb2                                          // id: %14
+  br bb3                                          // id: %14
 
 bb2:
+  br bb3
+
+bb3:
   %3 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %17 = apply %3() : $@convention(thin) () -> @owned SomeClass
   assign %17 to %6 : $*SomeClass                // id: %18
@@ -540,9 +546,12 @@ bb1:
   %9 = function_ref @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
   %10 = apply %9() : $@convention(thin) () -> @owned MyStruct3
   assign %10 to %3 : $*MyStruct3
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+
+bb3:
   destroy_addr %3 : $*MyStruct3
   dealloc_stack %2 : $*MyStruct3
   %15 = tuple ()
@@ -564,9 +573,12 @@ bb1:
   %5 = function_ref @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
   %6 = apply %5(%4) : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
   store %6 to [init] %3 : $*MyClass3
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+
+bb3:
   destroy_addr %3 : $*MyClass3
   dealloc_stack %2 : $*MyClass3
   %7 = tuple ()
