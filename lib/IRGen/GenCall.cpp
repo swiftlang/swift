@@ -3458,6 +3458,18 @@ void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
                      llvm::Attribute::ReadNone);
 }
 
+void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
+  if (task->getType() != IGF.IGM.SwiftTaskPtrTy) {
+    task = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftTaskPtrTy);
+  }
+
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskCancelFn(), {task});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+}
+
 std::pair<Address, Size> irgen::emitAllocAsyncContext(IRGenFunction &IGF,
                                                       AsyncContextLayout layout,
                                                       llvm::Value *sizeValue,

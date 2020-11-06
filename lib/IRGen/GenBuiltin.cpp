@@ -220,6 +220,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Everything else cares about the (rvalue) argument.
 
+  if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
+    emitTaskCancel(IGF, args.claimNext());
+    return;
+  }
+
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;

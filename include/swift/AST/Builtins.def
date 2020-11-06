@@ -723,6 +723,12 @@ BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Spe
 // function is executing.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
 
+/// cancelAsyncTask(): (Builtin.NativeObject) -> Void
+///
+/// Cancel the given asynchronous task.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
+
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
