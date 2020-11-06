@@ -10,6 +10,7 @@ template<class T>
 struct MagicWrapper {
   T t;
   int getValuePlusArg(int arg) const { return t.getValue() + arg; }
+  int getValuePlusArg(T arg) const { return t.getValue() + arg.getValue(); }
 };
 
 template<>

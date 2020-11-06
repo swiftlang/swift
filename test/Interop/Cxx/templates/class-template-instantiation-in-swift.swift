@@ -14,9 +14,15 @@ TemplatesTestSuite.test("with-c++-type") {
 }
 
 TemplatesTestSuite.test("with-swift-type") {
-  let _ = MagicWrapper<CInt>()
   var wrappedMagicNumber = MagicWrapper<CInt>(i: 13)
   expectEqual(wrappedMagicNumber.getValuePlusArg(8), 21)
+}
+
+TemplatesTestSuite.test("with-c++-type-calling-method-on-arg") {
+  let i1 = IntWrapper(value: 42)
+  let i2 = IntWrapper(value: 12)
+  var wrappedMagicNumber = MagicWrapper<IntWrapper>(t: i1)
+  expectEqual(wrappedMagicNumber.getValuePlusArg(i2), 54)
 }
 
 runAllTests()
