@@ -1736,6 +1736,14 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
       return;
     }
+
+    // Check that 'getCurrentAsyncTask' only occurs within an async function.
+    if (BI->getBuiltinKind() &&
+        *BI->getBuiltinKind() == BuiltinValueKind::GetCurrentAsyncTask) {
+      require(F.isAsync(),
+          "getCurrentAsyncTask builtin can only be used in an async function");
+      return;
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
