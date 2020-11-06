@@ -13,31 +13,31 @@ func asyncThrowsOnCancel() async throws -> Int {
   throw Task.CancellationError()
 }
 
-func test_nursery_add() async throws -> Int {
-  await try Task.withNursery(resultType: Int.self) { nursery in
-    await nursery.add {
+func test_taskGroup_add() async throws -> Int {
+  await try Task.withGroup(resultType: Int.self) { group in
+    await group.add {
       await asyncFunc()
     }
 
-    await nursery.add {
+    await group.add {
       await asyncFunc()
     }
 
     var sum = 0
-    while let v = await try nursery.next() {
+    while let v = await try group.next() {
       sum += v
     }
     return sum
   } // implicitly awaits
 }
 
-func test_nursery_addHandles() async throws -> Int {
-  await try Task.withNursery(resultType: Int.self) { nursery in
-    let one = await nursery.addWithHandle {
+func test_taskGroup_addHandles() async throws -> Int {
+  await try Task.withGroup(resultType: Int.self) { group in
+    let one = await group.addWithHandle {
       await asyncFunc()
     }
 
-    let two = await nursery.addWithHandle {
+    let two = await group.addWithHandle {
       await asyncFunc()
     }
 
@@ -46,13 +46,13 @@ func test_nursery_addHandles() async throws -> Int {
   } // implicitly awaits
 }
 
-func test_nursery_cancel_handles() async throws {
-  await try Task.withNursery(resultType: Int.self) { nursery in
-    let one = await nursery.addWithHandle {
+func test_taskGroup_cancel_handles() async throws {
+  await try Task.withGroup(resultType: Int.self) { group in
+    let one = await group.addWithHandle {
       await try asyncThrowsOnCancel()
     }
 
-    let two = await nursery.addWithHandle {
+    let two = await group.addWithHandle {
       await asyncFunc()
     }
 
@@ -62,7 +62,7 @@ func test_nursery_cancel_handles() async throws {
 }
 
 // ==== ------------------------------------------------------------------------
-// MARK: Example Nursery Usages
+// MARK: Example group Usages
 
 struct Boom: Error {}
 func work() async -> Int { 42 }
@@ -70,12 +70,12 @@ func boom() async throws -> Int { throw Boom() }
 
 func first_allMustSucceed() async throws {
 
-  let first: Int = await try Task.withNursery(resultType: Int.self) { nursery in
-    await nursery.add { await work() }
-    await nursery.add { await work() }
-    await nursery.add { await try boom() }
+  let first: Int = await try Task.withGroup(resultType: Int.self) { group in
+    await group.add { await work() }
+    await group.add { await work() }
+    await group.add { await try boom() }
 
-    if let first = await try nursery.next() {
+    if let first = await try group.next() {
       return first
     } else {
       fatalError("Should never happen, we either throw, or get a result from any of the tasks")
@@ -90,10 +90,10 @@ func first_ignoreFailures() async throws {
   func work() async -> Int { 42 }
   func boom() async throws -> Int { throw Boom() }
 
-  let first: Int = await try Task.withNursery(resultType: Int.self) { nursery in
-    await nursery.add { await work() }
-    await nursery.add { await work() }
-    await nursery.add {
+  let first: Int = await try Task.withGroup(resultType: Int.self) { group in
+    await group.add { await work() }
+    await group.add { await work() }
+    await group.add {
       do {
         return await try boom()
       } catch {
@@ -102,7 +102,7 @@ func first_ignoreFailures() async throws {
     }
 
     var result: Int = 0
-    while let v = await try nursery.next() {
+    while let v = await try group.next() {
       result = v
 
       if result != 0 {
@@ -117,9 +117,9 @@ func first_ignoreFailures() async throws {
 }
 
 // ==== ------------------------------------------------------------------------
-// MARK: Advanced Custom Nursery Usage
+// MARK: Advanced Custom Task Group Usage
 
-func test_nursery_quorum_thenCancel() async {
+func test_taskGroup_quorum_thenCancel() async {
   // imitates a typical "gather quorum" routine that is typical in distributed systems programming
   enum Vote {
     case yay
@@ -137,19 +137,19 @@ func test_nursery_quorum_thenCancel() async {
   ///
   /// - Returns: `true` iff `N/2 + 1` followers return `.yay`, `false` otherwise.
   func gatherQuorum(followers: [Follower]) async -> Bool {
-    await try! Task.withNursery(resultType: Vote.self) { nursery in
+    await try! Task.withGroup(resultType: Vote.self) { group in
       for follower in followers {
-        await nursery.add { await try follower.vote() }
+        await group.add { await try follower.vote() }
       }
 
       defer {
-        nursery.cancelAll()
+        group.cancelAll()
       }
 
       var yays: Int = 0
       var nays: Int = 0
       let quorum = Int(followers.count / 2) + 1
-      while let vote = await try nursery.next() {
+      while let vote = await try group.next() {
         switch vote {
         case .yay:
           yays += 1
