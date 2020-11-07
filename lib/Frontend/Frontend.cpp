@@ -599,17 +599,19 @@ bool CompilerInstance::setUpInputs() {
 
   const auto &Inputs =
       Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  bool hasFailed = false;
   for (const InputFile &input : Inputs) {
     bool failed = false;
     Optional<unsigned> bufferID = getRecordedBufferID(input, failed);
-    if (failed)
-      return true;
+    hasFailed |= failed;
 
     if (!bufferID.hasValue() || !input.isPrimary())
       continue;
 
     recordPrimaryInputBuffer(*bufferID);
   }
+  if (hasFailed)
+    return true;
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
@@ -630,6 +632,15 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
     }
   }
   auto buffers = getInputBuffersIfPresent(input);
+
+  // For non-primary '.swift' files, recover by dummy buffer so that the primary
+  // files are diagnosed. Also, IDE functionalities want to proceed even with
+  // missing files.
+  if (!buffers.hasValue() && input.getType() == file_types::TY_Swift &&
+      !input.isPrimary()) {
+    buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
+        "// missing file\n", input.getFileName()));
+  }
 
   if (!buffers.hasValue()) {
     failed = true;
