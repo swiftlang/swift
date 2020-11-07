@@ -160,17 +160,16 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 bool
 TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
+                                              const ExtensionDecl *ext,
                                               const ExportContext &where) {
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
-  auto originKind = getDisallowedOriginKind(
-      rootConf->getDeclContext()->getAsDecl(),
-      where);
+  auto originKind = getDisallowedOriginKind(ext, where);
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+  ModuleDecl *M = ext->getParentModule();
   ASTContext &ctx = M->getASTContext();
 
   auto reason = where.getExportabilityReason();

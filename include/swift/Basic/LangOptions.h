@@ -95,6 +95,9 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
+    /// Should conformance availability violations be diagnosed as errors?
+    bool EnableConformanceAvailabilityErrors = false;
+
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
@@ -241,6 +244,9 @@ namespace swift {
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
+
+    /// Disable the implicit import of the _Concurrency module.
+    bool DisableImplicitConcurrencyModuleImport = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?

@@ -1661,6 +1661,12 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 
+  # Turn off implicit import of _Concurrency when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
+                      "-Xfrontend;-disable-implicit-concurrency-module-import")
+  endif()
+
   # If we are building this library for targets, loop through the various
   # SDKs building the variants of this library.
   list_intersect(

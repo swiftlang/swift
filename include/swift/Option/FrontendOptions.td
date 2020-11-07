@@ -286,6 +286,10 @@ def disable_clangimporter_source_import : Flag<["-"],
   "disable-clangimporter-source-import">,
   HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
 
+def disable_implicit_concurrency_module_import : Flag<["-"],
+  "disable-implicit-concurrency-module-import">,
+  HelpText<"Disable the implicit import of the _Concurrency module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
@@ -404,6 +408,14 @@ def disable_deserialization_recovery :
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
+
+def enable_conformance_availability_errors : Flag<["-"],
+  "enable-conformance-availability-errors">,
+  HelpText<"Diagnose conformance availability violations as errors">;
+
+def disable_conformance_availability_errors : Flag<["-"],
+  "disable-conformance-availability-errors">,
+  HelpText<"Diagnose conformance availability violations as warnings">;
 
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
