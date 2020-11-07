@@ -62,14 +62,48 @@ func escapedDollarAnd() {
   `$abc` = 3
 }
 
+// Test that we disallow user-defined $-prefixed identifiers. However, the error
+// should not be emitted on $-prefixed identifiers that are not considered
+// declarations.
+
 func $declareWithDollar() { // expected-error{{cannot declare entity named '$declareWithDollar'}}
-  var $foo = 17 // expected-error{{cannot declare entity named '$foo'}}
-  // expected-warning@-1 {{initialization of variable '$foo' was never used; consider replacing with assignment to '_' or removing it}}
+  var $foo: Int { // expected-error{{cannot declare entity named '$foo'}}
+    get { 0 }
+    set($value) {} // expected-error{{cannot declare entity named '$value'}}
+  }
   func $bar() { } // expected-error{{cannot declare entity named '$bar'}}
   func wibble(
     $a: Int, // expected-error{{cannot declare entity named '$a'}}
     $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
+  let _: (Int) -> Int = {
+    [$capture = 0] // expected-error{{cannot declare entity named '$capture'}}
+    $a in // expected-error{{cannot declare entity named '$a'}}
+    $capture
+  }
+  let ($a: _, _) = (0, 0) // expected-error{{cannot declare entity named '$a'}}
+  $label: if true { // expected-error{{cannot declare entity named '$label'}}
+    break $label
+  }
+  switch 0 {
+  @$dollar case _: // expected-error {{unknown attribute '$dollar'}}
+    break
+  }
+  if #available($Dummy 9999, *) {} // expected-warning {{unrecognized platform name '$Dummy'}}
+  @_swift_native_objc_runtime_base($Dollar)
+  class $Class {} // expected-error{{cannot declare entity named '$Class'; the '$' prefix is reserved}}
+  enum $Enum {} // expected-error{{cannot declare entity named '$Enum'; the '$' prefix is reserved}}
+  struct $Struct { // expected-error{{cannot declare entity named '$Struct'; the '$' prefix is reserved}}
+    @_projectedValueProperty($dummy)
+    let property: Never
+  }
 }
+protocol $Protocol {} // expected-error {{cannot declare entity named '$Protocol'; the '$' prefix is reserved}}
+precedencegroup $Precedence { // expected-error {{cannot declare entity named '$Precedence'; the '$' prefix is reserved}}
+  higherThan: $Precedence // expected-error {{cycle in 'higherThan' relation}}
+}
+infix operator **: $Precedence
+#$UnknownDirective() // expected-error {{use of unknown directive '#$UnknownDirective'}}
+
 
 // SR-13232
 @propertyWrapper
