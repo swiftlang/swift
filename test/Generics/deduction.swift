@@ -370,7 +370,7 @@ func test_transitive_subtype_deduction_for_generic_params() {
 }
 
 // SR-13776
-func SR13776<E: Equatable>(_ e1: E, _ e2: E) {} // expected-note {{where 'E' = 'SR13776A'}}
+func SR13776<E: Equatable>(_ e1: E, _ e2: E) {} 
 
 func SR1377f<C1: Collection, C2: Collection>(_ c1: C1, _ c2: C2) where C1.Element: Equatable, C2.Element: Equatable {
     SR13776(c1.map({ $0 }), c2.map({ $0 })) // expected-error {{conflicting arguments to generic parameter 'E' ('[C1.Element]' vs. '[C2.Element]')}}
@@ -380,9 +380,8 @@ struct SR13776A {}
 struct SR13776B {}
 struct SR13776C: Equatable {}
 
-SR13776(SR13776A(), SR13776B()) // expected-error {{cannot convert value of type 'SR13776B' to expected argument type 'SR13776A'}}
-// expected-error@-1 {{global function 'SR13776' requires that 'SR13776A' conform to 'Equatable'}}
-SR13776(SR13776A(), SR13776C()) // expected-error {{cannot convert value of type 'SR13776A' to expected argument type 'SR13776C'}}
+SR13776(SR13776A(), SR13776B()) // expected-error {{conflicting arguments to generic parameter 'E' ('SR13776A' vs. 'SR13776B')}}
+SR13776(SR13776A(), SR13776C()) // expected-error {{conflicting arguments to generic parameter 'E' ('SR13776A' vs. 'SR13776C')}}
 
 // Chooses the E == SR13776C as best solution.
 SR13776(SR13776C(), SR13776A()) // expected-error {{cannot convert value of type 'SR13776A' to expected argument type 'SR13776C'}}

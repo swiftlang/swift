@@ -142,11 +142,10 @@ func test17875634() {
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
-    // expected-error@-1 {{type '(Int, Int)' cannot conform to 'Comparable'}}
-    // expected-error@-2 2 {{cannot convert value of type 'Int' to expected argument type '(Int, Int)'}}
-    // expected-note@-3 {{required by referencing operator function '...' on 'Comparable' where 'Self' = '(Int, Int)'}}
-    // expected-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
-
+    // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
+    // expected-error@-2 {{type '(Int, Int)' cannot conform to 'Equatable'}}
+    // expected-note@-3 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-note@-4 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }
 
