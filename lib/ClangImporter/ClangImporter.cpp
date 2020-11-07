@@ -3650,7 +3650,7 @@ void ClangImporter::Implementation::lookupValue(
   if (name.isOperator()) {
     for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
       if (isVisibleClangEntry(entry)) {
-        if (auto decl = dyn_cast<ValueDecl>(
+        if (auto decl = dyn_cast_or_null<ValueDecl>(
                 importDeclReal(entry->getMostRecentDecl(), CurrentVersion)))
           consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
       }
