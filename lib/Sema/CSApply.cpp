@@ -5823,9 +5823,11 @@ Expr *ExprRewriter::coerceCallArguments(
       //   - new types are propagated to constraint system
       auto *closureType = param.getPlainType()->castTo<FunctionType>();
 
+      auto argLoc = getArgLocator(argIdx, paramIdx, param.getParameterFlags());
+
       arg = coerceToType(
           arg, closureType->getResult(),
-          locator.withPathElement(ConstraintLocator::AutoclosureResult));
+          argLoc.withPathElement(ConstraintLocator::AutoclosureResult));
 
       if (shouldInjectWrappedValuePlaceholder) {
         // If init(wrappedValue:) takes an autoclosure, then we want
