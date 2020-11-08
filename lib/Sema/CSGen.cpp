@@ -367,7 +367,7 @@ namespace {
         }
       };
 
-      simplifyBinOpExprTyVars();       
+      simplifyBinOpExprTyVars();
 
       return true;
     }

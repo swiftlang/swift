@@ -672,13 +672,16 @@ public:
     return Nested;
   }
 
-  unsigned countActiveNestedConstraints() const {
-    unsigned count = 0;
-    for (auto *constraint : Nested)
-      if (!constraint->isDisabled())
-        count++;
+  unsigned countFavoredNestedConstraints() const {
+    return llvm::count_if(Nested, [](const Constraint *constraint) {
+      return constraint->isFavored() && !constraint->isDisabled();
+    });
+  }
 
-    return count;
+  unsigned countActiveNestedConstraints() const {
+    return llvm::count_if(Nested, [](const Constraint *constraint) {
+      return !constraint->isDisabled();
+    });
   }
 
   /// Determine if this constraint represents explicit conversion,
