@@ -487,6 +487,14 @@ else()
   set(SWIFT_CROSS_COMPILING TRUE)
 endif()
 
+# Check if a prebuilt clang path was passed in, as this variable will be
+# assigned if not, in SwiftSharedCMakeConfig.
+if("${SWIFT_NATIVE_CLANG_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_PREBUILT_CLANG FALSE)
+else()
+  set(SWIFT_PREBUILT_CLANG TRUE)
+endif()
+
 include(SwiftSharedCMakeConfig)
 
 # NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
