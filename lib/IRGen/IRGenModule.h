@@ -731,7 +731,7 @@ public:
   llvm::PointerType *SwiftExecutorPtrTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
-
+  llvm::StructType *AsyncTaskAndContextTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;

@@ -1020,6 +1020,7 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, MustBeLive, CancelAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, MustBeLive, CreateAsyncTask)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

@@ -166,6 +166,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
+    case BuiltinValueKind::CreateAsyncTask:
       return true;
     }
   }

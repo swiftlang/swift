@@ -728,6 +728,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
+/// createAsyncTask(): (
+///     Int, Builtin.NativeObject?, @escaping () async throws -> Void
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task, given flags, an (optional) parent task, and
+/// a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
