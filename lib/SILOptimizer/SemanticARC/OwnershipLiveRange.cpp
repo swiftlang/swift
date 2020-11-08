@@ -48,7 +48,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // can also accept something that is guaranteed. Any non-consuming use of
     // an owned value should be able to take a guaranteed parameter as well
     // (modulo bugs). We assert to catch these.
-    if (!op->isConsumingUse()) {
+    if (!op->isLifetimeEnding()) {
       continue;
     }
 

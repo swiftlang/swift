@@ -700,7 +700,7 @@ public:
 
   /// Returns true if this operand acts as a use that consumes its associated
   /// value.
-  bool isConsumingUse() const {
+  bool isLifetimeEnding() const {
     // Type dependent uses can never be consuming and do not have valid
     // ownership maps since they do not participate in the ownership system.
     if (isTypeDependent())
@@ -795,9 +795,9 @@ public:
   explicit ConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   ConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    assert(Cur->isConsumingUse());
+    assert(Cur->isLifetimeEnding());
     while ((Cur = Cur->NextUse)) {
-      if (Cur->isConsumingUse())
+      if (Cur->isLifetimeEnding())
         break;
     }
     return *this;
@@ -813,7 +813,7 @@ public:
 inline ValueBase::consuming_use_iterator
 ValueBase::consuming_use_begin() const {
   auto cur = FirstUse;
-  while (cur && !cur->isConsumingUse()) {
+  while (cur && !cur->isLifetimeEnding()) {
     cur = cur->NextUse;
   }
   return ValueBase::consuming_use_iterator(cur);
@@ -828,9 +828,9 @@ public:
   explicit NonConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   NonConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    assert(!Cur->isConsumingUse());
+    assert(!Cur->isLifetimeEnding());
     while ((Cur = Cur->NextUse)) {
-      if (!Cur->isConsumingUse())
+      if (!Cur->isLifetimeEnding())
         break;
     }
     return *this;
@@ -846,7 +846,7 @@ public:
 inline ValueBase::non_consuming_use_iterator
 ValueBase::non_consuming_use_begin() const {
   auto cur = FirstUse;
-  while (cur && cur->isConsumingUse()) {
+  while (cur && cur->isLifetimeEnding()) {
     cur = cur->NextUse;
   }
   return ValueBase::non_consuming_use_iterator(cur);
@@ -883,7 +883,7 @@ inline Operand *ValueBase::getSingleUse() const {
 inline Operand *ValueBase::getSingleConsumingUse() const {
   Operand *result = nullptr;
   for (auto *op : getUses()) {
-    if (op->isConsumingUse()) {
+    if (op->isLifetimeEnding()) {
       if (result) {
         return nullptr;
       }
