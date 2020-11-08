@@ -144,7 +144,7 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,               \
-                                 UseLifetimeConstraint::MustBeLive);           \
+                                 UseLifetimeConstraint::NonLifetimeEnding);    \
   }
 INTERIOR_POINTER_PROJECTION(RefElementAddr)
 INTERIOR_POINTER_PROJECTION(RefTailAddr)
@@ -159,82 +159,83 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBox)
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, HopToExecutor)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, BeginCOWMutation)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndCOWMutation)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, AwaitAsyncContinuation)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, BindMemory)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, CheckedCastAddrBranch)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, CondFail)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, CopyAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocStack)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, DebugValueAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeinitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, DestroyAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndAccess)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndApply)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, GetAsyncContinuationAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexRawPointer)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitBlockStorageHeader)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, InjectEnumAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, IsUnique)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCExistentialMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCToThickMetatype)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, OpenExistentialAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, OpenExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, PointerToAddress)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, PointerToThinFunction)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ProjectBlockStorage)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ProjectValueBuffer)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, RawPointerToRef)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, SelectEnumAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, SelectValue)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, StructElementAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, SwitchEnumAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, SwitchValue)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, TailAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThickToObjCMetatype)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThinFunctionToPointer)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThinToThickFunction)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, TupleElementAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedRefCastAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedTakeEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, UnconditionalCheckedCastAddr)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, AllocValueBuffer)
-CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocValueBuffer)
+CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialValue)
+CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialBoxValue)
+CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialBox)
+CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, HopToExecutor)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, AutoreleaseValue)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, DeallocBox)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, DeallocExistentialBox)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, DeallocRef)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, DestroyValue)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, BeginCOWMutation)
+CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, EndCOWMutation)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, AwaitAsyncContinuation)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, AbortApply)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, AddressToPointer)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, BeginAccess)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, BeginUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, BindMemory)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, CheckedCastAddrBranch)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, CondFail)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, CopyAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DeallocStack)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DebugValueAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DeinitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DestroyAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, EndAccess)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, EndApply)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, EndUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, GetAsyncContinuationAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, IndexAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, IndexRawPointer)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, InitBlockStorageHeader)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, InitEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, InitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, InitExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, InjectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, IsUnique)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, Load)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, MarkFunctionEscape)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding,
+                        ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ObjCMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ObjCToThickMetatype)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, OpenExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, OpenExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, PointerToAddress)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, PointerToThinFunction)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ProjectBlockStorage)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ProjectValueBuffer)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, RawPointerToRef)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, SelectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, SelectValue)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, StructElementAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, SwitchEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, SwitchValue)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, TailAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ThickToObjCMetatype)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ThinFunctionToPointer)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, TupleElementAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, UncheckedAddrCast)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, UncheckedRefCastAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, UncheckedTakeEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, UnconditionalCheckedCastAddr)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, AllocValueBuffer)
+CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DeallocValueBuffer)
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load##Name)
+  CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
-  CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, Name##Release)
+  CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, Name##Release)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")                              \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  CONSTANT_OWNERSHIP_INST(None, MustBeLive, Name##ToRef)
+  CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -248,13 +249,11 @@ CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocValueBuffer)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                CheckedCastValueBranch)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding, CheckedCastValueBranch)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding,
                                 UnconditionalCheckedCastValue)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialValue)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                DeinitExistentialValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding, InitExistentialValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding, DeinitExistentialValue)
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
@@ -367,13 +366,15 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedValueCast)
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
     return map;                                                                \
   }
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
+                                        TupleExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
+                                        StructExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
                                         DifferentiableFunctionExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
                                         LinearFunctionExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding,
                                         MarkUninitialized)
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
@@ -382,7 +383,7 @@ OperandOwnershipKindClassifier::visitDeallocPartialRefInst(
     DeallocPartialRefInst *i) {
   if (getValue() == i->getInstance()) {
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                                 UseLifetimeConstraint::MustBeInvalidated);
+                                 UseLifetimeConstraint::LifetimeEnding);
   }
 
   return Map::allLive();
@@ -431,7 +432,7 @@ OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
   // If we have a guaranteed parameter, treat this as consuming.
   if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
     return Map::compatibilityMap(destBlockArgOwnershipKind,
-                                 UseLifetimeConstraint::MustBeInvalidated);
+                                 UseLifetimeConstraint::LifetimeEnding);
   }
 
   // Otherwise, defer to defaults.
@@ -550,13 +551,13 @@ OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *i) {
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
   return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitThrowInst(ThrowInst *i) {
   return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
@@ -577,7 +578,7 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   if (getValue() == i->getSrc()) {
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
+                                 UseLifetimeConstraint::NonLifetimeEnding);
   }
   return Map::allLive();
 }
@@ -592,12 +593,12 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
     assert(!SILModuleConventions(mod).isSILIndirect(
                                       SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                                 UseLifetimeConstraint::MustBeInvalidated);
+                                 UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Indirect_In_Guaranteed:
     assert(!SILModuleConventions(mod).isSILIndirect(
                                       SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
+                                 UseLifetimeConstraint::NonLifetimeEnding);
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");
@@ -605,16 +606,17 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
     return Map::allLive();
   case ParameterConvention::Direct_Owned:
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                                 UseLifetimeConstraint::MustBeInvalidated);
+                                 UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Direct_Guaranteed:
     if (substCalleeType->isNoEscape())
       return Map::allLive();
     // We want to accept guaranteed/owned in this position since we
     // treat the use of an owned parameter as an instantaneously
     // borrowed value for the duration of the call.
-    return Map::compatibilityMap(
-        {{ValueOwnershipKind::Guaranteed, UseLifetimeConstraint::MustBeLive},
-         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
+    return Map::compatibilityMap({{ValueOwnershipKind::Guaranteed,
+                                   UseLifetimeConstraint::NonLifetimeEnding},
+                                  {ValueOwnershipKind::Owned,
+                                   UseLifetimeConstraint::NonLifetimeEnding}});
   }
 
   llvm_unreachable("Unhandled ParameterConvention in switch.");
@@ -629,9 +631,9 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
   // Check against the passed in convention. We allow for owned to be passed to
   // apply parameters.
   if (kind != ValueOwnershipKind::Owned) {
-    return Map::compatibilityMap(
-        {{kind, requirement},
-         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
+    return Map::compatibilityMap({{kind, requirement},
+                                  {ValueOwnershipKind::Owned,
+                                   UseLifetimeConstraint::NonLifetimeEnding}});
   }
   return Map::compatibilityMap(kind, requirement);
 }
@@ -660,7 +662,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
   switch (paramInfo.getConvention()) {
   case ParameterConvention::Direct_Owned:
     return visitApplyParameter(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Direct_Unowned:
     return Map::allLive();
 
@@ -671,7 +673,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     }
     // TODO: Once trivial is subsumed in any, this goes away.
     auto map = visitApplyParameter(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeInvalidated);
+                                   UseLifetimeConstraint::LifetimeEnding);
     return map;
   }
 
@@ -681,7 +683,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
       return Map::allLive();
     }
     return visitApplyParameter(ValueOwnershipKind::Guaranteed,
-                               UseLifetimeConstraint::MustBeLive);
+                               UseLifetimeConstraint::NonLifetimeEnding);
   }
 
   // The following conventions should take address types and thus be
@@ -697,7 +699,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     // Direct_Guaranteed only accepts non-trivial types, but trivial types are
     // already handled above.
     return visitApplyParameter(ValueOwnershipKind::Guaranteed,
-                               UseLifetimeConstraint::MustBeLive);
+                               UseLifetimeConstraint::NonLifetimeEnding);
   }
   llvm_unreachable("unhandled convension");
 }
@@ -724,8 +726,8 @@ OperandOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     return Map::allLive();
 
   return Map::compatibilityMap(
-       // All non-trivial types should be captured.
-       ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);
+      // All non-trivial types should be captured.
+      ValueOwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding);
 }
 
 // TODO: FIX THIS
@@ -743,7 +745,7 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Owned:
     return visitApplyParameter(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
     // We accept unowned, owned, and guaranteed in unowned positions.
@@ -751,7 +753,7 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
     return visitApplyParameter(ValueOwnershipKind::Guaranteed,
-                               UseLifetimeConstraint::MustBeLive);
+                               UseLifetimeConstraint::NonLifetimeEnding);
   // The following conventions should take address types.
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
@@ -767,7 +769,7 @@ OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
   }
 
   return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 OperandOwnershipKindMap
@@ -777,7 +779,7 @@ OperandOwnershipKindClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i)
   }
 
   return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 OperandOwnershipKindMap
@@ -787,7 +789,7 @@ OperandOwnershipKindClassifier::visitStoreInst(StoreInst *i) {
   }
 
   return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                               UseLifetimeConstraint::MustBeInvalidated);
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 OperandOwnershipKindMap
@@ -796,7 +798,7 @@ OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
   // Consumes the closure parameter.
   if (getValue() == i->getClosure()) {
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
-                                 UseLifetimeConstraint::MustBeInvalidated);
+                                 UseLifetimeConstraint::LifetimeEnding);
   }
 
   return Map::allLive();
@@ -824,8 +826,8 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitKeyPathInst(KeyPathInst *I) {
   // KeyPath moves the value in memory out of address operands, but the
   // ownership checker doesn't reason about that yet.
-  return Map::compatibilityMap(
-       ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::LifetimeEnding);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1017,9 +1019,9 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
-CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, MustBeLive, CancelAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, COWBufferForReading)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, CancelAsyncTask)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

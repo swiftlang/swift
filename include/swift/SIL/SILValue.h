@@ -63,15 +63,16 @@ static inline llvm::hash_code hash_value(ValueKind K) {
 /// What constraint does the given use of an SSA value put on the lifetime of
 /// the given SSA value.
 ///
-/// There are two possible constraints: MustBeLive and
-/// MustBeInvalidated. MustBeLive means that the SSA value must be able to be
-/// used in a valid way at the given use point. MustBeInvalidated means that any
-/// use of given SSA value after this instruction on any path through this
-/// instruction.
+/// There are two possible constraints: NonLifetimeEnding and
+/// LifetimeEnding. NonLifetimeEnding means that the SSA value must be
+/// able to be used in a valid way at the given use
+/// point. LifetimeEnding means that the value has been invalidated at
+/// the given use point and any uses reachable from that point are
+/// invalid in SIL causing a SIL verifier error.
 enum class UseLifetimeConstraint {
   /// This use requires the SSA value to be live after the given instruction's
   /// execution.
-  MustBeLive,
+  NonLifetimeEnding,
 
   /// This use invalidates the given SSA value.
   ///
@@ -81,7 +82,7 @@ enum class UseLifetimeConstraint {
   /// guaranteed (i.e. shared borrow) semantics this means that the program
   /// has left the scope of the borrowed SSA value and said value can not be
   /// used.
-  MustBeInvalidated,
+  LifetimeEnding,
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -174,9 +175,9 @@ struct ValueOwnershipKind {
     case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
-      return UseLifetimeConstraint::MustBeLive;
+      return UseLifetimeConstraint::NonLifetimeEnding;
     case ValueOwnershipKind::Owned:
-      return UseLifetimeConstraint::MustBeInvalidated;
+      return UseLifetimeConstraint::LifetimeEnding;
     }
     llvm_unreachable("covered switch");
   }
@@ -523,7 +524,8 @@ struct OperandOwnershipKindMap {
       if (ValueOwnershipKind(index) == kind) {
         continue;
       }
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+      map.add(ValueOwnershipKind(index),
+              UseLifetimeConstraint::NonLifetimeEnding);
     }
     return map;
   }
@@ -548,7 +550,8 @@ struct OperandOwnershipKindMap {
     unsigned index = 0;
     unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
     while (index != end) {
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+      map.add(ValueOwnershipKind(index),
+              UseLifetimeConstraint::NonLifetimeEnding);
       ++index;
     }
     return map;
@@ -574,7 +577,7 @@ struct OperandOwnershipKindMap {
 
   void addCompatibilityConstraint(ValueOwnershipKind kind,
                                   UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding);
     add(kind, constraint);
   }
 
@@ -704,7 +707,7 @@ public:
       return false;
     auto map = getOwnershipKindMap();
     auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
-    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+    return constraint == UseLifetimeConstraint::LifetimeEnding;
   }
 
   SILBasicBlock *getParentBlock() const;
