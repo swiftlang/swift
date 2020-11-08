@@ -164,10 +164,12 @@ static int run_driver(StringRef ExecName,
   if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
     newDriverName = driverNameOp.getValue();
   }
-
+  auto disallowForwarding = llvm::find_if(argv, [](const char* arg) {
+    return StringRef(arg) == "-disallow-use-new-driver";
+  }) != argv.end();
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
-  if (!newDriverName.empty() &&
+  if (!newDriverName.empty() && !disallowForwarding &&
       (ExecName == "swift" || ExecName == "swiftc")) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
     llvm::sys::path::append(NewDriverPath, newDriverName);
