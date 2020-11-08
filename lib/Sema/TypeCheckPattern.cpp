@@ -1703,6 +1703,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
         }
 
         ty = computeWrappedValueType(param, ty);
+        param->getPropertyWrapperWrappedValueVar()->setInterfaceType(ty);
       }
 
       param->setInterfaceType(ty->mapTypeOutOfContext());
