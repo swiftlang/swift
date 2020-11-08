@@ -2886,5 +2886,8 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
       });
 
   // Then merge all of our ownership kinds. Assert if we fail to merge.
-  ownershipKind = *ValueOwnershipKind::merge(ownershipKindRange);
+  ownershipKind = ValueOwnershipKind::merge(ownershipKindRange);
+  assert(ownershipKind != ValueOwnershipKind::Invalid &&
+         "Conflicting ownership kinds when creating term inst from function "
+         "result info?!");
 }

@@ -496,6 +496,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // Owned values need to be destroyed.
   for (auto arg : valuesToCleanup) {
     switch (arg.getOwnershipKind()) {
+    case ValueOwnershipKind::Invalid:
+      llvm_unreachable("Invalid ownership kind?!");
     case ValueOwnershipKind::Guaranteed:
       builder.emitEndBorrowOperation(loc, arg);
       break;
