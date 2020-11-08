@@ -21,7 +21,13 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/GraphTraits.h"
+
+#if defined(__has_include)
+#if __has_include("llvm/Support/CfgTraits.h")
 #include "llvm/Support/CfgTraits.h"
+#define SWIFT_LLVM_HAS_CFGTRAITS_H
+#endif
+#endif
 
 namespace llvm {
 
@@ -121,6 +127,8 @@ template <> struct GraphTraits<Inverse<swift::SILFunction*> >
   static unsigned size(GraphType F) { return F.Graph->size(); }
 };
 
+#ifdef SWIFT_LLVM_HAS_CFGTRAITS_H
+
 class SILCfgTraitsBase : public CfgTraitsBase {
 public:
   using ParentType = swift::SILFunction;
@@ -209,6 +217,8 @@ public:
 template <> struct CfgTraitsFor<swift::SILBasicBlock> {
   using CfgTraits = SILCfgTraits;
 };
+
+#endif
 
 } // end llvm namespace
 

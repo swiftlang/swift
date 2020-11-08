@@ -467,10 +467,16 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OMPIterator:
       return OmissionTypeName();
 
-    // SVE builtin types that don't have Swift equivalents.
+    // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) \
     case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+      return OmissionTypeName();
+
+    // PPC MMA builtin types that don't have Swift equivalents.
+#define PPC_MMA_VECTOR_TYPE(Name, Id, Size) \
+    case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
       return OmissionTypeName();
     }
   }
