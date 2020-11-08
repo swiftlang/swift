@@ -5328,6 +5328,12 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
+  /// The overload sets that have already been resolved along the current path.
+  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
+  getResolvedOverloads() const {
+    return ResolvedOverloads;
+  }
+
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
   void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
