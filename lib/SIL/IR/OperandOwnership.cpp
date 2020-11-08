@@ -476,7 +476,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // merge in a forwarding context.
   if (!mergedKind)
     return Map();
-  auto kind = mergedKind.getValue();
+  auto kind = mergedKind;
   if (kind == ValueOwnershipKind::None)
     return Map::allLive();
   auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
@@ -537,11 +537,10 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.
-  auto mergedBase = ValueOwnershipKind::merge(ownershipKindRange);
-  if (!mergedBase)
+  auto base = ValueOwnershipKind::merge(ownershipKindRange);
+  if (!base)
     return Map();
 
-  auto base = *mergedBase;
   return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
 }
 

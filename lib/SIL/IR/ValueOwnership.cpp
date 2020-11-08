@@ -225,7 +225,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get().getOwnershipKind();
       }));
 
-  if (!mergedValue.hasValue()) {
+  if (!mergedValue) {
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return None for staging purposes. If SILOwnership is enabled, then
     // we must assert!
@@ -235,7 +235,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return mergedValue.getValue();
+  return mergedValue;
 }
 
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
@@ -341,7 +341,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return *mergedOwnershipKind;
+  return mergedOwnershipKind;
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {

@@ -198,6 +198,8 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
 StringRef ValueOwnershipKind::asString() const {
   switch (Value) {
+  case ValueOwnershipKind::Invalid:
+    return "invalid";
   case ValueOwnershipKind::Unowned:
     return "unowned";
   case ValueOwnershipKind::Owned:
@@ -215,21 +217,21 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os << kind.asString();
 }
 
-Optional<ValueOwnershipKind>
-ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
-  auto LHSVal = Value;
-  auto RHSVal = RHS.Value;
+ValueOwnershipKind ValueOwnershipKind::merge(ValueOwnershipKind rhs) const {
+  auto lhsVal = Value;
+  auto rhsVal = rhs.Value;
 
-  // Any merges with anything.
-  if (LHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(RHSVal);
+  // None merges with anything.
+  if (lhsVal == ValueOwnershipKind::None) {
+    return ValueOwnershipKind(rhsVal);
   }
-  // Any merges with anything.
-  if (RHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(LHSVal);
+  // None merges with anything.
+  if (rhsVal == ValueOwnershipKind::None) {
+    return ValueOwnershipKind(lhsVal);
   }
 
-  return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : llvm::None;
+  return (lhsVal == rhsVal) ? *this
+                            : ValueOwnershipKind(ValueOwnershipKind::Invalid);
 }
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S) {

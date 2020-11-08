@@ -487,6 +487,8 @@ bool SILValueOwnershipChecker::gatherUsers(
 bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     SILFunctionArgument *arg) {
   switch (arg->getOwnershipKind()) {
+  case ValueOwnershipKind::Invalid:
+    llvm_unreachable("Invalid ownership kind used?!");
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
   case ValueOwnershipKind::None:
@@ -507,6 +509,8 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
 bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     BeginApplyResult *yield, ArrayRef<Operand *> regularUses) {
   switch (yield->getOwnershipKind()) {
+  case ValueOwnershipKind::Invalid:
+    llvm_unreachable("Invalid ownership kind used?!");
   case ValueOwnershipKind::Unowned:
   case ValueOwnershipKind::None:
     return true;
