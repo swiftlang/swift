@@ -33,11 +33,12 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 sil hidden [ossa] @launch_task : $@convention(method) @async (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed () -> (@error Error)) -> () {
 bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed () -> (@error Error)):
   %3 = begin_borrow %1 : $Optional<Builtin.NativeObject>
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_f
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
   // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]]
-  // CHECK-NEXT: store %swift.refcounted* %{{.*}}, %swift.refcounted** [[CONTEXT_INFO_LOC]]
+  // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
   %20 = builtin "createAsyncTask"(%0 : $Int, %3 : $Optional<Builtin.NativeObject>, %2 : $@async @callee_guaranteed () -> (@error Error)) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %3 : $Optional<Builtin.NativeObject>
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
