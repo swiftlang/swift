@@ -4573,7 +4573,7 @@ private:
                                         ConstraintLocatorBuilder locator);
 
   /// Simplify an equality constraint between result and base types of
-  /// a unresolved member chain.
+  /// an unresolved member chain.
   SolutionKind simplifyUnresolvedMemberChainBaseConstraint(
       Type first, Type second, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);

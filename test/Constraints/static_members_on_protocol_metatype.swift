@@ -37,9 +37,11 @@ extension P {
 
 _ = P.property // Ok
 _ = P.property.other // Ok
+_ = P.fnProp // Ok
 _ = P.fnProp() // Ok
 _ = P.fnProp().other // Ok
 _ = P.method() // Ok
+_ = P.method   // Ok (partial application)
 _ = P.method().other // Ok
 _ = P.genericFn(42) // Ok
 _ = P.genericFn(42).other // Ok
@@ -50,8 +52,10 @@ _ = P[t: 42].other // Ok
 
 let _: S = P.property // Ok
 let _: S = P.property.other // Ok
+let _: () -> S = P.fnProp
 let _: S = P.fnProp() // Ok
 let _: S = P.fnProp().other // Ok
+let _: () -> S = P.method // Ok
 let _: S = P.method() // Ok
 let _: S = P.method().other // Ok
 let _: G<Int> = P.genericFn(42) // Ok
@@ -113,7 +117,7 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 extension P {
   static var invalidProp: Int { 42 } // expected-note 5 {{'invalidProp' declared here}}
   static var selfProp: Self { fatalError() }
-  static func invalidMethod() -> Int { 42 } // expected-note 5 {{'invalidMethod()' declared here}}
+  static func invalidMethod() -> Int { 42 } // expected-note 6 {{'invalidMethod()' declared here}}
   static func generic<T>(_: T) -> T { fatalError() } // expected-note 5 {{'generic' declared here}}
   static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note 3 {{'genericWithReqs' declared here}} expected-note 3 {{required by static method 'genericWithReqs' where 'T' = '()'}}
     fatalError()
@@ -129,6 +133,8 @@ _ = P.invalidProp
 _ = P.invalidProp.other
 // expected-error@-1 {{cannot reference static property 'invalidProp' on 'P.Protocol' with non-conforming result type 'Int'}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
+_ = P.invalidMethod // Partial application with an invalid base type
+// expected-error@-1 {{cannot reference static method 'invalidMethod()' on 'P.Protocol' with non-conforming result type 'Int'}}
 _ = P.invalidMethod()
 // expected-error@-1 {{cannot reference static method 'invalidMethod()' on 'P.Protocol' with non-conforming result type 'Int'}}
 _ = P.invalidMethod().other
