@@ -73,12 +73,6 @@ public:
     return getOwnershipKind() == ValueOwnershipKind::None;
   }
 
-  OperandOwnershipKindMap visitForwardingInst(SILInstruction *i,
-                                              ArrayRef<Operand> ops);
-  OperandOwnershipKindMap visitForwardingInst(SILInstruction *i) {
-    return visitForwardingInst(i, i->getAllOperands());
-  }
-
   OperandOwnershipKindMap
   visitApplyParameter(ValueOwnershipKind requiredConvention,
                       UseLifetimeConstraint requirement);
@@ -299,38 +293,12 @@ ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
-OperandOwnershipKindMap
-OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
-                                                    ArrayRef<Operand> ops) {
-  assert(i->getNumOperands() && "Expected to have non-zero operands");
-  assert(isOwnershipForwardingInst(i) &&
-         "Expected to have an ownership forwarding inst");
-
-  // Merge all of the ownership of our operands. If we get back a .none from the
-  // merge, then we return an empty compatibility map. This ensures that we will
-  // not be compatible with /any/ input triggering a special error in the
-  // ownership verifier.
-  Optional<ValueOwnershipKind> optionalKind =
-      ValueOwnershipKind::merge(makeOptionalTransformRange(
-          ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
-            if (i->isTypeDependentOperand(op))
-              return None;
-            return op.get().getOwnershipKind();
-          }));
-  if (!optionalKind)
-    return Map();
-
-  auto kind = optionalKind.getValue();
-  if (kind == ValueOwnershipKind::None)
-    return Map::allLive();
-  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
-  return Map::compatibilityMap(kind, lifetimeConstraint);
-}
-
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    return visitForwardingInst(i);                                             \
+    auto kind = i->getOwnershipKind();                                         \
+    auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();          \
+    return Map::compatibilityMap(kind, lifetimeConstraint);                    \
   }
 FORWARD_ANY_OWNERSHIP_INST(Tuple)
 FORWARD_ANY_OWNERSHIP_INST(Struct)
@@ -348,24 +316,9 @@ FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
 FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedValueCast)
+FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
+FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 #undef FORWARD_ANY_OWNERSHIP_INST
-
-// Temporary implementation for staging purposes.
-OperandOwnershipKindMap
-OperandOwnershipKindClassifier::visitDestructureStructInst(
-    DestructureStructInst *dsi) {
-  auto kind = dsi->getOwnershipKind();
-  auto constraint = kind.getForwardingLifetimeConstraint();
-  return {kind, constraint};
-}
-
-OperandOwnershipKindMap
-OperandOwnershipKindClassifier::visitDestructureTupleInst(
-    DestructureTupleInst *dsi) {
-  auto kind = dsi->getOwnershipKind();
-  auto constraint = kind.getForwardingLifetimeConstraint();
-  return {kind, constraint};
-}
 
 // An instruction that forwards a constant ownership or trivial ownership.
 #define FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP,                     \
@@ -410,7 +363,9 @@ OperandOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *i) {
     return Map::allLive();
   }
 
-  return visitForwardingInst(i, i->getAllOperands().drop_front());
+  auto kind = i->getOwnershipKind();
+  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
