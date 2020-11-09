@@ -177,7 +177,7 @@ void BorrowingOperand::visitLocalEndScopeInstructions(
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         func(use);
       }
     }
@@ -248,7 +248,7 @@ void BorrowingOperand::visitUserResultConsumingUses(
   if (!ti) {
     for (SILValue result : op->getUser()->getResults()) {
       for (auto *use : result->getUses()) {
-        if (use->isConsumingUse()) {
+        if (use->isLifetimeEnding()) {
           visitor(use);
         }
       }
@@ -259,7 +259,7 @@ void BorrowingOperand::visitUserResultConsumingUses(
   for (auto *succBlock : ti->getSuccessorBlocks()) {
     auto *arg = succBlock->getArgument(op->getOperandNumber());
     for (auto *use : arg->getUses()) {
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         visitor(use);
       }
     }
@@ -311,8 +311,8 @@ void BorrowedValue::getLocalScopeEndingInstructions(
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
-      if (use->isConsumingUse()) {
-	scopeEndingInsts.push_back(use->getUser());
+      if (use->isLifetimeEnding()) {
+        scopeEndingInsts.push_back(use->getUser());
       }
     }
     return;
@@ -330,7 +330,7 @@ void BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::BeginBorrow:
   case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         visitor(use);
       }
     }
@@ -385,7 +385,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
   SmallVector<Operand *, 32> worklist;
   SmallPtrSet<Operand *, 16> beenInWorklist;
   for (auto *use : value->getUses()) {
-    if (!use->isConsumingUse())
+    if (!use->isLifetimeEnding())
       continue;
     worklist.push_back(use);
     beenInWorklist.insert(use);
@@ -394,7 +394,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
   bool foundError = false;
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
-    assert(op->isConsumingUse() && "Expected only consuming uses");
+    assert(op->isLifetimeEnding() && "Expected only consuming uses");
 
     // See if we have a borrow scope operand. If we do not, then we know we are
     // a final consumer of our borrow scope introducer. Visit it and continue.
@@ -406,7 +406,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
 
     scopeOperand->visitConsumingUsesOfBorrowIntroducingUserResults(
         [&](Operand *op) {
-          assert(op->isConsumingUse() && "Expected only consuming uses");
+          assert(op->isLifetimeEnding() && "Expected only consuming uses");
           // Make sure we haven't visited this consuming operand yet. If we
           // have, signal an error and bail without re-visiting the operand.
           if (!beenInWorklist.insert(op).second) {
