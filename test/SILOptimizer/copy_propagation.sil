@@ -166,15 +166,18 @@ bb0(%arg : @owned $T, %addr : $*T):
 // CHECK-LABEL: } // end sil function 'testDestroyEdge'
 sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
 bb0(%arg : @owned $T, %addr : $*T, %z : $Builtin.Int1):
-  cond_br %z, bb1, bb2
+  cond_br %z, bb2, bb1
 
 bb1:
+  br bb3
+
+bb2:
   debug_value %arg : $T
   %copy = copy_value %arg : $T
   destroy_value %copy : $T
-  br bb2
+  br bb3
 
-bb2:
+bb3:
   destroy_value %arg : $T
   %10 = tuple ()
   return %10 : $()
