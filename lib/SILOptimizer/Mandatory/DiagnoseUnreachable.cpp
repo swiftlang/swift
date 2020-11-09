@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-diagnose-unreachable"
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -20,6 +21,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -27,6 +29,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
@@ -194,15 +197,15 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
 static bool constantFoldEnumTerminator(SILBasicBlock &BB,
                                        UnreachableUserCodeReportingState *State,
-                                       SwitchEnumInstBase *SUI,
+                                       SwitchEnumTermInst SUI,
                                        EnumElementDecl *TheEnumElem,
                                        EnumInst *EnumInst) {
   SILBasicBlock *TheSuccessorBlock = nullptr;
   int ReachableBlockIdx = -1;
-  for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+  for (unsigned Idx = 0; Idx < SUI.getNumCases(); ++Idx) {
     const EnumElementDecl *EI;
     SILBasicBlock *BI;
-    std::tie(EI, BI) = SUI->getCase(Idx);
+    std::tie(EI, BI) = SUI.getCase(Idx);
     if (EI == TheEnumElem) {
       TheSuccessorBlock = BI;
       ReachableBlockIdx = Idx;
@@ -212,11 +215,11 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
 
   SILBasicBlock *DB = nullptr;
   if (!TheSuccessorBlock) {
-    if (SUI->hasDefault()) {
-      DB = SUI->getDefaultBB();
+    if (SUI.hasDefault()) {
+      DB = SUI.getDefaultBB();
       if (!isa<UnreachableInst>(DB->getTerminator())) {
         TheSuccessorBlock = DB;
-        ReachableBlockIdx = SUI->getNumCases();
+        ReachableBlockIdx = SUI.getNumCases();
       }
     }
   }
@@ -253,15 +256,15 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
     // Find the first unreachable block in the switch so that we could use
     // it for better diagnostics.
     SILBasicBlock *UnreachableBlock = nullptr;
-    if (SUI->getNumCases() > 1) {
+    if (SUI.getNumCases() > 1) {
       // More than one case.
-      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getCase(1).second
-                                                  : SUI->getCase(0).second;
+      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI.getCase(1).second
+                                                  : SUI.getCase(0).second;
     } else {
-      if (SUI->getNumCases() == 1 && SUI->hasDefault()) {
+      if (SUI.getNumCases() == 1 && SUI.hasDefault()) {
         // One case and a default.
-        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getDefaultBB()
-                                                    : SUI->getCase(0).second;
+        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI.getDefaultBB()
+                                                    : SUI.getCase(0).second;
       }
     }
 
@@ -275,7 +278,7 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
     }
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
+  LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << **SUI);
   recursivelyDeleteTriviallyDeadInstructions(SUI, true);
   ++NumTerminatorsFolded;
   return true;
@@ -283,13 +286,13 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
 
 static bool constantFoldEnumAddrTerminator(
     SILBasicBlock &BB, UnreachableUserCodeReportingState *State,
-    SwitchEnumInstBase *SUI, const EnumElementDecl *TheEnumElem) {
+    SwitchEnumTermInst SUI, const EnumElementDecl *TheEnumElem) {
   SILBasicBlock *TheSuccessorBlock = nullptr;
   int ReachableBlockIdx = -1;
-  for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+  for (unsigned Idx = 0; Idx < SUI.getNumCases(); ++Idx) {
     const EnumElementDecl *EI;
     SILBasicBlock *BI;
-    std::tie(EI, BI) = SUI->getCase(Idx);
+    std::tie(EI, BI) = SUI.getCase(Idx);
     if (EI == TheEnumElem) {
       TheSuccessorBlock = BI;
       ReachableBlockIdx = Idx;
@@ -299,11 +302,11 @@ static bool constantFoldEnumAddrTerminator(
 
   SILBasicBlock *DB = nullptr;
   if (!TheSuccessorBlock) {
-    if (SUI->hasDefault()) {
-      DB = SUI->getDefaultBB();
+    if (SUI.hasDefault()) {
+      DB = SUI.getDefaultBB();
       if (!isa<UnreachableInst>(DB->getTerminator())) {
         TheSuccessorBlock = DB;
-        ReachableBlockIdx = SUI->getNumCases();
+        ReachableBlockIdx = SUI.getNumCases();
       }
     }
   }
@@ -328,15 +331,15 @@ static bool constantFoldEnumAddrTerminator(
     // Find the first unreachable block in the switch so that we could use
     // it for better diagnostics.
     SILBasicBlock *UnreachableBlock = nullptr;
-    if (SUI->getNumCases() > 1) {
+    if (SUI.getNumCases() > 1) {
       // More than one case.
-      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getCase(1).second
-                                                  : SUI->getCase(0).second;
+      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI.getCase(1).second
+                                                  : SUI.getCase(0).second;
     } else {
-      if (SUI->getNumCases() == 1 && SUI->hasDefault()) {
+      if (SUI.getNumCases() == 1 && SUI.hasDefault()) {
         // One case and a default.
-        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getDefaultBB()
-                                                    : SUI->getCase(0).second;
+        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI.getDefaultBB()
+                                                    : SUI.getCase(0).second;
       }
     }
 

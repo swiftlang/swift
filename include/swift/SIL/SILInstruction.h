@@ -40,6 +40,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -7318,6 +7319,20 @@ public:
   }
 };
 
+class OwnershipForwardingTermInst : public TermInst {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingTermInst(SILInstructionKind kind,
+                              SILDebugLocation debugLoc,
+                              ValueOwnershipKind ownershipKind)
+      : TermInst(kind, debugLoc), ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+  void setOwnershipKind(ValueOwnershipKind newKind) { ownershipKind = newKind; }
+};
+
 /// UnreachableInst - Position in the code which would be undefined to reach.
 /// These are always implicitly generated, e.g. when falling off the end of a
 /// function or after a no-return function call.
@@ -7806,9 +7821,9 @@ public:
   }
 };
 
-/// Common implementation for the switch_enum and
-/// switch_enum_addr instructions.
-class SwitchEnumInstBase : public TermInst {
+/// Common implementation for the switch_enum and switch_enum_addr instructions.
+template <typename BaseTy>
+class SwitchEnumInstBase : public BaseTy {
   FixedOperandList<1> Operands;
 
   // Tail-allocated after the SwitchEnumInst record are:
@@ -7837,48 +7852,97 @@ class SwitchEnumInstBase : public TermInst {
   }
 
 protected:
+  template <typename... Rest>
   SwitchEnumInstBase(
       SILInstructionKind Kind, SILDebugLocation DebugLoc, SILValue Operand,
       SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount);
+      Optional<ArrayRef<ProfileCounter>> Counts, ProfileCounter DefaultCount,
+      Rest &&... rest)
+      : BaseTy(Kind, DebugLoc, std::forward<Rest>(rest)...),
+        Operands(this, Operand) {
+    SILInstruction::Bits.SEIBase.HasDefault = bool(DefaultBB);
+    SILInstruction::Bits.SEIBase.NumCases = CaseBBs.size();
+    // Initialize the case and successor arrays.
+    auto *cases = getCaseBuf();
+    auto *succs = getSuccessorBuf();
+    for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
+      cases[i] = CaseBBs[i].first;
+      if (Counts) {
+        ::new (succs + i)
+            SILSuccessor(this, CaseBBs[i].second, Counts.getValue()[i]);
+      } else {
+        ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+      }
+    }
 
-  template <typename SWITCH_ENUM_INST>
+    if (hasDefault()) {
+      ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB, DefaultCount);
+    }
+  }
+
+  template <typename SWITCH_ENUM_INST, typename... RestTys>
   static SWITCH_ENUM_INST *createSwitchEnum(
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
       SILFunction &F, Optional<ArrayRef<ProfileCounter>> Counts,
-      ProfileCounter DefaultCount);
+      ProfileCounter DefaultCount, RestTys &&... restArgs);
 
 public:
   /// Clean up tail-allocated successor records for the switch cases.
-  ~SwitchEnumInstBase();
+  ~SwitchEnumInstBase() {
+    // Destroy the successor records to keep the CFG up to date.
+    auto *succs = getSuccessorBuf();
+    for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
+      succs[i].~SILSuccessor();
+    }
+  }
 
   SILValue getOperand() const { return Operands[0].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  SuccessorListTy getSuccessors() {
+  TermInst::SuccessorListTy getSuccessors() {
     return MutableArrayRef<SILSuccessor>{getSuccessorBuf(),
                            static_cast<size_t>(getNumCases() + hasDefault())};
   }
 
-  unsigned getNumCases() const {
-    return SILInstruction::Bits.SwitchEnumInstBase.NumCases;
-  }
+  unsigned getNumCases() const { return SILInstruction::Bits.SEIBase.NumCases; }
+
   std::pair<EnumElementDecl*, SILBasicBlock*>
   getCase(unsigned i) const {
     assert(i < getNumCases() && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
+
   ProfileCounter getCaseCount(unsigned i) const {
     assert(i < getNumCases() && "case out of bounds");
     return getSuccessorBuf()[i].getCount();
   }
 
   // Swap the cases at indices \p i and \p j.
-  void swapCase(unsigned i, unsigned j);
+  void swapCase(unsigned i, unsigned j) {
+    assert(i < getNumCases() && "First index is out of bounds?!");
+    assert(j < getNumCases() && "Second index is out of bounds?!");
+
+    auto *succs = getSuccessorBuf();
+
+    // First grab our destination blocks.
+    SILBasicBlock *iBlock = succs[i].getBB();
+    SILBasicBlock *jBlock = succs[j].getBB();
+
+    // Then destroy the sil successors and reinitialize them with the new things
+    // that they are pointing at.
+    succs[i].~SILSuccessor();
+    ::new (succs + i) SILSuccessor(this, jBlock);
+    succs[j].~SILSuccessor();
+    ::new (succs + j) SILSuccessor(this, iBlock);
+
+    // Now swap our cases.
+    auto *cases = getCaseBuf();
+    std::swap(cases[i], cases[j]);
+  }
 
   /// Return the block that will be branched to on the specified enum
   /// case.
@@ -7893,22 +7957,69 @@ public:
   }
 
   /// If the default refers to exactly one case decl, return it.
-  NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
+  NullablePtr<EnumElementDecl> getUniqueCaseForDefault() {
+    auto enumValue = getOperand();
+    SILType enumType = enumValue->getType();
+
+    auto *f = SILInstruction::getFunction();
+    if (!enumType.isEffectivelyExhaustiveEnumType(f))
+      return nullptr;
+
+    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    assert(decl && "switch_enum operand is not an enum");
+
+    SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
+    for (auto elt : decl->getAllElements())
+      unswitchedElts.insert(elt);
+
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCase(i);
+      unswitchedElts.erase(Entry.first);
+    }
+
+    if (unswitchedElts.size() == 1)
+      return *unswitchedElts.begin();
+
+    return nullptr;
+  }
 
   /// If the given block only has one enum element decl matched to it,
   /// return it.
-  NullablePtr<EnumElementDecl> getUniqueCaseForDestination(SILBasicBlock *BB);
+  NullablePtr<EnumElementDecl>
+  getUniqueCaseForDestination(SILBasicBlock *block) {
+    SILValue value = getOperand();
+    SILType enumType = value->getType();
+    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    assert(decl && "switch_enum operand is not an enum");
+    (void)decl;
 
-  bool hasDefault() const {
-    return SILInstruction::Bits.SwitchEnumInstBase.HasDefault;
+    EnumElementDecl *eltDecl = nullptr;
+    for (unsigned i : range(getNumCases())) {
+      auto entry = getCase(i);
+      if (entry.second == block) {
+        if (eltDecl != nullptr)
+          return nullptr;
+        eltDecl = entry.first;
+      }
+    }
+    if (!eltDecl && hasDefault() && getDefaultBB() == block) {
+      return getUniqueCaseForDefault();
+    }
+    return eltDecl;
   }
+
+  bool hasDefault() const { return SILInstruction::Bits.SEIBase.HasDefault; }
 
   SILBasicBlock *getDefaultBB() const {
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()];
   }
 
-  NullablePtr<SILBasicBlock> getDefaultBBOrNull() const;
+  NullablePtr<SILBasicBlock> getDefaultBBOrNull() const {
+    if (!hasDefault())
+      return nullptr;
+    return getDefaultBB();
+  }
 
   ProfileCounter getDefaultCount() const {
     assert(hasDefault() && "doesn't have a default");
@@ -7925,7 +8036,7 @@ public:
 /// passed into the corresponding destination block as an argument.
 class SwitchEnumInst
     : public InstructionBase<SILInstructionKind::SwitchEnumInst,
-                             SwitchEnumInstBase> {
+                             SwitchEnumInstBase<OwnershipForwardingTermInst>> {
   friend SILBuilder;
 
 private:
@@ -7937,7 +8048,7 @@ private:
       Optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount)
       : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
-                        DefaultCount) {}
+                        DefaultCount, Operand.getOwnershipKind()) {}
   static SwitchEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
@@ -7948,7 +8059,7 @@ private:
 /// A switch on an enum's discriminator in memory.
 class SwitchEnumAddrInst
     : public InstructionBase<SILInstructionKind::SwitchEnumAddrInst,
-                             SwitchEnumInstBase> {
+                             SwitchEnumInstBase<TermInst>> {
   friend SILBuilder;
 
 private:
