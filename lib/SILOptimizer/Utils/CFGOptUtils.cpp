@@ -601,9 +601,10 @@ bool swift::hasCriticalEdges(SILFunction &f, bool onlyNonCondBr) {
     if (isa<BranchInst>(bb.getTerminator()))
       continue;
 
-    for (unsigned idx = 0, e = bb.getSuccessors().size(); idx != e; ++idx)
-      if (isCriticalEdge(bb.getTerminator(), idx))
+    for (SILBasicBlock *succBB : bb.getSuccessorBlocks()) {
+      if (!isNonCriticalEdge(&bb, succBB))
         return true;
+    }
   }
   return false;
 }

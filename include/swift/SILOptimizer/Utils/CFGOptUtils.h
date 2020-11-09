@@ -83,6 +83,11 @@ void replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
 
+inline bool isNonCriticalEdge(SILBasicBlock *predBB, SILBasicBlock *succBB) {
+  return predBB->getSingleSuccessorBlock() == succBB
+    || succBB->getSinglePredecessorBlock() == predBB;
+}
+
 /// Splits the edge from terminator if it is critical.
 ///
 /// Updates dominance information and loop information if not null.
