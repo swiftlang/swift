@@ -41,6 +41,7 @@ protocol MyFakeAnyObject : Klass {
 
 final class Klass {
   var base: Klass
+  let baseLet: Klass
 }
 
 extension Klass : MyFakeAnyObject {
@@ -2804,5 +2805,30 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %2 : ${ var Builtin.NativeObject }
+  unreachable
+}
+
+// Just make sure that we do not crash on this code and convert the 2nd load
+// [copy] to a load_borrow.
+//
+// CHECK-LABEL: sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK: load_borrow
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inproper_dead_end_block_crasher_test'
+sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = ref_element_addr %2 : $Klass, #Klass.baseLet
+  %4 = load [copy] %3 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %4 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
   unreachable
 }
