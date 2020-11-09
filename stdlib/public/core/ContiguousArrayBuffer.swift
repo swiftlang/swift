@@ -470,18 +470,17 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     nonmutating set {
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if (_COWChecksEnabled()) {
-          if newValue {
-            if capacity > 0 {
-              let wasImmutable = _swift_setImmutableCOWBuffer(_storage, true)
+          // Make sure to not modify the empty array singleton (which has a
+          // capacity of 0).
+          if capacity > 0 {
+            let wasImmutable = _swift_setImmutableCOWBuffer(_storage, newValue)
+            if newValue {
               _internalInvariant(!wasImmutable,
                 "re-setting immutable array buffer to immutable")
+            } else {
+              _internalInvariant(wasImmutable,
+                "re-setting mutable array buffer to mutable")
             }
-          } else {
-            _internalInvariant(capacity > 0,
-              "setting empty array buffer to mutable")
-             let wasImmutable = _swift_setImmutableCOWBuffer(_storage, false)
-            _internalInvariant(wasImmutable,
-              "re-setting mutable array buffer to mutable")
           }
         }
       }
@@ -698,7 +697,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Puts the buffer in an immutable state.
   ///
-  /// - Precondition: The buffer must be mutable.
+  /// - Precondition: The buffer must be mutable or the empty array singleton.
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.
