@@ -17,6 +17,7 @@
 // graph of the coroutine has a yield instruction before a return instruction.
 
 #define DEBUG_TYPE "yield-once-check"
+
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -24,6 +25,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -444,18 +446,18 @@ class YieldOnceCheck : public SILFunctionTransform {
       // For switch_enum instructions, report the case that doesn't yield.
       enum SwitchCaseKind { Default, OptionNil, OptionSome };
 
-      if (auto *switchEnum = dyn_cast<SwitchEnumInstBase>(conflictingBranch)) {
+      if (auto switchEnum = SwitchEnumTermInst(conflictingBranch)) {
         auto enumCaseLoc = noYieldTarget->begin()->getLoc().getSourceLoc();
 
-        if (switchEnum->hasDefault() &&
-            switchEnum->getDefaultBB() == noYieldTarget) {
+        if (switchEnum.hasDefault() &&
+            switchEnum.getDefaultBB() == noYieldTarget) {
           diagnose(astCtx, enumCaseLoc, diag::case_doesnt_yield, Default);
           return;
         }
 
         // Find the case identifier that doesn't yield.
         NullablePtr<EnumElementDecl> enumElemDecl =
-            switchEnum->getUniqueCaseForDestination(noYieldTarget);
+            switchEnum.getUniqueCaseForDestination(noYieldTarget);
         assert(enumElemDecl.isNonNull());
 
         // Specialize diagnostics for cases of an optional.

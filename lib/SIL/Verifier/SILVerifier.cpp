@@ -4280,6 +4280,13 @@ public:
           require(dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
+          if (!dest->getArgument(0)->getType().isTrivial(*SOI->getFunction())) {
+            require(
+                dest->getArgument(0)->getOwnershipKind().isCompatibleWith(
+                    SOI->getOwnershipKind()),
+                "Switch enum non-trivial destination arg must have ownership "
+                "kind that is compatible with the switch_enum's operand");
+          }
         } else {
           require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
@@ -4327,6 +4334,12 @@ public:
             SOI->getOperand()->getType(),
             "Switch enum default block should have one argument that is "
             "the same as the input type");
+        auto defaultKind =
+            SOI->getDefaultBB()->getArgument(0)->getOwnershipKind();
+        require(
+            defaultKind.isCompatibleWith(SOI->getOperand().getOwnershipKind()),
+            "Switch enum default block arg must have same ownership kind "
+            "as operand");
       } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
