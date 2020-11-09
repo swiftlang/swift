@@ -349,7 +349,7 @@
                 "swift": "tensorflow-0.12",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
-                "swift-tools-support-core": "0.1.8",
+                "swift-tools-support-core": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swift-argument-parser": "0.3.1",
                 "swift-driver": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
